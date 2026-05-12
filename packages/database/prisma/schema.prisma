@@ -1,0 +1,2252 @@
+// Bloqer 2.0 — Prisma schema
+// Tenant isolation:  docs/bloqer2.0/07-non-functional/MULTITENANCY.md
+// Money/decimal:     docs/bloqer2.0/03-finance/MONEY_MODEL.md
+// Audit fields:      docs/bloqer2.0/07-non-functional/AUDIT_AND_TRACEABILITY.md
+// Roles & RBAC:      docs/bloqer2.0/00-product/USER_ROLES.md + PERMISSIONS_MATRIX.md
+// ID strategy:       UUID v4 — ADR-Phase1-01
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+/// Internal SaaS lifecycle only — no sync with payment providers in Phase 10A.
+enum SubscriptionStatus {
+  NONE
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TenantInvitationStatus {
+  PENDING
+  ACCEPTED
+  CANCELLED
+  EXPIRED
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum JournalEntrySourceType {
+  MANUAL
+  SALES_INVOICE
+  COLLECTION
+  SUPPLIER_INVOICE
+  PAYMENT
+  INTERNAL_TRANSFER
+  STOCK_MOVEMENT
+  ADJUSTMENT
+  /// Treasury cash/bank inflow (AccountMovement INFLOW), distinct from Collection.
+  TREASURY_INFLOW
+  /// Treasury cash/bank outflow (AccountMovement OUTFLOW), distinct from Payment.
+  TREASURY_OUTFLOW
+}
+
+/// Drives `AccountingMappingRule.eventType` — which operational event selects the rule.
+enum AccountingMappingEventType {
+  COLLECTION_CONFIRMED
+  PAYMENT_CONFIRMED
+  TREASURY_INFLOW
+  TREASURY_OUTFLOW
+  TREASURY_TRANSFER
+  STOCK_CONSUMPTION
+  MANUAL_CAPITAL_CONTRIBUTION
+  MANUAL_OWNER_LOAN
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  FINANCE
+  PROCUREMENT
+  WAREHOUSE
+  SALES
+  VIEWER
+  PROJECT_MANAGER
+  SITE_FOREMAN
+  PROJECT_VIEWER
+}
+
+enum ContactStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum ContactRoleType {
+  CLIENT
+  SUPPLIER
+  SUBCONTRACTOR
+  EMPLOYEE
+  OTHER
+}
+
+enum ContactRoleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TaxIdType {
+  CUIT
+  CUIL
+  CDI
+  FOREIGN
+  FINAL_CONSUMER
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectType {
+  PUBLIC
+  PRIVATE
+}
+
+enum BudgetStatus {
+  DRAFT
+  IN_REVIEW
+  RETURNED_FOR_CHANGES
+  APPROVED
+  CLOSED
+  CANCELLED
+}
+
+enum WbsNodeType {
+  GROUP
+  ITEM
+}
+
+enum CostCategory {
+  MATERIAL
+  LABOR
+  EQUIPMENT
+  SUBCONTRACT
+  OTHER
+}
+
+enum CertificationStatus {
+  DRAFT
+  ISSUED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// BR-AUD-002: SalesInvoice is a legal document — immutable once ISSUED.
+// BR-CERT-007: no INVOICED status in Certification; check via SalesInvoice FK.
+enum SalesInvoiceStatus {
+  DRAFT
+  ISSUED
+  CANCELLED
+}
+
+// BR-AR-002: status derived from paidAmount vs originalAmount + dueDate.
+// PARTIAL/PAID/OVERDUE reserved for Collections phase.
+enum ReceivableStatus {
+  OPEN
+  PARTIAL
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+// ─── Treasury / Collections ───────────────────────────────────────────────────
+
+enum TreasuryAccountType {
+  BANK
+  CASH
+  DIGITAL_WALLET
+  OTHER
+}
+
+enum TreasuryAccountStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+}
+
+// INFLOW/TRANSFER_IN = +1 on balance; OUTFLOW/TRANSFER_OUT = -1.
+// ADJUSTMENT reserved; not exposed in UI for Phase 3C.
+enum AccountMovementType {
+  INFLOW
+  OUTFLOW
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+}
+
+// No DRAFT (movements created directly as CONFIRMED) and no RECONCILED (Phase 4).
+enum AccountMovementStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum AccountMovementSourceType {
+  COLLECTION
+  INTERNAL_TRANSFER
+  MANUAL_ADJUSTMENT
+  OPENING_BALANCE
+  PAYMENT
+}
+
+// AP — Accounts Payable
+
+// Document lifecycle only. PAID/OVERDUE belong to Payable.
+enum SupplierInvoiceStatus {
+  DRAFT
+  ISSUED
+  CANCELLED
+}
+
+// OVERDUE is computed on read (same pattern as ReceivableStatus / D5).
+enum PayableStatus {
+  OPEN
+  PARTIAL
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+// ─── Procurement ──────────────────────────────────────────────────────────────
+
+// BR-PUR-001: ISSUED PO commits cost (committed_amount layer).
+// BR-PUR-004: Receipt only allowed when PO is ISSUED or partially/fully received.
+// PARTIALLY_RECEIVED / RECEIVED are computed — set only via receipt confirm/cancel.
+enum PurchaseOrderStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+// CONFIRMED receipt increments receivedQuantity on PO lines.
+// CANCELLED receipt reverses exact quantities — no silent clamp.
+enum PurchaseReceiptStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum CollectionStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum InternalTransferStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+// ─── Jobsite Log ──────────────────────────────────────────────────────────────
+
+// BR-JL-001: one per day recommended, not enforced — multiple allowed (shifts, fronts, crews).
+enum JobsiteLogStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  CANCELLED
+}
+
+enum JobsiteLogIssueType {
+  INCIDENT
+  BLOCKER
+  SAFETY
+  OTHER
+}
+
+enum JobsiteLogIssueSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum JobsiteLogIssueStatus {
+  OPEN
+  RESOLVED
+  ESCALATED
+}
+
+// ─── Subcontracts ─────────────────────────────────────────────────────────────
+
+enum SubcontractStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// Mirrors CertificationStatus lifecycle on the AP side.
+// APPROVED creates SupplierInvoice DRAFT. REJECTED is terminal with no effects.
+// CANCELLED reverses only if previously APPROVED and linked SupplierInvoice is still DRAFT.
+enum SubcontractCertificationStatus {
+  DRAFT
+  ISSUED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// ─── Inventory ────────────────────────────────────────────────────────────────
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum WarehouseStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+}
+
+enum WarehouseType {
+  CENTRAL
+  PROJECT
+  TEMPORARY
+  OTHER
+}
+
+// IN/OUT affect balance. TRANSFER_IN/TRANSFER_OUT paired for warehouse transfers (Phase 4D+).
+// ADJUSTMENT reserved but not exposed in Phase 4C UI.
+enum StockMovementType {
+  IN
+  OUT
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+}
+
+enum StockMovementSourceType {
+  PURCHASE_RECEIPT
+  CONSUMPTION
+  TRANSFER
+  ADJUSTMENT
+  OPENING_BALANCE
+}
+
+// No DRAFT — movements are created directly as CONFIRMED or CANCELLED.
+enum StockMovementStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum WarehouseTransferStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+// ─── Auth.js v5 adapter tables ────────────────────────────────────────────────
+
+model User {
+  id            String     @id @default(uuid())
+  name          String?
+  email         String     @unique
+  emailVerified DateTime?
+  image         String?
+  status        UserStatus @default(INVITED)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  accounts    Account[]
+  sessions    Session[]
+  memberships UserMembership[]
+  auditLogs   AuditLog[]
+  notificationsReceived Notification[] @relation("NotificationRecipient")
+  platformAdmin         PlatformAdmin?
+  platformAuditsPerformed PlatformAuditLog[] @relation("PlatformAuditActor")
+  invitationsSent       TenantInvitation[] @relation("TenantInvitationInvitedBy")
+  invitationsAccepted   TenantInvitation[] @relation("TenantInvitationAcceptedBy")
+  journalEntriesCreated  JournalEntry[]     @relation("JournalEntryCreatedBy")
+  journalEntriesUpdated  JournalEntry[]     @relation("JournalEntryUpdatedBy")
+
+  @@map("users")
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── Tenant & company ─────────────────────────────────────────────────────────
+
+model Tenant {
+  id           String       @id @default(uuid())
+  name         String
+  slug         String       @unique
+  status       TenantStatus @default(ACTIVE)
+  fiscalId     String?
+  timezone     String       @default("America/Argentina/Buenos_Aires")
+  baseCurrency String       @default("ARS")
+  /// SaaS plan slug (internal); not a Stripe price id.
+  saasPlan                 String               @default("trial")
+  subscriptionStatus       SubscriptionStatus   @default(TRIAL)
+  trialEndsAt              DateTime?
+  billingCustomerId        String?              @db.VarChar(255)
+  suspendedReason          String?              @db.VarChar(512)
+  platformInternalNotes    String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  companies      Company[]
+  memberships    UserMembership[]
+  auditLogs      AuditLog[]
+  contacts       Contact[]
+  projects       Project[]
+  budgets        Budget[]
+  certifications    Certification[]
+  salesInvoices     SalesInvoice[]
+  receivables       Receivable[]
+  treasuryAccounts  TreasuryAccount[]
+  accountMovements  AccountMovement[]
+  collections       Collection[]
+  internalTransfers InternalTransfer[]
+  supplierInvoices  SupplierInvoice[]
+  payables          Payable[]
+  payments          Payment[]
+  purchaseOrders    PurchaseOrder[]
+  purchaseReceipts  PurchaseReceipt[]
+  products          Product[]
+  warehouses        Warehouse[]
+  stockMovements    StockMovement[]
+  subcontracts      Subcontract[]
+  subcontractCertifications SubcontractCertification[]
+  jobsiteLogs           JobsiteLog[]
+  warehouseTransfers    WarehouseTransfer[]
+  documentAttachments   DocumentAttachment[]
+  notifications         Notification[]
+  emailDeliveryLogs     EmailDeliveryLog[]
+  platformAuditLogs     PlatformAuditLog[] @relation("PlatformAuditTargetTenant")
+  tenantInvitations     TenantInvitation[]
+  accountingAccounts    AccountingAccount[]
+  journalEntries        JournalEntry[]
+  accountingMappingRules AccountingMappingRule[]
+  tenantModuleSettings    TenantModuleSetting[]
+
+  @@map("tenants")
+}
+
+/// Per-tenant enable/disable for product modules (`moduleKey` matches `PermissionModule` string in app code; validated in services, not Prisma enum).
+model TenantModuleSetting {
+  id            String   @id @default(uuid())
+  tenantId      String
+  moduleKey     String   @db.VarChar(64)
+  isEnabled     Boolean  @default(true)
+  internalNotes String?  @db.VarChar(2000)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, moduleKey])
+  @@index([tenantId])
+  @@map("tenant_module_settings")
+}
+
+/// Platform operators (separate from tenant RBAC). Grant/revoke via DB; env allowlist is additional OR path.
+model PlatformAdmin {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([active])
+  @@map("platform_admins")
+}
+
+/// Cross-tenant platform actions (append-only).
+model PlatformAuditLog {
+  id               String   @id @default(uuid())
+  actorUserId      String
+  action           String   @db.VarChar(128)
+  targetTenantId   String?
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  actor        User    @relation("PlatformAuditActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+  targetTenant Tenant? @relation("PlatformAuditTargetTenant", fields: [targetTenantId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([targetTenantId, createdAt])
+  @@map("platform_audit_logs")
+}
+
+model Company {
+  id        String        @id @default(uuid())
+  tenantId  String
+  name      String
+  legalName String?
+  fiscalId  String?
+  status    CompanyStatus @default(ACTIVE)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  memberships    UserMembership[]
+  projects       Project[]
+  budgets        Budget[]
+  certifications    Certification[]
+  salesInvoices     SalesInvoice[]
+  receivables       Receivable[]
+  treasuryAccounts  TreasuryAccount[]
+  collections       Collection[]
+  internalTransfers InternalTransfer[]
+  supplierInvoices  SupplierInvoice[]
+  payables          Payable[]
+  payments          Payment[]
+  purchaseOrders    PurchaseOrder[]
+  purchaseReceipts  PurchaseReceipt[]
+  products          Product[]
+  warehouses        Warehouse[]
+  stockMovements    StockMovement[]
+  subcontracts      Subcontract[]
+  subcontractCertifications SubcontractCertification[]
+  jobsiteLogs           JobsiteLog[]
+  warehouseTransfers    WarehouseTransfer[]
+  tenantInvitations     TenantInvitation[]
+  accountingAccounts    AccountingAccount[]
+  journalEntries        JournalEntry[]
+  accountingMappingRules AccountingMappingRule[]
+
+  @@index([tenantId])
+  @@map("companies")
+}
+
+// ─── RBAC ─────────────────────────────────────────────────────────────────────
+
+model UserMembership {
+  id        String           @id @default(uuid())
+  userId    String
+  tenantId  String
+  companyId String?
+  roles     UserRole[]
+  status    MembershipStatus @default(ACTIVE)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id])
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("user_memberships")
+}
+
+model TenantInvitation {
+  id               String                 @id @default(uuid())
+  tenantId         String
+  companyId        String?
+  email            String                 @db.VarChar(320)
+  roles            UserRole[]
+  status           TenantInvitationStatus @default(PENDING)
+  tokenHash        String                 @unique @db.VarChar(64)
+  expiresAt        DateTime
+  invitedByUserId  String
+  acceptedByUserId String?
+  acceptedAt       DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  invitedBy User     @relation("TenantInvitationInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  acceptedBy User?  @relation("TenantInvitationAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, email, status])
+  @@index([tenantId, status, expiresAt])
+  @@map("tenant_invitations")
+}
+
+// ─── Audit ────────────────────────────────────────────────────────────────────
+
+// Append-only: no updatedAt. actorUserId nullable for SYSTEM actions.
+model AuditLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  before      Json?
+  after       Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  actor  User?  @relation(fields: [actorUserId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, entityType, entityId])
+  @@map("audit_logs")
+}
+
+// ─── Directory ────────────────────────────────────────────────────────────────
+// See: docs/bloqer2.0/02-modules/DIRECTORY.md
+// BR-DIR-001: tax_id unique per tenant when non-null (Postgres allows multiple NULLs in unique index).
+
+model Contact {
+  id          String        @id @default(uuid())
+  tenantId    String
+  legalName   String
+  fantasyName String?
+  taxId       String?
+  taxIdType   TaxIdType?
+  address     String?
+  city        String?
+  province    String?
+  country     String        @default("AR")
+  phone       String?
+  email       String?
+  notes       String?
+  status      ContactStatus @default(ACTIVE)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tenant               Tenant                @relation(fields: [tenantId], references: [id])
+  roles                ContactRole[]
+  clientProfile        ClientProfile?
+  supplierProfile      SupplierProfile?
+  subcontractorProfile SubcontractorProfile?
+  projects             Project[]
+  salesInvoices        SalesInvoice[]
+  receivables          Receivable[]
+  collections          Collection[]
+  supplierInvoices     SupplierInvoice[]
+  payables             Payable[]
+  purchaseOrders       PurchaseOrder[]
+  purchaseReceipts     PurchaseReceipt[]
+  subcontracts         Subcontract[]         @relation("SubcontractSubcontractor")
+  subcontractCertifications SubcontractCertification[] @relation("SubcontractCertificationSubcontractor")
+  jobsiteLogLabors     JobsiteLogLabor[]
+  /// Accounts-payable payments (`payments` table); distinct from `payables` / treasury naming.
+  apPayments           Payment[]
+
+  @@unique([tenantId, taxId])
+  @@index([tenantId, status])
+  @@index([tenantId, legalName])
+  @@map("contacts")
+}
+
+model ContactRole {
+  id        String            @id @default(uuid())
+  contactId String
+  tenantId  String
+  role      ContactRoleType
+  status    ContactRoleStatus @default(ACTIVE)
+  notes     String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id])
+
+  @@unique([contactId, role])
+  @@index([tenantId, role, status])
+  @@map("contact_roles")
+}
+
+model ClientProfile {
+  id               String   @id @default(uuid())
+  contactId        String   @unique
+  creditLimit      Decimal? @db.Decimal(18, 2)
+  paymentTermsDays Int      @default(0)
+  defaultCurrency  String   @default("ARS")
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id])
+
+  @@map("client_profiles")
+}
+
+model SupplierProfile {
+  id               String   @id @default(uuid())
+  contactId        String   @unique
+  paymentTermsDays Int      @default(0)
+  defaultCurrency  String   @default("ARS")
+  bankAccount      String?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id])
+
+  @@map("supplier_profiles")
+}
+
+model SubcontractorProfile {
+  id        String   @id @default(uuid())
+  contactId String   @unique
+  specialty String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id])
+
+  @@map("subcontractor_profiles")
+}
+
+// ─── Projects ─────────────────────────────────────────────────────────────────
+// See: docs/bloqer2.0/02-modules/PROJECTS.md
+// BR-PROJ-001: clientContactId must reference a Contact with active CLIENT role (enforced at service layer).
+// BR-PROJ-002: type is immutable after first approved budget (not yet enforced — no budgets).
+// BR-PROJ-003: COMPLETED/CANCELLED projects are read-only.
+
+model Project {
+  id              String        @id @default(uuid())
+  tenantId        String
+  companyId       String?
+  clientContactId String
+  code            String
+  name            String
+  description     String?
+  address         String?
+  city            String?
+  province        String?
+  country         String        @default("AR")
+  type            ProjectType   @default(PRIVATE)
+  status          ProjectStatus @default(DRAFT)
+  startDate       DateTime?
+  expectedEndDate DateTime?
+  actualEndDate   DateTime?
+  notes           String?
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  company        Company?        @relation(fields: [companyId], references: [id])
+  client         Contact         @relation(fields: [clientContactId], references: [id])
+  budgets        Budget[]
+  certifications Certification[]
+  salesInvoices  SalesInvoice[]
+  receivables    Receivable[]
+  collections    Collection[]
+  supplierInvoices SupplierInvoice[]
+  payables         Payable[]
+  payments         Payment[]
+  purchaseOrders   PurchaseOrder[]
+  purchaseReceipts PurchaseReceipt[]
+  warehouses       Warehouse[]
+  stockMovements   StockMovement[]
+  subcontracts     Subcontract[]
+  subcontractCertifications SubcontractCertification[]
+  jobsiteLogs           JobsiteLog[]
+  warehouseTransfers    WarehouseTransfer[]
+  documentAttachments   DocumentAttachment[]
+  notifications         Notification[]
+  journalEntries        JournalEntry[]
+  journalEntryLines     JournalEntryLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, clientContactId])
+  @@map("projects")
+}
+
+// ─── Budgets / WBS / APU ──────────────────────────────────────────────────────
+// See: docs/bloqer2.0/02-modules/BUDGETS.md, WBS_AND_COST_ITEMS.md
+// BR-BUD-001: one APPROVED version per project — enforced at service layer.
+// BR-BUD-002/006/008: status-based edit locks enforced at service layer.
+// BR-WBS-001: only ITEM nodes receive certifications (future).
+// BR-WBS-002: code unique within budget.
+
+model Budget {
+  id             String       @id @default(uuid())
+  tenantId       String
+  companyId      String?
+  projectId      String
+  parentBudgetId String?
+  versionNumber  Int
+  name           String
+  status         BudgetStatus @default(DRAFT)
+  currency       String       @default("ARS")
+  totalCost      Decimal      @default(0) @db.Decimal(18, 4)
+  totalSalePrice Decimal      @default(0) @db.Decimal(18, 4)
+  internalNotes  String?
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  company      Company?        @relation(fields: [companyId], references: [id])
+  project      Project         @relation(fields: [projectId], references: [id])
+  parentBudget Budget?         @relation("BudgetAddenda", fields: [parentBudgetId], references: [id])
+  addenda      Budget[]        @relation("BudgetAddenda")
+  settings     BudgetSettings?
+  wbsNodes     WbsNode[]
+  costItems    CostItem[]
+  analysisLines CostAnalysisLine[]
+  certifications Certification[]
+
+  @@unique([projectId, versionNumber])
+  @@index([projectId, status])
+  @@index([tenantId, projectId])
+  @@map("budgets")
+}
+
+model BudgetSettings {
+  id               String   @id @default(uuid())
+  budgetId         String   @unique
+  overheadPct      Decimal  @default(0) @db.Decimal(8, 4)
+  financialCostPct Decimal  @default(0) @db.Decimal(8, 4)
+  financialDaysAvg Int      @default(0)
+  profitPct        Decimal  @default(0) @db.Decimal(8, 4)
+  taxPct           Decimal  @default(0) @db.Decimal(8, 4)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  budget Budget @relation(fields: [budgetId], references: [id])
+
+  @@map("budget_settings")
+}
+
+model WbsNode {
+  id          String      @id @default(uuid())
+  budgetId    String
+  parentId    String?
+  type        WbsNodeType
+  code        String
+  name        String
+  description String?
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  budget             Budget              @relation(fields: [budgetId], references: [id])
+  parent             WbsNode?            @relation("WbsChildren", fields: [parentId], references: [id])
+  children           WbsNode[]           @relation("WbsChildren")
+  costItem           CostItem?
+  certificationLines    CertificationLine[]
+  purchaseOrderLines    PurchaseOrderLine[]
+  stockMovements        StockMovement[]
+  subcontractLines      SubcontractLine[]
+  jobsiteLogProgress    JobsiteLogProgress[]
+
+  @@unique([budgetId, code])
+  @@index([budgetId, parentId])
+  @@map("wbs_nodes")
+}
+
+model CostItem {
+  id              String   @id @default(uuid())
+  budgetId        String
+  wbsNodeId       String   @unique
+  unit            String   @default("")
+  quantity        Decimal  @default(0) @db.Decimal(18, 4)
+  unitCostDirect  Decimal  @default(0) @db.Decimal(18, 4)
+  unitSalePrice   Decimal  @default(0) @db.Decimal(18, 4)
+  totalCostDirect Decimal  @default(0) @db.Decimal(18, 4)
+  totalSalePrice  Decimal  @default(0) @db.Decimal(18, 4)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  budget        Budget             @relation(fields: [budgetId], references: [id])
+  wbsNode       WbsNode            @relation(fields: [wbsNodeId], references: [id])
+  analysisLines CostAnalysisLine[]
+
+  @@index([budgetId])
+  @@map("cost_items")
+}
+
+/// supplierContactId is an optional soft-FK to Contact (no Prisma relation): supplier hints on analysis lines; enforced only when wired in services/UI.
+model CostAnalysisLine {
+  id                String       @id @default(uuid())
+  costItemId        String
+  budgetId          String
+  category          CostCategory
+  description       String
+  unit              String
+  coefficient       Decimal      @db.Decimal(18, 4)
+  unitCost          Decimal      @db.Decimal(18, 4)
+  totalCost         Decimal      @db.Decimal(18, 4)
+  sortOrder         Int          @default(0)
+  supplierContactId String?
+  notes             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  costItem CostItem @relation(fields: [costItemId], references: [id])
+  budget   Budget   @relation(fields: [budgetId], references: [id])
+
+  @@index([costItemId])
+  @@index([budgetId])
+  @@map("cost_analysis_lines")
+}
+
+// ─── Certifications ───────────────────────────────────────────────────────────
+// See: docs/bloqer2.0/02-modules/CERTIFICATIONS.md
+// BR-CERT-001: requires APPROVED/CLOSED budget.
+// BR-CERT-002: over-certification rules differ for PUBLIC vs PRIVATE projects.
+// BR-CERT-004: ISSUED+ is immutable.
+// BR-CERT-007: no INVOICED status — invoicing lives in SalesInvoice/Receivable.
+
+model Certification {
+  id            String              @id @default(uuid())
+  tenantId      String
+  companyId     String?
+  projectId     String
+  budgetId      String
+  number        Int
+  periodStart   DateTime            @db.Date
+  periodEnd     DateTime            @db.Date
+  issueDate     DateTime?           @db.Date
+  status        CertificationStatus @default(DRAFT)
+  notes         String?
+  internalNotes String?
+  totalAmount   Decimal             @default(0) @db.Decimal(18, 4)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  company       Company?            @relation(fields: [companyId], references: [id])
+  project       Project             @relation(fields: [projectId], references: [id])
+  budget        Budget              @relation(fields: [budgetId], references: [id])
+  lines         CertificationLine[]
+  salesInvoices SalesInvoice[]
+
+  @@unique([projectId, number])
+  @@index([tenantId, projectId])
+  @@index([budgetId, status])
+  @@map("certifications")
+}
+
+model CertificationLine {
+  id                    String        @id @default(uuid())
+  certificationId       String
+  wbsNodeId             String
+  // Snapshots captured at line creation — frozen when certification is ISSUED
+  unitSalePriceSnapshot Decimal       @db.Decimal(18, 4)
+  budgetQty             Decimal       @db.Decimal(18, 4)
+  // Progress — BR-CERT-003: physical and economic are independent
+  physicalPct           Decimal       @default(0) @db.Decimal(8, 4)
+  previousQty           Decimal       @default(0) @db.Decimal(18, 4)
+  currentQty            Decimal       @default(0) @db.Decimal(18, 4)
+  cumulativeQty         Decimal       @default(0) @db.Decimal(18, 4)
+  periodAmount          Decimal       @default(0) @db.Decimal(18, 4)
+  notes                 String?
+  sortOrder             Int           @default(0)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  certification     Certification      @relation(fields: [certificationId], references: [id])
+  wbsNode           WbsNode            @relation(fields: [wbsNodeId], references: [id])
+  salesInvoiceLines SalesInvoiceLine[]
+
+  @@unique([certificationId, wbsNodeId])
+  @@index([wbsNodeId])
+  @@index([certificationId])
+  @@map("certification_lines")
+}
+
+// ─── Sales Invoices / AR ──────────────────────────────────────────────────────
+// See: docs/bloqer2.0/02-modules/SALES_AND_COLLECTIONS.md
+// BR-AUD-002: ISSUED invoice is immutable; corrections via cancellation + reissue.
+// BR-CERT-007: no INVOICED in Certification.status — check SalesInvoice FK instead.
+// BR-NUM-001: number is sequential per company (Q-002 scope TBD — see PENDING_ARCHITECTURE_ITEMS.md).
+// BR-AR-004: cancelling invoice cascades to cancel linked Receivable (service layer).
+
+model SalesInvoice {
+  id              String             @id @default(uuid())
+  tenantId        String
+  companyId       String
+  projectId       String
+  clientContactId String
+  certificationId String?
+  number          Int
+  issueDate       DateTime           @db.Date
+  dueDate         DateTime           @db.Date
+  currency        String             @default("ARS")
+  subtotal        Decimal            @default(0) @db.Decimal(18, 4)
+  taxAmount       Decimal            @default(0) @db.Decimal(18, 4)
+  totalAmount     Decimal            @default(0) @db.Decimal(18, 4)
+  status          SalesInvoiceStatus @default(DRAFT)
+  notes           String?
+  internalNotes   String?
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  tenant        Tenant            @relation(fields: [tenantId], references: [id])
+  company       Company           @relation(fields: [companyId], references: [id])
+  project       Project           @relation(fields: [projectId], references: [id])
+  clientContact Contact           @relation(fields: [clientContactId], references: [id])
+  certification Certification?    @relation(fields: [certificationId], references: [id])
+  lines         SalesInvoiceLine[]
+  receivable    Receivable?
+  collections   Collection[]
+
+  @@unique([tenantId, companyId, number])
+  @@index([tenantId, projectId])
+  @@index([tenantId, certificationId])
+  @@index([tenantId, status])
+  @@map("sales_invoices")
+}
+
+model SalesInvoiceLine {
+  id                  String   @id @default(uuid())
+  invoiceId           String
+  description         String
+  quantity            Decimal  @db.Decimal(18, 4)
+  unitPrice           Decimal  @db.Decimal(18, 4)
+  taxRate             Decimal  @default(0) @db.Decimal(8, 4)
+  lineSubtotal        Decimal  @db.Decimal(18, 4)
+  lineTax             Decimal  @default(0) @db.Decimal(18, 4)
+  lineTotal           Decimal  @db.Decimal(18, 4)
+  certificationLineId String?
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  invoice           SalesInvoice       @relation(fields: [invoiceId], references: [id])
+  certificationLine CertificationLine? @relation(fields: [certificationLineId], references: [id])
+
+  @@index([invoiceId])
+  @@index([certificationLineId])
+  @@map("sales_invoice_lines")
+}
+
+// BR-AR-001: Receivable created from issued SalesInvoice (1:1).
+// BR-AR-002: status derived from paidAmount — maintained by service layer.
+// BR-AR-003: product concepts may allow debt without a project; **schema requires projectId** today (all issuing flows tie to a project). Relaxing to nullable would need migration + rules review.
+// PARTIAL/PAID/OVERDUE reserved for Collections phase.
+model Receivable {
+  id              String           @id @default(uuid())
+  tenantId        String
+  companyId       String
+  projectId       String
+  clientContactId String
+  salesInvoiceId  String           @unique
+  issueDate       DateTime         @db.Date
+  dueDate         DateTime         @db.Date
+  currency        String
+  originalAmount  Decimal          @db.Decimal(18, 4)
+  paidAmount      Decimal          @default(0) @db.Decimal(18, 4)
+  status          ReceivableStatus @default(OPEN)
+  notes           String?
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  company       Company      @relation(fields: [companyId], references: [id])
+  project       Project      @relation(fields: [projectId], references: [id])
+  clientContact Contact      @relation(fields: [clientContactId], references: [id])
+  salesInvoice  SalesInvoice @relation(fields: [salesInvoiceId], references: [id])
+  collections   Collection[]
+
+  @@index([tenantId, projectId])
+  @@index([tenantId, status])
+  @@map("receivables")
+}
+
+// ─── Accounting ledger (Phase 11A) ───────────────────────────────────────────
+// Debit/credit GL. Distinct from Treasury (operational cash). See ACCOUNTING_LEDGER_ARCHITECTURE.md.
+
+model AccountingAccount {
+  id          String      @id @default(uuid())
+  tenantId    String
+  companyId   String
+  code        String      @db.VarChar(64)
+  name        String      @db.VarChar(256)
+  type        AccountType
+  parentId    String?
+  isActive    Boolean     @default(true)
+  description String?     @db.VarChar(1024)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company      Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent       AccountingAccount?  @relation("AccountingAccountParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children     AccountingAccount[] @relation("AccountingAccountParent")
+  journalLines JournalEntryLine[]
+  mappingRulesDebit  AccountingMappingRule[] @relation("AccountingMappingDebitAccount")
+  mappingRulesCredit AccountingMappingRule[] @relation("AccountingMappingCreditAccount")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([tenantId, type])
+  @@map("accounting_accounts")
+}
+
+model JournalEntry {
+  id                String                 @id @default(uuid())
+  tenantId          String
+  companyId         String
+  projectId         String?
+  entryDate         DateTime               @db.Date
+  status            JournalEntryStatus     @default(DRAFT)
+  sourceType        JournalEntrySourceType
+  sourceId          String?                @db.VarChar(128)
+  description       String                 @db.VarChar(1024)
+  reference         String?                @db.VarChar(256)
+  createdByUserId   String
+  updatedByUserId   String
+  postedAt          DateTime?
+  cancelledAt       DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  project   Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  lines     JournalEntryLine[]
+  createdBy User               @relation("JournalEntryCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedBy User               @relation("JournalEntryUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId, entryDate])
+  @@index([tenantId, sourceType, sourceId])
+  @@index([tenantId, status])
+  @@map("journal_entries")
+}
+
+// Phase 11B: company-scoped GL mapping; multiple rules per eventType resolved by priority ASC.
+model AccountingMappingRule {
+  id               String                    @id @default(uuid())
+  tenantId         String
+  companyId        String
+  eventType        AccountingMappingEventType
+  name             String                    @db.VarChar(256)
+  description      String?                   @db.VarChar(1024)
+  debitAccountId   String
+  creditAccountId  String
+  isActive         Boolean                   @default(true)
+  priority         Int                       @default(100)
+  metadata         Json?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  debitAccount  AccountingAccount @relation("AccountingMappingDebitAccount", fields: [debitAccountId], references: [id], onDelete: Restrict)
+  creditAccount AccountingAccount @relation("AccountingMappingCreditAccount", fields: [creditAccountId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId, eventType, isActive])
+  @@map("accounting_mapping_rules")
+}
+
+model JournalEntryLine {
+  id             String   @id @default(uuid())
+  journalEntryId String
+  accountId      String
+  projectId      String?
+  description    String?  @db.VarChar(512)
+  debit          Decimal  @default(0) @db.Decimal(18, 4)
+  credit         Decimal  @default(0) @db.Decimal(18, 4)
+  currency       String   @db.VarChar(8)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  journalEntry JournalEntry      @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      AccountingAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  project      Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([accountId])
+  @@index([projectId])
+  @@map("journal_entry_lines")
+}
+
+// ─── Treasury / Collections ───────────────────────────────────────────────────
+// See: docs/bloqer2.0/02-modules/TREASURY.md, BANK_ACCOUNTS.md
+// BR-TRZ-001: every AccountMovement belongs to an active TreasuryAccount.
+// Balance = Σ amount × sign(type) where status = CONFIRMED.
+// Balance is NEVER manually edited — always derived from movements.
+
+model TreasuryAccount {
+  id             String                @id @default(uuid())
+  tenantId       String
+  companyId      String?
+  name           String
+  type           TreasuryAccountType
+  currency       String                @default("ARS")
+  bankName       String?
+  accountNumber  String?
+  alias          String?
+  notes          String?
+  openingBalance Decimal               @default(0) @db.Decimal(18, 4)
+  status         TreasuryAccountStatus @default(ACTIVE)
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  tenant             Tenant             @relation(fields: [tenantId], references: [id])
+  company            Company?           @relation(fields: [companyId], references: [id])
+  movements          AccountMovement[]
+  collections        Collection[]
+  transfersOut       InternalTransfer[] @relation("TransferSource")
+  transfersIn        InternalTransfer[] @relation("TransferDest")
+  payments           Payment[]
+
+  /// Tenant-wide unique **display name** (see docs/bloqer2.0/03-finance/TREASURY_MODEL.md §TreasuryAccount uniqueness).
+  @@unique([tenantId, name])
+  @@index([tenantId, status])
+  @@map("treasury_accounts")
+}
+
+// BR-TRZ-003: movements in a closed period cannot be mutated.
+// No DRAFT state — movements created directly as CONFIRMED.
+// No RECONCILED state yet — added in Bank Reconciliation phase.
+model AccountMovement {
+  id           String                   @id @default(uuid())
+  tenantId     String
+  companyId    String?
+  accountId    String
+  movementDate DateTime                 @db.Date
+  type         AccountMovementType
+  sourceType   AccountMovementSourceType
+  sourceId     String?
+  currency     String
+  amount       Decimal                  @db.Decimal(18, 4)
+  description  String
+  status       AccountMovementStatus    @default(CONFIRMED)
+  transferId   String?
+  createdBy    String?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id])
+  account TreasuryAccount @relation(fields: [accountId], references: [id])
+
+  @@index([tenantId, accountId, movementDate])
+  @@index([tenantId, sourceType, sourceId])
+  @@index([transferId])
+  @@map("account_movements")
+}
+
+// BR-TRZ-006: collection amount cannot exceed Receivable.balanceDue.
+// On confirm: creates AccountMovement INFLOW + updates Receivable.paidAmount + recalculates status.
+// On cancel: reverses all effects atomically.
+// Currency must match Receivable.currency and TreasuryAccount.currency (no FX in Phase 3C).
+model Collection {
+  id              String           @id @default(uuid())
+  tenantId        String
+  companyId       String
+  projectId       String
+  clientContactId String
+  receivableId    String
+  salesInvoiceId  String
+  accountId       String
+  collectionDate  DateTime         @db.Date
+  currency        String
+  amount          Decimal          @db.Decimal(18, 4)
+  notes           String?
+  status          CollectionStatus @default(CONFIRMED)
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+  company       Company         @relation(fields: [companyId], references: [id])
+  project       Project         @relation(fields: [projectId], references: [id])
+  clientContact Contact         @relation(fields: [clientContactId], references: [id])
+  receivable    Receivable      @relation(fields: [receivableId], references: [id])
+  salesInvoice  SalesInvoice    @relation(fields: [salesInvoiceId], references: [id])
+  account       TreasuryAccount @relation(fields: [accountId], references: [id])
+
+  @@index([tenantId, projectId])
+  @@index([tenantId, receivableId])
+  @@index([tenantId, status])
+  @@map("collections")
+}
+
+// BR-TRZ-004: exactly 2 AccountMovements per transfer (TRANSFER_OUT + TRANSFER_IN), linked by transferId.
+// Same currency only for Phase 3C. Source != destination. No negative balance allowed.
+model InternalTransfer {
+  id                   String                @id @default(uuid())
+  tenantId             String
+  companyId            String
+  sourceAccountId      String
+  destinationAccountId String
+  transferDate         DateTime              @db.Date
+  currency             String
+  amount               Decimal               @db.Decimal(18, 4)
+  description          String?
+  status               InternalTransferStatus @default(CONFIRMED)
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  tenant             Tenant          @relation(fields: [tenantId], references: [id])
+  company            Company         @relation(fields: [companyId], references: [id])
+  sourceAccount      TreasuryAccount @relation("TransferSource", fields: [sourceAccountId], references: [id])
+  destinationAccount TreasuryAccount @relation("TransferDest", fields: [destinationAccountId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, sourceAccountId])
+  @@index([tenantId, destinationAccountId])
+  @@map("internal_transfers")
+}
+
+// ─── Accounts Payable ─────────────────────────────────────────────────────────
+// See: docs/bloqer2.0/03-finance/ACCOUNTS_PAYABLE.md
+// BR-AP-001: supplierContactId must have active SUPPLIER role (enforced at service layer).
+// BR-AP-002: ISSUED invoice creates Payable atomically.
+// BR-AP-003: CANCELLED invoice cancels Payable if no active Payments exist.
+
+model SupplierInvoice {
+  id                String                @id @default(uuid())
+  tenantId          String
+  companyId         String
+  projectId         String
+  supplierContactId String
+  number            Int
+  issueDate         DateTime              @db.Date
+  dueDate           DateTime              @db.Date
+  currency          String                @default("ARS")
+  subtotal          Decimal               @default(0) @db.Decimal(18, 4)
+  taxAmount         Decimal               @default(0) @db.Decimal(18, 4)
+  totalAmount       Decimal               @default(0) @db.Decimal(18, 4)
+  status            SupplierInvoiceStatus @default(DRAFT)
+  notes             String?
+  internalNotes     String?
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  // Optional link to PurchaseOrder — no 3-way match yet; validates consistency in service.
+  purchaseOrderId           String?
+  // Optional link to SubcontractCertification — set on certification approve.
+  subcontractCertificationId String? @unique
+
+  tenant                    Tenant               @relation(fields: [tenantId], references: [id])
+  company                   Company              @relation(fields: [companyId], references: [id])
+  project                   Project              @relation(fields: [projectId], references: [id])
+  supplierContact           Contact              @relation(fields: [supplierContactId], references: [id])
+  purchaseOrder             PurchaseOrder?       @relation(fields: [purchaseOrderId], references: [id])
+  subcontractCertification  SubcontractCertification? @relation(fields: [subcontractCertificationId], references: [id])
+  lines                     SupplierInvoiceLine[]
+  payable                   Payable?
+  /// Partial payments against this invoice (`Payment.supplierInvoiceId`).
+  apPayments                Payment[]
+
+  @@unique([tenantId, companyId, number])
+  @@index([tenantId, projectId])
+  @@index([tenantId, status])
+  @@index([tenantId, supplierContactId])
+  @@map("supplier_invoices")
+}
+
+model SupplierInvoiceLine {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  description String
+  quantity    Decimal  @db.Decimal(18, 4)
+  unitPrice   Decimal  @db.Decimal(18, 4)
+  taxRate     Decimal  @default(0) @db.Decimal(8, 4)
+  lineSubtotal Decimal @db.Decimal(18, 4)
+  lineTax     Decimal  @default(0) @db.Decimal(18, 4)
+  lineTotal   Decimal  @db.Decimal(18, 4)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  invoice SupplierInvoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@map("supplier_invoice_lines")
+}
+
+// BR-AP-002: Payable created from issued SupplierInvoice (1:1).
+// BR-AP-004: status derived from paidAmount — maintained by service layer.
+// OVERDUE computed on read if dueDate passed and balanceDue > 0 (same as ReceivableStatus / D5).
+model Payable {
+  id                String        @id @default(uuid())
+  tenantId          String
+  companyId         String
+  projectId         String
+  supplierContactId String
+  supplierInvoiceId String        @unique
+  issueDate         DateTime      @db.Date
+  dueDate           DateTime      @db.Date
+  currency          String
+  originalAmount    Decimal       @db.Decimal(18, 4)
+  paidAmount        Decimal       @default(0) @db.Decimal(18, 4)
+  status            PayableStatus @default(OPEN)
+  notes             String?
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  company         Company         @relation(fields: [companyId], references: [id])
+  project         Project         @relation(fields: [projectId], references: [id])
+  supplierContact Contact         @relation(fields: [supplierContactId], references: [id])
+  supplierInvoice SupplierInvoice @relation(fields: [supplierInvoiceId], references: [id])
+  payments        Payment[]
+
+  @@index([tenantId, projectId])
+  @@index([tenantId, status])
+  @@map("payables")
+}
+
+// BR-AP-005: Payment amount cannot exceed Payable.balanceDue (no overpayment).
+// On confirm: creates AccountMovement OUTFLOW + updates Payable.paidAmount + recalculates status.
+// On cancel: reverses all effects atomically.
+// Currency must match Payable.currency and TreasuryAccount.currency (no FX in Phase 4A).
+model Payment {
+  id                String        @id @default(uuid())
+  tenantId          String
+  companyId         String
+  projectId         String
+  supplierContactId String
+  payableId         String
+  supplierInvoiceId String
+  accountId         String
+  paymentDate       DateTime      @db.Date
+  currency          String
+  amount            Decimal       @db.Decimal(18, 4)
+  notes             String?
+  status            PaymentStatus @default(CONFIRMED)
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  company         Company         @relation(fields: [companyId], references: [id])
+  project         Project         @relation(fields: [projectId], references: [id])
+  supplierContact Contact         @relation(fields: [supplierContactId], references: [id])
+  payable         Payable         @relation(fields: [payableId], references: [id])
+  supplierInvoice SupplierInvoice @relation(fields: [supplierInvoiceId], references: [id])
+  account         TreasuryAccount @relation(fields: [accountId], references: [id])
+
+  @@index([tenantId, projectId])
+  @@index([tenantId, payableId])
+  @@index([tenantId, status])
+  @@index([tenantId, supplierInvoiceId])
+  @@index([tenantId, supplierContactId])
+  @@map("payments")
+}
+
+// ─── Procurement ──────────────────────────────────────────────────────────────
+// See: docs/bloqer2.0/02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md
+// BR-PUR-001: ISSUED PO contributes to committed_amount cost layer.
+// BR-PUR-004: Receipt only allowed when PO status is ISSUED | PARTIALLY_RECEIVED | RECEIVED.
+// BR-SUP-001: supplierContactId must have active SUPPLIER role (enforced at service layer).
+// No inventory stock movements in this phase.
+
+model PurchaseOrder {
+  id                    String              @id @default(uuid())
+  tenantId              String
+  companyId             String
+  projectId             String
+  supplierContactId     String
+  number                Int
+  issueDate             DateTime            @db.Date
+  expectedDeliveryDate  DateTime?           @db.Date
+  currency              String              @default("ARS")
+  subtotal              Decimal             @default(0) @db.Decimal(18, 4)
+  taxAmount             Decimal             @default(0) @db.Decimal(18, 4)
+  totalAmount           Decimal             @default(0) @db.Decimal(18, 4)
+  status                PurchaseOrderStatus @default(DRAFT)
+  notes                 String?
+  internalNotes         String?
+  createdBy             String?
+  updatedBy             String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  company         Company          @relation(fields: [companyId], references: [id])
+  project         Project          @relation(fields: [projectId], references: [id])
+  supplierContact Contact          @relation(fields: [supplierContactId], references: [id])
+  lines           PurchaseOrderLine[]
+  receipts        PurchaseReceipt[]
+  supplierInvoices SupplierInvoice[]
+
+  @@unique([tenantId, companyId, number])
+  @@index([tenantId, projectId])
+  @@index([tenantId, status])
+  @@index([tenantId, supplierContactId])
+  @@map("purchase_orders")
+}
+
+// wbsNodeId links to WbsNode of type ITEM (validated at service layer).
+// productId optional — only product-linked lines generate StockMovement IN on receipt confirm.
+// receivedQuantity is maintained by service when receipts are confirmed/cancelled.
+model PurchaseOrderLine {
+  id               String    @id @default(uuid())
+  purchaseOrderId  String
+  wbsNodeId        String?
+  productId        String?
+  description      String
+  unit             String    @default("")
+  quantity         Decimal   @db.Decimal(18, 4)
+  unitPrice        Decimal   @db.Decimal(18, 4)
+  taxRate          Decimal   @default(0) @db.Decimal(8, 4)
+  lineSubtotal     Decimal   @db.Decimal(18, 4)
+  lineTax          Decimal   @default(0) @db.Decimal(18, 4)
+  lineTotal        Decimal   @db.Decimal(18, 4)
+  receivedQuantity Decimal   @default(0) @db.Decimal(18, 4)
+  sortOrder        Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  purchaseOrder PurchaseOrder       @relation(fields: [purchaseOrderId], references: [id])
+  wbsNode       WbsNode?            @relation(fields: [wbsNodeId], references: [id])
+  product       Product?            @relation(fields: [productId], references: [id])
+  receiptLines  PurchaseReceiptLine[]
+
+  @@index([purchaseOrderId])
+  @@index([wbsNodeId])
+  @@index([productId])
+  @@map("purchase_order_lines")
+}
+
+// warehouseId optional — if set, confirmed receipt generates StockMovement IN for product-linked lines.
+model PurchaseReceipt {
+  id                String                @id @default(uuid())
+  tenantId          String
+  companyId         String
+  projectId         String
+  purchaseOrderId   String
+  supplierContactId String
+  warehouseId       String?
+  receiptDate       DateTime              @db.Date
+  status            PurchaseReceiptStatus @default(DRAFT)
+  notes             String?
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  company         Company         @relation(fields: [companyId], references: [id])
+  project         Project         @relation(fields: [projectId], references: [id])
+  purchaseOrder   PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id])
+  supplierContact Contact         @relation(fields: [supplierContactId], references: [id])
+  warehouse       Warehouse?      @relation(fields: [warehouseId], references: [id])
+  lines           PurchaseReceiptLine[]
+  stockMovements  StockMovement[]
+
+  @@index([tenantId, projectId])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, status])
+  @@index([warehouseId])
+  @@map("purchase_receipts")
+}
+
+model PurchaseReceiptLine {
+  id                  String   @id @default(uuid())
+  purchaseReceiptId   String
+  purchaseOrderLineId String
+  quantityReceived    Decimal  @db.Decimal(18, 4)
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  purchaseReceipt   PurchaseReceipt   @relation(fields: [purchaseReceiptId], references: [id])
+  purchaseOrderLine PurchaseOrderLine @relation(fields: [purchaseOrderLineId], references: [id])
+  stockMovements    StockMovement[]
+
+  @@index([purchaseReceiptId])
+  @@index([purchaseOrderLineId])
+  @@map("purchase_receipt_lines")
+}
+
+// ─── Inventory ────────────────────────────────────────────────────────────────
+// See: docs/bloqer2.0/02-modules/INVENTORY.md, WAREHOUSES.md
+// BR-INV-001: stock balance = SUM of confirmed StockMovements — never a stored field.
+// BR-INV-005: StockMovement IN created on PurchaseReceipt confirm for product-linked lines.
+// No negative stock in Phase 4C (blocks OUT if insufficient balance).
+
+// Product catalog is tenant-wide; companyId optional for company-scoped catalogs.
+// @@unique([tenantId, companyId, sku]) — Prisma handles NULL-nullable composite unique.
+model Product {
+  id          String        @id @default(uuid())
+  tenantId    String
+  companyId   String?
+  sku         String
+  name        String
+  description String?
+  unit        String        @default("")
+  category    String?
+  status      ProductStatus @default(ACTIVE)
+  notes       String?
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tenant            Tenant              @relation(fields: [tenantId], references: [id])
+  company           Company?            @relation(fields: [companyId], references: [id])
+  purchaseOrderLines  PurchaseOrderLine[]
+  stockMovements      StockMovement[]
+  jobsiteLogMaterials JobsiteLogMaterialUsage[]
+  warehouseTransfers  WarehouseTransfer[]
+
+  @@unique([tenantId, companyId, sku])
+  @@index([tenantId, status])
+  @@index([tenantId, companyId])
+  @@map("products")
+}
+
+model Warehouse {
+  id        String          @id @default(uuid())
+  tenantId  String
+  companyId String
+  projectId String?
+  name      String
+  type      WarehouseType   @default(CENTRAL)
+  address   String?
+  notes     String?
+  status    WarehouseStatus @default(ACTIVE)
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  company        Company         @relation(fields: [companyId], references: [id])
+  project        Project?        @relation(fields: [projectId], references: [id])
+  stockMovements StockMovement[]
+  receipts       PurchaseReceipt[]
+  jobsiteLogMaterials JobsiteLogMaterialUsage[]
+  transfersOut   WarehouseTransfer[] @relation("TransferSource")
+  transfersIn    WarehouseTransfer[] @relation("TransferDestination")
+
+  @@unique([tenantId, companyId, name])
+  @@index([tenantId, companyId, status])
+  @@index([projectId])
+  @@map("warehouses")
+}
+
+// Append-only ledger. No hard delete. Cancellation creates a reversal via status CANCELLED.
+// quantity is always positive — direction determined by type (IN increases, OUT decreases).
+// unitCost/totalCost nullable — captured from PO line unitPrice on PURCHASE_RECEIPT movements.
+model StockMovement {
+  id                   String                  @id @default(uuid())
+  tenantId             String
+  companyId            String
+  warehouseId          String
+  productId            String
+  projectId            String?
+  wbsNodeId            String?
+  purchaseReceiptId    String?
+  purchaseReceiptLineId String?
+  type                 StockMovementType
+  sourceType           StockMovementSourceType
+  sourceId             String?
+  movementDate         DateTime                @db.Date
+  quantity             Decimal                 @db.Decimal(18, 4)
+  unitCost             Decimal?                @db.Decimal(18, 4)
+  totalCost            Decimal?                @db.Decimal(18, 4)
+  status               StockMovementStatus     @default(CONFIRMED)
+  notes                String?
+  createdBy            String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  tenant               Tenant               @relation(fields: [tenantId], references: [id])
+  company              Company              @relation(fields: [companyId], references: [id])
+  warehouse            Warehouse            @relation(fields: [warehouseId], references: [id])
+  product              Product              @relation(fields: [productId], references: [id])
+  project              Project?             @relation(fields: [projectId], references: [id])
+  wbsNode              WbsNode?             @relation(fields: [wbsNodeId], references: [id])
+  purchaseReceipt      PurchaseReceipt?     @relation(fields: [purchaseReceiptId], references: [id])
+  purchaseReceiptLine  PurchaseReceiptLine?  @relation(fields: [purchaseReceiptLineId], references: [id])
+  warehouseTransferId  String?
+  warehouseTransfer    WarehouseTransfer?    @relation(fields: [warehouseTransferId], references: [id])
+
+  @@index([tenantId, warehouseId, productId])
+  @@index([tenantId, productId, status])
+  @@index([tenantId, projectId])
+  @@index([purchaseReceiptId])
+  @@index([warehouseTransferId])
+  @@map("stock_movements")
+}
+
+// ─── Subcontracts ─────────────────────────────────────────────────────────────
+// DRAFT allows full structural edits. ACTIVE locks lines; only notes/dates editable.
+// CANCELLED blocked if confirmed certifications exist.
+// Lines immutable once ACTIVE (quantity/price/WBS locked).
+
+model Subcontract {
+  id                     String            @id @default(uuid())
+  tenantId               String
+  companyId              String
+  projectId              String
+  subcontractorContactId String
+  number                 Int
+  title                  String
+  description            String?
+  contractDate           DateTime          @db.Date
+  startDate              DateTime?         @db.Date
+  expectedEndDate        DateTime?         @db.Date
+  currency               String            @default("ARS")
+  status                 SubcontractStatus @default(DRAFT)
+  notes                  String?
+  internalNotes          String?
+  createdBy              String?
+  updatedBy              String?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  tenant                 Tenant                     @relation(fields: [tenantId], references: [id])
+  company                Company                    @relation(fields: [companyId], references: [id])
+  project                Project                    @relation(fields: [projectId], references: [id])
+  subcontractorContact   Contact                    @relation("SubcontractSubcontractor", fields: [subcontractorContactId], references: [id])
+  lines                  SubcontractLine[]
+  certifications         SubcontractCertification[]
+  jobsiteLogLabors       JobsiteLogLabor[]
+
+  @@unique([tenantId, companyId, number])
+  @@index([tenantId, projectId])
+  @@index([tenantId, status])
+  @@index([tenantId, subcontractorContactId])
+  @@map("subcontracts")
+}
+
+// wbsNodeId must be WbsNodeType.ITEM if provided (enforced at service layer).
+// certifiedQuantity maintained by service when certifications are approved/cancelled.
+model SubcontractLine {
+  id                String   @id @default(uuid())
+  subcontractId     String
+  wbsNodeId         String?
+  description       String
+  unit              String   @default("")
+  quantity          Decimal  @db.Decimal(18, 4)
+  unitPrice         Decimal  @db.Decimal(18, 4)
+  lineTotal         Decimal  @db.Decimal(18, 4)
+  certifiedQuantity Decimal  @default(0) @db.Decimal(18, 4)
+  notes             String?
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  subcontract        Subcontract                   @relation(fields: [subcontractId], references: [id])
+  wbsNode            WbsNode?                      @relation(fields: [wbsNodeId], references: [id])
+  certificationLines SubcontractCertificationLine[]
+
+  @@index([subcontractId])
+  @@index([wbsNodeId])
+  @@map("subcontract_lines")
+}
+
+// Mirrors Certification lifecycle on AP side.
+// APPROVED → creates SupplierInvoice DRAFT (via SupplierInvoice.subcontractCertificationId unique FK).
+// CANCELLED reverses certifiedQuantity only if previously APPROVED and linked invoice is DRAFT.
+model SubcontractCertification {
+  id                     String                         @id @default(uuid())
+  tenantId               String
+  companyId              String
+  projectId              String
+  subcontractId          String
+  subcontractorContactId String
+  number                 Int
+  periodStart            DateTime                       @db.Date
+  periodEnd              DateTime                       @db.Date
+  certificationDate      DateTime                       @db.Date
+  status                 SubcontractCertificationStatus @default(DRAFT)
+  notes                  String?
+  createdBy              String?
+  updatedBy              String?
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+
+  tenant                 Tenant                         @relation(fields: [tenantId], references: [id])
+  company                Company                        @relation(fields: [companyId], references: [id])
+  project                Project                        @relation(fields: [projectId], references: [id])
+  subcontract            Subcontract                    @relation(fields: [subcontractId], references: [id])
+  subcontractorContact   Contact                        @relation("SubcontractCertificationSubcontractor", fields: [subcontractorContactId], references: [id])
+  lines                  SubcontractCertificationLine[]
+  supplierInvoice        SupplierInvoice?
+
+  @@unique([subcontractId, number])
+  @@index([tenantId, projectId])
+  @@index([tenantId, subcontractId])
+  @@index([tenantId, status])
+  @@map("subcontract_certifications")
+}
+
+// previousQty/cumulativeQty/remainingQty are computed server-side and stored as snapshots.
+// unitPriceSnapshot frozen from SubcontractLine.unitPrice at creation time.
+model SubcontractCertificationLine {
+  id                         String   @id @default(uuid())
+  subcontractCertificationId String
+  subcontractLineId          String
+  previousQty                Decimal  @db.Decimal(18, 4)
+  currentQty                 Decimal  @db.Decimal(18, 4)
+  cumulativeQty              Decimal  @db.Decimal(18, 4)
+  remainingQty               Decimal  @db.Decimal(18, 4)
+  unitPriceSnapshot          Decimal  @db.Decimal(18, 4)
+  lineTotal                  Decimal  @db.Decimal(18, 4)
+  notes                      String?
+  sortOrder                  Int      @default(0)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  certification   SubcontractCertification @relation(fields: [subcontractCertificationId], references: [id])
+  subcontractLine SubcontractLine          @relation(fields: [subcontractLineId], references: [id])
+
+  @@index([subcontractCertificationId])
+  @@index([subcontractLineId])
+  @@map("subcontract_certification_lines")
+}
+
+// ─── Jobsite Log / Libro de obra ──────────────────────────────────────────────
+// BR-JL-001: one per day recommended — NOT hard enforced; multiple allowed for shifts/fronts.
+// BR-JL-002: attachments use `DocumentAttachment` + `linkedEntityType=JOBSITE_LOG` (see documents module).
+// logDate not future (enforced at service layer).
+
+model JobsiteLog {
+  id            String           @id @default(uuid())
+  tenantId      String
+  companyId     String
+  projectId     String
+  logDate       DateTime         @db.Date
+  title         String?
+  workFront     String?
+  shift         String?
+  status        JobsiteLogStatus @default(DRAFT)
+  weather       String?
+  generalNotes  String?
+  blockers      String?
+  incidents     String?
+  safetyNotes   String?
+  returnNotes   String?
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id])
+  company   Company              @relation(fields: [companyId], references: [id])
+  project   Project              @relation(fields: [projectId], references: [id])
+  progress  JobsiteLogProgress[]
+  labor     JobsiteLogLabor[]
+  materials JobsiteLogMaterialUsage[]
+  issues    JobsiteLogIssue[]
+
+  @@index([tenantId, projectId, logDate])
+  @@index([tenantId, status])
+  @@map("jobsite_logs")
+}
+
+// wbsNodeId must be WbsNodeType.ITEM (validated at service layer).
+// quantityCompleted is operational evidence only — does not affect Certification/CertificationLine.
+model JobsiteLogProgress {
+  id                 String   @id @default(uuid())
+  jobsiteLogId       String
+  wbsNodeId          String
+  description        String?
+  quantityCompleted  Decimal  @db.Decimal(18, 4)
+  physicalPct        Decimal? @db.Decimal(8, 4)
+  notes              String?
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  jobsiteLog JobsiteLog @relation(fields: [jobsiteLogId], references: [id])
+  wbsNode    WbsNode    @relation(fields: [wbsNodeId], references: [id])
+
+  @@index([jobsiteLogId])
+  @@index([wbsNodeId])
+  @@map("jobsite_log_progress")
+}
+
+// contactId: any active contact (internal crew, subcontractor, foreman, etc.)
+// subcontractId: optional link to a Subcontract on the same project.
+model JobsiteLogLabor {
+  id              String   @id @default(uuid())
+  jobsiteLogId    String
+  contactId       String?
+  subcontractId   String?
+  crewDescription String?
+  workersCount    Int
+  hoursWorked     Decimal? @db.Decimal(8, 2)
+  notes           String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  jobsiteLog  JobsiteLog  @relation(fields: [jobsiteLogId], references: [id])
+  contact     Contact?    @relation(fields: [contactId], references: [id])
+  subcontract Subcontract? @relation(fields: [subcontractId], references: [id])
+
+  @@index([jobsiteLogId])
+  @@index([contactId])
+  @@map("jobsite_log_labor")
+}
+
+// Evidence only — does NOT create StockMovement OUT.
+// description mandatory fallback when productId is null.
+model JobsiteLogMaterialUsage {
+  id           String   @id @default(uuid())
+  jobsiteLogId String
+  productId    String?
+  warehouseId  String?
+  description  String
+  quantity     Decimal  @db.Decimal(18, 4)
+  notes        String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  jobsiteLog JobsiteLog @relation(fields: [jobsiteLogId], references: [id])
+  product    Product?   @relation(fields: [productId], references: [id])
+  warehouse  Warehouse? @relation(fields: [warehouseId], references: [id])
+
+  @@index([jobsiteLogId])
+  @@map("jobsite_log_material_usages")
+}
+
+model JobsiteLogIssue {
+  id           String                  @id @default(uuid())
+  jobsiteLogId String
+  type         JobsiteLogIssueType
+  severity     JobsiteLogIssueSeverity
+  description  String
+  status       JobsiteLogIssueStatus   @default(OPEN)
+  notes        String?
+  sortOrder    Int                     @default(0)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  jobsiteLog JobsiteLog @relation(fields: [jobsiteLogId], references: [id])
+
+  @@index([jobsiteLogId])
+  @@map("jobsite_log_issues")
+}
+
+// ─── Document Enums ───────────────────────────────────────────────────────────
+
+enum DocumentCategory {
+  CONTRACT
+  PLAN
+  PERMIT
+  TECHNICAL
+  PHOTO
+  INVOICE
+  RECEIPT
+  CERTIFICATE
+  REPORT
+  JOBSITE_EVIDENCE
+  OTHER
+}
+
+enum DocumentStatus {
+  UPLOADING
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum LinkedEntityType {
+  PROJECT
+  BUDGET
+  CERTIFICATION
+  SALES_INVOICE
+  SUPPLIER_INVOICE
+  PURCHASE_ORDER
+  PURCHASE_RECEIPT
+  SUBCONTRACT
+  SUBCONTRACT_CERTIFICATION
+  JOBSITE_LOG
+  WAREHOUSE_TRANSFER
+  OTHER
+}
+
+enum StorageProvider {
+  PLACEHOLDER
+  R2
+  S3
+}
+
+// ─── Warehouse Transfers ──────────────────────────────────────────────────────
+
+model WarehouseTransfer {
+  id                     String                  @id @default(uuid())
+  tenantId               String
+  companyId              String
+  projectId              String?
+  number                 Int
+  sourceWarehouseId      String
+  destinationWarehouseId String
+  productId              String
+  transferDate           DateTime                @db.Date
+  quantity               Decimal                 @db.Decimal(18, 4)
+  unitCost               Decimal?                @db.Decimal(18, 4)
+  totalCost              Decimal?                @db.Decimal(18, 4)
+  notes                  String?
+  status                 WarehouseTransferStatus @default(CONFIRMED)
+  createdBy              String?
+  updatedBy              String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  tenant               Tenant    @relation(fields: [tenantId], references: [id])
+  company              Company   @relation(fields: [companyId], references: [id])
+  project              Project?  @relation(fields: [projectId], references: [id])
+  sourceWarehouse      Warehouse @relation("TransferSource", fields: [sourceWarehouseId], references: [id])
+  destinationWarehouse Warehouse @relation("TransferDestination", fields: [destinationWarehouseId], references: [id])
+  product              Product   @relation(fields: [productId], references: [id])
+  stockMovements       StockMovement[]
+
+  @@unique([tenantId, companyId, number])
+  @@index([tenantId, companyId, status])
+  @@index([tenantId, sourceWarehouseId])
+  @@index([tenantId, destinationWarehouseId])
+  @@index([tenantId, productId])
+  @@index([tenantId, transferDate])
+  @@map("warehouse_transfers")
+}
+
+// ─── Documents ────────────────────────────────────────────────────────────────
+// Download/access policy: presigned GET URLs only (`document.service`); `publicUrl` is unused/reserved — do not expose in API DTOs.
+
+model DocumentAttachment {
+  id               String           @id @default(uuid())
+  tenantId         String
+  companyId        String?
+  projectId        String?
+  originalFileName String
+  fileName         String
+  mimeType         String
+  sizeBytes        Int
+  storageProvider  StorageProvider  @default(PLACEHOLDER)
+  storageBucket    String?
+  storageKey       String
+  /// Unused in production flows; reserved if a CDN/public asset strategy is added later.
+  publicUrl        String?
+  category         DocumentCategory @default(OTHER)
+  description      String?
+  status           DocumentStatus   @default(ACTIVE)
+  linkedEntityType LinkedEntityType?
+  linkedEntityId   String?
+  uploadedBy       String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([tenantId, projectId])
+  @@index([tenantId, linkedEntityType, linkedEntityId])
+  @@index([tenantId, status])
+  @@map("document_attachments")
+}
+
+// ─── In-app notifications (Phase 8A) ──────────────────────────────────────────
+
+enum NotificationType {
+  DOCUMENT_UPLOAD_CONFIRMED
+  JOBSITE_LOG_RETURNED
+  CERTIFICATION_APPROVED
+  RECEIVABLE_OVERDUE
+  PAYABLE_OVERDUE
+  NEGATIVE_STOCK
+  CERTIFICATION_APPROVED_WITHOUT_INVOICE
+  STALE_DOCUMENT_UPLOAD
+}
+
+enum NotificationSeverity {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+enum EmailDeliveryType {
+  NOTIFICATION
+  OPERATIONAL_ALERT
+  REPORT_MANUAL
+  REPORT_SCHEDULED
+}
+
+enum EmailDeliveryStatus {
+  PENDING
+  SENT
+  SKIPPED
+  FAILED
+}
+
+enum EmailProvider {
+  RESEND
+  DISABLED
+}
+
+model Notification {
+  id               String                @id @default(uuid())
+  tenantId         String
+  companyId        String?
+  recipientUserId  String?
+  type             NotificationType
+  title            String
+  body             String
+  severity         NotificationSeverity  @default(INFO)
+  status           NotificationStatus    @default(UNREAD)
+  linkedEntityType LinkedEntityType?
+  linkedEntityId   String?
+  projectId        String?
+  actionUrl        String?
+  metadata         Json?
+  createdAt        DateTime              @default(now())
+  readAt           DateTime?
+  archivedAt       DateTime?
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  recipient User?    @relation("NotificationRecipient", fields: [recipientUserId], references: [id])
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  @@index([tenantId, recipientUserId, status, createdAt])
+  @@index([tenantId, projectId, createdAt])
+  @@index([tenantId, linkedEntityType, linkedEntityId])
+  @@map("notifications")
+}
+
+/// Phase 9D — outbound email traceability (no automatic sends implied by this row).
+model EmailDeliveryLog {
+  id                String              @id @default(uuid())
+  tenantId          String
+  companyId         String?
+  recipientUserId   String?
+  recipientEmail    String
+  subject           String              @db.VarChar(998)
+  emailType         EmailDeliveryType
+  status            EmailDeliveryStatus
+  provider          EmailProvider
+  providerMessageId String?
+  skippedReason     String?             @db.VarChar(256)
+  errorMessage      String?             @db.VarChar(512)
+  relatedEntityType LinkedEntityType?
+  relatedEntityId   String?
+  reportType        String?             @db.VarChar(64)
+  reportFormat      String?             @db.VarChar(16)
+  idempotencyKey    String?             @db.VarChar(512)
+  metadata          Json?
+  sentAt            DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, recipientEmail, createdAt])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, emailType, createdAt])
+  @@index([tenantId, relatedEntityType, relatedEntityId])
+  @@index([tenantId, idempotencyKey])
+  @@map("email_delivery_logs")
+}

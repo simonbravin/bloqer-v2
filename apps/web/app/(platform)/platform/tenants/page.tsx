@@ -1,0 +1,97 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@bloqer/auth";
+import { listPlatformTenants, ServiceError } from "@bloqer/services";
+import { getPlatformServiceContext } from "@/lib/platform-service-context";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+interface PageProps {
+  searchParams: Promise<{ q?: string }>;
+}
+
+export default async function PlatformTenantsPage({ searchParams }: PageProps) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  const ctx = await getPlatformServiceContext(session.user.id);
+  const sp = await searchParams;
+  const q = sp.q?.trim();
+  let rows;
+  try {
+    rows = await listPlatformTenants({ search: q, limit: 100 }, ctx);
+  } catch (e) {
+    if (e instanceof ServiceError && e.code === "FORBIDDEN") redirect("/dashboard");
+    throw e;
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Tenants</h1>
+          <p className="text-sm text-muted-foreground">Búsqueda por nombre o slug.</p>
+        </div>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/platform">Resumen</Link>
+        </Button>
+      </div>
+      <form className="flex max-w-md flex-wrap items-end gap-2" method="get" action="/platform/tenants">
+        <div className="grid flex-1 gap-1 min-w-[200px]">
+          <label htmlFor="q" className="text-xs text-muted-foreground">
+            Buscar
+          </label>
+          <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Nombre o slug" />
+        </div>
+        <Button type="submit" size="sm">
+          Filtrar
+        </Button>
+      </form>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Slug</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Plan</TableHead>
+              <TableHead>Suscripción</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                  Sin resultados.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((t) => (
+                <TableRow key={t.id}>
+                  <TableCell className="font-medium">{t.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{t.slug}</TableCell>
+                  <TableCell>{t.status}</TableCell>
+                  <TableCell>{t.saasPlan}</TableCell>
+                  <TableCell>{t.subscriptionStatus}</TableCell>
+                  <TableCell>
+                    <Button variant="link" className="h-auto p-0" asChild>
+                      <Link href={`/platform/tenants/${t.id}`}>Ver</Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}

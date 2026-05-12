@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --recursive typecheck)",
+      "Bash(pnpm --filter @bloqer/web add @bloqer/database@workspace:*)",
+      "Bash(pnpm --filter @bloqer/database db:generate)",
+      "Bash(pnpm --filter @bloqer/web add @bloqer/validators@workspace:*)",
+      "Bash(pnpm dlx *)",
+      "Bash(pnpm --filter @bloqer/web add react-hook-form @hookform/resolvers)",
+      "Bash(pnpm --filter @bloqer/web lint)",
+      "Bash(pnpm --filter @bloqer/web tsc --noEmit)",
+      "Bash(pnpm add *)",
+      "Bash(mkdir -p \"C:/Dev/bloqer-v2/apps/web/app/\\(app\\)/proyectos/[id]/facturas/[invoiceId]\")",
+      "Bash(mkdir -p \"C:/Dev/bloqer-v2/apps/web/app/\\(app\\)/proyectos/[id]/cuentas-por-cobrar/[receivableId]\")",
+      "Bash(mkdir -p \"C:/Dev/bloqer-v2/apps/web/app/\\(app\\)/proyectos/[id]/facturas/[invoiceId]/editar\")",
+      "Bash(awk -F/ '{depth=NF-1; indent=sprintf\\(\"%*s\", depth*2, \"\"\\); print indent substr\\($NF,1,50\\)}')",
+      "Bash(Get-ChildItem \"C:\\\\Dev\\\\bloqer-v2\\\\packages\\\\validators\\\\src\\\\\" | Select-Object Name)",
+      "Bash(dir \"C:\\\\Dev\\\\bloqer-v2\\\\apps\\\\web\\\\features\" /b)",
+      "Bash(mkdir -p \"C:\\\\Dev\\\\bloqer-v2\\\\apps\\\\web\\\\app\\\\\\(app\\)\\\\proyectos\\\\[id]\\\\subcontratos\\\\[subcontractId]\\\\certificaciones\\\\[certId]\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Dev\\\\bloqer-v2\\\\docs\\\\bloqer2.0\" -Recurse -Filter \"*DAILY_LOG*\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object FullName)",
+      "Bash(Select-String -Path \"C:\\\\Dev\\\\bloqer-v2\\\\packages\\\\services\\\\src\\\\inventory\\\\warehouse.service.ts\" -Pattern \"^export async function\")",
+      "Bash(Select-Object -First 10)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\([\\(k,v\\) for k,v in {**d.get\\('dependencies',{}\\),**d.get\\('devDependencies',{}\\)}.items\\(\\) if 'chart' in k or 'recharts' in k]\\)\")",
+      "Bash(pnpm --filter @bloqer/web add recharts)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Dev\\\\bloqer-v2\\\\docs\\\\bloqer2.0\" -Recurse -File -Name)",
+      "Bash(Sort-Object)",
+      "Bash(pnpm install *)",
+      "Bash(New-Item -ItemType Directory -Path \"C:\\\\Dev\\\\bloqer-v2\\\\apps\\\\web\\\\app\\\\api\\\\documents\\\\initiate-upload\" -Force)",
+      "Bash(Out-Null)",
+      "Bash(New-Item -ItemType Directory -Path \"C:\\\\Dev\\\\bloqer-v2\\\\apps\\\\web\\\\app\\\\api\\\\documents\\\\[documentId]\\\\confirm\" -Force)",
+      "Bash(New-Item -ItemType Directory -Path \"C:\\\\Dev\\\\bloqer-v2\\\\apps\\\\web\\\\app\\\\api\\\\documents\\\\[documentId]\\\\download\" -Force)",
+      "Bash(Write-Output \"dirs created\")",
+      "Bash(cd /mnt/c/Dev/bloqer-v2 && pnpm install --filter @bloqer/storage 2>&1 | tail -5)"
+    ]
+  }
+}

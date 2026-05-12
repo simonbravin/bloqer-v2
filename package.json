@@ -1,0 +1,29 @@
+{
+  "name": "bloqer-v2",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev --parallel",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "db:generate": "pnpm --filter @bloqer/database db:generate",
+    "db:migrate": "pnpm --filter @bloqer/database db:migrate",
+    "db:migrate:deploy": "pnpm --filter @bloqer/database db:migrate:deploy",
+    "db:seed": "pnpm --filter @bloqer/database db:seed",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\" --ignore-path .gitignore",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\" --ignore-path .gitignore"
+  },
+  "devDependencies": {
+    "eslint": "^9.15.0",
+    "prettier": "^3.3.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
