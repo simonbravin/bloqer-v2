@@ -7,7 +7,11 @@ import {
 import { JournalEntryDetailActions, JournalEntrySourcePanel, JournalEntryStatusBadge } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import { getJournalEntryById, getJournalEntrySourceLink } from "@bloqer/services";
+import {
+  getJournalEntryById,
+  getJournalEntrySourceLink,
+  type JournalEntryView,
+} from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
 
@@ -27,7 +31,7 @@ export default async function AsientoDetallePage({
   const ctx = (await buildTenantServiceContext())!;
   const cf = companyQueryFilter(sp);
 
-  let entry;
+  let entry: JournalEntryView;
   try {
     entry = await getJournalEntryById(journalEntryId, ctx, { companyId: cf.companyId ?? null });
   } catch {
