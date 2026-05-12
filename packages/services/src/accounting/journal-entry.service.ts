@@ -18,7 +18,7 @@ export type JournalEntryLineView = Omit<JournalEntryLine, "debit" | "credit"> & 
   credit: string;
 };
 
-export type JournalEntryView = JournalEntry & {
+export type JournalEntryView = Omit<JournalEntry, "lines"> & {
   lines: (JournalEntryLineView & { accountCode: string; accountName: string })[];
 };
 
