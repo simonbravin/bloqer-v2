@@ -15,8 +15,7 @@ out/
 # Turbo
 .turbo/
 
-# Prisma
-packages/database/prisma/migrations/
+# Prisma — migrations are versioned; use `migrate deploy` in prod (see docs).
 
 # OS
 .DS_Store

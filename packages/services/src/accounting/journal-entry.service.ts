@@ -18,7 +18,26 @@ export type JournalEntryLineView = Omit<JournalEntryLine, "debit" | "credit"> & 
   credit: string;
 };
 
-export type JournalEntryView = Omit<JournalEntry, "lines"> & {
+/** Serialized journal entry for services/UI — scalar fields + computed lines (no Prisma `Decimal` on lines). */
+export type JournalEntryView = Pick<
+  JournalEntry,
+  | "id"
+  | "tenantId"
+  | "companyId"
+  | "projectId"
+  | "entryDate"
+  | "status"
+  | "sourceType"
+  | "sourceId"
+  | "description"
+  | "reference"
+  | "createdByUserId"
+  | "updatedByUserId"
+  | "postedAt"
+  | "cancelledAt"
+  | "createdAt"
+  | "updatedAt"
+> & {
   lines: (JournalEntryLineView & { accountCode: string; accountName: string })[];
 };
 
