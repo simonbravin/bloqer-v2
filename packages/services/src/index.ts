@@ -6,6 +6,7 @@ export * from "./membership/membership.service";
 export * from "./contact/contact.service";
 export * from "./audit/audit.service";
 export * from "./project/project.service";
+export * from "./project/project-overview-dashboard.service";
 export * from "./budget/budget.service";
 export * from "./budget/budget-settings.service";
 export * from "./budget/wbs.service";

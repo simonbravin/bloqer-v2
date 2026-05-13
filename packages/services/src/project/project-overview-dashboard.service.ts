@@ -1,0 +1,476 @@
+import { Prisma, prisma } from "@bloqer/database";
+import type { PermissionModule } from "@bloqer/domain";
+import { can } from "@bloqer/domain";
+import { listBudgetsByProject } from "../budget/budget.service";
+import { listInvoicesByProject } from "../ar/sales-invoice.service";
+import { listCollectionsByProject } from "../treasury/collection.service";
+import { listCertificationsByProject } from "../certification/certification.service";
+import { getProjectFinanceOverview } from "../project-finance/project-finance-overview.service";
+import { getProjectById, getProjectShellInfo } from "./project.service";
+import { canShowProjectFinanzasNavLink, canViewBudgetsArea } from "./project-nav-guards";
+import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
+import { canViewProjectCostControlReport } from "../cost-control/cost-control.service";
+import { canViewArProjectArea } from "../ar/ar-access";
+import { canViewApProjectArea } from "../ap/ap-access";
+import { canViewProcurementProjectArea } from "../procurement/procurement-access";
+import { canViewSubcontractsArea } from "../subcontracts/subcontract-access";
+import { assertJobsiteLogTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import type { ServiceContext } from "../types";
+
+const ZERO = new Prisma.Decimal(0);
+
+export type ProjectOverviewMoneyRow = { currency: string; amount: string };
+
+export type ProjectOverviewBudgetKpi = {
+  amountByCurrency: ProjectOverviewMoneyRow[];
+  status: string | null;
+  href: string;
+};
+
+export type ProjectOverviewReceivablesKpi = {
+  openByCurrency: ProjectOverviewMoneyRow[];
+  overdueByCurrency: ProjectOverviewMoneyRow[];
+  href: string;
+};
+
+export type ProjectOverviewPayablesKpi = {
+  openByCurrency: ProjectOverviewMoneyRow[];
+  overdueByCurrency: ProjectOverviewMoneyRow[];
+  href: string;
+};
+
+export type ProjectOverviewCashFlowKpi = {
+  href: string;
+  available: boolean;
+};
+
+export type ProjectOverviewCostControlKpi = {
+  href: string;
+  available: boolean;
+};
+
+export type ProjectOverviewBillingVsCollections = {
+  invoicedByCurrency: ProjectOverviewMoneyRow[];
+  collectedByCurrency: ProjectOverviewMoneyRow[];
+};
+
+export type ProjectOverviewActivity = {
+  certificationsCount: number | null;
+  purchaseOrdersCount: number | null;
+  subcontractsCount: number | null;
+  documentsCount: number | null;
+  jobsiteLogsCount: number | null;
+  stockMovementsCount: number | null;
+};
+
+export type ProjectOverviewAlert = {
+  label: string;
+  description: string;
+  severity: "info" | "warning" | "critical";
+  href?: string;
+};
+
+export type ProjectOverviewQuickLink = {
+  label: string;
+  description?: string;
+  href: string;
+};
+
+export type ProjectOverviewSectionExcluded = {
+  module: PermissionModule;
+  section: string;
+  reason: "TENANT_MODULE_DISABLED" | "MISSING_PERMISSION";
+};
+
+export type ProjectOverviewDashboard = {
+  project: {
+    id: string;
+    name: string;
+    code: string | null;
+    status: string;
+    clientName: string | null;
+    startDate: string | null;
+    estimatedEndDate: string | null;
+  };
+  kpis: {
+    budget: ProjectOverviewBudgetKpi | null;
+    receivables: ProjectOverviewReceivablesKpi | null;
+    payables: ProjectOverviewPayablesKpi | null;
+    cashFlow: ProjectOverviewCashFlowKpi | null;
+    costControl: ProjectOverviewCostControlKpi | null;
+  };
+  billingVsCollections: ProjectOverviewBillingVsCollections | null;
+  activity: ProjectOverviewActivity;
+  alerts: ProjectOverviewAlert[];
+  quickLinks: ProjectOverviewQuickLink[];
+  sectionsExcluded: ProjectOverviewSectionExcluded[];
+};
+
+function fmtDate(d: Date | null | undefined): string | null {
+  if (!d) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function addMoneyMap(m: Map<string, Prisma.Decimal>, currency: string, amount: Prisma.Decimal) {
+  m.set(currency, (m.get(currency) ?? ZERO).add(amount));
+}
+
+function mapMoneyMap(m: Map<string, Prisma.Decimal>): ProjectOverviewMoneyRow[] {
+  return [...m.entries()]
+    .filter(([, v]) => v.greaterThan(ZERO))
+    .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
+    .sort((a, b) => a.currency.localeCompare(b.currency));
+}
+
+function canViewJobsiteLogArea(roles: ServiceContext["roles"]): boolean {
+  return can(roles, "VIEW", "JOBSITE_LOG") || can(roles, "VIEW", "PROJECTS");
+}
+
+/**
+ * Resumen ejecutivo del proyecto (Phase 15B). Un solo `getTenantModuleGate`; sin métricas inventadas.
+ */
+export async function getProjectOverviewDashboard(
+  ctx: ServiceContext,
+  projectId: string,
+): Promise<ProjectOverviewDashboard> {
+  const gate = await getTenantModuleGate(ctx);
+  const shell = await getProjectShellInfo(projectId, ctx);
+  const base = `/proyectos/${projectId}`;
+  const sectionsExcluded: ProjectOverviewSectionExcluded[] = [];
+  const alerts: ProjectOverviewAlert[] = [];
+
+  let clientName: string | null = null;
+  let startDate: string | null = null;
+  let estimatedEndDate: string | null = null;
+  if (can(ctx.roles, "VIEW", "PROJECTS")) {
+    try {
+      const full = await getProjectById(projectId, ctx);
+      clientName = full.client ? (full.client.fantasyName ?? full.client.legalName) : null;
+      startDate = fmtDate(full.startDate);
+      estimatedEndDate = fmtDate(full.expectedEndDate);
+    } catch {
+      /* omit extended fields */
+    }
+  } else {
+    sectionsExcluded.push({ module: "PROJECTS", section: "project_detail", reason: "MISSING_PERMISSION" });
+  }
+
+  const finance = await getProjectFinanceOverview(ctx, projectId, { gate });
+
+  let budget: ProjectOverviewBudgetKpi | null = null;
+  const budgetsGate = gate.isEnabled("BUDGETS") && gate.isEnabled("PROJECTS");
+  if (!gate.isEnabled("BUDGETS")) {
+    sectionsExcluded.push({ module: "BUDGETS", section: "budget", reason: "TENANT_MODULE_DISABLED" });
+  } else if (!budgetsGate) {
+    sectionsExcluded.push({ module: "BUDGETS", section: "budget", reason: "TENANT_MODULE_DISABLED" });
+  } else if (!canViewBudgetsArea(ctx.roles)) {
+    sectionsExcluded.push({ module: "BUDGETS", section: "budget", reason: "MISSING_PERMISSION" });
+  } else {
+    try {
+      const budgets = await listBudgetsByProject(projectId, ctx);
+      const approved = budgets.filter((b) => b.status === "APPROVED" || b.status === "CLOSED");
+      const pick =
+        approved.length === 0 ? null : approved.reduce((a, b) => (a.versionNumber >= b.versionNumber ? a : b));
+      const amountByCurrency: ProjectOverviewMoneyRow[] = pick
+        ? [{ currency: pick.currency, amount: pick.totalSalePrice.toString() }]
+        : [];
+      budget = {
+        amountByCurrency,
+        status: pick?.status ?? null,
+        href: `${base}/presupuestos`,
+      };
+      if (!pick) {
+        alerts.push({
+          label: "Presupuesto",
+          description: "Todavía no hay presupuesto aprobado o cerrado para este proyecto.",
+          severity: "info",
+          href: `${base}/presupuestos`,
+        });
+      }
+    } catch {
+      sectionsExcluded.push({ module: "BUDGETS", section: "budget", reason: "MISSING_PERMISSION" });
+    }
+  }
+
+  let receivables: ProjectOverviewReceivablesKpi | null = null;
+  if (!gate.isEnabled("AR")) {
+    sectionsExcluded.push({ module: "AR", section: "receivables", reason: "TENANT_MODULE_DISABLED" });
+  } else if (!finance.sections.ar?.canView) {
+    sectionsExcluded.push({ module: "AR", section: "receivables", reason: "MISSING_PERMISSION" });
+  } else {
+    const ar = finance.sections.ar;
+    receivables = {
+      openByCurrency: ar.totalReceivableByCurrency.map((r) => ({ currency: r.currency, amount: r.amount })),
+      overdueByCurrency: ar.overdueByCurrency.map((r) => ({ currency: r.currency, amount: r.amount })),
+      href: ar.links.receivables,
+    };
+    for (const row of ar.overdueByCurrency) {
+      if (Number(row.amount) > 0) {
+        alerts.push({
+          label: "Cuentas por cobrar vencidas",
+          description: `Hay saldo vencido en ${row.currency}.`,
+          severity: "warning",
+          href: ar.links.receivables,
+        });
+        break;
+      }
+    }
+    if (ar.totalReceivableByCurrency.length === 0) {
+      alerts.push({
+        label: "Cuentas por cobrar",
+        description: "Sin cuentas por cobrar abiertas con saldo.",
+        severity: "info",
+        href: ar.links.receivables,
+      });
+    }
+  }
+
+  let payables: ProjectOverviewPayablesKpi | null = null;
+  if (!gate.isEnabled("AP")) {
+    sectionsExcluded.push({ module: "AP", section: "payables", reason: "TENANT_MODULE_DISABLED" });
+  } else if (!finance.sections.ap?.canView) {
+    sectionsExcluded.push({ module: "AP", section: "payables", reason: "MISSING_PERMISSION" });
+  } else {
+    const ap = finance.sections.ap;
+    payables = {
+      openByCurrency: ap.totalPayableByCurrency.map((r) => ({ currency: r.currency, amount: r.amount })),
+      overdueByCurrency: ap.overdueByCurrency.map((r) => ({ currency: r.currency, amount: r.amount })),
+      href: ap.links.payables,
+    };
+    for (const row of ap.overdueByCurrency) {
+      if (Number(row.amount) > 0) {
+        alerts.push({
+          label: "Cuentas por pagar vencidas",
+          description: `Hay saldo vencido en ${row.currency}.`,
+          severity: "critical",
+          href: ap.links.payables,
+        });
+        break;
+      }
+    }
+    if (ap.totalPayableByCurrency.length === 0) {
+      alerts.push({
+        label: "Cuentas por pagar",
+        description: "Sin cuentas por pagar abiertas con saldo.",
+        severity: "info",
+        href: ap.links.payables,
+      });
+    }
+  }
+
+  let cashFlow: ProjectOverviewCashFlowKpi | null = null;
+  const canCf = gate.isEnabled("PROJECTS") && canViewProjectCashFlowReport(ctx.roles);
+  if (!gate.isEnabled("PROJECTS")) {
+    sectionsExcluded.push({ module: "PROJECTS", section: "cash_flow", reason: "TENANT_MODULE_DISABLED" });
+  } else if (!canViewProjectCashFlowReport(ctx.roles)) {
+    sectionsExcluded.push({ module: "PROJECTS", section: "cash_flow", reason: "MISSING_PERMISSION" });
+  } else {
+    cashFlow = { href: `${base}/flujo-caja`, available: canCf };
+  }
+
+  let costControl: ProjectOverviewCostControlKpi | null = null;
+  const canCc =
+    gate.isEnabled("PROJECTS") &&
+    gate.isEnabled("BUDGETS") &&
+    canViewProjectCostControlReport(ctx.roles);
+  if (!gate.isEnabled("BUDGETS")) {
+    sectionsExcluded.push({ module: "BUDGETS", section: "cost_control", reason: "TENANT_MODULE_DISABLED" });
+  } else if (!gate.isEnabled("PROJECTS")) {
+    sectionsExcluded.push({ module: "PROJECTS", section: "cost_control", reason: "TENANT_MODULE_DISABLED" });
+  } else if (!canViewProjectCostControlReport(ctx.roles)) {
+    sectionsExcluded.push({ module: "PROJECTS", section: "cost_control", reason: "MISSING_PERMISSION" });
+  } else {
+    costControl = { href: `${base}/control-costos`, available: canCc };
+  }
+
+  let billingVsCollections: ProjectOverviewBillingVsCollections | null = null;
+  if (gate.isEnabled("AR") && canViewArProjectArea(ctx.roles)) {
+    try {
+      const [invoices, collections] = await Promise.all([
+        listInvoicesByProject(projectId, ctx),
+        listCollectionsByProject(projectId, ctx),
+      ]);
+      const invoiced = new Map<string, Prisma.Decimal>();
+      for (const inv of invoices) {
+        if (inv.status !== "ISSUED") continue;
+        addMoneyMap(invoiced, inv.currency, new Prisma.Decimal(inv.totalAmount));
+      }
+      const collected = new Map<string, Prisma.Decimal>();
+      for (const c of collections) {
+        if (c.status !== "CONFIRMED") continue;
+        addMoneyMap(collected, c.currency, new Prisma.Decimal(c.amount));
+      }
+      billingVsCollections = {
+        invoicedByCurrency: mapMoneyMap(invoiced),
+        collectedByCurrency: mapMoneyMap(collected),
+      };
+    } catch {
+      billingVsCollections = null;
+    }
+  }
+
+  let certificationsCount: number | null = null;
+  if (gate.isEnabled("CERTIFICATIONS") && can(ctx.roles, "VIEW", "CERTIFICATIONS")) {
+    try {
+      certificationsCount = (await listCertificationsByProject(projectId, ctx)).length;
+    } catch {
+      certificationsCount = null;
+    }
+  } else if (!gate.isEnabled("CERTIFICATIONS")) {
+    sectionsExcluded.push({
+      module: "CERTIFICATIONS",
+      section: "activity_certifications",
+      reason: "TENANT_MODULE_DISABLED",
+    });
+  } else {
+    sectionsExcluded.push({
+      module: "CERTIFICATIONS",
+      section: "activity_certifications",
+      reason: "MISSING_PERMISSION",
+    });
+  }
+
+  let purchaseOrdersCount: number | null = null;
+  if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(ctx.roles)) {
+    purchaseOrdersCount = await prisma.purchaseOrder.count({
+      where: { tenantId: ctx.tenantId, projectId },
+    });
+  } else if (!gate.isEnabled("PROCUREMENT")) {
+    sectionsExcluded.push({ module: "PROCUREMENT", section: "activity_po", reason: "TENANT_MODULE_DISABLED" });
+  } else {
+    sectionsExcluded.push({ module: "PROCUREMENT", section: "activity_po", reason: "MISSING_PERMISSION" });
+  }
+
+  let subcontractsCount: number | null = null;
+  if (gate.isEnabled("SUBCONTRACTS") && canViewSubcontractsArea(ctx.roles)) {
+    subcontractsCount = await prisma.subcontract.count({
+      where: { tenantId: ctx.tenantId, projectId },
+    });
+  } else if (!gate.isEnabled("SUBCONTRACTS")) {
+    sectionsExcluded.push({
+      module: "SUBCONTRACTS",
+      section: "activity_subcontracts",
+      reason: "TENANT_MODULE_DISABLED",
+    });
+  } else {
+    sectionsExcluded.push({
+      module: "SUBCONTRACTS",
+      section: "activity_subcontracts",
+      reason: "MISSING_PERMISSION",
+    });
+  }
+
+  let documentsCount: number | null = null;
+  if (gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS")) {
+    documentsCount = await prisma.documentAttachment.count({
+      where: { tenantId: ctx.tenantId, projectId, status: "ACTIVE" },
+    });
+  } else {
+    sectionsExcluded.push({ module: "PROJECTS", section: "activity_documents", reason: "MISSING_PERMISSION" });
+  }
+
+  let jobsiteLogsCount: number | null = null;
+  if (gate.isEnabled("JOBSITE_LOG") && canViewJobsiteLogArea(ctx.roles)) {
+    try {
+      await assertJobsiteLogTenantModule(ctx);
+      jobsiteLogsCount = await prisma.jobsiteLog.count({
+        where: { tenantId: ctx.tenantId, projectId },
+      });
+    } catch {
+      jobsiteLogsCount = null;
+    }
+  } else if (!gate.isEnabled("JOBSITE_LOG")) {
+    sectionsExcluded.push({ module: "JOBSITE_LOG", section: "activity_jobsite", reason: "TENANT_MODULE_DISABLED" });
+  } else {
+    sectionsExcluded.push({ module: "JOBSITE_LOG", section: "activity_jobsite", reason: "MISSING_PERMISSION" });
+  }
+
+  let stockMovementsCount: number | null = null;
+  if (gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY")) {
+    stockMovementsCount = await prisma.stockMovement.count({
+      where: { tenantId: ctx.tenantId, projectId },
+    });
+  } else if (!gate.isEnabled("INVENTORY")) {
+    sectionsExcluded.push({ module: "INVENTORY", section: "activity_stock", reason: "TENANT_MODULE_DISABLED" });
+  } else {
+    sectionsExcluded.push({ module: "INVENTORY", section: "activity_stock", reason: "MISSING_PERMISSION" });
+  }
+
+  const activity: ProjectOverviewActivity = {
+    certificationsCount,
+    purchaseOrdersCount,
+    subcontractsCount,
+    documentsCount,
+    jobsiteLogsCount,
+    stockMovementsCount,
+  };
+
+  if (
+    jobsiteLogsCount === 0 &&
+    gate.isEnabled("JOBSITE_LOG") &&
+    canViewJobsiteLogArea(ctx.roles) &&
+    jobsiteLogsCount !== null
+  ) {
+    alerts.push({
+      label: "Libro de obra",
+      description: "Cargá partes de obra para ver actividad operativa.",
+      severity: "info",
+      href: `${base}/libro-obra`,
+    });
+  }
+
+  const quickLinks: ProjectOverviewQuickLink[] = [];
+  const pushLink = (label: string, href: string, description?: string) => {
+    if (quickLinks.some((q) => q.href === href)) return;
+    quickLinks.push({ label, href, description });
+  };
+
+  pushLink("Presupuesto", `${base}/presupuestos`, "Versiones y WBS del proyecto");
+  if (canShowProjectFinanzasNavLink(gate, ctx.roles)) {
+    pushLink("Finanzas del proyecto", `${base}/finanzas`, "Resumen financiero del proyecto");
+  }
+  if (costControl?.available) {
+    pushLink("Control de costos", costControl.href, "Presupuesto vs ejecutado");
+  }
+  if (cashFlow?.available) {
+    pushLink("Flujo de caja", cashFlow.href, "Cobros y pagos imputados a la obra");
+  }
+  if (gate.isEnabled("JOBSITE_LOG") && canViewJobsiteLogArea(ctx.roles)) {
+    pushLink("Libro de obra", `${base}/libro-obra`, "Partes y avance físico");
+  }
+  if (gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS")) {
+    pushLink("Documentos", `${base}/documentos`, "Adjuntos del proyecto");
+  }
+  if (gate.isEnabled("AR") && canViewArProjectArea(ctx.roles)) {
+    pushLink("Cuentas por cobrar", `${base}/cuentas-por-cobrar`, "Saldos abiertos de clientes");
+    pushLink("Cobranzas", `${base}/cobranzas`, "Cobros registrados");
+  }
+  if (gate.isEnabled("AP") && canViewApProjectArea(ctx.roles)) {
+    pushLink("Cuentas por pagar", `${base}/cuentas-por-pagar`, "Saldos abiertos con proveedores");
+  }
+
+  return {
+    project: {
+      id: shell.id,
+      name: shell.name,
+      code: shell.code,
+      status: shell.status,
+      clientName,
+      startDate,
+      estimatedEndDate,
+    },
+    kpis: {
+      budget,
+      receivables,
+      payables,
+      cashFlow,
+      costControl,
+    },
+    billingVsCollections,
+    activity,
+    alerts,
+    quickLinks,
+    sectionsExcluded,
+  };
+}

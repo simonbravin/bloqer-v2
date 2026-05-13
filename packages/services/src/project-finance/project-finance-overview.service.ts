@@ -165,8 +165,9 @@ function pushUniqueQuickAction(
 export async function getProjectFinanceOverview(
   ctx: ServiceContext,
   projectId: string,
+  options?: { gate?: TenantModuleGate },
 ): Promise<ProjectFinanceOverview> {
-  const gate = await getTenantModuleGate(ctx);
+  const gate = options?.gate ?? (await getTenantModuleGate(ctx));
   const shell = await getProjectShellInfo(projectId, ctx);
   const base = `/proyectos/${projectId}`;
   const warnings: ProjectFinanceOverviewWarning[] = [];

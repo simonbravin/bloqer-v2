@@ -216,7 +216,7 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 ### 6.4 Hub financiero del proyecto (Phase 14E)
 
 - **Ruta:** `/proyectos/[id]/finanzas`.
-- **Servicio:** `getProjectFinanceOverview(ctx, projectId)` — valida tenant con `getProjectShellInfo`; **una** llamada a `getTenantModuleGate(ctx)` por invocación.
+- **Servicio:** `getProjectFinanceOverview(ctx, projectId, options?)` — valida tenant con `getProjectShellInfo`; **una** llamada a `getTenantModuleGate(ctx)` salvo que se pase `options.gate` (Phase **15B** comparte el gate con `getProjectOverviewDashboard`).
 - **AR:** si módulo `AR` activo y `canViewArProjectArea` → totales y vencido **por moneda** (`getReceivableAgingReport({ projectId })` si `VIEW AR`, si no agregación sobre `listReceivablesByProject`); conteo facturas venta `ISSUED` vía `listInvoicesByProject`.
 - **AP:** análogo con `getPayableAgingReport` / `listPayablesByProject` / `listSupplierInvoicesByProject`.
 - **Flujo de caja:** card con enlace a `/flujo-caja` si `PROJECTS` activo y `canViewProjectCashFlowReport`; notas de contexto tesorería (sin inventar saldos bancarios por proyecto).
@@ -228,9 +228,16 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 
 - **`apps/web/components/layout/app-nav-column.tsx`** — cliente: si pathname `/proyectos/[id]/**` y usuario con tenant → **`ProjectWorkspaceSidebar`**; si no → **`Sidebar`** global.
 - **`apps/web/components/layout/project-workspace-sidebar.tsx`** — cliente; secciones desde **`buildProjectWorkspaceNavSections`**; **Resumen** usa `NavItem` con `matchExact` (solo activo en la raíz del proyecto).
-- **`apps/web/features/projects/project-workspace-nav-config.ts`** — **`buildProjectWorkspaceNavSections(projectId, gate, roles)`**; enlace **Finanzas del proyecto** cuando `canShowProjectFinanzasNavLink`.
 - **`apps/web/features/projects/tenant-gate-from-snapshot.ts`** — **`tenantGateFromSnapshot`** reconstruye `TenantModuleGate` en cliente.
 - **`apps/web/app/api/projects/[id]/shell/route.ts`** — JSON del shell vía `getProjectShellInfo` (misma AuthZ que el layout).
+- **`packages/services/src/project/project-workspace-nav.ts`** — **`buildProjectWorkspaceNavSections(projectId, gate, roles)`** (import en app vía `@bloqer/services/project-workspace-nav`).
+
+### 6.6 Resumen ejecutivo del proyecto (Phase 15B)
+
+- **Ruta:** `/proyectos/[id]` (raíz del workspace).
+- **Servicio:** `getProjectOverviewDashboard(ctx, projectId)` en **`packages/services/src/project/project-overview-dashboard.service.ts`** — DTO estable para UI; sin Prisma en `apps/web`.
+- **Datos:** reutiliza **`getProjectFinanceOverview(ctx, projectId, { gate })`** para C×C/C×P coherente con el hub; presupuesto vía **`listBudgetsByProject`**; facturado vs cobrado con **`listInvoicesByProject`** (total `ISSUED`) + **`listCollectionsByProject`** (`CONFIRMED`), **sin conversión de moneda** entre divisas; conteos con `prisma.count` / listas existentes según módulo y `can()`.
+- **UI:** `ProjectOverviewView` y piezas en **`apps/web/features/projects/overview/`**.
 
 ---
 
@@ -240,6 +247,7 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 - [x] Rediseño `/finanzas` overview global (servicio + UI) — **v1** con `getFinanceHubOverview`.
 - [x] `layout.tsx` bajo `[id]` + navegación de proyecto (Phase **14D** subnav horizontal → **15A** sidebar workspace).
 - [x] `/proyectos/[id]/finanzas` (página + servicio orquestador) — **Phase 14E**.
+- [x] Resumen `/proyectos/[id]` — **Phase 15B** (`getProjectOverviewDashboard` + `ProjectOverviewView`).
 - [ ] Producto: ¿nullable `projectId` en `SupplierInvoice` / `SalesInvoice` / `Receivable` / `Payable`?
 - [ ] Producto: ¿`projectId` en `AccountMovement` o tabla puente?
 - [ ] Documentar en `OPEN_QUESTIONS.md` si se abre debate BR-AR-003 / gastos generales AP.
@@ -250,13 +258,14 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 
 | Área | Path principal |
 |------|----------------|
+| Resumen proyecto (Phase 15B) | `packages/services/src/project/project-overview-dashboard.service.ts`, `apps/web/features/projects/overview/project-overview-view.tsx`, `apps/web/app/(app)/proyectos/[id]/page.tsx` |
 | Rutas proyecto | `apps/web/app/(app)/proyectos/**` |
 | Rutas finanzas | `apps/web/app/(app)/finanzas/**` |
 | Hub finanzas (servicio) | `packages/services/src/finance/finance-hub-overview.service.ts` |
 | Hub finanzas (UI) | `apps/web/features/finance/finance-hub-view.tsx` |
 | Hub finanzas **proyecto** | `packages/services/src/project-finance/project-finance-overview.service.ts` |
 | Hub finanzas proyecto (UI) | `apps/web/features/projects/project-finance-overview-view.tsx`, `apps/web/app/(app)/proyectos/[id]/finanzas/page.tsx` |
-| Workspace + layout proyecto | `apps/web/app/(app)/proyectos/[id]/layout.tsx`, `apps/web/components/layout/app-nav-column.tsx`, `project-workspace-sidebar.tsx`, `apps/web/features/projects/project-workspace-nav-config.ts`, `GET /api/projects/[id]/shell` |
+| Workspace + layout proyecto | `apps/web/app/(app)/proyectos/[id]/layout.tsx`, `apps/web/components/layout/app-nav-column.tsx`, `project-workspace-sidebar.tsx`, `packages/services/src/project/project-workspace-nav.ts`, `GET /api/projects/[id]/shell` |
 | Shell proyecto (servicio) | `packages/services/src/project/project.service.ts` (`getProjectShellInfo`, `canAccessProjectLayout`) |
 | Rutas tesorería | `apps/web/app/(app)/tesoreria/**` |
 | AR | `packages/services/src/ar/**` |
