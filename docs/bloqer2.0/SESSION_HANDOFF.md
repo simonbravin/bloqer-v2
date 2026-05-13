@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
 Last updated: 2026-05-13  
-Status: Phase **14D** — `layout.tsx` bajo `/proyectos/[id]` (`getProjectShellInfo` + `ProjectSubnav` compartido); `buildProjectSubnavLinks` audita solo rutas existentes (AR/AP, control de costos, flujo de caja, etc.); `getProjectShellInfo` / `canAccessProjectLayout` en `project.service.ts`. Phase **14C+**: hub `/finanzas`. Doc subnav: [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md). Sin `db:push`; verificar `db:generate` + typecheck + lint + build en CI local.
+Status: Phase **14E** — hub **`/proyectos/[id]/finanzas`**: `getProjectFinanceOverview` + UI `ProjectFinanceOverviewView`; subnav con link **Finanzas** vía `canShowProjectFinanzasNavLink`. Sobre **14D** (layout + subnav) y **14C+** (hub empresa `/finanzas`). Doc: [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md). Sin `db:push`; verificar `db:generate` + typecheck + lint + build en CI local.
 
 ---
 
@@ -66,8 +66,9 @@ Status: Phase **14D** — `layout.tsx` bajo `/proyectos/[id]` (`getProjectShellI
 | Phase 14C | Auditoría rutas finanzas/proyecto/tesorería + modelo `projectId` + plan indicadores; doc [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) | Complete (doc) |
 | Phase 14C+ | Hub `/finanzas` (`getFinanceHubOverview` + `FinanceHubView`); subnav proyecto en ficha `/proyectos/[id]` | Complete |
 | Phase 14D | Layout `/proyectos/[id]` + subnav global; `getProjectShellInfo` / `canAccessProjectLayout`; enlaces subnav solo a rutas reales; presupuestos/certificaciones usan shell para breadcrumb | Complete |
+| Phase 14E | Hub `/proyectos/[id]/finanzas` — `getProjectFinanceOverview` (aging AR/AP con `projectId` o agregados desde listados; sin mezclar monedas); UI + link subnav | Complete |
 
-**Siguiente (sugerido):** página `/proyectos/[id]/finanzas` (hub proyecto); servicio `getProjectFinanceOverview`; producto: `projectId` nullable / `AccountMovement`. Deploy: Neon + Vercel, [`DEPLOYMENT_SMOKE_TEST.md`](./08-architecture/DEPLOYMENT_SMOKE_TEST.md).
+**Siguiente (sugerido):** producto: `projectId` nullable / `AccountMovement`; módulo gastos / `Expense` si aplica. Deploy: Neon + Vercel, [`DEPLOYMENT_SMOKE_TEST.md`](./08-architecture/DEPLOYMENT_SMOKE_TEST.md).
 
 ---
 
@@ -117,6 +118,7 @@ Ver matrices: `PERMISSIONS_ROUTE_MATRIX.md`, `SECURITY_ARCHITECTURE.md`.
 /directorio, /directorio/nuevo, /directorio/[id], /directorio/[id]/editar
 /proyectos, /proyectos/nuevo
 /proyectos/[id]
+/proyectos/[id]/finanzas
 /proyectos/[id]/presupuestos, /nueva, /[budgetId], /[budgetId]/editar
 /proyectos/[id]/certificaciones, /nueva, /[certId], /[certId]/editar
 /proyectos/[id]/facturas, /nueva, /[invoiceId], /[invoiceId]/editar

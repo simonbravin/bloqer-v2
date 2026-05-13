@@ -40,6 +40,7 @@ export * from "./jobsite-log/jobsite-log.service";
 export * from "./cost-control/cost-control.service";
 export * from "./aging/aging.service";
 export * from "./finance/finance-hub-overview.service";
+export * from "./project-finance/project-finance-overview.service";
 export * from "./inventory/warehouse-transfer.service";
 export * from "./treasury-reports/treasury-reports.service";
 export * from "./inventory-reports/inventory-reports.service";

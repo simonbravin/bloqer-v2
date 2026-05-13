@@ -1,4 +1,4 @@
-# Finanzas globales, overview por proyecto y plan de indicadores (Phase 14C–14D)
+# Finanzas globales, overview por proyecto y plan de indicadores (Phase 14C–14E)
 
 Este documento **audita el estado actual** (rutas + Prisma + servicios) y define **arquitectura objetivo** sin implementar un módulo nuevo de gastos generales. Las reglas de implementación siguen siendo: **sin Prisma en `apps/web`**, datos solo desde **`@bloqer/services`**, **RBAC `can()`**, **tenant module gates**, **sin inventar métricas**.
 
@@ -20,19 +20,19 @@ Bajo `apps/web/app/(app)/proyectos/**` (App Router), además de `/proyectos` y `
 | Facturación venta (AR) | `/facturas`, `/nueva`, `/[invoiceId]`, `/[invoiceId]/editar` |
 | CxC / cobranzas | `/cuentas-por-cobrar`, `/[receivableId]`, `/[receivableId]/cobrar`, `/cobranzas`, `/nueva`, `/[collectionId]` |
 | AP / compras | `/facturas-proveedor`, `/nueva`, `/[supplierInvoiceId]`, `/[supplierInvoiceId]/editar`, `/cuentas-por-pagar`, `/[payableId]`, `/[payableId]/pagar`, `/pagos`, `/[paymentId]`, `/ordenes-compra`, `/nueva`, `/[poId]`, `/[poId]/editar`, `/[poId]/recepciones/nueva`, `/recepciones`, `/[receiptId]` |
-| Costos / flujo | `/control-costos`, `/control-costos/[wbsNodeId]`, `/flujo-caja` |
+| Costos / flujo / hub finanzas obra | `/control-costos`, `/control-costos/[wbsNodeId]`, `/flujo-caja`, **`/finanzas`** (segmento bajo `[id]`, es decir `/proyectos/[id]/finanzas`) |
 | Operativa | `/subcontratos`, `/nuevo`, `/[subcontractId]`, `/editar`, certificaciones de subcontrato, `/libro-obra`, `/nuevo`, `/[logId]`, `/[logId]/editar`, `/inventario`, `/consumos/nuevo`, `/documentos`, `/nuevo`, `/[documentId]` |
 
 La **ficha** `/proyectos/[id]` conserva atajos en botones; la **navegación principal entre secciones** es la subnav del layout. Rutas como OC, recepciones, consumos, detalle de facturas siguen enlazadas desde listas o CTAs internos.
 
 ### 1.2 ¿Qué rutas faltan para una experiencia “completa”?
 
-- **`/proyectos/[id]/finanzas`** — no existe; hoy la información financiera del proyecto está **dispersa** en C×C, cobranzas, facturas proveedor, C×P, pagos, flujo de caja y control de costos (**Phase 14E** propuesta).
 - **Hub financiero global** más allá de aging — ver 1.4.
+- **Gastos generales sin obra** / entidad `Expense` — ver 1.5 y §7 (pendiente de producto).
 
 ### 1.3 ¿Existe `/proyectos/[id]/finanzas`?
 
-**No.** No hay carpeta ni página con ese segmento.
+**Sí (Phase 14E).** Página `apps/web/app/(app)/proyectos/[id]/finanzas/page.tsx` y servicio **`getProjectFinanceOverview(ctx, projectId)`** en `packages/services/src/project-finance/project-finance-overview.service.ts`. Orquesta aging AR/AP con filtro `projectId` cuando el rol tiene `VIEW AR` / `VIEW AP`; si el acceso es solo vía `canViewArProjectArea` / `canViewApProjectArea` (p. ej. `VIEW PROJECTS` sin `VIEW AR`), agrega saldos por moneda desde los listados por proyecto **sin** mezclar monedas en un solo total. No llama a `getProjectCostControl` completo.
 
 ### 1.4 ¿Existe una visión global financiera “real” en `/finanzas`?
 
@@ -111,16 +111,16 @@ La **empresa** (`companyId` dentro del tenant) debe poder verse como:
 
 ## 3. Visión proyecto (objetivo)
 
-Cada **`/proyectos/[id]/...`** debería poder resumirse en **`/proyectos/[id]/finanzas`** como **hub de solo lectura** (o con CTAs a mutaciones existentes):
+**Phase 14E (v1):** la ruta **`/proyectos/[id]/finanzas`** implementa un **hub de solo lectura** con CTAs hacia mutaciones ya existentes (`getProjectFinanceOverview`). Resumen:
 
 | Bloque | Servicio / ruta existente | Notas |
 |--------|---------------------------|--------|
-| CxC / cobranzas | Rutas bajo `[id]/cuentas-por-cobrar`, `cobranzas`; aging con `projectId` | Ya filtrable |
-| CxP / pagos | `[id]/cuentas-por-pagar`, `pagos`, facturas proveedor | Ya existente |
-| Flujo de caja proyecto | `getProjectCashFlowReport` + `/flujo-caja` | No reimplementar |
-| Presupuesto vs real | `getProjectCostControl` + `/control-costos` | No reimplementar |
-| Certificaciones / compras / subcontratos | Enlaces a módulos ya implementados | Solo navegación |
-| Inventario en obra | `/inventario`, consumos | Ya existe |
+| CxC / cobranzas | `getReceivableAgingReport({ projectId })` o agregado desde `listReceivablesByProject`; rutas `[id]/cuentas-por-cobrar`, `cobranzas` | Sin mezclar monedas |
+| CxP / pagos | `getPayableAgingReport({ projectId })` o `listPayablesByProject`; facturas proveedor | Sin mezclar monedas |
+| Flujo de caja proyecto | Enlace a `/flujo-caja`; `getProjectCashFlowReport` no se duplica en el hub | |
+| Presupuesto vs real | `listBudgetsByProject` para último aprobado/cerrado; enlaces a `/presupuestos` y `/control-costos` | No se invoca `getProjectCostControl` en el overview |
+| Certificaciones / compras / subcontratos | Fuera del alcance de la v1 del hub financiero | Siguen en subnav / rutas dedicadas |
+| Inventario en obra | Fuera del alcance de la v1 del hub financiero | `/inventario`, consumos |
 
 **Tesorería “por proyecto”:** limitada por modelo: cobros/pagos llevan `projectId`, pero el movimiento en cuenta no; un overview puede **listar** cobros/pagos del proyecto y **enlazar** a cuenta, sin inventar saldo “por proyecto” en tesorería global sin reglas nuevas.
 
@@ -176,6 +176,7 @@ Cada fila solo aparece si el **módulo tenant** está habilitado (`gate.isEnable
 | Label | Ruta | Módulo gate (tenant) | Permiso / helper |
 |-------|------|----------------------|------------------|
 | Resumen | `/proyectos/[id]` | — | `VIEW PROJECTS` |
+| **Finanzas (hub)** | **`/proyectos/[id]/finanzas`** | `PROJECTS` + (AR / AP / TREASURY / BUDGETS según bloque o flujo) | `canShowProjectFinanzasNavLink` — ver servicio |
 | Presupuesto | `/proyectos/[id]/presupuestos` | `BUDGETS` | `VIEW BUDGETS` **o** `VIEW PROJECTS` (alineado a `canViewBudgetsArea` en servicios de presupuesto) |
 | Control de costos | `/proyectos/[id]/control-costos` | `PROJECTS` + `BUDGETS` | `canViewProjectCostControlReport` (`VIEW PROJECTS` **o** `VIEW BUDGETS`) |
 | Libro de obra | `/proyectos/[id]/libro-obra` | `JOBSITE_LOG` | `VIEW JOBSITE_LOG` **o** `VIEW PROJECTS` |
@@ -199,24 +200,34 @@ Cada fila solo aparece si el **módulo tenant** está habilitado (`gate.isEnable
 
 | Label aspiracional | Ruta | Notas |
 |--------------------|------|--------|
-| Finanzas (hub proyecto) | **`/proyectos/[id]/finanzas`** | **Phase 14E** sugerida — consolidar C×C, cobranzas, AP, flujo y costos en un hub de solo lectura. |
 | Cronograma | **`/proyectos/[id]/cronograma`** | Sin página. |
 | Reportes (proyecto) | **`/proyectos/[id]/reportes`** | Sin página; hoy reportes clave = **Flujo de caja** y **Control de costos** con rutas propias. |
 | WBS dedicado | ruta propia | Hoy WBS vive en **Presupuesto** y **Control de costos**; no se duplica link con la misma URL que presupuesto. |
 
-### 6.4 Componentes
+### 6.4 Hub financiero del proyecto (Phase 14E)
+
+- **Ruta:** `/proyectos/[id]/finanzas`.
+- **Servicio:** `getProjectFinanceOverview(ctx, projectId)` — valida tenant con `getProjectShellInfo`; **una** llamada a `getTenantModuleGate(ctx)` por invocación.
+- **AR:** si módulo `AR` activo y `canViewArProjectArea` → totales y vencido **por moneda** (`getReceivableAgingReport({ projectId })` si `VIEW AR`, si no agregación sobre `listReceivablesByProject`); conteo facturas venta `ISSUED` vía `listInvoicesByProject`.
+- **AP:** análogo con `getPayableAgingReport` / `listPayablesByProject` / `listSupplierInvoicesByProject`.
+- **Flujo de caja:** card con enlace a `/flujo-caja` si `PROJECTS` activo y `canViewProjectCashFlowReport`; notas de contexto tesorería (sin inventar saldos bancarios por proyecto).
+- **Presupuesto / costos:** si `PROJECTS` + `BUDGETS` activos — enlaces y, si `canViewBudgetsArea`, último presupuesto aprobado/cerrado vía `listBudgetsByProject` (sin ejecutar control de costos completo).
+- **UI:** `ProjectFinanceOverviewView` en `apps/web/features/projects/project-finance-overview-view.tsx`.
+- **Limitaciones:** sin entidad **Expense**; gastos generales fuera de obra siguen fuera de este hub; **no** se mezclan monedas en un único total.
+
+### 6.5 Componentes (subnav)
 
 - **`apps/web/features/projects/project-subnav.tsx`** — cliente (`usePathname`); **Resumen** activo con match exacto de `href`; demás ítems activos con `pathname === href` o prefijo `href/`; si `items.length === 0` no renderiza nav.
-- **`apps/web/features/projects/project-subnav-config.ts`** — **`buildProjectSubnavLinks(projectId, gate, roles)`**.
+- **`apps/web/features/projects/project-subnav-config.ts`** — **`buildProjectSubnavLinks(projectId, gate, roles)`**; ítem **Finanzas** cuando `canShowProjectFinanzasNavLink`.
 
 ---
 
 ## 7. Pendientes explícitos (backlog)
 
-- [ ] `getProjectFinanceOverview` (o nombre alineado) en `packages/services`.
+- [x] `getProjectFinanceOverview` en `packages/services/src/project-finance/project-finance-overview.service.ts`.
 - [x] Rediseño `/finanzas` overview global (servicio + UI) — **v1** con `getFinanceHubOverview`.
 - [x] `layout.tsx` bajo `[id]` + reutilizar `ProjectSubnav` en todas las páginas hijas (Phase **14D**).
-- [ ] `/proyectos/[id]/finanzas` (página + servicio delgado) — **Phase 14E**.
+- [x] `/proyectos/[id]/finanzas` (página + servicio orquestador) — **Phase 14E**.
 - [ ] Producto: ¿nullable `projectId` en `SupplierInvoice` / `SalesInvoice` / `Receivable` / `Payable`?
 - [ ] Producto: ¿`projectId` en `AccountMovement` o tabla puente?
 - [ ] Documentar en `OPEN_QUESTIONS.md` si se abre debate BR-AR-003 / gastos generales AP.
@@ -231,6 +242,8 @@ Cada fila solo aparece si el **módulo tenant** está habilitado (`gate.isEnable
 | Rutas finanzas | `apps/web/app/(app)/finanzas/**` |
 | Hub finanzas (servicio) | `packages/services/src/finance/finance-hub-overview.service.ts` |
 | Hub finanzas (UI) | `apps/web/features/finance/finance-hub-view.tsx` |
+| Hub finanzas **proyecto** | `packages/services/src/project-finance/project-finance-overview.service.ts` |
+| Hub finanzas proyecto (UI) | `apps/web/features/projects/project-finance-overview-view.tsx`, `apps/web/app/(app)/proyectos/[id]/finanzas/page.tsx` |
 | Subnav + layout proyecto | `apps/web/app/(app)/proyectos/[id]/layout.tsx`, `apps/web/features/projects/project-subnav.tsx`, `project-subnav-config.ts` |
 | Shell proyecto (servicio) | `packages/services/src/project/project.service.ts` (`getProjectShellInfo`, `canAccessProjectLayout`) |
 | Rutas tesorería | `apps/web/app/(app)/tesoreria/**` |
@@ -244,4 +257,4 @@ Cada fila solo aparece si el **módulo tenant** está habilitado (`gate.isEnable
 
 ---
 
-*Phase 14C–14D — auditoría + arquitectura; hub `/finanzas`; layout `/proyectos/[id]` con subnav compartida y `getProjectShellInfo`; sin schema nuevo.*
+*Phase 14C–14E — auditoría + arquitectura; hubs `/finanzas` (empresa) y `/proyectos/[id]/finanzas` (obra); layout proyecto con subnav; sin schema nuevo ni entidad Expense.*

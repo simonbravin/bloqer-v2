@@ -1,6 +1,7 @@
 import { can, type UserRole } from "@bloqer/domain";
 import type { TenantModuleGate } from "@bloqer/services";
 import {
+  canShowProjectFinanzasNavLink,
   canViewApProjectArea,
   canViewArProjectArea,
   canViewProcurementProjectArea,
@@ -14,10 +15,11 @@ export type ProjectSubnavLink = { label: string; href: string };
  * Links for {@link ProjectSubnav}. Only **existing** App Router paths under `/proyectos/[id]`.
  *
  * **Not shown until routes exist** (documented in `FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`):
- * - `/proyectos/[id]/finanzas` — Phase 14E hub
  * - `/proyectos/[id]/cronograma`
  * - `/proyectos/[id]/reportes`
  * - Dedicated WBS (today WBS lives inside presupuesto / control de costos)
+ *
+ * **Finanzas del proyecto:** `/proyectos/[id]/finanzas` (Phase 14E) cuando `canShowProjectFinanzasNavLink` da verdadero.
  */
 export function buildProjectSubnavLinks(projectId: string, gate: TenantModuleGate, roles: UserRole[]): ProjectSubnavLink[] {
   const base = `/proyectos/${projectId}`;
@@ -25,6 +27,10 @@ export function buildProjectSubnavLinks(projectId: string, gate: TenantModuleGat
 
   if (can(roles, "VIEW", "PROJECTS")) {
     out.push({ label: "Resumen", href: base });
+  }
+
+  if (canShowProjectFinanzasNavLink(gate, roles)) {
+    out.push({ label: "Finanzas", href: `${base}/finanzas` });
   }
 
   const canBudgetsArea = can(roles, "VIEW", "BUDGETS") || can(roles, "VIEW", "PROJECTS");
