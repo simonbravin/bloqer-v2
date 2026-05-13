@@ -60,7 +60,7 @@ export default async function FacturasProveedorPage({ params }: PageProps) {
           <h2 className="font-semibold">Facturas del proyecto</h2>
         </div>
         <div className="p-6">
-          <SupplierInvoiceList invoices={items} projectId={id} />
+          <SupplierInvoiceList invoices={items} hrefPrefix={`/proyectos/${id}/facturas-proveedor`} />
         </div>
       </div>
     </div>

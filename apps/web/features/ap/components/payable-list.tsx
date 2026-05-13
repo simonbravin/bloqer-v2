@@ -12,14 +12,20 @@ export type PayableListItem = {
   paidAmount: string;
   balanceDue: string;
   currency: string;
+  /** Corporate list: link label to supplier invoice detail. */
+  supplierInvoiceId?: string;
+  supplierInvoiceCode?: string | null;
 };
 
 interface Props {
   payables: PayableListItem[];
-  projectId: string;
+  /** e.g. `/proyectos/x/cuentas-por-pagar` or `/finanzas/cuentas-por-pagar` */
+  hrefPrefix: string;
+  /** When set with `supplierInvoiceId` / `supplierInvoiceCode`, links the factura label. */
+  supplierInvoiceHrefPrefix?: string;
 }
 
-export function PayableList({ payables, projectId }: Props) {
+export function PayableList({ payables, hrefPrefix, supplierInvoiceHrefPrefix }: Props) {
   if (payables.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
@@ -34,13 +40,24 @@ export function PayableList({ payables, projectId }: Props) {
         <div key={p.id} className="flex items-center justify-between px-2 py-3 hover:bg-muted/40">
           <div className="flex flex-col gap-0.5">
             <Link
-              href={`/proyectos/${projectId}/cuentas-por-pagar/${p.id}`}
+              href={`${hrefPrefix}/${p.id}`}
               className="text-sm font-medium hover:underline"
             >
               {p.supplierName}
             </Link>
             <span className="text-xs text-muted-foreground">
               Vence {new Date(p.dueDate).toLocaleDateString("es-AR")}
+              {p.supplierInvoiceCode && p.supplierInvoiceId && supplierInvoiceHrefPrefix ? (
+                <>
+                  {" · "}
+                  <Link
+                    href={`${supplierInvoiceHrefPrefix}/${p.supplierInvoiceId}`}
+                    className="hover:underline"
+                  >
+                    {p.supplierInvoiceCode}
+                  </Link>
+                </>
+              ) : null}
             </span>
           </div>
           <div className="flex items-center gap-4">

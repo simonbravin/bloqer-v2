@@ -11,6 +11,11 @@ import {
   restoreDocumentAction,
   softDeleteDocumentAction,
 } from "@/app/(app)/proyectos/[id]/documentos/actions";
+import {
+  archiveCompanyFinanzasAttachmentAction,
+  restoreCompanyFinanzasAttachmentAction,
+  softDeleteCompanyFinanzasAttachmentAction,
+} from "@/app/(app)/finanzas/facturas-proveedor/attachment-actions";
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-AR");
@@ -32,6 +37,10 @@ export type EntityDocumentsLink =
   | { type: "SUBCONTRACT_CERTIFICATION"; id: string; subcontractId: string }
   | { type: "BUDGET"; id: string };
 
+export type EntityDocumentsPanelScope =
+  | { kind: "project"; projectId: string }
+  | { kind: "company-finanzas-supplier-invoice" };
+
 interface PanelPaths {
   revalidateExtra: string[];
   afterUploadPath: string;
@@ -41,7 +50,24 @@ interface PanelPaths {
   uploadHint:      string | null;
 }
 
-function getPanelPaths(projectId: string, linkedEntity: EntityDocumentsLink): PanelPaths {
+function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDocumentsLink): PanelPaths {
+  if (scope.kind === "company-finanzas-supplier-invoice") {
+    if (linkedEntity.type !== "SUPPLIER_INVOICE") {
+      throw new Error("EntityDocumentsPanel: alcance empresa solo admite facturas de proveedor");
+    }
+    const p = `/finanzas/facturas-proveedor/${linkedEntity.id}`;
+    return {
+      revalidateExtra: [p],
+      afterUploadPath: p,
+      cancelHref:      p,
+      emptyMessage:    "No hay adjuntos en esta factura de proveedor.",
+      defaultCategory: "INVOICE",
+      uploadHint:      "Factura, remito o comprobante",
+    };
+  }
+
+  const projectId = scope.projectId;
+
   switch (linkedEntity.type) {
     case "JOBSITE_LOG": {
       const p = `/proyectos/${projectId}/libro-obra/${linkedEntity.id}`;
@@ -135,7 +161,7 @@ function getPanelPaths(projectId: string, linkedEntity: EntityDocumentsLink): Pa
 }
 
 interface Props {
-  projectId:         string;
+  scope:             EntityDocumentsPanelScope;
   linkedEntity:      EntityDocumentsLink;
   storageConfigured: boolean;
   docs:              DocumentAttachmentView[];
@@ -143,14 +169,22 @@ interface Props {
 }
 
 export function EntityDocumentsPanel({
-  projectId,
+  scope,
   linkedEntity,
   storageConfigured,
   docs,
   canEdit,
 }: Props) {
   const { revalidateExtra, afterUploadPath, cancelHref, emptyMessage, defaultCategory, uploadHint } =
-    getPanelPaths(projectId, linkedEntity);
+    getPanelPaths(scope, linkedEntity);
+
+  const isCompany = scope.kind === "company-finanzas-supplier-invoice";
+  const projectIdForForm = scope.kind === "project" ? scope.projectId : null;
+  const projectIdForTable = scope.kind === "project" ? scope.projectId : null;
+
+  const subtitle = isCompany
+    ? "Adjuntos de la factura corporativa (sin proyecto). Podés descargar desde acá; no hay biblioteca de proyecto vinculada."
+    : "También aparecen en la biblioteca de documentos del proyecto.";
 
   return (
     <div className="space-y-6">
@@ -158,7 +192,7 @@ export function EntityDocumentsPanel({
         <div className="border-b px-6 py-4">
           <h2 className="font-semibold">Adjuntos</h2>
           <p className="text-xs text-muted-foreground mt-1">
-            También aparecen en la biblioteca de documentos del proyecto.
+            {subtitle}
           </p>
         </div>
         {docs.length === 0 ? (
@@ -186,12 +220,16 @@ export function EntityDocumentsPanel({
                   return (
                     <tr key={doc.id} className="border-t hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-2.5">
-                        <Link
-                          href={`/proyectos/${projectId}/documentos/${doc.id}`}
-                          className="font-medium hover:underline underline-offset-2"
-                        >
-                          {doc.originalFileName}
-                        </Link>
+                        {projectIdForTable ? (
+                          <Link
+                            href={`/proyectos/${projectIdForTable}/documentos/${doc.id}`}
+                            className="font-medium hover:underline underline-offset-2"
+                          >
+                            {doc.originalFileName}
+                          </Link>
+                        ) : (
+                          <span className="font-medium">{doc.originalFileName}</span>
+                        )}
                         {doc.description && (
                           <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[200px]">
                             {doc.description}
@@ -217,23 +255,44 @@ export function EntityDocumentsPanel({
                               <a href={`/api/documents/${doc.id}/download`}>Descargar</a>
                             </Button>
                           )}
-                          {doc.canMutate && doc.status === "ACTIVE" && (
-                            <form action={archiveDocumentAction.bind(null, doc.id, projectId, revalidateExtra)}>
+                          {doc.canMutate && doc.status === "ACTIVE" && isCompany && (
+                            <form action={archiveCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
                               <Button variant="ghost" size="sm" type="submit">
                                 Archivar
                               </Button>
                             </form>
                           )}
-                          {doc.canMutate && doc.status === "ARCHIVED" && (
-                            <form action={restoreDocumentAction.bind(null, doc.id, projectId, revalidateExtra)}>
+                          {doc.canMutate && doc.status === "ACTIVE" && !isCompany && projectIdForTable && (
+                            <form action={archiveDocumentAction.bind(null, doc.id, projectIdForTable, revalidateExtra)}>
+                              <Button variant="ghost" size="sm" type="submit">
+                                Archivar
+                              </Button>
+                            </form>
+                          )}
+                          {doc.canMutate && doc.status === "ARCHIVED" && isCompany && (
+                            <form action={restoreCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
                               <Button variant="ghost" size="sm" type="submit">
                                 Restaurar
                               </Button>
                             </form>
                           )}
-                          {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && (
+                          {doc.canMutate && doc.status === "ARCHIVED" && !isCompany && projectIdForTable && (
+                            <form action={restoreDocumentAction.bind(null, doc.id, projectIdForTable, revalidateExtra)}>
+                              <Button variant="ghost" size="sm" type="submit">
+                                Restaurar
+                              </Button>
+                            </form>
+                          )}
+                          {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && isCompany && (
+                            <form action={softDeleteCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
+                              <Button variant="ghost" size="sm" type="submit" className="text-destructive">
+                                Eliminar
+                              </Button>
+                            </form>
+                          )}
+                          {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && !isCompany && projectIdForTable && (
                             <form
-                              action={softDeleteDocumentAction.bind(null, doc.id, projectId, {
+                              action={softDeleteDocumentAction.bind(null, doc.id, projectIdForTable, {
                                 extraPathsToRevalidate: revalidateExtra,
                                 redirectToProjectDocuments: false,
                               })}
@@ -263,7 +322,7 @@ export function EntityDocumentsPanel({
             <p className="text-xs text-muted-foreground mb-3">{uploadHint}</p>
           )}
           <DocumentForm
-            projectId={projectId}
+            projectId={projectIdForForm}
             storageConfigured={storageConfigured}
             linkedEntity={linkedEntity}
             defaultCategory={defaultCategory}

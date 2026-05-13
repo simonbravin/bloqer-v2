@@ -15,10 +15,11 @@ export type PaymentListItem = {
 
 interface Props {
   payments: PaymentListItem[];
-  projectId: string;
+  /** e.g. `/proyectos/x/pagos` or `/finanzas/pagos-proveedor` */
+  hrefPrefix: string;
 }
 
-export function PaymentList({ payments, projectId }: Props) {
+export function PaymentList({ payments, hrefPrefix }: Props) {
   if (payments.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
@@ -33,7 +34,7 @@ export function PaymentList({ payments, projectId }: Props) {
         <div key={p.id} className="flex items-center justify-between px-2 py-3 hover:bg-muted/40">
           <div className="flex flex-col gap-0.5">
             <Link
-              href={`/proyectos/${projectId}/pagos/${p.id}`}
+              href={`${hrefPrefix}/${p.id}`}
               className="text-sm font-medium hover:underline"
             >
               {new Date(p.paymentDate).toLocaleDateString("es-AR")}

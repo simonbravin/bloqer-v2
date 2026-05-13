@@ -251,7 +251,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
       )}
 
       <EntityDocumentsPanel
-        projectId={projectId}
+        scope={{ kind: "project", projectId }}
         linkedEntity={{ type: "JOBSITE_LOG", id: logId }}
         storageConfigured={storageConfigured}
         docs={logAttachments}

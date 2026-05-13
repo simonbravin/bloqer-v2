@@ -220,7 +220,7 @@ export default async function SubcontratoPage({ params }: PageProps) {
       </div>
 
       <EntityDocumentsPanel
-        projectId={projectId}
+        scope={{ kind: "project", projectId }}
         linkedEntity={{ type: "SUBCONTRACT", id: subcontractId }}
         storageConfigured={storageConfigured}
         docs={subcontractAttachments}

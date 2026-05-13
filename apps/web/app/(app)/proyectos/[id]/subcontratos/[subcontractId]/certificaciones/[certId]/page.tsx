@@ -174,7 +174,7 @@ export default async function CertificacionPage({ params }: PageProps) {
       )}
 
       <EntityDocumentsPanel
-        projectId={projectId}
+        scope={{ kind: "project", projectId }}
         linkedEntity={{ type: "SUBCONTRACT_CERTIFICATION", id: certId, subcontractId }}
         storageConfigured={storageConfigured}
         docs={certAttachments}

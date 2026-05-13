@@ -24,7 +24,7 @@ export * from "./treasury/collection.service";
 export * from "./treasury/internal-transfer.service";
 export { getTreasurySummaryByCompany } from "./treasury/balance.service";
 export type { AccountBalanceSummary } from "./treasury/balance.service";
-export { canViewApProjectArea } from "./ap/ap-access";
+export { canViewApProjectArea, canViewCompanyAp } from "./ap/ap-access";
 export * from "./ap/supplier-invoice.service";
 export * from "./ap/payable.service";
 export * from "./ap/payment.service";

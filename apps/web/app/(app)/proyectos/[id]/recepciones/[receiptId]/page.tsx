@@ -160,7 +160,7 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
       </div>
 
       <EntityDocumentsPanel
-        projectId={id}
+        scope={{ kind: "project", projectId: id }}
         linkedEntity={{ type: "PURCHASE_RECEIPT", id: receiptId }}
         storageConfigured={storageConfigured}
         docs={receiptAttachments}

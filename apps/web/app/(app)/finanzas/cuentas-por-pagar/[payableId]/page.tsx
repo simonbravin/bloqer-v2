@@ -5,20 +5,20 @@ import { PayableStatusBadge, PaymentList } from "@/features/ap";
 import type { PaymentListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  getPayableById,
+  getCompanyPayableById,
   listPaymentsByPayable,
   ServiceError,
 } from "@bloqer/services";
 
 interface PageProps {
-  params: Promise<{ id: string; payableId: string }>;
+  params: Promise<{ payableId: string }>;
 }
 
-export default async function PayableDetailPage({ params }: PageProps) {
+export default async function FinanzasPayableDetailPage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
-  const { id, payableId } = await params;
+  const { payableId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId:    current.tenantCtx.tenantId,
@@ -30,11 +30,11 @@ export default async function PayableDetailPage({ params }: PageProps) {
   let payments;
   try {
     [payable, payments] = await Promise.all([
-      getPayableById(payableId, ctx, id),
+      getCompanyPayableById(payableId, ctx),
       listPaymentsByPayable(payableId, ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 
@@ -54,9 +54,9 @@ export default async function PayableDetailPage({ params }: PageProps) {
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}/cuentas-por-pagar`}>← Volver</Link>
+          <Link href="/finanzas/cuentas-por-pagar">← Volver</Link>
         </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Cuenta por pagar</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Cuenta por pagar (empresa)</h1>
         <PayableStatusBadge status={payable.status} />
       </div>
 
@@ -103,8 +103,8 @@ export default async function PayableDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        <Button asChild>
-          <Link href={`/proyectos/${id}/facturas-proveedor/${payable.supplierInvoiceId}`}>
+        <Button asChild variant="outline">
+          <Link href={`/finanzas/facturas-proveedor/${payable.supplierInvoiceId}`}>
             Ver factura →
           </Link>
         </Button>
@@ -113,7 +113,7 @@ export default async function PayableDetailPage({ params }: PageProps) {
       {canPay && (
         <div className="flex justify-end">
           <Button asChild>
-            <Link href={`/proyectos/${id}/cuentas-por-pagar/${payableId}/pagar`}>
+            <Link href={`/finanzas/cuentas-por-pagar/${payableId}/pagar`}>
               Registrar pago
             </Link>
           </Button>
@@ -125,7 +125,7 @@ export default async function PayableDetailPage({ params }: PageProps) {
           <h2 className="font-semibold">Pagos registrados</h2>
         </div>
         <div className="p-6">
-          <PaymentList payments={paymentItems} hrefPrefix={`/proyectos/${id}/pagos`} />
+          <PaymentList payments={paymentItems} hrefPrefix="/finanzas/pagos-proveedor" />
         </div>
       </div>
     </div>

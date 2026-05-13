@@ -5,3 +5,8 @@ import type { ServiceContext } from "../types";
 export function canViewApProjectArea(roles: ServiceContext["roles"]): boolean {
   return can(roles, "VIEW", "AP") || can(roles, "VIEW", "PROJECTS");
 }
+
+/** Company-level Finanzas AP routes: VIEW AP only (not VIEW PROJECTS). */
+export function canViewCompanyAp(roles: ServiceContext["roles"]): boolean {
+  return can(roles, "VIEW", "AP");
+}

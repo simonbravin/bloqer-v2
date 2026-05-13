@@ -12,19 +12,27 @@ import {
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine } from "./invoice-lines-editor";
 import { createSupplierInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
+import { createCompanySupplierInvoiceAction } from "@/app/(app)/finanzas/facturas-proveedor/actions";
 
 export type SupplierOption = { id: string; label: string };
 export type POOption = { id: string; code: string; supplierContactId: string; currency: string };
 
 interface Props {
-  projectId: string;
+  /** Required when `companyFinanzas` is false */
+  projectId?: string;
+  companyFinanzas?: boolean;
   suppliers: SupplierOption[];
   poOptions?: POOption[];
 }
 
 const DEFAULT_LINE: InvoiceLine = { description: "", quantity: "1", unitPrice: "", taxRate: "21" };
 
-export function SupplierInvoiceForm({ projectId, suppliers, poOptions = [] }: Props) {
+export function SupplierInvoiceForm({
+  projectId,
+  companyFinanzas = false,
+  suppliers,
+  poOptions = [],
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +53,27 @@ export function SupplierInvoiceForm({ projectId, suppliers, poOptions = [] }: Pr
     }
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
+      if (companyFinanzas) {
+        const res = await createCompanySupplierInvoiceAction({
+          supplierContactId,
+          issueDate:     fd.get("issueDate") as string,
+          dueDate:       fd.get("dueDate") as string,
+          currency:      "ARS",
+          notes:         (fd.get("notes") as string) || null,
+          internalNotes: null,
+          lines:         lines.map((l, i) => ({ ...l, sortOrder: i })),
+        });
+        if ("error" in res) {
+          setError(res.error);
+        } else {
+          router.push(`/finanzas/facturas-proveedor/${res.id}`);
+        }
+        return;
+      }
+      if (!projectId) {
+        setError("Configuración inválida del formulario");
+        return;
+      }
       const res = await createSupplierInvoiceAction(projectId, {
         projectId,
         supplierContactId,
@@ -92,7 +121,7 @@ export function SupplierInvoiceForm({ projectId, suppliers, poOptions = [] }: Pr
             )}
           </div>
 
-          {filteredPOs.length > 0 && (
+          {filteredPOs.length > 0 && !companyFinanzas && (
             <div className="col-span-2 space-y-1">
               <Label>Orden de compra (opcional)</Label>
               <Select

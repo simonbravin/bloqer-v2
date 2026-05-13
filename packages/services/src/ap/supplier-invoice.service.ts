@@ -4,7 +4,7 @@ import type { CreateSupplierInvoiceInput, UpdateSupplierInvoiceInput } from "@bl
 import { log } from "../audit/audit.service";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { canViewApProjectArea } from "./ap-access";
+import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 
 // ─── View types ───────────────────────────────────────────────────────────────
@@ -90,6 +90,80 @@ export async function listSupplierInvoicesByProject(
     orderBy: { number: "asc" },
   });
   return invoices.map(serializeInvoice);
+}
+
+export type CompanySupplierInvoiceListFilters = {
+  status?:            "DRAFT" | "ISSUED" | "CANCELLED";
+  supplierContactId?: string;
+  issueDateFrom?:    string;
+  issueDateTo?:      string;
+};
+
+/** AP at company level: invoices with no project. Requires VIEW AP (not VIEW PROJECTS). */
+export async function listCompanySupplierInvoices(
+  ctx: ServiceContext,
+  filters?: CompanySupplierInvoiceListFilters,
+): Promise<SupplierInvoiceView[]> {
+  await assertApTenantModule(ctx);
+  if (!canViewCompanyAp(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de proveedor a nivel empresa");
+  }
+
+  const where: Prisma.SupplierInvoiceWhereInput = {
+    tenantId:  ctx.tenantId,
+    projectId: null,
+    ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    ...(filters?.status ? { status: filters.status } : {}),
+    ...(filters?.supplierContactId ? { supplierContactId: filters.supplierContactId } : {}),
+    ...(filters?.issueDateFrom || filters?.issueDateTo
+      ? {
+          issueDate: {
+            ...(filters.issueDateFrom ? { gte: new Date(filters.issueDateFrom) } : {}),
+            ...(filters.issueDateTo ? { lte: new Date(filters.issueDateTo) } : {}),
+          },
+        }
+      : {}),
+  };
+
+  const invoices = await prisma.supplierInvoice.findMany({
+    where,
+    include: {
+      lines: { orderBy: { sortOrder: "asc" } },
+      supplierContact: { select: { legalName: true, fantasyName: true } },
+    },
+    orderBy: { number: "desc" },
+  });
+  return invoices.map(serializeInvoice);
+}
+
+/**
+ * Corporate supplier invoice by id: tenant-safe and enforces `projectId === null`.
+ * Use from `/finanzas/facturas-proveedor/...` only (not project workspace).
+ */
+export async function getCompanySupplierInvoiceById(
+  id: string,
+  ctx: ServiceContext,
+): Promise<SupplierInvoiceView> {
+  await assertApTenantModule(ctx);
+  if (!canViewCompanyAp(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de proveedor a nivel empresa");
+  }
+  const inv = await prisma.supplierInvoice.findUnique({
+    where: { id },
+    include: {
+      lines: { orderBy: { sortOrder: "asc" } },
+      supplierContact: { select: { legalName: true, fantasyName: true } },
+    },
+  });
+  if (!inv) throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
+  if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (inv.projectId !== null) {
+    throw new ServiceError("FORBIDDEN", "Esta factura está asignada a un proyecto; usá el espacio de trabajo del proyecto");
+  }
+  if (ctx.companyId && inv.companyId !== ctx.companyId) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
+  return serializeInvoice(inv);
 }
 
 // ─── Resolve company (AP) ─────────────────────────────────────────────────────

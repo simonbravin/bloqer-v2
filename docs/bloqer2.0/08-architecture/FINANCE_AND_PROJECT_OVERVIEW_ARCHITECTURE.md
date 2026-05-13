@@ -1,4 +1,4 @@
-# Finanzas Empresa, overview por proyecto y plan de indicadores (Phase 14C–14E + **Phase 16A–16B**)
+# Finanzas Empresa, overview por proyecto y plan de indicadores (Phase 14C–14E + **Phase 16A–16C**)
 
 Este documento **audita el estado actual** (rutas + Prisma + servicios) y define **arquitectura objetivo** para que **Finanzas** (`/finanzas`) sea el **hub financiero de la empresa**: vista global (CxC, CxP, tesorería, contabilidad, reporting) más **gastos corporativos** imputados por **`projectId` nullable** y/o dimensiones analíticas — **sin** un segundo libro ni “proyecto ficticio” para estructura.
 
@@ -78,8 +78,8 @@ Relacionado: [`TENANT_DASHBOARD_ARCHITECTURE.md`](./TENANT_DASHBOARD_ARCHITECTUR
 | Fase | Contenido |
 |------|-----------|
 | **16B** | **Hecho (2026-05-13):** ver §Phase 16B — migración + servicios + validators + aging AP + documentos; **sin** UI global de alta corporativa (→ 16C). |
-| **16C** | **Hub Finanzas Empresa** ampliado en `/finanzas`: secciones de solo lectura (vencimientos próximos, totales por moneda, enlaces) orquestando servicios existentes + nuevos queries agregados en `packages/services` (sin Prisma en web). |
-| **16D** | **Captura gastos generales:** UI + acciones bajo permisos AP existentes (ruta global o bajo `/finanzas`) para `SupplierInvoice` sin proyecto; tesorería al pagar; sugerencias contables ya alineadas a eventos. |
+| **16C** | **Hecho (2026-05-13):** UI bajo `/finanzas/facturas-proveedor/**`, `/finanzas/cuentas-por-pagar/**`, `/finanzas/pagos-proveedor/[paymentId]`; servicios `listCompany*` / `getCompany*` con **`VIEW AP` only**; hub con enlaces; adjuntos corporativos. Ver §Phase 16C. |
+| **16D** | **Dashboard / indicadores financieros empresa** (gráficos, KPIs) reutilizando datos 16B–16C. |
 | **16E** | **Integración proyecto:** filtros “solo obra” / “mixto”; reportes distribución por proyecto y por categoría; alinear `getProjectCashFlowReport` / cost control con movimientos que expongan dimensión corporativa donde aplique. |
 | **16F** | **Indicadores** en `/dashboard` y/o hub: deuda próxima, cobros próximos, cash forecast — solo métricas ya definibles desde datos existentes o desde 16B; nuevas métricas → doc de fórmulas / `OPEN_QUESTIONS`. |
 
@@ -117,7 +117,6 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 ### 16B.4 Validators y rutas proyecto
 
 - `createSupplierInvoiceSchema`: `projectId` opcional/nullable; la **Server Action** `createSupplierInvoiceAction` **fuerza** `projectId` desde la ruta `/proyectos/[id]/...` para que el flujo obra no regrese.
-- **Phase 16C (pendiente):** pantalla / acción de alta de factura corporativa bajo `/finanzas` o similar (misma mutación `createSupplierInvoice` con `projectId` null y permisos AP).
 
 ### 16B.5 UI mínima
 
@@ -137,6 +136,25 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 | `createSupplierInvoice` | Si `ctx.companyId` y proyecto con `companyId`, deben coincidir. |
 | Migración SQL | `DROP CONSTRAINT` + `DROP NOT NULL` + `ADD CONSTRAINT` — riesgo bajo si nombres de FK coinciden con init; **no** usa `db:push`. |
 
+---
+
+## Phase 16C — UI AP empresa bajo `/finanzas` (implementado 2026-05-13)
+
+### 16C.1 Alcance
+
+- **Rutas:** `GET /finanzas/facturas-proveedor`, `/nueva`, `/[invoiceId]`; `GET /finanzas/cuentas-por-pagar`, `/[payableId]`, `/[payableId]/pagar`; `GET /finanzas/pagos-proveedor/[paymentId]`.
+- **Representación de “gastos generales”:** mismas entidades **SupplierInvoice → Payable → Payment** con `projectId` null (sin tabla `Expense`).
+- **Aislamiento:** servicios `listCompanySupplierInvoices`, `getCompanySupplierInvoiceById`, `listCompanyPayables`, `getCompanyPayableById`, `getCompanyPaymentById` exigen **`VIEW AP`** (`canViewCompanyAp`) y filas con **`projectId === null`** (más `ctx.companyId` cuando aplica). Las rutas proyecto siguen con `projectScopeId` / `list*ByProject`.
+- **Hub:** `getFinanceHubOverview` agrega enlaces de reporte a facturas/C×P empresa y “gastos generales”.
+- **Adjuntos:** `EntityDocumentsPanel` con `scope: { kind: "company-finanzas-supplier-invoice" }` + `DocumentForm` con `projectId` null; acciones server `attachment-actions.ts` revalidan `/finanzas/facturas-proveedor/...`.
+- **Contabilidad:** sin auto-post; botón “Generar asiento” en pago empresa reutiliza `suggestJournalFromPayment` como en proyecto.
+
+### 16C.2 Fuera de alcance (16D+)
+
+- Gráficos / KPI dashboard financiero empresa.
+- Filtros avanzados (proveedor en listado) más allá de estado/fechas simples por query.
+
+---
 
 ## 1. Auditoría — respuestas directas (histórico Phase 14C–14E)
 
@@ -159,8 +177,8 @@ La **ficha** `/proyectos/[id]` conserva atajos en botones; la **navegación prin
 
 ### 1.2 ¿Qué rutas faltan para una experiencia “completa”?
 
-- **Hub financiero global** más allá de aging — ver 1.4.
-- **Gastos generales sin obra** / entidad `Expense` — ver 1.5 y §7 (pendiente de producto).
+- **Indicadores / gráficos** en hub empresa — Phase **16D+** (ver §16C.2).
+- **Entidad `Expense` dedicada** — no prevista; ver 1.5 y §7.
 
 ### 1.3 ¿Existe `/proyectos/[id]/finanzas`?
 
@@ -172,11 +190,12 @@ La **ficha** `/proyectos/[id]` conserva atajos en botones; la **navegación prin
 
 ### 1.5 ¿Cómo se registran hoy gastos “sin proyecto”?
 
-- **AR / AP “clásicos” (factura → cuenta por cobrar/pagar → cobro/pago):** el modelo Prisma **exige `projectId`** en `SalesInvoice`, `Receivable`, `Collection`, `SupplierInvoice`, `Payable`, `Payment`, `PurchaseOrder`, etc. Los servicios de alta (`supplier-invoice.service`, flujos AR) **resuelven `companyId` vía proyecto**. **No** hay hoy un flujo productizado de “factura de gasto general sin obra” en esas entidades.
-- **Tesorería:** `AccountMovement` **no tiene** columna `projectId`; el vínculo con negocio es **`sourceType` + `sourceId`** (p. ej. cobro/pago genera movimiento). Movimientos “sueltos” o transferencias pueden existir **sin** obra explícita a nivel fila.
-- **Contabilidad:** `JournalEntry.projectId` y `JournalEntryLine.projectId` son **opcionales** (`String?`). Un **asiento manual** puede representar gasto de estructura **sin** proyecto (subject a reglas de negocio y permisos `ACCOUNTING`).
+- **AR (factura → C×C → cobro):** el modelo sigue amarrado a **obra** (`projectId` requerido en cadena AR típica). **Fuera de alcance** Phase 16 salvo decisión BR-AR-003.
+- **AP (factura proveedor → C×P → pago):** desde **Phase 16B** `SupplierInvoice` / `Payable` / `Payment` admiten **`projectId` null** (gastos generales). **Phase 16C** expone UI bajo **`/finanzas/...`** con flujo completo (alta, emisión, C×P, pago, adjuntos) sin tabla `Expense`.
+- **Tesorería:** `AccountMovement` puede tener `projectId` opcional (16B); el vínculo operativo sigue siendo **`sourceType` + `sourceId`** donde aplique.
+- **Contabilidad:** `JournalEntry` / líneas con `projectId` opcional; asiento manual sigue siendo alternativa para gastos de estructura.
 
-Conclusión operativa: **gasto general sin obra** hoy se acerca por **asientos contables** y/o **movimientos de tesorería no etiquetados por proyecto**, no por C×P estándar con `projectId` null (no permitido por schema).
+Conclusión operativa: **gasto general sin obra** en AP se registra como **factura de proveedor corporativa** (`projectId` null) y su **C×P / pago**; AR y otras cadenas siguen las reglas históricas del doc hasta relajarlas explícitamente.
 
 ### 1.6 ¿Qué modelos ya aceptan `projectId` opcional?
 
@@ -198,7 +217,7 @@ Entre los de ciclo financiero operativo típico:
 | Modelo | Notas |
 |--------|--------|
 | `Budget`, `Certification`, `SalesInvoice`, `Receivable`, `Collection` | Cadena AR amarrada a obra |
-| `SupplierInvoice`, `Payable`, `Payment`, `PurchaseOrder`, `PurchaseReceipt` | Cadena AP / compras amarrada a obra |
+| `SupplierInvoice`, `Payable`, `Payment`, `PurchaseOrder`, `PurchaseReceipt` | **AP:** `SupplierInvoice` / `Payable` / `Payment` → `projectId` **opcional** (16B); **compras** (`PurchaseOrder` / recepciones) siguen **obra**. Cadena **AR** sigue amarrada a obra en el schema actual. |
 | `Subcontract`, `SubcontractCertification`, `JobsiteLog` | Alcance obra |
 
 Comentario en schema (`Receivable`): *“product concepts may allow debt without a project”* — **a nivel negocio** se discutió; **a nivel schema** sigue **requerido**; relajar implicaría migración + revisión BR (ver 1.9).
@@ -381,7 +400,7 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 - [x] `/proyectos/[id]/finanzas` (página + servicio orquestador) — **Phase 14E**.
 - [x] Resumen `/proyectos/[id]` — **Phase 15B** (`getProjectOverviewDashboard` + `ProjectOverviewView`).
 - [x] **Phase 16B — schema + servicios:** `SupplierInvoice` / `Payable` / `Payment` con `projectId` nullable; `AccountMovement.projectId` nullable; aging AP + documentos corporativos; migración versionada.
-- [ ] **Phase 16C:** hub `/finanzas` + alta factura proveedor corporativa (UI + revalidaciones).
+- [x] **Phase 16C:** UI `/finanzas/facturas-proveedor/**`, `/finanzas/cuentas-por-pagar/**`, `/finanzas/pagos-proveedor/[paymentId]` + enlaces en hub + `canViewCompanyAp`.
 - [ ] **Phase 16 — producto:** AR sin obra (`SalesInvoice` / `Receivable` / `Collection`) — **fuera de alcance** salvo decisión BR-AR-003.
 - [ ] Rellenar `projectId` en movimientos tesorería desde fuente solo si producto define reglas anti-duplicación.
 
@@ -411,4 +430,4 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 
 ---
 
-*Phase 14C–14E — hubs y workspace; Phase **16A** — auditoría; Phase **16B** — AP `projectId` nullable + `AccountMovement.projectId`; **16C** — hub empresa + alta corporativa (pendiente).*
+*Phase 14C–14E — hubs y workspace; Phase **16A** — auditoría; Phase **16B** — AP `projectId` nullable + `AccountMovement.projectId`; Phase **16C** — UI AP empresa `/finanzas` (hecho).*

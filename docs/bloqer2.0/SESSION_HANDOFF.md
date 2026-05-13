@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
 Last updated: 2026-05-13  
-Status: Phase **16B** — AP corporativo (`projectId` nullable) + `AccountMovement.projectId` + migración; **auditoría 16B.1:** alcance proyecto en **get/update/issue/cancel** factura, **get** C×P/pago y **create/cancel** pago; Zod en `initiateUpload` para adjuntos no-SUPPLIER_INVOICE; alineación proyecto/`ctx.companyId` en alta factura. Ver [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) §16B.6.
+Status: Phase **16C** — UI AP empresa bajo **`/finanzas`** (facturas proveedor / C×P / pago corporativos, `VIEW AP` only en servicios `*Company*`); hub con enlaces; `EntityDocumentsPanel` alcance empresa + `DocumentForm` con `projectId` null. Sobre **16B** + **16B.1** ver [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) §16B–16C.
 
 ---
 

@@ -7,24 +7,24 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import {
-  getSupplierInvoiceById,
+  getCompanySupplierInvoiceById,
   listEntityDocuments,
   ServiceError,
 } from "@bloqer/services";
 import {
-  issueSupplierInvoiceAction,
-  cancelSupplierInvoiceAction,
-} from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
+  issueCompanySupplierInvoiceAction,
+  cancelCompanySupplierInvoiceAction,
+} from "@/app/(app)/finanzas/facturas-proveedor/actions";
 
 interface PageProps {
-  params: Promise<{ id: string; supplierInvoiceId: string }>;
+  params: Promise<{ invoiceId: string }>;
 }
 
-export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
+export default async function FinanzasFacturaProveedorDetailPage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
-  const { id, supplierInvoiceId } = await params;
+  const { invoiceId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId:    current.tenantCtx.tenantId,
@@ -34,20 +34,13 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
 
   let invoice;
   try {
-    invoice = await getSupplierInvoiceById(supplierInvoiceId, ctx, id);
+    invoice = await getCompanySupplierInvoiceById(invoiceId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 
-  if (invoice.projectId !== id) notFound();
-
-  const invoiceAttachments = await listEntityDocuments(
-    "SUPPLIER_INVOICE",
-    supplierInvoiceId,
-    ctx,
-    { projectId: id },
-  );
+  const invoiceAttachments = await listEntityDocuments("SUPPLIER_INVOICE", invoiceId, ctx, {});
   const storageConfigured = isStorageConfigured();
   const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "AP");
 
@@ -59,11 +52,16 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}/facturas-proveedor`}>← Volver</Link>
+          <Link href="/finanzas/facturas-proveedor">← Volver</Link>
         </Button>
         <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
         <SupplierInvoiceStatusBadge status={invoice.status} />
       </div>
+
+      <p className="text-sm text-muted-foreground rounded-md border border-dashed bg-muted/30 px-3 py-2">
+        Factura a nivel <strong>empresa</strong> (sin proyecto). Los adjuntos y la cuenta por pagar no están ligados a
+        una obra.
+      </p>
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -133,19 +131,14 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
         )}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {isDraft && (
           <>
-            <Button asChild variant="outline">
-              <Link href={`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}/editar`}>
-                Editar
-              </Link>
-            </Button>
             <form
               action={async () => {
                 "use server";
-                await issueSupplierInvoiceAction(supplierInvoiceId, id);
-                redirect(`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`);
+                await issueCompanySupplierInvoiceAction(invoiceId);
+                redirect(`/finanzas/facturas-proveedor/${invoiceId}`);
               }}
             >
               <Button type="submit">Emitir factura</Button>
@@ -156,8 +149,8 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
           <form
             action={async () => {
               "use server";
-              await cancelSupplierInvoiceAction(supplierInvoiceId, id);
-              redirect(`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`);
+              await cancelCompanySupplierInvoiceAction(invoiceId);
+              redirect(`/finanzas/facturas-proveedor/${invoiceId}`);
             }}
           >
             <Button type="submit" variant="destructive">Anular</Button>
@@ -165,16 +158,14 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
         )}
         {isIssued && (
           <Button asChild variant="outline">
-            <Link href={`/proyectos/${id}/cuentas-por-pagar`}>
-              Ver cuenta por pagar →
-            </Link>
+            <Link href="/finanzas/cuentas-por-pagar">Ver cuentas por pagar empresa →</Link>
           </Button>
         )}
       </div>
 
       <EntityDocumentsPanel
-        scope={{ kind: "project", projectId: id }}
-        linkedEntity={{ type: "SUPPLIER_INVOICE", id: supplierInvoiceId }}
+        scope={{ kind: "company-finanzas-supplier-invoice" }}
+        linkedEntity={{ type: "SUPPLIER_INVOICE", id: invoiceId }}
         storageConfigured={storageConfigured}
         docs={invoiceAttachments}
         canEdit={canEditAttachments}

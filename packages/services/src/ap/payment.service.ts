@@ -4,7 +4,7 @@ import type { CreatePaymentInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { canViewApProjectArea } from "./ap-access";
+import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 
 export type PaymentView = Omit<Payment, "amount"> & {
   amount: string;
@@ -31,6 +31,27 @@ export async function getPaymentById(
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");
+  }
+  return serialize(p);
+}
+
+/** Payment for corporate AP (`projectId` null). VIEW AP only. */
+export async function getCompanyPaymentById(id: string, ctx: ServiceContext): Promise<PaymentView> {
+  await assertApTenantModule(ctx);
+  if (!canViewCompanyAp(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver pagos a nivel empresa");
+  }
+  const p = await prisma.payment.findUnique({
+    where: { id },
+    include: { account: { select: { name: true } } },
+  });
+  if (!p) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
+  if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (p.projectId !== null) {
+    throw new ServiceError("FORBIDDEN", "Este pago pertenece a un proyecto; usá el espacio de trabajo del proyecto");
+  }
+  if (ctx.companyId && p.companyId !== ctx.companyId) {
+    throw new ServiceError("FORBIDDEN", "El pago no pertenece a la empresa activa");
   }
   return serialize(p);
 }

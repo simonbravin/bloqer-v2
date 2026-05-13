@@ -203,7 +203,7 @@ export default async function OrdenCompraDetailPage({ params }: PageProps) {
       </div>
 
       <EntityDocumentsPanel
-        projectId={id}
+        scope={{ kind: "project", projectId: id }}
         linkedEntity={{ type: "PURCHASE_ORDER", id: poId }}
         storageConfigured={storageConfigured}
         docs={poAttachments}

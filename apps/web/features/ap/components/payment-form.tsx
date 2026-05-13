@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { createPaymentAction } from "@/app/(app)/proyectos/[id]/cuentas-por-pagar/actions";
+import { createCompanyPaymentAction } from "@/app/(app)/finanzas/cuentas-por-pagar/actions";
 
 interface AccountOption {
   id: string;
@@ -18,15 +19,18 @@ interface AccountOption {
 }
 
 interface Props {
-  projectId: string;
   payableId: string;
   payableBalance: string;
   payableCurrency: string;
   accounts: AccountOption[];
+  /** Project workspace */
+  projectId?: string;
+  companyFinanzas?: boolean;
 }
 
 export function PaymentForm({
   projectId,
+  companyFinanzas = false,
   payableId,
   payableBalance,
   payableCurrency,
@@ -44,6 +48,25 @@ export function PaymentForm({
     if (!accountId) { setError("Seleccione una cuenta de tesorería"); return; }
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
+      if (companyFinanzas) {
+        const res = await createCompanyPaymentAction({
+          payableId,
+          accountId,
+          paymentDate: fd.get("paymentDate") as string,
+          amount:      fd.get("amount") as string,
+          notes:       (fd.get("notes") as string) || null,
+        });
+        if ("error" in res) {
+          setError(res.error);
+        } else {
+          router.push(`/finanzas/pagos-proveedor/${res.id}`);
+        }
+        return;
+      }
+      if (!projectId) {
+        setError("Configuración inválida del formulario");
+        return;
+      }
       const res = await createPaymentAction(projectId, {
         payableId,
         accountId,

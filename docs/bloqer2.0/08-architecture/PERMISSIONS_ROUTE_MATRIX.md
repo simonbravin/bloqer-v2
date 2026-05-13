@@ -81,7 +81,10 @@ Removed dead links: `/compras`, `/reportes` (no routes in App Router). **`/confi
 
 | Route | Access | Notes |
 |-------|--------|-------|
-| `/finanzas` | Authenticated; `buildTenantServiceContext` no nulo | Server Component: **`getFinanceHubOverview(ctx)`** — cards CxC/CxP solo si módulo tenant **AR**/**AP** + `VIEW AR`/`VIEW AP`; tesorería si **TREASURY** + `VIEW TREASURY`. Reutiliza `getReceivableAgingReport`, `getPayableAgingReport`, `getTreasurySummaryByCompany` (errores `FORBIDDEN` omiten sección). Sin Prisma en la página. |
+| `/finanzas` | Authenticated; `buildTenantServiceContext` no nulo | Server Component: **`getFinanceHubOverview(ctx)`** — cards CxC/CxP solo si módulo tenant **AR**/**AP** + `VIEW AR`/`VIEW AP`; tesorería si **TREASURY** + `VIEW TREASURY`. Reutiliza `getReceivableAgingReport`, `getPayableAgingReport`, `getTreasurySummaryByCompany` (errores `FORBIDDEN` omiten sección). Sin Prisma en la página. **Phase 16C:** enlaces de reporte a **facturas proveedor empresa**, **Cuentas por pagar empresa** y **Gastos generales** (mismo listado corporativo) cuando módulo **AP** + `VIEW AP`. |
+| `/finanzas/facturas-proveedor`, `/finanzas/facturas-proveedor/nueva`, `/finanzas/facturas-proveedor/[invoiceId]` | Authenticated; tenant module **AP** | Servicios: `listCompanySupplierInvoices`, `getCompanySupplierInvoiceById`, `createSupplierInvoice` / `issue` / `cancel` (sin `projectScopeId`). **Lecturas y listados corporativos: solo `VIEW AP`** (`canViewCompanyAp` en servicios) — **no** alcanza solo `VIEW PROJECTS`. Mutaciones alta/emisión/anulación: `EDIT AP`. Adjuntos: `EntityDocumentsPanel` alcance `company-finanzas-supplier-invoice` + `listEntityDocuments` sin `projectId`. |
+| `/finanzas/cuentas-por-pagar`, `/finanzas/cuentas-por-pagar/[payableId]`, `/finanzas/cuentas-por-pagar/[payableId]/pagar` | Same | `listCompanyPayables`, `getCompanyPayableById`, `createPayment` sin `projectScopeId`; mismos gates **VIEW AP** / **EDIT AP**. |
+| `/finanzas/pagos-proveedor/[paymentId]` | Same | `getCompanyPaymentById`; cancel pago `EDIT AP`; contabilidad draft igual que pago proyecto (`EDIT ACCOUNTING`). |
 
 ## In-app notifications (Phase 8A–8D)
 
@@ -115,7 +118,8 @@ See [`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md).
 | Jobsite log — create / update / submit / cancel | `EDIT JOBSITE_LOG` **or** `EDIT PROJECTS` | Foreman can contribute; mismo gate de módulo |
 | Jobsite log — approve / return | `EDIT PROJECTS` only | Supervisor / PM (matrix: PM has `PROJECTS` `EDIT`); mismo gate de módulo |
 | Purchase order / receipt — reads | `VIEW PROCUREMENT` **or** `VIEW PROJECTS` | Aligned with entity document list; `listLinkablePurchaseOrders` / `listProcurementWbsOptions` now gated |
-| Supplier invoice / payable / payment — project-scoped reads | `VIEW AP` **or** `VIEW PROJECTS` | Aligned with `SUPPLIER_INVOICE` documents |
+| Supplier invoice / payable / payment — project workspace | `VIEW AP` **or** `VIEW PROJECTS` | Aligned with `SUPPLIER_INVOICE` documents; `projectScopeId` en getters/mutaciones donde aplica (16B.1) |
+| Supplier invoice / payable / payment — **Finanzas empresa** (`/finanzas/...`, filas con `projectId` null) | **`VIEW AP` only** | Phase **16C**: sin atajo `VIEW PROJECTS`; servicios `listCompany*`, `getCompany*` + `canViewCompanyAp` |
 | Sales invoice / receivable / collection — project-scoped reads | `VIEW AR` **or** `VIEW PROJECTS` | Same pattern as AP project reads (`ar-access.ts`) |
 | Sales invoice / receivable cancel / collection create & cancel — mutations | `EDIT AR` only | Owner module `AR` only (Phase 7B); `SALES_COLLECTIONS` removed from domain in Phase 7C |
 | Global AP / AR aging (`getReceivableAgingReport`, `getPayableAgingReport`) | `VIEW AP` / `VIEW AR` only | Tenant-wide — **no** `VIEW PROJECTS` |

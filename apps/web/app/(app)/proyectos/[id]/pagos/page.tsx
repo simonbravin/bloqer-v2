@@ -54,7 +54,7 @@ export default async function PagosPage({ params }: PageProps) {
           <h2 className="font-semibold">Pagos del proyecto</h2>
         </div>
         <div className="p-6">
-          <PaymentList payments={items} projectId={id} />
+          <PaymentList payments={items} hrefPrefix={`/proyectos/${id}/pagos`} />
         </div>
       </div>
     </div>

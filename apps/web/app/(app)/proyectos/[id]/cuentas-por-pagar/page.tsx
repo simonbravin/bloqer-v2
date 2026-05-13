@@ -55,7 +55,11 @@ export default async function CuentasPorPagarPage({ params }: PageProps) {
           <h2 className="font-semibold">Saldos del proyecto</h2>
         </div>
         <div className="p-6">
-          <PayableList payables={items} projectId={id} />
+          <PayableList
+            payables={items}
+            hrefPrefix={`/proyectos/${id}/cuentas-por-pagar`}
+            supplierInvoiceHrefPrefix={`/proyectos/${id}/facturas-proveedor`}
+          />
         </div>
       </div>
     </div>

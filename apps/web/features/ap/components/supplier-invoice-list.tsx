@@ -16,10 +16,11 @@ export type SupplierInvoiceListItem = {
 
 interface Props {
   invoices: SupplierInvoiceListItem[];
-  projectId: string;
+  /** Base path without trailing slash, e.g. `/proyectos/abc/facturas-proveedor` or `/finanzas/facturas-proveedor`. */
+  hrefPrefix: string;
 }
 
-export function SupplierInvoiceList({ invoices, projectId }: Props) {
+export function SupplierInvoiceList({ invoices, hrefPrefix }: Props) {
   if (invoices.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
@@ -34,7 +35,7 @@ export function SupplierInvoiceList({ invoices, projectId }: Props) {
         <div key={inv.id} className="flex items-center justify-between px-2 py-3 hover:bg-muted/40">
           <div className="flex flex-col gap-0.5">
             <Link
-              href={`/proyectos/${projectId}/facturas-proveedor/${inv.id}`}
+              href={`${hrefPrefix}/${inv.id}`}
               className="text-sm font-medium hover:underline"
             >
               {inv.code}

@@ -173,6 +173,21 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
       description: "Por proveedor y vencimiento.",
       href:        "/finanzas/cuentas-por-pagar-aging",
     });
+    reportLinks.push({
+      label:       "Facturas proveedor (empresa)",
+      description: "Gastos generales sin obra: facturas con proyecto nulo.",
+      href:        "/finanzas/facturas-proveedor",
+    });
+    reportLinks.push({
+      label:       "Cuentas por pagar (empresa)",
+      description: "Obligaciones AP sin proyecto.",
+      href:        "/finanzas/cuentas-por-pagar",
+    });
+    reportLinks.push({
+      label:       "Gastos generales",
+      description: "Alias práctico al listado de facturas corporativas.",
+      href:        "/finanzas/facturas-proveedor",
+    });
   }
   if (trMod && trPerm) {
     reportLinks.push({

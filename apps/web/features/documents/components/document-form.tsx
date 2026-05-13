@@ -28,7 +28,8 @@ const CATEGORY_OPTIONS = [
 const MAX_SIZE_BYTES = 50 * 1024 * 1024;
 
 interface Props {
-  projectId:         string;
+  /** Project UUID, or `null` for corporate supplier-invoice uploads (API + validators allow only that case). */
+  projectId:         string | null;
   storageConfigured: boolean;
   linkedEntity?:
     | { type: "JOBSITE_LOG"; id: string }
@@ -104,7 +105,7 @@ export function DocumentForm({
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
-          projectId,
+          projectId: projectId ?? null,
           originalFileName: selectedFile.name,
           mimeType:         selectedFile.type || "application/octet-stream",
           sizeBytes:        selectedFile.size,
@@ -160,8 +161,11 @@ export function DocumentForm({
       }
 
       const nextPath =
-        afterUploadPath ?? `/proyectos/${projectId}/documentos/${documentId}`;
-      router.push(nextPath);
+        afterUploadPath ??
+        (projectId ? `/proyectos/${projectId}/documentos/${documentId}` : null);
+      if (nextPath) {
+        router.push(nextPath);
+      }
       router.refresh();
     } catch {
       setError("Error de red. Verificá tu conexión e intentá de nuevo.");
@@ -233,7 +237,10 @@ export function DocumentForm({
         <Button
           type="button"
           variant="ghost"
-          onClick={() => router.push(cancelHref ?? `/proyectos/${projectId}/documentos`)}
+          onClick={() =>
+            router.push(
+              cancelHref ?? (projectId ? `/proyectos/${projectId}/documentos` : "/finanzas"),
+            )}
           disabled={pending}
         >
           Cancelar
