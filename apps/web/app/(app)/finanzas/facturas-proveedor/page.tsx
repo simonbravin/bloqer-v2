@@ -62,18 +62,17 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/finanzas">← Finanzas</Link>
-            </Button>
-            <h1 className="text-2xl font-bold tracking-tight">Facturas de proveedor (empresa)</h1>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
-            Gastos generales y facturas de proveedor <strong>sin obra asignada</strong>. Generan cuenta por pagar al
-            emitirlas, igual que en proyecto. No aparecen en el espacio de trabajo de una obra.
+          <h1 className="text-2xl font-bold tracking-tight">Facturas y gastos</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Gastos generales de la empresa: facturas de proveedor <strong>sin imputar a un proyecto</strong>. Al emitirlas
+            generan obligaciones en pagos pendientes. Las compras de obra se cargan desde{" "}
+            <Link href="/proyectos" className="font-medium text-foreground underline underline-offset-4 hover:no-underline">
+              Proyectos
+            </Link>
+            .
           </p>
         </div>
         <Button asChild>

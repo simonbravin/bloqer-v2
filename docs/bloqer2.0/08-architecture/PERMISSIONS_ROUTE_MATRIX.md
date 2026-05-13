@@ -22,7 +22,7 @@ Project-scoped access (same tenant, correct `projectId`) is enforced in services
 | Inventario  | `/inventario`    | `INVENTORY` **and** tenant module `INVENTORY` enabled |
 | Tesorería   | `/tesoreria`     | `TREASURY` **and** tenant module `TREASURY` enabled |
 | Contabilidad | `/contabilidad` | `ACCOUNTING` **and** tenant module `ACCOUNTING` enabled |
-| Finanzas    | `/finanzas`      | (`AR` **or** `AP`) **and** corresponding tenant module enabled for at least one branch the user satisfies |
+| Finanzas    | `/finanzas`      | (`AR` **or** `AP` **or** `TREASURY` **or** `ACCOUNTING`) **and** tenant module enabled for the branch the user satisfies (Phase **16D** shell; **16E** subnav bajo `/finanzas/**`) |
 | Configuración | `/configuracion` | (`TENANT_SETTINGS` **or** `USERS_PERMISSIONS`) **and** tenant module enabled for that branch |
 
 Phase **12B:** si no existe fila en `tenant_module_settings` para un `moduleKey`, el módulo se considera **habilitado** (compatibilidad). Los usuarios del tenant **no** editan estos flags; solo la consola de plataforma (`/platform/tenants/[tenantId]/modules`).
@@ -38,7 +38,7 @@ Phase **12B:** si no existe fila en `tenant_module_settings` para un `moduleKey`
 | Facturas proveedor, CxP, pagos (`supplier-invoice`, `payable`, `payment`) | `AP` | `AP` |
 | Aging CxC / CxP (`aging.service`) | `AR` / `AP` | `AR` / `AP` |
 | **`getTenantDashboard`** (`tenant-dashboard.service.ts`) | Por sección: `VIEW PROJECTS`, `VIEW BUDGETS`, `VIEW AR`/`AP`/`TREASURY`/`INVENTORY`, etc. | **Composite:** una llamada `getTenantModuleGate`; cada subconsulta respeta el mismo módulo + RBAC que el servicio subyacente (Prisma solo en capa servicios). |
-| **`getFinanceHubOverview`** (`finance-hub-overview.service.ts`) | `VIEW AR` / `VIEW AP` / `VIEW TREASURY` + módulos tenant correspondientes | **Composite:** `getTenantModuleGate` + delegación en aging AR/AP y `getTreasurySummaryByCompany`; `FORBIDDEN` → datos omitidos. |
+| **`getFinanceHubOverview`** (`finance-hub-overview.service.ts`) | `VIEW AR` / `VIEW AP` / `VIEW TREASURY` / `VIEW ACCOUNTING` + módulos tenant correspondientes | **Composite:** `getTenantModuleGate` + aging AR/AP y `getTreasurySummaryByCompany`; bloque contabilidad solo enlace (sin agregados GL); `FORBIDDEN` → datos omitidos. |
 | `/inventario/**`, productos, depósitos, movimientos, transferencias, `inventory-reports` | `INVENTORY` | `INVENTORY` |
 | Órdenes de compra y recepciones (`purchase-order`, `purchase-receipt`) | `PROCUREMENT` | `PROCUREMENT` |
 | Subcontratos y certificaciones (`subcontract`, `subcontract-certification`) | `SUBCONTRACTS` | `SUBCONTRACTS` |
@@ -77,11 +77,13 @@ Removed dead links: `/compras`, `/reportes` (no routes in App Router). **`/confi
 |-------|--------|-------|
 | `/dashboard` | Authenticated; **active tenant membership** (`buildTenantServiceContext` no nulo) para cargar datos | Server Component: `getTenantDashboard(ctx)` — cada bloque condicionado por **tenant module** + **`can()`** (p. ej. `VIEW PROJECTS`, `VIEW BUDGETS`, `VIEW AR`/`AP`/`TREASURY`/`INVENTORY`/`ACCOUNTING`). Sin Prisma en la página. **Superadmin** sin `tenantCtx`: copy + enlace a `/platform` (sin llamar al servicio de tablero). **Phase 15C:** enlaces del encabezado (“Nuevo proyecto”, “Crear contacto”, etc.) solo se renderizan si el `href` corresponde a una entrada ya filtrada en `quickActions` del servicio (misma fuente de verdad que permisos/módulos). |
 
-## Finance hub empresa (Phase 14C+)
+## Finance hub empresa (Phase 14C+ / 16D / 16E)
+
+Las rutas bajo **`/finanzas/**`** comparten layout: subnav filtrada por módulo tenant + `can()` (**16E**); datos del resumen vía **`getFinanceHubOverview`** (**16D**).
 
 | Route | Access | Notes |
 |-------|--------|-------|
-| `/finanzas` | Authenticated; `buildTenantServiceContext` no nulo | Server Component: **`getFinanceHubOverview(ctx)`** — cards CxC/CxP solo si módulo tenant **AR**/**AP** + `VIEW AR`/`VIEW AP`; tesorería si **TREASURY** + `VIEW TREASURY`. Reutiliza `getReceivableAgingReport`, `getPayableAgingReport`, `getTreasurySummaryByCompany` (errores `FORBIDDEN` omiten sección). Sin Prisma en la página. **Phase 16C:** enlaces de reporte a **facturas proveedor empresa**, **Cuentas por pagar empresa** y **Gastos generales** (mismo listado corporativo) cuando módulo **AP** + `VIEW AP`. |
+| `/finanzas` | Authenticated; `buildTenantServiceContext` no nulo | **Layout** `app/(app)/finanzas/layout.tsx`: **`getFinanceSubnavLinks(ctx)`** (`getTenantModuleGate` + `can()` por ítem) + **`FinanceSubnav`**. **Resumen:** **`getFinanceHubOverview(ctx)`** — CxC/C×P/Tesorería/Contabilidad según módulo + `VIEW AR` / `VIEW AP` / `VIEW TREASURY` / `VIEW ACCOUNTING`. **16D:** DTO multimoneda + split AP en aging. **16E:** polish UI + copy. Reutiliza aging AR/AP + `getTreasurySummaryByCompany`. Sin Prisma en páginas. **16C:** rutas corporativas AP. |
 | `/finanzas/facturas-proveedor`, `/finanzas/facturas-proveedor/nueva`, `/finanzas/facturas-proveedor/[invoiceId]` | Authenticated; tenant module **AP** | Servicios: `listCompanySupplierInvoices`, `getCompanySupplierInvoiceById`, `createSupplierInvoice` / `issue` / `cancel` (sin `projectScopeId`). **Lecturas y listados corporativos: solo `VIEW AP`** (`canViewCompanyAp` en servicios) — **no** alcanza solo `VIEW PROJECTS`. Mutaciones alta/emisión/anulación: `EDIT AP`. Adjuntos: `EntityDocumentsPanel` alcance `company-finanzas-supplier-invoice` + `listEntityDocuments` sin `projectId`. |
 | `/finanzas/cuentas-por-pagar`, `/finanzas/cuentas-por-pagar/[payableId]`, `/finanzas/cuentas-por-pagar/[payableId]/pagar` | Same | `listCompanyPayables`, `getCompanyPayableById`, `createPayment` sin `projectScopeId`; mismos gates **VIEW AP** / **EDIT AP**. |
 | `/finanzas/pagos-proveedor/[paymentId]` | Same | `getCompanyPaymentById`; cancel pago `EDIT AP`; contabilidad draft igual que pago proyecto (`EDIT ACCOUNTING`). |
@@ -146,7 +148,7 @@ See [`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md).
 
 ### UI
 
-- `/finanzas`: hub con **`getFinanceHubOverview`**; cards y enlaces según módulo + `VIEW AR` / `VIEW AP` / `VIEW TREASURY`; aging y reportes tesorería como antes.
+- `/finanzas` y subrutas bajo el mismo layout: hub **`getFinanceHubOverview`** (**16D**) + subnav (**16E**) con enlaces filtrados por módulo + `VIEW AR` / `VIEW AP` / `VIEW TREASURY` / `VIEW ACCOUNTING`; rutas corporativas AP (**16C**).
 - `/tesoreria` y `/tesoreria/reportes`: redirect si no `VIEW TREASURY` (deep links).
 - `/contabilidad` y subrutas: redirect si no `VIEW ACCOUNTING` (hub, cuentas, asientos, **reglas contables**, detalle). Mutaciones en UI (crear/editar/contabilizar/anular borrador; crear/editar/desactivar reglas) requieren `EDIT ACCOUNTING` (botones condicionales + Server Actions; servicios validan igual).
 - **Fase 11C — borrador GL desde documentos:** los botones “Generar asiento contable” / columna Contabilidad en tesorería–movimientos e inventario–movimientos requieren **`EDIT ACCOUNTING`** (además de poder ver la pantalla operativa: proyecto/cobranza, proyecto/pago, `VIEW TREASURY` en reporte movimientos, `VIEW INVENTORY` en movimientos de stock). No crean asientos al confirmar cobranzas/pagos/movimientos; solo bajo acción explícita del usuario. Errores de servicio vuelven con `?contabilidad=` en la URL de origen (solo mensaje de `ServiceError`, sin stack). En **`/contabilidad/**`**, `?empresa=` es **filtro de alcance contable** (UUID validado), no reemplaza la sesión ni el tenant; la autorización sigue siendo membresía + `can()`.

@@ -16,12 +16,14 @@ export default async function FinanzasPage() {
   const overview = await getFinanceHubOverview(ctx);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Finanzas</h1>
-          <p className="text-sm text-muted-foreground">
-            Resumen a nivel empresa. Los totales salen de los mismos servicios que el aging y la tesorería.
+          <p className="text-sm text-muted-foreground max-w-prose">
+            Tablero financiero de la empresa: cuentas por cobrar y por pagar (incluye obra y gastos generales sin
+            proyecto), tesorería por moneda y accesos a contabilidad cuando corresponde. Los números reutilizan aging AP/AR
+            y el resumen de tesorería; no se mezclan monedas en un solo total.
           </p>
         </div>
         <Button asChild variant="outline" size="sm">

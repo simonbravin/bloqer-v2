@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
 Last updated: 2026-05-13  
-Status: Phase **16C** — UI AP empresa bajo **`/finanzas`** (facturas proveedor / C×P / pago corporativos, `VIEW AP` only en servicios `*Company*`); hub con enlaces; `EntityDocumentsPanel` alcance empresa + `DocumentForm` con `projectId` null. Sobre **16B** + **16B.1** ver [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) §16B–16C.
+Status: Phase **16E** — UX **`/finanzas`**: jerarquía visual, empty states, barras vencido/al día, accesos rápidos en card; **subnav** en `app/(app)/finanzas/layout.tsx` (`getFinanceSubnavLinks` + `FinanceSubnav`) con rutas reales y gates módulo + `can()`. Copy “Facturas y gastos”, “Pagos pendientes”, “Empresa / gastos generales”. Ver [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) §16E.
 
 ---
 
@@ -72,8 +72,11 @@ Status: Phase **16C** — UI AP empresa bajo **`/finanzas`** (facturas proveedor
 | Phase 15C | Dashboard tenant `/dashboard`: `getTenantDashboard` ampliado + UI modular (KPIs, finanzas por moneda, proyectos, inventario, contabilidad, onboarding) | Complete |
 | Phase 16A | Finanzas Empresa — auditoría schema/servicios + arquitectura objetivo + fases 16B–16F (solo docs) | Complete (doc) |
 | Phase 16B | AP corporativo: `projectId` nullable en `SupplierInvoice`/`Payable`/`Payment`; `AccountMovement.projectId`; migración; servicios/validators/aging/docs; sin UI global alta (16C) | Complete |
+| Phase 16C | UI AP empresa bajo `/finanzas` (facturas proveedor / C×P / pago corporativos); `VIEW AP` en servicios `*Company*`; hub con enlaces corporativos | Complete |
+| Phase 16D | Hub `/finanzas` tablero empresa (`finance-hub-overview` + `FinanceHubView`); permisos AR/AP/TREASURY/ACCOUNTING; nav alineado | Complete |
+| Phase 16E | Polish UX hub + subnav finanzas (`layout` + `FinanceSubnav`); copy producto; sin schema | Complete |
 
-**Siguiente (sugerido):** **16C** — hub `/finanzas` + flujo de alta factura proveedor corporativa (`projectId` null) + revalidaciones. Opcional: política de relleno de `AccountMovement.projectId` desde pagos/cobros. Deploy: aplicar migración Neon + Vercel, [`DEPLOYMENT_SMOKE_TEST.md`](./08-architecture/DEPLOYMENT_SMOKE_TEST.md).
+**Siguiente (sugerido):** **16F+** — integración reportes / `AccountMovement.projectId` / indicadores dashboard según [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md). Sin migración mezclada con UX salvo plan explícito.
 
 ---
 

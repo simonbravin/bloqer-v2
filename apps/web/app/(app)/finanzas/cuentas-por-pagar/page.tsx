@@ -72,16 +72,13 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/finanzas">← Finanzas</Link>
-        </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Cuentas por pagar (empresa)</h1>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Pagos pendientes</h1>
       </div>
-      <p className="text-sm text-muted-foreground max-w-2xl">
-        Solo obligaciones <strong>sin proyecto</strong> (misma base que el aging global). Desde acá podés abrir el
-        detalle y registrar pagos.
+      <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+        Obligaciones de empresa <strong>sin proyecto</strong> (misma base que el aging global). Desde acá abrís el detalle
+        y registrás pagos.
       </p>
 
       <div className="flex flex-wrap items-center gap-2">

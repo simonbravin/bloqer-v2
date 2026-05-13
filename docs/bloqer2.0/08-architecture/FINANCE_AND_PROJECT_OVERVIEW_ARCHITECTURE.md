@@ -53,7 +53,7 @@ Relacionado: [`TENANT_DASHBOARD_ARCHITECTURE.md`](./TENANT_DASHBOARD_ARCHITECTUR
    - Contabilidad: `accounting.ts` ya permite `projectId` opcional/nullable en líneas/asientos.
 
 4. **¿Qué páginas / rutas asumen finanzas “siempre en proyecto”?**  
-   Mutaciones AP/AR viven bajo `apps/web/app/(app)/proyectos/[id]/...` (facturas, CxC, CxP, pagos, cobranzas). **`/finanzas`** (empresa) es **solo lectura** vía `getFinanceHubOverview`: aging **sin** `projectId` en el filtro (toda la cartera del tenant según permisos) + tesorería por compañía. No asume un proyecto único; **sí** asume que todo CxC/CxP proviene hoy de filas **con** proyecto (el agregado es suma sobre proyectos).
+   Mutaciones AP/AR viven bajo `apps/web/app/(app)/proyectos/[id]/...` (facturas, CxC, CxP, pagos, cobranzas). **`/finanzas`** (empresa) es **solo lectura** vía `getFinanceHubOverview`: aging **sin** `projectId` en el filtro (toda la cartera del tenant según permisos) + tesorería por compañía. **AR** sigue operando en cadena con obra; **AP** puede mezclar líneas con y sin proyecto en el aging global (Phase **16D** separa “con obra” vs “sin obra” en UI a partir de los ítems del aging).
 
 5. **¿Hay concepto duplicado de “gasto”?**  
    No hay módulo `Expense`. **Cost control** y **project cash flow** leen hechos operativos (certificaciones, OC, AP, stock, libro de obra, etc.); **contabilidad** es libro separado por diseño (GL), no duplicado de AP si se usa como reflejo / ajuste con `sourceType`/`sourceId`.
@@ -71,7 +71,7 @@ Relacionado: [`TENANT_DASHBOARD_ARCHITECTURE.md`](./TENANT_DASHBOARD_ARCHITECTUR
 | AR sin obra | **Diferido** salvo necesidad explícita: relajar `SalesInvoice`/`Receivable`/`Collection` impacta certificaciones y flujos de obra; auditar BR-AR-003 en `OPEN_QUESTIONS` / `DECISION_LOG` antes. |
 | `AccountMovement.projectId` | **Sí, evaluar agregar** nullable para UI “tesorería por proyecto / sin proyecto” y hub empresa; alternativa más débil: inferir solo desde `sourceType`+`sourceId` (más queries, huecos si el movimiento no tiene fuente con proyecto). |
 | `ExpenseCategory` | **Solo si** hace falta etiquetado estable para UI/filtros; implementar como **dimensión no contable** (tabla maestra o `metadata` JSON acotado en factura/movimiento) — **no** segundo asiento automático paralelo al GL salvo reglas documentadas. |
-| Tabla `Expense` genérica | **No** en 16B–16E salvo nuevo requisito de workflow/aprobaciones que no quepa en AP+GL (entonces ADR + `STATE_MACHINES`). |
+| Tabla `Expense` genérica | **No** en 16B–16G salvo nuevo requisito de workflow/aprobaciones que no quepa en AP+GL (entonces ADR + `STATE_MACHINES`). |
 
 ### 16A.5 Plan de implementación por fases (post-auditoría)
 
@@ -79,16 +79,17 @@ Relacionado: [`TENANT_DASHBOARD_ARCHITECTURE.md`](./TENANT_DASHBOARD_ARCHITECTUR
 |------|-----------|
 | **16B** | **Hecho (2026-05-13):** ver §Phase 16B — migración + servicios + validators + aging AP + documentos; **sin** UI global de alta corporativa (→ 16C). |
 | **16C** | **Hecho (2026-05-13):** UI bajo `/finanzas/facturas-proveedor/**`, `/finanzas/cuentas-por-pagar/**`, `/finanzas/pagos-proveedor/[paymentId]`; servicios `listCompany*` / `getCompany*` con **`VIEW AP` only**; hub con enlaces; adjuntos corporativos. Ver §Phase 16C. |
-| **16D** | **Dashboard / indicadores financieros empresa** (gráficos, KPIs) reutilizando datos 16B–16C. |
-| **16E** | **Integración proyecto:** filtros “solo obra” / “mixto”; reportes distribución por proyecto y por categoría; alinear `getProjectCashFlowReport` / cost control con movimientos que expongan dimensión corporativa donde aplique. |
-| **16F** | **Indicadores** en `/dashboard` y/o hub: deuda próxima, cobros próximos, cash forecast — solo métricas ya definibles desde datos existentes o desde 16B; nuevas métricas → doc de fórmulas / `OPEN_QUESTIONS`. |
+| **16D** | **Hecho (2026-05-13):** hub `/finanzas` tablero empresa — `getFinanceHubOverview` + `FinanceHubView`: multimoneda, split AP aging, accesos rápidos, tesorería, enlace contabilidad; nav shell Finanzas con `VIEW TREASURY` / `VIEW ACCOUNTING`. |
+| **16E** | **Hecho (2026-05-13):** subnav bajo `/finanzas` + polish UI hub + copy (“Facturas y gastos”, “Pagos pendientes”, “Empresa / gastos generales”). Ver §Phase 16E. |
+| **16F** | **Integración proyecto:** filtros “solo obra” / “mixto”; reportes distribución por proyecto y por categoría; alinear `getProjectCashFlowReport` / cost control con movimientos que expongan dimensión corporativa donde aplique. |
+| **16G** | **Indicadores** en `/dashboard` y/o hub: deuda próxima, cobros próximos, cash forecast — solo métricas ya definibles desde datos existentes o desde 16B; nuevas métricas → doc de fórmulas / `OPEN_QUESTIONS`. |
 
 ### 16A.6 Criterios de aceptación Phase 16A (cumplidos en doc)
 
 - [x] Auditoría explícita de schema y capa de servicios para las entidades pedidas.  
 - [x] Decisión documentada: nullable `projectId` en **AP** como dirección preferida para gastos generales; **AR** diferido; **`AccountMovement`** a evaluar.  
 - [x] Recomendación: **no** tabla `Expense` genérica; categorías solo como dimensión de reporting si hace falta.  
-- [x] Plan faseado 16B–16F.  
+- [x] Plan faseado 16B–16G.  
 
 ---
 
@@ -145,14 +146,44 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 - **Rutas:** `GET /finanzas/facturas-proveedor`, `/nueva`, `/[invoiceId]`; `GET /finanzas/cuentas-por-pagar`, `/[payableId]`, `/[payableId]/pagar`; `GET /finanzas/pagos-proveedor/[paymentId]`.
 - **Representación de “gastos generales”:** mismas entidades **SupplierInvoice → Payable → Payment** con `projectId` null (sin tabla `Expense`).
 - **Aislamiento:** servicios `listCompanySupplierInvoices`, `getCompanySupplierInvoiceById`, `listCompanyPayables`, `getCompanyPayableById`, `getCompanyPaymentById` exigen **`VIEW AP`** (`canViewCompanyAp`) y filas con **`projectId === null`** (más `ctx.companyId` cuando aplica). Las rutas proyecto siguen con `projectScopeId` / `list*ByProject`.
-- **Hub:** `getFinanceHubOverview` agrega enlaces de reporte a facturas/C×P empresa y “gastos generales”.
+- **Hub:** `getFinanceHubOverview` agrega enlaces de reporte a facturas/C×P empresa y “gastos generales”. **Phase 16D** amplía el mismo servicio a tablero multimoneda + split AP obra/corporativo (aging) + accesos rápidos + bloque contabilidad (solo enlace).
 - **Adjuntos:** `EntityDocumentsPanel` con `scope: { kind: "company-finanzas-supplier-invoice" }` + `DocumentForm` con `projectId` null; acciones server `attachment-actions.ts` revalidan `/finanzas/facturas-proveedor/...`.
 - **Contabilidad:** sin auto-post; botón “Generar asiento” en pago empresa reutiliza `suggestJournalFromPayment` como en proyecto.
 
-### 16C.2 Fuera de alcance (16D+)
+### 16C.2 Fuera de alcance (historial)
 
-- Gráficos / KPI dashboard financiero empresa.
+- ~~Gráficos / KPI dashboard financiero empresa~~ — cubierto en **16D** (v1 tablero sin Recharts obligatorio).
 - Filtros avanzados (proveedor en listado) más allá de estado/fechas simples por query.
+
+---
+
+## Phase 16D — Hub `/finanzas` tablero empresa (2026-05-13)
+
+### 16D.1 Alcance
+
+- **Servicio:** `packages/services/src/finance/finance-hub-overview.service.ts` — DTO con `FinanceHubCurrencySnapshot` por moneda (totales abiertos, vencido vs al día, ratios), `apWithProjectInsight` vs `apCorporateInsight` (filtro por `projectId` en ítems del **mismo** `getPayableAgingReport` global), `quickActions`, `alerts` (incl. nota multimoneda), `accountingSection` (enlace a `/contabilidad` si módulo + `VIEW ACCOUNTING`). Sin schema nuevo, sin entidad `Expense`, sin contabilización automática.
+- **UI:** `apps/web/features/finance/finance-hub-view.tsx` + copy en `apps/web/app/(app)/finanzas/page.tsx`.
+- **Nav:** `apps/web/lib/nav-config.ts` — ítem **Finanzas** si `VIEW AR` **o** `VIEW AP` **o** `VIEW TREASURY` **o** `VIEW ACCOUNTING`, con módulo tenant habilitado en la rama correspondiente.
+- **Permisos:** `canSeeAnything` no usa `VIEW PROJECTS` como atajo global; AP corporativo en UI/servicios `*Company*` sigue **`VIEW AP`** (sin cambio 16C).
+
+### 16D.2 Fuera de alcance
+
+- Entidad **Expense** dedicada, cashflow proyectado complejo, reportes GL avanzados, imputación automática, `projectId` nullable en cadena AR.
+
+---
+
+## Phase 16E — UX + subnav Finanzas (2026-05-13)
+
+### 16E.1 Alcance
+
+- **Subnav:** `apps/web/app/(app)/finanzas/layout.tsx` + `apps/web/features/finance/finance-subnav.tsx` + `finance-subnav-links.ts` — `getFinanceSubnavLinks(ctx)` con `getTenantModuleGate` + `can()`; solo rutas reales (Resumen, CxC aging, facturas y gastos, pagos pendientes, aging proveedores, Tesorería, Contabilidad). Enlaces a `/tesoreria` y `/contabilidad` salen del segmento `/finanzas` pero siguen en la barra cuando el rol califica.
+- **Hub:** refinamiento visual de `FinanceHubView` (jerarquía, cards, empty states, barra vencido vs al día con tokens, accesos rápidos en card).
+- **Copy:** “Facturas y gastos”, “Pagos pendientes”, “Empresa / gastos generales”; páginas listado/aging alineadas en títulos y textos cortos.
+- **Sin** schema, **sin** `Expense`, **sin** automatismos contables; **sin** cambios al contrato DTO de `getFinanceHubOverview` (solo strings de labels en servicio donde aplica).
+
+### 16E.2 Fuera de alcance
+
+- Rutas nuevas solo para subnav; **sin** “Gastos generales” como URL inventada.
 
 ---
 
@@ -177,7 +208,7 @@ La **ficha** `/proyectos/[id]` conserva atajos en botones; la **navegación prin
 
 ### 1.2 ¿Qué rutas faltan para una experiencia “completa”?
 
-- **Indicadores / gráficos** en hub empresa — Phase **16D+** (ver §16C.2).
+- **Indicadores / gráficos avanzados** en hub empresa (cashflow proyectado complejo, GL drill-down masivo) — fuera de **16D**; ver §16D.2.
 - **Entidad `Expense` dedicada** — no prevista; ver 1.5 y §7.
 
 ### 1.3 ¿Existe `/proyectos/[id]/finanzas`?
@@ -186,7 +217,7 @@ La **ficha** `/proyectos/[id]` conserva atajos en botones; la **navegación prin
 
 ### 1.4 ¿Existe una visión global financiera “real” en `/finanzas`?
 
-**Mejorada (Phase 14C+).** La página usa **`getFinanceHubOverview(ctx)`** (`packages/services/src/finance/finance-hub-overview.service.ts`): cards de saldo abierto CxC/CxP reutilizando **`getReceivableAgingReport` / `getPayableAgingReport`**, card de tesorería con **`getTreasurySummaryByCompany`**, enlaces a aging y reportes de tesorería, empty states por módulo deshabilitado o sin permiso. **No** duplica fórmulas de cost-control ni project-cash-flow. Contabilidad global en el hub queda **pendiente** (opcional futuro `accounting-insights`).
+**Sí (Phase 14C+; tablero Phase 16D).** La página usa **`getFinanceHubOverview(ctx)`** (`packages/services/src/finance/finance-hub-overview.service.ts`): aging AR/AP global (`getReceivableAgingReport` / `getPayableAgingReport`) con **desglose por moneda** y **split AP** con obra vs corporativo en ítems de aging; tesorería con **`getTreasurySummaryByCompany`**; **accesos rápidos** y **alertas** (p. ej. multimoneda); bloque **contabilidad** solo como enlace si módulo + `VIEW ACCOUNTING`. **No** duplica fórmulas de cost-control ni project-cash-flow; **no** agrega KPIs contables calculados.
 
 ### 1.5 ¿Cómo se registran hoy gastos “sin proyecto”?
 
@@ -232,7 +263,7 @@ Comentario en schema (`Receivable`): *“product concepts may allow debt without
 | Tesorería saldo por cuenta | `getTreasurySummaryByCompany`, reportes en `treasury-reports` | Por `companyId` / tenant; **no** hay agregado por proyecto en una sola columna en `AccountMovement` |
 | Mayor / asientos | `journal-entry`, listados | Filtrar por `projectId` null vs no null para “corporativo” vs obra |
 | Dashboard tenant (14B) | `getTenantDashboard` | Ya compone KPIs sin duplicar cost-control |
-| Hub finanzas empresa (14C+) | `getFinanceHubOverview` | Composición sobre aging + tesorería |
+| Hub finanzas empresa (14C+ / 16D) | `getFinanceHubOverview` | Aging AR/AP + tesorería; split AP obra/corporativo (16D) |
 
 ### 1.9 ¿Qué requiere decisión de producto o schema nuevo?
 
@@ -256,7 +287,7 @@ La **empresa** (`companyId` dentro del tenant) debe poder verse como:
 4. **Contabilidad** — plan de cuentas y asientos **por empresa**; líneas/asientos con `projectId` null = actividad no imputada a obra.
 5. **Gastos generales** — **sin** entidad `Expense`: uso previsto de **AP + tesorería + contabilidad** con imputación coherente; hoy el camino realista sin migración es **journal entries** (y política interna) + movimientos de caja no ligados a cobro/pago de C×P de obra.
 
-**Implementación (Phase 14C+):** ver `getFinanceHubOverview` + `FinanceHubView` en `apps/web/features/finance/`.
+**Implementación (Phase 14C+ / 16D):** ver `getFinanceHubOverview` + `FinanceHubView` en `apps/web/features/finance/`.
 
 ---
 
@@ -395,7 +426,7 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 ## 7. Pendientes explícitos (backlog)
 
 - [x] `getProjectFinanceOverview` en `packages/services/src/project-finance/project-finance-overview.service.ts`.
-- [x] Rediseño `/finanzas` overview global (servicio + UI) — **v1** con `getFinanceHubOverview`.
+- [x] Rediseño `/finanzas` overview global (servicio + UI) — **v3 (Phase 16E)** subnav + polish visual + copy.
 - [x] `layout.tsx` bajo `[id]` + navegación de proyecto (Phase **14D** subnav horizontal → **15A** sidebar workspace).
 - [x] `/proyectos/[id]/finanzas` (página + servicio orquestador) — **Phase 14E**.
 - [x] Resumen `/proyectos/[id]` — **Phase 15B** (`getProjectOverviewDashboard` + `ProjectOverviewView`).

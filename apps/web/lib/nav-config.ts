@@ -51,7 +51,14 @@ export const MAIN_NAV_DEF: MainNavItemDef[] = [
   {
     href:  "/finanzas",
     label: "Finanzas",
-    require: { anyOf: [{ action: "VIEW", module: "AR" }, { action: "VIEW", module: "AP" }] },
+    require: {
+      anyOf: [
+        { action: "VIEW", module: "AR" },
+        { action: "VIEW", module: "AP" },
+        { action: "VIEW", module: "TREASURY" },
+        { action: "VIEW", module: "ACCOUNTING" },
+      ],
+    },
   },
   {
     href: "/configuracion",

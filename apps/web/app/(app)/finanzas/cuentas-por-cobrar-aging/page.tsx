@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 import { getReceivableAgingReport, parseAgingFilters } from "@bloqer/services";
 import {
@@ -41,16 +39,11 @@ export default async function ArAgingPage({ searchParams }: PageProps) {
   const report = await getReceivableAgingReport(parseAgingFilters(sp), ctx);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/finanzas">← Finanzas</Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Aging — Cuentas por cobrar</h1>
-            <p className="text-xs text-muted-foreground">Al {report.asOfDate}</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Cuentas por cobrar</h1>
+          <p className="text-xs text-muted-foreground">Al {report.asOfDate}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ReportCsvExportLink exportPath="/api/reports/finanzas/ar-aging.csv" params={sp} />

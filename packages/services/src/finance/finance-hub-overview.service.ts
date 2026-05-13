@@ -3,12 +3,15 @@ import { can } from "@bloqer/domain";
 import {
   getPayableAgingReport,
   getReceivableAgingReport,
+  type AgingItem,
   type AgingReport,
 } from "../aging/aging.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { getTreasurySummaryByCompany } from "../treasury/balance.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
+
+const ZERO = new Prisma.Decimal(0);
 
 function fmtDecimalEs(value: string, currencyCode?: string): string {
   const n = Number(value);
@@ -74,6 +77,8 @@ export type FinanceHubTreasuryCard = {
   displayHeadline: string;
   treasuryHref: string;
   reportsHref: string;
+  posicionCajaHref: string;
+  movimientosHref: string;
   loadFailed: boolean;
 };
 
@@ -83,14 +88,65 @@ export type FinanceHubReportLink = {
   href: string;
 };
 
+/** Per-currency slice from aging lines (never mixes currencies). */
+export type FinanceHubCurrencySnapshot = {
+  currency: string;
+  openTotal: string;
+  overdueTotal: string;
+  /** Saldo en bucket “current” del aging (aún no vencido según aging). */
+  currentOrNotDueTotal: string;
+  openLineCount: number;
+  overdueLineCount: number;
+  /** 0–1 overdue / open; null when there is no open balance. */
+  overdueShareOfOpen: number | null;
+};
+
+export type FinanceHubInsightBlock = {
+  moduleEnabled: boolean;
+  hasPermission: boolean;
+  visible: boolean;
+  loadFailed: boolean;
+  agingHref: string;
+  multicurrency: boolean;
+  byCurrency: FinanceHubCurrencySnapshot[];
+};
+
+export type FinanceHubAccountingSection = {
+  moduleEnabled: boolean;
+  hasPermission: boolean;
+  visible: boolean;
+  href: string;
+};
+
+export type FinanceHubQuickAction = {
+  label: string;
+  href: string;
+};
+
+export type FinanceHubAlert = {
+  variant: "info" | "warning";
+  message: string;
+};
+
 export type FinanceHubOverview = {
   arCard?: FinanceHubMoneyCard;
   apCard?: FinanceHubMoneyCard;
   treasuryCard?: FinanceHubTreasuryCard;
+  /** Phase 16D — aging AR breakdown by currency + counts. */
+  arInsight?: FinanceHubInsightBlock;
+  /** Phase 16D — AP aging consolidated (obra + corporativo). */
+  apGlobalInsight?: FinanceHubInsightBlock;
+  /** Phase 16D — AP líneas con `projectId` no nulo. */
+  apWithProjectInsight?: FinanceHubInsightBlock;
+  /** Phase 16D — AP corporativo (`projectId` null). */
+  apCorporateInsight?: FinanceHubInsightBlock;
+  accountingSection?: FinanceHubAccountingSection;
+  quickActions: FinanceHubQuickAction[];
+  alerts: FinanceHubAlert[];
   reportLinks: FinanceHubReportLink[];
-  /** At least one of AR, AP, TREASURY modules is enabled for the tenant */
+  /** At least one finance-related tenant module is enabled */
   hasFinanceModules: boolean;
-  /** User can see at least one finance card or report link */
+  /** User can see at least one hub section (AR / AP / TREASURY / ACCOUNTING) */
   canSeeAnything: boolean;
 };
 
@@ -143,21 +199,156 @@ function buildMoneyCardFromAging(
   };
 }
 
+function overdueAmountForItem(item: AgingItem): Prisma.Decimal {
+  return item.daysOverdue > 0 ? new Prisma.Decimal(item.balanceDue) : ZERO;
+}
+
+function currentAmountForItem(item: AgingItem): Prisma.Decimal {
+  return item.daysOverdue <= 0 ? new Prisma.Decimal(item.balanceDue) : ZERO;
+}
+
+/**
+ * Aggregates open lines from an aging report, optionally filtered per line.
+ * Skips non-positive balances. Never sums across currencies.
+ */
+function aggregateAgingByCurrency(
+  report: AgingReport | null,
+  itemFilter?: (item: AgingItem) => boolean,
+): FinanceHubCurrencySnapshot[] {
+  if (!report) return [];
+  const map = new Map<
+    string,
+    {
+      open: Prisma.Decimal;
+      overdue: Prisma.Decimal;
+      current: Prisma.Decimal;
+      openLines: number;
+      overdueLines: number;
+    }
+  >();
+  for (const row of report.rows) {
+    for (const item of row.items) {
+      if (itemFilter && !itemFilter(item)) continue;
+      const bal = new Prisma.Decimal(item.balanceDue);
+      if (bal.lte(0)) continue;
+      const cur = item.currency;
+      const agg = map.get(cur) ?? {
+        open: ZERO,
+        overdue: ZERO,
+        current: ZERO,
+        openLines: 0,
+        overdueLines: 0,
+      };
+      agg.open = agg.open.add(bal);
+      agg.openLines += 1;
+      if (item.daysOverdue > 0) {
+        agg.overdue = agg.overdue.add(bal);
+        agg.overdueLines += 1;
+      } else {
+        agg.current = agg.current.add(bal);
+      }
+      map.set(cur, agg);
+    }
+  }
+  return [...map.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([currency, agg]) => {
+      const overdueShareOfOpen = agg.open.gt(0)
+        ? Math.min(1, Math.max(0, Number(agg.overdue.div(agg.open).toString())))
+        : null;
+      return {
+        currency,
+        openTotal: agg.open.toString(),
+        overdueTotal: agg.overdue.toString(),
+        currentOrNotDueTotal: agg.current.toString(),
+        openLineCount: agg.openLines,
+        overdueLineCount: agg.overdueLines,
+        overdueShareOfOpen,
+      };
+    });
+}
+
+function buildInsightBlock(
+  moduleEnabled: boolean,
+  hasPermission: boolean,
+  report: AgingReport | null,
+  agingHref: string,
+  itemFilter?: (item: AgingItem) => boolean,
+): FinanceHubInsightBlock {
+  if (!moduleEnabled) {
+    return {
+      moduleEnabled: false,
+      hasPermission,
+      visible:       false,
+      loadFailed:    false,
+      agingHref,
+      multicurrency: false,
+      byCurrency:    [],
+    };
+  }
+  if (!hasPermission) {
+    return {
+      moduleEnabled: true,
+      hasPermission: false,
+      visible:       false,
+      loadFailed:    false,
+      agingHref,
+      multicurrency: false,
+      byCurrency:    [],
+    };
+  }
+  const loadFailed = report === null;
+  const byCurrency   = loadFailed ? [] : aggregateAgingByCurrency(report, itemFilter);
+  const multicurrency = byCurrency.length > 1;
+  return {
+    moduleEnabled: true,
+    hasPermission: true,
+    visible:       true,
+    loadFailed,
+    agingHref,
+    multicurrency,
+    byCurrency,
+  };
+}
+
+function pushUniqueQuickAction(
+  list: FinanceHubQuickAction[],
+  action: FinanceHubQuickAction,
+  seen: Set<string>,
+) {
+  const key = `${action.href}::${action.label}`;
+  if (seen.has(key)) return;
+  seen.add(key);
+  list.push(action);
+}
+
 /**
  * Hub `/finanzas`: resúmenes ligeros reutilizando aging AR/AP y saldo tesorería.
+ * Phase 16D: desglose multimoneda, split AP obra vs corporativo, accesos rápidos, bloque contabilidad (solo enlace).
  * No duplica fórmulas de negocio; delega en servicios existentes.
  */
 export async function getFinanceHubOverview(ctx: ServiceContext): Promise<FinanceHubOverview> {
   const gate = await getTenantModuleGate(ctx);
 
-  const arMod  = gate.isEnabled("AR");
-  const apMod  = gate.isEnabled("AP");
-  const trMod  = gate.isEnabled("TREASURY");
-  const arPerm = can(ctx.roles, "VIEW", "AR");
-  const apPerm = can(ctx.roles, "VIEW", "AP");
-  const trPerm = can(ctx.roles, "VIEW", "TREASURY");
+  const arMod    = gate.isEnabled("AR");
+  const apMod    = gate.isEnabled("AP");
+  const trMod    = gate.isEnabled("TREASURY");
+  const acctMod  = gate.isEnabled("ACCOUNTING");
+  const arPerm   = can(ctx.roles, "VIEW", "AR");
+  const apPerm   = can(ctx.roles, "VIEW", "AP");
+  const trPerm   = can(ctx.roles, "VIEW", "TREASURY");
+  const acctPerm = can(ctx.roles, "VIEW", "ACCOUNTING");
 
-  const hasFinanceModules = arMod || apMod || trMod;
+  const hasFinanceModules = arMod || apMod || trMod || acctMod;
+
+  const canSeeAnything =
+    hasFinanceModules
+    && ((arMod && arPerm) || (apMod && apPerm) || (trMod && trPerm) || (acctMod && acctPerm));
+
+  const [arReport, apReport] = await Promise.all([
+    arMod && arPerm ? safeRun(() => getReceivableAgingReport({}, ctx)) : Promise.resolve(null),
+    apMod && apPerm ? safeRun(() => getPayableAgingReport({}, ctx)) : Promise.resolve(null),
+  ]);
 
   const reportLinks: FinanceHubReportLink[] = [];
   if (arMod && arPerm) {
@@ -169,24 +360,19 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
   }
   if (apMod && apPerm) {
     reportLinks.push({
-      label:       "Aging — Cuentas por pagar",
-      description: "Por proveedor y vencimiento.",
+      label:       "Aging proveedores",
+      description: "Por proveedor y vencimiento (global).",
       href:        "/finanzas/cuentas-por-pagar-aging",
     });
     reportLinks.push({
-      label:       "Facturas proveedor (empresa)",
-      description: "Gastos generales sin obra: facturas con proyecto nulo.",
+      label:       "Facturas y gastos (empresa)",
+      description: "Gastos generales sin imputar a obra.",
       href:        "/finanzas/facturas-proveedor",
     });
     reportLinks.push({
-      label:       "Cuentas por pagar (empresa)",
-      description: "Obligaciones AP sin proyecto.",
+      label:       "Pagos pendientes (empresa)",
+      description: "Obligaciones sin proyecto.",
       href:        "/finanzas/cuentas-por-pagar",
-    });
-    reportLinks.push({
-      label:       "Gastos generales",
-      description: "Alias práctico al listado de facturas corporativas.",
-      href:        "/finanzas/facturas-proveedor",
     });
   }
   if (trMod && trPerm) {
@@ -199,8 +385,7 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
 
   let arCard: FinanceHubMoneyCard | undefined;
   if (arMod) {
-    const arReport = arPerm ? await safeRun(() => getReceivableAgingReport({}, ctx)) : null;
-    const money    = buildMoneyCardFromAging(arReport, Boolean(arPerm && arReport === null));
+    const money = buildMoneyCardFromAging(arReport, Boolean(arPerm && arReport === null));
     arCard = {
       moduleEnabled: true,
       hasPermission: arPerm,
@@ -213,8 +398,7 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
 
   let apCard: FinanceHubMoneyCard | undefined;
   if (apMod) {
-    const apReport = apPerm ? await safeRun(() => getPayableAgingReport({}, ctx)) : null;
-    const money    = buildMoneyCardFromAging(apReport, Boolean(apPerm && apReport === null));
+    const money = buildMoneyCardFromAging(apReport, Boolean(apPerm && apReport === null));
     apCard = {
       moduleEnabled: true,
       hasPermission: apPerm,
@@ -224,6 +408,22 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
       loadFailed: apPerm ? money.loadFailed : false,
     };
   }
+
+  const arInsight = arMod
+    ? buildInsightBlock(arMod, arPerm, arReport, "/finanzas/cuentas-por-cobrar-aging")
+    : undefined;
+
+  const apGlobalInsight = apMod
+    ? buildInsightBlock(apMod, apPerm, apReport, "/finanzas/cuentas-por-pagar-aging")
+    : undefined;
+
+  const apWithProjectInsight = apMod
+    ? buildInsightBlock(apMod, apPerm, apReport, "/finanzas/cuentas-por-pagar-aging", (it) => it.projectId != null)
+    : undefined;
+
+  const apCorporateInsight = apMod
+    ? buildInsightBlock(apMod, apPerm, apReport, "/finanzas/cuentas-por-pagar-aging", (it) => it.projectId == null)
+    : undefined;
 
   let treasuryCard: FinanceHubTreasuryCard | undefined;
   if (trMod) {
@@ -263,19 +463,98 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
       multicurrency,
       balancesByCurrency,
       displayHeadline,
-      treasuryHref: "/tesoreria",
-      reportsHref:  "/tesoreria/reportes",
+      treasuryHref:       "/tesoreria",
+      reportsHref:        "/tesoreria/reportes",
+      posicionCajaHref:   "/tesoreria/reportes/posicion-caja",
+      movimientosHref:    "/tesoreria/reportes/movimientos",
       loadFailed,
     };
   }
 
-  const canSeeAnything =
-    hasFinanceModules && (arPerm || apPerm || trPerm);
+  let accountingSection: FinanceHubAccountingSection | undefined;
+  if (acctMod) {
+    accountingSection = {
+      moduleEnabled: true,
+      hasPermission: acctPerm,
+      visible:       acctPerm,
+      href:          "/contabilidad",
+    };
+  }
+
+  const quickActions: FinanceHubQuickAction[] = [];
+  const qaSeen = new Set<string>();
+  if (arMod && arPerm) {
+    pushUniqueQuickAction(quickActions, { label: "Aging cuentas por cobrar", href: "/finanzas/cuentas-por-cobrar-aging" }, qaSeen);
+  }
+  if (apMod && apPerm) {
+    pushUniqueQuickAction(
+      quickActions,
+      { label: "Nueva factura (empresa)", href: "/finanzas/facturas-proveedor/nueva" },
+      qaSeen,
+    );
+    pushUniqueQuickAction(quickActions, { label: "Pagos pendientes", href: "/finanzas/cuentas-por-pagar" }, qaSeen);
+    pushUniqueQuickAction(quickActions, { label: "Aging proveedores", href: "/finanzas/cuentas-por-pagar-aging" }, qaSeen);
+    pushUniqueQuickAction(quickActions, { label: "Facturas y gastos", href: "/finanzas/facturas-proveedor" }, qaSeen);
+  }
+  if (trMod && trPerm) {
+    pushUniqueQuickAction(quickActions, { label: "Tesorería", href: "/tesoreria" }, qaSeen);
+    pushUniqueQuickAction(quickActions, { label: "Posición de caja", href: "/tesoreria/reportes/posicion-caja" }, qaSeen);
+    pushUniqueQuickAction(quickActions, { label: "Movimientos", href: "/tesoreria/reportes/movimientos" }, qaSeen);
+  }
+  if (acctMod && acctPerm) {
+    pushUniqueQuickAction(quickActions, { label: "Contabilidad", href: "/contabilidad" }, qaSeen);
+  }
+
+  const alerts: FinanceHubAlert[] = [];
+
+  if (arMod && !arPerm && (apPerm || trPerm || acctPerm)) {
+    alerts.push({
+      variant: "info",
+      message: "El módulo de cuentas por cobrar está activo pero no tenés permiso de lectura (VIEW AR). Pedí acceso si necesitás ver C×C.",
+    });
+  }
+  if (apMod && !apPerm && (arPerm || trPerm || acctPerm)) {
+    alerts.push({
+      variant: "info",
+      message: "El módulo de cuentas por pagar está activo pero no tenés permiso de lectura (VIEW AP). Las facturas y C×P empresa requieren VIEW AP.",
+    });
+  }
+  if (trMod && !trPerm && (arPerm || apPerm || acctPerm)) {
+    alerts.push({
+      variant: "info",
+      message: "Tesorería está habilitada pero no tenés VIEW TREASURY para ver saldos y reportes.",
+    });
+  }
+  if (acctMod && !acctPerm && (arPerm || apPerm || trPerm)) {
+    alerts.push({
+      variant: "info",
+      message: "Contabilidad está habilitada pero no tenés VIEW ACCOUNTING para abrir el libro.",
+    });
+  }
+
+  const anyMulti =
+    Boolean(arInsight?.multicurrency)
+    || Boolean(apGlobalInsight?.multicurrency)
+    || Boolean(treasuryCard?.multicurrency);
+  if (anyMulti) {
+    alerts.push({
+      variant: "warning",
+      message:
+        "Hay más de una moneda en juego. Los importes se listan por moneda; no sumamos montos entre monedas distintas.",
+    });
+  }
 
   return {
     arCard,
     apCard,
     treasuryCard,
+    arInsight,
+    apGlobalInsight,
+    apWithProjectInsight,
+    apCorporateInsight,
+    accountingSection,
+    quickActions,
+    alerts,
     reportLinks,
     hasFinanceModules,
     canSeeAnything,
