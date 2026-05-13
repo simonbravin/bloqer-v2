@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+/** Monorepo root so Vercel output tracing includes hoisted pnpm .prisma client engines. */
+const monorepoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: monorepoRoot,
+  serverExternalPackages: ["@prisma/client", "@prisma/engines", "prisma"],
   transpilePackages: [
     "@bloqer/config",
     "@bloqer/domain",
