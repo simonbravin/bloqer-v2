@@ -100,7 +100,12 @@ export type BudgetSelectionRequired = {
   availableBudgets: AvailableBudget[];
 };
 
-export type CostControlResult = ProjectCostControlReport | BudgetSelectionRequired;
+/** No approved/closed budgets — avoid throwing so the UI can explain instead of a 500. */
+export type NoApprovedBudgets = {
+  type: "NO_APPROVED_BUDGETS";
+};
+
+export type CostControlResult = ProjectCostControlReport | BudgetSelectionRequired | NoApprovedBudgets;
 
 // ─── Internal accumulators ────────────────────────────────────────────────────
 
@@ -197,7 +202,7 @@ export async function getProjectCostControl(
   } else if (validBudgets.length === 1) {
     budget = validBudgets[0]!;
   } else if (validBudgets.length === 0) {
-    throw new ServiceError("CONFLICT", "El proyecto no tiene presupuestos aprobados o cerrados");
+    return { type: "NO_APPROVED_BUDGETS" };
   } else {
     return { type: "BUDGET_SELECTION_REQUIRED", availableBudgets: validBudgets };
   }

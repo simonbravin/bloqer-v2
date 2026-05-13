@@ -46,8 +46,8 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
     throw err;
   }
 
-  // availableBudgets is present on both result types
-  const availableBudgets = result.availableBudgets;
+  // availableBudgets is present on REPORT and BUDGET_SELECTION_REQUIRED
+  const availableBudgets = result.type === "NO_APPROVED_BUDGETS" ? [] : result.availableBudgets;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -81,7 +81,18 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
 
       <CostControlFilters budgets={availableBudgets} currentBudgetId={sp.budgetId} />
 
-      {result.type === "BUDGET_SELECTION_REQUIRED" ? (
+      {result.type === "NO_APPROVED_BUDGETS" ? (
+        <div className="rounded-lg border bg-card p-8 text-center space-y-3">
+          <p className="font-semibold">No hay presupuesto aprobado o cerrado</p>
+          <p className="text-sm text-muted-foreground">
+            El control de costos se calcula sobre un presupuesto en estado aprobado o cerrado. Creá o aprobá una
+            versión en presupuestos.
+          </p>
+          <Button variant="outline" size="sm" asChild className="mt-2">
+            <Link href={`/proyectos/${projectId}/presupuestos`}>Ir a presupuestos</Link>
+          </Button>
+        </div>
+      ) : result.type === "BUDGET_SELECTION_REQUIRED" ? (
         <div className="rounded-lg border bg-card p-8 text-center space-y-3">
           <p className="font-semibold">El proyecto tiene {result.availableBudgets.length} presupuestos aprobados.</p>
           <p className="text-sm text-muted-foreground">Seleccioná uno en el filtro de arriba para ver el control de costos.</p>

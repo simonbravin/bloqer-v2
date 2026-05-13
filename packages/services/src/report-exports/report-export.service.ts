@@ -399,6 +399,9 @@ export async function exportProjectCostControlCsv(
   ctx: ServiceContext,
 ): Promise<ReportCsvPayload> {
   const result = await getProjectCostControl(projectId, filters, ctx);
+  if (result.type === "NO_APPROVED_BUDGETS") {
+    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado o cerrado para exportar el control de costos");
+  }
   if (result.type === "BUDGET_SELECTION_REQUIRED") {
     throw new ServiceError("CONFLICT", "Seleccioná un presupuesto para exportar el control de costos");
   }

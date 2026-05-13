@@ -12,7 +12,7 @@ export function ProjectOverviewAlerts({ alerts }: { alerts: ProjectOverviewAlert
   if (alerts.length === 0) return null;
   return (
     <div className="space-y-2">
-      <h2 className="text-sm font-semibold text-muted-foreground">Avisos</h2>
+      <h2 className="text-sm font-semibold text-muted-foreground">Alertas</h2>
       <ul className="space-y-2">
         {alerts.map((a, i) => (
           <li

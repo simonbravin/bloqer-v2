@@ -5,19 +5,13 @@ import type { ProjectWithClient } from "@bloqer/services";
 import { ProjectStatusBadge } from "@/features/projects";
 import { ProjectOverviewActivityCard } from "./project-overview-activity-card";
 import { ProjectOverviewAlerts } from "./project-overview-alerts";
-import { ProjectOverviewBillingCard } from "./project-overview-billing-bars";
-import { ProjectOverviewCostCtaCard } from "./project-overview-cost-cta-card";
+import { ProjectOverviewCharts } from "./project-overview-charts";
 import { ProjectOverviewKpiCard } from "./project-overview-kpi-card";
 import { ProjectOverviewMoneyList } from "./project-overview-money-list";
-import { ProjectOverviewQuickLinks } from "./project-overview-quick-links";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 const TYPE_LABELS = { PUBLIC: "Público", PRIVATE: "Privado" } as const;
-
-function fmt(d: string | null | undefined) {
-  if (!d) return "—";
-  return new Date(d + "T12:00:00").toLocaleDateString("es-AR");
-}
 
 function locDate(d: Date | null | undefined) {
   if (!d) return "—";
@@ -36,7 +30,8 @@ export function ProjectOverviewView({
   lifecycleActions: React.ReactNode;
 }) {
   const p = dashboard.project;
-  const client = fullProject?.client;
+  const sched = dashboard.scheduleProgress;
+  const cashFlowHref = dashboard.kpis.cashFlow?.available ? dashboard.kpis.cashFlow.href : undefined;
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-6">
@@ -48,148 +43,11 @@ export function ProjectOverviewView({
           </div>
           {p.code ? <p className="font-mono text-sm text-muted-foreground">{p.code}</p> : null}
           <p className="max-w-2xl text-sm text-muted-foreground">
-            {p.clientName || client ? (
-              <>
-                Cliente:{" "}
-                {client ? (
-                  <Link
-                    href={`/directorio/${client.id}`}
-                    className="font-medium text-foreground underline underline-offset-2"
-                  >
-                    {client.fantasyName ?? client.legalName}
-                  </Link>
-                ) : (
-                  <span className="font-medium text-foreground">{p.clientName}</span>
-                )}
-                {" · "}
-              </>
-            ) : null}
-            Inicio {fmt(p.startDate ?? null)}
-            {p.estimatedEndDate ? ` · Fin estimado ${fmt(p.estimatedEndDate)}` : null}
+            Resumen ejecutivo del proyecto. Los detalles están en cada sección del menú lateral.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{lifecycleActions}</div>
       </div>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <ProjectOverviewKpiCard
-          title="Presupuesto"
-          description="Última versión aprobada o cerrada (total de venta)."
-          href={dashboard.kpis.budget?.href}
-          footerLabel={dashboard.kpis.budget ? "Ver presupuestos" : undefined}
-        >
-          {dashboard.kpis.budget ? (
-            <>
-              {dashboard.kpis.budget.status ? (
-                <p className="mb-2 text-xs text-muted-foreground">Estado: {dashboard.kpis.budget.status}</p>
-              ) : null}
-              <ProjectOverviewMoneyList
-                rows={dashboard.kpis.budget.amountByCurrency}
-                emptyLabel="Todavía no hay presupuesto aprobado o cerrado."
-              />
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">No tenés acceso al presupuesto o el módulo está deshabilitado.</p>
-          )}
-        </ProjectOverviewKpiCard>
-
-        <ProjectOverviewKpiCard
-          title="Cuentas por cobrar"
-          description="Saldos abiertos y vencidos por moneda."
-          href={dashboard.kpis.receivables?.href}
-          footerLabel={dashboard.kpis.receivables ? "Ver C×C" : undefined}
-        >
-          {dashboard.kpis.receivables ? (
-            <div className="space-y-3">
-              <div>
-                <p className="mb-1 text-xs font-medium text-muted-foreground">Abierto</p>
-                <ProjectOverviewMoneyList
-                  rows={dashboard.kpis.receivables.openByCurrency}
-                  emptyLabel="Sin saldos abiertos."
-                />
-              </div>
-              <div>
-                <p className="mb-1 text-xs font-medium text-muted-foreground">Vencido</p>
-                <ProjectOverviewMoneyList
-                  rows={dashboard.kpis.receivables.overdueByCurrency}
-                  emptyLabel="Sin vencidos."
-                />
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Sin acceso a cuentas por cobrar del proyecto.</p>
-          )}
-        </ProjectOverviewKpiCard>
-
-        <ProjectOverviewKpiCard
-          title="Cuentas por pagar"
-          description="Saldos abiertos y vencidos por moneda."
-          href={dashboard.kpis.payables?.href}
-          footerLabel={dashboard.kpis.payables ? "Ver C×P" : undefined}
-        >
-          {dashboard.kpis.payables ? (
-            <div className="space-y-3">
-              <div>
-                <p className="mb-1 text-xs font-medium text-muted-foreground">Abierto</p>
-                <ProjectOverviewMoneyList
-                  rows={dashboard.kpis.payables.openByCurrency}
-                  emptyLabel="Sin saldos abiertos."
-                />
-              </div>
-              <div>
-                <p className="mb-1 text-xs font-medium text-muted-foreground">Vencido</p>
-                <ProjectOverviewMoneyList
-                  rows={dashboard.kpis.payables.overdueByCurrency}
-                  emptyLabel="Sin vencidos."
-                />
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Sin acceso a cuentas por pagar del proyecto.</p>
-          )}
-        </ProjectOverviewKpiCard>
-
-        <ProjectOverviewKpiCard
-          title="Flujo de caja"
-          description="Movimientos del proyecto por periodo."
-          href={dashboard.kpis.cashFlow?.available ? dashboard.kpis.cashFlow.href : undefined}
-          footerLabel={dashboard.kpis.cashFlow?.available ? "Ver flujo de caja" : undefined}
-        >
-          {dashboard.kpis.cashFlow?.available ? (
-            <p className="text-sm text-muted-foreground">Resumen disponible en la vista de flujo de caja.</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">Sin permiso o módulo deshabilitado para ver flujo de caja.</p>
-          )}
-        </ProjectOverviewKpiCard>
-
-        <ProjectOverviewKpiCard
-          title="Control de costos"
-          description="Compará presupuesto contra ejecutado."
-          href={dashboard.kpis.costControl?.available ? dashboard.kpis.costControl.href : undefined}
-          footerLabel={dashboard.kpis.costControl?.available ? "Abrir control" : undefined}
-        >
-          {dashboard.kpis.costControl?.available ? (
-            <p className="text-sm text-muted-foreground">Informe detallado en la sección de control de costos.</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">Sin acceso al control de costos.</p>
-          )}
-        </ProjectOverviewKpiCard>
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        {dashboard.billingVsCollections ? (
-          <ProjectOverviewBillingCard data={dashboard.billingVsCollections} />
-        ) : null}
-        {dashboard.kpis.costControl?.available ? (
-          <ProjectOverviewCostCtaCard href={dashboard.kpis.costControl.href} />
-        ) : null}
-      </div>
-
-      <ProjectOverviewAlerts alerts={dashboard.alerts} />
-
-      <ProjectOverviewActivityCard activity={dashboard.activity} projectId={projectId} />
-
-      <ProjectOverviewQuickLinks links={dashboard.quickLinks} />
 
       {fullProject ? (
         <Card className="rounded-xl border bg-card shadow-sm">
@@ -253,6 +111,152 @@ export function ProjectOverviewView({
           </CardContent>
         </Card>
       ) : null}
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground">Indicadores</h2>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <ProjectOverviewKpiCard title="Avance de cronograma" description="Desde el inicio hasta hoy, respecto del fin estimado.">
+            {sched.percent !== null ? (
+              <div className="space-y-2">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-3xl font-bold tabular-nums">{sched.percent}%</span>
+                  <span className="text-xs text-muted-foreground">transcurrido</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      "h-full rounded-full bg-primary transition-all",
+                      sched.percent >= 100 && "bg-amber-600",
+                    )}
+                    style={{ width: `${Math.min(100, sched.percent)}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">{sched.note ?? "—"}</p>
+            )}
+          </ProjectOverviewKpiCard>
+
+          <ProjectOverviewKpiCard
+            title="Presupuesto"
+            description="Última versión aprobada o cerrada (total de venta)."
+            href={dashboard.kpis.budget?.href}
+            footerLabel={dashboard.kpis.budget ? "Ver presupuestos" : undefined}
+          >
+            {dashboard.kpis.budget ? (
+              <>
+                {dashboard.kpis.budget.status ? (
+                  <p className="mb-2 text-xs text-muted-foreground">Estado: {dashboard.kpis.budget.status}</p>
+                ) : null}
+                <ProjectOverviewMoneyList
+                  rows={dashboard.kpis.budget.amountByCurrency}
+                  emptyLabel="Todavía no hay presupuesto aprobado o cerrado."
+                />
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No tenés acceso al presupuesto o el módulo está deshabilitado.</p>
+            )}
+          </ProjectOverviewKpiCard>
+
+          <ProjectOverviewKpiCard
+            title="Cuentas por cobrar"
+            description="Saldos abiertos y vencidos por moneda."
+            href={dashboard.kpis.receivables?.href}
+            footerLabel={dashboard.kpis.receivables ? "Ver C×C" : undefined}
+          >
+            {dashboard.kpis.receivables ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Abierto</p>
+                  <ProjectOverviewMoneyList
+                    rows={dashboard.kpis.receivables.openByCurrency}
+                    emptyLabel="Sin saldos abiertos."
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Vencido</p>
+                  <ProjectOverviewMoneyList
+                    rows={dashboard.kpis.receivables.overdueByCurrency}
+                    emptyLabel="Sin vencidos."
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Sin acceso a cuentas por cobrar del proyecto.</p>
+            )}
+          </ProjectOverviewKpiCard>
+
+          <ProjectOverviewKpiCard
+            title="Cuentas por pagar"
+            description="Saldos abiertos y vencidos por moneda."
+            href={dashboard.kpis.payables?.href}
+            footerLabel={dashboard.kpis.payables ? "Ver C×P" : undefined}
+          >
+            {dashboard.kpis.payables ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Abierto</p>
+                  <ProjectOverviewMoneyList
+                    rows={dashboard.kpis.payables.openByCurrency}
+                    emptyLabel="Sin saldos abiertos."
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Vencido</p>
+                  <ProjectOverviewMoneyList
+                    rows={dashboard.kpis.payables.overdueByCurrency}
+                    emptyLabel="Sin vencidos."
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Sin acceso a cuentas por pagar del proyecto.</p>
+            )}
+          </ProjectOverviewKpiCard>
+
+          <ProjectOverviewKpiCard
+            title="Flujo de caja"
+            description="Cobros y pagos imputados a la obra."
+            href={cashFlowHref}
+            footerLabel={cashFlowHref ? "Ver detalle" : undefined}
+          >
+            {dashboard.kpis.cashFlow?.available ? (
+              <p className="text-sm text-muted-foreground">
+                Serie mensual arriba. Moneda principal según movimientos del proyecto.
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">Sin permiso o módulo deshabilitado para ver flujo de caja.</p>
+            )}
+          </ProjectOverviewKpiCard>
+
+          <ProjectOverviewKpiCard
+            title="Control de costos"
+            description="Presupuesto vs capas de costo por WBS."
+            href={dashboard.kpis.costControl?.available ? dashboard.kpis.costControl.href : undefined}
+            footerLabel={dashboard.kpis.costControl?.available ? "Abrir control" : undefined}
+          >
+            {dashboard.kpis.costControl?.available ? (
+              <p className="text-sm text-muted-foreground">Comparativo detallado en la vista de control de costos.</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">Sin acceso al control de costos.</p>
+            )}
+          </ProjectOverviewKpiCard>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground">Evolución</h2>
+        <ProjectOverviewCharts
+          projectId={projectId}
+          billingVsCollections={dashboard.billingVsCollections}
+          cashFlowMini={dashboard.cashFlowMini}
+          cashFlowHref={cashFlowHref}
+        />
+      </section>
+
+      <ProjectOverviewAlerts alerts={dashboard.alerts} />
+
+      <ProjectOverviewActivityCard activity={dashboard.activity} projectId={projectId} />
     </div>
   );
 }

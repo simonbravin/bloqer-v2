@@ -7,8 +7,11 @@ import { listCollectionsByProject } from "../treasury/collection.service";
 import { listCertificationsByProject } from "../certification/certification.service";
 import { getProjectFinanceOverview } from "../project-finance/project-finance-overview.service";
 import { getProjectById, getProjectShellInfo } from "./project.service";
-import { canShowProjectFinanzasNavLink, canViewBudgetsArea } from "./project-nav-guards";
-import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
+import { canViewBudgetsArea } from "./project-nav-guards";
+import {
+  canViewProjectCashFlowReport,
+  getProjectCashFlowReport,
+} from "../project-cash-flow/project-cash-flow.service";
 import { canViewProjectCostControlReport } from "../cost-control/cost-control.service";
 import { canViewArProjectArea } from "../ar/ar-access";
 import { canViewApProjectArea } from "../ap/ap-access";
@@ -71,10 +74,21 @@ export type ProjectOverviewAlert = {
   href?: string;
 };
 
-export type ProjectOverviewQuickLink = {
+export type ProjectOverviewCashFlowMiniPoint = {
   label: string;
-  description?: string;
-  href: string;
+  inflows: string;
+  outflows: string;
+};
+
+export type ProjectOverviewCashFlowMini = {
+  currency: string;
+  points: ProjectOverviewCashFlowMiniPoint[];
+};
+
+export type ProjectOverviewScheduleProgress = {
+  /** Avance temporal entre inicio y fin estimado (0–100), o null si no se puede calcular. */
+  percent: number | null;
+  note: string | null;
 };
 
 export type ProjectOverviewSectionExcluded = {
@@ -101,15 +115,40 @@ export type ProjectOverviewDashboard = {
     costControl: ProjectOverviewCostControlKpi | null;
   };
   billingVsCollections: ProjectOverviewBillingVsCollections | null;
+  /** Cobros y pagos imputados al proyecto por mes (primera moneda con datos). */
+  cashFlowMini: ProjectOverviewCashFlowMini | null;
+  scheduleProgress: ProjectOverviewScheduleProgress;
   activity: ProjectOverviewActivity;
   alerts: ProjectOverviewAlert[];
-  quickLinks: ProjectOverviewQuickLink[];
   sectionsExcluded: ProjectOverviewSectionExcluded[];
 };
 
 function fmtDate(d: Date | null | undefined): string | null {
   if (!d) return null;
   return d.toISOString().slice(0, 10);
+}
+
+function computeScheduleProgress(startIso: string | null, endIso: string | null): ProjectOverviewScheduleProgress {
+  if (!startIso) return { percent: null, note: "Sin fecha de inicio" };
+  const start = new Date(`${startIso}T12:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const s = new Date(start);
+  s.setHours(0, 0, 0, 0);
+  if (today < s) return { percent: 0, note: null };
+  if (!endIso) {
+    return {
+      percent: null,
+      note: "Agregá la fecha de fin estimada para ver el avance temporal frente a hoy.",
+    };
+  }
+  const end = new Date(`${endIso}T12:00:00`);
+  end.setHours(0, 0, 0, 0);
+  if (today >= end) return { percent: 100, note: null };
+  const span = end.getTime() - s.getTime();
+  if (span <= 0) return { percent: null, note: "La fecha de fin estimada es anterior al inicio." };
+  const elapsed = today.getTime() - s.getTime();
+  return { percent: Math.min(100, Math.max(0, Math.round((elapsed / span) * 100))), note: null };
 }
 
 function addMoneyMap(m: Map<string, Prisma.Decimal>, currency: string, amount: Prisma.Decimal) {
@@ -180,14 +219,6 @@ export async function getProjectOverviewDashboard(
         status: pick?.status ?? null,
         href: `${base}/presupuestos`,
       };
-      if (!pick) {
-        alerts.push({
-          label: "Presupuesto",
-          description: "Todavía no hay presupuesto aprobado o cerrado para este proyecto.",
-          severity: "info",
-          href: `${base}/presupuestos`,
-        });
-      }
     } catch {
       sectionsExcluded.push({ module: "BUDGETS", section: "budget", reason: "MISSING_PERMISSION" });
     }
@@ -216,14 +247,6 @@ export async function getProjectOverviewDashboard(
         break;
       }
     }
-    if (ar.totalReceivableByCurrency.length === 0) {
-      alerts.push({
-        label: "Cuentas por cobrar",
-        description: "Sin cuentas por cobrar abiertas con saldo.",
-        severity: "info",
-        href: ar.links.receivables,
-      });
-    }
   }
 
   let payables: ProjectOverviewPayablesKpi | null = null;
@@ -249,14 +272,6 @@ export async function getProjectOverviewDashboard(
         break;
       }
     }
-    if (ap.totalPayableByCurrency.length === 0) {
-      alerts.push({
-        label: "Cuentas por pagar",
-        description: "Sin cuentas por pagar abiertas con saldo.",
-        severity: "info",
-        href: ap.links.payables,
-      });
-    }
   }
 
   let cashFlow: ProjectOverviewCashFlowKpi | null = null;
@@ -267,6 +282,26 @@ export async function getProjectOverviewDashboard(
     sectionsExcluded.push({ module: "PROJECTS", section: "cash_flow", reason: "MISSING_PERMISSION" });
   } else {
     cashFlow = { href: `${base}/flujo-caja`, available: canCf };
+  }
+
+  let cashFlowMini: ProjectOverviewCashFlowMini | null = null;
+  if (canCf) {
+    try {
+      const cf = await getProjectCashFlowReport(projectId, { period: "month" }, ctx);
+      const row = cf.currencies.find((c) => c.currency === "ARS") ?? cf.currencies[0];
+      if (row?.periods.length) {
+        cashFlowMini = {
+          currency: row.currency,
+          points: row.periods.map((p) => ({
+            label: p.periodLabel,
+            inflows: p.inflows,
+            outflows: p.outflows,
+          })),
+        };
+      }
+    } catch {
+      /* omit mini chart */
+    }
   }
 
   let costControl: ProjectOverviewCostControlKpi | null = null;
@@ -406,49 +441,7 @@ export async function getProjectOverviewDashboard(
     stockMovementsCount,
   };
 
-  if (
-    jobsiteLogsCount === 0 &&
-    gate.isEnabled("JOBSITE_LOG") &&
-    canViewJobsiteLogArea(ctx.roles) &&
-    jobsiteLogsCount !== null
-  ) {
-    alerts.push({
-      label: "Libro de obra",
-      description: "Cargá partes de obra para ver actividad operativa.",
-      severity: "info",
-      href: `${base}/libro-obra`,
-    });
-  }
-
-  const quickLinks: ProjectOverviewQuickLink[] = [];
-  const pushLink = (label: string, href: string, description?: string) => {
-    if (quickLinks.some((q) => q.href === href)) return;
-    quickLinks.push({ label, href, description });
-  };
-
-  pushLink("Presupuesto", `${base}/presupuestos`, "Versiones y WBS del proyecto");
-  if (canShowProjectFinanzasNavLink(gate, ctx.roles)) {
-    pushLink("Finanzas del proyecto", `${base}/finanzas`, "Resumen financiero del proyecto");
-  }
-  if (costControl?.available) {
-    pushLink("Control de costos", costControl.href, "Presupuesto vs ejecutado");
-  }
-  if (cashFlow?.available) {
-    pushLink("Flujo de caja", cashFlow.href, "Cobros y pagos imputados a la obra");
-  }
-  if (gate.isEnabled("JOBSITE_LOG") && canViewJobsiteLogArea(ctx.roles)) {
-    pushLink("Libro de obra", `${base}/libro-obra`, "Partes y avance físico");
-  }
-  if (gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS")) {
-    pushLink("Documentos", `${base}/documentos`, "Adjuntos del proyecto");
-  }
-  if (gate.isEnabled("AR") && canViewArProjectArea(ctx.roles)) {
-    pushLink("Cuentas por cobrar", `${base}/cuentas-por-cobrar`, "Saldos abiertos de clientes");
-    pushLink("Cobranzas", `${base}/cobranzas`, "Cobros registrados");
-  }
-  if (gate.isEnabled("AP") && canViewApProjectArea(ctx.roles)) {
-    pushLink("Cuentas por pagar", `${base}/cuentas-por-pagar`, "Saldos abiertos con proveedores");
-  }
+  const scheduleProgress = computeScheduleProgress(startDate, estimatedEndDate);
 
   return {
     project: {
@@ -468,9 +461,10 @@ export async function getProjectOverviewDashboard(
       costControl,
     },
     billingVsCollections,
+    cashFlowMini,
+    scheduleProgress,
     activity,
     alerts,
-    quickLinks,
     sectionsExcluded,
   };
 }

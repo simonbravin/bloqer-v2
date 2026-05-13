@@ -2,11 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { BudgetStatusBadge, WbsTree, BudgetTotalsPanel } from "@/features/budgets";
-import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
-import { can } from "@bloqer/domain";
-import { isStorageConfigured } from "@bloqer/config";
-import { getBudgetById, getWbsTree, listEntityDocuments, ServiceError } from "@bloqer/services";
+import { getBudgetById, getWbsTree, ServiceError } from "@bloqer/services";
 import {
   addWbsNodeAction,
   updateWbsNodeAction,
@@ -52,10 +49,6 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
   }
 
   if (budget.projectId !== projectId) notFound();
-
-  const budgetAttachments = await listEntityDocuments("BUDGET", budgetId, ctx, { projectId });
-  const storageConfigured = isStorageConfigured();
-  const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "BUDGETS");
 
   const editable = budget.status === "DRAFT" || budget.status === "RETURNED_FOR_CHANGES";
 
@@ -120,14 +113,6 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
           />
         </div>
       </div>
-
-      <EntityDocumentsPanel
-        projectId={projectId}
-        linkedEntity={{ type: "BUDGET", id: budgetId }}
-        storageConfigured={storageConfigured}
-        docs={budgetAttachments}
-        canEdit={canEditAttachments}
-      />
     </div>
   );
 }
