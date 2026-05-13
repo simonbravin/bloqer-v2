@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import type { PermissionModule } from "@bloqer/domain";
+import { OVERVIEW_MODULES, type PermissionModule } from "@bloqer/domain";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -36,15 +36,22 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
   }
 
   let tenantModuleIsEnabled: ((m: PermissionModule) => boolean) | undefined;
+  let moduleGateSnapshot: Partial<Record<PermissionModule, boolean>> | undefined;
   if (current.tenantCtx) {
     const ctx = await buildTenantServiceContext();
     if (ctx) {
       try {
         const gate = await getTenantModuleGate(ctx);
         tenantModuleIsEnabled = (m) => gate.isEnabled(m);
+        moduleGateSnapshot = Object.fromEntries(
+          OVERVIEW_MODULES.map((m) => [m, gate.isEnabled(m)]),
+        ) as Record<PermissionModule, boolean>;
       } catch {
         tenantModuleIsEnabled = undefined;
+        moduleGateSnapshot = {};
       }
+    } else {
+      moduleGateSnapshot = {};
     }
   }
 
@@ -55,6 +62,7 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
       notificationUnreadCount={notificationUnreadCount}
       showPlatformLink={showPlatformLink}
       tenantModuleIsEnabled={tenantModuleIsEnabled}
+      moduleGateSnapshot={moduleGateSnapshot}
     >
       {children}
     </AppLayout>

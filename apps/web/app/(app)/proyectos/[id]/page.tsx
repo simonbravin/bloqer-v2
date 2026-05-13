@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getProjectById, ServiceError, canViewProjectCashFlowReport, canViewProjectCostControlReport } from "@bloqer/services";
+import { getProjectById, ServiceError } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
+import { ProjectStatusBadge } from "@/features/projects";
 import {
   activateProjectAction,
   pauseProjectAction,
@@ -45,10 +46,6 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
 
   const { client } = project;
 
-  const roles = current.tenantCtx.roles;
-  const showProjectCashFlow = canViewProjectCashFlowReport(roles);
-  const showCostControl = canViewProjectCostControlReport(roles);
-
   const doActivate = async () => {
     "use server";
     await activateProjectAction(id);
@@ -74,77 +71,68 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/proyectos/${id}/presupuestos`}>Presupuestos</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/proyectos/${id}/certificaciones`}>Certificaciones</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/proyectos/${id}/facturas`}>Facturas</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/proyectos/${id}/cuentas-por-cobrar`}>C×C</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/proyectos/${id}/cobranzas`}>Cobranzas</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/proyectos/${id}/subcontratos`}>Subcontratos</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/proyectos/${id}/libro-obra`}>Libro de obra</Link>
-        </Button>
-        {showCostControl && (
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${id}/control-costos`}>Control de costos</Link>
-          </Button>
-        )}
-        {showProjectCashFlow && (
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${id}/flujo-caja`}>Flujo de caja</Link>
-          </Button>
-        )}
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/proyectos/${id}/documentos`}>Documentos</Link>
-        </Button>
-        {!isTerminal && (
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${id}/editar`}>Editar</Link>
-          </Button>
-        )}
-        {project.status === "DRAFT" && (
-          <form action={doActivate}>
-            <Button size="sm">Activar</Button>
-          </form>
-        )}
-        {project.status === "ACTIVE" && (
-          <>
-            <form action={doPause}>
-              <Button variant="outline" size="sm">
-                Pausar
-              </Button>
-            </form>
-            <form action={doComplete}>
-              <Button variant="outline" size="sm">
-                Completar
-              </Button>
-            </form>
-          </>
-        )}
-        {project.status === "ON_HOLD" && (
-          <form action={doResume}>
-            <Button size="sm">Reanudar</Button>
-          </form>
-        )}
-        {!isTerminal && (
-          <form action={doCancel}>
-            <Button variant="ghost" size="sm" className="text-muted-foreground">
-              Cancelar proyecto
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="truncate text-2xl font-bold tracking-tight">{project.name}</h1>
+            <ProjectStatusBadge status={project.status} />
+          </div>
+          <p className="font-mono text-sm text-muted-foreground">{project.code}</p>
+          <p className="text-sm text-muted-foreground">
+            {client ? (
+              <>
+                Cliente:{" "}
+                <Link
+                  href={`/directorio/${client.id}`}
+                  className="font-medium text-foreground underline underline-offset-2"
+                >
+                  {client.fantasyName ?? client.legalName}
+                </Link>
+                {" · "}
+              </>
+            ) : null}
+            Inicio {fmt(project.startDate)}
+            {project.expectedEndDate ? ` · Fin estimado ${fmt(project.expectedEndDate)}` : null}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {!isTerminal && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/proyectos/${id}/editar`}>Editar</Link>
             </Button>
-          </form>
-        )}
+          )}
+          {project.status === "DRAFT" && (
+            <form action={doActivate}>
+              <Button size="sm">Activar</Button>
+            </form>
+          )}
+          {project.status === "ACTIVE" && (
+            <>
+              <form action={doPause}>
+                <Button variant="outline" size="sm">
+                  Pausar
+                </Button>
+              </form>
+              <form action={doComplete}>
+                <Button variant="outline" size="sm">
+                  Completar
+                </Button>
+              </form>
+            </>
+          )}
+          {project.status === "ON_HOLD" && (
+            <form action={doResume}>
+              <Button size="sm">Reanudar</Button>
+            </form>
+          )}
+          {!isTerminal && (
+            <form action={doCancel}>
+              <Button variant="ghost" size="sm" className="text-muted-foreground">
+                Cancelar proyecto
+              </Button>
+            </form>
+          )}
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card">

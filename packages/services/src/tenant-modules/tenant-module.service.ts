@@ -2,11 +2,9 @@ import { prisma } from "@bloqer/database";
 import { OVERVIEW_MODULES, type PermissionModule } from "@bloqer/domain";
 import { ServiceError } from "../types";
 import type { ServiceContext } from "../types";
+import type { TenantModuleGate } from "./tenant-module-gate";
 
-/** Resolved once per request; `isEnabled` defaults missing DB rows to enabled (Phase 12B). */
-export type TenantModuleGate = {
-  isEnabled(module: PermissionModule): boolean;
-};
+export type { TenantModuleGate } from "./tenant-module-gate";
 
 export async function getTenantModuleGate(ctx: ServiceContext): Promise<TenantModuleGate> {
   const rows = await prisma.tenantModuleSetting.findMany({

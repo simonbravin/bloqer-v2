@@ -8,11 +8,13 @@ interface NavItemProps {
   href: string;
   label: string;
   icon?: React.ReactNode;
+  /** When true, only an exact pathname match is active (e.g. project root “Resumen”). */
+  matchExact?: boolean;
 }
 
-export function NavItem({ href, label, icon }: NavItemProps) {
+export function NavItem({ href, label, icon, matchExact }: NavItemProps) {
   const pathname = usePathname();
-  const isActive = pathname === href || pathname.startsWith(href + "/");
+  const isActive = matchExact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <Link

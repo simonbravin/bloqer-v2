@@ -4,15 +4,9 @@ import { ServiceContext, ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 
-/** Project-scoped cash flow report (Phase 7D): not tenant-wide treasury; allows finance roles without VIEW PROJECTS. */
-export function canViewProjectCashFlowReport(roles: ServiceContext["roles"]): boolean {
-  return (
-    can(roles, "VIEW", "PROJECTS") ||
-    can(roles, "VIEW", "AR") ||
-    can(roles, "VIEW", "AP") ||
-    can(roles, "VIEW", "TREASURY")
-  );
-}
+import { canViewProjectCashFlowReport } from "../project/project-nav-guards";
+
+export { canViewProjectCashFlowReport };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

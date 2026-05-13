@@ -5,10 +5,9 @@ import type { CreateBudgetInput, UpdateBudgetInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 
-/** Matches document.service listEntityDocuments for `BUDGET` — VIEW BUDGETS | VIEW PROJECTS. */
-export function canViewBudgetsArea(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "VIEW", "BUDGETS") || can(roles, "VIEW", "PROJECTS");
-}
+import { canViewBudgetsArea } from "../project/project-nav-guards";
+
+export { canViewBudgetsArea };
 
 // ─── Guards ───────────────────────────────────────────────────────────────────
 

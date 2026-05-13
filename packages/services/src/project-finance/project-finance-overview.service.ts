@@ -15,6 +15,8 @@ import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-
 import { getTenantModuleGate, type TenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { ServiceContext } from "../types";
 
+export { canShowProjectFinanzasNavLink } from "../project/project-nav-guards";
+
 const ZERO = new Prisma.Decimal(0);
 
 export type ProjectFinanceMoneyByCurrency = { currency: string; amount: string };
@@ -143,27 +145,6 @@ function aggregatePayablesFromList(
     if (due < today) overdue.set(cur, (overdue.get(cur) ?? ZERO).add(bal));
   }
   return { total, overdue };
-}
-
-/**
- * Subnav "Finanzas" bajo `/proyectos/[id]`: módulo **PROJECTS** activo y al menos un bloque financiero/presupuesto visible.
- */
-export function canShowProjectFinanzasNavLink(gate: TenantModuleGate, roles: UserRole[]): boolean {
-  if (!gate.isEnabled("PROJECTS")) return false;
-  const anyFinanceModule =
-    gate.isEnabled("AR") ||
-    gate.isEnabled("AP") ||
-    gate.isEnabled("TREASURY") ||
-    gate.isEnabled("BUDGETS") ||
-    canViewProjectCashFlowReport(roles);
-  if (!anyFinanceModule) return false;
-  return (
-    (gate.isEnabled("AR") && canViewArProjectArea(roles)) ||
-    (gate.isEnabled("AP") && canViewApProjectArea(roles)) ||
-    (gate.isEnabled("TREASURY") && can(roles, "VIEW", "TREASURY")) ||
-    (gate.isEnabled("BUDGETS") && canViewBudgetsArea(roles)) ||
-    canViewProjectCashFlowReport(roles)
-  );
 }
 
 function pushUniqueQuickAction(

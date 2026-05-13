@@ -4,10 +4,9 @@ import { ServiceContext, ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 
-/** Project-scoped cost control (Phase 7D): VIEW PROJECTS or VIEW BUDGETS. */
-export function canViewProjectCostControlReport(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "VIEW", "PROJECTS") || can(roles, "VIEW", "BUDGETS");
-}
+import { canViewProjectCostControlReport } from "../project/project-nav-guards";
+
+export { canViewProjectCostControlReport };
 
 // ─── Filter / output types ────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
 Last updated: 2026-05-13  
-Status: Phase **14E** — hub **`/proyectos/[id]/finanzas`**: `getProjectFinanceOverview` + UI `ProjectFinanceOverviewView`; subnav con link **Finanzas** vía `canShowProjectFinanzasNavLink`. Sobre **14D** (layout + subnav) y **14C+** (hub empresa `/finanzas`). Doc: [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md). Sin `db:push`; verificar `db:generate` + typecheck + lint + build en CI local.
+Status: Phase **15A** — workspace de proyecto: bajo `/proyectos/[id]/**` el sidebar global se reemplaza por **`ProjectWorkspaceSidebar`** (grupos + mismos gates que antes en `buildProjectSubnavLinks`); shell mínimo por **`GET /api/projects/[id]/shell`** (`getProjectShellInfo`); snapshot de módulos tenant serializado desde `(app)/layout.tsx` + `tenantGateFromSnapshot` en cliente. Sin subnav horizontal. Doc: [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) §6. Sin `db:push`; verificar `db:generate` + typecheck + lint + build en CI local.
 
 ---
 
@@ -67,6 +67,7 @@ Status: Phase **14E** — hub **`/proyectos/[id]/finanzas`**: `getProjectFinance
 | Phase 14C+ | Hub `/finanzas` (`getFinanceHubOverview` + `FinanceHubView`); subnav proyecto en ficha `/proyectos/[id]` | Complete |
 | Phase 14D | Layout `/proyectos/[id]` + subnav global; `getProjectShellInfo` / `canAccessProjectLayout`; enlaces subnav solo a rutas reales; presupuestos/certificaciones usan shell para breadcrumb | Complete |
 | Phase 14E | Hub `/proyectos/[id]/finanzas` — `getProjectFinanceOverview` (aging AR/AP con `projectId` o agregados desde listados; sin mezclar monedas); UI + link subnav | Complete |
+| Phase 15A | Navegación workspace proyecto: sidebar contextual agrupada; `buildProjectWorkspaceNavSections`; API shell; sin `ProjectSubnav` horizontal | Complete |
 
 **Siguiente (sugerido):** producto: `projectId` nullable / `AccountMovement`; módulo gastos / `Expense` si aplica. Deploy: Neon + Vercel, [`DEPLOYMENT_SMOKE_TEST.md`](./08-architecture/DEPLOYMENT_SMOKE_TEST.md).
 

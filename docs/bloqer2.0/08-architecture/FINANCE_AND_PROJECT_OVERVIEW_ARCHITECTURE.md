@@ -160,23 +160,32 @@ La **empresa** (`companyId` dentro del tenant) debe poder verse como:
 
 ---
 
-## 6. Navegación interna de proyecto (subnav)
+## 6. Navegación interna de proyecto (workspace)
 
-### 6.1 Layout (Phase 14D)
+### 6.1 Layout (Phase 14D + 15A)
 
-- **`apps/web/app/(app)/proyectos/[id]/layout.tsx`** — envuelve **todas** las rutas bajo `[id]`; obtiene **`getProjectShellInfo(id, ctx)`** (`packages/services/src/project/project.service.ts`: `id`, `name`, `code`, `status`, validación tenant + **`canAccessProjectLayout`**) y **`getTenantModuleGate(ctx)`** en paralelo.
+- **`apps/web/app/(app)/proyectos/[id]/layout.tsx`** — envuelve **todas** las rutas bajo `[id]`; valida **`getProjectShellInfo(id, ctx)`** y **`getTenantModuleGate(ctx)`** en paralelo (mismos errores que antes).
 - **Errores:** `ServiceError` **`NOT_FOUND`** → `notFound()`; **`FORBIDDEN`** → `redirect("/dashboard")` (mismo criterio que otras rutas app).
-- **Cabecera:** nombre + `ProjectStatusBadge` + código; enlace “← Proyectos”.
-- **Subnav:** `ProjectSubnav` con ítems de **`buildProjectSubnavLinks`** (sin rutas muertas).
+- **Phase 15A — shell UI:** bajo `/proyectos/[id]/**`, **`AppNavColumn`** reemplaza el **`Sidebar`** global por **`ProjectWorkspaceSidebar`**: bloque “Volver a proyectos” + nombre + badge de estado + código (datos vía **`GET /api/projects/[id]/shell`** → `getProjectShellInfo`, sin ampliar el DTO). El gate de módulos en cliente usa el **snapshot** serializado en **`apps/web/app/(app)/layout.tsx`** (`OVERVIEW_MODULES` → flags booleanos) y **`tenantGateFromSnapshot`** (default-on si falta clave, alineado a `getTenantModuleGate`).
+- **Contenido principal:** título / estado / cliente / fechas / acciones de ciclo de vida siguen en las páginas (p. ej. resumen en `proyectos/[id]/page.tsx`); no hay barra horizontal de pestañas.
 
-### 6.2 Ítems visibles hoy (`buildProjectSubnavLinks`)
+### 6.2 Ítems visibles y agrupación (`buildProjectWorkspaceNavSections`)
 
-Cada fila solo aparece si el **módulo tenant** está habilitado (`gate.isEnabled`) **y** el rol cumple el permiso / helper indicado.
+Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo tenant** está habilitado (`gate.isEnabled`) **y** el rol cumple el permiso / helper indicado. No se muestran secciones vacías.
+
+| Sección UI | Enlaces (mismo criterio que tabla siguiente) |
+|------------|-----------------------------------------------|
+| Resumen | Resumen |
+| Planificación | Presupuesto, Control de costos, Flujo de caja, Finanzas del proyecto (`/finanzas`, label **Finanzas del proyecto**) |
+| Operación | Libro de obra, Certificaciones, Inventario, Documentos |
+| Compras y contratos | Compras, Subcontratos, Facturas proveedor, Cuentas por pagar, Pagos |
+| Comercial / Cobranzas | Facturas, Cuentas por cobrar, Cobranzas |
+| Administración | Configuración |
 
 | Label | Ruta | Módulo gate (tenant) | Permiso / helper |
 |-------|------|----------------------|------------------|
 | Resumen | `/proyectos/[id]` | — | `VIEW PROJECTS` |
-| **Finanzas (hub)** | **`/proyectos/[id]/finanzas`** | `PROJECTS` + (AR / AP / TREASURY / BUDGETS según bloque o flujo) | `canShowProjectFinanzasNavLink` — ver servicio |
+| **Finanzas del proyecto (hub)** | **`/proyectos/[id]/finanzas`** | `PROJECTS` + (AR / AP / TREASURY / BUDGETS según bloque o flujo) | `canShowProjectFinanzasNavLink` — ver servicio |
 | Presupuesto | `/proyectos/[id]/presupuestos` | `BUDGETS` | `VIEW BUDGETS` **o** `VIEW PROJECTS` (alineado a `canViewBudgetsArea` en servicios de presupuesto) |
 | Control de costos | `/proyectos/[id]/control-costos` | `PROJECTS` + `BUDGETS` | `canViewProjectCostControlReport` (`VIEW PROJECTS` **o** `VIEW BUDGETS`) |
 | Libro de obra | `/proyectos/[id]/libro-obra` | `JOBSITE_LOG` | `VIEW JOBSITE_LOG` **o** `VIEW PROJECTS` |
@@ -194,9 +203,9 @@ Cada fila solo aparece si el **módulo tenant** está habilitado (`gate.isEnable
 | Flujo de caja | `/proyectos/[id]/flujo-caja` | `PROJECTS` | `canViewProjectCashFlowReport` (`VIEW PROJECTS` **o** `VIEW AR` **o** `VIEW AP` **o** `VIEW TREASURY`) — coherente con `getProjectCashFlowReport` |
 | Configuración | `/proyectos/[id]/editar` | `PROJECTS` | `EDIT PROJECTS` |
 
-**Rutas existentes no incluidas en la subnav** (siguen por enlaces contextuales o menús internos): recepciones, consumos, detalles de facturas/OC/certificados, etc.
+**Rutas existentes no incluidas en el nav del workspace** (siguen por enlaces contextuales o menús internos): recepciones, consumos, detalles de facturas/OC/certificados, etc.
 
-### 6.3 Ocultas / futuras (no link en subnav hasta nueva página)
+### 6.3 Ocultas / futuras (no link en nav hasta nueva página)
 
 | Label aspiracional | Ruta | Notas |
 |--------------------|------|--------|
@@ -215,10 +224,13 @@ Cada fila solo aparece si el **módulo tenant** está habilitado (`gate.isEnable
 - **UI:** `ProjectFinanceOverviewView` en `apps/web/features/projects/project-finance-overview-view.tsx`.
 - **Limitaciones:** sin entidad **Expense**; gastos generales fuera de obra siguen fuera de este hub; **no** se mezclan monedas en un único total.
 
-### 6.5 Componentes (subnav)
+### 6.5 Componentes (workspace)
 
-- **`apps/web/features/projects/project-subnav.tsx`** — cliente (`usePathname`); **Resumen** activo con match exacto de `href`; demás ítems activos con `pathname === href` o prefijo `href/`; si `items.length === 0` no renderiza nav.
-- **`apps/web/features/projects/project-subnav-config.ts`** — **`buildProjectSubnavLinks(projectId, gate, roles)`**; ítem **Finanzas** cuando `canShowProjectFinanzasNavLink`.
+- **`apps/web/components/layout/app-nav-column.tsx`** — cliente: si pathname `/proyectos/[id]/**` y usuario con tenant → **`ProjectWorkspaceSidebar`**; si no → **`Sidebar`** global.
+- **`apps/web/components/layout/project-workspace-sidebar.tsx`** — cliente; secciones desde **`buildProjectWorkspaceNavSections`**; **Resumen** usa `NavItem` con `matchExact` (solo activo en la raíz del proyecto).
+- **`apps/web/features/projects/project-workspace-nav-config.ts`** — **`buildProjectWorkspaceNavSections(projectId, gate, roles)`**; enlace **Finanzas del proyecto** cuando `canShowProjectFinanzasNavLink`.
+- **`apps/web/features/projects/tenant-gate-from-snapshot.ts`** — **`tenantGateFromSnapshot`** reconstruye `TenantModuleGate` en cliente.
+- **`apps/web/app/api/projects/[id]/shell/route.ts`** — JSON del shell vía `getProjectShellInfo` (misma AuthZ que el layout).
 
 ---
 
@@ -226,7 +238,7 @@ Cada fila solo aparece si el **módulo tenant** está habilitado (`gate.isEnable
 
 - [x] `getProjectFinanceOverview` en `packages/services/src/project-finance/project-finance-overview.service.ts`.
 - [x] Rediseño `/finanzas` overview global (servicio + UI) — **v1** con `getFinanceHubOverview`.
-- [x] `layout.tsx` bajo `[id]` + reutilizar `ProjectSubnav` en todas las páginas hijas (Phase **14D**).
+- [x] `layout.tsx` bajo `[id]` + navegación de proyecto (Phase **14D** subnav horizontal → **15A** sidebar workspace).
 - [x] `/proyectos/[id]/finanzas` (página + servicio orquestador) — **Phase 14E**.
 - [ ] Producto: ¿nullable `projectId` en `SupplierInvoice` / `SalesInvoice` / `Receivable` / `Payable`?
 - [ ] Producto: ¿`projectId` en `AccountMovement` o tabla puente?
@@ -244,7 +256,7 @@ Cada fila solo aparece si el **módulo tenant** está habilitado (`gate.isEnable
 | Hub finanzas (UI) | `apps/web/features/finance/finance-hub-view.tsx` |
 | Hub finanzas **proyecto** | `packages/services/src/project-finance/project-finance-overview.service.ts` |
 | Hub finanzas proyecto (UI) | `apps/web/features/projects/project-finance-overview-view.tsx`, `apps/web/app/(app)/proyectos/[id]/finanzas/page.tsx` |
-| Subnav + layout proyecto | `apps/web/app/(app)/proyectos/[id]/layout.tsx`, `apps/web/features/projects/project-subnav.tsx`, `project-subnav-config.ts` |
+| Workspace + layout proyecto | `apps/web/app/(app)/proyectos/[id]/layout.tsx`, `apps/web/components/layout/app-nav-column.tsx`, `project-workspace-sidebar.tsx`, `apps/web/features/projects/project-workspace-nav-config.ts`, `GET /api/projects/[id]/shell` |
 | Shell proyecto (servicio) | `packages/services/src/project/project.service.ts` (`getProjectShellInfo`, `canAccessProjectLayout`) |
 | Rutas tesorería | `apps/web/app/(app)/tesoreria/**` |
 | AR | `packages/services/src/ar/**` |
