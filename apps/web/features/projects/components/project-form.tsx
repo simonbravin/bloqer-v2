@@ -2,6 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,8 @@ export function ProjectForm({
       ...defaultValues,
     },
   });
+
+  const clientContactId = form.watch("clientContactId");
 
   const handleSubmit = form.handleSubmit((data) => {
     setServerError(null);
@@ -101,21 +104,36 @@ export function ProjectForm({
 
       <div className="space-y-1.5">
         <Label>Cliente *</Label>
-        <Select
-          value={form.watch("clientContactId") ?? ""}
-          onValueChange={(v) => form.setValue("clientContactId", v)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Seleccionar cliente..." />
-          </SelectTrigger>
-          <SelectContent>
-            {clients.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.fantasyName ?? c.legalName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {clients.length === 0 ? (
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-foreground">
+            No hay contactos con rol <strong>Cliente</strong> activo. Los proyectos solo pueden asociarse a ese tipo
+            de contacto. Podés{" "}
+            <Link href="/directorio/nuevo" className="font-medium text-primary underline underline-offset-2">
+              crear un contacto
+            </Link>{" "}
+            y elegir &quot;Cliente&quot; en <strong>Rol inicial</strong>, o editar uno existente en{" "}
+            <Link href="/directorio" className="font-medium text-primary underline underline-offset-2">
+              Directorio
+            </Link>{" "}
+            y asignarle el rol Cliente.
+          </p>
+        ) : (
+          <Select
+            value={clientContactId || undefined}
+            onValueChange={(v) => form.setValue("clientContactId", v, { shouldValidate: true })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar cliente..." />
+            </SelectTrigger>
+            <SelectContent>
+              {clients.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.fantasyName ?? c.legalName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         {form.formState.errors.clientContactId && (
           <p className="text-xs text-destructive">{form.formState.errors.clientContactId.message}</p>
         )}
@@ -164,7 +182,7 @@ export function ProjectForm({
       )}
 
       <div className="flex gap-3">
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" disabled={isPending || clients.length === 0}>
           {isPending ? "Guardando..." : submitLabel}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()} disabled={isPending}>

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { prisma } from "@bloqer/database";
+import { prisma, Prisma } from "@bloqer/database";
 import { OVERVIEW_MODULES } from "@bloqer/domain";
 import type { CompleteTrialOnboardingInput } from "@bloqer/validators";
 import { ServiceError } from "../types";
@@ -23,9 +23,18 @@ function slugifyBase(displayName: string): string {
 const TRIAL_DAYS = 30;
 
 /**
+ * `pg_advisory_xact_lock(classid, key)` first argument: fixed namespace for Bloqer self-service
+ * onboarding so this lock never collides with unrelated advisory locks (second arg is per-user).
+ */
+const ONBOARDING_ADVISORY_CLASS_ID = 824_014_001;
+
+/**
  * First-time SaaS onboarding: creates tenant (trial), primary company, OWNER membership,
  * explicit tenant module rows, and audit entries in one transaction.
  * Re-entrant: if the user already has an ACTIVE membership, returns `already_member` without writes.
+ *
+ * Phase 14A.1: `pg_advisory_xact_lock` (transaction-scoped) serializes concurrent onboarding for the
+ * same `actorUserId` so two parallel requests cannot each pass the membership check before either commits.
  */
 export async function completeTrialOnboarding(
   actorUserId: string,
@@ -35,6 +44,10 @@ export async function completeTrialOnboarding(
   const ipAddress = options?.ipAddress ?? null;
 
   return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw(
+      Prisma.sql`SELECT pg_advisory_xact_lock(${ONBOARDING_ADVISORY_CLASS_ID}::integer, hashtext(${actorUserId}::text))`,
+    );
+
     const existing = await tx.userMembership.findFirst({
       where: { userId: actorUserId, status: "ACTIVE" },
       orderBy: { createdAt: "asc" },

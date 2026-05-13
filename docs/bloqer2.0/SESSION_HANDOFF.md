@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
 Last updated: 2026-05-13  
-Status: Phase **14A** — **SaaS onboarding / trial tenant**: ruta `/onboarding` (wizard sin shell lateral), `completeTrialOnboarding` en `packages/services/src/onboarding/` + validators Zod; Prisma `Company` ampliada (dirección, ciudad, país, teléfono, web, rubro, tamaño) + migración `20260513140000_phase_14a_company_onboarding_fields`; layout `(app)` redirige a `/onboarding` si no hay membresía ACTIVE y el usuario no es superadmin de plataforma. Ver [`SAAS_ONBOARDING_ARCHITECTURE.md`](./08-architecture/SAAS_ONBOARDING_ARCHITECTURE.md). Sin Stripe en esta fase. Sin `db:push`; `db:generate` + typecheck + lint + build verdes.
+Status: Phase **14D** — `layout.tsx` bajo `/proyectos/[id]` (`getProjectShellInfo` + `ProjectSubnav` compartido); `buildProjectSubnavLinks` audita solo rutas existentes (AR/AP, control de costos, flujo de caja, etc.); `getProjectShellInfo` / `canAccessProjectLayout` en `project.service.ts`. Phase **14C+**: hub `/finanzas`. Doc subnav: [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md). Sin `db:push`; verificar `db:generate` + typecheck + lint + build en CI local.
 
 ---
 
@@ -61,8 +61,13 @@ Status: Phase **14A** — **SaaS onboarding / trial tenant**: ruta `/onboarding`
 | Phase 13C.1 | Normalización URLs plataforma: todo bajo `/platform/*`; filesystem `app/(platform)/platform/tenants/...` | Complete |
 | Phase 13E–13G | Auditoría ERD Prisma; permisos/módulos doc; gate servicio `JOBSITE_LOG` en libro de obra | Complete |
 | Phase 14A | Onboarding SaaS: usuario autenticado sin membresía ACTIVE → `/onboarding`; alta transaccional tenant + company + membresía OWNER + trial 30 días + `TenantModuleSetting` explícitos + `AuditLog` | Complete |
+| Phase 14A.1 | Onboarding: `pg_advisory_xact_lock` por `actorUserId` dentro de `completeTrialOnboarding` para evitar dos tenants concurrentes del mismo usuario | Complete |
+| Phase 14B | Dashboard tenant: agregados servicio + UI; sin Prisma en `apps/web`; sin schema nuevo | Complete |
+| Phase 14C | Auditoría rutas finanzas/proyecto/tesorería + modelo `projectId` + plan indicadores; doc [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) | Complete (doc) |
+| Phase 14C+ | Hub `/finanzas` (`getFinanceHubOverview` + `FinanceHubView`); subnav proyecto en ficha `/proyectos/[id]` | Complete |
+| Phase 14D | Layout `/proyectos/[id]` + subnav global; `getProjectShellInfo` / `canAccessProjectLayout`; enlaces subnav solo a rutas reales; presupuestos/certificaciones usan shell para breadcrumb | Complete |
 
-**Siguiente (sugerido):** Crear Neon + proyecto Vercel, variables de entorno, `migrate deploy`, seed/bootstrap si aplica, smoke test [`DEPLOYMENT_SMOKE_TEST.md`](./08-architecture/DEPLOYMENT_SMOKE_TEST.md); QA manual por rol / módulos deshabilitados.
+**Siguiente (sugerido):** página `/proyectos/[id]/finanzas` (hub proyecto); servicio `getProjectFinanceOverview`; producto: `projectId` nullable / `AccountMovement`. Deploy: Neon + Vercel, [`DEPLOYMENT_SMOKE_TEST.md`](./08-architecture/DEPLOYMENT_SMOKE_TEST.md).
 
 ---
 

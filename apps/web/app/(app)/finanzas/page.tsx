@@ -1,51 +1,35 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getFinanceHubOverview } from "@bloqer/services";
+import { FinanceHubView } from "@/features/finance";
 import { getCurrentUser } from "@/lib/auth";
-import { can } from "@bloqer/domain";
+import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { Button } from "@/components/ui/button";
 
 export default async function FinanzasPage() {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
-  const roles = current.tenantCtx.roles;
+  const ctx = await buildTenantServiceContext();
+  if (!ctx) redirect("/login");
 
-  const allSections = [
-    {
-      href:        "/finanzas/cuentas-por-cobrar-aging",
-      title:       "Aging — Cuentas por cobrar",
-      description: "Saldos pendientes de cobro agrupados por cliente y vencimiento.",
-      canAccess:   can(roles, "VIEW", "AR"),
-    },
-    {
-      href:        "/finanzas/cuentas-por-pagar-aging",
-      title:       "Aging — Cuentas por pagar",
-      description: "Saldos pendientes de pago agrupados por proveedor y vencimiento.",
-      canAccess:   can(roles, "VIEW", "AP"),
-    },
-  ];
-
-  const sections = allSections.filter((s) => s.canAccess);
+  const overview = await getFinanceHubOverview(ctx);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Finanzas</h1>
-
-      {sections.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No tenés permisos para ver reportes de finanzas.</p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {sections.map((s) => (
-            <Link
-              key={s.href}
-              href={s.href}
-              className="rounded-lg border bg-card p-5 hover:bg-muted/40 transition-colors"
-            >
-              <p className="font-semibold">{s.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{s.description}</p>
-            </Link>
-          ))}
+    <div className="mx-auto max-w-5xl space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Finanzas</h1>
+          <p className="text-sm text-muted-foreground">
+            Resumen a nivel empresa. Los totales salen de los mismos servicios que el aging y la tesorería.
+          </p>
         </div>
-      )}
+        <Button asChild variant="outline" size="sm">
+          <Link href="/dashboard">← Inicio</Link>
+        </Button>
+      </div>
+
+      <FinanceHubView overview={overview} />
     </div>
   );
 }

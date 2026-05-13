@@ -3,11 +3,58 @@ import type { Project, ProjectStatus, Prisma, Contact } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreateProjectInput, UpdateProjectInput, ListProjectsInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
+import { canViewArProjectArea } from "../ar/ar-access";
+import { canViewApProjectArea } from "../ap/ap-access";
+import { canViewProjectCostControlReport } from "../cost-control/cost-control.service";
+import { canViewProcurementProjectArea } from "../procurement/procurement-access";
+import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import { ServiceContext, ServiceError } from "../types";
 
 export type ProjectWithClient = Project & {
   client: Pick<Contact, "id" | "legalName" | "fantasyName">;
 };
+
+/** Minimal project row for layouts and shells (no client join). */
+export type ProjectShellInfo = {
+  id: string;
+  name: string;
+  code: string;
+  status: ProjectStatus;
+  tenantId: string;
+};
+
+/**
+ * True if the actor may load `/proyectos/[id]` layout (any project-scoped area they can reach).
+ * Narrower than “VIEW PROJECTS everywhere”: AR/AP/procurement specialists can open their routes.
+ */
+export function canAccessProjectLayout(roles: ServiceContext["roles"]): boolean {
+  return (
+    can(roles, "VIEW", "PROJECTS") ||
+    canViewArProjectArea(roles) ||
+    canViewApProjectArea(roles) ||
+    canViewProjectCashFlowReport(roles) ||
+    canViewProjectCostControlReport(roles) ||
+    canViewProcurementProjectArea(roles) ||
+    can(roles, "VIEW", "SUBCONTRACTS") ||
+    can(roles, "VIEW", "INVENTORY") ||
+    can(roles, "VIEW", "JOBSITE_LOG") ||
+    can(roles, "VIEW", "BUDGETS") ||
+    can(roles, "VIEW", "CERTIFICATIONS")
+  );
+}
+
+export async function getProjectShellInfo(id: string, ctx: ServiceContext): Promise<ProjectShellInfo> {
+  if (!canAccessProjectLayout(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver este proyecto");
+  }
+  const row = await prisma.project.findUnique({
+    where: { id },
+    select: { id: true, name: true, code: true, status: true, tenantId: true },
+  });
+  if (!row) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  if (row.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  return row;
+}
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 

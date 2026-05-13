@@ -1,14 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { getProjectById, ServiceError, canViewProjectCashFlowReport, canViewProjectCostControlReport } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
-import { ProjectStatusBadge } from "@/features/projects";
 import { getCurrentUser } from "@/lib/auth";
-import {
-  getProjectById,
-  ServiceError,
-  canViewProjectCashFlowReport,
-  canViewProjectCostControlReport,
-} from "@bloqer/services";
 import {
   activateProjectAction,
   pauseProjectAction,
@@ -45,6 +39,7 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
     project = await getProjectById(id, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
@@ -52,100 +47,104 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
 
   const roles = current.tenantCtx.roles;
   const showProjectCashFlow = canViewProjectCashFlowReport(roles);
-  const showCostControl     = canViewProjectCostControlReport(roles);
+  const showCostControl = canViewProjectCostControlReport(roles);
 
-  const doActivate = async () => { "use server"; await activateProjectAction(id); };
-  const doPause    = async () => { "use server"; await pauseProjectAction(id); };
-  const doResume   = async () => { "use server"; await resumeProjectAction(id); };
-  const doComplete = async () => { "use server"; await completeProjectAction(id); };
-  const doCancel   = async () => { "use server"; await cancelProjectAction(id); };
+  const doActivate = async () => {
+    "use server";
+    await activateProjectAction(id);
+  };
+  const doPause = async () => {
+    "use server";
+    await pauseProjectAction(id);
+  };
+  const doResume = async () => {
+    "use server";
+    await resumeProjectAction(id);
+  };
+  const doComplete = async () => {
+    "use server";
+    await completeProjectAction(id);
+  };
+  const doCancel = async () => {
+    "use server";
+    await cancelProjectAction(id);
+  };
 
   const isTerminal = project.status === "COMPLETED" || project.status === "CANCELLED";
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/proyectos">← Volver</Link>
-          </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">{project.name}</h1>
-              <ProjectStatusBadge status={project.status} />
-            </div>
-            <p className="text-sm text-muted-foreground font-mono">{project.code}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
+    <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/proyectos/${id}/presupuestos`}>Presupuestos</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/proyectos/${id}/certificaciones`}>Certificaciones</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/proyectos/${id}/facturas`}>Facturas</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/proyectos/${id}/cuentas-por-cobrar`}>C×C</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/proyectos/${id}/cobranzas`}>Cobranzas</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/proyectos/${id}/subcontratos`}>Subcontratos</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/proyectos/${id}/libro-obra`}>Libro de obra</Link>
+        </Button>
+        {showCostControl && (
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${id}/presupuestos`}>Presupuestos</Link>
+            <Link href={`/proyectos/${id}/control-costos`}>Control de costos</Link>
           </Button>
+        )}
+        {showProjectCashFlow && (
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${id}/certificaciones`}>Certificaciones</Link>
+            <Link href={`/proyectos/${id}/flujo-caja`}>Flujo de caja</Link>
           </Button>
+        )}
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/proyectos/${id}/documentos`}>Documentos</Link>
+        </Button>
+        {!isTerminal && (
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${id}/facturas`}>Facturas</Link>
+            <Link href={`/proyectos/${id}/editar`}>Editar</Link>
           </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${id}/cuentas-por-cobrar`}>C×C</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${id}/cobranzas`}>Cobranzas</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${id}/subcontratos`}>Subcontratos</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${id}/libro-obra`}>Libro de obra</Link>
-          </Button>
-          {showCostControl && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/proyectos/${id}/control-costos`}>Control de costos</Link>
-            </Button>
-          )}
-          {showProjectCashFlow && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/proyectos/${id}/flujo-caja`}>Flujo de caja</Link>
-            </Button>
-          )}
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${id}/documentos`}>Documentos</Link>
-          </Button>
-          {!isTerminal && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/proyectos/${id}/editar`}>Editar</Link>
-            </Button>
-          )}
-          {project.status === "DRAFT" && (
-            <form action={doActivate}>
-              <Button size="sm">Activar</Button>
-            </form>
-          )}
-          {project.status === "ACTIVE" && (
-            <>
-              <form action={doPause}>
-                <Button variant="outline" size="sm">Pausar</Button>
-              </form>
-              <form action={doComplete}>
-                <Button variant="outline" size="sm">Completar</Button>
-              </form>
-            </>
-          )}
-          {project.status === "ON_HOLD" && (
-            <form action={doResume}>
-              <Button size="sm">Reanudar</Button>
-            </form>
-          )}
-          {!isTerminal && (
-            <form action={doCancel}>
-              <Button variant="ghost" size="sm" className="text-muted-foreground">
-                Cancelar proyecto
+        )}
+        {project.status === "DRAFT" && (
+          <form action={doActivate}>
+            <Button size="sm">Activar</Button>
+          </form>
+        )}
+        {project.status === "ACTIVE" && (
+          <>
+            <form action={doPause}>
+              <Button variant="outline" size="sm">
+                Pausar
               </Button>
             </form>
-          )}
-        </div>
+            <form action={doComplete}>
+              <Button variant="outline" size="sm">
+                Completar
+              </Button>
+            </form>
+          </>
+        )}
+        {project.status === "ON_HOLD" && (
+          <form action={doResume}>
+            <Button size="sm">Reanudar</Button>
+          </form>
+        )}
+        {!isTerminal && (
+          <form action={doCancel}>
+            <Button variant="ghost" size="sm" className="text-muted-foreground">
+              Cancelar proyecto
+            </Button>
+          </form>
+        )}
       </div>
 
       <div className="rounded-lg border bg-card">
@@ -160,7 +159,9 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
                 <Link href={`/directorio/${client.id}`} className="underline underline-offset-2">
                   {client.fantasyName ?? client.legalName}
                 </Link>
-              ) : "—"}
+              ) : (
+                "—"
+              )}
             </dd>
           </div>
           <div>

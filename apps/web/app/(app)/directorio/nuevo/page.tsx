@@ -14,7 +14,7 @@ export default function NuevoContactoPage() {
       </div>
 
       <div className="rounded-lg border bg-card p-6">
-        <ContactForm onSubmit={createContactAction} />
+        <ContactForm onSubmit={createContactAction} defaultValues={{ initialRole: "CLIENT" }} />
       </div>
     </div>
   );

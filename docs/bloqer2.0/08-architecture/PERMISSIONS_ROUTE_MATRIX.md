@@ -6,7 +6,7 @@ Phase **12C (pass 1):** además de `can()`, los **servicios** listados bajo “T
 
 Phase **12D:** reportes multi-módulo (`project-cash-flow`, `cost-control`) y mutaciones en `document.service` usan `getTenantModuleGate` / `assertTenantModuleEnabledWithGate` según política en la tabla “Phase 12D — implemented”; exclusiones parciales con `sectionsExcluded` / `warnings.sectionsExcluded`. Sin gate global en lecturas de documentos.
 
-Phase **13E:** auditoría Prisma/ERD documentada en [`PRISMA_ERD_AUDIT.md`](./PRISMA_ERD_AUDIT.md) (sin cambios de schema en esa fase). Phase **13F:** cierre de decisiones RBAC/módulos en esta matriz + [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md) + [`SECURITY_ARCHITECTURE.md`](./SECURITY_ARCHITECTURE.md). Phase **13G:** gate de módulo tenant **`JOBSITE_LOG`** en `jobsite-log.service.ts` (antes de `can()`), alineado a mutaciones de documentos enlazados a libro de obra. Phase **14A:** ruta **`/onboarding`** — wizard de alta del primer tenant (sin shell lateral); acceso solo usuario autenticado sin membresía ACTIVE (redirección desde layout `(app)`); sin permisos RBAC de tenant previos; superadmin de plataforma sin tenant no es forzado a onboarding.
+Phase **13E:** auditoría Prisma/ERD documentada en [`PRISMA_ERD_AUDIT.md`](./PRISMA_ERD_AUDIT.md) (sin cambios de schema en esa fase). Phase **13F:** cierre de decisiones RBAC/módulos en esta matriz + [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md) + [`SECURITY_ARCHITECTURE.md`](./SECURITY_ARCHITECTURE.md). Phase **13G:** gate de módulo tenant **`JOBSITE_LOG`** en `jobsite-log.service.ts` (antes de `can()`), alineado a mutaciones de documentos enlazados a libro de obra. Phase **14A:** ruta **`/onboarding`** — wizard de alta del primer tenant (sin shell lateral); acceso solo usuario autenticado sin membresía ACTIVE (redirección desde layout `(app)`); sin permisos RBAC de tenant previos; superadmin de plataforma sin tenant no es forzado a onboarding. Phase **14B:** ruta **`/dashboard`** — tablero ejecutivo; datos vía `getTenantDashboard` en servicios (gates + `can()` por sección); ver [`TENANT_DASHBOARD_ARCHITECTURE.md`](./TENANT_DASHBOARD_ARCHITECTURE.md). Phase **14C:** auditoría finanzas/proyecto/tesorería + plan de indicadores y overviews — ver [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md).
 
 AR project gates: `packages/services/src/ar/ar-access.ts` (`canViewArProjectArea`, `canEditArArea`).
 
@@ -37,6 +37,8 @@ Phase **12B:** si no existe fila en `tenant_module_settings` para un `moduleKey`
 | Facturas venta, CxC, cobranzas (`sales-invoice`, `receivable`, `collection.service`) | `AR` | `AR` |
 | Facturas proveedor, CxP, pagos (`supplier-invoice`, `payable`, `payment`) | `AP` | `AP` |
 | Aging CxC / CxP (`aging.service`) | `AR` / `AP` | `AR` / `AP` |
+| **`getTenantDashboard`** (`tenant-dashboard.service.ts`) | Por sección: `VIEW PROJECTS`, `VIEW BUDGETS`, `VIEW AR`/`AP`/`TREASURY`/`INVENTORY`, etc. | **Composite:** una llamada `getTenantModuleGate`; cada subconsulta respeta el mismo módulo + RBAC que el servicio subyacente (Prisma solo en capa servicios). |
+| **`getFinanceHubOverview`** (`finance-hub-overview.service.ts`) | `VIEW AR` / `VIEW AP` / `VIEW TREASURY` + módulos tenant correspondientes | **Composite:** `getTenantModuleGate` + delegación en aging AR/AP y `getTreasurySummaryByCompany`; `FORBIDDEN` → datos omitidos. |
 | `/inventario/**`, productos, depósitos, movimientos, transferencias, `inventory-reports` | `INVENTORY` | `INVENTORY` |
 | Órdenes de compra y recepciones (`purchase-order`, `purchase-receipt`) | `PROCUREMENT` | `PROCUREMENT` |
 | Subcontratos y certificaciones (`subcontract`, `subcontract-certification`) | `SUBCONTRACTS` | `SUBCONTRACTS` |
@@ -68,6 +70,18 @@ Removed dead links: `/compras`, `/reportes` (no routes in App Router). **`/confi
 | Route | Access | Notes |
 |-------|--------|-------|
 | `/onboarding` | Authenticated **NextAuth** session; user must **not** have `UserMembership` with `status=ACTIVE` (server check en página + servicio) | Wizard sin sidebar: crea `Tenant` (trial 30 días), `Company`, membresía **OWNER** + `TenantModuleSetting` para todos los `OVERVIEW_MODULES`. Usuario con membresía ACTIVE → redirect `/dashboard`. Superadmin de plataforma sin tenant **no** es redirigido aquí desde `(app)` (puede usar `/platform`). Server Action + `completeTrialOnboarding` en `@bloqer/services`; validación Zod en `@bloqer/validators`. |
+
+## Tenant dashboard (Phase 14B)
+
+| Route | Access | Notes |
+|-------|--------|-------|
+| `/dashboard` | Authenticated; **active tenant membership** (`buildTenantServiceContext` no nulo) para cargar datos | Server Component: `getTenantDashboard(ctx)` — cada bloque condicionado por **tenant module** + **`can()`** (p. ej. `VIEW PROJECTS`, `VIEW BUDGETS`, `VIEW AR`/`AP`/`TREASURY`/`INVENTORY`). Sin Prisma en la página. **Superadmin** sin `tenantCtx`: copy + enlace a `/platform` (sin llamar al servicio de tablero). |
+
+## Finance hub empresa (Phase 14C+)
+
+| Route | Access | Notes |
+|-------|--------|-------|
+| `/finanzas` | Authenticated; `buildTenantServiceContext` no nulo | Server Component: **`getFinanceHubOverview(ctx)`** — cards CxC/CxP solo si módulo tenant **AR**/**AP** + `VIEW AR`/`VIEW AP`; tesorería si **TREASURY** + `VIEW TREASURY`. Reutiliza `getReceivableAgingReport`, `getPayableAgingReport`, `getTreasurySummaryByCompany` (errores `FORBIDDEN` omiten sección). Sin Prisma en la página. |
 
 ## In-app notifications (Phase 8A–8D)
 
@@ -128,7 +142,7 @@ See [`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md).
 
 ### UI
 
-- `/finanzas`: enlaces a cada aging solo si `VIEW AR` / `VIEW AP` respectivamente.
+- `/finanzas`: hub con **`getFinanceHubOverview`**; cards y enlaces según módulo + `VIEW AR` / `VIEW AP` / `VIEW TREASURY`; aging y reportes tesorería como antes.
 - `/tesoreria` y `/tesoreria/reportes`: redirect si no `VIEW TREASURY` (deep links).
 - `/contabilidad` y subrutas: redirect si no `VIEW ACCOUNTING` (hub, cuentas, asientos, **reglas contables**, detalle). Mutaciones en UI (crear/editar/contabilizar/anular borrador; crear/editar/desactivar reglas) requieren `EDIT ACCOUNTING` (botones condicionales + Server Actions; servicios validan igual).
 - **Fase 11C — borrador GL desde documentos:** los botones “Generar asiento contable” / columna Contabilidad en tesorería–movimientos e inventario–movimientos requieren **`EDIT ACCOUNTING`** (además de poder ver la pantalla operativa: proyecto/cobranza, proyecto/pago, `VIEW TREASURY` en reporte movimientos, `VIEW INVENTORY` en movimientos de stock). No crean asientos al confirmar cobranzas/pagos/movimientos; solo bajo acción explícita del usuario. Errores de servicio vuelven con `?contabilidad=` en la URL de origen (solo mensaje de `ServiceError`, sin stack). En **`/contabilidad/**`**, `?empresa=` es **filtro de alcance contable** (UUID validado), no reemplaza la sesión ni el tenant; la autorización sigue siendo membresía + `can()`.
@@ -237,4 +251,5 @@ En **shell de app** (no `/platform`). No usa `PlatformAdmin`; solo RBAC por memb
 ## Pending / follow-up (product or later engineering)
 
 - Sub-routes under `/proyectos/[id]/*` rely on services; libro de obra (`jobsite-log.service`) tiene gate de módulo **`JOBSITE_LOG`** (Phase **13G**); otras ramas según 12C/12D.
+- **Phase 14D — layout proyecto:** `apps/web/app/(app)/proyectos/[id]/layout.tsx` usa `getProjectShellInfo` + `getTenantModuleGate`; `NOT_FOUND` → `notFound()`, `FORBIDDEN` → `redirect("/dashboard")`. La subnav (`buildProjectSubnavLinks`) lista **solo** rutas existentes; permisos = `can()` + helpers (`canViewArProjectArea`, `canViewApProjectArea`, `canViewProcurementProjectArea`, `canViewProjectCostControlReport`, `canViewProjectCashFlowReport`) y flags de módulo tenant (`gate.isEnabled`). Ver `FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md` § “Subnav”.
 - **PM vs aging global:** `PROJECT_MANAGER` tiene `EDIT AR` en matriz ⇒ `can(VIEW, AR)` es verdadero; puede abrir aging tenant-wide. Si el producto lo restringe solo a FINANCE/ADMIN, hace falta otra regla (módulo dedicado, o aging con filtro obligatorio por proyecto para ciertos roles) — no implementado en 7D; **sigue abierto** (ver `PERMISSIONS_MATRIX.md` “Remaining RBAC decisions”).

@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CertificationList } from "@/features/certifications";
 import { getCurrentUser } from "@/lib/auth";
-import { listCertificationsByProject, getProjectById, ServiceError } from "@bloqer/services";
+import { listCertificationsByProject, getProjectShellInfo, ServiceError } from "@bloqer/services";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -23,9 +23,10 @@ export default async function CertificacionesPage({ params }: PageProps) {
 
   let project;
   try {
-    project = await getProjectById(id, ctx);
+    project = await getProjectShellInfo(id, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
