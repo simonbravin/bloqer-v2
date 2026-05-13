@@ -46,7 +46,7 @@ function ItemRows({ items }: { items: AgingItem[] }) {
             {items.map((item) => (
               <tr key={item.id} className="border-t border-border/50 hover:bg-muted/20">
                 <td className="px-4 py-1.5 font-mono">#{item.invoiceNumber}</td>
-                <td className="px-4 py-1.5 max-w-[160px] truncate">{item.projectName}</td>
+                <td className="px-4 py-1.5 max-w-[160px] truncate">{item.projectName || "—"}</td>
                 <td className="px-4 py-1.5">{fmtDate(item.issueDate)}</td>
                 <td className="px-4 py-1.5">
                   <span>{fmtDate(item.dueDate)}</span>

@@ -29,7 +29,7 @@ export default async function PagarPage({ params }: PageProps) {
   let allAccounts;
   try {
     [payable, allAccounts] = await Promise.all([
-      getPayableById(payableId, ctx),
+      getPayableById(payableId, ctx, id),
       listTreasuryAccounts(ctx),
     ]);
   } catch (err) {

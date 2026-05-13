@@ -16,7 +16,12 @@ export type PayableView = Omit<Payable, "originalAmount" | "paidAmount"> & {
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
-export async function getPayableById(id: string, ctx: ServiceContext): Promise<PayableView> {
+export async function getPayableById(
+  id: string,
+  ctx: ServiceContext,
+  /** When set (project workspace routes), corporate payables and cross-project IDs are rejected. */
+  projectScopeId?: string,
+): Promise<PayableView> {
   await assertApTenantModule(ctx);
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar");
@@ -27,6 +32,9 @@ export async function getPayableById(id: string, ctx: ServiceContext): Promise<P
   });
   if (!p) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
+  }
   return serializePayable(p);
 }
 

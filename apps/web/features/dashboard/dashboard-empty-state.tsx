@@ -7,7 +7,7 @@ export function DashboardEmptyState({ steps }: { steps: DashboardOnboardingStep[
   if (steps.length === 0) return null;
 
   return (
-    <Card className="border-dashed shadow-sm">
+    <Card className="rounded-2xl border border-dashed bg-muted/20 shadow-sm">
       <CardHeader>
         <CardTitle>Empezá a operar</CardTitle>
         <CardDescription>

@@ -35,10 +35,11 @@ function handle(err: unknown): { error: string } {
 
 export async function createSupplierInvoiceAction(
   projectId: string,
-  data: CreateSupplierInvoiceInput,
+  data: Omit<CreateSupplierInvoiceInput, "projectId"> & { projectId?: string | null },
 ): Promise<{ id: string } | { error: string }> {
   const ctx = await getCtx();
-  const parsed = createSupplierInvoiceSchema.safeParse(data);
+  const payload: CreateSupplierInvoiceInput = { ...data, projectId };
+  const parsed = createSupplierInvoiceSchema.safeParse(payload);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const inv = await createSupplierInvoice(parsed.data, ctx);
@@ -58,7 +59,7 @@ export async function updateSupplierInvoiceAction(
   const parsed = updateSupplierInvoiceSchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
-    const inv = await updateSupplierInvoice(invoiceId, parsed.data, ctx);
+    const inv = await updateSupplierInvoice(invoiceId, parsed.data, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/facturas-proveedor`);
     revalidatePath(`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`);
     return { id: inv.id };
@@ -73,7 +74,7 @@ export async function issueSupplierInvoiceAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await issueSupplierInvoice(invoiceId, ctx);
+    await issueSupplierInvoice(invoiceId, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/facturas-proveedor`);
     revalidatePath(`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);
@@ -89,7 +90,7 @@ export async function cancelSupplierInvoiceAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await cancelSupplierInvoice(invoiceId, ctx);
+    await cancelSupplierInvoice(invoiceId, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/facturas-proveedor`);
     revalidatePath(`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);

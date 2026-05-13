@@ -32,7 +32,6 @@ export default async function PagosPage({ params }: PageProps) {
 
   const items: PaymentListItem[] = payments.map((p) => ({
     id:                p.id,
-    projectId:         id,
     paymentDate:       p.paymentDate,
     amount:            p.amount,
     currency:          p.currency,

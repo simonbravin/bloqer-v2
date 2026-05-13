@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export function InventorySummaryCard({ summary }: { summary: DashboardInventorySummary }) {
   return (
-    <Card className="shadow-sm">
+    <Card className="rounded-xl border bg-card shadow-sm">
       <CardHeader>
         <CardTitle>Inventario</CardTitle>
         <CardDescription>Estado rápido del catálogo y stock.</CardDescription>
@@ -16,6 +16,10 @@ export function InventorySummaryCard({ summary }: { summary: DashboardInventoryS
           <p>
             <span className="text-muted-foreground">Productos activos:</span>{" "}
             <span className="font-semibold tabular-nums">{summary.activeProductsCount}</span>
+          </p>
+          <p>
+            <span className="text-muted-foreground">Depósitos activos:</span>{" "}
+            <span className="font-semibold tabular-nums">{summary.activeWarehousesCount}</span>
           </p>
           <p className="flex flex-wrap items-center gap-2">
             <span className="text-muted-foreground">Stock negativo</span>

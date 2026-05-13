@@ -32,7 +32,6 @@ export default async function FacturasProveedorPage({ params }: PageProps) {
 
   const items: SupplierInvoiceListItem[] = invoices.map((inv) => ({
     id:           inv.id,
-    projectId:    inv.projectId,
     code:         inv.code,
     supplierName: inv.supplierName,
     issueDate:    inv.issueDate,

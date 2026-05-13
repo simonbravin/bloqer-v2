@@ -29,7 +29,7 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
 
   let payment;
   try {
-    payment = await getPaymentById(paymentId, ctx);
+    payment = await getPaymentById(paymentId, ctx, id);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;

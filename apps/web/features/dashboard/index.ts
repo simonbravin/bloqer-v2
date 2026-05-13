@@ -1,6 +1,16 @@
 export { DashboardEmptyState } from "./dashboard-empty-state";
 export type { DashboardOnboardingStep } from "./dashboard-empty-state";
 export { DashboardKpiCard } from "./dashboard-kpi-card";
+export { DashboardKpiGrid } from "./dashboard-kpi-grid";
+export { DashboardHeader, dashboardHeaderQuickNav } from "./dashboard-header";
+export { DashboardStatusDistribution } from "./dashboard-status-distribution";
+export { DashboardAlertsCard } from "./dashboard-alerts-card";
+export { DashboardAccountingCard } from "./dashboard-accounting-card";
+export { DashboardOnboardingChecklist } from "./dashboard-onboarding-checklist";
+export { DashboardFinanceOverview } from "./dashboard-finance-overview";
+export { DashboardMoneyBars } from "./dashboard-money-bars";
+export { DashboardProjectsOverview } from "./dashboard-projects-overview";
+export { DashboardQuickActions } from "./dashboard-quick-actions";
 export { FinanceSummaryCard } from "./finance-summary-card";
 export { InventorySummaryCard } from "./inventory-summary-card";
 export { ProjectProgressCard } from "./project-progress-card";

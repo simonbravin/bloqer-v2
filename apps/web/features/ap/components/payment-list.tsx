@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 
 export type PaymentListItem = {
   id: string;
-  projectId: string;
   paymentDate: Date;
   amount: string;
   currency: string;

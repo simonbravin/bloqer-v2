@@ -87,9 +87,12 @@ export function ProjectWorkspaceSidebar({
   }, [projectId]);
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r bg-background px-3 py-4">
-      <div className="mb-4 px-3">
-        <Link href="/dashboard" className="inline-block outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+      <div className="border-b border-sidebar-border/80 px-4 py-5">
+        <Link
+          href="/dashboard"
+          className="inline-block rounded-md outline-none ring-offset-sidebar focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <Image
             src="/bloqer-logo.png"
             alt="Bloqer"
@@ -99,13 +102,17 @@ export function ProjectWorkspaceSidebar({
             className="h-8 w-auto max-w-[9.5rem] object-contain object-left"
           />
         </Link>
-        {tenantName && <p className="mt-0.5 truncate text-xs text-muted-foreground">{tenantName}</p>}
+        {tenantName ? (
+          <p className="mt-2 truncate text-xs font-medium leading-snug text-muted-foreground" title={tenantName}>
+            {tenantName}
+          </p>
+        ) : null}
       </div>
 
-      <div className="mb-4 rounded-xl border bg-card px-3 py-3 shadow-sm">
+      <div className="mx-2 mb-3 mt-3 rounded-xl border border-border/80 bg-card px-3 py-3 text-card-foreground shadow-sm">
         <Link
           href="/proyectos"
-          className="mb-2 inline-flex text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="mb-2 inline-flex rounded-md text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
         >
           ← Volver a proyectos
         </Link>
@@ -132,7 +139,7 @@ export function ProjectWorkspaceSidebar({
         )}
       </div>
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 pb-3 pr-1">
         {sections.map((section, sectionIndex) => {
           const open = openByTitle[section.title] ?? false;
           const panelId = `project-nav-section-${sectionIndex}`;
@@ -150,9 +157,9 @@ export function ProjectWorkspaceSidebar({
                   }))
                 }
                 className={cn(
-                  "flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors",
-                  "hover:bg-muted/70 hover:text-foreground",
-                  open && "text-foreground",
+                  "flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors duration-150",
+                  "hover:bg-muted/60 hover:text-foreground",
+                  open && "bg-muted/30 text-foreground",
                 )}
               >
                 <ChevronRight

@@ -35,7 +35,8 @@ export const createDocumentMetadataSchema = z.object({
 
 export const initiateUploadSchema = z
   .object({
-    projectId:        z.string().uuid(),
+    /** Required for project-scoped entities; omit/null only for corporate supplier invoices (see document.service). */
+    projectId:        z.string().uuid().optional().nullable(),
     originalFileName: z.string().min(1, "Nombre de archivo requerido").max(500),
     mimeType:         z.enum(ALLOWED_MIME_TYPES, {
       errorMap: () => ({ message: "Tipo de archivo no permitido" }),
@@ -71,6 +72,14 @@ export const initiateUploadSchema = z
         code:    "custom",
         message: "Tipo de entidad vinculada requerido",
         path:    ["linkedEntityType"],
+      });
+    }
+    const hasProject = data.projectId != null && data.projectId !== "";
+    if (!hasProject && data.linkedEntityType && data.linkedEntityType !== "SUPPLIER_INVOICE") {
+      ctx.addIssue({
+        code:    "custom",
+        message: "Proyecto requerido para este tipo de adjunto",
+        path:    ["projectId"],
       });
     }
   });

@@ -5,7 +5,6 @@ import { SupplierInvoiceStatusBadge } from "./supplier-invoice-status-badge";
 
 export type SupplierInvoiceListItem = {
   id: string;
-  projectId: string;
   code: string;
   supplierName: string;
   issueDate: Date;

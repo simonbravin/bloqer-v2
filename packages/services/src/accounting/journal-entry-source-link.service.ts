@@ -245,10 +245,14 @@ export async function getJournalEntrySourceLink(
       }
       const detail = `Factura proveedor #${inv.number} · ${fmtDate(inv.issueDate)}`;
       const canLink = canViewApProjectArea(ctx.roles);
+      const href =
+        canLink && inv.projectId
+          ? `/proyectos/${inv.projectId}/facturas-proveedor/${inv.id}`
+          : null;
       return {
         kindLabel: "Factura de proveedor",
         detail,
-        href:      canLink ? `/proyectos/${inv.projectId}/facturas-proveedor/${inv.id}` : null,
+        href,
         noAccessHint: canLink ? null : noAp,
       };
     }

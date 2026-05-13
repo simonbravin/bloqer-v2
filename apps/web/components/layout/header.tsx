@@ -42,60 +42,71 @@ function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon"
-      className="h-8 w-8"
+      className="relative h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-      title="Cambiar tema"
+      title={resolvedTheme === "dark" ? "Modo claro" : "Modo oscuro"}
+      type="button"
     >
-      <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      <Sun className="absolute h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" aria-hidden />
+      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" aria-hidden />
+      <span className="sr-only">Cambiar tema</span>
     </Button>
   );
 }
 
 export function Header({ user, notificationUnreadCount = 0, showPlatformLink = false }: HeaderProps) {
   return (
-    <header className="flex h-14 items-center justify-between border-b bg-background px-6">
-      <div className="flex items-center gap-2">
-        <Image
-          src="/bloqer-logo.png"
-          alt="Bloqer"
-          width={120}
-          height={32}
-          className="h-6 w-auto object-contain object-left"
-        />
-        <span className="text-xs font-medium text-muted-foreground">2.0</span>
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/90 px-4 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/75 sm:px-6">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="hidden min-w-0 sm:block">
+          <p className="truncate text-sm font-semibold tracking-tight text-foreground">Bloqer</p>
+          <p className="truncate text-xs text-muted-foreground">Construcción y obra</p>
+        </div>
+        <div className="flex items-center gap-2 sm:hidden">
+          <Image
+            src="/bloqer-logo.png"
+            alt="Bloqer"
+            width={120}
+            height={32}
+            className="h-6 w-auto object-contain object-left"
+          />
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="relative h-8 w-8" asChild title="Notificaciones">
+      <div className="flex items-center gap-1 sm:gap-2">
+        <Button variant="ghost" size="icon" className="relative h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground" asChild title="Notificaciones">
           <Link href="/notificaciones">
-            <Bell className="h-4 w-4" />
-            {notificationUnreadCount > 0 && (
+            <Bell className="h-4 w-4" aria-hidden />
+            {notificationUnreadCount > 0 ? (
               <Badge
                 variant="destructive"
-                className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center px-1 text-[10px] leading-none"
+                className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center px-1 text-[10px] font-semibold leading-none tabular-nums"
               >
                 {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
               </Badge>
-            )}
+            ) : null}
+            <span className="sr-only">Notificaciones</span>
           </Link>
         </Button>
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring">
+            <button
+              type="button"
+              className="flex items-center gap-2 rounded-full border border-transparent p-0.5 outline-none transition-colors hover:border-border hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user?.image ?? undefined} alt={user?.name ?? "Usuario"} />
-                <AvatarFallback className="text-xs">
+                <AvatarFallback className="text-xs font-medium">
                   {getInitials(user?.name, user?.email)}
                 </AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{user?.name ?? "Usuario"}</p>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
+                <p className="text-sm font-medium leading-none">{user?.name ?? "Usuario"}</p>
+                <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -104,7 +115,9 @@ export function Header({ user, notificationUnreadCount = 0, showPlatformLink = f
                 <Link href="/platform">Plataforma</Link>
               </DropdownMenuItem>
             ) : null}
-            <DropdownMenuItem>Perfil</DropdownMenuItem>
+            <DropdownMenuItem disabled className="opacity-60">
+              Perfil (próximamente)
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"

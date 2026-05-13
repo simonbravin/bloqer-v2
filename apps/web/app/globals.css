@@ -24,6 +24,10 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+    /* Slightly separated from main canvas (sidebars) */
+    --sidebar: 210 40% 98.5%;
+    --sidebar-foreground: 222.2 84% 4.9%;
+    --sidebar-border: 214.3 31.8% 90%;
   }
 
   .dark {
@@ -46,6 +50,20 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+    --sidebar: 222.2 47% 6%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-border: 217.2 32.6% 14%;
+  }
+}
+
+@layer components {
+  /** Default width content column inside `(app)` main — avoids double horizontal padding with `main`. */
+  .shell-page {
+    @apply mx-auto w-full max-w-6xl space-y-8;
+  }
+
+  .shell-page-narrow {
+    @apply mx-auto w-full max-w-lg space-y-4;
   }
 }
 

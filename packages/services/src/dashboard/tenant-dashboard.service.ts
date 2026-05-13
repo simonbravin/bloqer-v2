@@ -1,6 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import { getPayableAgingReport, getReceivableAgingReport } from "../aging/aging.service";
+import { getPayableAgingReport, getReceivableAgingReport, type AgingReport } from "../aging/aging.service";
 import { getUnreadNotificationCount } from "../notifications/notification.service";
 import { canRunOperationalAlerts } from "../notifications/operational-alerts-runner.service";
 import { listNegativeStockBalancesForTenant } from "../inventory/stock-balance.service";
@@ -10,6 +10,8 @@ import { canEditTeamMembership, canReadTenantConfigArea } from "../tenant-settin
 import { getTreasurySummaryByCompany } from "../treasury/balance.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
+
+const ZERO = new Prisma.Decimal(0);
 
 export type DashboardKpiTone = "default" | "success" | "warning" | "danger" | "muted";
 
@@ -26,7 +28,11 @@ export type DashboardProjectRow = {
   id: string;
   name: string;
   status: string;
+  clientName?: string | null;
+  startDate?: string | null;
+  expectedEndDate?: string | null;
   budgetAmount?: string | null;
+  budgetCurrency?: string | null;
   actualCost?: string | null;
   progressPct?: number | null;
   href: string;
@@ -34,21 +40,43 @@ export type DashboardProjectRow = {
 
 export type DashboardProjectSummary = {
   activeProjectsCount: number;
-  totalProjectsAmount: string;
-  totalProjectsAmountNote?: string | null;
+  draftProjectsCount: number;
+  onHoldProjectsCount: number;
+  /** Suma del último presupuesto aprobado/cerrado **por moneda** (solo proyectos activos). Nunca mezcla divisas. */
+  budgetSaleByCurrency: { currency: string; amount: string }[];
   averageProgressPct: number | null;
   projects: DashboardProjectRow[];
+};
+
+export type DashboardProjectStatusSlice = {
+  status: string;
+  count: number;
+  label: string;
+};
+
+export type TenantSubscriptionInfo = {
+  saasPlan: string;
+  subscriptionStatus: string;
+  trialEndsAt: string | null;
+  /** Días hasta el fin del trial (solo si `subscriptionStatus` es trial y hay `trialEndsAt`). */
+  trialDaysRemaining: number | null;
+  trialWarning: string | null;
 };
 
 export type DashboardFinanceSummary = {
   receivablesTotal?: string | null;
   receivablesCurrency?: string | null;
   receivablesMulticurrency?: boolean;
+  /** Total abierto por moneda (aging). */
+  receivablesOpenByCurrency?: { currency: string; total: string }[];
   payablesTotal?: string | null;
   payablesCurrency?: string | null;
   payablesMulticurrency?: boolean;
+  payablesOpenByCurrency?: { currency: string; total: string }[];
   overdueReceivablesCount?: number;
   overduePayablesCount?: number;
+  receivablesDueSoonCount?: number;
+  payablesDueSoonCount?: number;
   cashByCurrency?: Record<string, string>;
   cashMulticurrency?: boolean;
 };
@@ -56,6 +84,12 @@ export type DashboardFinanceSummary = {
 export type DashboardInventorySummary = {
   activeProductsCount: number;
   negativeStockCount: number;
+  activeWarehousesCount: number;
+};
+
+export type DashboardAccountingSummary = {
+  journalDraftCount: number;
+  journalPostedCount: number;
 };
 
 export type DashboardModuleWarning = {
@@ -72,13 +106,16 @@ export type DashboardQuickAction = {
 
 export type TenantDashboardView = {
   tenantName: string;
+  subscription: TenantSubscriptionInfo | null;
   generatedAt: string;
   kpis: DashboardKpi[];
+  projectStatusSlices: DashboardProjectStatusSlice[];
   projectSummary?: DashboardProjectSummary;
   /** Presupuestado vs real: solo enlace informativo (sin agregado global Phase 14B). */
   showCostControlHint?: boolean;
   financeSummary?: DashboardFinanceSummary;
   inventorySummary?: DashboardInventorySummary;
+  accountingSummary?: DashboardAccountingSummary;
   unreadNotifications: number;
   showOperationalAlertsLink: boolean;
   /** Sin proyectos/finanzas/inventario ni notificaciones: mostrar pasos iniciales en UI. */
@@ -106,6 +143,11 @@ function fmtDecimalEs(value: string, currencyCode?: string): string {
   return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(n);
 }
 
+function isoDate(d: Date | null | undefined): string | null {
+  if (!d) return null;
+  return d.toISOString().slice(0, 10);
+}
+
 function countOverdueFromAgingReport(report: { rows: { items: { daysOverdue: number; balanceDue: string }[] }[] }): number {
   let n = 0;
   for (const row of report.rows) {
@@ -114,6 +156,61 @@ function countOverdueFromAgingReport(report: { rows: { items: { daysOverdue: num
     }
   }
   return n;
+}
+
+/** Líneas con saldo y vencimiento en los próximos `withinDays` días (según `asOfDate` del aging). */
+function countDueSoonFromAgingReport(report: AgingReport, withinDays: number): number {
+  const asOf = new Date(`${report.asOfDate}T12:00:00`);
+  const end = new Date(asOf);
+  end.setDate(end.getDate() + withinDays);
+  let n = 0;
+  for (const row of report.rows) {
+    for (const item of row.items) {
+      if (Number(item.balanceDue) <= 0) continue;
+      const due = new Date(`${item.dueDate}T12:00:00`);
+      if (due > asOf && due <= end) n += 1;
+    }
+  }
+  return n;
+}
+
+function agingOpenByCurrency(report: AgingReport): { currency: string; total: string }[] {
+  return Object.entries(report.byCurrency)
+    .map(([currency, t]) => ({ currency, total: t.totalBalance }))
+    .sort((a, b) => a.currency.localeCompare(b.currency));
+}
+
+function trialDaysRemaining(trialEndsAt: Date | null, now: Date): number | null {
+  if (!trialEndsAt) return null;
+  const end = new Date(trialEndsAt);
+  end.setHours(0, 0, 0, 0);
+  const t = new Date(now);
+  t.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((end.getTime() - t.getTime()) / 86400000);
+  return diff;
+}
+
+function buildSubscriptionInfo(row: {
+  saasPlan: string;
+  subscriptionStatus: string;
+  trialEndsAt: Date | null;
+}): TenantSubscriptionInfo {
+  const now = new Date();
+  const trialEndsIso = row.trialEndsAt ? row.trialEndsAt.toISOString().slice(0, 10) : null;
+  const days = row.subscriptionStatus === "TRIAL" ? trialDaysRemaining(row.trialEndsAt, now) : null;
+  let trialWarning: string | null = null;
+  if (row.subscriptionStatus === "TRIAL" && days !== null) {
+    if (days < 0) trialWarning = "El período de prueba finalizó. Revisá el plan con tu administrador.";
+    else if (days <= 3) trialWarning = `Quedan ${days} día(s) de prueba.`;
+    else if (days <= 14) trialWarning = `La prueba vence en ${days} días.`;
+  }
+  return {
+    saasPlan: row.saasPlan,
+    subscriptionStatus: row.subscriptionStatus,
+    trialEndsAt: trialEndsIso,
+    trialDaysRemaining: days,
+    trialWarning,
+  };
 }
 
 function safeRun<T>(_label: string, fn: () => Promise<T>): Promise<T | null> {
@@ -127,11 +224,18 @@ function safeRun<T>(_label: string, fn: () => Promise<T>): Promise<T | null> {
 
 /** Latest APPROVED/CLOSED budget per project (first row wins after version desc sort). */
 function pickLatestBudgetsPerProject(
-  rows: { projectId: string; totalSalePrice: Prisma.Decimal; totalCost: Prisma.Decimal }[],
-): Map<string, { totalSalePrice: Prisma.Decimal; totalCost: Prisma.Decimal }> {
-  const map = new Map<string, { totalSalePrice: Prisma.Decimal; totalCost: Prisma.Decimal }>();
+  rows: {
+    projectId: string;
+    totalSalePrice: Prisma.Decimal;
+    totalCost: Prisma.Decimal;
+    currency: string;
+  }[],
+): Map<string, { totalSalePrice: Prisma.Decimal; totalCost: Prisma.Decimal; currency: string }> {
+  const map = new Map<string, { totalSalePrice: Prisma.Decimal; totalCost: Prisma.Decimal; currency: string }>();
   for (const r of rows) {
-    if (!map.has(r.projectId)) map.set(r.projectId, { totalSalePrice: r.totalSalePrice, totalCost: r.totalCost });
+    if (!map.has(r.projectId)) {
+      map.set(r.projectId, { totalSalePrice: r.totalSalePrice, totalCost: r.totalCost, currency: r.currency });
+    }
   }
   return map;
 }
@@ -144,24 +248,67 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
   const gate = await getTenantModuleGate(ctx);
   const kpis: DashboardKpi[] = [];
   const quickActions: DashboardQuickAction[] = [];
+  const warnings: DashboardModuleWarning[] = [];
   const generatedAt = new Date().toISOString();
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: ctx.tenantId },
-    select: { name: true },
+    select: {
+      name: true,
+      saasPlan: true,
+      subscriptionStatus: true,
+      trialEndsAt: true,
+    },
   });
   const tenantName = tenant?.name ?? "Organización";
+  const subscription = tenant
+    ? buildSubscriptionInfo({
+        saasPlan: tenant.saasPlan,
+        subscriptionStatus: tenant.subscriptionStatus,
+        trialEndsAt: tenant.trialEndsAt,
+      })
+    : null;
 
-  const unreadNotifications = await getUnreadNotificationCount(ctx).catch(() => 0);
-  if (unreadNotifications > 0) {
-    kpis.push({
-      key:   "notifications_unread",
-      label: "Notificaciones sin leer",
-      value: String(unreadNotifications),
-      href:  "/notificaciones",
-      tone:  unreadNotifications > 0 ? "warning" : "default",
+  if (subscription?.trialWarning) {
+    warnings.push({
+      module: "TENANT",
+      label: "Plan",
+      message: subscription.trialWarning,
     });
   }
+
+  let projectStatusSlices: DashboardProjectStatusSlice[] = [];
+  if (gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS")) {
+    const grouped = await prisma.project.groupBy({
+      by: ["status"],
+      where: { tenantId: ctx.tenantId },
+      _count: { _all: true },
+    });
+    const labelMap: Record<string, string> = {
+      DRAFT: "Borrador",
+      ACTIVE: "Activo",
+      ON_HOLD: "En pausa",
+      COMPLETED: "Finalizado",
+      CANCELLED: "Cancelado",
+    };
+    projectStatusSlices = grouped
+      .filter((g) => g._count._all > 0)
+      .map((g) => ({
+        status: g.status,
+        count: g._count._all,
+        label: labelMap[g.status] ?? g.status,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  const unreadNotifications = await getUnreadNotificationCount(ctx).catch(() => 0);
+  kpis.push({
+    key:   "notifications_unread",
+    label: "Notificaciones sin leer",
+    value: String(unreadNotifications),
+    href:  "/notificaciones",
+    tone:  unreadNotifications > 0 ? "warning" : "muted",
+  });
 
   const showOperationalAlertsLink = canRunOperationalAlerts(ctx);
 
@@ -174,12 +321,46 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
     const activeProjectsCount = await prisma.project.count({
       where: { tenantId: ctx.tenantId, status: "ACTIVE" },
     });
+    const draftProjectsCount = await prisma.project.count({
+      where: { tenantId: ctx.tenantId, status: "DRAFT" },
+    });
+    const onHoldProjectsCount = await prisma.project.count({
+      where: { tenantId: ctx.tenantId, status: "ON_HOLD" },
+    });
+
+    kpis.push({
+      key:   "projects_active",
+      label: "Proyectos activos",
+      value: String(activeProjectsCount),
+      href:  "/proyectos",
+    });
+    kpis.push({
+      key:   "projects_draft",
+      label: "Proyectos borrador",
+      value: String(draftProjectsCount),
+      href:  "/proyectos",
+      tone:  draftProjectsCount > 0 ? "default" : "muted",
+    });
+    kpis.push({
+      key:   "projects_on_hold",
+      label: "Proyectos en pausa",
+      value: String(onHoldProjectsCount),
+      href:  "/proyectos",
+      tone:  onHoldProjectsCount > 0 ? "warning" : "muted",
+    });
 
     const recent = await prisma.project.findMany({
       where: { tenantId: ctx.tenantId, status: "ACTIVE" },
       orderBy: { updatedAt: "desc" },
       take: 5,
-      select: { id: true, name: true, status: true },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        startDate: true,
+        expectedEndDate: true,
+        client: { select: { fantasyName: true, legalName: true } },
+      },
     });
     const ids = recent.map((p) => p.id);
 
@@ -192,14 +373,14 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
               status:    { in: ["APPROVED", "CLOSED"] },
             },
             orderBy: [{ projectId: "asc" }, { versionNumber: "desc" }],
-            select: { projectId: true, totalSalePrice: true, totalCost: true },
+            select: { projectId: true, totalSalePrice: true, totalCost: true, currency: true },
           })
         : [];
 
     const budgetByProject = pickLatestBudgetsPerProject(budgetRows);
 
-    let totalSale = new Prisma.Decimal(0);
-    if (ids.length > 0 && canViewBudgets) {
+    let budgetSaleByCurrency: { currency: string; amount: string }[] = [];
+    if (canViewBudgets) {
       const allActiveIds = await prisma.project.findMany({
         where: { tenantId: ctx.tenantId, status: "ACTIVE" },
         select: { id: true },
@@ -213,53 +394,65 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
             status:    { in: ["APPROVED", "CLOSED"] },
           },
           orderBy: [{ projectId: "asc" }, { versionNumber: "desc" }],
-          select: { projectId: true, totalSalePrice: true, totalCost: true },
+          select: { projectId: true, totalSalePrice: true, totalCost: true, currency: true },
         });
         const byP = pickLatestBudgetsPerProject(allBudgetRows);
-        for (const v of byP.values()) totalSale = totalSale.plus(v.totalSalePrice);
+        const saleByCur = new Map<string, Prisma.Decimal>();
+        for (const v of byP.values()) {
+          saleByCur.set(v.currency, (saleByCur.get(v.currency) ?? ZERO).plus(v.totalSalePrice));
+        }
+        budgetSaleByCurrency = [...saleByCur.entries()]
+          .filter(([, a]) => a.greaterThan(ZERO))
+          .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
+          .sort((a, b) => a.currency.localeCompare(b.currency));
+      }
+
+      if (budgetSaleByCurrency.length === 1) {
+        const only = budgetSaleByCurrency[0]!;
+        kpis.push({
+          key:    "projects_budgeted_total",
+          label:  "Presupuesto venta (activos)",
+          value:  fmtDecimalEs(only.amount, only.currency),
+          helper: "Último aprobado/cerrado por proyecto activo, en una sola moneda.",
+          href:   "/proyectos",
+        });
+      } else if (budgetSaleByCurrency.length > 1) {
+        kpis.push({
+          key:    "projects_budgeted_total",
+          label:  "Presupuesto venta (activos)",
+          value:  "Multimoneda",
+          helper: "Totales por moneda en el tablero (no se suman divisas).",
+          href:   "/proyectos",
+          tone:   "muted",
+        });
       }
     }
 
     const projects: DashboardProjectRow[] = recent.map((p) => {
       const b = budgetByProject.get(p.id);
       return {
-        id:           p.id,
-        name:         p.name,
-        status:       p.status,
-        budgetAmount: b ? b.totalSalePrice.toString() : null,
-        actualCost:   b ? b.totalCost.toString() : null,
-        progressPct:  null,
-        href:         `/proyectos/${p.id}`,
+        id:               p.id,
+        name:             p.name,
+        status:           p.status,
+        clientName:       p.client ? (p.client.fantasyName ?? p.client.legalName) : null,
+        startDate:        isoDate(p.startDate),
+        expectedEndDate:  isoDate(p.expectedEndDate),
+        budgetAmount:     b ? b.totalSalePrice.toString() : null,
+        budgetCurrency:   b ? b.currency : null,
+        actualCost:       b ? b.totalCost.toString() : null,
+        progressPct:      null,
+        href:             `/proyectos/${p.id}`,
       };
     });
 
     projectSummary = {
       activeProjectsCount,
-      totalProjectsAmount: canViewBudgets ? fmtDecimalEs(totalSale.toString(), "ARS") : "—",
-      totalProjectsAmountNote:
-        !canViewBudgets && activeProjectsCount > 0
-          ? "El total presupuestado requiere el módulo Presupuestos y permiso de lectura."
-          : null,
+      draftProjectsCount,
+      onHoldProjectsCount,
+      budgetSaleByCurrency,
       averageProgressPct: null,
       projects,
     };
-
-    kpis.push({
-      key:   "projects_active",
-      label: "Proyectos activos",
-      value: String(activeProjectsCount),
-      href:  "/proyectos",
-    });
-
-    if (canViewBudgets) {
-      kpis.push({
-        key:     "projects_budgeted_total",
-        label:   "Total presupuestado (venta, aprob./cerr.)",
-        value:   fmtDecimalEs(totalSale.toString(), "ARS"),
-        helper:  "Suma del último presupuesto aprobado o cerrado por proyecto activo.",
-        href:    "/proyectos",
-      });
-    }
 
     if (can(ctx.roles, "EDIT", "PROJECTS")) {
       quickActions.push({
@@ -290,6 +483,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
   if (arAllowed) {
     const ar = await safeRun("AR aging", () => getReceivableAgingReport({}, ctx));
     if (ar) {
+      financeSummary!.receivablesOpenByCurrency = agingOpenByCurrency(ar);
       const curKeys = Object.keys(ar.byCurrency);
       financeSummary!.receivablesMulticurrency = curKeys.length > 1;
       if (curKeys.length === 1) {
@@ -303,6 +497,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
         financeSummary!.receivablesCurrency = "ARS";
       }
       financeSummary!.overdueReceivablesCount = countOverdueFromAgingReport(ar);
+      financeSummary!.receivablesDueSoonCount = countDueSoonFromAgingReport(ar, 14);
       if ((financeSummary!.overdueReceivablesCount ?? 0) > 0) {
         kpis.push({
           key:    "ar_overdue",
@@ -312,12 +507,22 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
           tone:   "warning",
         });
       }
+      if ((financeSummary!.receivablesDueSoonCount ?? 0) > 0) {
+        kpis.push({
+          key:    "ar_due_soon",
+          label:  "CxC próximas (14 días)",
+          value:  String(financeSummary!.receivablesDueSoonCount),
+          href:   "/finanzas/cuentas-por-cobrar-aging",
+          tone:   "muted",
+        });
+      }
     }
   }
 
   if (apAllowed) {
     const ap = await safeRun("AP aging", () => getPayableAgingReport({}, ctx));
     if (ap) {
+      financeSummary!.payablesOpenByCurrency = agingOpenByCurrency(ap);
       const curKeys = Object.keys(ap.byCurrency);
       financeSummary!.payablesMulticurrency = curKeys.length > 1;
       if (curKeys.length === 1) {
@@ -331,6 +536,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
         financeSummary!.payablesCurrency = "ARS";
       }
       financeSummary!.overduePayablesCount = countOverdueFromAgingReport(ap);
+      financeSummary!.payablesDueSoonCount = countDueSoonFromAgingReport(ap, 14);
       if ((financeSummary!.overduePayablesCount ?? 0) > 0) {
         kpis.push({
           key:    "ap_overdue",
@@ -338,6 +544,15 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
           value:  String(financeSummary!.overduePayablesCount),
           href:   "/finanzas",
           tone:   "warning",
+        });
+      }
+      if ((financeSummary!.payablesDueSoonCount ?? 0) > 0) {
+        kpis.push({
+          key:    "ap_due_soon",
+          label:  "CxP próximas (14 días)",
+          value:  String(financeSummary!.payablesDueSoonCount),
+          href:   "/finanzas/cuentas-por-pagar-aging",
+          tone:   "muted",
         });
       }
     }
@@ -393,12 +608,22 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
     } catch {
       /* best-effort */
     }
-    inventorySummary = { activeProductsCount, negativeStockCount };
+    const activeWarehousesCount = await prisma.warehouse.count({
+      where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+    });
+    inventorySummary = { activeProductsCount, negativeStockCount, activeWarehousesCount };
     kpis.push({
       key:   "inventory_products",
       label: "Productos activos",
       value: String(activeProductsCount),
       href:  "/inventario/productos",
+    });
+    kpis.push({
+      key:   "inventory_warehouses",
+      label: "Depósitos activos",
+      value: String(activeWarehousesCount),
+      href:  "/inventario/depositos",
+      tone:  "muted",
     });
     if (negativeStockCount > 0) {
       kpis.push({
@@ -418,7 +643,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
 
   if (arAllowed || apAllowed) {
     quickActions.push({
-      label:       "Finanzas",
+      label:       "Ver finanzas",
       href:        "/finanzas",
       description: "CxC, CxP y reportes",
     });
@@ -478,7 +703,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
 
   if (gate.isEnabled("ACCOUNTING") && can(ctx.roles, "VIEW", "ACCOUNTING")) {
     quickActions.push({
-      label:       "Contabilidad",
+      label:       "Ver contabilidad",
       href:        "/contabilidad",
       description: "Plan de cuentas y asientos",
     });
@@ -492,12 +717,45 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
     });
   }
 
+  let accountingSummary: DashboardAccountingSummary | undefined;
+  if (ctx.companyId && gate.isEnabled("ACCOUNTING") && can(ctx.roles, "VIEW", "ACCOUNTING")) {
+    const companyId = ctx.companyId;
+    const [journalDraftCount, journalPostedCount] = await Promise.all([
+      prisma.journalEntry.count({
+        where: { tenantId: ctx.tenantId, companyId, status: "DRAFT" },
+      }),
+      prisma.journalEntry.count({
+        where: { tenantId: ctx.tenantId, companyId, status: "POSTED" },
+      }),
+    ]);
+    accountingSummary = { journalDraftCount, journalPostedCount };
+    kpis.push({
+      key:    "accounting_draft",
+      label:  "Asientos en borrador",
+      value:  String(journalDraftCount),
+      href:   "/contabilidad",
+      tone:   journalDraftCount > 0 ? "warning" : "muted",
+    });
+    kpis.push({
+      key:    "accounting_posted",
+      label:  "Asientos contabilizados",
+      value:  String(journalPostedCount),
+      href:   "/contabilidad",
+      tone:   "muted",
+    });
+  }
+
   const hasRichData =
     (projectSummary?.activeProjectsCount ?? 0) > 0 ||
+    (projectSummary?.draftProjectsCount ?? 0) > 0 ||
     (financeSummary?.receivablesTotal != null && financeSummary.receivablesTotal !== "0") ||
     (financeSummary?.payablesTotal != null && financeSummary.payablesTotal !== "0") ||
+    (financeSummary?.receivablesOpenByCurrency?.length ?? 0) > 0 ||
+    (financeSummary?.payablesOpenByCurrency?.length ?? 0) > 0 ||
     Object.keys(financeSummary?.cashByCurrency ?? {}).length > 0 ||
-    (inventorySummary?.activeProductsCount ?? 0) > 0;
+    (inventorySummary?.activeProductsCount ?? 0) > 0 ||
+    (accountingSummary?.journalDraftCount ?? 0) > 0 ||
+    (accountingSummary?.journalPostedCount ?? 0) > 0;
 
   const operationalOnboarding = !hasRichData && unreadNotifications === 0;
 
@@ -522,6 +780,26 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
                 },
               ]
             : []),
+          ...(gate.isEnabled("BUDGETS") &&
+          gate.isEnabled("PROJECTS") &&
+          can(ctx.roles, "VIEW", "PROJECTS")
+            ? [
+                {
+                  title: "Cargar un presupuesto",
+                  body:  "En cada proyecto, creá o aprobá una versión para planificar costos y venta.",
+                  href:  "/proyectos",
+                },
+              ]
+            : []),
+          ...(canReadTenantConfig(gate, ctx)
+            ? [
+                {
+                  title: "Revisar módulos activos",
+                  body:  "Equipo, permisos y ajustes generales del tenant.",
+                  href:  "/configuracion",
+                },
+              ]
+            : []),
           ...(gate.isEnabled("ACCOUNTING") && can(ctx.roles, "VIEW", "ACCOUNTING")
             ? [
                 {
@@ -531,7 +809,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
                 },
               ]
             : []),
-          ...(gate.isEnabled("TREASURY") && can(ctx.roles, "VIEW", "TREASURY")
+          ...(gate.isEnabled("TREASURY") && can(ctx.roles, "EDIT", "TREASURY")
             ? [
                 {
                   title: "Configurar tesorería",
@@ -556,18 +834,21 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
 
   return {
     tenantName,
+    subscription,
     generatedAt,
     kpis,
+    projectStatusSlices,
     projectSummary,
     showCostControlHint,
     financeSummary:
       financeSummary && financeSummaryHasData(financeSummary) ? financeSummary : undefined,
     inventorySummary,
+    accountingSummary,
     unreadNotifications,
     showOperationalAlertsLink,
     operationalOnboarding,
     onboardingSteps,
-    warnings: [],
+    warnings,
     quickActions: dedupeQuickActions(quickActions),
   };
 }
@@ -582,11 +863,15 @@ function canReadTenantConfig(
 }
 
 function financeSummaryHasData(f: DashboardFinanceSummary): boolean {
+  if (f.receivablesOpenByCurrency && f.receivablesOpenByCurrency.length > 0) return true;
+  if (f.payablesOpenByCurrency && f.payablesOpenByCurrency.length > 0) return true;
   if (f.receivablesTotal != null && f.receivablesTotal !== "") return true;
   if (f.payablesTotal != null && f.payablesTotal !== "") return true;
   if (f.cashByCurrency && Object.keys(f.cashByCurrency).length > 0) return true;
   if ((f.overdueReceivablesCount ?? 0) > 0) return true;
   if ((f.overduePayablesCount ?? 0) > 0) return true;
+  if ((f.receivablesDueSoonCount ?? 0) > 0) return true;
+  if ((f.payablesDueSoonCount ?? 0) > 0) return true;
   if (f.receivablesMulticurrency || f.payablesMulticurrency || f.cashMulticurrency) return true;
   return false;
 }

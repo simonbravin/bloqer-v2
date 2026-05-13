@@ -8,8 +8,9 @@ const supplierInvoiceLineSchema = z.object({
   sortOrder:   z.number().int().min(0).optional().default(0),
 });
 
+/** projectId null/omit = company-level AP (Phase 16B). Project routes must still pass projectId from URL. */
 export const createSupplierInvoiceSchema = z.object({
-  projectId:         z.string().uuid(),
+  projectId:         z.string().uuid().optional().nullable(),
   supplierContactId: z.string().uuid(),
   issueDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dueDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

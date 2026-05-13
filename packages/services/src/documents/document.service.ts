@@ -201,12 +201,46 @@ export async function initiateDocumentUpload(
     throw new ServiceError("VALIDATION", "El archivo no puede superar 50 MB");
   }
 
-  const project = await prisma.project.findUnique({
-    where:  { id: input.projectId },
-    select: { id: true, tenantId: true },
-  });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  let anchorProjectId: string | null = null;
+  /** Non-null for any path that requires a project (all except corporate supplier-invoice upload). */
+  let strictProjectId: string | undefined;
+
+  if (linkedSupplierInvoice) {
+    const inv = await prisma.supplierInvoice.findUnique({
+      where: { id: linkedSupplierInvoice.supplierInvoiceId },
+      select: { tenantId: true, projectId: true, companyId: true },
+    });
+    if (!inv || inv.tenantId !== ctx.tenantId) {
+      throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
+    }
+    if (inv.projectId) {
+      if (!input.projectId || input.projectId !== inv.projectId) {
+        throw new ServiceError("FORBIDDEN", "La factura no pertenece al proyecto indicado");
+      }
+      anchorProjectId = inv.projectId;
+      strictProjectId   = inv.projectId;
+    } else {
+      if (input.projectId) {
+        throw new ServiceError("VALIDATION", "Esta factura es corporativa: no indique proyecto para el adjunto");
+      }
+      anchorProjectId = null;
+      if (ctx.companyId && inv.companyId !== ctx.companyId) {
+        throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+      }
+    }
+  } else {
+    if (!input.projectId) {
+      throw new ServiceError("VALIDATION", "Proyecto requerido");
+    }
+    const project = await prisma.project.findUnique({
+      where: { id: input.projectId },
+      select: { id: true, tenantId: true },
+    });
+    if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+    if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    anchorProjectId = input.projectId;
+    strictProjectId   = input.projectId;
+  }
 
   let linkedEntityType:
     | "PROJECT"
@@ -218,41 +252,40 @@ export async function initiateDocumentUpload(
     | "SUBCONTRACT"
     | "SUBCONTRACT_CERTIFICATION"
     | "BUDGET" = "PROJECT";
-  let linkedEntityId   = input.projectId;
+  let linkedEntityId = anchorProjectId ?? "";
   if (linkedJobsiteLog) {
-    await assertJobsiteLogDocumentTarget(input.projectId, linkedJobsiteLog.logId, ctx);
+    await assertJobsiteLogDocumentTarget(strictProjectId!, linkedJobsiteLog.logId, ctx);
     linkedEntityType = "JOBSITE_LOG";
     linkedEntityId   = linkedJobsiteLog.logId;
   } else if (linkedCertification) {
-    await assertCertificationDocumentTarget(input.projectId, linkedCertification.certificationId, ctx);
+    await assertCertificationDocumentTarget(strictProjectId!, linkedCertification.certificationId, ctx);
     linkedEntityType = "CERTIFICATION";
     linkedEntityId   = linkedCertification.certificationId;
   } else if (linkedSupplierInvoice) {
-    await assertSupplierInvoiceDocumentTarget(input.projectId, linkedSupplierInvoice.supplierInvoiceId, ctx);
     linkedEntityType = "SUPPLIER_INVOICE";
     linkedEntityId   = linkedSupplierInvoice.supplierInvoiceId;
   } else if (linkedPurchaseOrder) {
-    await assertPurchaseOrderDocumentTarget(input.projectId, linkedPurchaseOrder.purchaseOrderId, ctx);
+    await assertPurchaseOrderDocumentTarget(strictProjectId!, linkedPurchaseOrder.purchaseOrderId, ctx);
     linkedEntityType = "PURCHASE_ORDER";
     linkedEntityId   = linkedPurchaseOrder.purchaseOrderId;
   } else if (linkedPurchaseReceipt) {
-    await assertPurchaseReceiptDocumentTarget(input.projectId, linkedPurchaseReceipt.purchaseReceiptId, ctx);
+    await assertPurchaseReceiptDocumentTarget(strictProjectId!, linkedPurchaseReceipt.purchaseReceiptId, ctx);
     linkedEntityType = "PURCHASE_RECEIPT";
     linkedEntityId   = linkedPurchaseReceipt.purchaseReceiptId;
   } else if (linkedSubcontract) {
-    await assertSubcontractDocumentTarget(input.projectId, linkedSubcontract.subcontractId, ctx);
+    await assertSubcontractDocumentTarget(strictProjectId!, linkedSubcontract.subcontractId, ctx);
     linkedEntityType = "SUBCONTRACT";
     linkedEntityId   = linkedSubcontract.subcontractId;
   } else if (linkedSubcontractCertification) {
     await assertSubcontractCertificationDocumentTarget(
-      input.projectId,
+      strictProjectId!,
       linkedSubcontractCertification.subcontractCertificationId,
       ctx,
     );
     linkedEntityType = "SUBCONTRACT_CERTIFICATION";
     linkedEntityId   = linkedSubcontractCertification.subcontractCertificationId;
   } else if (linkedBudget) {
-    await assertBudgetDocumentTarget(input.projectId, linkedBudget.budgetId, ctx);
+    await assertBudgetDocumentTarget(strictProjectId!, linkedBudget.budgetId, ctx);
     linkedEntityType = "BUDGET";
     linkedEntityId   = linkedBudget.budgetId;
   }
@@ -260,7 +293,7 @@ export async function initiateDocumentUpload(
   const configured = isStorageConfigured();
   const id         = crypto.randomUUID();
   const fileName   = sanitize(input.originalFileName);
-  const storageKey = buildStorageKey(ctx.tenantId, input.projectId, id, input.originalFileName);
+  const storageKey = buildStorageKey(ctx.tenantId, anchorProjectId, id, input.originalFileName);
   const provider   = configured ? "R2" : "PLACEHOLDER";
   const status     = configured ? "UPLOADING" : "ACTIVE";
 
@@ -269,7 +302,7 @@ export async function initiateDocumentUpload(
       id,
       tenantId:         ctx.tenantId,
       companyId:        ctx.companyId ?? null,
-      projectId:        input.projectId,
+      projectId:        anchorProjectId,
       originalFileName: input.originalFileName,
       fileName,
       mimeType:         input.mimeType,
@@ -480,10 +513,14 @@ export async function listEntityDocuments(
     "SUBCONTRACT_CERTIFICATION",
     "BUDGET",
   ] as const;
-  const needsProject = (scoped as readonly string[]).includes(entityType);
+  /** Corporate supplier invoices are listed without a project scope. */
+  const needsProject =
+    (scoped as readonly string[]).includes(entityType) && entityType !== "SUPPLIER_INVOICE";
   if (needsProject && !options?.projectId) {
     throw new ServiceError("VALIDATION", "projectId requerido para listar adjuntos de esta entidad");
   }
+
+  let supplierInvoiceDocScope: { projectId?: string } = {};
 
   if (entityType === "JOBSITE_LOG") {
     if (!can(ctx.roles, "VIEW", "JOBSITE_LOG") && !can(ctx.roles, "VIEW", "PROJECTS")) {
@@ -499,7 +536,8 @@ export async function listEntityDocuments(
     if (!can(ctx.roles, "VIEW", "AP") && !can(ctx.roles, "VIEW", "PROJECTS")) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la factura de proveedor");
     }
-    await assertSupplierInvoiceDocumentTarget(options!.projectId!, entityId, ctx);
+    const { invoiceProjectId } = await assertSupplierInvoiceDocumentTarget(options?.projectId, entityId, ctx);
+    if (invoiceProjectId != null) supplierInvoiceDocScope = { projectId: invoiceProjectId };
   } else if (entityType === "PURCHASE_ORDER") {
     if (!can(ctx.roles, "VIEW", "PROCUREMENT") && !can(ctx.roles, "VIEW", "PROJECTS")) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la orden de compra");
@@ -535,6 +573,7 @@ export async function listEntityDocuments(
       linkedEntityType: entityType as never,
       linkedEntityId:   entityId,
       status:           { not: "DELETED" },
+      ...supplierInvoiceDocScope,
       ...(needsProject && options?.projectId ? { projectId: options.projectId } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -680,20 +719,30 @@ async function assertCertificationDocumentTarget(
 }
 
 async function assertSupplierInvoiceDocumentTarget(
-  projectId:       string,
+  routeProjectId: string | null | undefined,
   supplierInvoiceId: string,
-  ctx:             ServiceContext,
-): Promise<void> {
+  ctx: ServiceContext,
+): Promise<{ invoiceProjectId: string | null }> {
   const inv = await prisma.supplierInvoice.findUnique({
-    where:  { id: supplierInvoiceId },
-    select: { id: true, tenantId: true, projectId: true },
+    where: { id: supplierInvoiceId },
+    select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!inv || inv.tenantId !== ctx.tenantId) {
     throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
   }
-  if (inv.projectId !== projectId) {
-    throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+  if (inv.projectId != null) {
+    if (routeProjectId !== inv.projectId) {
+      throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+    }
+  } else {
+    if (ctx.companyId && inv.companyId !== ctx.companyId) {
+      throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+    }
+    if (routeProjectId != null && routeProjectId !== "") {
+      throw new ServiceError("VALIDATION", "Esta factura es corporativa; no use filtro por proyecto");
+    }
   }
+  return { invoiceProjectId: inv.projectId };
 }
 
 async function assertPurchaseOrderDocumentTarget(

@@ -33,6 +33,7 @@ Usar **migraciones versionadas** alineadas a **Prisma Migrate** contra **Neon Po
 ## Cambios de schema recientes (recordatorio deploy)
 
 - **Phase 13B:** relaciones Prisma / FKs en `Payment` (`supplierContactId`, `supplierInvoiceId`) — aplicar con **`prisma migrate deploy`** (o migración SQL equivalente) antes de usar producción; **no** `db:push` en Neon compartido/prod.
+- **Phase 16B:** `SupplierInvoice`, `Payable`, `Payment` — `projectId` nullable (AP corporativo); `AccountMovement.projectId` nullable (dimensión analítica opcional). Migración `20260513200000_phase_16b_ap_company_project_optional`. Sin backfill: filas existentes conservan `projectId` no nulo.
 
 ## Qué NO hacer
 

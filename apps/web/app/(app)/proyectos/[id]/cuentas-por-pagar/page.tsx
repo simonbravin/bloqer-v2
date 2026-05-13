@@ -32,7 +32,6 @@ export default async function CuentasPorPagarPage({ params }: PageProps) {
 
   const items: PayableListItem[] = payables.map((p) => ({
     id:             p.id,
-    projectId:      p.projectId,
     supplierName:   p.supplierName,
     dueDate:        p.dueDate,
     status:         p.status,

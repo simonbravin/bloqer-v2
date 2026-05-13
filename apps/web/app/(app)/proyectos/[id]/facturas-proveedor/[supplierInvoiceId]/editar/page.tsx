@@ -29,7 +29,7 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
   let invoice, suppliersResult, linkablePOs;
   try {
     [invoice, suppliersResult, linkablePOs] = await Promise.all([
-      getSupplierInvoiceById(supplierInvoiceId, ctx),
+      getSupplierInvoiceById(supplierInvoiceId, ctx, id),
       listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
       listLinkablePurchaseOrders(id, ctx),
     ]);

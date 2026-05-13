@@ -34,7 +34,7 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
 
   let invoice;
   try {
-    invoice = await getSupplierInvoiceById(supplierInvoiceId, ctx);
+    invoice = await getSupplierInvoiceById(supplierInvoiceId, ctx, id);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;

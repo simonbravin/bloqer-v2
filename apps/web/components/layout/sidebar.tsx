@@ -20,9 +20,12 @@ export function Sidebar({ tenantName, roles, moduleGateSnapshot }: SidebarProps)
   const mainNav = filterMainNav(roles, { isTenantModuleEnabled: (m) => gate.isEnabled(m) });
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r bg-background px-3 py-4">
-      <div className="mb-6 px-3">
-        <Link href="/dashboard" className="inline-block outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+      <div className="border-b border-sidebar-border/80 px-4 py-5">
+        <Link
+          href="/dashboard"
+          className="inline-block rounded-md outline-none ring-offset-sidebar focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <Image
             src="/bloqer-logo.png"
             alt="Bloqer"
@@ -32,11 +35,13 @@ export function Sidebar({ tenantName, roles, moduleGateSnapshot }: SidebarProps)
             className="h-8 w-auto max-w-[9.5rem] object-contain object-left"
           />
         </Link>
-        {tenantName && (
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">{tenantName}</p>
-        )}
+        {tenantName ? (
+          <p className="mt-2 truncate text-xs font-medium leading-snug text-muted-foreground" title={tenantName}>
+            {tenantName}
+          </p>
+        ) : null}
       </div>
-      <nav className="flex flex-1 flex-col gap-1">
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-3">
         {mainNav.map((item) => (
           <NavItem key={item.href} href={item.href} label={item.label} />
         ))}

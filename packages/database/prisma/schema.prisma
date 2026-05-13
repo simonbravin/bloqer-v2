@@ -837,6 +837,7 @@ model Project {
   supplierInvoices SupplierInvoice[]
   payables         Payable[]
   payments         Payment[]
+  accountMovements AccountMovement[]
   purchaseOrders   PurchaseOrder[]
   purchaseReceipts PurchaseReceipt[]
   warehouses       Warehouse[]
@@ -1307,11 +1308,14 @@ model TreasuryAccount {
 // BR-TRZ-003: movements in a closed period cannot be mutated.
 // No DRAFT state — movements created directly as CONFIRMED.
 // No RECONCILED state yet — added in Bank Reconciliation phase.
+// Phase 16B: optional project dimension for reporting / manual classification.
+// Movements from Collection/Payment keep projectId null unless explicitly set later; avoid duplicating source truth.
 model AccountMovement {
   id           String                   @id @default(uuid())
   tenantId     String
   companyId    String?
   accountId    String
+  projectId    String?
   movementDate DateTime                 @db.Date
   type         AccountMovementType
   sourceType   AccountMovementSourceType
@@ -1327,10 +1331,12 @@ model AccountMovement {
 
   tenant  Tenant          @relation(fields: [tenantId], references: [id])
   account TreasuryAccount @relation(fields: [accountId], references: [id])
+  project Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, accountId, movementDate])
   @@index([tenantId, sourceType, sourceId])
   @@index([transferId])
+  @@index([tenantId, projectId])
   @@map("account_movements")
 }
 
@@ -1406,11 +1412,12 @@ model InternalTransfer {
 // BR-AP-002: ISSUED invoice creates Payable atomically.
 // BR-AP-003: CANCELLED invoice cancels Payable if no active Payments exist.
 
+// Phase 16B: projectId null = company-level AP (general expenses), not a fake project.
 model SupplierInvoice {
   id                String                @id @default(uuid())
   tenantId          String
   companyId         String
-  projectId         String
+  projectId         String?
   supplierContactId String
   number            Int
   issueDate         DateTime              @db.Date
@@ -1434,7 +1441,7 @@ model SupplierInvoice {
 
   tenant                    Tenant               @relation(fields: [tenantId], references: [id])
   company                   Company              @relation(fields: [companyId], references: [id])
-  project                   Project              @relation(fields: [projectId], references: [id])
+  project                   Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
   supplierContact           Contact              @relation(fields: [supplierContactId], references: [id])
   purchaseOrder             PurchaseOrder?       @relation(fields: [purchaseOrderId], references: [id])
   subcontractCertification  SubcontractCertification? @relation(fields: [subcontractCertificationId], references: [id])
@@ -1477,7 +1484,7 @@ model Payable {
   id                String        @id @default(uuid())
   tenantId          String
   companyId         String
-  projectId         String
+  projectId         String?
   supplierContactId String
   supplierInvoiceId String        @unique
   issueDate         DateTime      @db.Date
@@ -1494,7 +1501,7 @@ model Payable {
 
   tenant          Tenant          @relation(fields: [tenantId], references: [id])
   company         Company         @relation(fields: [companyId], references: [id])
-  project         Project         @relation(fields: [projectId], references: [id])
+  project         Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   supplierContact Contact         @relation(fields: [supplierContactId], references: [id])
   supplierInvoice SupplierInvoice @relation(fields: [supplierInvoiceId], references: [id])
   payments        Payment[]
@@ -1512,7 +1519,7 @@ model Payment {
   id                String        @id @default(uuid())
   tenantId          String
   companyId         String
-  projectId         String
+  projectId         String?
   supplierContactId String
   payableId         String
   supplierInvoiceId String
@@ -1529,7 +1536,7 @@ model Payment {
 
   tenant          Tenant          @relation(fields: [tenantId], references: [id])
   company         Company         @relation(fields: [companyId], references: [id])
-  project         Project         @relation(fields: [projectId], references: [id])
+  project         Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   supplierContact Contact         @relation(fields: [supplierContactId], references: [id])
   payable         Payable         @relation(fields: [payableId], references: [id])
   supplierInvoice SupplierInvoice @relation(fields: [supplierInvoiceId], references: [id])

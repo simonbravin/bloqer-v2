@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
 Last updated: 2026-05-13  
-Status: Phase **15B** — resumen de proyecto: `getProjectOverviewDashboard` + UI `ProjectOverviewView` (`apps/web/features/projects/overview/`); `/proyectos/[id]` panel con KPIs reales (AR/AP vía `getProjectFinanceOverview` con `options?.gate` para un solo `getTenantModuleGate` en la cadena overview+finance), presupuesto aprobado, conteos, facturado vs cobrado (sin FX). Sobre **15A** (workspace sidebar). Doc: [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md). Sin `db:push`; verificar `db:generate` + typecheck + lint + build en CI local.
+Status: Phase **16B** — AP corporativo (`projectId` nullable) + `AccountMovement.projectId` + migración; **auditoría 16B.1:** alcance proyecto en **get/update/issue/cancel** factura, **get** C×P/pago y **create/cancel** pago; Zod en `initiateUpload` para adjuntos no-SUPPLIER_INVOICE; alineación proyecto/`ctx.companyId` en alta factura. Ver [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) §16B.6.
 
 ---
 
@@ -69,8 +69,11 @@ Status: Phase **15B** — resumen de proyecto: `getProjectOverviewDashboard` + U
 | Phase 14E | Hub `/proyectos/[id]/finanzas` — `getProjectFinanceOverview` (aging AR/AP con `projectId` o agregados desde listados; sin mezclar monedas); UI + link subnav | Complete |
 | Phase 15A | Navegación workspace proyecto: sidebar contextual agrupada; `buildProjectWorkspaceNavSections`; API shell; sin `ProjectSubnav` horizontal | Complete |
 | Phase 15B | Resumen `/proyectos/[id]`: `getProjectOverviewDashboard` + vista ejecutiva (KPIs, avisos, actividad, enlaces) | Complete |
+| Phase 15C | Dashboard tenant `/dashboard`: `getTenantDashboard` ampliado + UI modular (KPIs, finanzas por moneda, proyectos, inventario, contabilidad, onboarding) | Complete |
+| Phase 16A | Finanzas Empresa — auditoría schema/servicios + arquitectura objetivo + fases 16B–16F (solo docs) | Complete (doc) |
+| Phase 16B | AP corporativo: `projectId` nullable en `SupplierInvoice`/`Payable`/`Payment`; `AccountMovement.projectId`; migración; servicios/validators/aging/docs; sin UI global alta (16C) | Complete |
 
-**Siguiente (sugerido):** producto: `projectId` nullable / `AccountMovement`; módulo gastos / `Expense` si aplica. Deploy: Neon + Vercel, [`DEPLOYMENT_SMOKE_TEST.md`](./08-architecture/DEPLOYMENT_SMOKE_TEST.md).
+**Siguiente (sugerido):** **16C** — hub `/finanzas` + flujo de alta factura proveedor corporativa (`projectId` null) + revalidaciones. Opcional: política de relleno de `AccountMovement.projectId` desde pagos/cobros. Deploy: aplicar migración Neon + Vercel, [`DEPLOYMENT_SMOKE_TEST.md`](./08-architecture/DEPLOYMENT_SMOKE_TEST.md).
 
 ---
 

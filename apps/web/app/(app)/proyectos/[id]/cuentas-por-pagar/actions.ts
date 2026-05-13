@@ -37,7 +37,7 @@ export async function createPaymentAction(
   const parsed = createPaymentSchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
-    const payment = await createPayment(parsed.data, ctx);
+    const payment = await createPayment(parsed.data, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/pagos`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);
     return { id: payment.id };
@@ -52,7 +52,7 @@ export async function cancelPaymentAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await cancelPayment(paymentId, ctx);
+    await cancelPayment(paymentId, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/pagos`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);
     return { ok: true };

@@ -20,11 +20,14 @@ export type AgingFilters = {
   search?: string;
 };
 
+/** Display label in aging rows when AP line has no project (es-AR product copy). */
+export const AGING_AP_COMPANY_PROJECT_LABEL = "Empresa (general)";
+
 export type AgingItem = {
   id: string;
   invoiceId: string;
   invoiceNumber: number;
-  projectId: string;
+  projectId: string | null;
   projectName: string;
   issueDate: string;
   dueDate: string;
@@ -265,7 +268,7 @@ export async function getPayableAgingReport(
 
     const contactName   = p.supplierContact.fantasyName ?? p.supplierContact.legalName;
     const invoiceNumber = p.supplierInvoice.number;
-    const projectName   = p.project.name;
+    const projectName   = p.project?.name ?? AGING_AP_COMPANY_PROJECT_LABEL;
 
     if (filters.search && !matchesSearch(filters.search, contactName, invoiceNumber, projectName)) continue;
 

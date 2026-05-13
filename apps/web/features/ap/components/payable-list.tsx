@@ -5,7 +5,6 @@ import { PayableStatusBadge } from "./payable-status-badge";
 
 export type PayableListItem = {
   id: string;
-  projectId: string;
   supplierName: string;
   dueDate: Date;
   status: string;

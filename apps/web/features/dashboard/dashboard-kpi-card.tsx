@@ -22,7 +22,7 @@ const toneValue: Record<NonNullable<DashboardKpi["tone"]>, string> = {
 export function DashboardKpiCard({ kpi }: { kpi: DashboardKpi }) {
   const tone = kpi.tone ?? "default";
   const inner = (
-    <Card className={cn("border-l-4 shadow-sm", toneBorder[tone])}>
+    <Card className={cn("rounded-xl border bg-card border-l-4 shadow-sm transition-shadow duration-200", toneBorder[tone])}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{kpi.label}</CardTitle>
       </CardHeader>
@@ -35,7 +35,10 @@ export function DashboardKpiCard({ kpi }: { kpi: DashboardKpi }) {
 
   if (kpi.href) {
     return (
-      <Link href={kpi.href} className="block outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring rounded-lg">
+      <Link
+        href={kpi.href}
+        className="block rounded-xl outline-none ring-offset-background transition-shadow duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring"
+      >
         {inner}
       </Link>
     );

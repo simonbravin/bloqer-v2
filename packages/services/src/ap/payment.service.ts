@@ -13,7 +13,12 @@ export type PaymentView = Omit<Payment, "amount"> & {
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
-export async function getPaymentById(id: string, ctx: ServiceContext): Promise<PaymentView> {
+export async function getPaymentById(
+  id: string,
+  ctx: ServiceContext,
+  /** When set (project workspace routes), corporate payments and cross-project IDs are rejected. */
+  projectScopeId?: string,
+): Promise<PaymentView> {
   await assertApTenantModule(ctx);
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver pagos");
@@ -24,6 +29,9 @@ export async function getPaymentById(id: string, ctx: ServiceContext): Promise<P
   });
   if (!p) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");
+  }
   return serialize(p);
 }
 
@@ -64,6 +72,8 @@ export async function listPaymentsByPayable(
 export async function createPayment(
   input: CreatePaymentInput,
   ctx: ServiceContext,
+  /** When set, blocks paying corporate payables from a project workspace action. */
+  projectScopeId?: string,
 ): Promise<PaymentView> {
   await assertApTenantModule(ctx);
   if (!can(ctx.roles, "EDIT", "AP")) {
@@ -80,6 +90,9 @@ export async function createPayment(
     const payable = await tx.payable.findUnique({ where: { id: input.payableId } });
     if (!payable) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
     if (payable.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    if (projectScopeId !== undefined && payable.projectId !== projectScopeId) {
+      throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
+    }
     if (payable.status === "CANCELLED") {
       throw new ServiceError("CONFLICT", "No se puede pagar una cuenta por pagar cancelada");
     }
@@ -182,7 +195,12 @@ export async function createPayment(
   return serialize(result);
 }
 
-export async function cancelPayment(id: string, ctx: ServiceContext): Promise<Payment> {
+export async function cancelPayment(
+  id: string,
+  ctx: ServiceContext,
+  /** When set, rejects cancelling corporate payments from a project workspace action. */
+  projectScopeId?: string,
+): Promise<Payment> {
   await assertApTenantModule(ctx);
   if (!can(ctx.roles, "EDIT", "AP")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar pagos");
@@ -192,6 +210,9 @@ export async function cancelPayment(id: string, ctx: ServiceContext): Promise<Pa
     const p = await tx.payment.findUnique({ where: { id } });
     if (!p) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
     if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
+      throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");
+    }
     if (p.status === "CANCELLED") {
       throw new ServiceError("CONFLICT", "El pago ya está cancelado");
     }

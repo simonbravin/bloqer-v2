@@ -47,6 +47,8 @@ export function assertSupplierInvoiceEditable(invoice: SupplierInvoice): void {
 export async function getSupplierInvoiceById(
   id: string,
   ctx: ServiceContext,
+  /** When set (project workspace routes), corporate invoices (projectId null) and cross-project IDs are rejected. */
+  projectScopeId?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
   if (!canViewApProjectArea(ctx.roles)) {
@@ -61,6 +63,9 @@ export async function getSupplierInvoiceById(
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
   if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && inv.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+  }
   return serializeInvoice(inv);
 }
 
@@ -87,12 +92,21 @@ export async function listSupplierInvoicesByProject(
   return invoices.map(serializeInvoice);
 }
 
-// ─── Resolve company ──────────────────────────────────────────────────────────
+// ─── Resolve company (AP) ─────────────────────────────────────────────────────
 
-async function resolveCompanyId(projectId: string, ctx: ServiceContext): Promise<string> {
+/** companyId anchor: membership company, else project.company, else first ACTIVE company in tenant. */
+async function resolveCompanyIdForAp(
+  projectId: string | null | undefined,
+  ctx: ServiceContext,
+): Promise<string> {
   if (ctx.companyId) return ctx.companyId;
-  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { companyId: true } });
-  if (project?.companyId) return project.companyId;
+  if (projectId) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { companyId: true },
+    });
+    if (project?.companyId) return project.companyId;
+  }
   const company = await prisma.company.findFirst({
     where: { tenantId: ctx.tenantId, status: "ACTIVE" },
     orderBy: { createdAt: "asc" },
@@ -112,9 +126,19 @@ export async function createSupplierInvoice(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas de proveedor");
   }
 
-  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  const projectId = input.projectId ?? null;
+
+  if (projectId) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { tenantId: true, companyId: true },
+    });
+    if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+    if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    if (ctx.companyId && project.companyId && project.companyId !== ctx.companyId) {
+      throw new ServiceError("FORBIDDEN", "El proyecto no pertenece a la empresa activa");
+    }
+  }
 
   // BR-AP-001: validate supplier role
   const supplierRole = await prisma.contactRole.findUnique({
@@ -124,8 +148,11 @@ export async function createSupplierInvoice(
     throw new ServiceError("CONFLICT", "El contacto seleccionado no tiene rol de proveedor activo");
   }
 
-  // Optional PO link: validate supplier/project/company/currency consistency
+  // Optional PO link: only when invoice is project-scoped (OC always belongs to a project)
   if (input.purchaseOrderId) {
+    if (!projectId) {
+      throw new ServiceError("CONFLICT", "Una orden de compra solo puede vincularse a una factura con proyecto");
+    }
     const po = await prisma.purchaseOrder.findUnique({ where: { id: input.purchaseOrderId } });
     if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
     if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -135,7 +162,7 @@ export async function createSupplierInvoice(
     if (po.status === "DRAFT") {
       throw new ServiceError("CONFLICT", "No se puede vincular a una orden de compra en borrador");
     }
-    if (po.projectId !== input.projectId) {
+    if (po.projectId !== projectId) {
       throw new ServiceError("CONFLICT", "La orden de compra no pertenece al mismo proyecto");
     }
     if (po.supplierContactId !== input.supplierContactId) {
@@ -146,7 +173,7 @@ export async function createSupplierInvoice(
     }
   }
 
-  const companyId = await resolveCompanyId(input.projectId, ctx);
+  const companyId = await resolveCompanyIdForAp(projectId, ctx);
 
   const maxNum = await prisma.supplierInvoice.aggregate({
     where: { tenantId: ctx.tenantId, companyId },
@@ -159,7 +186,7 @@ export async function createSupplierInvoice(
       data: {
         tenantId:          ctx.tenantId,
         companyId,
-        projectId:         input.projectId,
+        projectId:         projectId,
         supplierContactId: input.supplierContactId,
         number,
         issueDate:         new Date(input.issueDate),
@@ -210,7 +237,7 @@ export async function createSupplierInvoice(
     action: "supplier_invoice.created",
     entityType: "SupplierInvoice",
     entityId: inv.id,
-    after: { number, projectId: input.projectId },
+    after: { number, projectId },
     ipAddress: ctx.ipAddress,
   });
 
@@ -221,6 +248,8 @@ export async function updateSupplierInvoice(
   id: string,
   input: UpdateSupplierInvoiceInput,
   ctx: ServiceContext,
+  /** When set, rejects corporate invoices and cross-project edits (project workspace). */
+  projectScopeId?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
   if (!can(ctx.roles, "EDIT", "AP")) {
@@ -230,6 +259,9 @@ export async function updateSupplierInvoice(
   const existing = await prisma.supplierInvoice.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && existing.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+  }
   assertSupplierInvoiceEditable(existing);
 
   if (input.supplierContactId && input.supplierContactId !== existing.supplierContactId) {
@@ -243,6 +275,9 @@ export async function updateSupplierInvoice(
 
   // Optional PO link validation on update
   if (input.purchaseOrderId !== undefined && input.purchaseOrderId !== null) {
+    if (!existing.projectId) {
+      throw new ServiceError("CONFLICT", "No se puede vincular una orden de compra a una factura corporativa sin proyecto");
+    }
     const po = await prisma.purchaseOrder.findUnique({ where: { id: input.purchaseOrderId } });
     if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
     if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -326,6 +361,8 @@ export async function updateSupplierInvoice(
 export async function issueSupplierInvoice(
   id: string,
   ctx: ServiceContext,
+  /** When set, rejects corporate invoices and cross-project issue (project workspace). */
+  projectScopeId?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
   if (!can(ctx.roles, "EDIT", "AP")) {
@@ -336,6 +373,9 @@ export async function issueSupplierInvoice(
     const inv = await tx.supplierInvoice.findUnique({ where: { id } });
     if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
     if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    if (projectScopeId !== undefined && inv.projectId !== projectScopeId) {
+      throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+    }
     if (inv.status !== "DRAFT") {
       throw new ServiceError("CONFLICT", "Solo se pueden emitir facturas en estado Borrador");
     }
@@ -400,6 +440,8 @@ export async function issueSupplierInvoice(
 export async function cancelSupplierInvoice(
   id: string,
   ctx: ServiceContext,
+  /** When set, rejects corporate invoices and cross-project cancel (project workspace). */
+  projectScopeId?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
   if (!can(ctx.roles, "EDIT", "AP")) {
@@ -410,6 +452,9 @@ export async function cancelSupplierInvoice(
     const inv = await tx.supplierInvoice.findUnique({ where: { id } });
     if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
     if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    if (projectScopeId !== undefined && inv.projectId !== projectScopeId) {
+      throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+    }
     if (inv.status === "CANCELLED") {
       throw new ServiceError("CONFLICT", "La factura ya está cancelada");
     }

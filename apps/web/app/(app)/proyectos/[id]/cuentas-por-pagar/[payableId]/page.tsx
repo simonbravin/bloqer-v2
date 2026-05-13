@@ -30,7 +30,7 @@ export default async function PayableDetailPage({ params }: PageProps) {
   let payments;
   try {
     [payable, payments] = await Promise.all([
-      getPayableById(payableId, ctx),
+      getPayableById(payableId, ctx, id),
       listPaymentsByPayable(payableId, ctx),
     ]);
   } catch (err) {
