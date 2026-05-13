@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { NavItem } from "@/features/shell/components/nav-item";
+import { tenantGateFromSnapshot } from "@/features/projects/tenant-gate-from-snapshot";
 import type { PermissionModule, UserRole } from "@bloqer/domain";
 import { filterMainNav } from "@/lib/nav-config";
 
@@ -10,12 +11,13 @@ interface SidebarProps {
   tenantName?: string;
   /** Membership roles; empty = only items without `require` (e.g. Inicio) */
   roles: UserRole[];
-  /** Phase 12B: optional tenant module gate from server layout */
-  tenantModuleIsEnabled?: (module: PermissionModule) => boolean;
+  /** Phase 12B / 15A: serialized tenant module flags (default-on when key missing). */
+  moduleGateSnapshot?: Partial<Record<PermissionModule, boolean>>;
 }
 
-export function Sidebar({ tenantName, roles, tenantModuleIsEnabled }: SidebarProps) {
-  const mainNav = filterMainNav(roles, { isTenantModuleEnabled: tenantModuleIsEnabled });
+export function Sidebar({ tenantName, roles, moduleGateSnapshot }: SidebarProps) {
+  const gate = tenantGateFromSnapshot(moduleGateSnapshot ?? {});
+  const mainNav = filterMainNav(roles, { isTenantModuleEnabled: (m) => gate.isEnabled(m) });
 
   return (
     <aside className="flex h-full w-60 flex-col border-r bg-background px-3 py-4">

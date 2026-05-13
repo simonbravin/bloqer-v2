@@ -35,19 +35,16 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
     showPlatformLink = false;
   }
 
-  let tenantModuleIsEnabled: ((m: PermissionModule) => boolean) | undefined;
   let moduleGateSnapshot: Partial<Record<PermissionModule, boolean>> | undefined;
   if (current.tenantCtx) {
     const ctx = await buildTenantServiceContext();
     if (ctx) {
       try {
         const gate = await getTenantModuleGate(ctx);
-        tenantModuleIsEnabled = (m) => gate.isEnabled(m);
         moduleGateSnapshot = Object.fromEntries(
           OVERVIEW_MODULES.map((m) => [m, gate.isEnabled(m)]),
         ) as Record<PermissionModule, boolean>;
       } catch {
-        tenantModuleIsEnabled = undefined;
         moduleGateSnapshot = {};
       }
     } else {
@@ -61,7 +58,6 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
       tenantCtx={current.tenantCtx}
       notificationUnreadCount={notificationUnreadCount}
       showPlatformLink={showPlatformLink}
-      tenantModuleIsEnabled={tenantModuleIsEnabled}
       moduleGateSnapshot={moduleGateSnapshot}
     >
       {children}

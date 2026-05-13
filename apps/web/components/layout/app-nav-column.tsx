@@ -8,7 +8,6 @@ import { Sidebar } from "./sidebar";
 interface AppNavColumnProps {
   tenantName?: string;
   roles: UserRole[];
-  tenantModuleIsEnabled?: (module: PermissionModule) => boolean;
   /** Serialized tenant module flags; omitted keys default to enabled (same as server gate). */
   moduleGateSnapshot?: Partial<Record<PermissionModule, boolean>>;
   /** When false, never swap to project workspace (e.g. user without tenant membership). */
@@ -18,7 +17,6 @@ interface AppNavColumnProps {
 export function AppNavColumn({
   tenantName,
   roles,
-  tenantModuleIsEnabled,
   moduleGateSnapshot,
   isTenantUser,
 }: AppNavColumnProps) {
@@ -37,7 +35,5 @@ export function AppNavColumn({
     );
   }
 
-  return (
-    <Sidebar tenantName={tenantName} roles={roles} tenantModuleIsEnabled={tenantModuleIsEnabled} />
-  );
+  return <Sidebar tenantName={tenantName} roles={roles} moduleGateSnapshot={moduleGateSnapshot} />;
 }

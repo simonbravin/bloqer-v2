@@ -9,9 +9,7 @@ interface AppLayoutProps {
   tenantCtx: TenantContext | null;
   notificationUnreadCount?: number;
   showPlatformLink?: boolean;
-  /** Phase 12B */
-  tenantModuleIsEnabled?: (module: PermissionModule) => boolean;
-  /** Phase 15A: serialized tenant module flags for project workspace nav (omit when no tenant). */
+  /** Phase 12B / 15A: serialized tenant module flags for nav (global sidebar + project workspace). */
   moduleGateSnapshot?: Partial<Record<PermissionModule, boolean>>;
   children: React.ReactNode;
 }
@@ -21,7 +19,6 @@ export function AppLayout({
   tenantCtx,
   notificationUnreadCount = 0,
   showPlatformLink = false,
-  tenantModuleIsEnabled,
   moduleGateSnapshot,
   children,
 }: AppLayoutProps) {
@@ -32,7 +29,6 @@ export function AppLayout({
       <AppNavColumn
         tenantName={tenantCtx?.tenantName}
         roles={roles}
-        tenantModuleIsEnabled={tenantModuleIsEnabled}
         moduleGateSnapshot={moduleGateSnapshot}
         isTenantUser={Boolean(tenantCtx)}
       />
