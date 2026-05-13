@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
-Last updated: 2026-05-11  
-Status: Phase **13E–13G** — **Pre-infra hardening**: auditoría Prisma/ERD ([`PRISMA_ERD_AUDIT.md`](./08-architecture/PRISMA_ERD_AUDIT.md)); auditoría permisos documentada (`PERMISSIONS_MATRIX.md`, `PERMISSIONS_ROUTE_MATRIX.md`, `SECURITY_ARCHITECTURE.md`); gate de módulo tenant **`JOBSITE_LOG`** en `jobsite-log.service.ts` (`assertJobsiteLogTenantModule`). Sin `db:push` ni schema. `db:generate` + typecheck + lint + build verdes tras 13G.
+Last updated: 2026-05-13  
+Status: Phase **14A** — **SaaS onboarding / trial tenant**: ruta `/onboarding` (wizard sin shell lateral), `completeTrialOnboarding` en `packages/services/src/onboarding/` + validators Zod; Prisma `Company` ampliada (dirección, ciudad, país, teléfono, web, rubro, tamaño) + migración `20260513140000_phase_14a_company_onboarding_fields`; layout `(app)` redirige a `/onboarding` si no hay membresía ACTIVE y el usuario no es superadmin de plataforma. Ver [`SAAS_ONBOARDING_ARCHITECTURE.md`](./08-architecture/SAAS_ONBOARDING_ARCHITECTURE.md). Sin Stripe en esta fase. Sin `db:push`; `db:generate` + typecheck + lint + build verdes.
 
 ---
 
@@ -60,6 +60,7 @@ Status: Phase **13E–13G** — **Pre-infra hardening**: auditoría Prisma/ERD (
 | Phase 13A | Estabilización / QA: rutas sin Prisma en páginas libro/subcontratos; pick lists en servicios; typecheck + lint + build | Complete |
 | Phase 13C.1 | Normalización URLs plataforma: todo bajo `/platform/*`; filesystem `app/(platform)/platform/tenants/...` | Complete |
 | Phase 13E–13G | Auditoría ERD Prisma; permisos/módulos doc; gate servicio `JOBSITE_LOG` en libro de obra | Complete |
+| Phase 14A | Onboarding SaaS: usuario autenticado sin membresía ACTIVE → `/onboarding`; alta transaccional tenant + company + membresía OWNER + trial 30 días + `TenantModuleSetting` explícitos + `AuditLog` | Complete |
 
 **Siguiente (sugerido):** Crear Neon + proyecto Vercel, variables de entorno, `migrate deploy`, seed/bootstrap si aplica, smoke test [`DEPLOYMENT_SMOKE_TEST.md`](./08-architecture/DEPLOYMENT_SMOKE_TEST.md); QA manual por rol / módulos deshabilitados.
 
@@ -97,6 +98,7 @@ Ver matrices: `PERMISSIONS_ROUTE_MATRIX.md`, `SECURITY_ARCHITECTURE.md`.
 /configuracion/equipo/[membershipId]
 /configuracion/permisos
 /invitaciones/aceptar
+/onboarding
 /platform
 /platform/tenants
 /platform/tenants/[tenantId]

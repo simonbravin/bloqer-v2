@@ -6,7 +6,7 @@ Phase **12C (pass 1):** además de `can()`, los **servicios** listados bajo “T
 
 Phase **12D:** reportes multi-módulo (`project-cash-flow`, `cost-control`) y mutaciones en `document.service` usan `getTenantModuleGate` / `assertTenantModuleEnabledWithGate` según política en la tabla “Phase 12D — implemented”; exclusiones parciales con `sectionsExcluded` / `warnings.sectionsExcluded`. Sin gate global en lecturas de documentos.
 
-Phase **13E:** auditoría Prisma/ERD documentada en [`PRISMA_ERD_AUDIT.md`](./PRISMA_ERD_AUDIT.md) (sin cambios de schema en esa fase). Phase **13F:** cierre de decisiones RBAC/módulos en esta matriz + [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md) + [`SECURITY_ARCHITECTURE.md`](./SECURITY_ARCHITECTURE.md). Phase **13G:** gate de módulo tenant **`JOBSITE_LOG`** en `jobsite-log.service.ts` (antes de `can()`), alineado a mutaciones de documentos enlazados a libro de obra.
+Phase **13E:** auditoría Prisma/ERD documentada en [`PRISMA_ERD_AUDIT.md`](./PRISMA_ERD_AUDIT.md) (sin cambios de schema en esa fase). Phase **13F:** cierre de decisiones RBAC/módulos en esta matriz + [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md) + [`SECURITY_ARCHITECTURE.md`](./SECURITY_ARCHITECTURE.md). Phase **13G:** gate de módulo tenant **`JOBSITE_LOG`** en `jobsite-log.service.ts` (antes de `can()`), alineado a mutaciones de documentos enlazados a libro de obra. Phase **14A:** ruta **`/onboarding`** — wizard de alta del primer tenant (sin shell lateral); acceso solo usuario autenticado sin membresía ACTIVE (redirección desde layout `(app)`); sin permisos RBAC de tenant previos; superadmin de plataforma sin tenant no es forzado a onboarding.
 
 AR project gates: `packages/services/src/ar/ar-access.ts` (`canViewArProjectArea`, `canEditArArea`).
 
@@ -63,10 +63,16 @@ Phase **12B:** si no existe fila en `tenant_module_settings` para un `moduleKey`
 
 Removed dead links: `/compras`, `/reportes` (no routes in App Router). **`/configuracion`** is implemented (Phase 10B–10C — tenant settings, team, invitations; not the platform shell).
 
+## SaaS trial onboarding (Phase 14A)
+
+| Route | Access | Notes |
+|-------|--------|-------|
+| `/onboarding` | Authenticated **NextAuth** session; user must **not** have `UserMembership` with `status=ACTIVE` (server check en página + servicio) | Wizard sin sidebar: crea `Tenant` (trial 30 días), `Company`, membresía **OWNER** + `TenantModuleSetting` para todos los `OVERVIEW_MODULES`. Usuario con membresía ACTIVE → redirect `/dashboard`. Superadmin de plataforma sin tenant **no** es redirigido aquí desde `(app)` (puede usar `/platform`). Server Action + `completeTrialOnboarding` en `@bloqer/services`; validación Zod en `@bloqer/validators`. |
+
 ## In-app notifications (Phase 8A–8D)
 
 | Route | Access | Notes |
-|-------|--------|--------|
+|-------|--------|-------|
 | `/notificaciones` | Authenticated user with active tenant membership | Personal inbox only; **not** gated on `VIEW NOTIFICATIONS` |
 | `/notificaciones/alertas` | **OWNER** or **ADMIN** on active tenant membership (`canRunOperationalAlerts`) | Manual operational alert runner; others get `notFound()` |
 | `/api/cron/operational-alerts` | **No session.** Valid `CRON_SECRET` via `Authorization: Bearer` or `x-cron-secret` | Server-to-server / Vercel Cron; optional `?tenantId=` (UUID, ACTIVE only); respuesta agregada sin PII ([`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md)) |

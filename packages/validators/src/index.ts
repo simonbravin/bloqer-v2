@@ -17,3 +17,4 @@ export * from "./tenant-settings";
 export * from "./tenant-invitations";
 export * from "./accounting";
 export * from "./accounting-mapping";
+export * from "./onboarding";

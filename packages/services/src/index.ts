@@ -69,3 +69,4 @@ export * from "./tenant-modules/tenant-module.service";
 export * from "./tenant-modules/tenant-module-enforcement";
 export * from "./tenant-modules/tenant-module-report-warnings";
 export * from "./platform/platform-tenant-module.service";
+export * from "./onboarding/onboarding.service";

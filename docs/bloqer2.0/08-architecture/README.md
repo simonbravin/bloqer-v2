@@ -54,20 +54,21 @@ Traducir la **fuente de verdad funcional** (producto, dominio, finanzas, fórmul
 37. [`AGENT_GUARDRAILS.md`](./AGENT_GUARDRAILS.md) — Límites duros para agentes.  
 38. [`TESTING_STRATEGY.md`](./TESTING_STRATEGY.md) — Pirámide y prioridades.  
 39. [`CODE_REVIEW_CHECKLIST.md`](./CODE_REVIEW_CHECKLIST.md) — Checklist de PR.  
-40. [`PENDING_ARCHITECTURE_ITEMS.md`](./PENDING_ARCHITECTURE_ITEMS.md) — **Pendientes técnicos** a cerrar (ERD, API, repo).
+40. [`PENDING_ARCHITECTURE_ITEMS.md`](./PENDING_ARCHITECTURE_ITEMS.md) — **Pendientes técnicos** a cerrar (ERD, API, repo).  
+41. [`SAAS_ONBOARDING_ARCHITECTURE.md`](./SAAS_ONBOARDING_ARCHITECTURE.md) — Alta primer tenant / trial SaaS (Phase 14A).
 
 ### Roadmap de implementación (Prompt 4)
 
-41. [`IMPLEMENTATION_ROADMAP.md`](./IMPLEMENTATION_ROADMAP.md) — Visión por fases 0–5 y **qué construir primero**.  
-42. [`MVP_TECHNICAL_SCOPE.md`](./MVP_TECHNICAL_SCOPE.md) — Primer hito piloto técnico.  
-43. [`PHASE_0_PROJECT_SETUP.md`](./PHASE_0_PROJECT_SETUP.md) — Setup repo y tooling.  
-44. [`PHASE_1_FOUNDATION.md`](./PHASE_1_FOUNDATION.md) — Auth, tenant, DB base.  
-45. [`PHASE_2_CORE_OPERATIONS.md`](./PHASE_2_CORE_OPERATIONS.md) — Obra, presupuesto, certificaciones.  
-46. [`PHASE_3_FINANCE_TREASURY.md`](./PHASE_3_FINANCE_TREASURY.md) — Ledger, AR/AP, cobranzas/pagos.  
-47. [`PHASE_4_REPORTING.md`](./PHASE_4_REPORTING.md) — Compras, inventario, reportes, dashboards.  
-48. [`PHASE_5_HARDENING.md`](./PHASE_5_HARDENING.md) — Tests, perf, observabilidad.  
-49. [`DEPLOYMENT_PLAN.md`](./DEPLOYMENT_PLAN.md) — Entornos y despliegue.  
-50. [`RISK_REGISTER.md`](./RISK_REGISTER.md) — Riesgos de implementación.
+42. [`IMPLEMENTATION_ROADMAP.md`](./IMPLEMENTATION_ROADMAP.md) — Visión por fases 0–5 y **qué construir primero**.  
+43. [`MVP_TECHNICAL_SCOPE.md`](./MVP_TECHNICAL_SCOPE.md) — Primer hito piloto técnico.  
+44. [`PHASE_0_PROJECT_SETUP.md`](./PHASE_0_PROJECT_SETUP.md) — Setup repo y tooling.  
+45. [`PHASE_1_FOUNDATION.md`](./PHASE_1_FOUNDATION.md) — Auth, tenant, DB base.  
+46. [`PHASE_2_CORE_OPERATIONS.md`](./PHASE_2_CORE_OPERATIONS.md) — Obra, presupuesto, certificaciones.  
+47. [`PHASE_3_FINANCE_TREASURY.md`](./PHASE_3_FINANCE_TREASURY.md) — Ledger, AR/AP, cobranzas/pagos.  
+48. [`PHASE_4_REPORTING.md`](./PHASE_4_REPORTING.md) — Compras, inventario, reportes, dashboards.  
+49. [`PHASE_5_HARDENING.md`](./PHASE_5_HARDENING.md) — Tests, perf, observabilidad.  
+50. [`DEPLOYMENT_PLAN.md`](./DEPLOYMENT_PLAN.md) — Entornos y despliegue.  
+51. [`RISK_REGISTER.md`](./RISK_REGISTER.md) — Riesgos de implementación.
 
 ## Relación con la documentación funcional
 

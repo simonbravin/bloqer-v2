@@ -9,6 +9,11 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
   const current = await getCurrentUser();
   if (!current) redirect("/login");
 
+  if (!current.tenantCtx) {
+    const platform = await isPlatformSuperadmin(current.session.user.id!);
+    if (!platform) redirect("/onboarding");
+  }
+
   let notificationUnreadCount = 0;
   if (current.tenantCtx) {
     try {

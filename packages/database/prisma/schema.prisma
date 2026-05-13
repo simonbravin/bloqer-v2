@@ -574,6 +574,14 @@ model Company {
   name      String
   legalName String?
   fiscalId  String?
+  /// Street / postal address (tenant primary company; Phase 14A onboarding).
+  address     String?
+  city        String?
+  country     String  @default("AR")
+  phone       String?
+  website     String? @db.VarChar(512)
+  industry    String? @db.VarChar(128)
+  companySize String? @db.VarChar(64)
   status    CompanyStatus @default(ACTIVE)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
