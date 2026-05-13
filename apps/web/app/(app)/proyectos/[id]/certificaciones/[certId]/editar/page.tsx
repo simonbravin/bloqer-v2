@@ -59,7 +59,7 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
             notes: cert.notes ?? "",
             internalNotes: cert.internalNotes ?? "",
           }}
-          onSubmit={(data) => updateCertificationAction(certId, projectId, data)}
+          onSubmit={updateCertificationAction.bind(null, certId, projectId)}
         />
       </div>
     </div>

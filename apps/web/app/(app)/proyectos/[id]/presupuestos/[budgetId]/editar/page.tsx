@@ -67,7 +67,7 @@ export default async function EditarPresupuestoPage({ params }: PageProps) {
         <h2 className="font-semibold mb-4">Parámetros económicos</h2>
         <BudgetSettingsForm
           defaults={defaults}
-          onSubmit={(data) => updateBudgetSettingsAction(budgetId, data)}
+          onSubmit={updateBudgetSettingsAction.bind(null, budgetId)}
         />
       </div>
     </div>

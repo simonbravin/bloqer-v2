@@ -69,7 +69,7 @@ export default async function EditarProyectoPage({ params }: PageProps) {
           defaultValues={defaultValues}
           submitLabel="Guardar cambios"
           successRedirect={`/proyectos/${id}`}
-          onSubmit={(data) => updateProjectAction(id, data)}
+          onSubmit={updateProjectAction.bind(null, id)}
         />
       </div>
     </div>

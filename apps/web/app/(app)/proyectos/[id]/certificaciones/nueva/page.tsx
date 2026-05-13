@@ -80,7 +80,7 @@ export default async function NuevaCertificacionPage({ params }: PageProps) {
           projectId={projectId}
           budgets={budgetOptions}
           defaultBudgetId={budgetOptions.length === 1 ? budgetOptions[0].id : undefined}
-          onSubmit={(data) => createCertificationAction(projectId, data)}
+          onSubmit={createCertificationAction.bind(null, projectId)}
         />
       </div>
     </div>

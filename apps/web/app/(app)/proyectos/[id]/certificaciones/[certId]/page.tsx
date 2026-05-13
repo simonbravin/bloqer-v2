@@ -135,10 +135,10 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
             availableItems={allItems}
             currency={cert.currency}
             editable={editable}
-            onAddLine={(data) => addCertificationLineAction(data)}
-            onUpdateLine={(lineId, data) => updateCertificationLineAction(lineId, data)}
-            onRemoveLine={(lineId) => removeCertificationLineAction(lineId)}
-            onRefresh={() => refreshPreviousQtyAction(certId)}
+            onAddLine={addCertificationLineAction}
+            onUpdateLine={updateCertificationLineAction}
+            onRemoveLine={removeCertificationLineAction}
+            onRefresh={refreshPreviousQtyAction.bind(null, certId)}
           />
         </div>
 
@@ -147,10 +147,10 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
             status={cert.status}
             currency={cert.currency}
             totalAmount={cert.totalAmount}
-            onIssue={() => issueCertificationAction(certId)}
-            onApprove={() => approveCertificationAction(certId)}
-            onReject={() => rejectCertificationAction(certId)}
-            onCancel={() => cancelCertificationAction(certId)}
+            onIssue={issueCertificationAction.bind(null, certId)}
+            onApprove={approveCertificationAction.bind(null, certId)}
+            onReject={rejectCertificationAction.bind(null, certId)}
+            onCancel={cancelCertificationAction.bind(null, certId)}
           />
         </div>
       </div>

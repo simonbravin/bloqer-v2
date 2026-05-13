@@ -19,7 +19,7 @@ export default async function NuevoPresupuestoPage({ params }: PageProps) {
       <div className="rounded-lg border bg-card p-6">
         <BudgetForm
           projectId={projectId}
-          onSubmit={(data) => createBudgetAction(projectId, data)}
+          onSubmit={createBudgetAction.bind(null, projectId)}
         />
       </div>
     </div>

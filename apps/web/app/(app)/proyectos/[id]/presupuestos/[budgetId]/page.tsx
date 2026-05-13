@@ -98,7 +98,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
             onUpdateNode={updateWbsNodeAction}
             onRemoveNode={removeWbsNodeAction}
             onReorderNodes={reorderWbsNodesAction}
-            onUpdateCostItem={(costItemId, data) => updateCostItemAction(costItemId, data)}
+            onUpdateCostItem={updateCostItemAction}
             onAddLine={addCostAnalysisLineAction}
             onUpdateLine={updateCostAnalysisLineAction}
             onRemoveLine={removeCostAnalysisLineAction}
@@ -112,11 +112,11 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
             currency={budget.currency}
             totalCost={budget.totalCost.toString()}
             totalSalePrice={budget.totalSalePrice.toString()}
-            onSubmitForReview={() => submitForReviewAction(budgetId)}
-            onReturnForChanges={() => returnForChangesAction(budgetId)}
-            onApprove={() => approveBudgetAction(budgetId)}
-            onClose={() => closeBudgetAction(budgetId)}
-            onCancel={() => cancelBudgetAction(budgetId)}
+            onSubmitForReview={submitForReviewAction.bind(null, budgetId)}
+            onReturnForChanges={returnForChangesAction.bind(null, budgetId)}
+            onApprove={approveBudgetAction.bind(null, budgetId)}
+            onClose={closeBudgetAction.bind(null, budgetId)}
+            onCancel={cancelBudgetAction.bind(null, budgetId)}
           />
         </div>
       </div>
