@@ -1,4 +1,4 @@
-import { auth } from "@bloqer/auth";
+import { auth } from "@bloqer/auth/middleware";
 import { NextResponse } from "next/server";
 
 export default auth((req) => {
