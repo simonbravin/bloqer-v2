@@ -2,16 +2,22 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { NavItem } from "@/features/shell/components/nav-item";
 import {
   buildProjectWorkspaceNavSections,
-  type ProjectWorkspaceNavSection,
 } from "@bloqer/services/project-workspace-nav";
 import { tenantGateFromSnapshot } from "@/features/projects/tenant-gate-from-snapshot";
 import { ProjectStatusBadge } from "@/features/projects/components/project-status-badge";
+import { cn } from "@/lib/utils";
 import type { PermissionModule, UserRole } from "@bloqer/domain";
 import type { ProjectShellInfo } from "@bloqer/services";
+
+function isNavItemActive(pathname: string, href: string, matchExact?: boolean) {
+  return matchExact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+}
 
 type ShellState =
   | { status: "loading" }
@@ -31,8 +37,27 @@ export function ProjectWorkspaceSidebar({
   roles,
   moduleGateSnapshot,
 }: ProjectWorkspaceSidebarProps) {
-  const gate = tenantGateFromSnapshot(moduleGateSnapshot);
-  const sections: ProjectWorkspaceNavSection[] = buildProjectWorkspaceNavSections(projectId, gate, roles);
+  const pathname = usePathname();
+  const gate = useMemo(() => tenantGateFromSnapshot(moduleGateSnapshot), [moduleGateSnapshot]);
+  const sections = useMemo(
+    () => buildProjectWorkspaceNavSections(projectId, gate, roles),
+    [projectId, gate, roles],
+  );
+
+  const [openByTitle, setOpenByTitle] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setOpenByTitle((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const s of sections) {
+        const hasActive = s.items.some((item) =>
+          isNavItemActive(pathname, item.href, item.matchExact),
+        );
+        next[s.title] = hasActive ? true : (prev[s.title] ?? false);
+      }
+      return next;
+    });
+  }, [pathname, projectId, sections]);
 
   const [shellState, setShellState] = useState<ShellState>({ status: "loading" });
 
@@ -107,24 +132,58 @@ export function ProjectWorkspaceSidebar({
         )}
       </div>
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
-        {sections.map((section) => (
-          <div key={section.title}>
-            <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {section.title}
-            </p>
-            <div className="flex flex-col gap-0.5">
-              {section.items.map((item) => (
-                <NavItem
-                  key={`${item.label}-${item.href}`}
-                  href={item.href}
-                  label={item.label}
-                  matchExact={item.matchExact}
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
+        {sections.map((section, sectionIndex) => {
+          const open = openByTitle[section.title] ?? false;
+          const panelId = `project-nav-section-${sectionIndex}`;
+          return (
+            <div key={section.title} className="rounded-md">
+              <button
+                type="button"
+                id={`${panelId}-trigger`}
+                aria-expanded={open}
+                aria-controls={panelId}
+                onClick={() =>
+                  setOpenByTitle((prev) => ({
+                    ...prev,
+                    [section.title]: !(prev[section.title] ?? false),
+                  }))
+                }
+                className={cn(
+                  "flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors",
+                  "hover:bg-muted/70 hover:text-foreground",
+                  open && "text-foreground",
+                )}
+              >
+                <ChevronRight
+                  className={cn(
+                    "h-3.5 w-3.5 shrink-0 text-muted-foreground/80 transition-transform duration-200",
+                    open && "rotate-90",
+                  )}
+                  aria-hidden
                 />
-              ))}
+                <span className="min-w-0 flex-1 truncate">{section.title}</span>
+              </button>
+              {open ? (
+                <div
+                  id={panelId}
+                  role="region"
+                  aria-labelledby={`${panelId}-trigger`}
+                  className="ml-1.5 mt-0.5 flex flex-col gap-0.5 border-l border-border/55 pl-3"
+                >
+                  {section.items.map((item) => (
+                    <NavItem
+                      key={`${item.label}-${item.href}`}
+                      href={item.href}
+                      label={item.label}
+                      matchExact={item.matchExact}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
     </aside>
   );
