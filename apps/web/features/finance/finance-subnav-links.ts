@@ -26,6 +26,11 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
 
   if (gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP")) {
     links.push({
+      href:  "/finanzas/gastos-generales",
+      label: "Gastos generales",
+      title: "Asistente para facturas de proveedor sin proyecto",
+    });
+    links.push({
       href:  "/finanzas/facturas-proveedor",
       label: "Facturas y gastos",
       title: "Facturas de proveedor y gastos generales sin proyecto",

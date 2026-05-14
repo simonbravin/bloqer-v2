@@ -18,6 +18,7 @@ interface PageProps {
     sourceType?:              string;
     currency?:                string;
     includeInternalTransfers?: string;
+    corporateApPayments?:     string;
   }>;
 }
 
@@ -41,6 +42,7 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
   if (sp.sourceType) qs.set("sourceType", sp.sourceType);
   if (sp.currency) qs.set("currency", sp.currency);
   if (sp.includeInternalTransfers === "false") qs.set("includeInternalTransfers", "false");
+  if (sp.corporateApPayments === "true") qs.set("corporateApPayments", "true");
   const accountingReturnPath = `/tesoreria/reportes/movimientos${qs.size ? `?${qs}` : ""}`;
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
 
@@ -53,6 +55,7 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
       sourceType:              sp.sourceType || undefined,
       currency:                sp.currency   || undefined,
       includeInternalTransfers: sp.includeInternalTransfers === "false" ? false : true,
+      corporateApPaymentsOnly: sp.corporateApPayments === "true",
     },
     ctx,
   );
@@ -88,6 +91,12 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
       <div className="text-sm text-muted-foreground">
         {rows.length} movimiento{rows.length !== 1 ? "s" : ""} encontrado{rows.length !== 1 ? "s" : ""}.
         {!sp.accountId && " Saldo acumulado disponible al filtrar por cuenta."}
+        {sp.corporateApPayments === "true" && (
+          <span className="mt-1 block text-foreground/90">
+            Filtro activo: egresos por <strong>pago a proveedor</strong> cuya obligación es <strong>sin proyecto</strong>{" "}
+            (gastos generales de empresa).
+          </span>
+        )}
       </div>
 
       <MovementLedgerTable

@@ -36,6 +36,8 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 | ADR-007 | Gantt y cronograma detrás de adapter único | PROPUESTO |
 | ADR-008 | Modelo físico: `tenant` + `company` 1:N (legal entity = `company`) con `project.company_id` opcional hasta multi-empresa activa | PROPUESTO |
 | ADR-009 | UUID PK en todas las entidades ERP; numeración humana en columnas separadas | PROPUESTO |
+| ADR-Phase1-06 | Membresía única `(userId, tenantId)` Phase 1 | ACEPTADO |
+| ADR-Phase1-07 | Ingresos corporativos sin obra: GL + tesorería Phase 1 | ACEPTADO |
 
 ---
 
@@ -76,6 +78,37 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 - **Contexto:** Se necesitaba almacenar los roles de un usuario por tenant. Opciones: tabla UserRole separada (join), array en PostgreSQL, JSON column.
 - **Decisión:** Array nativo de PostgreSQL (`UserRole[]` en Prisma). La semántica es unión: el usuario tiene acceso si **cualquiera** de sus roles lo habilita. La función `can(roles, action, module)` en `@bloqer/domain` es pura (sin I/O).
 - **Consecuencias:** Queries de roles son simples (`roles @> ARRAY['ADMIN']::UserRole[]`). No soporta permisos granulares por campo (fuera del alcance per PERMISSIONS_MATRIX.md).
+
+---
+
+## ADR-Phase1-05 — Notas internas en matriz de permisos (`Tenant.permissionMatrixNotes`)
+
+- **Fecha:** 2026-05-13
+- **Estado:** ACEPTADO
+- **Contexto:** la pantalla `/configuracion/permisos` lista muchos `PermissionModule` como columnas; las notas largas en tabla rompen la lectura y no son auditables.
+- **Decisión:** persistir un objeto JSON opcional `permission_matrix_notes` en la tabla `tenants`, clave = `PermissionModule` canónico, valor = `{ text, updatedAt, updatedByUserId }`. La UI usa Sheet/Dialog por módulo; **no** se duplica otra tabla de permisos.
+- **Consecuencias:** migración SQL + lectura/escritura solo vía `packages/services` con guard `EDIT USERS_PERMISSIONS` **o** `EDIT TENANT_SETTINGS`; evento de auditoría al actualizar.
+- **Referencias funcionales:** [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md) §2.2.2, [`USERS_AND_PERMISSIONS.md`](../02-modules/USERS_AND_PERMISSIONS.md) §9.
+
+---
+
+## ADR-Phase1-06 — Membresía tenant: una fila `UserMembership` por `(userId, tenantId)` en Phase 1
+
+- **Fecha:** 2026-05-14
+- **Estado:** ACEPTADO
+- **Contexto:** [Q-001](../00-product/OPEN_QUESTIONS.md) distingue multi-empresa en datos (`Company` N:1 `Tenant`) del sub-problema “misma persona en dos sociedades” simultáneas, que exige relajar `@@unique([userId, tenantId])` u otro modelo.
+- **Decisión:** en Phase 1 el schema Prisma **conserva** la unicidad `@@unique([userId, tenantId])`. El contexto de razón social activa en `UserMembership.companyId` (nullable) o en evoluciones de UI que **actualicen** esa única fila — no se introducen filas paralelas sin ADR de migración ([D-036](../00-product/DECISION_LOG.md)).
+- **Consecuencias:** `getMembershipByUserId` / `resolveTenantContext` permanecen alineados a **como máximo una** membresía por tenant por usuario; variante “0B” queda explícitamente fuera hasta nuevo ADR.
+
+---
+
+## ADR-Phase1-07 — Ingresos corporativos sin obra: Phase 1 sin relajar AR
+
+- **Fecha:** 2026-05-14
+- **Estado:** ACEPTADO
+- **Contexto:** [Q-030](../00-product/OPEN_QUESTIONS.md) listaba migración AR nullable, solo GL/tesorería, o nuevo documento.
+- **Decisión:** Phase 1 implementa la **opción documental y operativa (2)**: reflejo contable y banco vía **`JournalEntry`** + tesorería según política; **sin** migración `projectId` nullable en `SalesInvoice`/`Receivable`/`Collection` hasta decisión explícita de producto ([D-037](../00-product/DECISION_LOG.md)).
+- **Consecuencias:** checklist [Q030_CORPORATE_INCOME_CHECKLIST.md](./Q030_CORPORATE_INCOME_CHECKLIST.md) §Opción 1/3 quedan para fases posteriores; §Opción 2 es la referencia de implementación no-code del corte.
 
 ---
 

@@ -433,6 +433,46 @@
 
 ---
 
+### D-035 — Gastos generales empresa: núcleo AP + tesorería + GL; sin `Expense` en el corto plazo; rubro opcional
+
+- **Fecha:** 2026-05-13
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (vía auditoría Phase 17A)
+- **Contexto:** alinear “gastos de estructura” con patrón ERP **vendor bill** (Odoo: factura proveedor vs reintegro empleado); evitar duplicar montos y estados en una tabla **`Expense`** mientras el flujo factura → C×P → pago cubra el caso.
+- **Decisión:**
+  1. **Núcleo obligatorio:** `SupplierInvoice` / `Payable` / `Payment` con **`projectId` null** para gastos con proveedor y ciclo estándar; **`JournalEntry`** como libro único (borrador / publicado manual), sin segundo ledger automático desde este diseño.
+  2. **No** introducir entidad **`Expense`** en el corto plazo salvo requisito explícito de workflow (p. ej. reintegros, aprobaciones multi-nivel) que **no** quepa en AP + adjuntos + GL — entonces ADR + `STATE_MACHINES`.
+  3. **Dimensión rubro / centro de costo (C):** primero convención en líneas (`description` / notas); si hace falta reporting estable, tabla maestra liviana o `metadata` acotado **sin** segundo asiento paralelo no documentado.
+  4. **Ingresos corporativos sin proyecto:** el corte de producto **Phase 1** quedó lockeado en [**D-037**](./DECISION_LOG.md) (opción GL + tesorería); ampliaciones AR nullable u otro documento requieren nueva decisión.
+- **Implicancias:** UX “gastos generales” y reportes reutilizan servicios AP/tesorería existentes; contabilidad enlaza a `/finanzas/...` para orígenes corporativos con `VIEW AP`.
+- **Documentos afectados:** [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](../08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) (Phase 17A), [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) (Q-030), [`IMPLEMENTATION_ROADMAP.md`](../08-architecture/IMPLEMENTATION_ROADMAP.md) si se agenda fase explícita.
+
+---
+
+### D-036 — Q-001 Phase 1: membresía única por usuario+tenant (sin 0B hasta ADR)
+
+- **Fecha:** 2026-05-14
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (cierre operativo plan Q-001/Q-030)
+- **Contexto:** el sub-problema “misma persona en empresa X e Y” requiere relajar `@@unique([userId, tenantId])` o modelo alternativo; implica migración, invitaciones y contexto de sesión.
+- **Decisión:** en **Phase 1** se mantiene el modelo Prisma vigente: **como máximo una** fila `UserMembership` por par `(userId, tenantId)`; `companyId` en esa fila es el ancla de razón social cuando aplica (nullable = ámbito tenant). Cualquier **pertenencia simultánea** a dos `Company` bajo el mismo tenant queda **fuera de alcance** hasta ADR + migración explícita (variante **0B** del plan técnico).
+- **Implicancias:** `resolveTenantContext` y `getMembershipByUserId` siguen el contrato de **una** membresía relevante por resolución actual de sesión; selector global de empresa no implica segunda fila de membresía sin nuevo diseño.
+- **Documentos afectados:** [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) (Q-001), [`MULTITENANCY.md`](../07-non-functional/MULTITENANCY.md), [`TECHNICAL_ERD.md`](../08-architecture/TECHNICAL_ERD.md), [`PRISMA_ERD_AUDIT.md`](../08-architecture/PRISMA_ERD_AUDIT.md), [`ARCHITECTURE_DECISION_RECORDS.md`](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md) (ADR-Phase1-06).
+
+---
+
+### D-037 — Q-030 Phase 1: ingresos corporativos sin obra vía GL + tesorería (sin AR nullable)
+
+- **Fecha:** 2026-05-14
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (cierre operativo plan Q-001/Q-030)
+- **Contexto:** `SalesInvoice` / `Receivable` / `Collection` exigen `projectId` en schema; relajar AR impacta certificaciones, aging y numeración ([Q-030](./OPEN_QUESTIONS.md)).
+- **Decisión:** para **ingresos de estructura / sin obra** en Phase 1 se usa **solo** el camino **documentado** de **`JournalEntry`** (y líneas) con `projectId` null donde aplique, más movimientos de **tesorería** (`AccountMovement` / cobros manuales no ligados a `Receivable` de obra) según política interna del tenant — alineado a opción **(2)** de Q-030 y a libro único [D-035]. **No** se migra `projectId` a nullable en cadena AR en este corte. Las opciones **(1)** nullable AR y **(3)** nuevo documento quedan para decisión posterior explícita.
+- **Implicancias:** Finanzas empresa y contabilidad reflejan ingresos corporativos sin crear `SalesInvoice` ficticia ni segundo ledger; riesgo operativo = disciplina de uso (documentar en módulo ventas/finanzas).
+- **Documentos afectados:** [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) (Q-030), [`Q030_CORPORATE_INCOME_CHECKLIST.md`](../08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md), [`SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](../08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) §16A.4 (nota de cierre), [`ARCHITECTURE_DECISION_RECORDS.md`](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md) (ADR-Phase1-07).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

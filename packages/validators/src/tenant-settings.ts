@@ -1,3 +1,4 @@
+import { OVERVIEW_MODULE_KEYS_FOR_ZOD } from "@bloqer/domain";
 import { z } from "zod";
 
 const userRoleEnum = z.enum([
@@ -27,4 +28,13 @@ export const updateTenantMemberRolesInputSchema = z.object({
 export const updateTenantMemberStatusInputSchema = z.object({
   membershipId: z.string().uuid(),
   status:       z.enum(["ACTIVE", "INACTIVE"]),
+});
+
+const permissionMatrixNoteEntrySchema = z.object({
+  text: z.string().trim().max(4000),
+});
+
+/** Partial update: only keys present are merged server-side. */
+export const updateTenantPermissionMatrixNotesInputSchema = z.object({
+  notes: z.record(z.enum(OVERVIEW_MODULE_KEYS_FOR_ZOD), permissionMatrixNoteEntrySchema),
 });

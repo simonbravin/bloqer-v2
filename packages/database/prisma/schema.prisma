@@ -479,6 +479,8 @@ model Tenant {
   billingCustomerId        String?              @db.VarChar(255)
   suspendedReason          String?              @db.VarChar(512)
   platformInternalNotes    String?
+  /// Internal notes for `/configuracion/permisos` (key = PermissionModule overview key). See ADR-Phase1-05.
+  permissionMatrixNotes    Json?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 

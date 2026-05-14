@@ -63,6 +63,7 @@ export function parseMovementReportFilters(sp: Record<string, string | undefined
     sourceType: sp.sourceType,
     currency: sp.currency,
     includeInternalTransfers: sp.includeInternalTransfers === "false" ? false : true,
+    corporateApPaymentsOnly: sp.corporateApPayments === "true",
   };
 }
 

@@ -85,6 +85,7 @@ Las rutas bajo **`/finanzas/**`** comparten layout: subnav filtrada por módulo 
 |-------|--------|-------|
 | `/finanzas` | Authenticated; `buildTenantServiceContext` no nulo | **Layout** `app/(app)/finanzas/layout.tsx`: **`getFinanceSubnavLinks(ctx)`** (`getTenantModuleGate` + `can()` por ítem) + **`FinanceSubnav`**. **Resumen:** **`getFinanceHubOverview(ctx)`** — CxC/C×P/Tesorería/Contabilidad según módulo + `VIEW AR` / `VIEW AP` / `VIEW TREASURY` / `VIEW ACCOUNTING`. **16D:** DTO multimoneda + split AP en aging. **16E:** polish UI + copy. Reutiliza aging AR/AP + `getTreasurySummaryByCompany`. Sin Prisma en páginas. **16C:** rutas corporativas AP. |
 | `/finanzas/facturas-proveedor`, `/finanzas/facturas-proveedor/nueva`, `/finanzas/facturas-proveedor/[invoiceId]` | Authenticated; tenant module **AP** | Servicios: `listCompanySupplierInvoices`, `getCompanySupplierInvoiceById`, `createSupplierInvoice` / `issue` / `cancel` (sin `projectScopeId`). **Lecturas y listados corporativos: solo `VIEW AP`** (`canViewCompanyAp` en servicios) — **no** alcanza solo `VIEW PROJECTS`. Mutaciones alta/emisión/anulación: `EDIT AP`. Adjuntos: `EntityDocumentsPanel` alcance `company-finanzas-supplier-invoice` + `listEntityDocuments` sin `projectId`. |
+| `/finanzas/gastos-generales`, `/finanzas/gastos-generales/nueva` | Same | **Phase 17B:** asistente UX + alta reutilizando `SupplierInvoiceForm` / `createCompanySupplierInvoiceAction`. **`/gastos-generales`:** `VIEW AP`. **`/nueva`:** `EDIT AP` (redirige al asistente si solo lectura). |
 | `/finanzas/cuentas-por-pagar`, `/finanzas/cuentas-por-pagar/[payableId]`, `/finanzas/cuentas-por-pagar/[payableId]/pagar` | Same | `listCompanyPayables`, `getCompanyPayableById`, `createPayment` sin `projectScopeId`; mismos gates **VIEW AP** / **EDIT AP**. |
 | `/finanzas/pagos-proveedor/[paymentId]` | Same | `getCompanyPaymentById`; cancel pago `EDIT AP`; contabilidad draft igual que pago proyecto (`EDIT ACCOUNTING`). |
 
@@ -216,7 +217,7 @@ En **shell de app** (no `/platform`). No usa `PlatformAdmin`; solo RBAC por memb
 | `/configuracion/equipo/invitar` | Idem | Idem read (solo navegación) | `EDIT USERS_PERMISSIONS` — crear invitación |
 | `/configuracion/equipo/invitaciones/[invitationId]` | Idem | Idem read | `EDIT USERS_PERMISSIONS` — cancelar invitación **PENDING** |
 | `/configuracion/equipo/[membershipId]` | Idem | Idem read | `EDIT USERS_PERMISSIONS` para roles y estado `ACTIVE`/`INACTIVE` |
-| `/configuracion/permisos` | Idem | Idem read (matriz solo lectura) | — |
+| `/configuracion/permisos` | Idem | Idem read (matriz solo lectura `buildPermissionMatrixGrid`) | Notas por módulo: `EDIT USERS_PERMISSIONS` **o** `EDIT TENANT_SETTINGS` (persistencia `Tenant.permissionMatrixNotes`, ADR-Phase1-05) |
 | `/invitaciones/aceptar` | **Pública** (sin sesión: mensaje + login); con sesión: aceptar con token | Invitación válida (`peek` por token) | Aceptación: usuario autenticado cuyo **email** coincide con la invitación |
 
 - **Protección dominio:** no dejar el tenant **sin** al menos un miembro **ACTIVE** con rol **OWNER** si ya había uno antes del cambio (simulación sobre membresías activas). Desactivar al único OWNER activo queda bloqueado. **Aceptar invitación** respeta el mismo invariante al activar/reactivar membresía.

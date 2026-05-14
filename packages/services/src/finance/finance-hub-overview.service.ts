@@ -10,6 +10,8 @@ import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { getTreasurySummaryByCompany } from "../treasury/balance.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
+import type { CompanyFinanceOperationsSummary } from "./company-finance-operations-summary.service";
+import { getCompanyFinanceOperationsSummary } from "./company-finance-operations-summary.service";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -144,6 +146,8 @@ export type FinanceHubOverview = {
   quickActions: FinanceHubQuickAction[];
   alerts: FinanceHubAlert[];
   reportLinks: FinanceHubReportLink[];
+  /** Phase 17E — corporate AP snapshot (per-currency balances only). */
+  companyOperations?: CompanyFinanceOperationsSummary;
   /** At least one finance-related tenant module is enabled */
   hasFinanceModules: boolean;
   /** User can see at least one hub section (AR / AP / TREASURY / ACCOUNTING) */
@@ -382,6 +386,13 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
       href:        "/tesoreria/reportes",
     });
   }
+  if (apMod && apPerm && trMod && trPerm) {
+    reportLinks.push({
+      label:       "Movimientos — pagos empresa (AP)",
+      description: "Egresos bancarios originados en pagos a proveedor sin proyecto.",
+      href:        "/tesoreria/reportes/movimientos?sourceType=PAYMENT&type=OUTFLOW&corporateApPayments=true",
+    });
+  }
 
   let arCard: FinanceHubMoneyCard | undefined;
   if (arMod) {
@@ -489,6 +500,11 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
   if (apMod && apPerm) {
     pushUniqueQuickAction(
       quickActions,
+      { label: "Gastos generales — asistente", href: "/finanzas/gastos-generales" },
+      qaSeen,
+    );
+    pushUniqueQuickAction(
+      quickActions,
       { label: "Nueva factura (empresa)", href: "/finanzas/facturas-proveedor/nueva" },
       qaSeen,
     );
@@ -536,6 +552,9 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
     Boolean(arInsight?.multicurrency)
     || Boolean(apGlobalInsight?.multicurrency)
     || Boolean(treasuryCard?.multicurrency);
+
+  const companyOperations = apMod && apPerm ? await getCompanyFinanceOperationsSummary(ctx) : undefined;
+
   if (anyMulti) {
     alerts.push({
       variant: "warning",
@@ -556,6 +575,7 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
     quickActions,
     alerts,
     reportLinks,
+    companyOperations,
     hasFinanceModules,
     canSeeAnything,
   };

@@ -14,7 +14,9 @@
     "db:generate": "dotenv -e .env -- pnpm --filter @bloqer/database exec prisma generate",
     "db:migrate": "dotenv -e .env -- pnpm --filter @bloqer/database exec prisma migrate dev",
     "db:migrate:deploy": "dotenv -e .env -- pnpm --filter @bloqer/database exec prisma migrate deploy",
+    "db:migrate:status": "dotenv -e .env -- pnpm --filter @bloqer/database exec prisma migrate status",
     "db:seed": "dotenv -e .env -- pnpm --filter @bloqer/database db:seed",
+    "ci:prisma": "pnpm --filter @bloqer/database exec prisma generate",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\" --ignore-path .gitignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\" --ignore-path .gitignore"
   },

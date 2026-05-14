@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Inbox, Landmark, Scale } from "lucide-react";
 import type {
+  CompanyFinanceOperationsSummary,
   FinanceHubCurrencySnapshot,
   FinanceHubInsightBlock,
   FinanceHubOverview,
@@ -359,6 +360,91 @@ function AccountingCard({ section }: { section: NonNullable<FinanceHubOverview["
   );
 }
 
+function CompanyOperationsHubCard({ summary }: { summary: CompanyFinanceOperationsSummary }) {
+  if (!summary.visible) return null;
+  return (
+    <Card className="overflow-hidden border-border/80 shadow-md ring-1 ring-border/40">
+      <CardHeader className="border-b border-border/60 bg-muted/20 pb-4">
+        <CardTitle className="text-lg">Gastos generales (empresa)</CardTitle>
+        <CardDescription>
+          Resumen operativo de facturas y C×P <strong>sin proyecto</strong>. Los importes se muestran por moneda; no se
+          suman monedas distintas.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5 pt-6">
+        {summary.loadFailed ? (
+          <p className="text-sm text-destructive">No se pudo cargar el resumen. Reintentá más tarde.</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Facturas en borrador</p>
+                <p className="text-2xl font-semibold tabular-nums">{summary.draftInvoiceCount}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">C×P abiertas (líneas)</p>
+                <p className="text-2xl font-semibold tabular-nums">{summary.openPayableCount}</p>
+              </div>
+            </div>
+            {summary.openPayableBalancesByCurrency.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Saldo abierto por moneda</p>
+                <ul className="space-y-1.5 text-sm">
+                  {summary.openPayableBalancesByCurrency.map((row) => (
+                    <li key={row.currency} className="flex flex-wrap justify-between gap-2 border-b border-border/50 py-1.5 last:border-0">
+                      <span className="text-muted-foreground">
+                        {row.currency} · {row.openLineCount} obligacione{row.openLineCount !== 1 ? "s" : ""}
+                      </span>
+                      <span className="font-medium tabular-nums">{formatMoney(row.totalBalanceDue, row.currency)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No hay saldos abiertos en C×P corporativas.</p>
+            )}
+            {summary.recentCorporatePayments.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Últimos pagos corporativos</p>
+                <ul className="divide-y divide-border/60 text-sm">
+                  {summary.recentCorporatePayments.map((p) => (
+                    <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                      <div>
+                        <Link
+                          href={`/finanzas/pagos-proveedor/${p.id}`}
+                          className="font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          {p.supplierLabel}
+                        </Link>
+                        <p className="text-xs text-muted-foreground">{p.paymentDate}</p>
+                      </div>
+                      <span className="tabular-nums font-medium">{formatMoney(p.amount, p.currency)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </>
+        )}
+      </CardContent>
+      <CardFooter className="flex flex-wrap gap-2 border-t bg-muted/15 px-6 py-4">
+        <Button asChild size="sm" variant="default">
+          <Link href="/finanzas/gastos-generales">Abrir asistente</Link>
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link href="/finanzas/gastos-generales/nueva">Nueva factura</Link>
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link href="/finanzas/cuentas-por-pagar">Pagos pendientes</Link>
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link href={summary.movimientosCorporateFilterHref}>Movimientos tesorería</Link>
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
 export function FinanceHubView({ overview }: { overview: FinanceHubOverview }) {
   if (!overview.hasFinanceModules) {
     return (
@@ -430,6 +516,8 @@ export function FinanceHubView({ overview }: { overview: FinanceHubOverview }) {
           </CardContent>
         </Card>
       ) : null}
+
+      {overview.companyOperations ? <CompanyOperationsHubCard summary={overview.companyOperations} /> : null}
 
       <section className="space-y-6 scroll-mt-8">
         <SectionIntro

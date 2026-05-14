@@ -57,7 +57,8 @@
 ## Contradicciones a vigilar
 
 - Cualquier divergencia entre [`BACKEND_LAYERING`](./BACKEND_LAYERING.md) (“handlers delgados”) y ejemplos futuros en código → actualizar doc o código.  
-- Q-001 **RESUELTO 2026-05-07**: Tenant 1:N Company (Alternativa B). Ver ADR-Phase1-02. FKs `company_id` ya implementadas en `user_memberships`.
+- Q-001 **núcleo resuelto 2026-05-07**: Tenant 1:N Company (Alternativa B). Ver ADR-Phase1-02. FK `company_id` en `user_memberships`.
+- **Sub-problema 2026-05-13:** mismo usuario con **dos sociedades activas** en un tenant sigue **abierto** en [`OPEN_QUESTIONS.md`](../00-product/OPEN_QUESTIONS.md) Q-001 (`@@unique([userId, tenantId])` en Prisma).
 
 ## Cómo usar este archivo
 

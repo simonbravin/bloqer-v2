@@ -34,6 +34,12 @@ Usar **migraciones versionadas** alineadas a **Prisma Migrate** contra **Neon Po
 
 - **Phase 13B:** relaciones Prisma / FKs en `Payment` (`supplierContactId`, `supplierInvoiceId`) — aplicar con **`prisma migrate deploy`** (o migración SQL equivalente) antes de usar producción; **no** `db:push` en Neon compartido/prod.
 - **Phase 16B:** `SupplierInvoice`, `Payable`, `Payment` — `projectId` nullable (AP corporativo); `AccountMovement.projectId` nullable (dimensión analítica opcional). Migración `20260513200000_phase_16b_ap_company_project_optional`. Sin backfill: filas existentes conservan `projectId` no nulo.
+- **Phase1-05 notes:** `20260513220000_tenant_permission_matrix_notes` — `ALTER TABLE tenants ADD permission_matrix_notes JSONB` (revisado; sin backfill).
+
+## Orden release (código + base de datos)
+
+1. **CI:** `pnpm ci:prisma` (genera client sin `DATABASE_URL`) luego `pnpm typecheck` en cada PR (workflow en `.github/workflows/ci.yml`).
+2. **Deploy:** ejecutar `pnpm db:migrate:deploy` **antes** o en el **mismo pipeline** que publica una versión de app que dependa del nuevo schema — ver [`DEPLOYMENT_PLAN.md`](./DEPLOYMENT_PLAN.md). Evita arrancar código nuevo contra una base sin migrar.
 
 ## Qué NO hacer
 
@@ -45,7 +51,8 @@ Usar **migraciones versionadas** alineadas a **Prisma Migrate** contra **Neon Po
 
 - **Generar client:** `pnpm --filter @bloqer/database db:generate`  
 - **Crear migración (dev):** `pnpm --filter @bloqer/database db:migrate` (`prisma migrate dev`)  
-- **Aplicar migraciones (CI/prod):** `pnpm --filter @bloqer/database db:migrate:deploy` (`prisma migrate deploy`)  
+- **Aplicar migraciones (CI/prod):** `pnpm db:migrate:deploy` en raíz (`prisma migrate deploy`, usa `.env`)  
+- **Ver estado vs carpeta `migrations/`:** `pnpm db:migrate:status` en raíz  
 - **No** usar `db:push` contra bases compartidas o producción — ver [`DEPLOYMENT_PLAN.md`](./DEPLOYMENT_PLAN.md).
 
 ## Referencias

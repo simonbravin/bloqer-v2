@@ -24,13 +24,15 @@
 ### Q-001 — Multi-empresa por tenant
 
 - **Categoría:** Multitenancy
-- **Estado:** ABIERTA
-- **Impacto si no se resuelve:** modela tenant_id pero no clarifica si hay multi razón social adentro.
-- **Opciones:**
+- **Estado:** EN DEBATE (núcleo N:1 **Company** bajo **Tenant** ya decidido — ver [ADR-Phase1-02](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md); **corte Phase 1 de membresía** → [D-036](./DECISION_LOG.md); pendiente el **caso de uso usuario ↔ varias empresas simultáneas** dentro del mismo tenant si el negocio lo exige).
+- **Impacto si no se resuelve:** no queda claro cómo un mismo login opera en razón social X **y** Y con numeración y GL acotados por empresa; riesgo de mezclar contexto en reportes.
+- **Opciones (tenant vs razón social):**
   1. Tenant 1:1 con empresa (razón social).
   2. Tenant puede contener múltiples empresas (razones sociales) con datos compartidos pero contabilidad separada.
-- **Recomendación inicial:** opción 2 si ya hay clientes con grupos empresariales; opción 1 si no.
-- **Bloquea:** [`02-modules/USERS_AND_PERMISSIONS.md`](../02-modules/USERS_AND_PERMISSIONS.md), [`07-non-functional/MULTITENANCY.md`](../07-non-functional/MULTITENANCY.md).
+- **Resolución parcial (2026-05-13):** en implementación vigente, **Alternativa B** (varias `Company` por `Tenant`) está **aceptada en ADR-Phase1-02**. `UserMembership.companyId` es nullable (membresía “a todo el tenant” vs anclada a una empresa).
+- **Sub-problema abierto — mismo usuario en empresa X e Y (mismo tenant):** hoy Prisma impone `@@unique([userId, tenantId])` en `UserMembership` → **como máximo una fila de membresía por par usuario+tenant**, con un solo `companyId`. Un **selector de empresa en el shell** que permita alternar X/Y **sin migración** solo sirve si ese usuario **cambia** de `companyId` en esa única membresía (no pertenencias simultáneas a dos sociedades). Para **dos pertenencias activas** (p. ej. PEPE auditor en X y en Y) hace falta **evolución de modelo**: p. ej. relajar unicidad a `(userId, tenantId, companyId)`, tabla `user_company_access`, o membresías múltiples con reglas de `ctx.companyId` — documentar en ADR antes de tocar producción.
+- **Recomendación inicial:** si el caso “una persona, dos sociedades” es real, priorizar diseño de **membresía por empresa** + **contexto `companyId` en sesión** alineado a `buildTenantServiceContext`; si no, mantener membresía única y selector solo cuando haya **una** empresa asignada y varias `Company` en el tenant para admins globales.
+- **Bloquea:** [`02-modules/USERS_AND_PERMISSIONS.md`](../02-modules/USERS_AND_PERMISSIONS.md), [`07-non-functional/MULTITENANCY.md`](../07-non-functional/MULTITENANCY.md), selector global de empresa en UI (sin segunda membresía hasta variante 0B + ADR).
 
 ### Q-002 — Numeración de comprobantes
 
@@ -353,6 +355,20 @@
   2. Permitir `REJECTED` → `DRAFT` con mismo ID para corrección interna.
 - **Resolución:** opción 1 lockeada — ver [D-033](./DECISION_LOG.md); regla [BR-SUB-005] en [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md).
 - **Bloquea:** _(cerrado)_ permisos y UX de certificación subcontrato ([`02-modules/SUBCONTRACTS.md`](../02-modules/SUBCONTRACTS.md), [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §19).
+
+### Q-030 — Ingresos corporativos sin proyecto (AR vs GL vs nuevo documento)
+
+- **Categoría:** Finanzas / AR / Contabilidad
+- **Estado:** RESUELTA → [D-037](./DECISION_LOG.md) **(Phase 1: opción 2 GL + tesorería)**; reabrir solo si Owner elige implementar opción **(1)** o **(3)**.
+- **Impacto si no se resuelve:** no hay cadena operativa estándar para “facturación de servicios de estructura” o ingresos no imputados a obra sin forzar un proyecto real; los usuarios pueden improvisar contabilidad manual o datos fuera del modelo.
+- **Contexto:** `SalesInvoice` / `Receivable` / `Collection` llevan `projectId` **obligatorio** en schema (ver BR-AR-003 en comentarios Prisma). Los **egresos** corporativos ya cubren vía AP con `projectId` null ([`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](../08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) Phase 17A). Este ítem es **solo ingresos**.
+- **Opciones identificadas:**
+  1. Migración: `projectId` nullable en cadena AR + reglas de numeración, permisos y UI globales bajo `/finanzas`.
+  2. Sin AR: registrar solo **`JournalEntry`** + **`TREASURY_INFLOW`** / cobro manual de tesorería según política documentada.
+  3. Nuevo documento de ingreso corporativo (distinto de `Expense` y distinto de `SalesInvoice` obra) con propia máquina de estados.
+- **Matiz arquitectura (2026-05-13):** elegir (1)/(2)/(3) **no** obliga a “segundo libro” operativo: el libro contable único sigue siendo `JournalEntry` con trazabilidad por `sourceType`/`sourceId` ([D-035](./DECISION_LOG.md)). El riesgo es de **alcance de producto** (qué queda en AR vs solo GL/tesorería), no de duplicar montos en dos ledgers paralelos no documentados.
+- **Recomendación / cierre Phase 1 (2026-05-14):** opción **(2)** lockeada — [D-037](./DECISION_LOG.md). Opciones **(1)** y **(3)** quedan para decisión futura explícita si el negocio exige C×C formal sin obra u otro documento.
+- **Bloquea:** _(Phase 1 cerrado con D-037)_ “factura de venta empresa” vía **AR sin proyecto** sigue **fuera** hasta nueva decisión; ver [D-035](./DECISION_LOG.md), [D-037](./DECISION_LOG.md). Checklist técnica para ampliaciones futuras: [`Q030_CORPORATE_INCOME_CHECKLIST.md`](../08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md).
 
 ---
 

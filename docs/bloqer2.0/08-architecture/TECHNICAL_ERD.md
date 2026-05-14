@@ -132,6 +132,7 @@ erDiagram
 
 ### Notas sobre el diagrama
 
+- **`user_membership` (Prisma `UserMembership`):** **una fila por `(user_id, tenant_id)`**; `company_id` opcional. Pertenencia simultánea del mismo usuario a **dos** `company` bajo el mismo tenant (**Q-001** variante 0B) **no** está modelada en Phase 1 — [D-036](../00-product/DECISION_LOG.md), [ADR-Phase1-06](./ARCHITECTURE_DECISION_RECORDS.md).
 - **`COLLECTION_APPLICATION` / `PAYMENT_APPLICATION`**: tablas puente explícitas para **cobranzas/pagos parciales** ([D-010](../00-product/DECISION_LOG.md)); alternativa válida es modelo equivalente de líneas embebidas en `collection` / `payment` — decidir en Prisma sin cambiar reglas.
 - **`Certification`**: **no** persiste `payment_status` como verdad maestra; si se materializa, es **derivado** de `Receivable` + aplicaciones ([D-026](../00-product/DECISION_LOG.md), [BR-CERT-PAYMENT-001](../01-domain/BUSINESS_RULES.md)).
 - **`SubcontractCertification`**: **`settlement_status`** derivado de `Payable` + `Payment` ([D-027](../00-product/DECISION_LOG.md)).

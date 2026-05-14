@@ -59,11 +59,16 @@ Ver máquinas SalesInvoice y Receivable.
 ## 16. Permisos
 SALES emite; FINANCE cobra y anula.
 
-## 17. Eventos disparados / consumidos
+## 17. Ingresos corporativos sin proyecto ([D-037], Phase 1)
+
+- Mientras `SalesInvoice` / `Receivable` / `Collection` exijan **`projectId`** en schema, los **ingresos de estructura** (sin obra en DB) se reflejan vía **`JournalEntry`** (+ líneas, `projectId` null donde corresponda) y **tesorería** (`AccountMovement` / ingresos no ligados a `Receivable` de obra), con política interna del tenant. **No** se usa `SalesInvoice` “ficticia” para este fin.
+- Si el negocio exige **C×C formal sin obra**, reabrir [Q-030](../00-product/OPEN_QUESTIONS.md) con opción **(1)** o **(3)** y migración/ADR.
+
+## 18. Eventos disparados / consumidos
 - `sales_invoice.*`, `collection.confirmed`, `receivable.*`.
 
-## 18. Fase de implementación
+## 19. Fase de implementación
 **Fase 1**.
 
-## 19. Preguntas abiertas
+## 20. Preguntas abiertas
 - Facturación electrónica AFIP (Fase 3).

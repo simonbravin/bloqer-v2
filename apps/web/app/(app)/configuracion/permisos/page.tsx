@@ -1,36 +1,19 @@
-import type { PermissionAction, UserRole } from "@bloqer/domain";
+import type { PermissionModule } from "@bloqer/domain";
+import {
+  getPermissionModuleGroupSections,
+  TENANT_MODULE_LABEL_ES,
+} from "@bloqer/domain";
 import { notFound, redirect } from "next/navigation";
+import { PermissionMatrixOverview } from "@/features/tenant-config";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import { canReadTenantConfigArea, getPermissionMatrixOverview } from "@bloqer/services";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-function ceilingLabel(v: PermissionAction | null): string {
-  if (v === null) return "—";
-  if (v === "VIEW") return "Ver";
-  if (v === "EDIT") return "Editar";
-  return "Aprobar";
-}
-
-const ROLE_LABEL_ES: Record<UserRole, string> = {
-  OWNER:            "Propietario",
-  ADMIN:            "Administrador",
-  FINANCE:          "Finanzas",
-  PROCUREMENT:      "Compras",
-  WAREHOUSE:        "Depósito",
-  SALES:            "Ventas",
-  VIEWER:           "Solo lectura",
-  PROJECT_MANAGER:  "Jefe de obra",
-  SITE_FOREMAN:     "Capataz",
-  PROJECT_VIEWER:   "Visor de proyecto",
-};
+  canEditPermissionMatrixNotes,
+  canReadTenantConfigArea,
+  getPermissionMatrixOverview,
+  getTenantPermissionMatrixNotes,
+  ServiceError,
+} from "@bloqer/services";
 
 export default async function ConfiguracionPermisosPage() {
   const current = await getCurrentUser();
@@ -39,47 +22,42 @@ export default async function ConfiguracionPermisosPage() {
 
   const ctx = await buildTenantServiceContext();
   if (!ctx) redirect("/login");
-  const matrix = await getPermissionMatrixOverview(ctx);
+
+  let matrix: Awaited<ReturnType<typeof getPermissionMatrixOverview>>;
+  let notes: Awaited<ReturnType<typeof getTenantPermissionMatrixNotes>>;
+  try {
+    [matrix, notes] = await Promise.all([
+      getPermissionMatrixOverview(ctx),
+      getTenantPermissionMatrixNotes(ctx),
+    ]);
+  } catch (e) {
+    if (e instanceof ServiceError && (e.code === "FORBIDDEN" || e.code === "NOT_FOUND")) notFound();
+    throw e;
+  }
+
+  const sections = getPermissionModuleGroupSections();
+  const canEditNotes = canEditPermissionMatrixNotes(current.tenantCtx.roles);
+  const moduleLabelsEs = TENANT_MODULE_LABEL_ES as Record<PermissionModule, string>;
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Permisos</h1>
-        <p className="text-sm text-muted-foreground">
-          Techo efectivo por rol y módulo según <code className="text-xs">can()</code> (VIEW ⊆ EDIT ⊆
-          APROBAR). Incluye reglas especiales de la matriz. Solo referencia; el acceso real depende de la
-          membresía del usuario.
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Permisos</h1>
+        <p className="text-sm text-muted-foreground max-w-prose">
+          Techo efectivo por rol y módulo según <code className="text-xs">can()</code> (VIEW ⊆ EDIT ⊆ APROBAR).
+          Agrupado por área para lectura rápida. Las notas son internas del tenant y{" "}
+          <strong className="text-foreground">no modifican</strong> los permisos reales (siguen en equipo /
+          invitaciones).
         </p>
       </div>
-      <div className="overflow-x-auto rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="sticky left-0 z-10 min-w-[140px] bg-background">Rol</TableHead>
-              {matrix.modules.map((m) => (
-                <TableHead key={m} className="min-w-[72px] whitespace-nowrap text-xs font-normal" title={m}>
-                  {m}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {matrix.roles.map((role) => (
-              <TableRow key={role}>
-                <TableCell className="sticky left-0 z-10 bg-background font-medium text-xs">
-                  <span className="block">{ROLE_LABEL_ES[role] ?? role}</span>
-                  <span className="text-[10px] font-normal text-muted-foreground">{role}</span>
-                </TableCell>
-                {matrix.modules.map((m) => (
-                  <TableCell key={m} className="text-center text-xs">
-                    {ceilingLabel(matrix.grid[role][m])}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+
+      <PermissionMatrixOverview
+        sections={sections}
+        matrix={matrix}
+        moduleLabelsEs={moduleLabelsEs}
+        notes={notes}
+        canEditNotes={canEditNotes}
+      />
     </div>
   );
 }

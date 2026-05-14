@@ -1,4 +1,4 @@
-# Finanzas Empresa, overview por proyecto y plan de indicadores (Phase 14C–14E + **Phase 16A–16C**)
+# Finanzas Empresa, overview por proyecto y plan de indicadores (Phase 14C–14E + **Phase 16A–17A**)
 
 Este documento **audita el estado actual** (rutas + Prisma + servicios) y define **arquitectura objetivo** para que **Finanzas** (`/finanzas`) sea el **hub financiero de la empresa**: vista global (CxC, CxP, tesorería, contabilidad, reporting) más **gastos corporativos** imputados por **`projectId` nullable** y/o dimensiones analíticas — **sin** un segundo libro ni “proyecto ficticio” para estructura.
 
@@ -65,6 +65,8 @@ Relacionado: [`TENANT_DASHBOARD_ARCHITECTURE.md`](./TENANT_DASHBOARD_ARCHITECTUR
 
 ### 16A.4 Decisión recomendada (pendiente confirmación producto)
 
+> **Actualización 2026-05-14:** ingresos corporativos **sin obra** en Phase 1 quedaron en **opción (2)** — [D-037](../00-product/DECISION_LOG.md), [ADR-Phase1-07](./ARCHITECTURE_DECISION_RECORDS.md). La fila “AR sin obra” de la tabla sigue siendo el **objetivo futuro** si producto elige opción (1).
+
 | Tema | Recomendación Phase 16 |
 |------|-------------------------|
 | AP corporativo | **Sí**, dirección preferida: `SupplierInvoice.projectId`, `Payable.projectId`, `Payment.projectId` → **`String?`** con FK `onDelete: SetNull` o restrict según reglas; numeración ya es por empresa. |
@@ -113,7 +115,7 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 | `payable` / `payment` | `Payment.projectId` copia `payable.projectId` (puede ser null). **Alcance proyecto:** `getPayableById` / `getPaymentById` / `createPayment` / `cancelPayment` con `projectScopeId` opcional. |
 | `aging.service` (AP) | `AgingItem.projectId` **nullable**; `projectName` = nombre de obra o constante exportada **`AGING_AP_COMPANY_PROJECT_LABEL`** (*Empresa (general)*). |
 | `document.service` | Adjuntos a factura proveedor **corporativa**: `projectId` del documento null; `initiateUploadSchema.projectId` opcional; validación de factura sin proyecto vs. ruta con proyecto. |
-| `journal-entry-source-link.service` | Enlace a factura proveedor solo si `inv.projectId` no es null. |
+| `journal-entry-source-link.service` | Enlace a factura en proyecto si `inv.projectId` no es null; **Phase 17D:** corporativo → `/finanzas/facturas-proveedor/[id]` con `VIEW AP`; pago corporativo → `/finanzas/pagos-proveedor/[id]`. |
 
 ### 16B.4 Validators y rutas proyecto
 
@@ -133,7 +135,7 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 | Overview finanzas proyecto | Usa `listPayablesByProject` / `listSupplierInvoicesByProject` + aging con `{ projectId }` — **no** mezcla corporativas. |
 | `document.service` | `projectId` null solo con `SUPPLIER_INVOICE` corporativa (servicio); **Zod** `initiateUploadSchema` exige proyecto si `linkedEntityType` ≠ `SUPPLIER_INVOICE`. |
 | Lecturas/mutaciones bajo `/proyectos/[id]/...` | **Endurecido:** `getSupplierInvoiceById` / `getPayableById` / `getPaymentById` aceptan `projectScopeId` opcional; páginas y acciones de proyecto lo pasan. **Mutaciones** `update` / `issue` / `cancel` factura y `createPayment` / `cancelPayment` validan coherencia con el proyecto de la ruta. Evita deep links cruzados y facturas corporativas en shell de obra. |
-| `journal-entry-source-link` | Sin `href` a `/proyectos/null/...`; factura sin proyecto → `href: null`. |
+| `journal-entry-source-link` | Sin `href` a `/proyectos/null/...`; corporativo → `href` bajo `/finanzas/...` (Phase 17D). |
 | `createSupplierInvoice` | Si `ctx.companyId` y proyecto con `companyId`, deben coincidir. |
 | Migración SQL | `DROP CONSTRAINT` + `DROP NOT NULL` + `ADD CONSTRAINT` — riesgo bajo si nombres de FK coinciden con init; **no** usa `db:push`. |
 
@@ -183,7 +185,56 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 
 ### 16E.2 Fuera de alcance
 
-- Rutas nuevas solo para subnav; **sin** “Gastos generales” como URL inventada.
+- Rutas nuevas solo para subnav; **sin** “Gastos generales” como URL inventada (Phase **17B** agrega `/finanzas/gastos-generales` como **asistente** explícito; no cambia el modelo).
+
+---
+
+## Phase 17A — Auditoría diseño: transacciones empresa / gastos generales (2026-05-13)
+
+**Alcance:** consolidar hallazgos Prisma + servicios para “gastos de estructura / corporativos” alineados a ERP tipo **vendor bill** (factura proveedor → obligación → pago → GL opcional), sin introducir un segundo ledger ni tabla **`Expense`** en el corto plazo. **Ingresos corporativos sin obra** quedan como decisión de producto aparte — ver [`OPEN_QUESTIONS.md`](../00-product/OPEN_QUESTIONS.md) **Q-030** y [D-035](../00-product/DECISION_LOG.md).
+
+### 17A.1 Hallazgos Prisma (resumen)
+
+| Capa | Modelo | Rol para gastos generales |
+|------|--------|---------------------------|
+| Documento | `SupplierInvoice` + líneas | `projectId` **null** = corporativo (Phase 16B). |
+| Obligación | `Payable` | 1:1 con factura emitida; `projectId` opcional. |
+| Pago | `Payment` | Copia `projectId` del payable; genera tesorería. |
+| Tesorería | `AccountMovement` | `sourceType = PAYMENT`, `sourceId = payment.id`; filtro “solo empresa” vía pago con `projectId` null (Phase **17C**). |
+| Contabilidad | `JournalEntry` / líneas | Origen `SUPPLIER_INVOICE` / `PAYMENT`; sin auto-post (Phase 11C). |
+| Adjuntos | `DocumentAttachment` | Corporativo permitido para `SUPPLIER_INVOICE` sin proyecto. |
+
+**Hueco explícito — ingreso empresa sin proyecto:** cadena **AR** (`SalesInvoice` / `Receivable` / `Collection`) sigue con **`projectId` obligatorio** en schema (BR-AR-003). No se resuelve con “Expense”; opciones futuras: AR nullable + migración, documento de ingreso distinto, o solo GL + `TREASURY_INFLOW` — **Q-030**.
+
+**Egreso tesorería sin factura / sin AP:** `MANUAL_ADJUSTMENT` existe en enumeración; **no** hay flujo UI/servicio general de alta libre equivalente a extracto bancario sin `Payment` en esta fase.
+
+**Rubro / categoría:** líneas tienen `description` e impuestos; no hay `categoryId` maestro en línea. Dimensión analítica **C** (opcional): convención en texto → luego tabla/metadata acotado coordinado con mapeo GL — ver [D-035](../00-product/DECISION_LOG.md).
+
+### 17A.2 Hallazgos servicios (representativo)
+
+- **AP corporativo:** `listCompanySupplierInvoices`, `createSupplierInvoice` con `projectId` null, `listCompanyPayables`, `createPayment` con `projectScopeId` — ya cubren factura → C×P → pago.
+- **Tesorería:** `getAccountMovementReport` extendido con filtro opcional **pagos AP corporativos** (Phase **17C**).
+- **Contabilidad:** `getJournalEntrySourceLink` — enlace **`href`** a `/finanzas/facturas-proveedor/[id]` y `/finanzas/pagos-proveedor/[id]` cuando el origen es corporativo y el rol tiene **`VIEW AP`** (Phase **17D**); evita `/proyectos/null/...`.
+- **Hub:** `getFinanceHubOverview` + **`getCompanyFinanceOperationsSummary`** (Phase **17E**): conteos y saldos **por moneda** (sin sumar monedas distintas).
+
+### 17A.3 Decisión B + C (lockeada en producto)
+
+| Opción | Veredicto |
+|--------|-----------|
+| **A — Tabla `Expense`** | **No** como primer paso: duplicaría montos frente a AP + tesorería + GL; reservar solo si hay workflow que no quepa en AP. |
+| **B — AP + tesorería + contabilidad** | **Sí** como núcleo para gastos con proveedor (vendor bill). |
+| **C — Dimensión liviana** | **Probable** para rubro / centro de costo analítico **sin** segundo asiento automático. |
+
+**Referencia:** [D-035](../00-product/DECISION_LOG.md).
+
+### 17A.4 Plan 17B–17E (implementación)
+
+| Fase | Entregable |
+|------|------------|
+| **17B** | Rutas `/finanzas/gastos-generales` + `/nueva`: asistente de pasos reutilizando alta de factura corporativa, emisión y C×P existentes. |
+| **17C** | Filtro `corporateApPayments` en reporte de movimientos + CSV/email. |
+| **17D** | `journal-entry-source-link` — `href` finanzas para factura/pago corporativo. |
+| **17E** | `company-finance-operations-summary.service` + card en hub `/finanzas`. |
 
 ---
 

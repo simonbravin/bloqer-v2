@@ -32,6 +32,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § User.
 ## 9. Pantallas y vistas necesarias
 - Lista usuarios con roles efectivos.
 - Editor matriz simplificada (no por campo).
+- **Referencia de techo RBAC** en `/configuracion/permisos`: matriz agrupada + notas internas por módulo (JSON en `Tenant`), sin sustituir la asignación real de roles por usuario (sigue en equipo / invitaciones).
 
 ## 10. Reglas de negocio
 - **BR-MT-001**: aislamiento tenant ([BR-MT-001]).

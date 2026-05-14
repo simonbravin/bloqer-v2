@@ -21,7 +21,12 @@ Implementar **aislamiento lógico estricto** por `tenant_id` en **todas** las en
 - No usar **tenant_id opcional** en tablas operativas “porque es global” sin documentación explícita.
 - No resolver tenant **solo** desde query params o body sin validar contra la sesión.
 - No introducir **cachés** (edge, KV) que mezclen claves sin prefijo de `tenant_id`.
-- No asumir 1:1 tenant–empresa hasta resolver [`../00-product/OPEN_QUESTIONS.md`](../00-product/OPEN_QUESTIONS.md) Q-001; la arquitectura debe permitir **evolución** (p. ej. `company_id` bajo `tenant_id`).
+- No asumir 1:1 tenant–empresa: el modelo físico ya permite **N `Company` por `Tenant`** ([ADR-Phase1-02](./ARCHITECTURE_DECISION_RECORDS.md)); el alcance de producto sigue en [`../00-product/OPEN_QUESTIONS.md`](../00-product/OPEN_QUESTIONS.md) **Q-001** (incl. sub-problema **mismo usuario en dos sociedades** vs `@@unique([userId, tenantId])` en `UserMembership`).
+
+## UserMembership y contexto de empresa (Q-001)
+
+- **Hoy:** una fila `UserMembership` por `(userId, tenantId)` y un solo `companyId` opcional → **una** empresa anclada o membresía global al tenant.
+- **Selector de empresa en el shell:** adecuado para cambiar el contexto **dentro** de esa semántica; no sustituye por sí solo membresías múltiples por usuario sin migración (ver Q-001).
 
 ## Estrategia de defensa en profundidad (conceptual)
 

@@ -1,7 +1,7 @@
 import { prisma } from "@bloqer/database";
 import type { JournalEntrySourceType } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import { canViewApProjectArea } from "../ap/ap-access";
+import { canViewApProjectArea, canViewCompanyAp } from "../ap/ap-access";
 import { canViewArProjectArea } from "../ar/ar-access";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext } from "../types";
@@ -106,12 +106,17 @@ export async function getJournalEntrySourceLink(
         };
       }
       const detail = `${fmtDate(p.paymentDate)} · ${fmtMoneyAr(p.amount, p.currency)}`;
-      const canLink = canViewApProjectArea(ctx.roles);
+      const href =
+        p.projectId && canViewApProjectArea(ctx.roles)
+          ? `/proyectos/${p.projectId}/pagos/${p.id}`
+          : !p.projectId && canViewCompanyAp(ctx.roles)
+            ? `/finanzas/pagos-proveedor/${p.id}`
+            : null;
       return {
         kindLabel: "Pago a proveedor",
         detail,
-        href:      canLink ? `/proyectos/${p.projectId}/pagos/${p.id}` : null,
-        noAccessHint: canLink ? null : noAp,
+        href,
+        noAccessHint: href ? null : noAp,
       };
     }
     case "TREASURY_INFLOW":
@@ -244,16 +249,17 @@ export async function getJournalEntrySourceLink(
         return { kindLabel: "Factura de proveedor", detail: "Factura no encontrada.", href: null, noAccessHint: null };
       }
       const detail = `Factura proveedor #${inv.number} · ${fmtDate(inv.issueDate)}`;
-      const canLink = canViewApProjectArea(ctx.roles);
       const href =
-        canLink && inv.projectId
+        inv.projectId && canViewApProjectArea(ctx.roles)
           ? `/proyectos/${inv.projectId}/facturas-proveedor/${inv.id}`
-          : null;
+          : !inv.projectId && canViewCompanyAp(ctx.roles)
+            ? `/finanzas/facturas-proveedor/${inv.id}`
+            : null;
       return {
         kindLabel: "Factura de proveedor",
         detail,
         href,
-        noAccessHint: canLink ? null : noAp,
+        noAccessHint: href ? null : noAp,
       };
     }
     case "ADJUSTMENT": {

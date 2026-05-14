@@ -54,8 +54,9 @@
 
 ## 4. Alcance por empresa y proyecto
 
+- **`UserMembership`:** Prisma `@@unique([userId, tenantId])` — **una** membresía por usuario y tenant; `companyId` opcional. Variante multi-membresía por empresa (mismo login en sociedad X e Y simultáneo) **fuera de Phase 1** hasta ADR — [D-036](../00-product/DECISION_LOG.md), [ADR-Phase1-06](./ARCHITECTURE_DECISION_RECORDS.md).
 - **`companyId`**: Presente donde el dominio es multi-empresa (`AccountingAccount`, `JournalEntry`, tesorería AP/AR típico, `DocumentAttachment` con `companyId` opcional según contexto de subida). `Project` enlaza `tenantId` + `companyId` según modelo de obra.
-- **`projectId`**: Opcional en modelos que pueden ser globales o de obra (`JournalEntry`, `DocumentAttachment`, `JournalEntryLine`); obligatorio donde el documento es siempre de proyecto (certificación, parte de obra, etc.). La semántica “null = no proyecto” se mantiene consistente con comentarios BR en schema.
+- **`projectId`**: Opcional en modelos que pueden ser globales o de obra (`JournalEntry`, `DocumentAttachment`, `JournalEntryLine`); obligatorio donde el documento es siempre de proyecto (certificación, parte de obra, etc.). La semántica “null = no proyecto” se mantiene consistente con comentarios BR en schema. **Cadena AR (`SalesInvoice` / `Receivable` / `Collection`):** `projectId` **obligatorio** en Phase 1; ingresos corporativos sin obra vía **GL + tesorería** — [D-037](../00-product/DECISION_LOG.md), [ADR-Phase1-07](./ARCHITECTURE_DECISION_RECORDS.md).
 
 ---
 
@@ -77,6 +78,8 @@
 
 - Política exacta de **borrado de `Tenant`** vs archivo legal (cuarentena vs cascade) — hoy el schema asume cascade amplio bajo `Tenant`; validar con compliance antes de exponer “eliminar tenant” en producto.
 - **`PROJECT_VIEWER`** y permisos finos de certificación ya están en matriz; el modelo de “solo mis proyectos asignados” sigue pendiente a nivel de datos (ver `PERMISSIONS_ROUTE_MATRIX.md` — futuro).
+- **Q-001 variante 0B** (misma persona, dos `Company` activas en un tenant): pendiente de ADR + migración; Phase 1 en [D-036](../00-product/DECISION_LOG.md).
+- **Q-030 opciones (1) AR nullable y (3) nuevo documento:** fuera del corte Phase 1; ver [D-037](../00-product/DECISION_LOG.md) y checklist [Q030_CORPORATE_INCOME_CHECKLIST.md](./Q030_CORPORATE_INCOME_CHECKLIST.md).
 
 ---
 

@@ -28,6 +28,18 @@ Implementar en **6 fases numeradas 0–5**: setup → fundación → operaciones
 
 Ver [`MVP_TECHNICAL_SCOPE.md`](./MVP_TECHNICAL_SCOPE.md): define **qué debe estar cerrado** antes del primer uso interno/piloto, sin contradecir el scope funcional Fase 1 del producto.
 
+## Próximo backlog de bases (post corte Phase 1 Q-001 / Q-030)
+
+**2026-05-14:** corte documentado — [D-036](../00-product/DECISION_LOG.md) (membresía única), [D-037](../00-product/DECISION_LOG.md) (ingreso corporativo sin obra vía GL+tesorería), [ADR-Phase1-06](./ARCHITECTURE_DECISION_RECORDS.md), [ADR-Phase1-07](./ARCHITECTURE_DECISION_RECORDS.md).
+
+Orden sugerido **antes** de invertir fuerte en UX de cronograma/WBS ([Q-003](../00-product/OPEN_QUESTIONS.md), [Q-004](../00-product/OPEN_QUESTIONS.md)):
+
+1. **Q-001 variante 0B** (misma persona, dos `Company` activas): solo si negocio lo exige — ADR + migración + selector de contexto; hasta entonces [D-036](../00-product/DECISION_LOG.md).
+2. **Q-030 ampliaciones (1) AR nullable o (3) nuevo documento:** si Owner reabre la pregunta — ver [`Q030_CORPORATE_INCOME_CHECKLIST.md`](./Q030_CORPORATE_INCOME_CHECKLIST.md); Phase 1 cerrada con [D-037](../00-product/DECISION_LOG.md).
+3. **Q-007** conciliación bancaria / extractos (tesorería “ERP completo”) — ver [`PENDING_ARCHITECTURE_ITEMS.md`](./PENDING_ARCHITECTURE_ITEMS.md) P-TRZ-05 / P-ERD-06.
+4. **Phase 4** ([`PHASE_4_REPORTING.md`](./PHASE_4_REPORTING.md)): compras, inventario, reportes operativos.
+5. **Phase 5** endurecimiento: tests de invariantes financieros, observabilidad, performance.
+
 ## Riesgos globales
 
 Ver [`RISK_REGISTER.md`](./RISK_REGISTER.md). Deploy operativo: [`DEPLOYMENT_PLAN.md`](./DEPLOYMENT_PLAN.md).

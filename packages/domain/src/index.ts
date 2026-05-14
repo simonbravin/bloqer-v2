@@ -8,7 +8,13 @@ export {
 export {
   OVERVIEW_MODULES,
   OVERVIEW_ROLES,
+  OVERVIEW_MODULE_KEYS_FOR_ZOD,
   buildPermissionMatrixGrid,
   effectivePermissionCeiling,
+  getPermissionModuleGroupSections,
+  PERMISSION_MODULE_GROUP,
+  type OverviewPermissionModule,
+  type PermissionModuleGroupId,
+  type PermissionModuleGroupSection,
   type PermissionMatrixGrid,
 } from "./permissions/matrix-overview";

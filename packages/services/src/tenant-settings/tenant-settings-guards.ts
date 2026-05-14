@@ -13,3 +13,8 @@ export function canEditTenantDisplaySettings(roles: UserRole[]): boolean {
 export function canEditTeamMembership(roles: UserRole[]): boolean {
   return can(roles, "EDIT", "USERS_PERMISSIONS");
 }
+
+/** Notas internas en `/configuracion/permisos` (ADR-Phase1-05). */
+export function canEditPermissionMatrixNotes(roles: UserRole[]): boolean {
+  return can(roles, "EDIT", "USERS_PERMISSIONS") || can(roles, "EDIT", "TENANT_SETTINGS");
+}

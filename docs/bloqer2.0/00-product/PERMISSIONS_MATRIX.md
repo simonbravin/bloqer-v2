@@ -79,6 +79,10 @@ En `packages/domain/src/permissions/matrix.ts`, las claves son las únicas strin
 - **Removido:** `SALES_COLLECTIONS` — no se usaba en gates de servicios; capacidad unificada en `AR`.
 - Otros módulos financieros siguen en la unión `PermissionModule` aunque algunos aún no tengan `can()` en cada servicio (p. ej. `EXPENSES_PAYMENTS`, `BANK_RECONCILIATION`): la matriz documental §2.2 sigue siendo la guía de producto; el código agrega gates de a poco. **Huecos documentados** en §9 *Remaining RBAC decisions*.
 
+### 2.2.2 Pantalla `/configuracion/permisos` (referencia RBAC)
+
+- Matriz **solo lectura** (techo por rol × módulo) generada desde `buildPermissionMatrixGrid()`; la UI agrupa columnas por categoría y permite **notas internas por módulo** persistidas en `Tenant.permissionMatrixNotes` — ver [ADR-Phase1-05](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md) y [`PERMISSIONS_ROUTE_MATRIX.md`](../08-architecture/PERMISSIONS_ROUTE_MATRIX.md).
+
 ### 2.3 Reportes
 
 | Reporte | OWNER | ADMIN | PM | FINANCE | PROCUREMENT | WAREHOUSE | SALES | VIEWER |

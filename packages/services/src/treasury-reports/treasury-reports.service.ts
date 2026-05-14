@@ -124,6 +124,8 @@ export type MovementReportFilters = {
   sourceType?:              string;
   currency?:                string;
   includeInternalTransfers?: boolean;
+  /** When true: only `PAYMENT` movements whose source payment has `projectId` null (corporate AP outflows). */
+  corporateApPaymentsOnly?: boolean;
 };
 
 export type CashFlowFilters = {
@@ -222,6 +224,22 @@ export async function getAccountMovementReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver movimientos");
   }
 
+  let corporatePaymentIds: string[] | undefined;
+  if (filters.corporateApPaymentsOnly) {
+    const pays = await prisma.payment.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        projectId: null,
+        ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+      },
+      select: { id: true },
+    });
+    corporatePaymentIds = pays.map((p) => p.id);
+    if (corporatePaymentIds.length === 0) {
+      return [];
+    }
+  }
+
   // Tenant-guard for accountId
   if (filters.accountId) {
     const acc = await prisma.treasuryAccount.findUnique({
@@ -241,6 +259,9 @@ export async function getAccountMovementReport(
       ...(filters.currency   ? { currency:   filters.currency               } : {}),
       ...(filters.type       ? { type:       filters.type as never          } : {}),
       ...(filters.sourceType ? { sourceType: filters.sourceType as never    } : {}),
+      ...(filters.corporateApPaymentsOnly
+        ? { sourceType: "PAYMENT", sourceId: { in: corporatePaymentIds! } }
+        : {}),
       ...(filters.includeInternalTransfers === false ? { transferId: null } : {}),
       ...((filters.dateFrom || filters.dateTo) ? {
         movementDate: {

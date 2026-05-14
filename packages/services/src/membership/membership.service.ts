@@ -1,8 +1,32 @@
 import { prisma } from "@bloqer/database";
 import type { UserMembership, UserRole } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { can, type UserRole as DomainUserRole } from "@bloqer/domain";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
+
+/** Tenant + roles for session shell (`resolveTenantContext`); built only from DB — no Prisma in `apps/web`. */
+export type SessionTenantContext = {
+  tenantId: string;
+  tenantName: string;
+  companyId: string | null;
+  roles: DomainUserRole[];
+};
+
+export async function getSessionTenantContext(userId: string): Promise<SessionTenantContext | null> {
+  const membership = await getMembershipByUserId(userId);
+  if (!membership) return null;
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: membership.tenantId },
+    select: { name: true },
+  });
+  if (!tenant) return null;
+  return {
+    tenantId: membership.tenantId,
+    tenantName: tenant.name,
+    companyId: membership.companyId,
+    roles: membership.roles as DomainUserRole[],
+  };
+}
 
 export interface CreateMembershipInput {
   userId: string;
@@ -20,6 +44,11 @@ export async function getMembership(
   });
 }
 
+/**
+ * First ACTIVE membership for this user (ordered by `createdAt`).
+ * **Contract (D-036 / ADR-Phase1-06):** at most one `UserMembership` row per `(userId, tenantId)` in Prisma.
+ * If one user can belong to multiple tenants, prefer {@link getMembership} when `tenantId` is known.
+ */
 export async function getMembershipByUserId(userId: string): Promise<UserMembership | null> {
   return prisma.userMembership.findFirst({
     where: { userId, status: "ACTIVE" },
