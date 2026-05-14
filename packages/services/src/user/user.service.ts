@@ -1,6 +1,7 @@
 import { prisma } from "@bloqer/database";
 import type { User, UserStatus } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { updateMyUserProfileSchema } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 
@@ -32,6 +33,47 @@ export async function syncUserFromOAuth(input: SyncUserFromOAuthInput): Promise<
       status: "ACTIVE",
     },
   });
+}
+
+/** Updates the signed-in user's display name. Scoped to `ctx.tenantId` for audit only. */
+export async function updateMyUserProfile(
+  input: unknown,
+  ctx: ServiceContext,
+): Promise<User> {
+  const parsed = updateMyUserProfileSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new ServiceError("VALIDATION", parsed.error.flatten().formErrors[0] ?? "Datos inválidos");
+  }
+
+  const membership = await prisma.userMembership.findFirst({
+    where: { userId: ctx.actorUserId, tenantId: ctx.tenantId },
+  });
+  if (!membership) {
+    throw new ServiceError("FORBIDDEN", "No tenés acceso a este espacio de trabajo");
+  }
+
+  const before = await prisma.user.findUnique({
+    where: { id: ctx.actorUserId },
+    select: { name: true },
+  });
+
+  const user = await prisma.user.update({
+    where: { id: ctx.actorUserId },
+    data: { name: parsed.data.name },
+  });
+
+  await log({
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    action: "USER_PROFILE_UPDATED",
+    entityType: "User",
+    entityId: ctx.actorUserId,
+    before: { name: before?.name ?? null },
+    after: { name: user.name },
+    ipAddress: ctx.ipAddress,
+  });
+
+  return user;
 }
 
 export async function updateUserStatus(

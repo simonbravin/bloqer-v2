@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
@@ -55,6 +56,7 @@ export function SubcontractCertificationForm({
     const res = await action(fd);
     setPending(false);
     if ("error" in res) { setPendingError(res.error ?? null); return; }
+    toast.success(mode === "edit" ? "Certificación actualizada." : "Certificación guardada.");
     if (mode === "edit") { router.push(".."); return; }
     if ("id" in res) router.push(`certificaciones/${res.id}`);
   }

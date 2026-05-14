@@ -20,6 +20,8 @@ import {
 
 interface HeaderProps {
   user: Session["user"];
+  /** Organization name from tenant; shown under product title on desktop. */
+  tenantName?: string | null;
   notificationUnreadCount?: number;
   showPlatformLink?: boolean;
 }
@@ -54,13 +56,22 @@ function ThemeToggle() {
   );
 }
 
-export function Header({ user, notificationUnreadCount = 0, showPlatformLink = false }: HeaderProps) {
+export function Header({
+  user,
+  tenantName,
+  notificationUnreadCount = 0,
+  showPlatformLink = false,
+}: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/90 px-4 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/75 sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
         <div className="hidden min-w-0 sm:block">
           <p className="truncate text-sm font-semibold tracking-tight text-foreground">Bloqer</p>
-          <p className="truncate text-xs text-muted-foreground">Construcción y obra</p>
+          {tenantName ? (
+            <p className="truncate text-xs text-muted-foreground" title={tenantName}>
+              {tenantName}
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-2 sm:hidden">
           <Image
@@ -115,8 +126,8 @@ export function Header({ user, notificationUnreadCount = 0, showPlatformLink = f
                 <Link href="/platform">Plataforma</Link>
               </DropdownMenuItem>
             ) : null}
-            <DropdownMenuItem disabled className="opacity-60">
-              Perfil (próximamente)
+            <DropdownMenuItem asChild>
+              <Link href="/configuracion/perfil">Mi perfil</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

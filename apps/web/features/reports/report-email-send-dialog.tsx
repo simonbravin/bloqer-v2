@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { toast } from "sonner";
 import type { ManualReportType } from "@bloqer/validators";
 import { sendReportEmailAction } from "@/app/(app)/report-email-actions";
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,7 @@ export function ReportEmailSendDialog(props: ReportEmailSendDialogProps) {
       return;
     }
     setFeedback(`Enviado a ${d.recipientEmail} · adjunto ${d.filename}`);
+    toast.success(`Enviado a ${d.recipientEmail}`);
   }
 
   return (

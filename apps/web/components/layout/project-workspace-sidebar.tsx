@@ -2,16 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { NavItem } from "@/features/shell/components/nav-item";
+import { CollapsibleNavSection } from "@/features/shell/components/collapsible-nav-section";
 import {
   buildProjectWorkspaceNavSections,
 } from "@bloqer/services/project-workspace-nav";
 import { tenantGateFromSnapshot } from "@/features/projects/tenant-gate-from-snapshot";
 import { ProjectStatusBadge } from "@/features/projects/components/project-status-badge";
-import { cn } from "@/lib/utils";
 import type { PermissionModule, UserRole } from "@bloqer/domain";
 import type { ProjectShellInfo } from "@bloqer/services";
 
@@ -142,53 +140,20 @@ export function ProjectWorkspaceSidebar({
       <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 pb-3 pr-1">
         {sections.map((section, sectionIndex) => {
           const open = openByTitle[section.title] ?? false;
-          const panelId = `project-nav-section-${sectionIndex}`;
           return (
-            <div key={section.title} className="rounded-md">
-              <button
-                type="button"
-                id={`${panelId}-trigger`}
-                aria-expanded={open}
-                aria-controls={panelId}
-                onClick={() =>
-                  setOpenByTitle((prev) => ({
-                    ...prev,
-                    [section.title]: !(prev[section.title] ?? false),
-                  }))
-                }
-                className={cn(
-                  "flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors duration-150",
-                  "hover:bg-muted/60 hover:text-foreground",
-                  open && "bg-muted/30 text-foreground",
-                )}
-              >
-                <ChevronRight
-                  className={cn(
-                    "h-3.5 w-3.5 shrink-0 text-muted-foreground/80 transition-transform duration-200",
-                    open && "rotate-90",
-                  )}
-                  aria-hidden
-                />
-                <span className="min-w-0 flex-1 truncate">{section.title}</span>
-              </button>
-              {open ? (
-                <div
-                  id={panelId}
-                  role="region"
-                  aria-labelledby={`${panelId}-trigger`}
-                  className="ml-1.5 mt-0.5 flex flex-col gap-0.5 border-l border-border/55 pl-3"
-                >
-                  {section.items.map((item) => (
-                    <NavItem
-                      key={`${item.label}-${item.href}`}
-                      href={item.href}
-                      label={item.label}
-                      matchExact={item.matchExact}
-                    />
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            <CollapsibleNavSection
+              key={section.title}
+              title={section.title}
+              sectionIndex={sectionIndex}
+              open={open}
+              onToggle={() =>
+                setOpenByTitle((prev) => ({
+                  ...prev,
+                  [section.title]: !(prev[section.title] ?? false),
+                }))
+              }
+              items={section.items}
+            />
           );
         })}
       </nav>

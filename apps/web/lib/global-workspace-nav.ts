@@ -1,0 +1,114 @@
+import { can, type UserRole } from "@bloqer/domain";
+import type { PermissionModule } from "@bloqer/domain";
+import { satisfiesNavRequirement, type NavRequirement } from "./nav-config";
+
+export type GlobalNavLinkDef = {
+  label: string;
+  href: string;
+  matchExact?: boolean;
+  require?: NavRequirement;
+};
+
+export type GlobalNavSectionDef = {
+  title: string;
+  items: GlobalNavLinkDef[];
+};
+
+export type GlobalNavSection = {
+  title: string;
+  items: { label: string; href: string; matchExact?: boolean }[];
+};
+
+const FINANCE_AREA: NavRequirement = {
+  anyOf: [
+    { action: "VIEW", module: "AR" },
+    { action: "VIEW", module: "AP" },
+    { action: "VIEW", module: "TREASURY" },
+    { action: "VIEW", module: "ACCOUNTING" },
+  ],
+};
+
+function canReadConfigNav(roles: UserRole[]): boolean {
+  return can(roles, "VIEW", "TENANT_SETTINGS") || can(roles, "VIEW", "USERS_PERMISSIONS");
+}
+
+const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
+  {
+    title: "General",
+    items: [
+      { label: "Inicio", href: "/dashboard" },
+      { label: "Mi perfil", href: "/configuracion/perfil" },
+      { label: "Proyectos", href: "/proyectos", require: { action: "VIEW", module: "PROJECTS" } },
+      { label: "Directorio", href: "/directorio", require: { action: "VIEW", module: "DIRECTORY" } },
+      { label: "Inventario", href: "/inventario", require: { action: "VIEW", module: "INVENTORY" } },
+    ],
+  },
+  {
+    title: "Tesorería",
+    items: [
+      { label: "Resumen", href: "/tesoreria", matchExact: true, require: { action: "VIEW", module: "TREASURY" } },
+      { label: "Cuentas", href: "/tesoreria/cuentas", require: { action: "VIEW", module: "TREASURY" } },
+      { label: "Transferencias", href: "/tesoreria/transferencias", require: { action: "VIEW", module: "TREASURY" } },
+      { label: "Reportes", href: "/tesoreria/reportes", require: { action: "VIEW", module: "TREASURY" } },
+    ],
+  },
+  {
+    title: "Contabilidad",
+    items: [
+      { label: "Resumen", href: "/contabilidad", matchExact: true, require: { action: "VIEW", module: "ACCOUNTING" } },
+      { label: "Plan de cuentas", href: "/contabilidad/cuentas", require: { action: "VIEW", module: "ACCOUNTING" } },
+      { label: "Asientos", href: "/contabilidad/asientos", require: { action: "VIEW", module: "ACCOUNTING" } },
+      { label: "Reglas", href: "/contabilidad/reglas", require: { action: "VIEW", module: "ACCOUNTING" } },
+    ],
+  },
+  {
+    title: "Finanzas",
+    items: [
+      { label: "Tablero", href: "/finanzas", matchExact: true, require: FINANCE_AREA },
+      { label: "Aging C×C", href: "/finanzas/cuentas-por-cobrar-aging", require: { action: "VIEW", module: "AR" } },
+      { label: "Aging C×P", href: "/finanzas/cuentas-por-pagar-aging", require: { action: "VIEW", module: "AP" } },
+    ],
+  },
+  {
+    title: "Configuración",
+    items: [
+      { label: "General", href: "/configuracion", matchExact: true },
+      { label: "Equipo", href: "/configuracion/equipo" },
+      { label: "Permisos", href: "/configuracion/permisos" },
+    ],
+  },
+];
+
+/**
+ * Global shell sidebar (outside a project). Same permission + module gates as route handlers.
+ */
+export function buildGlobalNavSections(
+  roles: UserRole[],
+  isTenantModuleEnabled: (module: PermissionModule) => boolean,
+): GlobalNavSection[] {
+  const sections: GlobalNavSection[] = [];
+
+  for (const def of GLOBAL_NAV_SECTION_DEFS) {
+    if (def.title === "Configuración" && !canReadConfigNav(roles)) continue;
+
+    const items: GlobalNavSection["items"] = [];
+
+    for (const item of def.items) {
+      if (def.title === "Configuración") {
+        items.push({ label: item.label, href: item.href, matchExact: item.matchExact });
+        continue;
+      }
+      if (!item.require) {
+        items.push({ label: item.label, href: item.href, matchExact: item.matchExact });
+        continue;
+      }
+      if (satisfiesNavRequirement(roles, item.require, isTenantModuleEnabled)) {
+        items.push({ label: item.label, href: item.href, matchExact: item.matchExact });
+      }
+    }
+
+    if (items.length > 0) sections.push({ title: def.title, items });
+  }
+
+  return sections;
+}

@@ -296,18 +296,9 @@ function TreasuryHubCard({ card }: { card: NonNullable<FinanceHubOverview["treas
           </>
         )}
       </CardContent>
-      <CardFooter className="flex flex-wrap gap-2 border-t bg-muted/20 px-6 py-4">
+      <CardFooter className="border-t bg-muted/20 px-6 py-4">
         <Button asChild variant="default" size="sm">
           <Link href={card.treasuryHref}>Ir a tesorería</Link>
-        </Button>
-        <Button asChild variant="outline" size="sm">
-          <Link href={card.posicionCajaHref}>Posición de caja</Link>
-        </Button>
-        <Button asChild variant="outline" size="sm">
-          <Link href={card.movimientosHref}>Movimientos</Link>
-        </Button>
-        <Button asChild variant="ghost" size="sm">
-          <Link href={card.reportsHref}>Reportes</Link>
         </Button>
       </CardFooter>
     </Card>
@@ -431,15 +422,6 @@ function CompanyOperationsHubCard({ summary }: { summary: CompanyFinanceOperatio
         <Button asChild size="sm" variant="default">
           <Link href="/finanzas/gastos-generales">Abrir asistente</Link>
         </Button>
-        <Button asChild size="sm" variant="outline">
-          <Link href="/finanzas/gastos-generales/nueva">Nueva factura</Link>
-        </Button>
-        <Button asChild size="sm" variant="outline">
-          <Link href="/finanzas/cuentas-por-pagar">Pagos pendientes</Link>
-        </Button>
-        <Button asChild size="sm" variant="outline">
-          <Link href={summary.movimientosCorporateFilterHref}>Movimientos tesorería</Link>
-        </Button>
       </CardFooter>
     </Card>
   );
@@ -499,18 +481,32 @@ export function FinanceHubView({ overview }: { overview: FinanceHubOverview }) {
         </div>
       ) : null}
 
-      {overview.quickActions.length > 0 ? (
-        <Card className="overflow-hidden border-primary/20 shadow-md ring-1 ring-primary/15">
+      {overview.hubShortcuts.length > 0 ? (
+        <Card className="overflow-hidden border-border/80 shadow-sm ring-1 ring-border/40">
           <CardHeader className="border-b border-border/60 bg-muted/25 pb-4">
-            <CardTitle className="text-lg">Accesos rápidos</CardTitle>
-            <CardDescription>Alta y reportes según tus permisos; un clic para lo operativo del día a día.</CardDescription>
+            <CardTitle className="text-lg">Atajos</CardTitle>
+            <CardDescription>
+              Enlaces según tus permisos y módulos activos. Cada destino aparece una sola vez.
+            </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {overview.quickActions.map((a) => (
-                <Button key={`${a.href}-${a.label}`} asChild variant="secondary" size="default" className="h-auto min-h-11 justify-center px-4 py-2 text-center font-medium shadow-sm">
-                  <Link href={a.href}>{a.label}</Link>
-                </Button>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {overview.hubShortcuts.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "group rounded-xl border border-border/80 bg-card p-4 shadow-sm ring-1 ring-border/40",
+                    "transition-all hover:-translate-y-0.5 hover:border-border hover:shadow-md hover:ring-border",
+                  )}
+                >
+                  <p className="font-semibold text-foreground group-hover:underline group-hover:underline-offset-4">
+                    {item.label}
+                  </p>
+                  {item.description ? (
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+                  ) : null}
+                </Link>
               ))}
             </div>
           </CardContent>
@@ -566,21 +562,6 @@ export function FinanceHubView({ overview }: { overview: FinanceHubOverview }) {
               title="Empresa / gastos generales"
               description="Obligaciones sin proyecto: alquileres, honorarios u otros gastos de estructura. Alineado a facturas y pagos pendientes de empresa."
               block={overview.apCorporateInsight}
-              footerExtra={
-                overview.apCorporateInsight.visible && !overview.apCorporateInsight.loadFailed ? (
-                  <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
-                    <Button asChild variant="outline" size="sm">
-                      <Link href="/finanzas/facturas-proveedor">Facturas y gastos</Link>
-                    </Button>
-                    <Button asChild variant="outline" size="sm">
-                      <Link href="/finanzas/facturas-proveedor/nueva">Nueva factura</Link>
-                    </Button>
-                    <Button asChild variant="outline" size="sm">
-                      <Link href="/finanzas/cuentas-por-pagar">Pagos pendientes</Link>
-                    </Button>
-                  </div>
-                ) : null
-              }
             />
           ) : null}
         </div>
@@ -607,33 +588,6 @@ export function FinanceHubView({ overview }: { overview: FinanceHubOverview }) {
           <AccountingCard section={overview.accountingSection} />
         </section>
       ) : null}
-
-      <section className="scroll-mt-8 space-y-4">
-        <SectionIntro
-          eyebrow="Detalle"
-          title="Reportes y enlaces"
-          description="Listados y reportes con el mismo criterio de permisos que el resto de la aplicación."
-        />
-        {overview.reportLinks.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay enlaces adicionales con tus permisos actuales.</p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {overview.reportLinks.map((r) => (
-              <Link
-                key={r.href}
-                href={r.href}
-                className={cn(
-                  "group rounded-xl border border-border/80 bg-card p-5 shadow-sm ring-1 ring-border/40",
-                  "transition-all hover:-translate-y-0.5 hover:border-border hover:shadow-md hover:ring-border",
-                )}
-              >
-                <p className="font-semibold text-foreground group-hover:underline group-hover:underline-offset-4">{r.label}</p>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{r.description}</p>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }

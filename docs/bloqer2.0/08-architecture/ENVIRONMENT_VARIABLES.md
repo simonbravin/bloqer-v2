@@ -57,7 +57,7 @@ If either is missing/invalid, email features no-op; **boot continues**.
 | `R2_ACCESS_KEY_ID` | |
 | `R2_SECRET_ACCESS_KEY` | |
 | `R2_BUCKET_NAME` | |
-| `R2_PUBLIC_URL` | **Optional** in schema — presigned flows may not need it. |
+| `R2_PUBLIC_URL` | **Opcional** para presigned flows. Un valor vacío se ignora (equivale a no definirla). Si está definida, debe ser URL `http(s)` válida. |
 
 ## Optional — Operational alerts cron
 

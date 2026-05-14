@@ -18,7 +18,6 @@ import { cancelTenantInvitationAction } from "../../invitation-actions";
 
 interface PageProps {
   params: Promise<{ invitationId: string }>;
-  searchParams: Promise<{ ok?: string; err?: string }>;
 }
 
 function invitationStatusLabel(s: string) {
@@ -36,13 +35,12 @@ function invitationStatusLabel(s: string) {
   }
 }
 
-export default async function ConfiguracionEquipoInvitacionDetallePage({ params, searchParams }: PageProps) {
+export default async function ConfiguracionEquipoInvitacionDetallePage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
   if (!canReadTenantConfigArea(current.tenantCtx.roles)) notFound();
 
   const { invitationId } = await params;
-  const sp = await searchParams;
   const ctx = await buildTenantServiceContext();
   if (!ctx) redirect("/login");
 
@@ -60,15 +58,6 @@ export default async function ConfiguracionEquipoInvitacionDetallePage({ params,
     c.delete({ name: TENANT_INVITE_LINK_FLASH_COOKIE, path: TENANT_INVITE_LINK_FLASH_COOKIE_PATH });
   }
 
-  let errMsg: string | null = null;
-  if (sp.err) {
-    try {
-      errMsg = decodeURIComponent(sp.err);
-    } catch {
-      errMsg = sp.err;
-    }
-  }
-
   const canEdit = canEditTeamMembership(current.tenantCtx.roles);
 
   return (
@@ -82,12 +71,6 @@ export default async function ConfiguracionEquipoInvitacionDetallePage({ params,
         <h1 className="text-2xl font-bold tracking-tight">Invitación</h1>
         <p className="text-sm text-muted-foreground">{inv.email}</p>
       </div>
-      {sp.ok === "cancelled" ? <p className="text-sm text-muted-foreground">Invitación cancelada.</p> : null}
-      {errMsg ? (
-        <p className="text-sm text-destructive" role="alert">
-          {errMsg}
-        </p>
-      ) : null}
 
       {flashLink ? (
         <section className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 dark:bg-amber-500/10">

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Label }    from "@/components/ui/label";
 import { Input }    from "@/components/ui/input";
 import { Button }   from "@/components/ui/button";
@@ -163,10 +164,12 @@ export function DocumentForm({
       const nextPath =
         afterUploadPath ??
         (projectId ? `/proyectos/${projectId}/documentos/${documentId}` : null);
+      toast.success("Documento guardado.");
       if (nextPath) {
         router.push(nextPath);
       }
       router.refresh();
+      setPending(false);
     } catch {
       setError("Error de red. Verificá tu conexión e intentá de nuevo.");
       setPending(false);

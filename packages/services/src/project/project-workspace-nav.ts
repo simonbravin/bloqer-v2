@@ -32,8 +32,11 @@ export function buildProjectWorkspaceNavSections(
   if (gate.isEnabled("BUDGETS") && canBudgetsArea) {
     planificacion.push({ label: "Presupuesto", href: `${base}/presupuestos` });
   }
+  if (gate.isEnabled("PROJECTS") && can(roles, "VIEW", "PROJECTS")) {
+    planificacion.push({ label: "Cronograma", href: `${base}/cronograma` });
+  }
   if (gate.isEnabled("PROJECTS") && gate.isEnabled("BUDGETS") && canViewProjectCostControlReport(roles)) {
-    planificacion.push({ label: "Control de costos", href: `${base}/control-costos` });
+    planificacion.push({ label: "WBS y costos", href: `${base}/control-costos` });
   }
   if (gate.isEnabled("PROJECTS") && canViewProjectCashFlowReport(roles)) {
     planificacion.push({ label: "Flujo de caja", href: `${base}/flujo-caja` });

@@ -18,20 +18,18 @@ import {
 
 interface PageProps {
   params: Promise<{ membershipId: string }>;
-  searchParams: Promise<{ ok?: string; err?: string }>;
 }
 
 function membershipStatusLabel(s: string) {
   return s === "ACTIVE" ? "Activo" : "Inactivo";
 }
 
-export default async function ConfiguracionEquipoDetallePage({ params, searchParams }: PageProps) {
+export default async function ConfiguracionEquipoDetallePage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
   if (!canReadTenantConfigArea(current.tenantCtx.roles)) notFound();
 
   const { membershipId } = await params;
-  const sp = await searchParams;
   const ctx = await buildTenantServiceContext();
   if (!ctx) redirect("/login");
 
@@ -41,15 +39,6 @@ export default async function ConfiguracionEquipoDetallePage({ params, searchPar
   } catch (e) {
     if (e instanceof ServiceError && (e.code === "NOT_FOUND" || e.code === "FORBIDDEN")) notFound();
     throw e;
-  }
-
-  let errMsg: string | null = null;
-  if (sp.err) {
-    try {
-      errMsg = decodeURIComponent(sp.err);
-    } catch {
-      errMsg = sp.err;
-    }
   }
 
   const canEdit = canEditTeamMembership(current.tenantCtx.roles);
@@ -65,12 +54,6 @@ export default async function ConfiguracionEquipoDetallePage({ params, searchPar
         <h1 className="text-2xl font-bold tracking-tight">Miembro</h1>
         <p className="text-sm text-muted-foreground">{member.email}</p>
       </div>
-      {sp.ok ? <p className="text-sm text-muted-foreground">Cambios guardados.</p> : null}
-      {errMsg ? (
-        <p className="text-sm text-destructive" role="alert">
-          {errMsg}
-        </p>
-      ) : null}
 
       <dl className="grid gap-2 text-sm">
         <div>

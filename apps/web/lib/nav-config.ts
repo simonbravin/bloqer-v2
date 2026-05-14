@@ -3,19 +3,19 @@ import type { UserRole } from "@bloqer/domain";
 import type { PermissionAction, PermissionModule } from "@bloqer/domain";
 
 /** Leaf requirement: single can() check */
-type NavLeaf = { action: PermissionAction; module: PermissionModule };
+export type NavLeaf = { action: PermissionAction; module: PermissionModule };
 
 /** Composite: any branch must pass */
-type NavRequirement = NavLeaf | { anyOf: NavRequirement[] };
+export type NavRequirement = NavLeaf | { anyOf: NavRequirement[] };
 
 /** Phase 12B: role permission AND tenant module enabled for each leaf in the requirement tree. */
-function satisfiesWithTenantModules(
+export function satisfiesNavRequirement(
   roles: UserRole[],
   req: NavRequirement,
   isTenantModuleEnabled: (module: PermissionModule) => boolean,
 ): boolean {
   if ("anyOf" in req) {
-    return req.anyOf.some((r) => satisfiesWithTenantModules(roles, r, isTenantModuleEnabled));
+    return req.anyOf.some((r) => satisfiesNavRequirement(roles, r, isTenantModuleEnabled));
   }
   return can(roles, req.action, req.module) && isTenantModuleEnabled(req.module);
 }
@@ -76,6 +76,6 @@ export function filterMainNav(
   const modOk = options?.isTenantModuleEnabled ?? (() => true);
   return MAIN_NAV_DEF.filter((item) => {
     if (!item.require) return true;
-    return satisfiesWithTenantModules(roles, item.require, modOk);
+    return satisfiesNavRequirement(roles, item.require, modOk);
   }).map(({ href, label }) => ({ href, label }));
 }

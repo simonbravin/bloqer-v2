@@ -3,8 +3,6 @@ import { can } from "@bloqer/domain";
 import { getPayableAgingReport, getReceivableAgingReport, type AgingReport } from "../aging/aging.service";
 import { getUnreadNotificationCount } from "../notifications/notification.service";
 import { canRunOperationalAlerts } from "../notifications/operational-alerts-runner.service";
-import { listNegativeStockBalancesForTenant } from "../inventory/stock-balance.service";
-import { listProducts } from "../inventory/product.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { canEditTeamMembership, canReadTenantConfigArea } from "../tenant-settings/tenant-settings-guards";
 import { getTreasurySummaryByCompany } from "../treasury/balance.service";
@@ -48,6 +46,7 @@ export type DashboardProjectSummary = {
   projects: DashboardProjectRow[];
 };
 
+/** @deprecated Kept for optional widgets; no longer returned from `getTenantDashboard`. */
 export type DashboardProjectStatusSlice = {
   status: string;
   count: number;
@@ -81,6 +80,7 @@ export type DashboardFinanceSummary = {
   cashMulticurrency?: boolean;
 };
 
+/** @deprecated Kept for `InventorySummaryCard`; no longer returned from `getTenantDashboard`. */
 export type DashboardInventorySummary = {
   activeProductsCount: number;
   negativeStockCount: number;
@@ -109,12 +109,10 @@ export type TenantDashboardView = {
   subscription: TenantSubscriptionInfo | null;
   generatedAt: string;
   kpis: DashboardKpi[];
-  projectStatusSlices: DashboardProjectStatusSlice[];
   projectSummary?: DashboardProjectSummary;
   /** Presupuestado vs real: solo enlace informativo (sin agregado global Phase 14B). */
   showCostControlHint?: boolean;
   financeSummary?: DashboardFinanceSummary;
-  inventorySummary?: DashboardInventorySummary;
   accountingSummary?: DashboardAccountingSummary;
   unreadNotifications: number;
   showOperationalAlertsLink: boolean;
@@ -277,30 +275,6 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
     });
   }
 
-  let projectStatusSlices: DashboardProjectStatusSlice[] = [];
-  if (gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS")) {
-    const grouped = await prisma.project.groupBy({
-      by: ["status"],
-      where: { tenantId: ctx.tenantId },
-      _count: { _all: true },
-    });
-    const labelMap: Record<string, string> = {
-      DRAFT: "Borrador",
-      ACTIVE: "Activo",
-      ON_HOLD: "En pausa",
-      COMPLETED: "Finalizado",
-      CANCELLED: "Cancelado",
-    };
-    projectStatusSlices = grouped
-      .filter((g) => g._count._all > 0)
-      .map((g) => ({
-        status: g.status,
-        count: g._count._all,
-        label: labelMap[g.status] ?? g.status,
-      }))
-      .sort((a, b) => b.count - a.count);
-  }
-
   const unreadNotifications = await getUnreadNotificationCount(ctx).catch(() => 0);
   kpis.push({
     key:   "notifications_unread",
@@ -339,14 +313,12 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       label: "Proyectos borrador",
       value: String(draftProjectsCount),
       href:  "/proyectos",
-      tone:  draftProjectsCount > 0 ? "default" : "muted",
     });
     kpis.push({
       key:   "projects_on_hold",
       label: "Proyectos en pausa",
       value: String(onHoldProjectsCount),
       href:  "/proyectos",
-      tone:  onHoldProjectsCount > 0 ? "warning" : "muted",
     });
 
     const recent = await prisma.project.findMany({
@@ -594,46 +566,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
     }
   }
 
-  // ─── Inventory ─────────────────────────────────────────────────────────────
-  let inventorySummary: DashboardInventorySummary | undefined;
   if (gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY")) {
-    const products = await safeRun("listProducts", () =>
-      listProducts({ status: "ACTIVE" }, ctx),
-    );
-    const activeProductsCount = products?.length ?? 0;
-    let negativeStockCount = 0;
-    try {
-      const neg = await listNegativeStockBalancesForTenant({ tenantId: ctx.tenantId });
-      negativeStockCount = neg.length;
-    } catch {
-      /* best-effort */
-    }
-    const activeWarehousesCount = await prisma.warehouse.count({
-      where: { tenantId: ctx.tenantId, status: "ACTIVE" },
-    });
-    inventorySummary = { activeProductsCount, negativeStockCount, activeWarehousesCount };
-    kpis.push({
-      key:   "inventory_products",
-      label: "Productos activos",
-      value: String(activeProductsCount),
-      href:  "/inventario/productos",
-    });
-    kpis.push({
-      key:   "inventory_warehouses",
-      label: "Depósitos activos",
-      value: String(activeWarehousesCount),
-      href:  "/inventario/depositos",
-      tone:  "muted",
-    });
-    if (negativeStockCount > 0) {
-      kpis.push({
-        key:    "inventory_negative",
-        label:  "Stock negativo (ubicaciones)",
-        value:  String(negativeStockCount),
-        href:   "/inventario",
-        tone:   "danger",
-      });
-    }
     quickActions.push({
       label:       "Inventario",
       href:        "/inventario",
@@ -753,7 +686,6 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
     (financeSummary?.receivablesOpenByCurrency?.length ?? 0) > 0 ||
     (financeSummary?.payablesOpenByCurrency?.length ?? 0) > 0 ||
     Object.keys(financeSummary?.cashByCurrency ?? {}).length > 0 ||
-    (inventorySummary?.activeProductsCount ?? 0) > 0 ||
     (accountingSummary?.journalDraftCount ?? 0) > 0 ||
     (accountingSummary?.journalPostedCount ?? 0) > 0;
 
@@ -837,12 +769,10 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
     subscription,
     generatedAt,
     kpis,
-    projectStatusSlices,
     projectSummary,
     showCostControlHint,
     financeSummary:
       financeSummary && financeSummaryHasData(financeSummary) ? financeSummary : undefined,
-    inventorySummary,
     accountingSummary,
     unreadNotifications,
     showOperationalAlertsLink,

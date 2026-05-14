@@ -13,11 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateTenantDisplaySettingsAction } from "./configuracion-actions";
 
-interface PageProps {
-  searchParams: Promise<{ ok?: string; err?: string }>;
-}
-
-export default async function ConfiguracionHomePage({ searchParams }: PageProps) {
+export default async function ConfiguracionHomePage() {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
   if (!canReadTenantConfigArea(current.tenantCtx.roles)) notFound();
@@ -25,16 +21,6 @@ export default async function ConfiguracionHomePage({ searchParams }: PageProps)
   const ctx = await buildTenantServiceContext();
   if (!ctx) redirect("/login");
   const tenant = await getTenantSettings(ctx);
-  const sp = await searchParams;
-
-  let errMsg: string | null = null;
-  if (sp.err) {
-    try {
-      errMsg = decodeURIComponent(sp.err);
-    } catch {
-      errMsg = sp.err;
-    }
-  }
 
   const canEditDisplay = canEditTenantDisplaySettings(current.tenantCtx.roles);
 
@@ -44,12 +30,6 @@ export default async function ConfiguracionHomePage({ searchParams }: PageProps)
         <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
         <p className="text-sm text-muted-foreground">Ajustes del tenant y administración del equipo.</p>
       </div>
-      {sp.ok ? <p className="text-sm text-muted-foreground">Cambios guardados.</p> : null}
-      {errMsg ? (
-        <p className="text-sm text-destructive" role="alert">
-          {errMsg}
-        </p>
-      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>

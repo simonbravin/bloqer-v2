@@ -3,18 +3,10 @@ import type { DashboardKpi } from "@bloqer/services";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-const toneBorder: Record<NonNullable<DashboardKpi["tone"]>, string> = {
-  default: "border-transparent",
-  success: "border-primary/40",
-  warning: "border-primary/60",
-  danger:  "border-destructive/60",
-  muted:   "border-muted-foreground/30",
-};
-
 const toneValue: Record<NonNullable<DashboardKpi["tone"]>, string> = {
   default: "text-card-foreground",
-  success: "text-primary",
-  warning: "text-foreground",
+  success: "text-card-foreground",
+  warning: "text-card-foreground",
   danger:  "text-destructive",
   muted:   "text-muted-foreground",
 };
@@ -22,7 +14,7 @@ const toneValue: Record<NonNullable<DashboardKpi["tone"]>, string> = {
 export function DashboardKpiCard({ kpi }: { kpi: DashboardKpi }) {
   const tone = kpi.tone ?? "default";
   const inner = (
-    <Card className={cn("rounded-xl border bg-card border-l-4 shadow-sm transition-shadow duration-200", toneBorder[tone])}>
+    <Card className="rounded-xl border border-border bg-card shadow-sm transition-shadow duration-200">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{kpi.label}</CardTitle>
       </CardHeader>

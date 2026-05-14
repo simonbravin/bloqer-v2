@@ -35,9 +35,7 @@ export function ProjectProgressCard({
       <CardHeader>
         <CardTitle className="text-base">Proyectos</CardTitle>
         <CardDescription>
-          {summary.activeProjectsCount} activo{summary.activeProjectsCount === 1 ? "" : "s"} ·{" "}
-          {summary.draftProjectsCount} borrador · {summary.onHoldProjectsCount} en pausa · Avance promedio:{" "}
-          {progressLabel}
+          Proyectos recientes y presupuesto de venta agregado (activos). Avance promedio: {progressLabel}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

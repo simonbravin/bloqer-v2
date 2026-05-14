@@ -143,9 +143,9 @@ export type FinanceHubOverview = {
   /** Phase 16D — AP corporativo (`projectId` null). */
   apCorporateInsight?: FinanceHubInsightBlock;
   accountingSection?: FinanceHubAccountingSection;
-  quickActions: FinanceHubQuickAction[];
+  /** Single list of shortcuts and reports; each `href` appears at most once (richer `description` wins on collision). */
+  hubShortcuts: FinanceHubReportLink[];
   alerts: FinanceHubAlert[];
-  reportLinks: FinanceHubReportLink[];
   /** Phase 17E — corporate AP snapshot (per-currency balances only). */
   companyOperations?: CompanyFinanceOperationsSummary;
   /** At least one finance-related tenant module is enabled */
@@ -320,10 +320,29 @@ function pushUniqueQuickAction(
   action: FinanceHubQuickAction,
   seen: Set<string>,
 ) {
-  const key = `${action.href}::${action.label}`;
+  const key = action.href;
   if (seen.has(key)) return;
   seen.add(key);
   list.push(action);
+}
+
+function mergeFinanceHubShortcuts(
+  quickActions: FinanceHubQuickAction[],
+  reportLinks: FinanceHubReportLink[],
+): FinanceHubReportLink[] {
+  const byHref = new Map<string, FinanceHubReportLink>();
+  const order: string[] = [];
+  for (const r of reportLinks) {
+    byHref.set(r.href, r);
+    order.push(r.href);
+  }
+  for (const q of quickActions) {
+    if (!byHref.has(q.href)) {
+      byHref.set(q.href, { label: q.label, href: q.href, description: "" });
+      order.push(q.href);
+    }
+  }
+  return order.map((h) => byHref.get(h)!);
 }
 
 /**
@@ -563,6 +582,8 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
     });
   }
 
+  const hubShortcuts = mergeFinanceHubShortcuts(quickActions, reportLinks);
+
   return {
     arCard,
     apCard,
@@ -572,9 +593,8 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
     apWithProjectInsight,
     apCorporateInsight,
     accountingSection,
-    quickActions,
+    hubShortcuts,
     alerts,
-    reportLinks,
     companyOperations,
     hasFinanceModules,
     canSeeAnything,

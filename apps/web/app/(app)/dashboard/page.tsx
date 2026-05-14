@@ -11,8 +11,6 @@ import {
   DashboardOnboardingChecklist,
   DashboardProjectsOverview,
   DashboardQuickActions,
-  DashboardStatusDistribution,
-  InventorySummaryCard,
   dashboardHeaderQuickNav,
 } from "@/features/dashboard";
 import { getCurrentUser } from "@/lib/auth";
@@ -78,18 +76,12 @@ export default async function DashboardPage() {
 
       <DashboardKpiGrid kpis={dash.kpis} />
 
-      {dash.projectStatusSlices.length > 0 ? (
-        <DashboardStatusDistribution slices={dash.projectStatusSlices} />
-      ) : null}
-
       <div className="grid gap-6 lg:grid-cols-2">
         {dash.projectSummary ? (
           <DashboardProjectsOverview summary={dash.projectSummary} showCostControlHint={dash.showCostControlHint} />
         ) : null}
 
         {dash.financeSummary ? <DashboardFinanceOverview finance={dash.financeSummary} /> : null}
-
-        {dash.inventorySummary ? <InventorySummaryCard summary={dash.inventorySummary} /> : null}
 
         {dash.accountingSummary ? <DashboardAccountingCard summary={dash.accountingSummary} /> : null}
       </div>

@@ -2,10 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { NavItem } from "@/features/shell/components/nav-item";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
+import { CollapsibleNavSection } from "@/features/shell/components/collapsible-nav-section";
 import { tenantGateFromSnapshot } from "@/features/projects/tenant-gate-from-snapshot";
 import type { PermissionModule, UserRole } from "@bloqer/domain";
-import { filterMainNav } from "@/lib/nav-config";
+import { buildGlobalNavSections } from "@/lib/global-workspace-nav";
+
+function isNavItemActive(pathname: string, href: string, matchExact?: boolean) {
+  return matchExact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+}
 
 interface SidebarProps {
   tenantName?: string;
@@ -16,8 +22,25 @@ interface SidebarProps {
 }
 
 export function Sidebar({ tenantName, roles, moduleGateSnapshot }: SidebarProps) {
-  const gate = tenantGateFromSnapshot(moduleGateSnapshot ?? {});
-  const mainNav = filterMainNav(roles, { isTenantModuleEnabled: (m) => gate.isEnabled(m) });
+  const pathname = usePathname();
+  const gate = useMemo(() => tenantGateFromSnapshot(moduleGateSnapshot ?? {}), [moduleGateSnapshot]);
+  const sections = useMemo(
+    () => buildGlobalNavSections(roles, (m) => gate.isEnabled(m)),
+    [roles, gate],
+  );
+
+  const [openByTitle, setOpenByTitle] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setOpenByTitle((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const s of sections) {
+        const hasActive = s.items.some((item) => isNavItemActive(pathname, item.href, item.matchExact));
+        next[s.title] = hasActive ? true : (prev[s.title] ?? false);
+      }
+      return next;
+    });
+  }, [pathname, sections]);
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
@@ -41,10 +64,25 @@ export function Sidebar({ tenantName, roles, moduleGateSnapshot }: SidebarProps)
           </p>
         ) : null}
       </div>
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-3">
-        {mainNav.map((item) => (
-          <NavItem key={item.href} href={item.href} label={item.label} />
-        ))}
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3 pr-1">
+        {sections.map((section, sectionIndex) => {
+          const open = openByTitle[section.title] ?? false;
+          return (
+            <CollapsibleNavSection
+              key={section.title}
+              title={section.title}
+              sectionIndex={sectionIndex}
+              open={open}
+              onToggle={() =>
+                setOpenByTitle((prev) => ({
+                  ...prev,
+                  [section.title]: !(prev[section.title] ?? false),
+                }))
+              }
+              items={section.items}
+            />
+          );
+        })}
       </nav>
     </aside>
   );
