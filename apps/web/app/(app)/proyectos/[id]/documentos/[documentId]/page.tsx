@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ interface PageProps {
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-AR");
+  return formatDate(iso);
 }
 
 function fmtSize(bytes: number) {

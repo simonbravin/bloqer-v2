@@ -8,14 +8,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { listInternalTransfers } from "@bloqer/services";
 import { cancelInternalTransferAction } from "../actions";
-
-function fmtDate(d: Date) {
-  return new Date(d).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
+import { formatDate } from "@/lib/format";
 
 function fmtMoney(value: string, currency: string) {
   return (
@@ -83,7 +76,7 @@ export default async function TransferenciasPage() {
                   };
                   return (
                     <TableRow key={t.id}>
-                      <TableCell className="text-sm">{fmtDate(t.transferDate)}</TableCell>
+                      <TableCell className="text-sm">{formatDate(t.transferDate)}</TableCell>
                       <TableCell className="text-sm">{t.sourceAccountName}</TableCell>
                       <TableCell className="text-sm">{t.destinationAccountName}</TableCell>
                       <TableCell className="text-sm">{t.currency}</TableCell>

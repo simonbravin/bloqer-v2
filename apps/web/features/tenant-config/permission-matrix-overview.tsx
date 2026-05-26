@@ -9,6 +9,7 @@ import type {
   UserRole,
 } from "@bloqer/domain";
 import { useRouter } from "next/navigation";
+import { formatDateTime } from "@/lib/format";
 import { updateTenantPermissionMatrixNotesAction } from "@/app/(app)/configuracion/permission-matrix-actions";
 import {
   Accordion,
@@ -220,7 +221,7 @@ export function PermissionMatrixOverview({
             />
             {openModule && notes[openModule] ? (
               <p className="text-[11px] text-muted-foreground">
-                Última actualización: {new Date(notes[openModule]!.updatedAt).toLocaleString("es-AR")}
+                Última actualización: {formatDateTime(notes[openModule]!.updatedAt)}
               </p>
             ) : null}
           </div>

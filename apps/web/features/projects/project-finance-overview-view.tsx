@@ -96,7 +96,7 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
                   <Link href={sections.ar.links.invoices}>Facturas</Link>
                 </Button>
                 <Button asChild variant="outline" size="sm">
-                  <Link href={sections.ar.links.receivables}>C×C</Link>
+                  <Link href={sections.ar.links.receivables}>Cuentas por cobrar</Link>
                 </Button>
                 <Button asChild variant="outline" size="sm">
                   <Link href={sections.ar.links.collections}>Cobranzas</Link>
@@ -137,7 +137,7 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
                   <Link href={sections.ap.links.supplierInvoices}>Facturas proveedor</Link>
                 </Button>
                 <Button asChild variant="outline" size="sm">
-                  <Link href={sections.ap.links.payables}>C×P</Link>
+                  <Link href={sections.ap.links.payables}>Cuentas por pagar</Link>
                 </Button>
                 <Button asChild variant="outline" size="sm">
                   <Link href={sections.ap.links.payments}>Pagos</Link>

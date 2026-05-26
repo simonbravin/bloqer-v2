@@ -37,7 +37,6 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
     title: "General",
     items: [
       { label: "Inicio", href: "/dashboard" },
-      { label: "Mi perfil", href: "/configuracion/perfil" },
       { label: "Proyectos", href: "/proyectos", require: { action: "VIEW", module: "PROJECTS" } },
       { label: "Directorio", href: "/directorio", require: { action: "VIEW", module: "DIRECTORY" } },
       { label: "Inventario", href: "/inventario", require: { action: "VIEW", module: "INVENTORY" } },
@@ -65,14 +64,15 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
     title: "Finanzas",
     items: [
       { label: "Tablero", href: "/finanzas", matchExact: true, require: FINANCE_AREA },
-      { label: "Aging C×C", href: "/finanzas/cuentas-por-cobrar-aging", require: { action: "VIEW", module: "AR" } },
-      { label: "Aging C×P", href: "/finanzas/cuentas-por-pagar-aging", require: { action: "VIEW", module: "AP" } },
+      { label: "Cuentas por cobrar", href: "/finanzas/cuentas-por-cobrar-aging", require: { action: "VIEW", module: "AR" } },
+      { label: "Cuentas por pagar", href: "/finanzas/cuentas-por-pagar-aging", require: { action: "VIEW", module: "AP" } },
     ],
   },
   {
     title: "Configuración",
     items: [
       { label: "General", href: "/configuracion", matchExact: true },
+      { label: "Mi perfil", href: "/configuracion/perfil" },
       { label: "Equipo", href: "/configuracion/equipo" },
       { label: "Permisos", href: "/configuracion/permisos" },
     ],
@@ -89,12 +89,15 @@ export function buildGlobalNavSections(
   const sections: GlobalNavSection[] = [];
 
   for (const def of GLOBAL_NAV_SECTION_DEFS) {
-    if (def.title === "Configuración" && !canReadConfigNav(roles)) continue;
-
     const items: GlobalNavSection["items"] = [];
 
     for (const item of def.items) {
       if (def.title === "Configuración") {
+        if (item.href === "/configuracion/perfil") {
+          items.push({ label: item.label, href: item.href, matchExact: item.matchExact });
+          continue;
+        }
+        if (!canReadConfigNav(roles)) continue;
         items.push({ label: item.label, href: item.href, matchExact: item.matchExact });
         continue;
       }

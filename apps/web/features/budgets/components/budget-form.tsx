@@ -8,9 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import { createBudgetSchema, type CreateBudgetInput } from "@bloqer/validators";
 
 interface BudgetFormProps {
@@ -60,19 +58,11 @@ export function BudgetForm({ projectId, onSubmit }: BudgetFormProps) {
 
       <div className="space-y-1.5">
         <Label>Moneda</Label>
-        <Select
+        <CurrencySelect
           value={form.watch("currency") ?? "ARS"}
           onValueChange={(v) => form.setValue("currency", v)}
-        >
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ARS">ARS — Peso argentino</SelectItem>
-            <SelectItem value="USD">USD — Dólar</SelectItem>
-            <SelectItem value="EUR">EUR — Euro</SelectItem>
-          </SelectContent>
-        </Select>
+          triggerClassName="w-full max-w-xs"
+        />
       </div>
 
       <div className="rounded-lg border p-4 space-y-4">

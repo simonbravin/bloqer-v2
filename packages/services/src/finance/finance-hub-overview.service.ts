@@ -376,14 +376,14 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
   const reportLinks: FinanceHubReportLink[] = [];
   if (arMod && arPerm) {
     reportLinks.push({
-      label:       "Aging — Cuentas por cobrar",
+      label:       "Cuentas por cobrar",
       description: "Por cliente y vencimiento.",
       href:        "/finanzas/cuentas-por-cobrar-aging",
     });
   }
   if (apMod && apPerm) {
     reportLinks.push({
-      label:       "Aging proveedores",
+      label:       "Cuentas por pagar",
       description: "Por proveedor y vencimiento (global).",
       href:        "/finanzas/cuentas-por-pagar-aging",
     });
@@ -514,7 +514,7 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
   const quickActions: FinanceHubQuickAction[] = [];
   const qaSeen = new Set<string>();
   if (arMod && arPerm) {
-    pushUniqueQuickAction(quickActions, { label: "Aging cuentas por cobrar", href: "/finanzas/cuentas-por-cobrar-aging" }, qaSeen);
+    pushUniqueQuickAction(quickActions, { label: "Cuentas por cobrar", href: "/finanzas/cuentas-por-cobrar-aging" }, qaSeen);
   }
   if (apMod && apPerm) {
     pushUniqueQuickAction(
@@ -528,7 +528,7 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
       qaSeen,
     );
     pushUniqueQuickAction(quickActions, { label: "Pagos pendientes", href: "/finanzas/cuentas-por-pagar" }, qaSeen);
-    pushUniqueQuickAction(quickActions, { label: "Aging proveedores", href: "/finanzas/cuentas-por-pagar-aging" }, qaSeen);
+    pushUniqueQuickAction(quickActions, { label: "Cuentas por pagar", href: "/finanzas/cuentas-por-pagar-aging" }, qaSeen);
     pushUniqueQuickAction(quickActions, { label: "Facturas y gastos", href: "/finanzas/facturas-proveedor" }, qaSeen);
   }
   if (trMod && trPerm) {

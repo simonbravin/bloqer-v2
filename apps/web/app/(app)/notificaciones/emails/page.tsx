@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { canRunOperationalAlerts, listEmailDeliveryLogs } from "@bloqer/services";
 import type { EmailDeliveryStatus, EmailDeliveryType } from "@bloqer/database";
+import { formatDateTime } from "@/lib/format";
 
 const STATUSES: EmailDeliveryStatus[] = ["PENDING", "SENT", "SKIPPED", "FAILED"];
 const EMAIL_TYPES: EmailDeliveryType[] = [
@@ -29,17 +30,7 @@ function parseEnumParam<T extends string>(value: string | undefined, allowed: re
 }
 
 function fmtWhen(iso: Date) {
-  try {
-    return new Date(iso).toLocaleString("es-AR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return String(iso);
-  }
+  return formatDateTime(iso, String(iso));
 }
 
 interface PageProps {

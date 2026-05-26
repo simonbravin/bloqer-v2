@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import type { MovementReportRow } from "@bloqer/services";
 import { treasuryMovementTypeSupportsAccountingDraft } from "@bloqer/services";
 import { TreasuryMovementAccountingButton } from "@/features/accounting";
@@ -11,7 +12,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 function fmtDate(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("es-AR");
+  return formatDate(d );
 }
 
 function fmtSigned(signed: string, currency: string) {

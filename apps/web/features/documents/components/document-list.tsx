@@ -1,10 +1,11 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import type { DocumentAttachmentView } from "@bloqer/services";
 import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge }   from "./document-status-badge";
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-AR");
+  return formatDate(iso);
 }
 
 function fmtSize(bytes: number) {

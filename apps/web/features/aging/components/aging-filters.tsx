@@ -4,6 +4,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { CurrencyFilterSelect } from "@/components/ui/currency-select";
 import {
   Select,
   SelectContent,
@@ -45,14 +46,11 @@ export function AgingFilters() {
         />
       </div>
 
-      <div className="min-w-[160px]">
+      <div className="min-w-[180px]">
         <Label className="text-xs text-muted-foreground mb-1 block">Moneda</Label>
-        <Input
-          placeholder="ARS, USD…"
-          defaultValue={sp.get("currency") ?? ""}
-          onBlur={(e) => update("currency", e.target.value.toUpperCase())}
-          onKeyDown={(e) => { if (e.key === "Enter") update("currency", (e.target as HTMLInputElement).value.toUpperCase()); }}
-          className="uppercase"
+        <CurrencyFilterSelect
+          value={sp.get("currency") ?? ""}
+          onValueChange={(v) => update("currency", v)}
         />
       </div>
 

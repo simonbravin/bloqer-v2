@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -198,9 +199,9 @@ export default async function SubcontratoPage({ params }: PageProps) {
                     </Link>
                   </td>
                   <td className="px-4 py-2 text-muted-foreground text-xs">
-                    {new Date(c.periodStart).toLocaleDateString("es-AR")} – {new Date(c.periodEnd).toLocaleDateString("es-AR")}
+                    {formatDate(c.periodStart)} – {formatDate(c.periodEnd)}
                   </td>
-                  <td className="px-4 py-2 text-xs">{new Date(c.certificationDate).toLocaleDateString("es-AR")}</td>
+                  <td className="px-4 py-2 text-xs">{formatDate(c.certificationDate)}</td>
                   <td className="px-4 py-2 text-right font-medium">
                     {parseFloat(c.totalAmount).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
                   </td>

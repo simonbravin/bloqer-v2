@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { createTreasuryAccountAction } from "@/app/(app)/tesoreria/actions";
+import { CurrencySelect } from "@/components/ui/currency-select";
 
 interface Props {
   accounts?: never;
@@ -20,6 +21,7 @@ export function TreasuryAccountForm(_props: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [type, setType] = useState<string>("");
+  const [currency, setCurrency] = useState("ARS");
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -29,7 +31,7 @@ export function TreasuryAccountForm(_props: Props) {
       const res = await createTreasuryAccountAction({
         name:           fd.get("name") as string,
         type:           type as "BANK" | "CASH" | "DIGITAL_WALLET" | "OTHER",
-        currency:       (fd.get("currency") as string) || "ARS",
+        currency,
         bankName:       (fd.get("bankName") as string) || null,
         accountNumber:  (fd.get("accountNumber") as string) || null,
         alias:          (fd.get("alias") as string) || null,
@@ -74,7 +76,7 @@ export function TreasuryAccountForm(_props: Props) {
 
           <div className="space-y-1">
             <Label htmlFor="currency">Moneda</Label>
-            <Input id="currency" name="currency" defaultValue="ARS" maxLength={3} />
+            <CurrencySelect id="currency" value={currency} onValueChange={setCurrency} />
           </div>
 
           <div className="space-y-1">

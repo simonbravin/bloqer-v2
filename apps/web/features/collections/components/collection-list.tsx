@@ -5,6 +5,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CollectionStatusBadge } from "./collection-status-badge";
 import type { CollectionStatus } from "@bloqer/database";
+import { formatDate } from "@/lib/format";
 
 export type CollectionListItem = {
   id: string;
@@ -16,14 +17,6 @@ export type CollectionListItem = {
   notes: string | null;
   status: CollectionStatus;
 };
-
-function fmtDate(d: Date) {
-  return new Date(d).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
 
 function fmtMoney(value: string) {
   return new Intl.NumberFormat("es-AR", {
@@ -62,7 +55,7 @@ export function CollectionList({ collections, projectId }: CollectionListProps) 
       <TableBody>
         {collections.map((c) => (
           <TableRow key={c.id}>
-            <TableCell className="text-sm">{fmtDate(c.collectionDate)}</TableCell>
+            <TableCell className="text-sm">{formatDate(c.collectionDate)}</TableCell>
             <TableCell className="text-sm">{c.accountName}</TableCell>
             <TableCell className="text-sm">{c.currency}</TableCell>
             <TableCell className="text-right font-mono text-sm">

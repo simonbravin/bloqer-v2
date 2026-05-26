@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
@@ -74,7 +75,7 @@ export default async function ConfiguracionEquipoPage() {
                   <TableCell>{membershipStatusLabel(r.status)}</TableCell>
                   <TableCell className="text-xs">{r.roles.join(", ")}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">
-                    {r.createdAt.toLocaleDateString("es-AR")}
+                    {formatDate(r.createdAt)}
                   </TableCell>
                   <TableCell>
                     <Button variant="link" className="h-auto p-0" asChild>
@@ -107,7 +108,7 @@ export default async function ConfiguracionEquipoPage() {
                     <TableCell>{inv.email}</TableCell>
                     <TableCell className="text-xs">{inv.roles.join(", ")}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">
-                      {inv.expiresAt.toLocaleString("es-AR")}
+                      {formatDateTime(inv.expiresAt)}
                     </TableCell>
                     <TableCell>
                       <Button variant="link" className="h-auto p-0" asChild>

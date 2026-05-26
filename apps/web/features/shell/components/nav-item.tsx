@@ -27,8 +27,8 @@ export function NavItem({ href, label, icon, matchExact }: NavItemProps) {
         : "border border-transparent text-muted-foreground hover:bg-muted/70 hover:text-foreground",
     )}
     >
-      {icon}
-      {label}
+      {icon ? <span className="shrink-0 text-current">{icon}</span> : null}
+      <span className="truncate">{label}</span>
     </Link>
   );
 }

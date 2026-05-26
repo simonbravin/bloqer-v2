@@ -6,7 +6,6 @@ import { ProjectWorkspaceSidebar } from "./project-workspace-sidebar";
 import { Sidebar } from "./sidebar";
 
 interface AppNavColumnProps {
-  tenantName?: string;
   roles: UserRole[];
   /** Serialized tenant module flags; omitted keys default to enabled (same as server gate). */
   moduleGateSnapshot?: Partial<Record<PermissionModule, boolean>>;
@@ -14,12 +13,7 @@ interface AppNavColumnProps {
   isTenantUser: boolean;
 }
 
-export function AppNavColumn({
-  tenantName,
-  roles,
-  moduleGateSnapshot,
-  isTenantUser,
-}: AppNavColumnProps) {
+export function AppNavColumn({ roles, moduleGateSnapshot, isTenantUser }: AppNavColumnProps) {
   const pathname = usePathname();
   const m = pathname.match(/^\/proyectos\/([^/]+)/);
   const projectId = m?.[1];
@@ -28,12 +22,11 @@ export function AppNavColumn({
     return (
       <ProjectWorkspaceSidebar
         projectId={projectId}
-        tenantName={tenantName}
         roles={roles}
         moduleGateSnapshot={moduleGateSnapshot ?? {}}
       />
     );
   }
 
-  return <Sidebar tenantName={tenantName} roles={roles} moduleGateSnapshot={moduleGateSnapshot} />;
+  return <Sidebar roles={roles} moduleGateSnapshot={moduleGateSnapshot} />;
 }

@@ -1,4 +1,5 @@
 "use client";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 import Link from "next/link";
 import { SupplierInvoiceStatusBadge } from "./supplier-invoice-status-badge";
@@ -44,7 +45,7 @@ export function SupplierInvoiceList({ invoices, hrefPrefix }: Props) {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground hidden sm:block">
-              Vence {new Date(inv.dueDate).toLocaleDateString("es-AR")}
+              Vence {formatDate(inv.dueDate)}
             </span>
             <span className="text-sm font-medium tabular-nums">
               {Number(inv.totalAmount).toLocaleString("es-AR", { style: "currency", currency: inv.currency })}

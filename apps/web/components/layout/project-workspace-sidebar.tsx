@@ -12,6 +12,7 @@ import { tenantGateFromSnapshot } from "@/features/projects/tenant-gate-from-sna
 import { ProjectStatusBadge } from "@/features/projects/components/project-status-badge";
 import type { PermissionModule, UserRole } from "@bloqer/domain";
 import type { ProjectShellInfo } from "@bloqer/services";
+import { ProjectNavIcon } from "@/lib/project-nav-icons";
 
 function isNavItemActive(pathname: string, href: string, matchExact?: boolean) {
   return matchExact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
@@ -24,14 +25,12 @@ type ShellState =
 
 interface ProjectWorkspaceSidebarProps {
   projectId: string;
-  tenantName?: string;
   roles: UserRole[];
   moduleGateSnapshot: Partial<Record<PermissionModule, boolean>>;
 }
 
 export function ProjectWorkspaceSidebar({
   projectId,
-  tenantName,
   roles,
   moduleGateSnapshot,
 }: ProjectWorkspaceSidebarProps) {
@@ -86,7 +85,7 @@ export function ProjectWorkspaceSidebar({
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-      <div className="border-b border-sidebar-border/80 px-4 py-5">
+      <div className="flex h-14 shrink-0 items-center border-b border-sidebar-border/80 px-4">
         <Link
           href="/dashboard"
           className="inline-block rounded-md outline-none ring-offset-sidebar focus-visible:ring-2 focus-visible:ring-ring"
@@ -100,11 +99,6 @@ export function ProjectWorkspaceSidebar({
             className="h-8 w-auto max-w-[9.5rem] object-contain object-left"
           />
         </Link>
-        {tenantName ? (
-          <p className="mt-2 truncate text-xs font-medium leading-snug text-muted-foreground" title={tenantName}>
-            {tenantName}
-          </p>
-        ) : null}
       </div>
 
       <div className="mx-2 mb-3 mt-3 rounded-xl border border-border/80 bg-card px-3 py-3 text-card-foreground shadow-sm">
@@ -152,7 +146,10 @@ export function ProjectWorkspaceSidebar({
                   [section.title]: !(prev[section.title] ?? false),
                 }))
               }
-              items={section.items}
+              items={section.items.map((item) => ({
+                ...item,
+                icon: <ProjectNavIcon label={item.label} />,
+              }))}
             />
           );
         })}

@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -96,9 +97,9 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
               <CertificationStatusBadge status={cert.status} />
             </div>
             <p className="text-xs text-muted-foreground">
-              {new Date(cert.periodStart).toLocaleDateString("es-AR")}
+              {formatDate(cert.periodStart)}
               {" — "}
-              {new Date(cert.periodEnd).toLocaleDateString("es-AR")}
+              {formatDate(cert.periodEnd)}
             </p>
           </div>
         </div>

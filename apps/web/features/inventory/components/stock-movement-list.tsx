@@ -1,4 +1,5 @@
 "use client";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 import type { StockMovementView } from "@bloqer/services";
 import { StockMovementAccountingButton } from "@/features/accounting";
@@ -44,7 +45,7 @@ export function StockMovementList({ movements, accountingReturnPath, canEditAcco
           {movements.map((m) => (
             <tr key={m.id} className="hover:bg-muted/30">
               <td className="px-4 py-2 tabular-nums">
-                {new Date(m.movementDate).toLocaleDateString("es-AR")}
+                {formatDate(m.movementDate)}
               </td>
               <td className="px-4 py-2">
                 <StockMovementTypeBadge type={m.type} />

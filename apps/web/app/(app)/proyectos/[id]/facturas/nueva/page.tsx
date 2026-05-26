@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -57,8 +58,8 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
     const certSummary: CertSummary = {
       id: cert.id,
       code: cert.code,
-      periodStart: new Date(cert.periodStart).toLocaleDateString("es-AR"),
-      periodEnd:   new Date(cert.periodEnd).toLocaleDateString("es-AR"),
+      periodStart: formatDate(cert.periodStart),
+      periodEnd:   formatDate(cert.periodEnd),
       totalAmount: cert.totalAmount,
       currency:    cert.currency,
     };

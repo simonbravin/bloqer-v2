@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CurrencyFilterSelect } from "@/components/ui/currency-select";
 
 const TYPE_OPTIONS = [
   { value: "_all",        label: "Todos los tipos" },
@@ -63,12 +64,10 @@ export function MovementFilters() {
       </div>
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">Moneda</Label>
-        <Input
-          placeholder="ARS, USD…"
-          defaultValue={sp.get("currency") ?? ""}
-          onBlur={(e) => update("currency", e.target.value.toUpperCase())}
-          onKeyDown={(e) => { if (e.key === "Enter") update("currency", (e.target as HTMLInputElement).value.toUpperCase()); }}
-          className="w-24 uppercase"
+        <CurrencyFilterSelect
+          value={sp.get("currency") ?? ""}
+          onValueChange={(v) => update("currency", v)}
+          triggerClassName="w-[14rem]"
         />
       </div>
       <div className="space-y-1">

@@ -30,8 +30,8 @@ import {
 import { exportPayableAgingPdf, exportProjectCostControlPdf, exportReceivableAgingPdf } from "./report-pdf-export.service";
 
 const REPORT_LABEL: Record<SendReportByEmailInputValidated["reportType"], string> = {
-  AR_AGING: "Aging — Cuentas por cobrar",
-  AP_AGING: "Aging — Cuentas por pagar",
+  AR_AGING: "Cuentas por cobrar",
+  AP_AGING: "Cuentas por pagar",
   PROJECT_COST_CONTROL: "Control de costos (proyecto)",
   TREASURY_CASH_POSITION: "Tesorería — Posición de caja",
   TREASURY_MOVEMENTS: "Tesorería — Movimientos",

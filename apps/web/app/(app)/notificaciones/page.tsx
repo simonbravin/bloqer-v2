@@ -14,6 +14,7 @@ import {
   markAllNotificationsReadAction,
   markNotificationReadFormAction,
 } from "./actions";
+import { formatDateTime } from "@/lib/format";
 
 interface PageProps {
   searchParams: Promise<{ filtro?: string }>;
@@ -48,17 +49,7 @@ function safeActionHref(url: string | null): string | null {
 }
 
 function fmtWhen(iso: string) {
-  try {
-    return new Date(iso).toLocaleString("es-AR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+  return formatDateTime(iso, iso);
 }
 
 export default async function NotificacionesPage({ searchParams }: PageProps) {

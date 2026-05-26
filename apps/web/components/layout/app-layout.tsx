@@ -27,7 +27,6 @@ export function AppLayout({
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <AppNavColumn
-        tenantName={tenantCtx?.tenantName}
         roles={roles}
         moduleGateSnapshot={moduleGateSnapshot}
         isTenantUser={Boolean(tenantCtx)}

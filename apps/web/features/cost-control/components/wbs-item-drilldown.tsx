@@ -1,10 +1,11 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import type { WbsItemCostDetail } from "@bloqer/services";
 
 function fmt(v: string) {
   return parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function fmtDate(d: Date) {
-  return new Date(d).toLocaleDateString("es-AR");
+  return formatDate(d);
 }
 
 type Props = { detail: WbsItemCostDetail };

@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -90,12 +91,12 @@ export default async function OrdenCompraDetailPage({ params }: PageProps) {
           </div>
           <div>
             <p className="text-muted-foreground">Fecha de emisión</p>
-            <p className="font-medium">{new Date(order.issueDate).toLocaleDateString("es-AR")}</p>
+            <p className="font-medium">{formatDate(order.issueDate)}</p>
           </div>
           {order.expectedDeliveryDate && (
             <div>
               <p className="text-muted-foreground">Entrega esperada</p>
-              <p className="font-medium">{new Date(order.expectedDeliveryDate).toLocaleDateString("es-AR")}</p>
+              <p className="font-medium">{formatDate(order.expectedDeliveryDate)}</p>
             </div>
           )}
         </div>

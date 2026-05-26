@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import type { CollectionDetail } from "@bloqer/services";
 
 function fmt(v: string) {
@@ -5,7 +6,7 @@ function fmt(v: string) {
 }
 
 function fmtDate(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("es-AR");
+  return formatDate(d );
 }
 
 interface Props {

@@ -44,6 +44,9 @@ importers:
       '@bloqer/services':
         specifier: workspace:*
         version: link:../../packages/services
+      '@bloqer/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@bloqer/validators':
         specifier: workspace:^
         version: link:../../packages/validators

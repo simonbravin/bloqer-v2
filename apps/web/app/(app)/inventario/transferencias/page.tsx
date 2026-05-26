@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -66,7 +67,7 @@ export default async function TransferenciasPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-2.5">
-                    {new Date(t.transferDate + "T00:00:00").toLocaleDateString("es-AR")}
+                    {formatDate(t.transferDate )}
                   </td>
                   <td className="px-4 py-2.5">{t.sourceWarehouseName}</td>
                   <td className="px-4 py-2.5">{t.destinationWarehouseName}</td>

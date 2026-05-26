@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import type { ProjectStatus } from "@bloqer/database";
 import type { ProjectOverviewDashboard } from "@bloqer/services";
@@ -15,7 +16,7 @@ const TYPE_LABELS = { PUBLIC: "Público", PRIVATE: "Privado" } as const;
 
 function locDate(d: Date | null | undefined) {
   if (!d) return "—";
-  return d.toLocaleDateString("es-AR");
+  return formatDate(d);
 }
 
 export function ProjectOverviewView({
@@ -162,7 +163,7 @@ export function ProjectOverviewView({
             title="Cuentas por cobrar"
             description="Saldos abiertos y vencidos por moneda."
             href={dashboard.kpis.receivables?.href}
-            footerLabel={dashboard.kpis.receivables ? "Ver C×C" : undefined}
+            footerLabel={dashboard.kpis.receivables ? "Ver cuentas por cobrar" : undefined}
           >
             {dashboard.kpis.receivables ? (
               <div className="space-y-3">
@@ -190,7 +191,7 @@ export function ProjectOverviewView({
             title="Cuentas por pagar"
             description="Saldos abiertos y vencidos por moneda."
             href={dashboard.kpis.payables?.href}
-            footerLabel={dashboard.kpis.payables ? "Ver C×P" : undefined}
+            footerLabel={dashboard.kpis.payables ? "Ver cuentas por pagar" : undefined}
           >
             {dashboard.kpis.payables ? (
               <div className="space-y-3">

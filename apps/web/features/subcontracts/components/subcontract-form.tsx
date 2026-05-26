@@ -8,6 +8,7 @@ import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CurrencySelect } from "@/components/ui/currency-select";
 
 export type SubcontractorOption = { id: string; legalName: string; fantasyName: string | null };
 export type WbsOption           = { id: string; code: string; name: string; unit: string };
@@ -51,6 +52,7 @@ export function SubcontractForm({
   const router = useRouter();
   const [lines, setLines]                 = useState<LineState[]>(defaultValues?.lines ?? [{ ...DEFAULT_LINE }]);
   const [subcontractorId, setSubcontractorId] = useState(defaultValues?.subcontractorContactId ?? "__none__");
+  const [currency, setCurrency] = useState(defaultValues?.currency ?? "ARS");
   const [error, setError]                 = useState<string | null>(null);
   const [pending, setPending]             = useState(false);
 
@@ -80,6 +82,7 @@ export function SubcontractForm({
     fd.set("projectId",  projectId);
     fd.set("companyId",  companyId);
     fd.set("subcontractorContactId", subcontractorId === "__none__" ? "" : subcontractorId);
+    fd.set("currency", currency);
     fd.set("lines", JSON.stringify(lines.map((l) => ({
       wbsNodeId:   l.wbsNodeId === "__none__" ? null : l.wbsNodeId || null,
       description: l.description,
@@ -119,7 +122,7 @@ export function SubcontractForm({
 
         <div className="space-y-1">
           <Label htmlFor="currency">Moneda</Label>
-          <Input id="currency" name="currency" defaultValue={defaultValues?.currency ?? "ARS"} />
+          <CurrencySelect id="currency" value={currency} onValueChange={setCurrency} />
         </div>
 
         <div className="space-y-1">

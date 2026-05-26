@@ -1,4 +1,5 @@
 "use client";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 import Link from "next/link";
 import type { DocumentAttachmentView } from "@bloqer/services";
@@ -18,7 +19,7 @@ import {
 } from "@/app/(app)/finanzas/facturas-proveedor/attachment-actions";
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-AR");
+  return formatDate(iso);
 }
 
 function fmtSize(bytes: number) {

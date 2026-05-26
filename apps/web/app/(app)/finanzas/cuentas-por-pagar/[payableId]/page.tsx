@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -72,11 +73,11 @@ export default async function FinanzasPayableDetailPage({ params }: PageProps) {
           </div>
           <div>
             <p className="text-muted-foreground">Emisión</p>
-            <p className="font-medium">{new Date(payable.issueDate).toLocaleDateString("es-AR")}</p>
+            <p className="font-medium">{formatDate(payable.issueDate)}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Vencimiento</p>
-            <p className="font-medium">{new Date(payable.dueDate).toLocaleDateString("es-AR")}</p>
+            <p className="font-medium">{formatDate(payable.dueDate)}</p>
           </div>
         </div>
 

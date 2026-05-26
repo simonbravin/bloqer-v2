@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -18,7 +19,7 @@ export type CertificationListItem = {
 };
 
 function fmtDate(d: Date) {
-  return new Date(d).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return formatDate(d);
 }
 
 function fmtMoney(value: string, currency: string) {

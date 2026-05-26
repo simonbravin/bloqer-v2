@@ -358,7 +358,7 @@ function CompanyOperationsHubCard({ summary }: { summary: CompanyFinanceOperatio
       <CardHeader className="border-b border-border/60 bg-muted/20 pb-4">
         <CardTitle className="text-lg">Gastos generales (empresa)</CardTitle>
         <CardDescription>
-          Resumen operativo de facturas y C×P <strong>sin proyecto</strong>. Los importes se muestran por moneda; no se
+          Resumen operativo de facturas y cuentas por pagar <strong>sin proyecto</strong>. Los importes se muestran por moneda; no se
           suman monedas distintas.
         </CardDescription>
       </CardHeader>
@@ -373,7 +373,7 @@ function CompanyOperationsHubCard({ summary }: { summary: CompanyFinanceOperatio
                 <p className="text-2xl font-semibold tabular-nums">{summary.draftInvoiceCount}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">C×P abiertas (líneas)</p>
+                <p className="text-muted-foreground">Cuentas por pagar abiertas</p>
                 <p className="text-2xl font-semibold tabular-nums">{summary.openPayableCount}</p>
               </div>
             </div>
@@ -392,7 +392,7 @@ function CompanyOperationsHubCard({ summary }: { summary: CompanyFinanceOperatio
                 </ul>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No hay saldos abiertos en C×P corporativas.</p>
+              <p className="text-sm text-muted-foreground">No hay saldos abiertos en cuentas por pagar corporativas.</p>
             )}
             {summary.recentCorporatePayments.length > 0 ? (
               <div className="space-y-2">

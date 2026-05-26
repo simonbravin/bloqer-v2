@@ -1,4 +1,5 @@
 "use client";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 import Link from "next/link";
 import { PayableStatusBadge } from "./payable-status-badge";
@@ -46,7 +47,7 @@ export function PayableList({ payables, hrefPrefix, supplierInvoiceHrefPrefix }:
               {p.supplierName}
             </Link>
             <span className="text-xs text-muted-foreground">
-              Vence {new Date(p.dueDate).toLocaleDateString("es-AR")}
+              Vence {formatDate(p.dueDate)}
               {p.supplierInvoiceCode && p.supplierInvoiceId && supplierInvoiceHrefPrefix ? (
                 <>
                   {" · "}

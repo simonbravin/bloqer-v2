@@ -4,6 +4,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { AccountMovementTypeBadge } from "./account-movement-type-badge";
 import type { AccountMovementType, AccountMovementStatus } from "@bloqer/database";
+import { formatDate } from "@/lib/format";
 
 export type AccountMovementListItem = {
   id: string;
@@ -16,14 +17,6 @@ export type AccountMovementListItem = {
 };
 
 const OUTFLOW_TYPES: AccountMovementType[] = ["OUTFLOW", "TRANSFER_OUT"];
-
-function fmtDate(d: Date) {
-  return new Date(d).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
 
 function fmtMoney(value: string) {
   return new Intl.NumberFormat("es-AR", {
@@ -60,7 +53,7 @@ export function AccountMovementList({ movements }: AccountMovementListProps) {
           const isOutflow = OUTFLOW_TYPES.includes(m.type);
           return (
             <TableRow key={m.id}>
-              <TableCell className="text-sm">{fmtDate(m.movementDate)}</TableCell>
+              <TableCell className="text-sm">{formatDate(m.movementDate)}</TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {m.description ?? "—"}
               </TableCell>

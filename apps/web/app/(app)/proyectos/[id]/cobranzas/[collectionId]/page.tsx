@@ -7,18 +7,11 @@ import { generateJournalFromCollectionAction } from "@/app/(app)/contabilidad/so
 import { getCollectionById, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { cancelCollectionAction } from "../actions";
+import { formatDate } from "@/lib/format";
 
 interface PageProps {
   params: Promise<{ id: string; collectionId: string }>;
   searchParams: Promise<{ contabilidad?: string }>;
-}
-
-function fmtDate(d: Date) {
-  return new Date(d).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
 }
 
 function fmtMoney(value: string, currency: string) {
@@ -91,7 +84,7 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
         <dl className="grid grid-cols-2 gap-4 px-6 py-4 text-sm">
           <div>
             <dt className="text-muted-foreground">Fecha de cobro</dt>
-            <dd className="font-medium">{fmtDate(collection.collectionDate)}</dd>
+            <dd className="font-medium">{formatDate(collection.collectionDate)}</dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Cuenta</dt>

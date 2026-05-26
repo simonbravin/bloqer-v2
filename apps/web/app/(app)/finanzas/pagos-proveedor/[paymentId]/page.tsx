@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -67,7 +68,7 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
           </div>
           <div>
             <p className="text-muted-foreground">Fecha de pago</p>
-            <p className="font-medium">{new Date(payment.paymentDate).toLocaleDateString("es-AR")}</p>
+            <p className="font-medium">{formatDate(payment.paymentDate)}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Monto</p>

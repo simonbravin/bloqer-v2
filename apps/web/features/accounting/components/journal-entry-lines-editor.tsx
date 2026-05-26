@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { CurrencySelect } from "@/components/ui/currency-select";
 
 export interface LineEditorRow {
   key:         string;
@@ -101,11 +102,10 @@ export function JournalEntryLinesEditor({ accounts, lines, onChange }: Props) {
             </div>
             <div className="sm:col-span-2 space-y-1">
               <Label className="text-xs text-muted-foreground">Moneda</Label>
-              <Input
-                className="font-mono"
-                value={line.currency}
-                onChange={(e) => update(idx, { currency: e.target.value.toUpperCase() })}
-                maxLength={8}
+              <CurrencySelect
+                value={line.currency || "ARS"}
+                onValueChange={(currency) => update(idx, { currency })}
+                triggerClassName="h-9"
               />
             </div>
             <div className="sm:col-span-1 flex items-end">

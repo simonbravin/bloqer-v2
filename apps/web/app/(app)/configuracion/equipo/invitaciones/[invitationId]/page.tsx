@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -98,11 +99,11 @@ export default async function ConfiguracionEquipoInvitacionDetallePage({ params 
         </div>
         <div>
           <dt className="text-muted-foreground">Vence</dt>
-          <dd>{inv.expiresAt.toLocaleString("es-AR")}</dd>
+          <dd>{formatDateTime(inv.expiresAt)}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Creada</dt>
-          <dd>{inv.createdAt.toLocaleString("es-AR")}</dd>
+          <dd>{formatDateTime(inv.createdAt)}</dd>
         </div>
       </dl>
 

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useTheme } from "next-themes";
 import { signOut } from "next-auth/react";
 import type { Session } from "next-auth";
@@ -65,23 +64,11 @@ export function Header({
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/90 px-4 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/75 sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="hidden min-w-0 sm:block">
-          <p className="truncate text-sm font-semibold tracking-tight text-foreground">Bloqer</p>
-          {tenantName ? (
-            <p className="truncate text-xs text-muted-foreground" title={tenantName}>
-              {tenantName}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2 sm:hidden">
-          <Image
-            src="/bloqer-logo.png"
-            alt="Bloqer"
-            width={120}
-            height={32}
-            className="h-6 w-auto object-contain object-left"
-          />
-        </div>
+        {tenantName ? (
+          <p className="truncate text-sm font-semibold tracking-tight text-foreground" title={tenantName}>
+            {tenantName}
+          </p>
+        ) : null}
       </div>
       <div className="flex items-center gap-1 sm:gap-2">
         <Button variant="ghost" size="icon" className="relative h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground" asChild title="Notificaciones">

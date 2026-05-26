@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { AgingReport, AgingRow, AgingItem } from "@bloqer/services";
+import { formatCurrencyDisplay, formatDate } from "@/lib/format";
 import { AgingBucketBadge } from "./aging-bucket-badge";
 
 interface Props {
@@ -11,10 +12,6 @@ interface Props {
 
 function fmt(v: string) {
   return parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2 });
-}
-
-function fmtDate(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("es-AR");
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -47,9 +44,9 @@ function ItemRows({ items }: { items: AgingItem[] }) {
               <tr key={item.id} className="border-t border-border/50 hover:bg-muted/20">
                 <td className="px-4 py-1.5 font-mono">#{item.invoiceNumber}</td>
                 <td className="px-4 py-1.5 max-w-[160px] truncate">{item.projectName || "—"}</td>
-                <td className="px-4 py-1.5">{fmtDate(item.issueDate)}</td>
+                <td className="px-4 py-1.5">{formatDate(item.issueDate)}</td>
                 <td className="px-4 py-1.5">
-                  <span>{fmtDate(item.dueDate)}</span>
+                  <span>{formatDate(item.dueDate)}</span>
                   {item.daysOverdue > 0 && (
                     <span className="ml-1 text-red-500">({item.daysOverdue}d)</span>
                   )}
@@ -82,7 +79,7 @@ function GroupRow({ row, expanded, onToggle }: { row: AgingRow; expanded: boolea
           <span className="mr-2 text-muted-foreground">{expanded ? "▾" : "▸"}</span>
           {row.contactName}
         </td>
-        <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground">{row.currency}</td>
+        <td className="px-4 py-2.5 text-xs text-muted-foreground">{formatCurrencyDisplay(row.currency)}</td>
         <td className="px-4 py-2.5 text-right tabular-nums text-green-700 dark:text-green-400">
           {parseFloat(row.current) > 0 ? fmt(row.current) : "—"}
         </td>

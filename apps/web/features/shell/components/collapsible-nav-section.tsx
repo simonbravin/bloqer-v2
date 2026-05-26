@@ -4,7 +4,12 @@ import { ChevronRight } from "lucide-react";
 import { NavItem } from "@/features/shell/components/nav-item";
 import { cn } from "@/lib/utils";
 
-export type CollapsibleNavLink = { label: string; href: string; matchExact?: boolean };
+export type CollapsibleNavLink = {
+  label: string;
+  href: string;
+  matchExact?: boolean;
+  icon?: React.ReactNode;
+};
 
 interface CollapsibleNavSectionProps {
   title: string;
@@ -57,6 +62,7 @@ export function CollapsibleNavSection({
               key={`${item.label}-${item.href}`}
               href={item.href}
               label={item.label}
+              icon={item.icon}
               matchExact={item.matchExact}
             />
           ))}

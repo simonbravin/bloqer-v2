@@ -49,7 +49,7 @@ export default async function ReportesTesoreriaPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Solo movimientos confirmados. No incluye cuentas por cobrar ni cuentas por pagar (ver Aging).
+        Solo movimientos confirmados. No incluye cuentas por cobrar ni cuentas por pagar (ver Finanzas).
         Sin conversión de moneda: cada moneda se muestra por separado.
       </p>
     </div>

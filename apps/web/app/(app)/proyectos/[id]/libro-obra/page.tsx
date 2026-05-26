@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -64,7 +65,7 @@ export default async function LibroObraPage({ params }: PageProps) {
                 <tr key={l.id} className="border-t hover:bg-muted/30">
                   <td className="px-4 py-3 font-mono text-xs">
                     <Link href={`/proyectos/${projectId}/libro-obra/${l.id}`} className="hover:underline text-primary">
-                      {new Date(l.logDate).toLocaleDateString("es-AR")}
+                      {formatDate(l.logDate)}
                     </Link>
                   </td>
                   <td className="px-4 py-3">

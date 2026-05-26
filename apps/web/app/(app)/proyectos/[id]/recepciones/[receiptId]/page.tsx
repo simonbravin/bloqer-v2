@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -85,7 +86,7 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
           </div>
           <div>
             <p className="text-muted-foreground">Fecha de recepción</p>
-            <p className="font-medium">{new Date(receipt.receiptDate).toLocaleDateString("es-AR")}</p>
+            <p className="font-medium">{formatDate(receipt.receiptDate)}</p>
           </div>
         </div>
 

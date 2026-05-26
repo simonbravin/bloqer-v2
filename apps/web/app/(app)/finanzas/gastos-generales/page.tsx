@@ -34,7 +34,7 @@ export default async function GastosGeneralesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Gastos generales</h1>
           <p className="text-sm text-muted-foreground max-w-prose">
-            Asistente para cargar <strong>facturas de proveedor sin proyecto</strong>, emitir la obligación (C×P) y
+            Asistente para cargar <strong>facturas de proveedor sin proyecto</strong>, emitir la obligación (cuenta por pagar) y
             registrar el pago desde tesorería. Reutiliza el mismo flujo que Finanzas → facturas empresa; no agrega un
             libro paralelo.
           </p>
@@ -53,7 +53,7 @@ export default async function GastosGeneralesPage() {
           <span className="font-medium text-foreground">Emitir factura</span> — genera la cuenta por pagar corporativa.
         </li>
         <li>
-          <span className="font-medium text-foreground">Pagar</span> — desde C×P empresa elegís cuenta de tesorería y
+          <span className="font-medium text-foreground">Pagar</span> — desde cuentas por pagar de empresa elegís cuenta de tesorería y
           confirmás el pago (movimiento <code className="rounded bg-muted px-1">PAYMENT</code>).
         </li>
       </ol>

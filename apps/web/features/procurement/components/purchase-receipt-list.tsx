@@ -1,4 +1,5 @@
 "use client";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 import Link from "next/link";
 import { PurchaseReceiptStatusBadge } from "./purchase-receipt-status-badge";
@@ -40,7 +41,7 @@ export function PurchaseReceiptList({ receipts, projectId }: Props) {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground hidden sm:block">
-              {new Date(r.receiptDate).toLocaleDateString("es-AR")}
+              {formatDate(r.receiptDate)}
             </span>
             <PurchaseReceiptStatusBadge status={r.status} />
           </div>

@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { type DashboardProjectSummary, formatDashboardMoney } from "@bloqer/services";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,7 @@ function projectStatusLabel(status: string): string {
 
 function fmtShort(iso: string | null | undefined) {
   if (!iso) return null;
-  return new Date(iso + "T12:00:00").toLocaleDateString("es-AR");
+  return formatDate(iso + "T12:00:00");
 }
 
 export function ProjectProgressCard({

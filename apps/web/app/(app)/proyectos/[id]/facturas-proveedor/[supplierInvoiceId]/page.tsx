@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -77,11 +78,11 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
           </div>
           <div>
             <p className="text-muted-foreground">Fecha de emisión</p>
-            <p className="font-medium">{new Date(invoice.issueDate).toLocaleDateString("es-AR")}</p>
+            <p className="font-medium">{formatDate(invoice.issueDate)}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Fecha de vencimiento</p>
-            <p className="font-medium">{new Date(invoice.dueDate).toLocaleDateString("es-AR")}</p>
+            <p className="font-medium">{formatDate(invoice.dueDate)}</p>
           </div>
         </div>
 

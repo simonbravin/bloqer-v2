@@ -6,15 +6,16 @@ import {
   DashboardAccountingCard,
   DashboardAlertsCard,
   DashboardFinanceOverview,
+  DashboardCashFlowChart,
   DashboardHeader,
   DashboardKpiGrid,
   DashboardOnboardingChecklist,
   DashboardProjectsOverview,
   DashboardQuickActions,
-  dashboardHeaderQuickNav,
 } from "@/features/dashboard";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { formatDateTime } from "@/lib/format";
 
 export default async function DashboardPage() {
   const current = await getCurrentUser();
@@ -44,10 +45,7 @@ export default async function DashboardPage() {
 
   const dash = await getTenantDashboard(ctx);
 
-  const updatedAt = new Intl.DateTimeFormat("es-AR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(dash.generatedAt));
+  const updatedAt = formatDateTime(dash.generatedAt);
 
   const onboardingSteps = dash.onboardingSteps ?? [];
   const showOnboardingCard = dash.operationalOnboarding && onboardingSteps.length > 0;
@@ -60,7 +58,6 @@ export default async function DashboardPage() {
         generatedAtLabel={updatedAt}
         unreadNotifications={dash.unreadNotifications}
         showOperationalAlertsLink={dash.showOperationalAlertsLink}
-        quickNavLinks={dashboardHeaderQuickNav(dash.quickActions)}
       />
 
       <DashboardAlertsCard warnings={dash.warnings} />
@@ -75,6 +72,8 @@ export default async function DashboardPage() {
       ) : null}
 
       <DashboardKpiGrid kpis={dash.kpis} />
+
+      {dash.cashFlowChart ? <DashboardCashFlowChart chart={dash.cashFlowChart} /> : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {dash.projectSummary ? (

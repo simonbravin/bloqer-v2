@@ -1,22 +1,8 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
-import type { DashboardQuickAction, TenantSubscriptionInfo } from "@bloqer/services";
+import type { TenantSubscriptionInfo } from "@bloqer/services";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-/** Canonical header shortcuts; only shown if the same `href` is present in server-built `quickActions` (permission + module gated). */
-const HEADER_QUICK_NAV: { label: string; href: string }[] = [
-  { label: "Nuevo proyecto", href: "/proyectos/nuevo" },
-  { label: "Crear contacto", href: "/directorio/nuevo" },
-  { label: "Registrar movimiento", href: "/tesoreria/cuentas" },
-  { label: "Ver finanzas", href: "/finanzas" },
-  { label: "Ver contabilidad", href: "/contabilidad" },
-  { label: "Configuración", href: "/configuracion" },
-];
-
-export function dashboardHeaderQuickNav(quickActions: DashboardQuickAction[]): { label: string; href: string }[] {
-  const allowed = new Set(quickActions.map((a) => a.href));
-  return HEADER_QUICK_NAV.filter((item) => allowed.has(item.href));
-}
 
 const SUB_LABEL: Record<string, string> = {
   TRIAL: "Prueba",
@@ -36,14 +22,12 @@ export function DashboardHeader({
   generatedAtLabel,
   unreadNotifications,
   showOperationalAlertsLink,
-  quickNavLinks,
 }: {
   tenantName: string;
   subscription: TenantSubscriptionInfo | null;
   generatedAtLabel: string;
   unreadNotifications: number;
   showOperationalAlertsLink: boolean;
-  quickNavLinks: { label: string; href: string }[];
 }) {
   return (
     <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm">
@@ -67,23 +51,10 @@ export function DashboardHeader({
               {subscription.trialEndsAt ? (
                 <>
                   <span>·</span>
-                  <span>Prueba hasta {new Date(subscription.trialEndsAt + "T12:00:00").toLocaleDateString("es-AR")}</span>
+                  <span>Prueba hasta {formatDate(subscription.trialEndsAt + "T12:00:00")}</span>
                 </>
               ) : null}
             </div>
-          ) : null}
-          {quickNavLinks.length > 0 ? (
-            <nav aria-label="Accesos rápidos del encabezado" className="flex flex-wrap gap-x-3 gap-y-1 pt-1 text-sm">
-              {quickNavLinks.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className="text-primary underline-offset-4 hover:underline"
-                >
-                  {l.label}
-                </Link>
-              ))}
-            </nav>
           ) : null}
           <p className="text-xs text-muted-foreground">Última actualización: {generatedAtLabel}</p>
         </div>

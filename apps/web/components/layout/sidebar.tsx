@@ -8,20 +8,20 @@ import { CollapsibleNavSection } from "@/features/shell/components/collapsible-n
 import { tenantGateFromSnapshot } from "@/features/projects/tenant-gate-from-snapshot";
 import type { PermissionModule, UserRole } from "@bloqer/domain";
 import { buildGlobalNavSections } from "@/lib/global-workspace-nav";
+import { GlobalNavIcon } from "@/lib/global-nav-icons";
 
 function isNavItemActive(pathname: string, href: string, matchExact?: boolean) {
   return matchExact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
 interface SidebarProps {
-  tenantName?: string;
   /** Membership roles; empty = only items without `require` (e.g. Inicio) */
   roles: UserRole[];
   /** Phase 12B / 15A: serialized tenant module flags (default-on when key missing). */
   moduleGateSnapshot?: Partial<Record<PermissionModule, boolean>>;
 }
 
-export function Sidebar({ tenantName, roles, moduleGateSnapshot }: SidebarProps) {
+export function Sidebar({ roles, moduleGateSnapshot }: SidebarProps) {
   const pathname = usePathname();
   const gate = useMemo(() => tenantGateFromSnapshot(moduleGateSnapshot ?? {}), [moduleGateSnapshot]);
   const sections = useMemo(
@@ -44,7 +44,7 @@ export function Sidebar({ tenantName, roles, moduleGateSnapshot }: SidebarProps)
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-      <div className="border-b border-sidebar-border/80 px-4 py-5">
+      <div className="flex h-14 shrink-0 items-center border-b border-sidebar-border/80 px-4">
         <Link
           href="/dashboard"
           className="inline-block rounded-md outline-none ring-offset-sidebar focus-visible:ring-2 focus-visible:ring-ring"
@@ -58,11 +58,6 @@ export function Sidebar({ tenantName, roles, moduleGateSnapshot }: SidebarProps)
             className="h-8 w-auto max-w-[9.5rem] object-contain object-left"
           />
         </Link>
-        {tenantName ? (
-          <p className="mt-2 truncate text-xs font-medium leading-snug text-muted-foreground" title={tenantName}>
-            {tenantName}
-          </p>
-        ) : null}
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3 pr-1">
         {sections.map((section, sectionIndex) => {
@@ -79,7 +74,10 @@ export function Sidebar({ tenantName, roles, moduleGateSnapshot }: SidebarProps)
                   [section.title]: !(prev[section.title] ?? false),
                 }))
               }
-              items={section.items}
+              items={section.items.map((item) => ({
+                ...item,
+                icon: <GlobalNavIcon href={item.href} />,
+              }))}
             />
           );
         })}

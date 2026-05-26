@@ -13,6 +13,7 @@ import {
   returnJobsiteLogAction,
   cancelJobsiteLogAction,
 } from "../actions";
+import { formatDateLong } from "@/lib/format";
 
 interface PageProps { params: Promise<{ id: string; logId: string }> }
 
@@ -57,7 +58,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">
-                {new Date(log.logDate).toLocaleDateString("es-AR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                {formatDateLong(log.logDate)}
               </h1>
               <JobsiteLogStatusBadge status={log.status} />
             </div>

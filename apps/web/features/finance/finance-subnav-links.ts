@@ -20,7 +20,7 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
     links.push({
       href:  "/finanzas/cuentas-por-cobrar-aging",
       label: "Cuentas por cobrar",
-      title: "Aging global de cuentas por cobrar",
+      title: "Saldos por cliente y vencimiento",
     });
   }
 
@@ -42,8 +42,8 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
     });
     links.push({
       href:  "/finanzas/cuentas-por-pagar-aging",
-      label: "Aging proveedores",
-      title: "Cuentas por pagar por proveedor y vencimiento",
+      label: "Cuentas por pagar",
+      title: "Saldos por proveedor y vencimiento",
     });
   }
 

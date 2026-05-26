@@ -25,7 +25,7 @@ type Props = {
 
 export function AgingReportPdfDocument(props: Props) {
   const title =
-    props.variant === "AR" ? "Aging — Cuentas por cobrar" : "Aging — Cuentas por pagar";
+    props.variant === "AR" ? "Cuentas por cobrar" : "Cuentas por pagar";
 
   const rows: {
     contact: string;

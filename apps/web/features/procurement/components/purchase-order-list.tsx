@@ -1,4 +1,5 @@
 "use client";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 import Link from "next/link";
 import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
@@ -44,7 +45,7 @@ export function PurchaseOrderList({ orders, projectId }: Props) {
           <div className="flex items-center gap-4">
             {order.expectedDeliveryDate && (
               <span className="text-sm text-muted-foreground hidden sm:block">
-                Entrega {new Date(order.expectedDeliveryDate).toLocaleDateString("es-AR")}
+                Entrega {formatDate(order.expectedDeliveryDate)}
               </span>
             )}
             <span className="text-sm font-medium tabular-nums">

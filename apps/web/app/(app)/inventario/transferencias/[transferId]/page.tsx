@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ function fmt(v: string) {
 }
 
 function fmtDate(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("es-AR");
+  return formatDate(d );
 }
 
 export default async function TransferenciaDetailPage({ params }: PageProps) {

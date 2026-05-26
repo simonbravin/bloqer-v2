@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { OVERVIEW_ROLES } from "@bloqer/domain";
@@ -66,7 +67,7 @@ export default async function ConfiguracionEquipoDetallePage({ params }: PagePro
         </div>
         <div>
           <dt className="text-muted-foreground">Alta</dt>
-          <dd>{member.createdAt.toLocaleString("es-AR")}</dd>
+          <dd>{formatDateTime(member.createdAt)}</dd>
         </div>
       </dl>
 

@@ -1,4 +1,5 @@
 "use client";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +38,7 @@ export function PaymentList({ payments, hrefPrefix }: Props) {
               href={`${hrefPrefix}/${p.id}`}
               className="text-sm font-medium hover:underline"
             >
-              {new Date(p.paymentDate).toLocaleDateString("es-AR")}
+              {formatDate(p.paymentDate)}
             </Link>
             <span className="text-xs text-muted-foreground">{p.accountName}</span>
           </div>

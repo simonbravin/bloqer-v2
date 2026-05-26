@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import type { StockMovementReportRow } from "@bloqer/services";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -9,7 +10,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 function fmtDate(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("es-AR");
+  return formatDate(d );
 }
 
 function fmtQty(v: string, unit: string) {

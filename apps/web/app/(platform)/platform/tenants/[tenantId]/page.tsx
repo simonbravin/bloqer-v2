@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@bloqer/auth";
@@ -59,7 +60,7 @@ export default async function PlatformTenantDetailPage({ params }: PageProps) {
         </div>
         <div>
           <dt className="text-muted-foreground">Trial hasta</dt>
-          <dd>{tenant.trialEndsAt ? tenant.trialEndsAt.toLocaleDateString("es-AR") : "—"}</dd>
+          <dd>{tenant.trialEndsAt ? formatDate(tenant.trialEndsAt) : "—"}</dd>
         </div>
         <div className="sm:col-span-2">
           <dt className="text-muted-foreground">Billing customer id (placeholder)</dt>
