@@ -81,7 +81,7 @@ function CreateForm({
         setServerError(result.error);
         toast.error(result.error);
       } else {
-        toast.success(nodeType === "GROUP" ? "Capítulo agregado" : "Ítem agregado");
+        toast.success(nodeType === "GROUP" ? "Tarea agregada" : "Ítem agregado");
         onDone();
       }
     });
@@ -138,7 +138,7 @@ function CreateForm({
           Cancelar
         </Button>
         <Button type="submit" size="sm" disabled={isPending}>
-          {isPending ? "Guardando..." : preset === "childItem" ? "Agregar ítem" : "Agregar capítulo"}
+          {isPending ? "Guardando..." : preset === "childItem" ? "Agregar ítem" : "Agregar tarea"}
         </Button>
       </div>
     </form>

@@ -407,7 +407,7 @@ export function WbsTree({
                 })
               }
             >
-              <Plus className="h-3 w-3 mr-1" /> Agregar capítulo
+              <Plus className="h-3 w-3 mr-1" /> Agregar tarea
           </Button>
         )}
       </div>
@@ -421,7 +421,7 @@ export function WbsTree({
 
       {nodes.length === 0 ? (
         <ListEmptyState
-          message="Sin nodos en la EDT. Agregá el primer capítulo o ítem."
+          message="Sin nodos en la EDT. Agregá la primera tarea o ítem."
           className="border-0 shadow-none rounded-none"
         />
       ) : (
@@ -528,7 +528,7 @@ export function WbsTree({
               {dialogState.type === "add"
                 ? dialogState.preset === "childItem"
                   ? "Agregar ítem"
-                  : "Agregar capítulo"
+                  : "Agregar tarea"
                 : "Editar nodo"}
             </DialogTitle>
           </DialogHeader>

@@ -13,6 +13,38 @@ import {
   nextSortOrder,
 } from "./wbs-codes";
 
+type TxClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
+
+type WbsNodeRenumberRow = {
+  id: string;
+  parentId: string | null;
+  code: string;
+  type: WbsNodeType;
+  sortOrder: number;
+};
+
+async function applyRenumberPlanTx(
+  tx: TxClient,
+  allNodes: WbsNodeRenumberRow[],
+  parentId: string | null,
+  orderedSiblingIds: string[],
+): Promise<void> {
+  const renumber = buildRenumberPlan(allNodes, parentId, orderedSiblingIds);
+  if (renumber.size === 0) return;
+
+  const tempPrefix = `__renumber_${Date.now()}_`;
+  let tempIdx = 0;
+  for (const id of renumber.keys()) {
+    await tx.wbsNode.update({
+      where: { id },
+      data: { code: `${tempPrefix}${tempIdx++}` },
+    });
+  }
+  for (const [id, code] of renumber) {
+    await tx.wbsNode.update({ where: { id }, data: { code } });
+  }
+}
+
 // ─── View types (serializable for client) ─────────────────────────────────────
 
 export type CostAnalysisLineView = {
@@ -370,6 +402,26 @@ export async function removeWbsNode(id: string, ctx: ServiceContext): Promise<vo
       await tx.costItem.delete({ where: { id: node.costItem.id } });
     }
     await tx.wbsNode.delete({ where: { id } });
+
+    const parentId = node.parentId;
+    const siblings = await tx.wbsNode.findMany({
+      where: { budgetId: node.budgetId, parentId },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, parentId: true, code: true, type: true, sortOrder: true },
+    });
+    if (siblings.length > 0) {
+      const allNodes = await tx.wbsNode.findMany({
+        where: { budgetId: node.budgetId },
+        select: { id: true, parentId: true, code: true, type: true, sortOrder: true },
+      });
+      await applyRenumberPlanTx(
+        tx,
+        allNodes,
+        parentId,
+        siblings.map((s) => s.id),
+      );
+    }
+
     await _recalcBudgetSummary(tx, node.budgetId);
   });
 
@@ -414,8 +466,6 @@ export async function reorderWbsNodes(
     select: { id: true, parentId: true, code: true, type: true, sortOrder: true },
   });
 
-  const renumber = buildRenumberPlan(allNodes, input.parentId, input.orderedNodeIds);
-
   await prisma.$transaction(async (tx) => {
     for (let idx = 0; idx < input.orderedNodeIds.length; idx++) {
       await tx.wbsNode.update({
@@ -424,19 +474,7 @@ export async function reorderWbsNodes(
       });
     }
 
-    if (renumber.size === 0) return;
-
-    const tempPrefix = `__renumber_${Date.now()}_`;
-    let tempIdx = 0;
-    for (const id of renumber.keys()) {
-      await tx.wbsNode.update({
-        where: { id },
-        data: { code: `${tempPrefix}${tempIdx++}` },
-      });
-    }
-    for (const [id, code] of renumber) {
-      await tx.wbsNode.update({ where: { id }, data: { code } });
-    }
+    await applyRenumberPlanTx(tx, allNodes, input.parentId, input.orderedNodeIds);
   });
 
   await log({

@@ -17,26 +17,13 @@ function flatten(nodes: WbsViewNode[]): WbsViewNode[] {
 export function suggestRootGroupCode(nodes: WbsViewNode[]): string {
   const flat = flatten(nodes);
   const roots = flat.filter((n) => n.parentId === null);
-  let max = 0;
-  for (const n of roots) {
-    const top = parseInt(n.code.split(".")[0] ?? "", 10);
-    if (!Number.isNaN(top)) max = Math.max(max, top);
-  }
-  return String(max + 1);
+  return String(roots.length + 1);
 }
 
 export function suggestChildItemCode(parent: WbsViewNode, nodes: WbsViewNode[]): string {
   const flat = flatten(nodes);
   const siblings = flat.filter((n) => n.parentId === parent.id);
-  let max = 0;
-  const prefix = `${parent.code}.`;
-  for (const n of siblings) {
-    if (!n.code.startsWith(prefix)) continue;
-    const suffix = n.code.slice(prefix.length);
-    const part = parseInt(suffix.split(".")[0] ?? "", 10);
-    if (!Number.isNaN(part)) max = Math.max(max, part);
-  }
-  return `${parent.code}.${max + 1}`;
+  return `${parent.code}.${siblings.length + 1}`;
 }
 
 export function getSiblings(nodes: WbsViewNode[], parentId: string | null): NodeLike[] {

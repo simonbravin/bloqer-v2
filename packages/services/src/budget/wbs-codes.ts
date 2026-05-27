@@ -2,28 +2,23 @@ import type { WbsNodeType } from "@bloqer/database";
 
 type WbsNodeRow = { id: string; parentId: string | null; code: string; type: WbsNodeType; sortOrder: number };
 
-/** Próximo código para capítulo raíz (1, 2, 3…). */
+/** Próximo código para tarea raíz (1, 2, 3… según cantidad de hermanos). */
 export function nextRootGroupCode(roots: WbsNodeRow[]): string {
-  let max = 0;
-  for (const n of roots) {
-    if (n.parentId !== null) continue;
-    const top = parseInt(n.code.split(".")[0] ?? "", 10);
-    if (!Number.isNaN(top)) max = Math.max(max, top);
-  }
-  return String(max + 1);
+  const rootCount = roots.filter((n) => n.parentId === null).length;
+  return String(rootCount + 1);
 }
 
-/** Próximo código hijo bajo un capítulo (p. ej. 1.3 si existen 1.1 y 1.2). */
+/** Próximo código hijo bajo una tarea (p. ej. 1.3 si hay dos ítems bajo 1). */
 export function nextChildItemCode(parentCode: string, siblings: WbsNodeRow[]): string {
-  let max = 0;
   const prefix = `${parentCode}.`;
+  let childCount = 0;
   for (const n of siblings) {
     if (!n.code.startsWith(prefix)) continue;
     const suffix = n.code.slice(prefix.length);
-    const part = parseInt(suffix.split(".")[0] ?? "", 10);
-    if (!Number.isNaN(part)) max = Math.max(max, part);
+    if (!suffix || suffix.includes(".")) continue;
+    childCount += 1;
   }
-  return `${parentCode}.${max + 1}`;
+  return `${parentCode}.${childCount + 1}`;
 }
 
 /** sortOrder al final entre hermanos. */

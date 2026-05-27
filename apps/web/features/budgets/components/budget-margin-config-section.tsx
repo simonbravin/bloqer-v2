@@ -140,7 +140,7 @@ export function BudgetMarginConfigSection({
               />
               <p className="text-xs font-mono text-muted-foreground">{fmt(breakdown.profit, currency)}</p>
             </div>
-            <div className="space-y-1.5 col-span-2">
+            <div className="space-y-1.5">
               <Label>IVA %</Label>
               <Input
                 type="number"
