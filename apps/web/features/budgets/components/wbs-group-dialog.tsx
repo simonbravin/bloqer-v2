@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,8 @@ export function WbsGroupDialog({
   editable,
   onUpdateNode,
 }: WbsGroupDialogProps) {
+  const router = useRouter();
+
   if (!node || node.type !== "GROUP") return null;
 
   const metrics = computeWbsRowMetrics(node);
@@ -67,7 +70,11 @@ export function WbsGroupDialog({
               name: node.name,
               description: node.description,
             }}
-            onSubmit={(data) => onUpdateNode(node.id, data)}
+            onSubmit={async (data) => {
+              const result = await onUpdateNode(node.id, data);
+              if (!("error" in result)) router.refresh();
+              return result;
+            }}
             onDone={() => onOpenChange(false)}
           />
         ) : (

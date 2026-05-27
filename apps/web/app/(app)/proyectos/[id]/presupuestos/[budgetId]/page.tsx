@@ -122,18 +122,14 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
         budgetId={budgetId}
         currency={budget.currency}
         editable={editable}
-        onAddNode={(_budgetId, data) => addWbsNodeAction(budgetId, projectId, data)}
-        onUpdateNode={(nodeId, data) => updateWbsNodeAction(nodeId, projectId, budgetId, data)}
-        onRemoveNode={(nodeId) => removeWbsNodeAction(nodeId, projectId, budgetId)}
-        onReorderNodes={(_budgetId, data) => reorderWbsNodesAction(budgetId, projectId, data)}
-        onUpdateCostItem={(costItemId, data) =>
-          updateCostItemAction(costItemId, projectId, budgetId, data)
-        }
-        onAddLine={(data) => addCostAnalysisLineAction(projectId, budgetId, data)}
-        onUpdateLine={(lineId, data) =>
-          updateCostAnalysisLineAction(lineId, projectId, budgetId, data)
-        }
-        onRemoveLine={(lineId) => removeCostAnalysisLineAction(lineId, projectId, budgetId)}
+        onAddNode={addWbsNodeAction.bind(null, budgetId, projectId)}
+        onUpdateNode={updateWbsNodeAction.bind(null, projectId, budgetId)}
+        onRemoveNode={removeWbsNodeAction.bind(null, projectId, budgetId)}
+        onReorderNodes={reorderWbsNodesAction.bind(null, budgetId, projectId)}
+        onUpdateCostItem={updateCostItemAction.bind(null, projectId, budgetId)}
+        onAddLine={addCostAnalysisLineAction.bind(null, projectId, budgetId)}
+        onUpdateLine={updateCostAnalysisLineAction.bind(null, projectId, budgetId)}
+        onRemoveLine={removeCostAnalysisLineAction.bind(null, projectId, budgetId)}
       />
 
       {budget.settings ? (

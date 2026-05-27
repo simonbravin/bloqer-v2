@@ -104,10 +104,10 @@ interface WbsTreeProps {
   budgetId: string;
   currency: string;
   editable: boolean;
-  onAddNode: (budgetId: string, data: CreateWbsNodeInput) => Promise<{ id: string } | { error: string }>;
+  onAddNode: (data: CreateWbsNodeInput) => Promise<{ id: string } | { error: string }>;
   onUpdateNode: (nodeId: string, data: UpdateWbsNodeInput) => Promise<{ ok: true } | { error: string }>;
   onRemoveNode: (nodeId: string) => Promise<{ ok: true } | { error: string }>;
-  onReorderNodes: (budgetId: string, data: ReorderWbsNodesInput) => Promise<{ ok: true } | { error: string }>;
+  onReorderNodes: (data: ReorderWbsNodesInput) => Promise<{ ok: true } | { error: string }>;
   onUpdateCostItem: (costItemId: string, data: UpdateCostItemInput) => Promise<{ ok: true } | { error: string }>;
   onAddLine: (data: CreateCostAnalysisLineInput) => Promise<{ id: string } | { error: string }>;
   onUpdateLine: (lineId: string, data: UpdateCostAnalysisLineInput) => Promise<{ ok: true } | { error: string }>;
@@ -205,7 +205,7 @@ export function WbsTree({
     [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
 
     startReorderTransition(async () => {
-      const result = await onReorderNodes(budgetId, {
+      const result = await onReorderNodes({
         parentId: node.parentId ?? null,
         orderedNodeIds: next.map((s) => s.id),
       });
@@ -490,11 +490,7 @@ export function WbsTree({
         node={groupDialogNode}
         currency={currency}
         editable={editable}
-        onUpdateNode={async (nodeId, data) => {
-          const result = await onUpdateNode(nodeId, data);
-          if (!("error" in result)) router.refresh();
-          return result;
-        }}
+        onUpdateNode={onUpdateNode}
       />
 
       <Dialog
@@ -512,7 +508,7 @@ export function WbsTree({
               mode="create"
               parentId={dialogState.parentId}
               onSubmit={async (data) => {
-                const result = await onAddNode(budgetId, data);
+                const result = await onAddNode(data);
                 if (!("error" in result)) router.refresh();
                 return result;
               }}
