@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import type { CashFlowCurrency, DashboardCashFlowChart, DashboardCashFlowRange } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CashFlowChart } from "@/features/treasury-reports";
+import { CashFlowChart } from "@/features/treasury-reports/components/cash-flow-chart";
 import { formatCurrencyDisplay } from "@/lib/format";
 import { cn } from "@/lib/utils";
 

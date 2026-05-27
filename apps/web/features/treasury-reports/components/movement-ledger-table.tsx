@@ -1,7 +1,10 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import type { MovementReportRow } from "@bloqer/services";
-import { treasuryMovementTypeSupportsAccountingDraft } from "@bloqer/services";
 import { TreasuryMovementAccountingButton } from "@/features/accounting";
+
+function treasuryMovementTypeSupportsAccountingDraft(type: string): boolean {
+  return type === "INFLOW" || type === "OUTFLOW" || type === "TRANSFER_IN" || type === "TRANSFER_OUT";
+}
 
 const TYPE_LABELS: Record<string, string> = {
   INFLOW:       "Ingreso",
