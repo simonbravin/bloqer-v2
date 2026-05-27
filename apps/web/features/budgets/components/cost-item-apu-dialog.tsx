@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { X, Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -311,26 +311,14 @@ export function CostItemApuDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={requestClose}>
-        <DialogContent className="flex max-h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
-          <div className="flex items-start justify-between gap-4 border-b px-6 py-4">
-            <div className="min-w-0 space-y-1">
-              <DialogTitle className="text-lg">
-                APU — Análisis de precio unitario
-              </DialogTitle>
-              <p className="text-sm text-muted-foreground">
-                <span className="font-mono">{node.code}</span> — {node.name}
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="shrink-0"
-              onClick={() => requestClose(false)}
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Cerrar</span>
-            </Button>
+        <DialogContent className="flex max-h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0 pr-12">
+          <div className="border-b px-6 py-4">
+            <DialogTitle className="text-lg pr-6">
+              APU — Análisis de precio unitario
+            </DialogTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              <span className="font-mono">{node.code}</span> — {node.name}
+            </p>
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">

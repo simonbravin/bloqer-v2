@@ -36,6 +36,8 @@ import { WbsTreeToolbar, type WbsViewMode } from "./wbs-tree-toolbar";
 import { CostItemApuDialog } from "./cost-item-apu-dialog";
 import { WbsGroupDialog } from "./wbs-group-dialog";
 import { computeWbsRowMetrics, computeTreeGrandTotals } from "../lib/wbs-metrics";
+import { suggestChildItemCode, suggestRootGroupCode } from "../lib/wbs-codes";
+import type { WbsCreatePreset } from "./wbs-node-form";
 import type { WbsViewNode } from "@bloqer/services";
 import type {
   CreateWbsNodeInput,
@@ -96,7 +98,7 @@ function collectMatchingIds(nodes: WbsViewNode[], query: string): Set<string> {
 
 type DialogState =
   | { type: "closed" }
-  | { type: "add"; parentId?: string }
+  | { type: "add"; parentId?: string; preset: WbsCreatePreset; suggestedCode: string }
   | { type: "edit"; node: WbsViewNode };
 
 interface WbsTreeProps {
@@ -253,10 +255,10 @@ export function WbsTree({
       rows.push(
         <TableRow
           key={node.id}
-          className="cursor-pointer hover:bg-muted/40"
+          className="cursor-pointer hover:bg-muted/40 h-9"
           onClick={() => handleRowClick(node)}
         >
-          <TableCell className="font-mono text-xs text-muted-foreground w-24">
+          <TableCell className="py-1.5 font-mono text-xs text-muted-foreground w-24">
             <div className="flex items-center gap-1" style={{ paddingLeft: depth * 16 }}>
               {node.type === "GROUP" ? (
                 <button
@@ -279,44 +281,44 @@ export function WbsTree({
               <span className="truncate">{node.code}</span>
             </div>
           </TableCell>
-          <TableCell className="min-w-[12rem] text-sm font-medium">{node.name}</TableCell>
-          <TableCell className="text-sm text-muted-foreground w-20">
+          <TableCell className="py-1.5 min-w-[12rem] text-sm font-medium">{node.name}</TableCell>
+          <TableCell className="py-1.5 text-sm text-muted-foreground w-20">
             {metrics.unit ? budgetUnitLabel(metrics.unit) : "—"}
           </TableCell>
-          <TableCell className="text-right font-mono text-sm w-24">
+          <TableCell className="py-1.5 text-right font-mono text-sm w-24">
             {metrics.quantity != null ? metrics.quantity.toLocaleString("es-AR") : "—"}
           </TableCell>
 
           {viewMode === "breakdown" ? (
             <>
-              <TableCell className="text-right font-mono text-xs w-28">
+              <TableCell className="py-1.5 text-right font-mono text-xs w-28">
                 {fmt(metrics.byCategory.MATERIAL, currency)}
               </TableCell>
-              <TableCell className="text-right font-mono text-xs w-28">
+              <TableCell className="py-1.5 text-right font-mono text-xs w-28">
                 {fmt(metrics.byCategory.LABOR, currency)}
               </TableCell>
-              <TableCell className="text-right font-mono text-xs w-28">
+              <TableCell className="py-1.5 text-right font-mono text-xs w-28">
                 {fmt(metrics.byCategory.EQUIPMENT, currency)}
               </TableCell>
-              <TableCell className="text-right font-mono text-xs w-28">
+              <TableCell className="py-1.5 text-right font-mono text-xs w-28">
                 {fmt(metrics.byCategory.SUBCONTRACT, currency)}
               </TableCell>
-              <TableCell className="text-right font-mono text-sm font-semibold w-28">
+              <TableCell className="py-1.5 text-right font-mono text-sm font-semibold w-28">
                 {fmt(metrics.totalSalePrice, currency)}
               </TableCell>
             </>
           ) : (
             <>
-              <TableCell className="text-right font-mono text-sm w-32">
+              <TableCell className="py-1.5 text-right font-mono text-sm w-32">
                 {fmt(metrics.totalCostDirect, currency)}
               </TableCell>
-              <TableCell className="text-right font-mono text-sm font-semibold w-32">
+              <TableCell className="py-1.5 text-right font-mono text-sm font-semibold w-32">
                 {fmt(metrics.totalSalePrice, currency)}
               </TableCell>
             </>
           )}
 
-          <TableCell className="w-32" onClick={(e) => e.stopPropagation()}>
+          <TableCell className="py-1.5 w-32" onClick={(e) => e.stopPropagation()}>
             {editable && (
               <div className="flex items-center justify-end gap-0.5">
                 {node.type === "GROUP" && (
@@ -325,7 +327,14 @@ export function WbsTree({
                     size="icon"
                     className="h-7 w-7"
                     title="Agregar subnodo"
-                    onClick={() => setDialogState({ type: "add", parentId: node.id })}
+                    onClick={() =>
+                    setDialogState({
+                      type: "add",
+                      parentId: node.id,
+                      preset: "childItem",
+                      suggestedCode: suggestChildItemCode(node, nodes),
+                    })
+                  }
                   >
                     <Plus className="h-3 w-3" />
                   </Button>
@@ -388,9 +397,16 @@ export function WbsTree({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setDialogState({ type: "add", parentId: undefined })}
-          >
-            <Plus className="h-3 w-3 mr-1" /> Agregar nodo raíz
+              onClick={() =>
+                setDialogState({
+                  type: "add",
+                  parentId: undefined,
+                  preset: "rootGroup",
+                  suggestedCode: suggestRootGroupCode(nodes),
+                })
+              }
+            >
+              <Plus className="h-3 w-3 mr-1" /> Agregar capítulo
           </Button>
         )}
       </div>
@@ -500,13 +516,19 @@ export function WbsTree({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {dialogState.type === "add" ? "Agregar nodo" : "Editar nodo"}
+              {dialogState.type === "add"
+                ? dialogState.preset === "childItem"
+                  ? "Agregar ítem"
+                  : "Agregar capítulo"
+                : "Editar nodo"}
             </DialogTitle>
           </DialogHeader>
           {dialogState.type === "add" && (
             <WbsNodeForm
               mode="create"
               parentId={dialogState.parentId}
+              preset={dialogState.preset}
+              suggestedCode={dialogState.suggestedCode}
               onSubmit={async (data) => {
                 const result = await onAddNode(data);
                 if (!("error" in result)) router.refresh();

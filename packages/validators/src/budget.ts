@@ -35,7 +35,8 @@ export const updateBudgetSettingsSchema = z.object({
 export const createWbsNodeSchema = z.object({
   parentId: z.string().uuid().optional(),
   type: wbsNodeTypeSchema,
-  code: z.string().min(1, "El código es obligatorio").max(50),
+  /** Si se omite, el servicio asigna el siguiente código según padre y tipo. */
+  code: z.string().min(1).max(50).optional(),
   name: z.string().min(1, "El nombre es obligatorio").max(255),
   description: z.string().max(2000).optional(),
   sortOrder: z.number().int().min(0).optional(),

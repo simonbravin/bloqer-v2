@@ -9,17 +9,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
   createWbsNodeSchema, updateWbsNodeSchema,
   type CreateWbsNodeInput, type UpdateWbsNodeInput,
 } from "@bloqer/validators";
 import { UnitSelect } from "./unit-select";
 
+export type WbsCreatePreset = "rootGroup" | "childItem";
+
 type CreateMode = {
   mode: "create";
   parentId?: string;
+  preset?: WbsCreatePreset;
+  suggestedCode?: string;
   onSubmit: (data: CreateWbsNodeInput) => Promise<{ id: string } | { error: string }>;
 };
 
@@ -50,25 +51,37 @@ type Shared = {
 };
 
 function CreateForm({
-  parentId, onSubmit, isPending, startTransition, serverError, setServerError, onDone,
+  parentId, preset, suggestedCode, onSubmit, isPending, startTransition, serverError, setServerError, onDone,
 }: CreateMode & Shared) {
+  const nodeType = preset === "childItem" ? "ITEM" : "GROUP";
+
   const form = useForm<CreateWbsNodeInput>({
     resolver: zodResolver(createWbsNodeSchema),
-    defaultValues: { parentId, type: "GROUP", sortOrder: 0, unit: "un" },
+    defaultValues: {
+      parentId,
+      type: nodeType,
+      unit: preset === "childItem" ? "un" : undefined,
+      quantity: preset === "childItem" ? 1 : undefined,
+    },
   });
 
-  const type = form.watch("type");
   const unit = form.watch("unit") ?? "";
 
   const handleSubmit = form.handleSubmit((data) => {
     setServerError(null);
+    const payload: CreateWbsNodeInput = {
+      ...data,
+      type: nodeType,
+      parentId,
+      code: suggestedCode || data.code,
+    };
     startTransition(async () => {
-      const result = await onSubmit(data);
+      const result = await onSubmit(payload);
       if ("error" in result) {
         setServerError(result.error);
         toast.error(result.error);
       } else {
-        toast.success("Nodo agregado");
+        toast.success(nodeType === "GROUP" ? "Capítulo agregado" : "Ítem agregado");
         onDone();
       }
     });
@@ -76,37 +89,26 @@ function CreateForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {suggestedCode ? (
+        <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+          <span className="text-muted-foreground">Código asignado: </span>
+          <span className="font-mono font-semibold">{suggestedCode}</span>
+        </div>
+      ) : null}
+
       <div className="space-y-1.5">
-        <Label>Tipo *</Label>
-        <Select value={type} onValueChange={(v) => form.setValue("type", v as "GROUP" | "ITEM")}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="GROUP">GROUP — Agrupador</SelectItem>
-            <SelectItem value="ITEM">ITEM — Ítem medible</SelectItem>
-          </SelectContent>
-        </Select>
+        <Label>Nombre *</Label>
+        <Input
+          placeholder={preset === "childItem" ? "Hormigón H-21" : "Estructura"}
+          autoFocus
+          {...form.register("name")}
+        />
+        {form.formState.errors.name && (
+          <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label>Código *</Label>
-          <Input placeholder="1.1.2" {...form.register("code")} />
-          {form.formState.errors.code && (
-            <p className="text-xs text-destructive">{form.formState.errors.code.message}</p>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label>Nombre *</Label>
-          <Input placeholder="Estructura de hormigón" {...form.register("name")} />
-          {form.formState.errors.name && (
-            <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
-          )}
-        </div>
-      </div>
-
-      {type === "ITEM" && (
+      {preset === "childItem" && (
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Unidad</Label>
@@ -118,7 +120,6 @@ function CreateForm({
               type="number"
               step="0.0001"
               min="0"
-              placeholder="0"
               {...form.register("quantity", { valueAsNumber: true })}
             />
           </div>
@@ -127,19 +128,17 @@ function CreateForm({
 
       <div className="space-y-1.5">
         <Label>Descripción</Label>
-        <Textarea rows={2} placeholder="Descripción opcional..." {...form.register("description")} />
+        <Textarea rows={2} placeholder="Opcional..." {...form.register("description")} />
       </div>
 
-      {serverError && (
-        <p className="text-sm text-destructive">{serverError}</p>
-      )}
+      {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" onClick={onDone} disabled={isPending}>
           Cancelar
         </Button>
         <Button type="submit" size="sm" disabled={isPending}>
-          {isPending ? "Guardando..." : "Agregar nodo"}
+          {isPending ? "Guardando..." : preset === "childItem" ? "Agregar ítem" : "Agregar capítulo"}
         </Button>
       </div>
     </form>
@@ -196,9 +195,7 @@ function EditForm({
         <Textarea rows={2} {...form.register("description")} />
       </div>
 
-      {serverError && (
-        <p className="text-sm text-destructive">{serverError}</p>
-      )}
+      {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" onClick={onDone} disabled={isPending}>

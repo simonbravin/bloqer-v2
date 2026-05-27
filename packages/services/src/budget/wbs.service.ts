@@ -6,6 +6,12 @@ import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertBudgetEditable, canViewBudgetsArea } from "./budget.service";
 import { _recalcBudgetSummary } from "./budget-calc.service";
+import {
+  buildRenumberPlan,
+  nextChildItemCode,
+  nextRootGroupCode,
+  nextSortOrder,
+} from "./wbs-codes";
 
 // ─── View types (serializable for client) ─────────────────────────────────────
 
@@ -207,10 +213,38 @@ export async function addWbsNode(
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   assertBudgetEditable(budget);
 
-  const existing = await prisma.wbsNode.findUnique({
-    where: { budgetId_code: { budgetId, code: input.code } },
+  const allNodes = await prisma.wbsNode.findMany({
+    where: { budgetId },
+    select: { id: true, parentId: true, code: true, type: true, sortOrder: true },
   });
-  if (existing) throw new ServiceError("CONFLICT", `Ya existe un nodo con el código "${input.code}"`);
+
+  const siblings = allNodes.filter((n) => n.parentId === (input.parentId ?? null));
+  const roots = allNodes.filter((n) => n.parentId === null);
+
+  let code = input.code?.trim();
+  if (!code) {
+    if (input.parentId) {
+      const parent = allNodes.find((n) => n.id === input.parentId);
+      if (!parent) throw new ServiceError("NOT_FOUND", "Nodo padre no encontrado");
+      if (input.type === "ITEM") {
+        code = nextChildItemCode(parent.code, siblings);
+      } else {
+        throw new ServiceError("CONFLICT", "Solo se pueden agregar ítems bajo un capítulo");
+      }
+    } else {
+      if (input.type !== "GROUP") {
+        throw new ServiceError("CONFLICT", "Los ítems deben crearse dentro de un capítulo");
+      }
+      code = nextRootGroupCode(roots);
+    }
+  }
+
+  const existing = await prisma.wbsNode.findUnique({
+    where: { budgetId_code: { budgetId, code } },
+  });
+  if (existing) throw new ServiceError("CONFLICT", `Ya existe un nodo con el código "${code}"`);
+
+  const sortOrder = input.sortOrder ?? nextSortOrder(siblings);
 
   if (input.parentId) {
     const parent = await prisma.wbsNode.findUnique({ where: { id: input.parentId } });
@@ -228,10 +262,10 @@ export async function addWbsNode(
         budgetId,
         parentId: input.parentId ?? null,
         type: input.type,
-        code: input.code,
+        code,
         name: input.name,
         description: input.description,
-        sortOrder: input.sortOrder ?? 0,
+        sortOrder,
       },
     });
     // ITEM nodes always get a CostItem container
@@ -375,11 +409,35 @@ export async function reorderWbsNodes(
     throw new ServiceError("CONFLICT", "Todos los nodos deben tener el mismo padre para reordenar");
   }
 
-  await prisma.$transaction(
-    input.orderedNodeIds.map((nodeId, idx) =>
-      prisma.wbsNode.update({ where: { id: nodeId }, data: { sortOrder: idx } }),
-    ),
-  );
+  const allNodes = await prisma.wbsNode.findMany({
+    where: { budgetId },
+    select: { id: true, parentId: true, code: true, type: true, sortOrder: true },
+  });
+
+  const renumber = buildRenumberPlan(allNodes, input.parentId, input.orderedNodeIds);
+
+  await prisma.$transaction(async (tx) => {
+    for (let idx = 0; idx < input.orderedNodeIds.length; idx++) {
+      await tx.wbsNode.update({
+        where: { id: input.orderedNodeIds[idx]! },
+        data: { sortOrder: idx },
+      });
+    }
+
+    if (renumber.size === 0) return;
+
+    const tempPrefix = `__renumber_${Date.now()}_`;
+    let tempIdx = 0;
+    for (const id of renumber.keys()) {
+      await tx.wbsNode.update({
+        where: { id },
+        data: { code: `${tempPrefix}${tempIdx++}` },
+      });
+    }
+    for (const [id, code] of renumber) {
+      await tx.wbsNode.update({ where: { id }, data: { code } });
+    }
+  });
 
   await log({
     tenantId: ctx.tenantId,

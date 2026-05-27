@@ -137,9 +137,9 @@ export async function addWbsNodeAction(
 }
 
 export async function updateWbsNodeAction(
-  nodeId: string,
   projectId: string,
   budgetId: string,
+  nodeId: string,
   data: UpdateWbsNodeInput,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
@@ -153,9 +153,9 @@ export async function updateWbsNodeAction(
 }
 
 export async function removeWbsNodeAction(
-  nodeId: string,
   projectId: string,
   budgetId: string,
+  nodeId: string,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
@@ -183,9 +183,9 @@ export async function reorderWbsNodesAction(
 // ─── CostItem ─────────────────────────────────────────────────────────────────
 
 export async function updateCostItemAction(
-  costItemId: string,
   projectId: string,
   budgetId: string,
+  costItemId: string,
   data: UpdateCostItemInput,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
@@ -216,9 +216,9 @@ export async function addCostAnalysisLineAction(
 }
 
 export async function updateCostAnalysisLineAction(
-  lineId: string,
   projectId: string,
   budgetId: string,
+  lineId: string,
   data: UpdateCostAnalysisLineInput,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
@@ -232,9 +232,9 @@ export async function updateCostAnalysisLineAction(
 }
 
 export async function removeCostAnalysisLineAction(
-  lineId: string,
   projectId: string,
   budgetId: string,
+  lineId: string,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
