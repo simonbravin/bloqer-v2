@@ -36,7 +36,7 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
       <ProjectPageHeader
         projectId={project.id}
         projectName={project.name}
-        title="Finanzas del proyecto"
+        title="Tablero de finanzas"
         subtitle={
           project.code ? (
             <span className="font-mono text-sm">{project.code}</span>

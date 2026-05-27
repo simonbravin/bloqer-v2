@@ -38,12 +38,6 @@ export function buildProjectWorkspaceNavSections(
   if (gate.isEnabled("PROJECTS") && gate.isEnabled("BUDGETS") && canViewProjectCostControlReport(roles)) {
     planificacion.push({ label: "WBS y costos", href: `${base}/control-costos` });
   }
-  if (gate.isEnabled("PROJECTS") && canViewProjectCashFlowReport(roles)) {
-    planificacion.push({ label: "Flujo de caja", href: `${base}/flujo-caja` });
-  }
-  if (canShowProjectFinanzasNavLink(gate, roles)) {
-    planificacion.push({ label: "Finanzas del proyecto", href: `${base}/finanzas` });
-  }
   if (planificacion.length) sections.push({ title: "Planificación", items: planificacion });
 
   const operacion: ProjectWorkspaceNavLink[] = [];
@@ -60,6 +54,17 @@ export function buildProjectWorkspaceNavSections(
     operacion.push({ label: "Documentos", href: `${base}/documentos` });
   }
   if (operacion.length) sections.push({ title: "Operación", items: operacion });
+
+  const finanzasProyecto: ProjectWorkspaceNavLink[] = [];
+  if (canShowProjectFinanzasNavLink(gate, roles)) {
+    finanzasProyecto.push({ label: "Tablero de finanzas", href: `${base}/finanzas` });
+  }
+  if (gate.isEnabled("PROJECTS") && canViewProjectCashFlowReport(roles)) {
+    finanzasProyecto.push({ label: "Flujo de caja", href: `${base}/flujo-caja` });
+  }
+  if (finanzasProyecto.length) {
+    sections.push({ title: "Finanzas del proyecto", items: finanzasProyecto });
+  }
 
   const compras: ProjectWorkspaceNavLink[] = [];
   if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) {

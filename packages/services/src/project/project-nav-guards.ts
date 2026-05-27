@@ -24,7 +24,7 @@ export function canViewProjectCashFlowReport(roles: UserRole[]): boolean {
 }
 
 /**
- * Nav “Finanzas del proyecto” bajo `/proyectos/[id]`: módulo **PROJECTS** activo y al menos un bloque financiero/presupuesto visible.
+ * Nav “Tablero de finanzas” (`/proyectos/[id]/finanzas`): módulo **PROJECTS** activo y al menos un bloque financiero/presupuesto visible.
  */
 export function canShowProjectFinanzasNavLink(gate: TenantModuleGate, roles: UserRole[]): boolean {
   if (!gate.isEnabled("PROJECTS")) return false;

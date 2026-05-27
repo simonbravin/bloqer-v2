@@ -409,7 +409,8 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 | Sección UI | Enlaces (mismo criterio que tabla siguiente) |
 |------------|-----------------------------------------------|
 | Resumen | Resumen |
-| Planificación | Presupuesto, Control de costos, Flujo de caja, Finanzas del proyecto (`/finanzas`, label **Finanzas del proyecto**) |
+| Planificación | Presupuesto, Cronograma, WBS y costos |
+| Finanzas del proyecto | Tablero de finanzas (`/finanzas`), Flujo de caja — debajo de Operación |
 | Operación | Libro de obra, Certificaciones, Inventario, Documentos |
 | Compras y contratos | Compras, Subcontratos, Facturas proveedor, Cuentas por pagar, Pagos |
 | Comercial / Cobranzas | Facturas, Cuentas por cobrar, Cobranzas |
@@ -418,7 +419,7 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 | Label | Ruta | Módulo gate (tenant) | Permiso / helper |
 |-------|------|----------------------|------------------|
 | Resumen | `/proyectos/[id]` | — | `VIEW PROJECTS` |
-| **Finanzas del proyecto (hub)** | **`/proyectos/[id]/finanzas`** | `PROJECTS` + (AR / AP / TREASURY / BUDGETS según bloque o flujo) | `canShowProjectFinanzasNavLink` — ver servicio |
+| **Tablero de finanzas (hub)** | **`/proyectos/[id]/finanzas`** | `PROJECTS` + (AR / AP / TREASURY / BUDGETS según bloque o flujo) | `canShowProjectFinanzasNavLink` — ver servicio |
 | Presupuesto | `/proyectos/[id]/presupuestos` | `BUDGETS` | `VIEW BUDGETS` **o** `VIEW PROJECTS` (alineado a `canViewBudgetsArea` en servicios de presupuesto) |
 | Control de costos | `/proyectos/[id]/control-costos` | `PROJECTS` + `BUDGETS` | `canViewProjectCostControlReport` (`VIEW PROJECTS` **o** `VIEW BUDGETS`) |
 | Libro de obra | `/proyectos/[id]/libro-obra` | `JOBSITE_LOG` | `VIEW JOBSITE_LOG` **o** `VIEW PROJECTS` |

@@ -23,7 +23,7 @@ const PROJECT_NAV_ICON_BY_LABEL: Record<string, LucideIcon> = {
   Cronograma: CalendarRange,
   "WBS y costos": FolderKanban,
   "Flujo de caja": TrendingUp,
-  "Finanzas del proyecto": Wallet,
+  "Tablero de finanzas": Wallet,
   "Libro de obra": HardHat,
   Certificaciones: ClipboardList,
   Inventario: Package,
