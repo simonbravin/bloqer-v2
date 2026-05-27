@@ -7,6 +7,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
 import { deactivateTreasuryAccountAction, reactivateTreasuryAccountAction } from "../../actions";
 import { Button } from "@/components/ui/button";
+import { DataTableSection } from "@/components/ui/data-table-section";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
@@ -149,14 +150,9 @@ export default async function AccountDetailPage({ params }: PageProps) {
         </dl>
       </div>
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Movimientos</h2>
-        </div>
-        <div className="p-6">
-          <AccountMovementList movements={movementItems} />
-        </div>
-      </div>
+      <DataTableSection title="Movimientos">
+        <AccountMovementList movements={movementItems} />
+      </DataTableSection>
     </PageShell>
   );
 }

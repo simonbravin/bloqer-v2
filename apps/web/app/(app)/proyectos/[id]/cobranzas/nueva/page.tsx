@@ -52,7 +52,7 @@ export default async function NuevaCobranzaPage({ params, searchParams }: PagePr
     : openReceivables[0];
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href={`/proyectos/${id}/cobranzas`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva cobranza</h1>

@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SalesInvoiceStatusBadge } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
@@ -66,7 +67,7 @@ export default async function FacturaDetailPage({ params }: PageProps) {
   };
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <PageBackLink href={`/proyectos/${id}/facturas`} label="Volver" />
@@ -139,11 +140,8 @@ export default async function FacturaDetailPage({ params }: PageProps) {
         </dl>
       </div>
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Líneas</h2>
-        </div>
-        <TableScroll className="border-0 rounded-none">
+      <DataTableSection title="Líneas">
+        <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -170,24 +168,24 @@ export default async function FacturaDetailPage({ params }: PageProps) {
               ))}
             </TableBody>
           </Table>
-        </TableScroll>
-        <div className="border-t px-6 py-4 text-sm">
-          <div className="ml-auto max-w-xs space-y-1">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-mono">{fmtMoney(invoice.subtotal, invoice.currency)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">IVA</span>
-              <span className="font-mono">{fmtMoney(invoice.taxAmount, invoice.currency)}</span>
-            </div>
-            <div className="flex justify-between font-semibold">
-              <span>Total</span>
-              <span className="font-mono">{fmtMoney(invoice.totalAmount, invoice.currency)}</span>
+          <div className="border-t px-6 py-4 text-sm">
+            <div className="ml-auto max-w-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-mono">{fmtMoney(invoice.subtotal, invoice.currency)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">IVA</span>
+                <span className="font-mono">{fmtMoney(invoice.taxAmount, invoice.currency)}</span>
+              </div>
+              <div className="flex justify-between font-semibold">
+                <span>Total</span>
+                <span className="font-mono">{fmtMoney(invoice.totalAmount, invoice.currency)}</span>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </TableScroll>
+      </DataTableSection>
     </PageShell>
   );
 }

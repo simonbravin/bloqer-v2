@@ -2,6 +2,15 @@ import Link from "next/link";
 import type { CompanyFinanceOperationsSummary, FinanceHubOverview } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { DashboardKpiCard } from "@/features/dashboard/dashboard-kpi-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { Inbox } from "lucide-react";
@@ -48,22 +57,35 @@ function CompanyOperationsSection({ summary }: { summary: CompanyFinanceOperatio
         ) : summary.recentCorporatePayments.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sin pagos corporativos recientes.</p>
         ) : (
-          <ul className="divide-y divide-border/60 text-sm">
-            {summary.recentCorporatePayments.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <div>
-                  <Link
-                    href={`/finanzas/pagos-proveedor/${p.id}`}
-                    className="font-medium text-primary underline-offset-4 hover:underline"
-                  >
-                    {p.supplierLabel}
-                  </Link>
-                  <p className="text-xs text-muted-foreground">{p.paymentDate}</p>
-                </div>
-                <span className="tabular-nums font-medium">{formatMoney(p.amount, p.currency)}</span>
-              </li>
-            ))}
-          </ul>
+          <TableScroll>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Proveedor</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead className="text-right">Monto</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {summary.recentCorporatePayments.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">
+                      <Link
+                        href={`/finanzas/pagos-proveedor/${p.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        {p.supplierLabel}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{p.paymentDate}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">
+                      {formatMoney(p.amount, p.currency)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableScroll>
         )}
         <Button asChild size="sm" variant="outline">
           <Link href="/finanzas/gastos-generales">Abrir asistente</Link>

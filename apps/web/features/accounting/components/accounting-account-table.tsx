@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { AccountTypeBadge } from "./account-type-badge";
 import type { AccountingAccountListItem } from "./accounting-account-list";
 
@@ -25,7 +26,7 @@ export function AccountingAccountTable({
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
@@ -57,6 +58,6 @@ export function AccountingAccountTable({
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

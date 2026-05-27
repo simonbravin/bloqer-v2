@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { PayableListItem } from "./payable-list";
 
@@ -27,7 +28,7 @@ export function PayableTable({
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
@@ -74,6 +75,6 @@ export function PayableTable({
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

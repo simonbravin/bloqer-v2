@@ -40,7 +40,7 @@ function ItemRows({ items }: { items: AgingItem[] }) {
   return (
     <TableRow>
       <TableCell colSpan={8} className="p-0">
-        <TableScroll className="border-0 rounded-none">
+        <TableScroll>
           <Table className="text-xs">
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -152,8 +152,8 @@ export function AgingTable({ report }: Props) {
   const t = report.totals;
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <TableScroll className="border-0 rounded-none">
+    <div className="space-y-0">
+    <TableScroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -192,7 +192,7 @@ export function AgingTable({ report }: Props) {
             </TableRow>
           </TableFooter>
         </Table>
-      </TableScroll>
+    </TableScroll>
 
       {Object.keys(report.byCurrency).length > 1 && (
         <div className="border-t px-4 py-3 flex flex-wrap gap-4 text-xs text-muted-foreground">

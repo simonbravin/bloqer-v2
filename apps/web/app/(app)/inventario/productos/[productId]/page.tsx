@@ -7,6 +7,7 @@ import { deactivateProductAction, reactivateProductAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
+import { DataTableSection } from "@/components/ui/data-table-section";
 
 interface PageProps {
   params: Promise<{ productId: string }>;
@@ -91,14 +92,9 @@ export default async function ProductoPage({ params }: PageProps) {
         </div>
       )}
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Movimientos de stock</h2>
-        </div>
-        <div className="p-6">
-          <StockMovementList movements={movements} />
-        </div>
-      </div>
+      <DataTableSection title="Movimientos de stock">
+        <StockMovementList movements={movements} />
+      </DataTableSection>
     </PageShell>
   );
 }

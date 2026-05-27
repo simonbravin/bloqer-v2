@@ -1,7 +1,8 @@
 import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { PayableStatusBadge, PaymentList } from "@/features/ap";
+import { DataTableSection } from "@/components/ui/data-table-section";
+import { PayableStatusBadge, PaymentTable } from "@/features/ap";
 import type { PaymentListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
@@ -126,14 +127,9 @@ export default async function FinanzasPayableDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Pagos registrados</h2>
-        </div>
-        <div className="p-6">
-          <PaymentList payments={paymentItems} hrefPrefix="/finanzas/pagos-proveedor" />
-        </div>
-      </div>
+      <DataTableSection title="Pagos registrados">
+        <PaymentTable payments={paymentItems} hrefPrefix="/finanzas/pagos-proveedor" />
+      </DataTableSection>
     </PageShell>
   );
 }

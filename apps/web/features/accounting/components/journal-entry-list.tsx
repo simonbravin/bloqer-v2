@@ -4,6 +4,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import type { JournalEntryView } from "@bloqer/services";
 import { JournalEntryStatusBadge } from "./journal-entry-status-badge";
 
@@ -19,7 +20,7 @@ export function JournalEntryList({
     return <ListEmptyState message="No hay asientos." />;
   }
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
       <TableHeader>
         <TableRow>
@@ -46,6 +47,6 @@ export function JournalEntryList({
         ))}
       </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

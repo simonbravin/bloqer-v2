@@ -44,14 +44,7 @@ export default async function ContabilidadReglasPage({
         Mapeo debe/haber por tipo de evento operativo. Los asientos sugeridos se crean en borrador;
         la fase 11C puede enlazar botones desde cobranzas, pagos, tesorería e inventario.
       </p>
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Reglas por empresa</h2>
-        </div>
-        <div className="p-6">
-          <AccountingMappingRuleList rules={rules} empresa={empresa} />
-        </div>
-      </div>
+      <AccountingMappingRuleList rules={rules} empresa={empresa} />
     </PageShell>
   );
 }

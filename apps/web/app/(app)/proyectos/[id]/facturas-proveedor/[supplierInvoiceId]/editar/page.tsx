@@ -55,7 +55,7 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
   }));
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink
           href={`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`}

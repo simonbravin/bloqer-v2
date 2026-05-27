@@ -43,7 +43,7 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
   const returnPath = `/proyectos/${id}/pagos/${paymentId}`;
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href={`/proyectos/${id}/pagos`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Pago</h1>

@@ -2,6 +2,8 @@ import Link from "next/link";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import type { AccountingMappingRuleView } from "@bloqer/services";
 import { AccountingEventTypeBadge } from "./accounting-event-type-badge";
 
@@ -14,9 +16,10 @@ export function AccountingMappingRuleList({
 }) {
   const q = empresa ? `?empresa=${encodeURIComponent(empresa)}` : "";
   if (rules.length === 0) {
-    return <p className="text-sm text-muted-foreground">No hay reglas contables.</p>;
+    return <ListEmptyState message="No hay reglas contables." />;
   }
   return (
+    <TableScroll>
     <Table>
       <TableHeader>
         <TableRow>
@@ -45,5 +48,6 @@ export function AccountingMappingRuleList({
         ))}
       </TableBody>
     </Table>
+    </TableScroll>
   );
 }

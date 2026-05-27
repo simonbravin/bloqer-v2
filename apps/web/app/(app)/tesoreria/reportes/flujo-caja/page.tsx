@@ -45,7 +45,7 @@ export default async function FlujoCajaPage({ searchParams }: PageProps) {
   );
 
   return (
-    <PageShell variant="wide" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
           <PageBackLink href="/tesoreria/reportes" label="Reportes" />

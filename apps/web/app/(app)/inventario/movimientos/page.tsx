@@ -33,22 +33,17 @@ export default async function MovimientosPage({
         <h1 className="text-2xl font-bold tracking-tight">Movimientos de stock</h1>
       </div>
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Historial completo</h2>
-        </div>
-        <div className="p-6 space-y-4">
-          {contabilidadErr && (
-            <p className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {contabilidadErr}
-            </p>
-          )}
-          <StockMovementList
-            movements={movements}
-            accountingReturnPath="/inventario/movimientos"
-            canEditAccounting={canEditAccounting}
-          />
-        </div>
+      <div className="space-y-4">
+        {contabilidadErr && (
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {contabilidadErr}
+          </p>
+        )}
+        <StockMovementList
+          movements={movements}
+          accountingReturnPath="/inventario/movimientos"
+          canEditAccounting={canEditAccounting}
+        />
       </div>
     </PageShell>
   );

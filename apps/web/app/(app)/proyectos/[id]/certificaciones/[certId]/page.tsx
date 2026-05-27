@@ -87,7 +87,7 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
   const allItems = flattenItemNodes(wbsTree);
 
   return (
-    <PageShell variant="wide" className="space-y-4">
+    <PageShell variant="default" className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <PageBackLink href={`/proyectos/${projectId}/certificaciones`} label="Certificaciones" />

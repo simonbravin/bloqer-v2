@@ -38,8 +38,7 @@ export function ProjectCashFlowTable({ periods, currency }: Props) {
   const currencyLabel = formatCurrencyDisplay(currency);
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <TableScroll className="border-0 rounded-none">
+    <TableScroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -74,10 +73,9 @@ export function ProjectCashFlowTable({ periods, currency }: Props) {
             ))}
           </TableBody>
         </Table>
-      </TableScroll>
-      <p className="px-4 py-2 text-xs text-muted-foreground border-t">
-        El acumulado corresponde al rango filtrado.
-      </p>
-    </div>
+        <p className="px-4 py-2 text-xs text-muted-foreground border-t">
+          El acumulado corresponde al rango filtrado.
+        </p>
+    </TableScroll>
   );
 }

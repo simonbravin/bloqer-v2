@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
+import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
-import { CertificationList } from "@/features/certifications";
+import { CertificationListSection } from "@/features/certifications";
 import { getCurrentUser } from "@/lib/auth";
 import { listCertificationsByProject, getProjectShellInfo, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -55,21 +56,19 @@ export default async function CertificacionesPage({ params }: PageProps) {
         title="Certificaciones"
         subtitle={`${serialized.length} ${serialized.length === 1 ? "certificación" : "certificaciones"}`}
         actions={
-          <Button asChild>
-            <Link href={`/proyectos/${id}/certificaciones/nueva`}>Nueva certificación</Link>
-          </Button>
+          <>
+            <Suspense fallback={null}>
+              <ListViewToggle storageKey={`certificaciones-${id}`} />
+            </Suspense>
+            <Button asChild>
+              <Link href={`/proyectos/${id}/certificaciones/nueva`}>Nueva certificación</Link>
+            </Button>
+          </>
         }
       />
 
       <Suspense fallback={<ListSectionSkeleton />}>
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-6 py-4">
-            <h2 className="font-semibold">Historial</h2>
-          </div>
-          <div className="px-6 py-4">
-            <CertificationList certifications={serialized} projectId={id} />
-          </div>
-        </div>
+        <CertificationListSection certifications={serialized} projectId={id} />
       </Suspense>
     </PageShell>
   );

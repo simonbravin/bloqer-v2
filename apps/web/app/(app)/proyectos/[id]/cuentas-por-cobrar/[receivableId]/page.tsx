@@ -1,8 +1,9 @@
 import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { DataTableSection } from "@/components/ui/data-table-section";
 import { ReceivableStatusBadge } from "@/features/sales-invoices";
-import { CollectionList } from "@/features/collections";
+import { CollectionTable } from "@/features/collections";
 import type { CollectionListItem } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { getReceivableById, listCollectionsByReceivable, ServiceError } from "@bloqer/services";
@@ -74,7 +75,7 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
   }));
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <PageBackLink href={`/proyectos/${id}/cuentas-por-cobrar`} label="Volver" />
@@ -161,21 +162,20 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
         </dl>
       </div>
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4 flex items-center justify-between">
-          <h2 className="font-semibold">Cobranzas</h2>
-          {canCollect && (
+      <DataTableSection
+        title="Cobranzas"
+        actions={
+          canCollect ? (
             <Button variant="outline" size="sm" asChild>
               <Link href={`/proyectos/${id}/cobranzas/nueva?receivableId=${receivableId}`}>
                 Registrar cobranza
               </Link>
             </Button>
-          )}
-        </div>
-        <div className="p-6">
-          <CollectionList collections={collectionItems} projectId={id} />
-        </div>
-      </div>
+          ) : undefined
+        }
+      >
+        <CollectionTable collections={collectionItems} projectId={id} />
+      </DataTableSection>
     </PageShell>
   );
 }

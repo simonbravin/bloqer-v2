@@ -4,6 +4,15 @@ import { type DashboardProjectSummary, formatDashboardMoney } from "@bloqer/serv
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 
 function projectStatusLabel(status: string): string {
   if (status === "ACTIVE") return "Activo";
@@ -52,38 +61,46 @@ export function ProjectProgressCard({
           </div>
         ) : null}
 
-        <ul className="divide-y rounded-lg border">
-          {summary.projects.map((p) => (
-            <li key={p.id}>
-              <Link
-                href={p.href}
-                className="flex flex-col gap-1 px-4 py-3 text-sm transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <span className="font-medium">{p.name}</span>
-                  {p.clientName ? (
-                    <p className="truncate text-xs text-muted-foreground">{p.clientName}</p>
-                  ) : null}
-                  {(p.startDate || p.expectedEndDate) && (
-                    <p className="text-xs text-muted-foreground">
-                      {fmtShort(p.startDate) ? `Inicio ${fmtShort(p.startDate)}` : null}
-                      {p.startDate && p.expectedEndDate ? " · " : null}
-                      {fmtShort(p.expectedEndDate) ? `Fin est. ${fmtShort(p.expectedEndDate)}` : null}
-                    </p>
-                  )}
-                </div>
-                <span className="flex shrink-0 flex-wrap items-center gap-2 text-muted-foreground">
-                  <Badge variant="secondary">{projectStatusLabel(p.status)}</Badge>
-                  {p.budgetAmount != null && p.budgetCurrency ? (
-                    <span className="tabular-nums">{formatDashboardMoney(p.budgetAmount, p.budgetCurrency)}</span>
-                  ) : (
-                    <span className="text-xs">Sin presupuesto aprobado</span>
-                  )}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <TableScroll>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Proyecto</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Plazos</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Presupuesto</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {summary.projects.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-medium">
+                    <Link href={p.href} className="text-primary hover:underline">
+                      {p.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {p.clientName ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {fmtShort(p.startDate) ? `Inicio ${fmtShort(p.startDate)}` : "—"}
+                    {p.startDate && p.expectedEndDate ? " · " : null}
+                    {fmtShort(p.expectedEndDate) ? `Fin ${fmtShort(p.expectedEndDate)}` : null}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{projectStatusLabel(p.status)}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-sm">
+                    {p.budgetAmount != null && p.budgetCurrency
+                      ? formatDashboardMoney(p.budgetAmount, p.budgetCurrency)
+                      : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableScroll>
       </CardContent>
       <CardFooter>
         <Button asChild variant="outline" size="sm">

@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
+import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
-import { SupplierInvoiceList } from "@/features/ap";
+import { SupplierInvoiceListSection } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectShellInfo, listSupplierInvoicesByProject, ServiceError } from "@bloqer/services";
@@ -62,24 +63,22 @@ export default async function FacturasProveedorPage({ params }: PageProps) {
         title="Facturas de proveedor"
         subtitle={`${items.length} ${items.length === 1 ? "factura" : "facturas"}`}
         actions={
-          <Button asChild>
-            <Link href={`/proyectos/${id}/facturas-proveedor/nueva`}>Nueva factura</Link>
-          </Button>
+          <>
+            <Suspense fallback={null}>
+              <ListViewToggle storageKey={`facturas-proveedor-${id}`} />
+            </Suspense>
+            <Button asChild>
+              <Link href={`/proyectos/${id}/facturas-proveedor/nueva`}>Nueva factura</Link>
+            </Button>
+          </>
         }
       />
 
       <Suspense fallback={<ListSectionSkeleton />}>
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-6 py-4">
-            <h2 className="font-semibold">Facturas del proyecto</h2>
-          </div>
-          <div className="p-6">
-            <SupplierInvoiceList
-              invoices={items}
-              hrefPrefix={`/proyectos/${id}/facturas-proveedor`}
-            />
-          </div>
-        </div>
+        <SupplierInvoiceListSection
+          invoices={items}
+          hrefPrefix={`/proyectos/${id}/facturas-proveedor`}
+        />
       </Suspense>
     </PageShell>
   );

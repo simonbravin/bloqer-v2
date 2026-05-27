@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { CollectionStatusBadge } from "./collection-status-badge";
 import type { CollectionListItem } from "./collection-list";
 
@@ -32,7 +33,7 @@ export function CollectionTable({
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
@@ -69,6 +70,6 @@ export function CollectionTable({
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

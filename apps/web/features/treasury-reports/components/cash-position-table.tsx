@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatCurrencyDisplay } from "@/lib/format";
 
@@ -59,11 +60,8 @@ export function CashPositionTable({ report }: Props) {
         ))}
       </KpiStatGrid>
 
-      <div className="rounded-lg border bg-card overflow-hidden">
-        <div className="border-b px-6 py-3">
-          <h2 className="font-semibold text-sm">Saldos por cuenta</h2>
-        </div>
-        <TableScroll className="border-0 rounded-none">
+      <DataTableSection title="Saldos por cuenta">
+        <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -95,14 +93,11 @@ export function CashPositionTable({ report }: Props) {
             </TableBody>
           </Table>
         </TableScroll>
-      </div>
+      </DataTableSection>
 
       {report.byCompany.length > 1 && (
-        <div className="rounded-lg border bg-card overflow-hidden">
-          <div className="border-b px-6 py-3">
-            <h2 className="font-semibold text-sm">Por empresa</h2>
-          </div>
-          <TableScroll className="border-0 rounded-none">
+        <DataTableSection title="Por empresa">
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -130,7 +125,7 @@ export function CashPositionTable({ report }: Props) {
               </TableBody>
             </Table>
           </TableScroll>
-        </div>
+        </DataTableSection>
       )}
     </div>
   );

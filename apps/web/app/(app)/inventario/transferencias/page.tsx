@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import {
   Table,
   TableBody,
@@ -49,7 +50,7 @@ export default async function TransferenciasPage() {
       {transfers.length === 0 ? (
         <ListEmptyState message="No hay transferencias registradas." />
       ) : (
-        <div className="rounded-lg border">
+        <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -87,7 +88,7 @@ export default async function TransferenciasPage() {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableScroll>
       )}
     </PageShell>
   );

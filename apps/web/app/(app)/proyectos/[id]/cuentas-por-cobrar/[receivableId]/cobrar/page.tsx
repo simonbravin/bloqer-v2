@@ -43,7 +43,7 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
   const isBlocked = receivable.status === "PAID" || receivable.status === "CANCELLED";
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href={`/proyectos/${id}/cuentas-por-cobrar/${receivableId}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Registrar cobro</h1>

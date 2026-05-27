@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { DataTableSection } from "@/components/ui/data-table-section";
+import { TableScroll } from "@/components/ui/table-scroll";
 import {
   Table,
   TableBody,
@@ -99,11 +101,8 @@ export default async function AsientoDetallePage({
 
       {sourceLink && <JournalEntrySourcePanel link={sourceLink} />}
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Líneas</h2>
-        </div>
-        <div className="p-6 overflow-x-auto">
+      <DataTableSection title="Líneas">
+        <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -134,8 +133,8 @@ export default async function AsientoDetallePage({
               ))}
             </TableBody>
           </Table>
-        </div>
-      </div>
+        </TableScroll>
+      </DataTableSection>
 
       {canEdit && entry.status === "DRAFT" && (
         <div className="rounded-lg border bg-card p-6 space-y-3">

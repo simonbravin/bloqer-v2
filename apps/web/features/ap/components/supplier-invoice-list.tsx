@@ -1,8 +1,5 @@
-"use client";
-import { formatDate, formatDateTime } from "@/lib/format";
-
-import Link from "next/link";
-import { SupplierInvoiceStatusBadge } from "./supplier-invoice-status-badge";
+/** @deprecated Use SupplierInvoiceTable or SupplierInvoiceListSection */
+export { SupplierInvoiceTable as SupplierInvoiceList } from "./supplier-invoice-table";
 
 export type SupplierInvoiceListItem = {
   id: string;
@@ -14,46 +11,3 @@ export type SupplierInvoiceListItem = {
   currency: string;
   status: string;
 };
-
-interface Props {
-  invoices: SupplierInvoiceListItem[];
-  /** Base path without trailing slash, e.g. `/proyectos/abc/facturas-proveedor` or `/finanzas/facturas-proveedor`. */
-  hrefPrefix: string;
-}
-
-export function SupplierInvoiceList({ invoices, hrefPrefix }: Props) {
-  if (invoices.length === 0) {
-    return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
-        No hay facturas de proveedor registradas.
-      </p>
-    );
-  }
-
-  return (
-    <div className="divide-y">
-      {invoices.map((inv) => (
-        <div key={inv.id} className="flex items-center justify-between px-2 py-3 hover:bg-muted/40">
-          <div className="flex flex-col gap-0.5">
-            <Link
-              href={`${hrefPrefix}/${inv.id}`}
-              className="text-sm font-medium hover:underline"
-            >
-              {inv.code}
-            </Link>
-            <span className="text-xs text-muted-foreground">{inv.supplierName}</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:block">
-              Vence {formatDate(inv.dueDate)}
-            </span>
-            <span className="text-sm font-medium tabular-nums">
-              {Number(inv.totalAmount).toLocaleString("es-AR", { style: "currency", currency: inv.currency })}
-            </span>
-            <SupplierInvoiceStatusBadge status={inv.status} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}

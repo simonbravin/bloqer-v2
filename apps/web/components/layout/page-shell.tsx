@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 
 export type PageShellVariant = "default" | "wide" | "form" | "detail" | "narrow";
 
+/** `default` (max-w-6xl): listados, detalle y formularios del workspace de proyecto y módulos operativos. */
 const variantClass: Record<PageShellVariant, string> = {
   default: "shell-page",
   wide:    "shell-page-wide",

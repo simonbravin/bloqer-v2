@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PurchaseReceiptStatusBadge } from "@/features/procurement";
 import { StockMovementList } from "@/features/inventory";
@@ -69,7 +70,7 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
   const isCancelled = receipt.status === "CANCELLED";
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href={`/proyectos/${id}/recepciones`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">
@@ -103,7 +104,7 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
 
         <hr />
 
-        <TableScroll className="border-0">
+        <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -135,14 +136,9 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
       </div>
 
       {stockMovements.length > 0 && (
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-6 py-4">
-            <h2 className="font-semibold">Movimientos de stock generados</h2>
-          </div>
-          <div className="p-6">
-            <StockMovementList movements={stockMovements} />
-          </div>
-        </div>
+        <DataTableSection title="Movimientos de stock generados">
+          <StockMovementList movements={stockMovements} />
+        </DataTableSection>
       )}
 
       <div className="flex gap-2">

@@ -24,7 +24,7 @@ export default async function NuevoProyectoPage() {
   );
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <PageBackLink href="/proyectos" label="Proyectos" />
       <PageListHeader title="Nuevo proyecto" subtitle="Alta de obra" />
 

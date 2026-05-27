@@ -17,7 +17,7 @@ export default async function NuevoDocumentoPage({ params }: PageProps) {
   const storageConfigured = isStorageConfigured();
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href={`/proyectos/${id}/documentos`} label="Documentos" />
         <h1 className="text-2xl font-bold tracking-tight">Agregar documento</h1>

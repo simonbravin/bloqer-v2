@@ -1,6 +1,8 @@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { Badge } from "@/components/ui/badge";
 import { AccountMovementTypeBadge } from "./account-movement-type-badge";
 import type { AccountMovementType, AccountMovementStatus } from "@bloqer/database";
@@ -31,12 +33,11 @@ interface AccountMovementListProps {
 
 export function AccountMovementList({ movements }: AccountMovementListProps) {
   if (movements.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">Sin movimientos registrados.</p>
-    );
+    return <ListEmptyState message="Sin movimientos registrados." />;
   }
 
   return (
+    <TableScroll>
     <Table>
       <TableHeader>
         <TableRow>
@@ -76,5 +77,6 @@ export function AccountMovementList({ movements }: AccountMovementListProps) {
         })}
       </TableBody>
     </Table>
+    </TableScroll>
   );
 }

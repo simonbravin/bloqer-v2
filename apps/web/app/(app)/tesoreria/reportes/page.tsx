@@ -14,7 +14,7 @@ export default async function ReportesTesoreriaPage() {
   }
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href="/tesoreria" label="Tesorería" />
         <div>

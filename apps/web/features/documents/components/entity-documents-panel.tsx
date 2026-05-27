@@ -199,17 +199,15 @@ export function EntityDocumentsPanel({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Adjuntos</h2>
-          <p className="text-xs text-muted-foreground mt-1">
-            {subtitle}
-          </p>
+      <div className="space-y-3">
+        <div>
+          <h2 className="text-base font-semibold">Adjuntos</h2>
+          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
         </div>
         {docs.length === 0 ? (
-          <ListEmptyState message={emptyMessage} className="border-0 rounded-none" />
+          <ListEmptyState message={emptyMessage} />
         ) : (
-          <TableScroll className="border-0 rounded-none">
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>

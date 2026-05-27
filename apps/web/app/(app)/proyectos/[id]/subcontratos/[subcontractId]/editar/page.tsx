@@ -56,7 +56,7 @@ export default async function EditarSubcontratoPage({ params }: PageProps) {
   const companyId = subcontract.companyId ?? current.tenantCtx.companyId ?? "";
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink
           href={`/proyectos/${projectId}/subcontratos/${subcontractId}`}

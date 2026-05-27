@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SupplierInvoiceStatusBadge } from "@/features/ap";
 import { EntityDocumentsPanel } from "@/features/documents";
@@ -61,7 +62,7 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
   const isCancelled = invoice.status === "CANCELLED";
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href={`/proyectos/${id}/facturas-proveedor`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
@@ -90,7 +91,7 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
 
         <hr />
 
-        <TableScroll className="border-0">
+        <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>

@@ -15,6 +15,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { Plus, Pencil, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CertificationLineView } from "@bloqer/services";
@@ -96,7 +97,7 @@ export function CertificationLineEditor({
           Sin ítems. Agregue los ítems a certificar en este período.
         </p>
       ) : (
-        <div className="rounded-lg border overflow-x-auto">
+        <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -170,7 +171,7 @@ export function CertificationLineEditor({
               })}
             </TableBody>
           </Table>
-        </div>
+        </TableScroll>
       )}
 
       {/* Add / Edit dialog */}

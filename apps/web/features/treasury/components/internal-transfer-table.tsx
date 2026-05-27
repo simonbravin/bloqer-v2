@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import type { InternalTransferView } from "@bloqer/services";
 import { CancelInternalTransferButton } from "./cancel-internal-transfer-button";
 
@@ -31,7 +32,7 @@ export function InternalTransferTable({ transfers }: { transfers: InternalTransf
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
@@ -66,6 +67,6 @@ export function InternalTransferTable({ transfers }: { transfers: InternalTransf
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

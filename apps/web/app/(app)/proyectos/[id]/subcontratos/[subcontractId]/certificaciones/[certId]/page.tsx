@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
@@ -72,7 +73,7 @@ export default async function CertificacionPage({ params }: PageProps) {
   const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "SUBCONTRACTS");
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <PageBackLink
@@ -179,11 +180,8 @@ export default async function CertificacionPage({ params }: PageProps) {
       )}
 
       {/* Lines */}
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Detalle de certificación</h2>
-        </div>
-        <TableScroll className="border-0 rounded-none">
+      <DataTableSection title="Detalle de certificación">
+        <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -233,7 +231,7 @@ export default async function CertificacionPage({ params }: PageProps) {
             </TableFooter>
           </Table>
         </TableScroll>
-      </div>
+      </DataTableSection>
 
       {cert.notes && (
         <div className="rounded-lg border bg-card p-4">

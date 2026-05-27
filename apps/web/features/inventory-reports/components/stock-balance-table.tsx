@@ -32,8 +32,7 @@ export function StockBalanceTable({ rows }: Props) {
   }
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <TableScroll className="border-0 rounded-none">
+    <TableScroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -90,7 +89,6 @@ export function StockBalanceTable({ rows }: Props) {
             ))}
           </TableBody>
         </Table>
-      </TableScroll>
-    </div>
+    </TableScroll>
   );
 }

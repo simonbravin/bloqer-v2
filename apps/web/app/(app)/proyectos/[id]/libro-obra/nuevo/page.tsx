@@ -45,7 +45,7 @@ export default async function NuevoParteObraPage({ params }: PageProps) {
   const companyId = pickList.companyId || current.tenantCtx.companyId || "";
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         projectId={projectId}
         projectName={project.name}

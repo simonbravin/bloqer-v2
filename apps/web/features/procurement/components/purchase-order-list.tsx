@@ -1,9 +1,5 @@
-"use client";
-import { formatDate } from "@/lib/format";
-
-import Link from "next/link";
-import { ListEmptyState } from "@/components/ui/list-empty-state";
-import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
+/** @deprecated Use PurchaseOrderTable or PurchaseOrderListSection */
+export { PurchaseOrderTable as PurchaseOrderList } from "./purchase-order-table";
 
 export type PurchaseOrderListItem = {
   id: string;
@@ -15,43 +11,3 @@ export type PurchaseOrderListItem = {
   currency: string;
   status: string;
 };
-
-interface Props {
-  orders: PurchaseOrderListItem[];
-  projectId: string;
-}
-
-export function PurchaseOrderList({ orders, projectId }: Props) {
-  if (orders.length === 0) {
-    return <ListEmptyState message="No hay órdenes de compra registradas." />;
-  }
-
-  return (
-    <div className="divide-y">
-      {orders.map((order) => (
-        <div key={order.id} className="flex items-center justify-between px-2 py-3 hover:bg-muted/40">
-          <div className="flex flex-col gap-0.5">
-            <Link
-              href={`/proyectos/${projectId}/ordenes-compra/${order.id}`}
-              className="text-sm font-medium hover:underline"
-            >
-              {order.code}
-            </Link>
-            <span className="text-xs text-muted-foreground">{order.supplierName}</span>
-          </div>
-          <div className="flex items-center gap-4">
-            {order.expectedDeliveryDate && (
-              <span className="text-sm text-muted-foreground hidden sm:block">
-                Entrega {formatDate(order.expectedDeliveryDate)}
-              </span>
-            )}
-            <span className="text-sm font-medium tabular-nums">
-              {Number(order.totalAmount).toLocaleString("es-AR", { style: "currency", currency: order.currency })}
-            </span>
-            <PurchaseOrderStatusBadge status={order.status} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}

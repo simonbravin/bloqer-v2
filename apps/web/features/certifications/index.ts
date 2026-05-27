@@ -1,4 +1,7 @@
 export { CertificationList } from "./components/certification-list";
+export { CertificationTable } from "./components/certification-table";
+export { CertificationCards } from "./components/certification-cards";
+export { CertificationListSection } from "./components/certification-list-section";
 export { CertificationForm } from "./components/certification-form";
 export { CertificationEditForm } from "./components/certification-edit-form";
 export { CertificationStatusBadge } from "./components/certification-status-badge";

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { ReceivableStatusBadge } from "./receivable-status-badge";
 import type { ReceivableListItem } from "./receivable-list";
 
@@ -37,7 +38,7 @@ export function ReceivableTable({
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
@@ -72,6 +73,6 @@ export function ReceivableTable({
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

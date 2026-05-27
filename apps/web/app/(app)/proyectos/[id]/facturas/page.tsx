@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
+import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
-import { SalesInvoiceList } from "@/features/sales-invoices";
+import { SalesInvoiceListSection } from "@/features/sales-invoices";
 import type { SalesInvoiceListItem } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectShellInfo, listInvoicesByProject, ServiceError } from "@bloqer/services";
@@ -63,21 +64,19 @@ export default async function FacturasPage({ params }: PageProps) {
         title="Facturas"
         subtitle={`${items.length} ${items.length === 1 ? "factura" : "facturas"}`}
         actions={
-          <Button size="sm" asChild>
-            <Link href={`/proyectos/${id}/facturas/nueva`}>Nueva factura</Link>
-          </Button>
+          <>
+            <Suspense fallback={null}>
+              <ListViewToggle storageKey={`facturas-${id}`} />
+            </Suspense>
+            <Button size="sm" asChild>
+              <Link href={`/proyectos/${id}/facturas/nueva`}>Nueva factura</Link>
+            </Button>
+          </>
         }
       />
 
       <Suspense fallback={<ListSectionSkeleton />}>
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-6 py-4">
-            <h2 className="font-semibold">Facturas del proyecto</h2>
-          </div>
-          <div className="p-6">
-            <SalesInvoiceList invoices={items} projectId={id} />
-          </div>
-        </div>
+        <SalesInvoiceListSection invoices={items} projectId={id} />
       </Suspense>
     </PageShell>
   );

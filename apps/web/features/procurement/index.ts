@@ -10,4 +10,7 @@ export type { WarehouseOption as ReceiptWarehouseOption } from "./components/rec
 export { PurchaseOrderList } from "./components/purchase-order-list";
 export type { PurchaseOrderListItem } from "./components/purchase-order-list";
 export { PurchaseReceiptList } from "./components/purchase-receipt-list";
+export { PurchaseReceiptTable } from "./components/purchase-receipt-table";
+export { PurchaseReceiptCards } from "./components/purchase-receipt-cards";
+export { PurchaseReceiptListSection } from "./components/purchase-receipt-list-section";
 export type { PurchaseReceiptListItem } from "./components/purchase-receipt-list";

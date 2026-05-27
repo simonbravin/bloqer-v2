@@ -140,7 +140,7 @@ export function ReceiptForm({ projectId, purchaseOrderId, purchaseOrderCode, poL
           <Input id="receiptDate" name="receiptDate" type="date" required />
         </div>
 
-        <TableScroll className="border-0">
+        <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>

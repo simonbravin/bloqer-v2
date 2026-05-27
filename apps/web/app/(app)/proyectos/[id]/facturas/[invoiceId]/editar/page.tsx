@@ -35,7 +35,7 @@ export default async function EditarFacturaPage({ params }: PageProps) {
 
   if (invoice.status !== "DRAFT") {
     return (
-      <PageShell variant="form" className="space-y-4">
+      <PageShell variant="default" className="space-y-4">
         <div className="flex items-center gap-4">
           <PageBackLink href={`/proyectos/${id}/facturas/${invoiceId}`} label="Volver" />
           <h1 className="text-2xl font-bold tracking-tight">Editar factura</h1>
@@ -49,7 +49,7 @@ export default async function EditarFacturaPage({ params }: PageProps) {
   }
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href={`/proyectos/${id}/facturas/${invoiceId}`} label="Volver" />
         <div>

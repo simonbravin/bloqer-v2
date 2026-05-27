@@ -73,7 +73,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
         : undefined;
 
   return (
-    <PageShell variant="wide" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         projectId={projectId}
         projectName={project.name}

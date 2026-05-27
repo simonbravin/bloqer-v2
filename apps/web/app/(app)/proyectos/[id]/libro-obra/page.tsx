@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import {
@@ -70,7 +71,7 @@ export default async function LibroObraPage({ params }: PageProps) {
         {logs.length === 0 ? (
           <ListEmptyState message="No hay partes de obra registrados en este proyecto." />
         ) : (
-          <div className="rounded-lg border">
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -119,7 +120,7 @@ export default async function LibroObraPage({ params }: PageProps) {
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </TableScroll>
         )}
       </Suspense>
     </PageShell>

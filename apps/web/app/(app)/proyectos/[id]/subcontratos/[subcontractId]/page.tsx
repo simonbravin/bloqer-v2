@@ -19,7 +19,9 @@ import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
+import { DataTableSection } from "@/components/ui/data-table-section";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import {
   Table,
   TableBody,
@@ -173,11 +175,8 @@ export default async function SubcontratoPage({ params }: PageProps) {
       </KpiStatGrid>
 
       {/* Lines */}
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Líneas del subcontrato</h2>
-        </div>
-        <div className="overflow-x-auto">
+      <DataTableSection title="Líneas del subcontrato">
+        <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -212,14 +211,14 @@ export default async function SubcontratoPage({ params }: PageProps) {
               ))}
             </TableBody>
           </Table>
-        </div>
-      </div>
+        </TableScroll>
+      </DataTableSection>
 
       {/* Certifications */}
-      <div className="rounded-lg border bg-card">
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <h2 className="font-semibold">Certificaciones</h2>
-          {subcontract.status === "ACTIVE" && (
+      <DataTableSection
+        title="Certificaciones"
+        actions={
+          subcontract.status === "ACTIVE" ? (
             <Button size="sm" asChild>
               <Link
                 href={`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/nueva`}
@@ -227,11 +226,13 @@ export default async function SubcontratoPage({ params }: PageProps) {
                 + Nueva
               </Link>
             </Button>
-          )}
-        </div>
+          ) : undefined
+        }
+      >
         {certifications.length === 0 ? (
-          <ListEmptyState message="Sin certificaciones." className="border-0 shadow-none" />
+          <ListEmptyState message="Sin certificaciones." />
         ) : (
+          <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -280,8 +281,9 @@ export default async function SubcontratoPage({ params }: PageProps) {
               ))}
             </TableBody>
           </Table>
+          </TableScroll>
         )}
-      </div>
+      </DataTableSection>
 
       <EntityDocumentsPanel
         scope={{ kind: "project", projectId }}

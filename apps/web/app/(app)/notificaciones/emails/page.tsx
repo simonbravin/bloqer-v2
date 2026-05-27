@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -154,7 +155,7 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
         </div>
       </form>
 
-      <div className="rounded-lg border bg-card overflow-x-auto">
+      <TableScroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -195,7 +196,7 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
             )}
           </TableBody>
         </Table>
-      </div>
+      </TableScroll>
 
       <p className="text-xs text-muted-foreground">
         Mostrando hasta 80 filas. Filtros activos:{" "}

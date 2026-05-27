@@ -39,7 +39,7 @@ export default async function NuevoSubcontratoPage({ params }: PageProps) {
   const companyId = wbsPick.companyId || current.tenantCtx.companyId || "";
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href={`/proyectos/${projectId}/subcontratos`} label="Subcontratos" />
         <h1 className="text-2xl font-bold tracking-tight">Nuevo subcontrato</h1>

@@ -55,8 +55,7 @@ export function MovementLedgerTable({
   }
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <TableScroll className="border-0 rounded-none">
+    <TableScroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -120,7 +119,6 @@ export function MovementLedgerTable({
             })}
           </TableBody>
         </Table>
-      </TableScroll>
-    </div>
+    </TableScroll>
   );
 }

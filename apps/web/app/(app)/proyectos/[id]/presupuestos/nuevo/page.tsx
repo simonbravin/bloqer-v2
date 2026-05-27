@@ -32,7 +32,7 @@ export default async function NuevoPresupuestoPage({ params }: PageProps) {
   }
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         projectId={projectId}
         projectName={project.name}

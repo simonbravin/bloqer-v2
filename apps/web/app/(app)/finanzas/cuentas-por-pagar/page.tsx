@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { PayableList } from "@/features/ap";
+import { ListViewToggle } from "@/components/ui/list-view-toggle";
+import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
+import { PayableListSection } from "@/features/ap";
 import type { PayableListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { listCompanyPayables, ServiceError } from "@bloqer/services";
@@ -74,8 +77,11 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
 
   return (
     <PageShell variant="default" className="space-y-6">
-      <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Pagos pendientes</h1>
+        <Suspense fallback={null}>
+          <ListViewToggle storageKey="finanzas-cuentas-por-pagar" />
+        </Suspense>
       </div>
       <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
         Obligaciones de empresa <strong>sin proyecto</strong> (misma base que el aging global). Desde acá abrís el detalle
@@ -96,18 +102,13 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
         ))}
       </div>
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Saldos empresa</h2>
-        </div>
-        <div className="p-6">
-          <PayableList
-            payables={items}
-            hrefPrefix="/finanzas/cuentas-por-pagar"
-            supplierInvoiceHrefPrefix="/finanzas/facturas-proveedor"
-          />
-        </div>
-      </div>
+      <Suspense fallback={<ListSectionSkeleton />}>
+        <PayableListSection
+          payables={items}
+          hrefPrefix="/finanzas/cuentas-por-pagar"
+          supplierInvoiceHrefPrefix="/finanzas/facturas-proveedor"
+        />
+      </Suspense>
     </PageShell>
   );
 }

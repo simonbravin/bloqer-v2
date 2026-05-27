@@ -19,7 +19,7 @@ export default async function ContabilidadPage() {
   const q = (id: string) => (current.tenantCtx!.companyId ? "" : `?empresa=${encodeURIComponent(id)}`);
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Contabilidad</h1>
       <p className="text-sm text-muted-foreground">
         Libro mayor (debe/haber). Los movimientos de tesorería siguen en Tesorería; plan de cuentas, asientos manuales y reglas de mapeo (fase 11A–11B).

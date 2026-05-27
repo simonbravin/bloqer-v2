@@ -166,7 +166,7 @@ function Kv({ label, value }: { label: string; value: string }) {
 
 function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
   return (
-    <TableScroll className="border-0">
+    <TableScroll>
       <Table className="text-xs">
         <TableHeader>
           <TableRow>

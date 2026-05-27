@@ -8,6 +8,7 @@ import { listAccountLedgerSchema } from "@bloqer/validators";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
+import { DataTableSection } from "@/components/ui/data-table-section";
 
 export default async function CuentaContableDetallePage({
   params,
@@ -55,14 +56,9 @@ export default async function CuentaContableDetallePage({
         )}
         <p className="text-sm text-muted-foreground">{account.isActive ? "Activa" : "Inactiva"}</p>
       </div>
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Mayor (solo contabilizado)</h2>
-        </div>
-        <div className="p-6 overflow-x-auto">
-          <AccountLedgerTable rows={ledger} />
-        </div>
-      </div>
+      <DataTableSection title="Mayor (solo contabilizado)">
+        <AccountLedgerTable rows={ledger} />
+      </DataTableSection>
     </PageShell>
   );
 }

@@ -35,7 +35,7 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
   const toDateInput = (d: Date | string) => new Date(d).toISOString().split("T")[0];
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href={`/proyectos/${projectId}/certificaciones/${certId}`} label="Volver" />
         <div>

@@ -58,11 +58,10 @@ export function CashFlowTable({ data }: Props) {
         </div>
       </div>
 
-      <div className="rounded-lg border bg-card overflow-hidden">
-        {buckets.length === 0 ? (
-          <ListEmptyState message="Sin movimientos en el período." className="border-0 rounded-none" />
-        ) : (
-          <TableScroll className="border-0 rounded-none">
+      {buckets.length === 0 ? (
+        <ListEmptyState message="Sin movimientos en el período." />
+      ) : (
+        <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -121,9 +120,8 @@ export function CashFlowTable({ data }: Props) {
                 })}
               </TableBody>
             </Table>
-          </TableScroll>
-        )}
-      </div>
+        </TableScroll>
+      )}
     </div>
   );
 }

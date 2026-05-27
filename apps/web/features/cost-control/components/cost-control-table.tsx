@@ -27,8 +27,7 @@ type Props = {
 
 export function CostControlTable({ rows, totals, projectId }: Props) {
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <TableScroll className="border-0 rounded-none">
+    <TableScroll>
         <Table className="text-xs">
           <TableHeader className="sticky top-0 z-10 bg-muted/50">
             <TableRow>
@@ -140,6 +139,5 @@ export function CostControlTable({ rows, totals, projectId }: Props) {
           </TableFooter>
         </Table>
       </TableScroll>
-    </div>
   );
 }

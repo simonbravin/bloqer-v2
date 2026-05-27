@@ -39,7 +39,7 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
     if (cert.projectId !== projectId) notFound();
     if (cert.status !== "APPROVED") {
       return (
-        <PageShell variant="form" className="space-y-4">
+        <PageShell variant="default" className="space-y-4">
           <div className="flex items-center gap-4">
             <PageBackLink
               href={`/proyectos/${projectId}/certificaciones/${certificationId}`}
@@ -65,7 +65,7 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
     };
 
     return (
-      <PageShell variant="form" className="space-y-6">
+      <PageShell variant="default" className="space-y-6">
         <div className="flex items-center gap-4">
           <PageBackLink
             href={`/proyectos/${projectId}/certificaciones/${certificationId}`}
@@ -87,7 +87,7 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
   }));
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href={`/proyectos/${projectId}/facturas`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva factura</h1>

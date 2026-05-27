@@ -56,7 +56,7 @@ export default async function EditarProyectoPage({ params }: PageProps) {
   };
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <PageBackLink href={`/proyectos/${id}`} label={project.name} />
       <PageListHeader title="Editar proyecto" subtitle="Datos generales de la obra" />
 

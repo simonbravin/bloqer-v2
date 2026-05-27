@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import type { ProductView } from "@bloqer/services";
 import { ProductStatusBadge } from "./product-status-badge";
 
@@ -17,7 +18,7 @@ export function ProductTable({ products }: { products: ProductView[] }) {
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
@@ -46,6 +47,6 @@ export function ProductTable({ products }: { products: ProductView[] }) {
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

@@ -74,7 +74,7 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
         </Button>
       </div>
 
-      <TableScroll className="border-0">
+      <TableScroll>
         <Table>
           <TableHeader>
             <TableRow>

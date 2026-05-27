@@ -1,6 +1,7 @@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import type { AccountLedgerRowView } from "@bloqer/services";
 
 export function AccountLedgerTable({ rows }: { rows: AccountLedgerRowView[] }) {
@@ -8,6 +9,7 @@ export function AccountLedgerTable({ rows }: { rows: AccountLedgerRowView[] }) {
     return <p className="text-sm text-muted-foreground">Sin movimientos contabilizados en esta cuenta.</p>;
   }
   return (
+    <TableScroll>
     <Table>
       <TableHeader>
         <TableRow>
@@ -35,5 +37,6 @@ export function AccountLedgerTable({ rows }: { rows: AccountLedgerRowView[] }) {
         ))}
       </TableBody>
     </Table>
+    </TableScroll>
   );
 }

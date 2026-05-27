@@ -172,8 +172,7 @@ export function SubcontractForm({
           <h3 className="font-medium">Líneas del subcontrato</h3>
           <Button type="button" variant="outline" size="sm" onClick={addLine}>+ Agregar línea</Button>
         </div>
-        <div className="rounded-lg border overflow-hidden">
-          <TableScroll className="border-0 rounded-none">
+        <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -238,8 +237,7 @@ export function SubcontractForm({
                 </TableRow>
               </TableFooter>
             </Table>
-          </TableScroll>
-        </div>
+        </TableScroll>
       </div>
 
       <div className="flex gap-2 justify-end">

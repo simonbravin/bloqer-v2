@@ -64,7 +64,7 @@ export default async function ConfiguracionEquipoPage() {
       {pendingInvitations.length > 0 ? (
         <div className="space-y-2">
           <h2 className="text-lg font-semibold tracking-tight">Invitaciones pendientes</h2>
-          <TableScroll className="border-0">
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>

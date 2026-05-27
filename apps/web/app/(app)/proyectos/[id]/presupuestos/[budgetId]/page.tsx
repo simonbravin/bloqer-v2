@@ -63,7 +63,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
       : "—";
 
   return (
-    <PageShell variant="wide" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="space-y-4">
         <PageBackLink href={`/proyectos/${projectId}/presupuestos`} label="Presupuestos" />
         <div className="flex flex-wrap items-start justify-between gap-4">

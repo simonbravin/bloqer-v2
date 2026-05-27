@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import type { WarehouseView } from "@bloqer/services";
 import { WarehouseStatusBadge } from "./warehouse-status-badge";
 
@@ -24,7 +25,7 @@ export function WarehouseTable({ warehouses }: { warehouses: WarehouseView[] }) 
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
@@ -53,6 +54,6 @@ export function WarehouseTable({ warehouses }: { warehouses: WarehouseView[] }) 
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

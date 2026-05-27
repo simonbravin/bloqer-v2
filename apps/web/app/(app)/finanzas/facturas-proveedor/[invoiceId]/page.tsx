@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SupplierInvoiceStatusBadge } from "@/features/ap";
 import { EntityDocumentsPanel } from "@/features/documents";
@@ -92,7 +93,7 @@ export default async function FinanzasFacturaProveedorDetailPage({ params }: Pag
 
         <hr />
 
-        <TableScroll className="border-0">
+        <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>

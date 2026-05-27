@@ -31,8 +31,7 @@ export function PaymentDetailTable({ payments, currency }: Props) {
   const currencyLabel = formatCurrencyDisplay(currency);
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <TableScroll className="border-0 rounded-none">
+    <TableScroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -57,7 +56,6 @@ export function PaymentDetailTable({ payments, currency }: Props) {
             ))}
           </TableBody>
         </Table>
-      </TableScroll>
-    </div>
+    </TableScroll>
   );
 }

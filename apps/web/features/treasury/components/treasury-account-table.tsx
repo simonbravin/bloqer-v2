@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { TreasuryAccountStatusBadge } from "./treasury-account-status-badge";
 import type { TreasuryAccountListItem } from "./treasury-account-list";
 import type { TreasuryAccountType } from "@bloqer/database";
@@ -33,7 +34,7 @@ export function TreasuryAccountTable({ accounts }: { accounts: TreasuryAccountLi
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
@@ -66,6 +67,6 @@ export function TreasuryAccountTable({ accounts }: { accounts: TreasuryAccountLi
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

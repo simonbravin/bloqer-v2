@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import type { TenantMemberListRow } from "@bloqer/services";
 
 function membershipStatusLabel(s: string) {
@@ -22,7 +23,7 @@ export function TeamMemberTable({ members }: { members: TenantMemberListRow[] })
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
@@ -51,6 +52,6 @@ export function TeamMemberTable({ members }: { members: TenantMemberListRow[] })
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

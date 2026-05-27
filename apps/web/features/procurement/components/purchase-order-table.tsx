@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
 import type { PurchaseOrderListItem } from "./purchase-order-list";
 
@@ -24,7 +25,7 @@ export function PurchaseOrderTable({
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
@@ -65,6 +66,6 @@ export function PurchaseOrderTable({
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

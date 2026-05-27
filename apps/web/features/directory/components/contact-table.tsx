@@ -41,7 +41,7 @@ export function ContactTable({ contacts }: ContactTableProps) {
   }
 
   return (
-    <TableScroll className="border-0">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>

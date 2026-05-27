@@ -208,7 +208,7 @@ export function JobsiteLogForm({
         {progress.length === 0 ? (
           <ListEmptyState message="Sin registros de avance." className="p-6" />
         ) : (
-          <TableScroll className="border-0">
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -259,7 +259,7 @@ export function JobsiteLogForm({
         {labor.length === 0 ? (
           <ListEmptyState message="Sin registros de mano de obra." className="p-6" />
         ) : (
-          <TableScroll className="border-0">
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -319,7 +319,7 @@ export function JobsiteLogForm({
         {materials.length === 0 ? (
           <ListEmptyState message="Sin registros de materiales." className="p-6" />
         ) : (
-          <TableScroll className="border-0">
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -377,7 +377,7 @@ export function JobsiteLogForm({
         {issues.length === 0 ? (
           <ListEmptyState message="Sin incidencias registradas." className="p-6" />
         ) : (
-          <TableScroll className="border-0">
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>

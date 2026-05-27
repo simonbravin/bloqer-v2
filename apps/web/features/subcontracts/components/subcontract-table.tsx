@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import type { SubcontractView } from "@bloqer/services";
 import { SubcontractStatusBadge } from "./subcontract-status-badge";
 
@@ -23,7 +24,7 @@ export function SubcontractTable({
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
@@ -65,6 +66,6 @@ export function SubcontractTable({
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

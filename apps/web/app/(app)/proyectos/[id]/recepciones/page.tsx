@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { Suspense } from "react";
+import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
-import { PurchaseReceiptList } from "@/features/procurement";
+import { PurchaseReceiptListSection } from "@/features/procurement";
 import type { PurchaseReceiptListItem } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectShellInfo, listReceiptsByProject, ServiceError } from "@bloqer/services";
@@ -56,17 +58,15 @@ export default async function RecepcionesPage({ params }: PageProps) {
         projectName={project.name}
         title="Recepciones"
         subtitle={`${items.length} ${items.length === 1 ? "recepción" : "recepciones"}`}
+        actions={
+          <Suspense fallback={null}>
+            <ListViewToggle storageKey={`recepciones-${id}`} />
+          </Suspense>
+        }
       />
 
       <Suspense fallback={<ListSectionSkeleton />}>
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-6 py-4">
-            <h2 className="font-semibold">Recepciones del proyecto</h2>
-          </div>
-          <div className="p-6">
-            <PurchaseReceiptList receipts={items} projectId={id} />
-          </div>
-        </div>
+        <PurchaseReceiptListSection receipts={items} projectId={id} />
       </Suspense>
     </PageShell>
   );

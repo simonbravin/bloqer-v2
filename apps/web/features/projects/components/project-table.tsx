@@ -47,7 +47,7 @@ export function ProjectTable({ projects }: ProjectTableProps) {
   }
 
   return (
-    <TableScroll className="border-0">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>

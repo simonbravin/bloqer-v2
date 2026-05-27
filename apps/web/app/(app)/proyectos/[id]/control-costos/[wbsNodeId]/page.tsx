@@ -37,7 +37,7 @@ export default async function WbsItemDetailPage({ params, searchParams }: PagePr
   const backUrl = `/proyectos/${projectId}/control-costos${sp.budgetId ? `?budgetId=${sp.budgetId}` : ""}`;
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href={backUrl} label="Control de costos" />
         <div>

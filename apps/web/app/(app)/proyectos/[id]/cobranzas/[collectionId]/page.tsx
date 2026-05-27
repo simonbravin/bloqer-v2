@@ -58,7 +58,7 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
   const returnPath = `/proyectos/${id}/cobranzas/${collectionId}`;
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <PageBackLink href={`/proyectos/${id}/cobranzas`} label="Volver" />

@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { TableScroll } from "@/components/ui/table-scroll";
 import type { DocumentAttachmentView } from "@bloqer/services";
 import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge }   from "./document-status-badge";
@@ -34,7 +35,7 @@ export function DocumentList({ docs, projectId }: Props) {
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
@@ -71,6 +72,6 @@ export function DocumentList({ docs, projectId }: Props) {
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

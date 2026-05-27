@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PageBackLink } from "@/components/layout/page-back-link";
 import { DetailField, DetailFieldGrid } from "@/components/ui/detail-field-grid";
@@ -76,7 +77,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
   };
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -164,11 +165,8 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
 
       {/* Progress */}
       {log.progress.length > 0 && (
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-6 py-4">
-            <h2 className="font-semibold">Avance de obra</h2>
-          </div>
-          <TableScroll className="border-0 rounded-none">
+        <DataTableSection title="Avance de obra">
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -203,16 +201,13 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
               </TableBody>
             </Table>
           </TableScroll>
-        </div>
+        </DataTableSection>
       )}
 
       {/* Labor */}
       {log.labor.length > 0 && (
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-6 py-4">
-            <h2 className="font-semibold">Mano de obra</h2>
-          </div>
-          <TableScroll className="border-0 rounded-none">
+        <DataTableSection title="Mano de obra">
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -242,16 +237,13 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
               </TableBody>
             </Table>
           </TableScroll>
-        </div>
+        </DataTableSection>
       )}
 
       {/* Materials */}
       {log.materials.length > 0 && (
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-6 py-4">
-            <h2 className="font-semibold">Materiales utilizados</h2>
-          </div>
-          <TableScroll className="border-0 rounded-none">
+        <DataTableSection title="Materiales utilizados">
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -281,16 +273,13 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
               </TableBody>
             </Table>
           </TableScroll>
-        </div>
+        </DataTableSection>
       )}
 
       {/* Issues */}
       {log.issues.length > 0 && (
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-6 py-4">
-            <h2 className="font-semibold">Problemas / Incidencias</h2>
-          </div>
-          <TableScroll className="border-0 rounded-none">
+        <DataTableSection title="Problemas / Incidencias">
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -326,7 +315,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
               </TableBody>
             </Table>
           </TableScroll>
-        </div>
+        </DataTableSection>
       )}
 
       <EntityDocumentsPanel

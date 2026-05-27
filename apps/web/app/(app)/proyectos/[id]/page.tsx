@@ -121,7 +121,7 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
     ) : null;
 
   return (
-    <PageShell>
+    <PageShell variant="default" className="space-y-8">
       <ProjectOverviewView
         dashboard={dashboard}
         projectId={id}

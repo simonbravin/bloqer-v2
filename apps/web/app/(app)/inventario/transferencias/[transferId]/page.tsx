@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { getCurrentUser } from "@/lib/auth";
 import { getWarehouseTransferById, ServiceError } from "@bloqer/services";
@@ -134,11 +135,8 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
         </dl>
       </div>
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Movimientos de stock</h2>
-        </div>
-        <TableScroll className="border-0 rounded-none">
+      <DataTableSection title="Movimientos de stock">
+        <TableScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -164,7 +162,7 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
             </TableBody>
           </Table>
         </TableScroll>
-      </div>
+      </DataTableSection>
     </PageShell>
   );
 }

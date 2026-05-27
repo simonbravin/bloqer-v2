@@ -57,14 +57,7 @@ export default async function ProyectoInventarioPage({ params }: PageProps) {
       />
 
       <Suspense fallback={<ListSectionSkeleton />}>
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-6 py-4">
-            <h2 className="font-semibold">Movimientos de stock</h2>
-          </div>
-          <div className="p-6">
-            <StockMovementList movements={movements} />
-          </div>
-        </div>
+        <StockMovementList movements={movements} />
       </Suspense>
     </PageShell>
   );
