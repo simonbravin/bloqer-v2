@@ -2,20 +2,8 @@ import Link from "next/link";
 import type { ProjectFinanceOverview, ProjectFinanceOverviewWarning } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-
-function fmtAmount(raw: string, currency: string): string {
-  const n = Number(raw);
-  if (Number.isNaN(n)) return `${raw} ${currency}`;
-  try {
-    return new Intl.NumberFormat("es-AR", {
-      style:                 "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(n);
-  } catch {
-    return `${raw} ${currency}`;
-  }
-}
+import { ProjectPageHeader } from "@/components/layout/project-page-header";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 function MoneyList({ rows, emptyLabel }: { rows: { currency: string; amount: string }[]; emptyLabel: string }) {
   if (rows.length === 0) {
@@ -26,7 +14,7 @@ function MoneyList({ rows, emptyLabel }: { rows: { currency: string; amount: str
       {rows.map((r) => (
         <li key={r.currency} className="flex justify-between gap-2 tabular-nums">
           <span className="text-muted-foreground">{r.currency}</span>
-          <span className="font-medium text-foreground">{fmtAmount(r.amount, r.currency)}</span>
+          <span className="font-medium text-foreground">{formatMoneyAmount(r.amount, r.currency)}</span>
         </li>
       ))}
     </ul>
@@ -44,14 +32,19 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
   const { project, sections, quickActions, warnings } = overview;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 px-4 py-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Finanzas del proyecto</h1>
-        <p className="mt-1 text-muted-foreground">
-          {project.name}
-          {project.code ? <span className="ml-2 font-mono text-sm">({project.code})</span> : null}
-        </p>
-      </div>
+    <div className="space-y-6">
+      <ProjectPageHeader
+        projectId={project.id}
+        projectName={project.name}
+        title="Finanzas del proyecto"
+        subtitle={
+          project.code ? (
+            <span className="font-mono text-sm">{project.code}</span>
+          ) : (
+            "Cobros, pagos y saldos de la obra"
+          )
+        }
+      />
 
       {warnings.length > 0 ? (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -85,7 +78,8 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
                     <MoneyList rows={sections.ar.overdueByCurrency} emptyLabel="Sin saldo vencido." />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Facturas de venta emitidas (abiertas): <span className="font-medium text-foreground">{sections.ar.openInvoicesCount}</span>
+                    Facturas de venta emitidas (abiertas):{" "}
+                    <span className="font-medium text-foreground">{sections.ar.openInvoicesCount}</span>
                   </p>
                 </>
               )}
@@ -126,7 +120,8 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
                     <MoneyList rows={sections.ap.overdueByCurrency} emptyLabel="Sin saldo vencido." />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Facturas proveedor emitidas: <span className="font-medium text-foreground">{sections.ap.openSupplierInvoicesCount}</span>
+                    Facturas proveedor emitidas:{" "}
+                    <span className="font-medium text-foreground">{sections.ap.openSupplierInvoicesCount}</span>
                   </p>
                 </>
               )}
@@ -222,9 +217,14 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
             <ul className="grid gap-2 sm:grid-cols-2">
               {quickActions.map((a) => (
                 <li key={a.href + a.label}>
-                  <Link href={a.href} className="group block rounded-md border bg-card px-3 py-2 transition-colors hover:bg-muted/60">
+                  <Link
+                    href={a.href}
+                    className="group block rounded-md border bg-card px-3 py-2 transition-colors hover:bg-muted/60"
+                  >
                     <span className="font-medium text-foreground group-hover:underline">{a.label}</span>
-                    {a.description ? <p className="mt-0.5 text-xs text-muted-foreground">{a.description}</p> : null}
+                    {a.description ? (
+                      <p className="mt-0.5 text-xs text-muted-foreground">{a.description}</p>
+                    ) : null}
                   </Link>
                 </li>
               ))}
@@ -234,7 +234,8 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
       ) : null}
 
       <p className="text-center text-xs text-muted-foreground">
-        Los gastos generales fuera de obra y un módulo de gastos dedicado siguen sin definirse en producto. No se muestran totales mezclando monedas distintas.
+        Los gastos generales fuera de obra y un módulo de gastos dedicado siguen sin definirse en producto. No se
+        muestran totales mezclando monedas distintas.
       </p>
     </div>
   );

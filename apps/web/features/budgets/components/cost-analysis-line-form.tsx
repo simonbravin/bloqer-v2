@@ -3,6 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -84,7 +85,9 @@ function CreateLineForm({
       const result = await onSubmit(data);
       if ("error" in result) {
         setServerError(result.error);
+        toast.error(result.error);
       } else {
+        toast.success("Línea APU agregada");
         onDone();
       }
     });
@@ -114,7 +117,9 @@ function EditLineForm({
       const result = await onSubmit(data);
       if ("error" in result) {
         setServerError(result.error);
+        toast.error(result.error);
       } else {
+        toast.success("Línea APU actualizada");
         onDone();
       }
     });

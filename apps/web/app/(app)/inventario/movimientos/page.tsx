@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 import { listStockMovements } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { StockMovementList } from "@/features/inventory";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function MovimientosPage({
   searchParams,
@@ -18,20 +18,18 @@ export default async function MovimientosPage({
 
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   const movements = await listStockMovements({}, ctx);
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/inventario">← Volver</Link>
-        </Button>
+        <PageBackLink href="/inventario" label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Movimientos de stock</h1>
       </div>
 
@@ -52,6 +50,6 @@ export default async function MovimientosPage({
           />
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

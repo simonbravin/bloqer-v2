@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 import { listProducts, listWarehouses, listProcurementWbsOptions } from "@bloqer/services";
 import { ConsumptionForm } from "@/features/inventory";
 import type { ProductOption, WarehouseOption, WbsOption } from "@/features/inventory";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -17,35 +17,40 @@ export default async function NuevoConsumoPage({ params }: PageProps) {
   const { id } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
-  const [products, warehouses, wbsNodes] = await Promise.all([
+  const [productsResult, warehouses, wbsNodes] = await Promise.all([
     listProducts({ status: "ACTIVE" }, ctx),
     listWarehouses({ status: "ACTIVE" }, ctx),
     listProcurementWbsOptions(id, ctx),
   ]);
+  const products = productsResult.data;
 
   const productOptions: ProductOption[] = products.map((p) => ({
-    id: p.id, name: p.name, sku: p.sku, unit: p.unit,
+    id: p.id,
+    name: p.name,
+    sku: p.sku,
+    unit: p.unit,
   }));
 
   const warehouseOptions: WarehouseOption[] = warehouses.map((w) => ({
-    id: w.id, name: w.name,
+    id: w.id,
+    name: w.name,
   }));
 
   const wbsOptions: WbsOption[] = wbsNodes.map((w) => ({
-    id: w.id, code: w.code, name: w.name,
+    id: w.id,
+    code: w.code,
+    name: w.name,
   }));
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}/inventario`}>← Inventario del proyecto</Link>
-        </Button>
+        <PageBackLink href={`/proyectos/${id}/inventario`} label="Inventario del proyecto" />
         <h1 className="text-2xl font-bold tracking-tight">Registrar consumo</h1>
       </div>
 
@@ -57,6 +62,6 @@ export default async function NuevoConsumoPage({ params }: PageProps) {
           wbsOptions={wbsOptions}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }

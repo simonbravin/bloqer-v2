@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDebouncedSearchParam } from "@/hooks/use-debounced-search-param";
 
 const ROLE_OPTIONS = [
   { value: "ALL", label: "Todos los roles" },
@@ -30,6 +31,7 @@ export function ContactFilters() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { defaultValue: searchDefault, setDebounced: setSearchDebounced } = useDebouncedSearchParam("search");
 
   const updateParam = useCallback(
     (key: string, value: string) => {
@@ -49,8 +51,8 @@ export function ContactFilters() {
     <div className="flex flex-wrap gap-3">
       <Input
         placeholder="Buscar por nombre, CUIT..."
-        defaultValue={searchParams.get("search") ?? ""}
-        onChange={(e) => updateParam("search", e.target.value)}
+        defaultValue={searchDefault}
+        onChange={(e) => setSearchDebounced(e.target.value)}
         className="h-9 w-64"
       />
       <Select

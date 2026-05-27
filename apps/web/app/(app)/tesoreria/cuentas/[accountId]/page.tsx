@@ -1,28 +1,22 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { TreasuryAccountStatusBadge, AccountMovementList } from "@/features/treasury";
 import type { AccountMovementListItem } from "@/features/treasury";
 import { getCurrentUser } from "@/lib/auth";
-import {
-  getTreasuryAccountById,
-  listAccountMovements,
-  ServiceError,
-} from "@bloqer/services";
-import {
-  deactivateTreasuryAccountAction,
-  reactivateTreasuryAccountAction,
-} from "../../actions";
+import { getTreasuryAccountById, listAccountMovements, ServiceError } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { deactivateTreasuryAccountAction, reactivateTreasuryAccountAction } from "../../actions";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  BANK:           "Banco",
-  CASH:           "Caja",
+  BANK: "Banco",
+  CASH: "Caja",
   DIGITAL_WALLET: "Billetera",
-  OTHER:          "Otro",
+  OTHER: "Otro",
 };
 
 function fmtMoney(value: string, currency: string) {
@@ -43,15 +37,15 @@ export default async function AccountDetailPage({ params }: PageProps) {
   const { accountId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let account;
   let movements;
   try {
-    account   = await getTreasuryAccountById(accountId, ctx);
+    account = await getTreasuryAccountById(accountId, ctx);
     movements = await listAccountMovements(accountId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
@@ -69,22 +63,20 @@ export default async function AccountDetailPage({ params }: PageProps) {
   };
 
   const movementItems: AccountMovementListItem[] = movements.map((m) => ({
-    id:           m.id,
+    id: m.id,
     movementDate: m.movementDate,
-    type:         m.type,
-    currency:     m.currency,
-    amount:       m.amount,
-    description:  m.description,
-    status:       m.status,
+    type: m.type,
+    currency: m.currency,
+    amount: m.amount,
+    description: m.description,
+    status: m.status,
   }));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/tesoreria/cuentas">← Volver</Link>
-          </Button>
+          <PageBackLink href="/tesoreria/cuentas" label="Volver" />
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">{account.name}</h1>
             <TreasuryAccountStatusBadge status={account.status} />
@@ -165,6 +157,6 @@ export default async function AccountDetailPage({ params }: PageProps) {
           <AccountMovementList movements={movementItems} />
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

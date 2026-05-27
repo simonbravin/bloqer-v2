@@ -16,6 +16,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { formatDateTime } from "@/lib/format";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default async function DashboardPage() {
   const current = await getCurrentUser();
@@ -26,7 +27,7 @@ export default async function DashboardPage() {
     const platform = uid ? await isPlatformSuperadmin(uid) : false;
     if (platform) {
       return (
-        <div className="shell-page-narrow">
+        <PageShell variant="narrow">
           <h1 className="text-2xl font-bold tracking-tight">Panel de plataforma</h1>
           <p className="text-sm text-muted-foreground">
             No tenés un tenant seleccionado. Desde acá podés administrar organizaciones.
@@ -34,7 +35,7 @@ export default async function DashboardPage() {
           <Button asChild variant="link" className="h-auto p-0">
             <Link href="/platform">Ir al panel de plataforma</Link>
           </Button>
-        </div>
+        </PageShell>
       );
     }
     redirect("/onboarding");
@@ -51,7 +52,7 @@ export default async function DashboardPage() {
   const showOnboardingCard = dash.operationalOnboarding && onboardingSteps.length > 0;
 
   return (
-    <div className="shell-page">
+    <PageShell variant="default">
       <DashboardHeader
         tenantName={dash.tenantName}
         subscription={dash.subscription}
@@ -86,6 +87,6 @@ export default async function DashboardPage() {
       </div>
 
       <DashboardQuickActions actions={dash.quickActions} />
-    </div>
+    </PageShell>
   );
 }

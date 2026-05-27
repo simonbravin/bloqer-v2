@@ -1,5 +1,4 @@
 import { formatDateTime } from "@/lib/format";
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
@@ -14,8 +13,10 @@ import {
   getTenantInvitationById,
   ServiceError,
 } from "@bloqer/services";
-import { Button } from "@/components/ui/button";
 import { cancelTenantInvitationAction } from "../../invitation-actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ invitationId: string }>;
@@ -62,11 +63,9 @@ export default async function ConfiguracionEquipoInvitacionDetallePage({ params 
   const canEdit = canEditTeamMembership(current.tenantCtx.roles);
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex flex-wrap gap-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/configuracion/equipo">← Equipo</Link>
-        </Button>
+        <PageBackLink href="/configuracion/equipo" label="Equipo" />
       </div>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Invitación</h1>
@@ -77,8 +76,9 @@ export default async function ConfiguracionEquipoInvitacionDetallePage({ params 
         <section className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 dark:bg-amber-500/10">
           <h2 className="text-sm font-semibold">Enlace de invitación (copiá y compartí)</h2>
           <p className="text-xs text-muted-foreground">
-            El correo no se despachó (integración desactivada, URL pública de la app ausente o inválida, o fallo del
-            proveedor). Este enlace incluye un token secreto: no lo publiques en lugares públicos.
+            El correo no se despachó (integración desactivada, URL pública de la app ausente o
+            inválida, o fallo del proveedor). Este enlace incluye un token secreto: no lo publiques
+            en lugares públicos.
           </p>
           <p className="break-all font-mono text-xs">{flashLink}</p>
         </section>
@@ -115,6 +115,6 @@ export default async function ConfiguracionEquipoInvitacionDetallePage({ params 
           </Button>
         </form>
       ) : null}
-    </div>
+    </PageShell>
   );
 }

@@ -1,15 +1,13 @@
 import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { PayableStatusBadge, PaymentList } from "@/features/ap";
 import type { PaymentListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
-import {
-  getPayableById,
-  listPaymentsByPayable,
-  ServiceError,
-} from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { getPayableById, listPaymentsByPayable, ServiceError } from "@bloqer/services";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; payableId: string }>;
@@ -22,9 +20,9 @@ export default async function PayableDetailPage({ params }: PageProps) {
   const { id, payableId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let payable;
@@ -40,23 +38,22 @@ export default async function PayableDetailPage({ params }: PageProps) {
   }
 
   const paymentItems: PaymentListItem[] = payments.map((p) => ({
-    id:                p.id,
-    paymentDate:       p.paymentDate,
-    amount:            p.amount,
-    currency:          p.currency,
-    status:            p.status,
-    accountName:       p.accountName,
+    id: p.id,
+    paymentDate: p.paymentDate,
+    amount: p.amount,
+    currency: p.currency,
+    status: p.status,
+    accountName: p.accountName,
     supplierInvoiceId: p.supplierInvoiceId,
   }));
 
-  const canPay = payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE";
+  const canPay =
+    payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE";
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}/cuentas-por-pagar`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/proyectos/${id}/cuentas-por-pagar`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Cuenta por pagar</h1>
         <PayableStatusBadge status={payable.status} />
       </div>
@@ -87,19 +84,28 @@ export default async function PayableDetailPage({ params }: PageProps) {
           <div>
             <p className="text-muted-foreground">Total original</p>
             <p className="font-medium tabular-nums">
-              {Number(payable.originalAmount).toLocaleString("es-AR", { style: "currency", currency: payable.currency })}
+              {Number(payable.originalAmount).toLocaleString("es-AR", {
+                style: "currency",
+                currency: payable.currency,
+              })}
             </p>
           </div>
           <div>
             <p className="text-muted-foreground">Pagado</p>
             <p className="font-medium tabular-nums">
-              {Number(payable.paidAmount).toLocaleString("es-AR", { style: "currency", currency: payable.currency })}
+              {Number(payable.paidAmount).toLocaleString("es-AR", {
+                style: "currency",
+                currency: payable.currency,
+              })}
             </p>
           </div>
           <div>
             <p className="text-muted-foreground font-semibold">Saldo pendiente</p>
             <p className="font-semibold tabular-nums">
-              {Number(payable.balanceDue).toLocaleString("es-AR", { style: "currency", currency: payable.currency })}
+              {Number(payable.balanceDue).toLocaleString("es-AR", {
+                style: "currency",
+                currency: payable.currency,
+              })}
             </p>
           </div>
         </div>
@@ -129,6 +135,6 @@ export default async function PayableDetailPage({ params }: PageProps) {
           <PaymentList payments={paymentItems} hrefPrefix={`/proyectos/${id}/pagos`} />
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

@@ -27,14 +27,26 @@ async function assertEdit(ctx: ServiceContext): Promise<void> {
 
 export async function listAccountingAccounts(
   ctx: ServiceContext,
-  opts?: { companyId?: string | null },
-): Promise<AccountingAccountView[]> {
+  opts?: { companyId?: string | null; page?: number; pageSize?: number },
+): Promise<{ data: AccountingAccountView[]; total: number }> {
   await assertView(ctx);
   const companyId = await resolveAccountingCompanyId(ctx, opts?.companyId ?? null);
-  return prisma.accountingAccount.findMany({
-    where: { tenantId: ctx.tenantId, companyId },
-    orderBy: [{ code: "asc" }],
-  });
+
+  const where = { tenantId: ctx.tenantId, companyId };
+  const paginate = opts?.page !== undefined || opts?.pageSize !== undefined;
+  const page = opts?.page ?? 1;
+  const pageSize = opts?.pageSize ?? 20;
+
+  const [data, total] = await Promise.all([
+    prisma.accountingAccount.findMany({
+      where,
+      orderBy: [{ code: "asc" }],
+      ...(paginate ? { skip: (page - 1) * pageSize, take: pageSize } : {}),
+    }),
+    prisma.accountingAccount.count({ where }),
+  ]);
+
+  return { data, total };
 }
 
 export async function getAccountingAccountById(

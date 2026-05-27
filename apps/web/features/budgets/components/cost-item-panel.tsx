@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { CostAnalysisLineForm } from "./cost-analysis-line-form";
 import type { CostItemView, CostAnalysisLineView } from "@bloqer/services";
 import type { CreateCostAnalysisLineInput, UpdateCostAnalysisLineInput, UpdateCostItemInput } from "@bloqer/validators";
@@ -80,7 +82,9 @@ export function CostItemPanel({
       });
       if ("error" in result) {
         setItemError(result.error);
+        toast.error(result.error);
       } else {
+        toast.success("Ítem actualizado");
         setEditingItem(false);
       }
     });
@@ -89,7 +93,12 @@ export function CostItemPanel({
   function handleRemoveLine(lineId: string) {
     if (!confirm("¿Eliminar esta línea de análisis?")) return;
     startRemoveTransition(async () => {
-      await onRemoveLine(lineId);
+      const result = await onRemoveLine(lineId);
+      if ("error" in result) {
+        toast.error(result.error);
+      } else {
+        toast.success("Línea APU eliminada");
+      }
     });
   }
 
@@ -190,9 +199,10 @@ export function CostItemPanel({
         </div>
 
         {costItem.analysisLines.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted-foreground text-center">
-            Sin líneas de análisis. Agregue materiales, mano de obra y equipos.
-          </p>
+          <ListEmptyState
+            className="border-0 py-8"
+            message="Sin líneas de APU. Agregá materiales, mano de obra y equipos."
+          />
         ) : (
           <Table>
             <TableHeader>

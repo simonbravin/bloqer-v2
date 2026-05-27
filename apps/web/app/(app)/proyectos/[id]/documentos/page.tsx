@@ -1,25 +1,37 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
+import { ListViewToggle } from "@/components/ui/list-view-toggle";
+import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
+import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { getCurrentUser } from "@/lib/auth";
-import { listProjectDocuments, ServiceError } from "@bloqer/services";
-import { notFound } from "next/navigation";
-import { DocumentList, DocumentFilters } from "@/features/documents";
+import { getProjectShellInfo, listProjectDocuments, ServiceError } from "@bloqer/services";
+import { DocumentListSection, DocumentFilters } from "@/features/documents";
+import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
-  params:      Promise<{ id: string }>;
+  params: Promise<{ id: string }>;
   searchParams: Promise<{
     category?: string;
-    status?:   string;
-    search?:   string;
+    status?: string;
+    search?: string;
   }>;
 }
 
 const VALID_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 const VALID_CATEGORIES = [
-  "CONTRACT","PLAN","PERMIT","TECHNICAL","PHOTO",
-  "INVOICE","RECEIPT","CERTIFICATE","REPORT","JOBSITE_EVIDENCE","OTHER",
+  "CONTRACT",
+  "PLAN",
+  "PERMIT",
+  "TECHNICAL",
+  "PHOTO",
+  "INVOICE",
+  "RECEIPT",
+  "CERTIFICATE",
+  "REPORT",
+  "JOBSITE_EVIDENCE",
+  "OTHER",
 ] as const;
 
 export default async function DocumentosPage({ params, searchParams }: PageProps) {
@@ -30,35 +42,57 @@ export default async function DocumentosPage({ params, searchParams }: PageProps
   const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
-  const status   = VALID_STATUSES.includes(sp.status as never) ? sp.status as "ACTIVE" | "ARCHIVED" : "ACTIVE";
-  const category = VALID_CATEGORIES.includes(sp.category as never) ? sp.category as never : undefined;
+  let project;
+  try {
+    project = await getProjectShellInfo(id, ctx);
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
+
+  const status = VALID_STATUSES.includes(sp.status as never)
+    ? (sp.status as "ACTIVE" | "ARCHIVED")
+    : "ACTIVE";
+  const category = VALID_CATEGORIES.includes(sp.category as never)
+    ? (sp.category as never)
+    : undefined;
 
   let docs;
   try {
-    docs = await listProjectDocuments(id, { status, category, search: sp.search || undefined }, ctx);
+    docs = await listProjectDocuments(
+      id,
+      { status, category, search: sp.search || undefined },
+      ctx,
+    );
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/proyectos/${id}`}>← Proyecto</Link>
-          </Button>
-          <h1 className="text-2xl font-bold tracking-tight">Documentos</h1>
-        </div>
-        <Button asChild size="sm">
-          <Link href={`/proyectos/${id}/documentos/nuevo`}>+ Agregar documento</Link>
-        </Button>
-      </div>
+    <PageShell variant="default" className="space-y-6">
+      <ProjectPageHeader
+        projectId={id}
+        projectName={project.name}
+        title="Documentos"
+        subtitle={`${docs.length} ${docs.length === 1 ? "documento" : "documentos"}`}
+        actions={
+          <>
+            <Suspense fallback={null}>
+              <ListViewToggle storageKey={`documentos-${id}`} />
+            </Suspense>
+            <Button asChild size="sm">
+              <Link href={`/proyectos/${id}/documentos/nuevo`}>+ Agregar documento</Link>
+            </Button>
+          </>
+        }
+      />
 
       <div className="rounded-lg border bg-card p-4">
         <Suspense>
@@ -66,11 +100,9 @@ export default async function DocumentosPage({ params, searchParams }: PageProps
         </Suspense>
       </div>
 
-      <div className="text-sm text-muted-foreground">
-        {docs.length} documento{docs.length !== 1 ? "s" : ""}
-      </div>
-
-      <DocumentList docs={docs} projectId={id} />
-    </div>
+      <Suspense fallback={<ListSectionSkeleton />}>
+        <DocumentListSection docs={docs} projectId={id} />
+      </Suspense>
+    </PageShell>
   );
 }

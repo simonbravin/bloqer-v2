@@ -9,6 +9,12 @@ export type { SupplierOption, POOption } from "./components/supplier-invoice-for
 export { SupplierInvoiceEditForm } from "./components/supplier-invoice-edit-form";
 export { PayableList } from "./components/payable-list";
 export type { PayableListItem } from "./components/payable-list";
+export { PayableTable } from "./components/payable-table";
+export { PayableCards } from "./components/payable-cards";
+export { PayableListSection } from "./components/payable-list-section";
 export { PaymentForm } from "./components/payment-form";
 export { PaymentList } from "./components/payment-list";
 export type { PaymentListItem } from "./components/payment-list";
+export { PaymentTable } from "./components/payment-table";
+export { PaymentCards } from "./components/payment-cards";
+export { PaymentListSection } from "./components/payment-list-section";

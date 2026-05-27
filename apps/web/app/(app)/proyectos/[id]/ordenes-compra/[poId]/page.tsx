@@ -1,7 +1,15 @@
 import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { PurchaseOrderStatusBadge, PurchaseReceiptList } from "@/features/procurement";
 import type { PurchaseReceiptListItem } from "@/features/procurement";
 import { EntityDocumentsPanel } from "@/features/documents";
@@ -14,10 +22,13 @@ import {
   listReceiptsByPurchaseOrder,
   ServiceError,
 } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   issuePurchaseOrderAction,
   cancelPurchaseOrderAction,
 } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; poId: string }>;
@@ -30,9 +41,9 @@ export default async function OrdenCompraDetailPage({ params }: PageProps) {
   const { id, poId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let order, receipts;
@@ -48,33 +59,26 @@ export default async function OrdenCompraDetailPage({ params }: PageProps) {
 
   if (order.projectId !== id) notFound();
 
-  const poAttachments = await listEntityDocuments(
-    "PURCHASE_ORDER",
-    poId,
-    ctx,
-    { projectId: id },
-  );
+  const poAttachments = await listEntityDocuments("PURCHASE_ORDER", poId, ctx, { projectId: id });
   const storageConfigured = isStorageConfigured();
   const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "PROCUREMENT");
 
-  const isDraft      = order.status === "DRAFT";
-  const isCancelled  = order.status === "CANCELLED";
+  const isDraft = order.status === "DRAFT";
+  const isCancelled = order.status === "CANCELLED";
   const isReceivable = ["ISSUED", "PARTIALLY_RECEIVED"].includes(order.status);
 
   const receiptItems: PurchaseReceiptListItem[] = receipts.map((r) => ({
-    id:                r.id,
+    id: r.id,
     purchaseOrderCode: r.purchaseOrderCode,
-    supplierName:      r.supplierName,
-    receiptDate:       r.receiptDate,
-    status:            r.status,
+    supplierName: r.supplierName,
+    receiptDate: r.receiptDate,
+    status: r.status,
   }));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}/ordenes-compra`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/proyectos/${id}/ordenes-compra`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">{order.code}</h1>
         <PurchaseOrderStatusBadge status={order.status} />
       </div>
@@ -103,36 +107,40 @@ export default async function OrdenCompraDetailPage({ params }: PageProps) {
 
         <hr />
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-muted-foreground">
-              <th className="pb-2 font-normal w-[30%]">Descripción</th>
-              <th className="pb-2 font-normal">WBS</th>
-              <th className="pb-2 font-normal text-right">Unidad</th>
-              <th className="pb-2 font-normal text-right">Cant.</th>
-              <th className="pb-2 font-normal text-right">Recibido</th>
-              <th className="pb-2 font-normal text-right">Pendiente</th>
-              <th className="pb-2 font-normal text-right">Precio unit.</th>
-              <th className="pb-2 font-normal text-right">Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {order.lines.map((line) => (
-              <tr key={line.id}>
-                <td className="py-1.5">{line.description}</td>
-                <td className="py-1.5 text-muted-foreground text-xs">
-                  {line.wbsNodeCode ? `${line.wbsNodeCode} — ${line.wbsNodeName}` : "—"}
-                </td>
-                <td className="py-1.5 text-right tabular-nums">{line.unit || "—"}</td>
-                <td className="py-1.5 text-right tabular-nums">{line.quantity}</td>
-                <td className="py-1.5 text-right tabular-nums">{line.receivedQuantity}</td>
-                <td className="py-1.5 text-right tabular-nums">{line.remainingQuantity}</td>
-                <td className="py-1.5 text-right tabular-nums">{line.unitPrice}</td>
-                <td className="py-1.5 text-right tabular-nums">{line.lineTotal}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <TableScroll className="border-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[30%]">Descripción</TableHead>
+                <TableHead>WBS</TableHead>
+                <TableHead className="text-right">Unidad</TableHead>
+                <TableHead className="text-right">Cant.</TableHead>
+                <TableHead className="text-right">Recibido</TableHead>
+                <TableHead className="text-right">Pendiente</TableHead>
+                <TableHead className="text-right">Precio unit.</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {order.lines.map((line) => (
+                <TableRow key={line.id}>
+                  <TableCell>{line.description}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {line.wbsNodeCode ? `${line.wbsNodeCode} — ${line.wbsNodeName}` : "—"}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{line.unit || "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{line.quantity}</TableCell>
+                  <TableCell className="text-right tabular-nums">{line.receivedQuantity}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {line.remainingQuantity}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{line.unitPrice}</TableCell>
+                  <TableCell className="text-right tabular-nums">{line.lineTotal}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableScroll>
 
         <div className="flex justify-end gap-8 text-sm">
           <div className="text-right">
@@ -145,7 +153,9 @@ export default async function OrdenCompraDetailPage({ params }: PageProps) {
           </div>
           <div className="text-right">
             <p className="font-semibold">Total</p>
-            <p className="font-semibold tabular-nums">{order.totalAmount} {order.currency}</p>
+            <p className="font-semibold tabular-nums">
+              {order.totalAmount} {order.currency}
+            </p>
           </div>
         </div>
 
@@ -189,7 +199,9 @@ export default async function OrdenCompraDetailPage({ params }: PageProps) {
               redirect(`/proyectos/${id}/ordenes-compra/${poId}`);
             }}
           >
-            <Button type="submit" variant="destructive">Anular</Button>
+            <Button type="submit" variant="destructive">
+              Anular
+            </Button>
           </form>
         )}
       </div>
@@ -210,6 +222,6 @@ export default async function OrdenCompraDetailPage({ params }: PageProps) {
         docs={poAttachments}
         canEdit={canEditAttachments}
       />
-    </div>
+    </PageShell>
   );
 }

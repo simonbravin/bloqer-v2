@@ -7,6 +7,9 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  Line,
+  LineChart,
+  Area,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -56,6 +59,7 @@ export function ProjectOverviewCharts({
       periodo: p.label,
       ingresos: Number(p.inflows),
       egresos: Number(p.outflows),
+      neto: Number(p.inflows) - Number(p.outflows),
     }));
   }, [cashFlowMini]);
 
@@ -115,15 +119,54 @@ export function ProjectOverviewCharts({
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={cashRows} margin={{ top: 8, right: 8, left: 0, bottom: 32 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="periodo" tick={{ fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={48} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${v}`)} />
-                <Tooltip formatter={(v) => moneyTooltip(v as number)} />
-                <Legend />
-                <Bar dataKey="ingresos" name="Ingresos (cobros)" fill="#15803d" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="egresos" name="Egresos (pagos)" fill="#b91c1c" radius={[4, 4, 0, 0]} />
-              </BarChart>
+              <LineChart data={cashRows} margin={{ top: 8, right: 12, left: 4, bottom: 32 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                <XAxis
+                  dataKey="periodo"
+                  tick={{ fontSize: 10 }}
+                  interval={0}
+                  angle={-25}
+                  textAnchor="end"
+                  height={48}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(v) => (Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${v}`)}
+                  tickLine={false}
+                  axisLine={false}
+                  width={52}
+                />
+                <Tooltip
+                  formatter={(v, name) => [
+                    moneyTooltip(v as number),
+                    name === "neto" ? "Neto" : String(name),
+                  ]}
+                  contentStyle={{
+                    fontSize: 12,
+                    borderRadius: 8,
+                    border: "1px solid hsl(var(--border))",
+                    background: "hsl(var(--card))",
+                  }}
+                />
+                <defs>
+                  <linearGradient id="projectNetFlowFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.25} />
+                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="neto" stroke="none" fill="url(#projectNetFlowFill)" legendType="none" />
+                <Line
+                  type="monotone"
+                  dataKey="neto"
+                  name="Neto"
+                  stroke="#6366f1"
+                  strokeWidth={2.5}
+                  dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: "#6366f1", strokeWidth: 2, stroke: "hsl(var(--background))" }}
+                />
+              </LineChart>
             </ResponsiveContainer>
           )}
           {cashRows.length > 0 && cashFlowHref ? (

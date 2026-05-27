@@ -1,18 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function ReportesInventarioPage() {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/inventario">← Inventario</Link>
-        </Button>
+        <PageBackLink href="/inventario" label="Inventario" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Reportes de inventario</h1>
           <p className="text-sm text-muted-foreground mt-1">Stock y movimientos en tiempo real.</p>
@@ -32,13 +31,15 @@ export default async function ReportesInventarioPage() {
           className="rounded-lg border bg-card p-6 hover:bg-accent transition-colors"
         >
           <h2 className="font-semibold">Movimientos</h2>
-          <p className="text-sm text-muted-foreground mt-1">Historial filtrable de entradas y salidas</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Historial filtrable de entradas y salidas
+          </p>
         </Link>
       </div>
 
       <p className="text-xs text-muted-foreground">
         Solo movimientos confirmados. Sin valuación FIFO/AVG. Ajustes expuestos por separado.
       </p>
-    </div>
+    </PageShell>
   );
 }

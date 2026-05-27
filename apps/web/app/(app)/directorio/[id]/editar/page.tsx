@@ -1,11 +1,11 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { ContactForm } from "@/features/directory/components/contact-form";
 import { getCurrentUser } from "@/lib/auth";
 import { getContactById, ServiceError } from "@bloqer/services";
 import { updateContactAction } from "../../actions";
 import type { CreateContactInput } from "@bloqer/validators";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -37,11 +37,9 @@ export default async function EditarContactoPage({ params }: PageProps) {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/directorio/${id}`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/directorio/${id}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Editar contacto</h1>
       </div>
 
@@ -64,6 +62,6 @@ export default async function EditarContactoPage({ params }: PageProps) {
           }}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }

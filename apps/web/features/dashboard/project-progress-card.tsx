@@ -40,23 +40,6 @@ export function ProjectProgressCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <p className="text-sm text-muted-foreground">Presupuesto de venta (último aprobado/cerrado, activos)</p>
-          {summary.budgetSaleByCurrency.length === 0 ? (
-            <p className="mt-1 text-lg font-semibold text-muted-foreground">—</p>
-          ) : (
-            <ul className="mt-2 space-y-1">
-              {summary.budgetSaleByCurrency.map((row) => (
-                <li key={row.currency} className="flex justify-between text-sm tabular-nums">
-                  <span className="text-muted-foreground">{row.currency}</span>
-                  <span className="font-semibold">{formatDashboardMoney(row.amount, row.currency)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="mt-1 text-xs text-muted-foreground">Los importes no se suman entre monedas distintas.</p>
-        </div>
-
         {showCostControlHint ? (
           <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-sm">
             <p className="font-medium">Control de costos</p>

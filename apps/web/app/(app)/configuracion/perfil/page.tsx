@@ -3,6 +3,7 @@ import { getUserById } from "@bloqer/services";
 import { getCurrentUser } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserProfileForm } from "@/components/configuracion/user-profile-form";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default async function ConfiguracionPerfilPage() {
   const current = await getCurrentUser();
@@ -13,7 +14,7 @@ export default async function ConfiguracionPerfilPage() {
   if (!user) redirect("/login");
 
   return (
-    <div className="space-y-8">
+    <PageShell variant="default" className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Mi perfil</h1>
         <p className="text-sm text-muted-foreground">Datos personales de tu cuenta (no reemplazan la configuración del tenant).</p>
@@ -28,6 +29,6 @@ export default async function ConfiguracionPerfilPage() {
           <UserProfileForm defaultName={user.name} email={user.email} />
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }

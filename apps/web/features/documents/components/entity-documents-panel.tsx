@@ -1,5 +1,5 @@
 "use client";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 import Link from "next/link";
 import type { DocumentAttachmentView } from "@bloqer/services";
@@ -7,6 +7,16 @@ import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge } from "./document-status-badge";
 import { DocumentForm } from "./document-form";
 import { Button } from "@/components/ui/button";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import {
   archiveDocumentAction,
   restoreDocumentAction,
@@ -197,30 +207,28 @@ export function EntityDocumentsPanel({
           </p>
         </div>
         {docs.length === 0 ? (
-          <p className="px-6 py-8 text-sm text-muted-foreground text-center">
-            {emptyMessage}
-          </p>
+          <ListEmptyState message={emptyMessage} className="border-0 rounded-none" />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2.5 text-left font-medium">Archivo</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Categoría</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Estado</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Tamaño</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Fecha</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
+          <TableScroll className="border-0 rounded-none">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Archivo</TableHead>
+                  <TableHead>Categoría</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Tamaño</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {docs.map((doc) => {
                   const canDownload =
                     doc.storageProvider === "R2" &&
                     (doc.status === "ACTIVE" || doc.status === "ARCHIVED");
                   return (
-                    <tr key={doc.id} className="border-t hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-2.5">
+                    <TableRow key={doc.id}>
+                      <TableCell>
                         {projectIdForTable ? (
                           <Link
                             href={`/proyectos/${projectIdForTable}/documentos/${doc.id}`}
@@ -236,20 +244,20 @@ export function EntityDocumentsPanel({
                             {doc.description}
                           </p>
                         )}
-                      </td>
-                      <td className="px-4 py-2.5">
+                      </TableCell>
+                      <TableCell>
                         <DocumentCategoryBadge category={doc.category} />
-                      </td>
-                      <td className="px-4 py-2.5">
+                      </TableCell>
+                      <TableCell>
                         <DocumentStatusBadge status={doc.status} />
-                      </td>
-                      <td className="px-4 py-2.5 text-muted-foreground text-xs tabular-nums">
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs tabular-nums">
                         {fmtSize(doc.sizeBytes)}
-                      </td>
-                      <td className="px-4 py-2.5 text-muted-foreground text-xs whitespace-nowrap">
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
                         {fmtDate(doc.createdAt)}
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
+                      </TableCell>
+                      <TableCell className="text-right">
                         <div className="flex flex-wrap justify-end gap-1">
                           {canDownload && (
                             <Button variant="outline" size="sm" asChild>
@@ -304,13 +312,13 @@ export function EntityDocumentsPanel({
                             </form>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </TableScroll>
         )}
       </div>
 

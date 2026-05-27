@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { useDebouncedSearchParam } from "@/hooks/use-debounced-search-param";
 
 const CATEGORY_OPTIONS = [
   { value: "_all",             label: "Todas las categorías" },
@@ -32,10 +33,12 @@ export function DocumentFilters() {
   const router   = useRouter();
   const pathname = usePathname();
   const sp       = useSearchParams();
+  const { defaultValue: searchDefault, setDebounced: setSearchDebounced } = useDebouncedSearchParam("search");
 
   function update(key: string, value: string) {
     const params = new URLSearchParams(sp.toString());
     if (value) params.set(key, value); else params.delete(key);
+    params.delete("page");
     router.push(`${pathname}?${params.toString()}`);
   }
 
@@ -45,8 +48,8 @@ export function DocumentFilters() {
         <Label className="text-xs text-muted-foreground">Buscar</Label>
         <Input
           placeholder="Nombre o descripción..."
-          defaultValue={sp.get("search") ?? ""}
-          onChange={(e) => update("search", e.target.value)}
+          defaultValue={searchDefault}
+          onChange={(e) => setSearchDebounced(e.target.value)}
         />
       </div>
       <div className="space-y-1">

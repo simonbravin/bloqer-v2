@@ -1,10 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { getTenantModuleGate } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 const MOVIMIENTOS_CORP =
   "/tesoreria/reportes/movimientos?sourceType=PAYMENT&type=OUTFLOW&corporateApPayments=true";
@@ -15,9 +24,9 @@ export default async function GastosGeneralesPage() {
 
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   const gate = await getTenantModuleGate(ctx);
@@ -26,35 +35,36 @@ export default async function GastosGeneralesPage() {
   }
 
   const canEditAp = can(current.tenantCtx.roles, "EDIT", "AP");
-  const canTreasury = gate.isEnabled("TREASURY") && can(current.tenantCtx.roles, "VIEW", "TREASURY");
+  const canTreasury =
+    gate.isEnabled("TREASURY") && can(current.tenantCtx.roles, "VIEW", "TREASURY");
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <PageShell variant="detail" className="space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Gastos generales</h1>
           <p className="text-sm text-muted-foreground max-w-prose">
-            Asistente para cargar <strong>facturas de proveedor sin proyecto</strong>, emitir la obligación (cuenta por pagar) y
-            registrar el pago desde tesorería. Reutiliza el mismo flujo que Finanzas → facturas empresa; no agrega un
-            libro paralelo.
+            Asistente para cargar <strong>facturas de proveedor sin proyecto</strong>, emitir la
+            obligación (cuenta por pagar) y registrar el pago desde tesorería. Reutiliza el mismo
+            flujo que Finanzas → facturas empresa; no agrega un libro paralelo.
           </p>
         </div>
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/finanzas">← Resumen Finanzas</Link>
-        </Button>
+        <PageBackLink href="/finanzas" label="Resumen Finanzas" />
       </div>
 
       <ol className="list-decimal space-y-6 pl-5 text-sm leading-relaxed">
         <li>
-          <span className="font-medium text-foreground">Crear borrador</span> — proveedor, líneas, fechas e IVA. Podés
-          adjuntar comprobantes en el detalle luego del alta.
+          <span className="font-medium text-foreground">Crear borrador</span> — proveedor, líneas,
+          fechas e IVA. Podés adjuntar comprobantes en el detalle luego del alta.
         </li>
         <li>
-          <span className="font-medium text-foreground">Emitir factura</span> — genera la cuenta por pagar corporativa.
+          <span className="font-medium text-foreground">Emitir factura</span> — genera la cuenta por
+          pagar corporativa.
         </li>
         <li>
-          <span className="font-medium text-foreground">Pagar</span> — desde cuentas por pagar de empresa elegís cuenta de tesorería y
-          confirmás el pago (movimiento <code className="rounded bg-muted px-1">PAYMENT</code>).
+          <span className="font-medium text-foreground">Pagar</span> — desde cuentas por pagar de
+          empresa elegís cuenta de tesorería y confirmás el pago (movimiento{" "}
+          <code className="rounded bg-muted px-1">PAYMENT</code>).
         </li>
       </ol>
 
@@ -88,6 +98,6 @@ export default async function GastosGeneralesPage() {
           </CardFooter>
         ) : null}
       </Card>
-    </div>
+    </PageShell>
   );
 }

@@ -1,18 +1,34 @@
 import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { PurchaseReceiptStatusBadge } from "@/features/procurement";
 import { StockMovementList } from "@/features/inventory";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
-import { getPurchaseReceiptById, listEntityDocuments, listStockMovements, ServiceError } from "@bloqer/services";
+import {
+  getPurchaseReceiptById,
+  listEntityDocuments,
+  listStockMovements,
+  ServiceError,
+} from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   confirmPurchaseReceiptAction,
   cancelPurchaseReceiptAction,
 } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; receiptId: string }>;
@@ -25,9 +41,9 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
   const { id, receiptId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let receipt, stockMovements;
@@ -43,24 +59,19 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
 
   if (receipt.projectId !== id) notFound();
 
-  const receiptAttachments = await listEntityDocuments(
-    "PURCHASE_RECEIPT",
-    receiptId,
-    ctx,
-    { projectId: id },
-  );
+  const receiptAttachments = await listEntityDocuments("PURCHASE_RECEIPT", receiptId, ctx, {
+    projectId: id,
+  });
   const storageConfigured = isStorageConfigured();
   const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "PROCUREMENT");
 
-  const isDraft     = receipt.status === "DRAFT";
+  const isDraft = receipt.status === "DRAFT";
   const isCancelled = receipt.status === "CANCELLED";
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}/recepciones`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/proyectos/${id}/recepciones`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">
           Recepción — {receipt.purchaseOrderCode}
         </h1>
@@ -92,24 +103,28 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
 
         <hr />
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-muted-foreground">
-              <th className="pb-2 font-normal w-[50%]">Descripción</th>
-              <th className="pb-2 font-normal text-right">Cantidad recibida</th>
-              <th className="pb-2 font-normal">Notas</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {receipt.lines.map((line) => (
-              <tr key={line.id}>
-                <td className="py-1.5">{line.lineDescription}</td>
-                <td className="py-1.5 text-right tabular-nums">{line.quantityReceived}</td>
-                <td className="py-1.5 text-muted-foreground text-xs">{line.notes ?? "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <TableScroll className="border-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[50%]">Descripción</TableHead>
+                <TableHead className="text-right">Cantidad recibida</TableHead>
+                <TableHead>Notas</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {receipt.lines.map((line) => (
+                <TableRow key={line.id}>
+                  <TableCell>{line.lineDescription}</TableCell>
+                  <TableCell className="text-right tabular-nums">{line.quantityReceived}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {line.notes ?? "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableScroll>
 
         {receipt.notes && (
           <div>
@@ -150,13 +165,13 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
               redirect(`/proyectos/${id}/recepciones/${receiptId}`);
             }}
           >
-            <Button type="submit" variant="destructive">Anular recepción</Button>
+            <Button type="submit" variant="destructive">
+              Anular recepción
+            </Button>
           </form>
         )}
         <Button asChild variant="outline">
-          <Link href={`/proyectos/${id}/ordenes-compra/${receipt.purchaseOrderId}`}>
-            Ver OC →
-          </Link>
+          <Link href={`/proyectos/${id}/ordenes-compra/${receipt.purchaseOrderId}`}>Ver OC →</Link>
         </Button>
       </div>
 
@@ -167,6 +182,6 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
         docs={receiptAttachments}
         canEdit={canEditAttachments}
       />
-    </div>
+    </PageShell>
   );
 }

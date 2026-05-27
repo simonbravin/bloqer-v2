@@ -1,11 +1,22 @@
 import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { SalesInvoiceStatusBadge } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
 import { getSalesInvoiceById, ServiceError } from "@bloqer/services";
 import { issueSalesInvoiceAction, cancelSalesInvoiceAction } from "../actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; invoiceId: string }>;
@@ -19,7 +30,9 @@ function fmtMoney(value: string, currency: string) {
   return (
     new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
       parseFloat(value),
-    ) + " " + currency
+    ) +
+    " " +
+    currency
   );
 }
 
@@ -43,16 +56,20 @@ export default async function FacturaDetailPage({ params }: PageProps) {
     throw err;
   }
 
-  const doIssue  = async () => { "use server"; await issueSalesInvoiceAction(invoiceId, id); };
-  const doCancel = async () => { "use server"; await cancelSalesInvoiceAction(invoiceId, id); };
+  const doIssue = async () => {
+    "use server";
+    await issueSalesInvoiceAction(invoiceId, id);
+  };
+  const doCancel = async () => {
+    "use server";
+    await cancelSalesInvoiceAction(invoiceId, id);
+  };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/proyectos/${id}/facturas`}>← Volver</Link>
-          </Button>
+          <PageBackLink href={`/proyectos/${id}/facturas`} label="Volver" />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
@@ -75,7 +92,9 @@ export default async function FacturaDetailPage({ params }: PageProps) {
           )}
           {invoice.status !== "CANCELLED" && (
             <form action={doCancel}>
-              <Button variant="ghost" size="sm" className="text-muted-foreground">Anular</Button>
+              <Button variant="ghost" size="sm" className="text-muted-foreground">
+                Anular
+              </Button>
             </form>
           )}
         </div>
@@ -124,28 +143,34 @@ export default async function FacturaDetailPage({ params }: PageProps) {
         <div className="border-b px-6 py-4">
           <h2 className="font-semibold">Líneas</h2>
         </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="px-6 py-3 text-muted-foreground font-normal">Descripción</th>
-              <th className="px-4 py-3 text-right text-muted-foreground font-normal">Cant.</th>
-              <th className="px-4 py-3 text-right text-muted-foreground font-normal">P. Unit.</th>
-              <th className="px-4 py-3 text-right text-muted-foreground font-normal">IVA %</th>
-              <th className="px-4 py-3 text-right text-muted-foreground font-normal">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoice.lines.map((l) => (
-              <tr key={l.id} className="border-b last:border-0">
-                <td className="px-6 py-3">{l.description}</td>
-                <td className="px-4 py-3 text-right font-mono">{l.quantity}</td>
-                <td className="px-4 py-3 text-right font-mono">{fmtMoney(l.unitPrice, invoice.currency)}</td>
-                <td className="px-4 py-3 text-right font-mono">{l.taxRate}%</td>
-                <td className="px-4 py-3 text-right font-mono">{fmtMoney(l.lineTotal, invoice.currency)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <TableScroll className="border-0 rounded-none">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Descripción</TableHead>
+                <TableHead className="text-right">Cant.</TableHead>
+                <TableHead className="text-right">P. Unit.</TableHead>
+                <TableHead className="text-right">IVA %</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invoice.lines.map((l) => (
+                <TableRow key={l.id}>
+                  <TableCell>{l.description}</TableCell>
+                  <TableCell className="text-right font-mono">{l.quantity}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {fmtMoney(l.unitPrice, invoice.currency)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">{l.taxRate}%</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {fmtMoney(l.lineTotal, invoice.currency)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableScroll>
         <div className="border-t px-6 py-4 text-sm">
           <div className="ml-auto max-w-xs space-y-1">
             <div className="flex justify-between">
@@ -163,6 +188,6 @@ export default async function FacturaDetailPage({ params }: PageProps) {
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

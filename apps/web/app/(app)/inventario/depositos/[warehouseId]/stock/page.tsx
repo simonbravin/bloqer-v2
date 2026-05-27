@@ -1,12 +1,12 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 import { getWarehouseStockDetail, ServiceError } from "@bloqer/services";
 import { StockBalanceTable, StockMovementReportTable } from "@/features/inventory-reports";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
-  params:      Promise<{ warehouseId: string }>;
+  params: Promise<{ warehouseId: string }>;
   searchParams: Promise<{ dateFrom?: string; dateTo?: string }>;
 }
 
@@ -18,14 +18,18 @@ export default async function DepositoStockPage({ params, searchParams }: PagePr
   const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let detail;
   try {
-    detail = await getWarehouseStockDetail(warehouseId, { dateFrom: sp.dateFrom, dateTo: sp.dateTo }, ctx);
+    detail = await getWarehouseStockDetail(
+      warehouseId,
+      { dateFrom: sp.dateFrom, dateTo: sp.dateTo },
+      ctx,
+    );
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
@@ -36,11 +40,9 @@ export default async function DepositoStockPage({ params, searchParams }: PagePr
   const productCount = new Set(balancesByProduct.map((r) => r.productId)).size;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/inventario/depositos/${warehouseId}`}>← {warehouse.name}</Link>
-        </Button>
+        <PageBackLink href={`/inventario/depositos/${warehouseId}`} label={warehouse.name} />
         <h1 className="text-2xl font-bold tracking-tight">Stock — {warehouse.name}</h1>
       </div>
 
@@ -73,6 +75,6 @@ export default async function DepositoStockPage({ params, searchParams }: PagePr
         <h2 className="font-semibold text-sm px-1">Historial de movimientos</h2>
         <StockMovementReportTable rows={movements} showProduct showWarehouse={false} />
       </div>
-    </div>
+    </PageShell>
   );
 }

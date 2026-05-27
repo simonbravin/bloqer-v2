@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { BudgetList } from "@/features/budgets";
+import { ListViewToggle } from "@/components/ui/list-view-toggle";
+import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
+import { ProjectPageHeader } from "@/components/layout/project-page-header";
+import { BudgetListSection } from "@/features/budgets";
 import { getCurrentUser } from "@/lib/auth";
 import { listBudgetsByProject, getProjectShellInfo, ServiceError } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -44,27 +49,27 @@ export default async function PresupuestosPage({ params }: PageProps) {
   }));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/proyectos/${id}`}>← {project.name}</Link>
-          </Button>
-          <h1 className="text-2xl font-bold tracking-tight">Presupuestos</h1>
-        </div>
-        <Button asChild>
-          <Link href={`/proyectos/${id}/presupuestos/nuevo`}>Nuevo presupuesto</Link>
-        </Button>
-      </div>
+    <PageShell variant="default" className="space-y-6">
+      <ProjectPageHeader
+        projectId={id}
+        projectName={project.name}
+        title="Presupuestos"
+        subtitle={`${serialized.length} ${serialized.length === 1 ? "versión" : "versiones"}`}
+        actions={
+          <>
+            <Suspense fallback={null}>
+              <ListViewToggle storageKey={`presupuestos-${id}`} />
+            </Suspense>
+            <Button asChild>
+              <Link href={`/proyectos/${id}/presupuestos/nuevo`}>Nuevo presupuesto</Link>
+            </Button>
+          </>
+        }
+      />
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Versiones ({serialized.length})</h2>
-        </div>
-        <div className="px-6 py-4">
-          <BudgetList budgets={serialized} projectId={id} />
-        </div>
-      </div>
-    </div>
+      <Suspense fallback={<ListSectionSkeleton />}>
+        <BudgetListSection budgets={serialized} projectId={id} />
+      </Suspense>
+    </PageShell>
   );
 }

@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { AccountingAccountList } from "@/features/accounting";
+import { Suspense } from "react";
+import { ListViewToggle } from "@/components/ui/list-view-toggle";
+import { AccountingAccountListSection } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { listAccountingAccounts } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 export default async function ContabilidadCuentasPage({
   searchParams,
@@ -20,32 +24,33 @@ export default async function ContabilidadCuentasPage({
   const sp = await searchParams;
   const ctx = (await buildTenantServiceContext())!;
   const cf = companyQueryFilter(sp);
-  const accounts = await listAccountingAccounts(ctx, cf);
+  const { data: accounts } = await listAccountingAccounts(ctx, cf);
 
   const empresa = cf.companyId;
   const q = empresa ? `?empresa=${encodeURIComponent(empresa)}` : "";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/contabilidad">← Volver</Link>
-          </Button>
+          <PageBackLink href="/contabilidad" label="Volver" />
           <h1 className="text-2xl font-bold tracking-tight">Plan de cuentas</h1>
         </div>
-        {can(current.tenantCtx.roles, "EDIT", "ACCOUNTING") && (
-          <Button asChild><Link href={`/contabilidad/cuentas/nueva${q}`}>+ Nueva cuenta</Link></Button>
-        )}
-      </div>
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Cuentas contables</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <Suspense fallback={null}>
+            <ListViewToggle />
+          </Suspense>
+          {can(current.tenantCtx.roles, "EDIT", "ACCOUNTING") && (
+            <Button asChild>
+              <Link href={`/contabilidad/cuentas/nueva${q}`}>+ Nueva cuenta</Link>
+            </Button>
+          )}
         </div>
-        <div className="p-6">
-          <AccountingAccountList accounts={accounts} empresa={empresa} />
-        </div>
       </div>
-    </div>
+
+      <Suspense fallback={null}>
+        <AccountingAccountListSection accounts={accounts} empresa={empresa} />
+      </Suspense>
+    </PageShell>
   );
 }

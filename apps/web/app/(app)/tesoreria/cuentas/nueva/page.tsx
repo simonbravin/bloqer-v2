@@ -1,23 +1,21 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { TreasuryAccountForm } from "@/features/treasury";
 import { getCurrentUser } from "@/lib/auth";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function NuevaCuentaPage() {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/tesoreria/cuentas">← Volver</Link>
-        </Button>
+        <PageBackLink href="/tesoreria/cuentas" label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva cuenta</h1>
       </div>
 
       <TreasuryAccountForm />
-    </div>
+    </PageShell>
   );
 }

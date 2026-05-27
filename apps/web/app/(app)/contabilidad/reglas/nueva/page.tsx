@@ -1,12 +1,12 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { AccountingMappingRuleForm } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { listAccountingAccounts } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function NuevaReglaContablePage({
   searchParams,
@@ -20,20 +20,17 @@ export default async function NuevaReglaContablePage({
   const sp = await searchParams;
   const ctx = (await buildTenantServiceContext())!;
   const cf = companyQueryFilter(sp);
-  const accounts = await listAccountingAccounts(ctx, cf);
+  const { data: accounts } = await listAccountingAccounts(ctx, cf);
   const picks = accounts.map((a) => ({ id: a.id, code: a.code, name: a.name }));
 
   const empresa = cf.companyId;
   const q = empresa ? `?empresa=${encodeURIComponent(empresa)}` : "";
-  const defaultCompanyId =
-    current.tenantCtx.companyId ?? cf.companyId ?? null;
+  const defaultCompanyId = current.tenantCtx.companyId ?? cf.companyId ?? null;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/contabilidad/reglas${q}`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/contabilidad/reglas${q}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva regla contable</h1>
       </div>
       <AccountingMappingRuleForm
@@ -41,6 +38,6 @@ export default async function NuevaReglaContablePage({
         accounts={picks}
         defaultCompanyId={defaultCompanyId}
       />
-    </div>
+    </PageShell>
   );
 }

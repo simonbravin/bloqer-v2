@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { TreasuryAccountList } from "@/features/treasury";
+import { Suspense } from "react";
+import { ListViewToggle } from "@/components/ui/list-view-toggle";
+import { TreasuryAccountListSection } from "@/features/treasury";
 import type { TreasuryAccountListItem } from "@/features/treasury";
 import { getCurrentUser } from "@/lib/auth";
 import { listTreasuryAccounts } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 export default async function CuentasPage() {
   const current = await getCurrentUser();
@@ -12,30 +16,28 @@ export default async function CuentasPage() {
 
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
-  const accounts = await listTreasuryAccounts(ctx);
+  const { data: accounts } = await listTreasuryAccounts(ctx);
 
   const items: TreasuryAccountListItem[] = accounts.map((a) => ({
-    id:       a.id,
-    name:     a.name,
-    type:     a.type,
+    id: a.id,
+    name: a.name,
+    type: a.type,
     currency: a.currency,
-    balance:  a.balance,
-    status:   a.status,
+    balance: a.balance,
+    status: a.status,
     bankName: a.bankName,
   }));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/tesoreria">← Volver</Link>
-          </Button>
+          <PageBackLink href="/tesoreria" label="Volver" />
           <h1 className="text-2xl font-bold tracking-tight">Cuentas</h1>
         </div>
         <Button asChild>
@@ -43,14 +45,15 @@ export default async function CuentasPage() {
         </Button>
       </div>
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Cuentas de tesorería</h2>
-        </div>
-        <div className="p-6">
-          <TreasuryAccountList accounts={items} />
-        </div>
+      <div className="flex justify-end">
+        <Suspense fallback={null}>
+          <ListViewToggle />
+        </Suspense>
       </div>
-    </div>
+
+      <Suspense fallback={null}>
+        <TreasuryAccountListSection accounts={items} />
+      </Suspense>
+    </PageShell>
   );
 }

@@ -296,7 +296,6 @@ function pushMoneyKpi(
     key,
     label,
     value: "Multimoneda",
-    helper: "Ver detalle por moneda en Finanzas.",
     href,
     tone: "muted",
   });
@@ -454,7 +453,6 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
           key:    "projects_budgeted_total",
           label:  "Presupuesto total (activos)",
           value:  fmtDecimalEs(only.amount, only.currency),
-          helper: "Suma del último presupuesto aprobado/cerrado por obra activa.",
           href:   "/proyectos",
         });
       } else if (budgetSaleByCurrency.length > 1) {
@@ -462,7 +460,6 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
           key:    "projects_budgeted_total",
           label:  "Presupuesto total (activos)",
           value:  "Multimoneda",
-          helper: "Totales por moneda (no se suman divisas).",
           href:   "/proyectos",
           tone:   "muted",
         });
@@ -471,7 +468,6 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
           key:    "projects_budgeted_total",
           label:  "Presupuesto total (activos)",
           value:  "—",
-          helper: "Sin presupuestos aprobados o cerrados en obras activas.",
           href:   "/proyectos",
           tone:   "muted",
         });
@@ -529,7 +525,6 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       label:  "Certificaciones pendientes",
       value:  String(pendingCertCount),
       href:   "/proyectos",
-      helper: "Certificaciones en borrador (sin emitir).",
       tone:   pendingCertCount > 0 ? "warning" : "muted",
     });
   }
@@ -687,7 +682,6 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
           key:    "treasury_balance",
           label:  "Saldo tesorería",
           value:  "Multimoneda",
-          helper: "Varias monedas: ver detalle en Tesorería.",
           href:   "/tesoreria",
           tone:   "muted",
         });

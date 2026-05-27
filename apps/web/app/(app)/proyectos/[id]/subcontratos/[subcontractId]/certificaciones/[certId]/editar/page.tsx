@@ -1,12 +1,18 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
-import { getSubcontractCertificationById, getSubcontractById, ServiceError } from "@bloqer/services";
+import {
+  getSubcontractCertificationById,
+  getSubcontractById,
+  ServiceError,
+} from "@bloqer/services";
 import { SubcontractCertificationForm } from "@/features/subcontracts";
 import { updateSubcontractCertificationAction } from "../../../../actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
-interface PageProps { params: Promise<{ id: string; subcontractId: string; certId: string }> }
+interface PageProps {
+  params: Promise<{ id: string; subcontractId: string; certId: string }>;
+}
 
 function toDateStr(d: Date | string): string {
   return new Date(d).toISOString().split("T")[0]!;
@@ -19,9 +25,9 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
   const { id: projectId, subcontractId, certId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let cert, subcontract;
@@ -50,13 +56,12 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${certId}`}>
-            ← Certificación
-          </Link>
-        </Button>
+        <PageBackLink
+          href={`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${certId}`}
+          label="Certificación"
+        />
         <h1 className="text-2xl font-bold tracking-tight">Editar certificación</h1>
       </div>
       <div className="rounded-lg border bg-card p-6">
@@ -67,13 +72,13 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
           mode="edit"
           initialQuantities={initialQuantities}
           defaultDates={{
-            periodStart:       toDateStr(cert.periodStart),
-            periodEnd:         toDateStr(cert.periodEnd),
+            periodStart: toDateStr(cert.periodStart),
+            periodEnd: toDateStr(cert.periodEnd),
             certificationDate: toDateStr(cert.certificationDate),
           }}
           defaultNotes={cert.notes ?? undefined}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }

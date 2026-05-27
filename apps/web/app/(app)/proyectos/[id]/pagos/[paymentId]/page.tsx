@@ -1,13 +1,15 @@
 import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getCurrentUser } from "@/lib/auth";
 import { generateJournalFromPaymentAction } from "@/app/(app)/contabilidad/source-draft-actions";
 import { getPaymentById, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { cancelPaymentAction } from "@/app/(app)/proyectos/[id]/cuentas-por-pagar/actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; paymentId: string }>;
@@ -23,9 +25,9 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
   const contabilidadErr = sp.contabilidad;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let payment;
@@ -41,11 +43,9 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
   const returnPath = `/proyectos/${id}/pagos/${paymentId}`;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}/pagos`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/proyectos/${id}/pagos`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Pago</h1>
         <Badge variant={isConfirmed ? "default" : "destructive"}>
           {isConfirmed ? "Confirmado" : "Cancelado"}
@@ -69,7 +69,10 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
           <div>
             <p className="text-muted-foreground">Monto</p>
             <p className="font-semibold tabular-nums">
-              {Number(payment.amount).toLocaleString("es-AR", { style: "currency", currency: payment.currency })}
+              {Number(payment.amount).toLocaleString("es-AR", {
+                style: "currency",
+                currency: payment.currency,
+              })}
             </p>
           </div>
         </div>
@@ -100,7 +103,8 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
         <div className="rounded-lg border bg-card p-6 space-y-3">
           <h2 className="font-semibold">Contabilidad</h2>
           <p className="text-sm text-muted-foreground">
-            Generá un asiento en borrador según la regla activa para pagos confirmados. El posteo es manual en Contabilidad.
+            Generá un asiento en borrador según la regla activa para pagos confirmados. El posteo es
+            manual en Contabilidad.
           </p>
           <form action={generateJournalFromPaymentAction.bind(null, paymentId, returnPath)}>
             <Button type="submit" variant="outline">
@@ -118,9 +122,11 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
             redirect(`/proyectos/${id}/pagos/${paymentId}`);
           }}
         >
-          <Button type="submit" variant="destructive">Cancelar pago</Button>
+          <Button type="submit" variant="destructive">
+            Cancelar pago
+          </Button>
         </form>
       )}
-    </div>
+    </PageShell>
   );
 }

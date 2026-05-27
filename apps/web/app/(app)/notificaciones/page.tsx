@@ -15,6 +15,7 @@ import {
   markNotificationReadFormAction,
 } from "./actions";
 import { formatDateTime } from "@/lib/format";
+import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
   searchParams: Promise<{ filtro?: string }>;
@@ -70,7 +71,7 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
   const items = await listMyNotifications(filtro, ctx);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Notificaciones</h1>
@@ -179,6 +180,6 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
           })}
         </ul>
       )}
-    </div>
+    </PageShell>
   );
 }

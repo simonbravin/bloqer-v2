@@ -2,8 +2,13 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { BudgetStatusBadge, WbsTree, BudgetTotalsPanel } from "@/features/budgets";
+import { KpiStatCard } from "@/components/ui/kpi-stat-card";
+import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { getCurrentUser } from "@/lib/auth";
 import { getBudgetById, getWbsTree, ServiceError } from "@bloqer/services";
+import { formatMoneyAmount } from "@/lib/format-money";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { PageShell } from "@/components/layout/page-shell";
 import {
   addWbsNodeAction,
   updateWbsNodeAction,
@@ -39,10 +44,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
   let budget;
   let tree;
   try {
-    [budget, tree] = await Promise.all([
-      getBudgetById(budgetId, ctx),
-      getWbsTree(budgetId, ctx),
-    ]);
+    [budget, tree] = await Promise.all([getBudgetById(budgetId, ctx), getWbsTree(budgetId, ctx)]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
@@ -51,68 +53,79 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
   if (budget.projectId !== projectId) notFound();
 
   const editable = budget.status === "DRAFT" || budget.status === "RETURNED_FOR_CHANGES";
+  const costStr = budget.totalCost.toString();
+  const saleStr = budget.totalSalePrice.toString();
+  const costN = parseFloat(costStr);
+  const saleN = parseFloat(saleStr);
+  const marginStr =
+    Number.isFinite(costN) && Number.isFinite(saleN)
+      ? formatMoneyAmount(String(saleN - costN), budget.currency)
+      : "—";
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/proyectos/${projectId}/presupuestos`}>← Presupuestos</Link>
-          </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight">{budget.name}</h1>
-              <span className="text-sm text-muted-foreground font-mono">v{budget.versionNumber}</span>
+    <PageShell variant="wide" className="space-y-6">
+      <div className="space-y-4">
+        <PageBackLink href={`/proyectos/${projectId}/presupuestos`} label="Presupuestos" />
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight">{budget.name}</h1>
+              <span className="font-mono text-sm text-muted-foreground">v{budget.versionNumber}</span>
               <BudgetStatusBadge status={budget.status} />
             </div>
-            <p className="text-xs text-muted-foreground">{budget.currency}</p>
+            <p className="text-sm text-muted-foreground">Moneda: {budget.currency}</p>
           </div>
-        </div>
-        {editable && (
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${projectId}/presupuestos/${budgetId}/editar`}>
-              Configuración
-            </Link>
-          </Button>
-        )}
-      </div>
-
-      {/* Main content */}
-      <div className="flex gap-4 items-start">
-        {/* WBS tree takes most of the space */}
-        <div className="flex-1 min-w-0">
-          <WbsTree
-            nodes={tree}
-            budgetId={budgetId}
-            currency={budget.currency}
-            editable={editable}
-            onAddNode={addWbsNodeAction}
-            onUpdateNode={updateWbsNodeAction}
-            onRemoveNode={removeWbsNodeAction}
-            onReorderNodes={reorderWbsNodesAction}
-            onUpdateCostItem={updateCostItemAction}
-            onAddLine={addCostAnalysisLineAction}
-            onUpdateLine={updateCostAnalysisLineAction}
-            onRemoveLine={removeCostAnalysisLineAction}
-          />
-        </div>
-
-        {/* Right sidebar: totals + lifecycle */}
-        <div className="w-56 shrink-0">
-          <BudgetTotalsPanel
-            status={budget.status}
-            currency={budget.currency}
-            totalCost={budget.totalCost.toString()}
-            totalSalePrice={budget.totalSalePrice.toString()}
-            onSubmitForReview={submitForReviewAction.bind(null, budgetId)}
-            onReturnForChanges={returnForChangesAction.bind(null, budgetId)}
-            onApprove={approveBudgetAction.bind(null, budgetId)}
-            onClose={closeBudgetAction.bind(null, budgetId)}
-            onCancel={cancelBudgetAction.bind(null, budgetId)}
-          />
+          {editable ? (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/proyectos/${projectId}/presupuestos/${budgetId}/editar`}>
+                Configuración
+              </Link>
+            </Button>
+          ) : null}
         </div>
       </div>
-    </div>
+
+      <KpiStatGrid columns={3}>
+        <KpiStatCard
+          label="Costo directo total"
+          value={formatMoneyAmount(costStr, budget.currency)}
+        />
+        <KpiStatCard
+          label="Precio de venta total"
+          value={formatMoneyAmount(saleStr, budget.currency)}
+          variant="highlight"
+        />
+        <KpiStatCard label="Margen (venta − costo)" value={marginStr} tone="muted" />
+      </KpiStatGrid>
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_17rem]">
+        <WbsTree
+          nodes={tree}
+          budgetId={budgetId}
+          currency={budget.currency}
+          editable={editable}
+          onAddNode={addWbsNodeAction}
+          onUpdateNode={updateWbsNodeAction}
+          onRemoveNode={removeWbsNodeAction}
+          onReorderNodes={reorderWbsNodesAction}
+          onUpdateCostItem={updateCostItemAction}
+          onAddLine={addCostAnalysisLineAction}
+          onUpdateLine={updateCostAnalysisLineAction}
+          onRemoveLine={removeCostAnalysisLineAction}
+        />
+
+        <BudgetTotalsPanel
+          status={budget.status}
+          currency={budget.currency}
+          totalCost={costStr}
+          totalSalePrice={saleStr}
+          onSubmitForReview={submitForReviewAction.bind(null, budgetId)}
+          onReturnForChanges={returnForChangesAction.bind(null, budgetId)}
+          onApprove={approveBudgetAction.bind(null, budgetId)}
+          onClose={closeBudgetAction.bind(null, budgetId)}
+          onCancel={cancelBudgetAction.bind(null, budgetId)}
+        />
+      </div>
+    </PageShell>
   );
 }

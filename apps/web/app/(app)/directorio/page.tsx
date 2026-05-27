@@ -1,12 +1,18 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
+import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { Pagination } from "@/components/ui/pagination";
-import { ContactTable } from "@/features/directory/components/contact-table";
+import { ContactListSection } from "@/features/directory/components/contact-list-section";
+import { ContactListExportButton } from "@/features/directory/components/contact-list-export-button";
 import { ContactFilters } from "@/features/directory/components/contact-filters";
 import { getCurrentUser } from "@/lib/auth";
 import { listContacts } from "@bloqer/services";
 import { redirect } from "next/navigation";
 import type { ContactRoleType } from "@bloqer/database";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageListHeader } from "@/components/ui/page-list-header";
+import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 
 interface PageProps {
   searchParams: Promise<{ role?: string; status?: string; search?: string; page?: string }>;
@@ -34,22 +40,30 @@ export default async function DirectorioPage({ searchParams }: PageProps) {
   const { data, total } = await listContacts({ role, status, search: sp.search, page, pageSize: PAGE_SIZE }, ctx);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Directorio</h1>
-          <p className="text-sm text-muted-foreground">
-            {total} {total === 1 ? "contacto" : "contactos"}
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/directorio/nuevo">+ Nuevo contacto</Link>
-        </Button>
-      </div>
+    <PageShell variant="default" className="space-y-6">
+      <PageListHeader
+        title="Directorio"
+        subtitle={`${total} ${total === 1 ? "contacto" : "contactos"}`}
+        actions={
+          <>
+            <ContactListExportButton contacts={data} />
+            <Button asChild>
+              <Link href="/directorio/nuevo">+ Nuevo contacto</Link>
+            </Button>
+          </>
+        }
+      />
 
-      <ContactFilters />
-      <ContactTable contacts={data} />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <ContactFilters />
+        <Suspense fallback={null}>
+          <ListViewToggle storageKey="directorio" />
+        </Suspense>
+      </div>
+      <Suspense fallback={<ListSectionSkeleton />}>
+        <ContactListSection contacts={data} />
+      </Suspense>
       <Pagination page={page} pageSize={PAGE_SIZE} total={total} />
-    </div>
+    </PageShell>
   );
 }

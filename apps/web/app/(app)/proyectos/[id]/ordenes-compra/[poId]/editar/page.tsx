@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { PurchaseOrderEditForm } from "@/features/procurement";
 import type { SupplierOption, WbsOption, ProductOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   getPurchaseOrderById,
   listProcurementWbsOptions,
@@ -23,9 +23,9 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
   const { id, poId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let order;
@@ -40,37 +40,36 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
     redirect(`/proyectos/${id}/ordenes-compra/${poId}`);
   }
 
-  const [suppliersResult, wbsNodes, products] = await Promise.all([
+  const [suppliersResult, wbsNodes, productsResult] = await Promise.all([
     listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
     listProcurementWbsOptions(id, ctx),
     listProducts({ status: "ACTIVE" }, ctx),
   ]);
+  const products = productsResult.data;
 
   const suppliers: SupplierOption[] = suppliersResult.data.map((c) => ({
-    id:    c.id,
+    id: c.id,
     label: c.fantasyName ?? c.legalName,
   }));
 
   const wbsOptions: WbsOption[] = wbsNodes.map((n) => ({
-    id:         n.id,
-    code:       n.code,
-    name:       n.name,
+    id: n.id,
+    code: n.code,
+    name: n.name,
     budgetName: n.budgetName,
   }));
 
   const productOptions: ProductOption[] = products.map((p) => ({
-    id:   p.id,
-    sku:  p.sku,
+    id: p.id,
+    sku: p.sku,
     name: p.name,
     unit: p.unit,
   }));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}/ordenes-compra/${poId}`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/proyectos/${id}/ordenes-compra/${poId}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Editar {order.code}</h1>
       </div>
 
@@ -81,6 +80,6 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
         wbsOptions={wbsOptions}
         productOptions={productOptions}
       />
-    </div>
+    </PageShell>
   );
 }

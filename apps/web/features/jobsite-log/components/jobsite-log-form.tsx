@@ -8,6 +8,16 @@ import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
 
 export type WbsItemOption = { id: string; code: string; name: string; unit: string };
 export type ContactOption  = { id: string; name: string };
@@ -196,24 +206,24 @@ export function JobsiteLogForm({
           </Button>
         </div>
         {progress.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin registros de avance.</p>
+          <ListEmptyState message="Sin registros de avance." className="p-6" />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-xs uppercase bg-muted/50">
-                <tr>
-                  <th className="px-2 py-2 text-left">Partida WBS</th>
-                  <th className="px-2 py-2 text-left">Descripción</th>
-                  <th className="px-2 py-2 text-left">Cantidad</th>
-                  <th className="px-2 py-2 text-left">% Físico</th>
-                  <th className="px-2 py-2 text-left">Notas</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
+          <TableScroll className="border-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Partida WBS</TableHead>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead>Cantidad</TableHead>
+                  <TableHead>% Físico</TableHead>
+                  <TableHead>Notas</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {progress.map((row, i) => (
-                  <tr key={i} className="border-t">
-                    <td className="px-2 py-1">
+                  <TableRow key={i}>
+                    <TableCell className="py-1">
                       <Select value={row.wbsNodeId} onValueChange={(v) => updateProgress(i, "wbsNodeId", v)}>
                         <SelectTrigger className="w-48 h-8 text-xs"><SelectValue placeholder="Seleccionar…" /></SelectTrigger>
                         <SelectContent>
@@ -222,19 +232,19 @@ export function JobsiteLogForm({
                           ))}
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-36" value={row.description} onChange={(e) => updateProgress(i, "description", e.target.value)} /></td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-24" value={row.quantityCompleted} onChange={(e) => updateProgress(i, "quantityCompleted", e.target.value)} placeholder="0.00" /></td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-20" value={row.physicalPct} onChange={(e) => updateProgress(i, "physicalPct", e.target.value)} placeholder="%" /></td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-36" value={row.notes} onChange={(e) => updateProgress(i, "notes", e.target.value)} /></td>
-                    <td className="px-2 py-1">
+                    </TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-36" value={row.description} onChange={(e) => updateProgress(i, "description", e.target.value)} /></TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-24" value={row.quantityCompleted} onChange={(e) => updateProgress(i, "quantityCompleted", e.target.value)} placeholder="0.00" /></TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-20" value={row.physicalPct} onChange={(e) => updateProgress(i, "physicalPct", e.target.value)} placeholder="%" /></TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-36" value={row.notes} onChange={(e) => updateProgress(i, "notes", e.target.value)} /></TableCell>
+                    <TableCell className="py-1">
                       <Button type="button" variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => setProgress((p) => p.filter((_, idx) => idx !== i))}>✕</Button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </TableScroll>
         )}
       </section>
 
@@ -247,25 +257,25 @@ export function JobsiteLogForm({
           </Button>
         </div>
         {labor.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin registros de mano de obra.</p>
+          <ListEmptyState message="Sin registros de mano de obra." className="p-6" />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-xs uppercase bg-muted/50">
-                <tr>
-                  <th className="px-2 py-2 text-left">Contacto</th>
-                  <th className="px-2 py-2 text-left">Subcontrato</th>
-                  <th className="px-2 py-2 text-left">Descripción cuadrilla</th>
-                  <th className="px-2 py-2 text-left">Trabajadores</th>
-                  <th className="px-2 py-2 text-left">Horas</th>
-                  <th className="px-2 py-2 text-left">Notas</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
+          <TableScroll className="border-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Contacto</TableHead>
+                  <TableHead>Subcontrato</TableHead>
+                  <TableHead>Descripción cuadrilla</TableHead>
+                  <TableHead>Trabajadores</TableHead>
+                  <TableHead>Horas</TableHead>
+                  <TableHead>Notas</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {labor.map((row, i) => (
-                  <tr key={i} className="border-t">
-                    <td className="px-2 py-1">
+                  <TableRow key={i}>
+                    <TableCell className="py-1">
                       <Select value={row.contactId} onValueChange={(v) => updateLabor(i, "contactId", v)}>
                         <SelectTrigger className="w-40 h-8 text-xs"><SelectValue placeholder="— ninguno —" /></SelectTrigger>
                         <SelectContent>
@@ -273,8 +283,8 @@ export function JobsiteLogForm({
                           {contactOptions.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="px-2 py-1">
+                    </TableCell>
+                    <TableCell className="py-1">
                       <Select value={row.subcontractId} onValueChange={(v) => updateLabor(i, "subcontractId", v)}>
                         <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="— ninguno —" /></SelectTrigger>
                         <SelectContent>
@@ -282,19 +292,19 @@ export function JobsiteLogForm({
                           {subcontractOptions.map((s) => <SelectItem key={s.id} value={s.id}>{s.code}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-36" value={row.crewDescription} onChange={(e) => updateLabor(i, "crewDescription", e.target.value)} /></td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-20" type="number" min="1" value={row.workersCount} onChange={(e) => updateLabor(i, "workersCount", e.target.value)} /></td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-20" value={row.hoursWorked} onChange={(e) => updateLabor(i, "hoursWorked", e.target.value)} placeholder="0.00" /></td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-32" value={row.notes} onChange={(e) => updateLabor(i, "notes", e.target.value)} /></td>
-                    <td className="px-2 py-1">
+                    </TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-36" value={row.crewDescription} onChange={(e) => updateLabor(i, "crewDescription", e.target.value)} /></TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-20" type="number" min="1" value={row.workersCount} onChange={(e) => updateLabor(i, "workersCount", e.target.value)} /></TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-20" value={row.hoursWorked} onChange={(e) => updateLabor(i, "hoursWorked", e.target.value)} placeholder="0.00" /></TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-32" value={row.notes} onChange={(e) => updateLabor(i, "notes", e.target.value)} /></TableCell>
+                    <TableCell className="py-1">
                       <Button type="button" variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => setLabor((p) => p.filter((_, idx) => idx !== i))}>✕</Button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </TableScroll>
         )}
       </section>
 
@@ -307,24 +317,24 @@ export function JobsiteLogForm({
           </Button>
         </div>
         {materials.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin registros de materiales.</p>
+          <ListEmptyState message="Sin registros de materiales." className="p-6" />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-xs uppercase bg-muted/50">
-                <tr>
-                  <th className="px-2 py-2 text-left">Producto</th>
-                  <th className="px-2 py-2 text-left">Depósito</th>
-                  <th className="px-2 py-2 text-left">Descripción *</th>
-                  <th className="px-2 py-2 text-left">Cantidad</th>
-                  <th className="px-2 py-2 text-left">Notas</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
+          <TableScroll className="border-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Producto</TableHead>
+                  <TableHead>Depósito</TableHead>
+                  <TableHead>Descripción *</TableHead>
+                  <TableHead>Cantidad</TableHead>
+                  <TableHead>Notas</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {materials.map((row, i) => (
-                  <tr key={i} className="border-t">
-                    <td className="px-2 py-1">
+                  <TableRow key={i}>
+                    <TableCell className="py-1">
                       <Select value={row.productId} onValueChange={(v) => updateMaterial(i, "productId", v)}>
                         <SelectTrigger className="w-40 h-8 text-xs"><SelectValue placeholder="— ninguno —" /></SelectTrigger>
                         <SelectContent>
@@ -332,8 +342,8 @@ export function JobsiteLogForm({
                           {productOptions.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="px-2 py-1">
+                    </TableCell>
+                    <TableCell className="py-1">
                       <Select value={row.warehouseId} onValueChange={(v) => updateMaterial(i, "warehouseId", v)}>
                         <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="— ninguno —" /></SelectTrigger>
                         <SelectContent>
@@ -341,18 +351,18 @@ export function JobsiteLogForm({
                           {warehouseOptions.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-40" value={row.description} onChange={(e) => updateMaterial(i, "description", e.target.value)} required /></td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-24" value={row.quantity} onChange={(e) => updateMaterial(i, "quantity", e.target.value)} placeholder="0.00" /></td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-32" value={row.notes} onChange={(e) => updateMaterial(i, "notes", e.target.value)} /></td>
-                    <td className="px-2 py-1">
+                    </TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-40" value={row.description} onChange={(e) => updateMaterial(i, "description", e.target.value)} required /></TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-24" value={row.quantity} onChange={(e) => updateMaterial(i, "quantity", e.target.value)} placeholder="0.00" /></TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-32" value={row.notes} onChange={(e) => updateMaterial(i, "notes", e.target.value)} /></TableCell>
+                    <TableCell className="py-1">
                       <Button type="button" variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => setMaterials((p) => p.filter((_, idx) => idx !== i))}>✕</Button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </TableScroll>
         )}
       </section>
 
@@ -365,24 +375,24 @@ export function JobsiteLogForm({
           </Button>
         </div>
         {issues.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin incidencias registradas.</p>
+          <ListEmptyState message="Sin incidencias registradas." className="p-6" />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-xs uppercase bg-muted/50">
-                <tr>
-                  <th className="px-2 py-2 text-left">Tipo</th>
-                  <th className="px-2 py-2 text-left">Severidad</th>
-                  <th className="px-2 py-2 text-left">Descripción *</th>
-                  <th className="px-2 py-2 text-left">Estado</th>
-                  <th className="px-2 py-2 text-left">Notas</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
+          <TableScroll className="border-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Severidad</TableHead>
+                  <TableHead>Descripción *</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Notas</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {issues.map((row, i) => (
-                  <tr key={i} className="border-t">
-                    <td className="px-2 py-1">
+                  <TableRow key={i}>
+                    <TableCell className="py-1">
                       <Select value={row.type} onValueChange={(v) => updateIssue(i, "type", v)}>
                         <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -392,8 +402,8 @@ export function JobsiteLogForm({
                           <SelectItem value="OTHER">Otro</SelectItem>
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="px-2 py-1">
+                    </TableCell>
+                    <TableCell className="py-1">
                       <Select value={row.severity} onValueChange={(v) => updateIssue(i, "severity", v)}>
                         <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -403,9 +413,9 @@ export function JobsiteLogForm({
                           <SelectItem value="CRITICAL">Crítica</SelectItem>
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-48" value={row.description} onChange={(e) => updateIssue(i, "description", e.target.value)} required /></td>
-                    <td className="px-2 py-1">
+                    </TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-48" value={row.description} onChange={(e) => updateIssue(i, "description", e.target.value)} required /></TableCell>
+                    <TableCell className="py-1">
                       <Select value={row.status} onValueChange={(v) => updateIssue(i, "status", v)}>
                         <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -414,16 +424,16 @@ export function JobsiteLogForm({
                           <SelectItem value="ESCALATED">Escalado</SelectItem>
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="px-2 py-1"><Input className="h-8 text-xs w-32" value={row.notes} onChange={(e) => updateIssue(i, "notes", e.target.value)} /></td>
-                    <td className="px-2 py-1">
+                    </TableCell>
+                    <TableCell className="py-1"><Input className="h-8 text-xs w-32" value={row.notes} onChange={(e) => updateIssue(i, "notes", e.target.value)} /></TableCell>
+                    <TableCell className="py-1">
                       <Button type="button" variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => setIssues((p) => p.filter((_, idx) => idx !== i))}>✕</Button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </TableScroll>
         )}
       </section>
 

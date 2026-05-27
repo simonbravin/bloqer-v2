@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDebouncedSearchParam } from "@/hooks/use-debounced-search-param";
 
 const STATUSES = [
   { value: "DRAFT",     label: "Borrador" },
@@ -23,6 +24,7 @@ export function ProjectFilters() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { defaultValue: searchDefault, setDebounced: setSearchDebounced } = useDebouncedSearchParam("search");
 
   const update = useCallback(
     (key: string, value: string) => {
@@ -39,15 +41,15 @@ export function ProjectFilters() {
     <div className="flex flex-wrap gap-3">
       <Input
         placeholder="Buscar por nombre o código..."
-        defaultValue={searchParams.get("search") ?? ""}
-        onChange={(e) => update("search", e.target.value)}
-        className="w-64"
+        defaultValue={searchDefault}
+        onChange={(e) => setSearchDebounced(e.target.value)}
+        className="h-9 w-64"
       />
       <Select
         value={searchParams.get("status") ?? ""}
         onValueChange={(v) => update("status", v === "all" ? "" : v)}
       >
-        <SelectTrigger className="w-40">
+        <SelectTrigger className="h-9 w-40">
           <SelectValue placeholder="Estado" />
         </SelectTrigger>
         <SelectContent>

@@ -7,6 +7,7 @@ import { notFound, redirect } from "next/navigation";
 import { PermissionMatrixOverview } from "@/features/tenant-config";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { PageShell } from "@/components/layout/page-shell";
 import {
   canEditPermissionMatrixNotes,
   canReadTenantConfigArea,
@@ -40,7 +41,7 @@ export default async function ConfiguracionPermisosPage() {
   const moduleLabelsEs = TENANT_MODULE_LABEL_ES as Record<PermissionModule, string>;
 
   return (
-    <div className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Permisos</h1>
         <p className="text-sm text-muted-foreground max-w-prose">
@@ -58,6 +59,6 @@ export default async function ConfiguracionPermisosPage() {
         notes={notes}
         canEditNotes={canEditNotes}
       />
-    </div>
+    </PageShell>
   );
 }

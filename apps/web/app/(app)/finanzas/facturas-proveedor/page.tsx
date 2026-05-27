@@ -5,6 +5,7 @@ import { SupplierInvoiceList } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { listCompanySupplierInvoices, ServiceError } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
 
 const STATUSES = ["DRAFT", "ISSUED", "CANCELLED"] as const;
 
@@ -62,7 +63,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
   }
 
   return (
-    <div className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Facturas y gastos</h1>
@@ -119,6 +120,6 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

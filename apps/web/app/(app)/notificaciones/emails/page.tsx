@@ -15,6 +15,7 @@ import {
 import { canRunOperationalAlerts, listEmailDeliveryLogs } from "@bloqer/services";
 import type { EmailDeliveryStatus, EmailDeliveryType } from "@bloqer/database";
 import { formatDateTime } from "@/lib/format";
+import { PageShell } from "@/components/layout/page-shell";
 
 const STATUSES: EmailDeliveryStatus[] = ["PENDING", "SENT", "SKIPPED", "FAILED"];
 const EMAIL_TYPES: EmailDeliveryType[] = [
@@ -83,7 +84,7 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
   const querySuffix = qs.toString() ? `?${qs.toString()}` : "";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div>
         <p className="text-sm text-muted-foreground">
           <Link href="/notificaciones" className="text-primary underline-offset-4 hover:underline">
@@ -202,6 +203,6 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
           compartir URL
         </Link>
       </p>
-    </div>
+    </PageShell>
   );
 }

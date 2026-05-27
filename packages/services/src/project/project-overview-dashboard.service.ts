@@ -1,6 +1,8 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { PermissionModule } from "@bloqer/domain";
 import { can } from "@bloqer/domain";
+import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
+import { pushMoneyRowsKpi } from "../dashboard/kpi-helpers";
 import { listBudgetsByProject } from "../budget/budget.service";
 import { listInvoicesByProject } from "../ar/sales-invoice.service";
 import { listCollectionsByProject } from "../treasury/collection.service";
@@ -107,6 +109,7 @@ export type ProjectOverviewDashboard = {
     startDate: string | null;
     estimatedEndDate: string | null;
   };
+  compactKpis: DashboardKpi[];
   kpis: {
     budget: ProjectOverviewBudgetKpi | null;
     receivables: ProjectOverviewReceivablesKpi | null;
@@ -443,6 +446,56 @@ export async function getProjectOverviewDashboard(
 
   const scheduleProgress = computeScheduleProgress(startDate, estimatedEndDate);
 
+  const compactKpis: DashboardKpi[] = [];
+
+  if (scheduleProgress.percent !== null) {
+    compactKpis.push({
+      key:   "schedule_progress",
+      label: "Avance de cronograma",
+      value: `${scheduleProgress.percent}%`,
+      tone:  scheduleProgress.percent >= 100 ? "warning" : "default",
+    });
+  } else {
+    compactKpis.push({
+      key:   "schedule_progress",
+      label: "Avance de cronograma",
+      value: "—",
+      tone:  "muted",
+    });
+  }
+
+  if (budget) {
+    pushMoneyRowsKpi(compactKpis, "budget_sale", "Presupuesto (venta)", budget.amountByCurrency, budget.href);
+  }
+
+  if (receivables) {
+    pushMoneyRowsKpi(compactKpis, "ar_open", "Cuentas por cobrar", receivables.openByCurrency, receivables.href);
+    pushMoneyRowsKpi(compactKpis, "ar_overdue", "C×C vencidas", receivables.overdueByCurrency, receivables.href);
+  }
+
+  if (payables) {
+    pushMoneyRowsKpi(compactKpis, "ap_open", "Cuentas por pagar", payables.openByCurrency, payables.href);
+    pushMoneyRowsKpi(compactKpis, "ap_overdue", "C×P vencidas", payables.overdueByCurrency, payables.href);
+  }
+
+  if (cashFlow?.available) {
+    compactKpis.push({
+      key:   "cash_flow",
+      label: "Flujo de caja",
+      value: "Ver serie",
+      href:  cashFlow.href,
+    });
+  }
+
+  if (costControl?.available) {
+    compactKpis.push({
+      key:   "cost_control",
+      label: "Control de costos",
+      value: "Abrir",
+      href:  costControl.href,
+    });
+  }
+
   return {
     project: {
       id: shell.id,
@@ -453,6 +506,7 @@ export async function getProjectOverviewDashboard(
       startDate,
       estimatedEndDate,
     },
+    compactKpis,
     kpis: {
       budget,
       receivables,

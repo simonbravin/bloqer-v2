@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { CertificationStatusBadge, CertificationEditForm } from "@/features/certifications";
 import { getCurrentUser } from "@/lib/auth";
 import { getCertificationById, ServiceError } from "@bloqer/services";
 import { updateCertificationAction } from "../../actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string; certId: string }>;
@@ -35,11 +35,9 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
   const toDateInput = (d: Date | string) => new Date(d).toISOString().split("T")[0];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${projectId}/certificaciones/${certId}`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/proyectos/${projectId}/certificaciones/${certId}`} label="Volver" />
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold tracking-tight">Editar encabezado</h1>
@@ -62,6 +60,6 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
           onSubmit={updateCertificationAction.bind(null, certId, projectId)}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }

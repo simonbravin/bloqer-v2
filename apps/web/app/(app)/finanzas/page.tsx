@@ -5,6 +5,7 @@ import { FinanceHubView } from "@/features/finance";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default async function FinanzasPage() {
   const current = await getCurrentUser();
@@ -16,14 +17,12 @@ export default async function FinanzasPage() {
   const overview = await getFinanceHubOverview(ctx);
 
   return (
-    <div className="space-y-8">
+    <PageShell variant="default" className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Finanzas</h1>
           <p className="text-sm text-muted-foreground max-w-prose">
-            Tablero financiero de la empresa: cuentas por cobrar y por pagar (incluye obra y gastos generales sin
-            proyecto), tesorería por moneda y accesos a contabilidad cuando corresponde. Los números reutilizan aging AP/AR
-            y el resumen de tesorería; no se mezclan monedas en un solo total.
+            Indicadores y accesos rápidos de cuentas por cobrar, por pagar, tesorería y contabilidad.
           </p>
         </div>
         <Button asChild variant="outline" size="sm">
@@ -32,6 +31,6 @@ export default async function FinanzasPage() {
       </div>
 
       <FinanceHubView overview={overview} />
-    </div>
+    </PageShell>
   );
 }

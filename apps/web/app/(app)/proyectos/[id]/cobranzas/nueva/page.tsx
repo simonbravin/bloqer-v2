@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { CollectionForm } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
-import {
-  listReceivablesByProject,
-  listTreasuryAccounts,
-  ServiceError,
-} from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { listReceivablesByProject, listTreasuryAccounts, ServiceError } from "@bloqer/services";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -25,38 +23,38 @@ export default async function NuevaCobranzaPage({ params, searchParams }: PagePr
 
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let receivables;
   let allAccounts;
   try {
-    [receivables, allAccounts] = await Promise.all([
+    const [receivablesResult, accountsResult] = await Promise.all([
       listReceivablesByProject(id, ctx),
       listTreasuryAccounts(ctx),
     ]);
+    receivables = receivablesResult;
+    allAccounts = accountsResult.data;
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
   }
 
   const openReceivables = receivables.filter((r) => OPEN_STATUSES.has(r.status));
-  const activeAccounts  = allAccounts
+  const activeAccounts = allAccounts
     .filter((a) => a.status === "ACTIVE")
     .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
 
   const selected = preSelectedId
-    ? openReceivables.find((r) => r.id === preSelectedId) ?? openReceivables[0]
+    ? (openReceivables.find((r) => r.id === preSelectedId) ?? openReceivables[0])
     : openReceivables[0];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}/cobranzas`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/proyectos/${id}/cobranzas`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva cobranza</h1>
       </div>
 
@@ -105,6 +103,6 @@ export default async function NuevaCobranzaPage({ params, searchParams }: PagePr
           )}
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

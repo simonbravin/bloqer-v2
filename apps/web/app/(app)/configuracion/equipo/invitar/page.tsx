@@ -1,12 +1,13 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { OVERVIEW_ROLES } from "@bloqer/domain";
 import { getCurrentUser } from "@/lib/auth";
 import { canEditTeamMembership, canReadTenantConfigArea } from "@bloqer/services";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createTenantInvitationAction } from "../invitation-actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   searchParams: Promise<{ err?: string }>;
@@ -29,18 +30,16 @@ export default async function ConfiguracionEquipoInvitarPage({ searchParams }: P
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex flex-wrap gap-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/configuracion/equipo">← Equipo</Link>
-        </Button>
+        <PageBackLink href="/configuracion/equipo" label="Equipo" />
       </div>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Invitar usuario</h1>
         <p className="text-sm text-muted-foreground">
-          Si el correo se envía correctamente, el invitado lo recibe con el enlace. Si no se pudo enviar (correo
-          desactivado, URL pública de la app mal configurada o error del proveedor), vas a poder copiar el enlace en
-          el detalle de la invitación.
+          Si el correo se envía correctamente, el invitado lo recibe con el enlace. Si no se pudo
+          enviar (correo desactivado, URL pública de la app mal configurada o error del proveedor),
+          vas a poder copiar el enlace en el detalle de la invitación.
         </p>
       </div>
       {errMsg ? (
@@ -49,10 +48,20 @@ export default async function ConfiguracionEquipoInvitarPage({ searchParams }: P
         </p>
       ) : null}
 
-      <form action={createTenantInvitationAction} className="space-y-4 rounded-lg border bg-card p-4">
+      <form
+        action={createTenantInvitationAction}
+        className="space-y-4 rounded-lg border bg-card p-4"
+      >
         <div className="grid gap-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" required autoComplete="email" placeholder="nombre@empresa.com" />
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="nombre@empresa.com"
+          />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="expiresInDays">Vencimiento (días)</Label>
@@ -72,7 +81,11 @@ export default async function ConfiguracionEquipoInvitarPage({ searchParams }: P
           <div className="grid gap-2 sm:grid-cols-2">
             {OVERVIEW_ROLES.map((role) => (
               <label key={role} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name={`role_${role}`} className="h-4 w-4 rounded border border-input" />
+                <input
+                  type="checkbox"
+                  name={`role_${role}`}
+                  className="h-4 w-4 rounded border border-input"
+                />
                 <span>{role}</span>
               </label>
             ))}
@@ -81,6 +94,6 @@ export default async function ConfiguracionEquipoInvitarPage({ searchParams }: P
         </div>
         <Button type="submit">Crear invitación</Button>
       </form>
-    </div>
+    </PageShell>
   );
 }

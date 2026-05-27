@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 import { getWbsItemCostDetail, ServiceError } from "@bloqer/services";
 import { WbsItemDrilldown } from "@/features/cost-control";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string; wbsNodeId: string }>;
@@ -19,9 +19,9 @@ export default async function WbsItemDetailPage({ params, searchParams }: PagePr
 
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   const filters = { budgetId: sp.budgetId, dateFrom: sp.dateFrom, dateTo: sp.dateTo };
@@ -37,11 +37,9 @@ export default async function WbsItemDetailPage({ params, searchParams }: PagePr
   const backUrl = `/proyectos/${projectId}/control-costos${sp.budgetId ? `?budgetId=${sp.budgetId}` : ""}`;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={backUrl}>← Control de costos</Link>
-        </Button>
+        <PageBackLink href={backUrl} label="Control de costos" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight font-mono">{detail.wbsCode}</h1>
           <p className="text-sm text-muted-foreground">{detail.wbsName}</p>
@@ -49,6 +47,6 @@ export default async function WbsItemDetailPage({ params, searchParams }: PagePr
       </div>
 
       <WbsItemDrilldown detail={detail} />
-    </div>
+    </PageShell>
   );
 }

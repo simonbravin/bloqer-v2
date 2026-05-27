@@ -1,11 +1,11 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 import { getCashPositionReport } from "@bloqer/services";
 import { CashPositionTable } from "@/features/treasury-reports";
 import { ReportCsvExportLink } from "@/features/reports/report-csv-export-link";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   searchParams: Promise<{ companyId?: string; currency?: string }>;
@@ -18,26 +18,24 @@ export default async function PosicionCajaPage({ searchParams }: PageProps) {
   const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   const report = await getCashPositionReport(
     {
       companyId: sp.companyId || undefined,
-      currency:  sp.currency || undefined,
+      currency: sp.currency || undefined,
     },
     ctx,
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/tesoreria/reportes">← Reportes</Link>
-          </Button>
+          <PageBackLink href="/tesoreria/reportes" label="Reportes" />
           <h1 className="text-2xl font-bold tracking-tight">Posición de caja</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -52,6 +50,6 @@ export default async function PosicionCajaPage({ searchParams }: PageProps) {
       </div>
 
       <CashPositionTable report={report} />
-    </div>
+    </PageShell>
   );
 }

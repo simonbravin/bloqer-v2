@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
+import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
+import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { SalesInvoiceList } from "@/features/sales-invoices";
 import type { SalesInvoiceListItem } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
-import { listInvoicesByProject, ServiceError } from "@bloqer/services";
+import { getProjectShellInfo, listInvoicesByProject, ServiceError } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -21,6 +25,15 @@ export default async function FacturasPage({ params }: PageProps) {
     companyId: current.tenantCtx.companyId,
     roles: current.tenantCtx.roles,
   };
+
+  let project;
+  try {
+    project = await getProjectShellInfo(id, ctx);
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
 
   let invoices;
   try {
@@ -43,27 +56,29 @@ export default async function FacturasPage({ params }: PageProps) {
   }));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/proyectos/${id}`}>← Volver</Link>
+    <PageShell variant="default" className="space-y-6">
+      <ProjectPageHeader
+        projectId={id}
+        projectName={project.name}
+        title="Facturas"
+        subtitle={`${items.length} ${items.length === 1 ? "factura" : "facturas"}`}
+        actions={
+          <Button size="sm" asChild>
+            <Link href={`/proyectos/${id}/facturas/nueva`}>Nueva factura</Link>
           </Button>
-          <h1 className="text-2xl font-bold tracking-tight">Facturas</h1>
-        </div>
-        <Button size="sm" asChild>
-          <Link href={`/proyectos/${id}/facturas/nueva`}>Nueva factura</Link>
-        </Button>
-      </div>
+        }
+      />
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Facturas del proyecto</h2>
+      <Suspense fallback={<ListSectionSkeleton />}>
+        <div className="rounded-lg border bg-card">
+          <div className="border-b px-6 py-4">
+            <h2 className="font-semibold">Facturas del proyecto</h2>
+          </div>
+          <div className="p-6">
+            <SalesInvoiceList invoices={items} projectId={id} />
+          </div>
         </div>
-        <div className="p-6">
-          <SalesInvoiceList invoices={items} projectId={id} />
-        </div>
-      </div>
-    </div>
+      </Suspense>
+    </PageShell>
   );
 }

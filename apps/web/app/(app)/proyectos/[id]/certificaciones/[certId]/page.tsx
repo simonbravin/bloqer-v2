@@ -1,7 +1,6 @@
 import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import {
   CertificationStatusBadge,
   CertificationLineEditor,
@@ -18,6 +17,8 @@ import {
   listEntityDocuments,
   ServiceError,
 } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   issueCertificationAction,
   approveCertificationAction,
@@ -28,6 +29,7 @@ import {
   removeCertificationLineAction,
   refreshPreviousQtyAction,
 } from "../actions";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; certId: string }>;
@@ -85,12 +87,10 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
   const allItems = flattenItemNodes(wbsTree);
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-4">
+    <PageShell variant="wide" className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/proyectos/${projectId}/certificaciones`}>← Certificaciones</Link>
-          </Button>
+          <PageBackLink href={`/proyectos/${projectId}/certificaciones`} label="Certificaciones" />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold tracking-tight">{cert.code}</h1>
@@ -163,6 +163,6 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
         docs={certAttachments}
         canEdit={canEditAttachments}
       />
-    </div>
+    </PageShell>
   );
 }

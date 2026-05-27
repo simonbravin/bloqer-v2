@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { getCompanies } from "@bloqer/services";
 import { can } from "@bloqer/domain";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default async function ContabilidadPage() {
   const current = await getCurrentUser();
@@ -18,7 +19,7 @@ export default async function ContabilidadPage() {
   const q = (id: string) => (current.tenantCtx!.companyId ? "" : `?empresa=${encodeURIComponent(id)}`);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Contabilidad</h1>
       <p className="text-sm text-muted-foreground">
         Libro mayor (debe/haber). Los movimientos de tesorería siguen en Tesorería; plan de cuentas, asientos manuales y reglas de mapeo (fase 11A–11B).
@@ -55,6 +56,6 @@ export default async function ContabilidadPage() {
           </ul>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

@@ -2,7 +2,15 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 
 export type InvoiceLine = {
   description: string;
@@ -66,26 +74,26 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
         </Button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs text-muted-foreground">
-              <th className="pb-1 pr-2 font-normal w-[35%]">Descripción</th>
-              <th className="pb-1 pr-2 font-normal w-[10%]">Cant.</th>
-              <th className="pb-1 pr-2 font-normal w-[15%]">Precio unit.</th>
-              <th className="pb-1 pr-2 font-normal w-[10%]">IVA %</th>
-              <th className="pb-1 pr-2 font-normal w-[15%] text-right">Subtotal</th>
-              <th className="pb-1 pr-2 font-normal w-[10%] text-right">IVA</th>
-              <th className="pb-1 font-normal w-[10%] text-right">Total</th>
-              <th className="pb-1 w-8" />
-            </tr>
-          </thead>
-          <tbody className="divide-y">
+      <TableScroll className="border-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[35%]">Descripción</TableHead>
+              <TableHead className="w-[10%]">Cant.</TableHead>
+              <TableHead className="w-[15%]">Precio unit.</TableHead>
+              <TableHead className="w-[10%]">IVA %</TableHead>
+              <TableHead className="w-[15%] text-right">Subtotal</TableHead>
+              <TableHead className="w-[10%] text-right">IVA</TableHead>
+              <TableHead className="w-[10%] text-right">Total</TableHead>
+              <TableHead className="w-8" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {lines.map((line, i) => {
               const p = linePreview(line);
               return (
-                <tr key={i} className="align-top">
-                  <td className="py-1.5 pr-2">
+                <TableRow key={i} className="align-top">
+                  <TableCell className="py-1.5">
                     <Input
                       required
                       value={line.description}
@@ -93,8 +101,8 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
                       placeholder="Descripción del ítem"
                       className="h-8 text-sm"
                     />
-                  </td>
-                  <td className="py-1.5 pr-2">
+                  </TableCell>
+                  <TableCell className="py-1.5">
                     <Input
                       required
                       value={line.quantity}
@@ -102,8 +110,8 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
                       placeholder="1"
                       className="h-8 text-sm"
                     />
-                  </td>
-                  <td className="py-1.5 pr-2">
+                  </TableCell>
+                  <TableCell className="py-1.5">
                     <Input
                       required
                       value={line.unitPrice}
@@ -111,19 +119,19 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
                       placeholder="0.00"
                       className="h-8 text-sm"
                     />
-                  </td>
-                  <td className="py-1.5 pr-2">
+                  </TableCell>
+                  <TableCell className="py-1.5">
                     <Input
                       value={line.taxRate}
                       onChange={(e) => update(i, "taxRate", e.target.value)}
                       placeholder="21"
                       className="h-8 text-sm"
                     />
-                  </td>
-                  <td className="py-1.5 pr-2 text-right tabular-nums pt-3">{fmt(p.subtotal)}</td>
-                  <td className="py-1.5 pr-2 text-right tabular-nums pt-3">{fmt(p.tax)}</td>
-                  <td className="py-1.5 text-right tabular-nums pt-3">{fmt(p.total)}</td>
-                  <td className="py-1.5 pl-2 pt-2">
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">{fmt(p.subtotal)}</TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">{fmt(p.tax)}</TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">{fmt(p.total)}</TableCell>
+                  <TableCell className="align-top pt-2">
                     {lines.length > 1 && (
                       <button
                         type="button"
@@ -134,13 +142,13 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
                         ✕
                       </button>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </TableScroll>
 
       <div className="flex justify-end gap-8 text-sm border-t pt-3">
         <div className="text-right">

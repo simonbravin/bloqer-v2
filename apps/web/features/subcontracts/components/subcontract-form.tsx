@@ -7,6 +7,16 @@ import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CurrencySelect } from "@/components/ui/currency-select";
 
@@ -162,25 +172,26 @@ export function SubcontractForm({
           <h3 className="font-medium">Líneas del subcontrato</h3>
           <Button type="button" variant="outline" size="sm" onClick={addLine}>+ Agregar línea</Button>
         </div>
-        <div className="rounded-lg border overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-xs uppercase">
-              <tr>
-                <th className="px-3 py-2 text-left">WBS (ITEM)</th>
-                <th className="px-3 py-2 text-left">Descripción *</th>
-                <th className="px-3 py-2 text-left">Unidad</th>
-                <th className="px-3 py-2 text-right">Cantidad *</th>
-                <th className="px-3 py-2 text-right">Precio unit. *</th>
-                <th className="px-3 py-2 text-right">Subtotal</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line, i) => {
-                const sub = (parseFloat(line.quantity) || 0) * (parseFloat(line.unitPrice) || 0);
-                return (
-                  <tr key={i} className="border-t">
-                    <td className="px-3 py-2 min-w-[160px]">
+        <div className="rounded-lg border overflow-hidden">
+          <TableScroll className="border-0 rounded-none">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>WBS (ITEM)</TableHead>
+                  <TableHead>Descripción *</TableHead>
+                  <TableHead>Unidad</TableHead>
+                  <TableHead className="text-right">Cantidad *</TableHead>
+                  <TableHead className="text-right">Precio unit. *</TableHead>
+                  <TableHead className="text-right">Subtotal</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lines.map((line, i) => {
+                  const sub = (parseFloat(line.quantity) || 0) * (parseFloat(line.unitPrice) || 0);
+                  return (
+                    <TableRow key={i}>
+                      <TableCell className="min-w-[160px]">
                       <Select value={line.wbsNodeId} onValueChange={(v) => handleWbsChange(i, v)}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sin WBS" /></SelectTrigger>
                         <SelectContent>
@@ -190,41 +201,44 @@ export function SubcontractForm({
                           ))}
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="px-3 py-2 min-w-[200px]">
-                      <Input className="h-8 text-xs" value={line.description} onChange={(e) => updateLine(i, "description", e.target.value)} required />
-                    </td>
-                    <td className="px-3 py-2 min-w-[80px]">
-                      <Input className="h-8 text-xs" value={line.unit} onChange={(e) => updateLine(i, "unit", e.target.value)} />
-                    </td>
-                    <td className="px-3 py-2 min-w-[100px]">
-                      <Input className="h-8 text-xs text-right" type="number" step="any" min="0.0001" value={line.quantity} onChange={(e) => updateLine(i, "quantity", e.target.value)} required />
-                    </td>
-                    <td className="px-3 py-2 min-w-[120px]">
-                      <Input className="h-8 text-xs text-right" type="number" step="any" min="0.0001" value={line.unitPrice} onChange={(e) => updateLine(i, "unitPrice", e.target.value)} required />
-                    </td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">
-                      {sub.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-3 py-2">
+                      </TableCell>
+                      <TableCell className="min-w-[200px]">
+                        <Input className="h-8 text-xs" value={line.description} onChange={(e) => updateLine(i, "description", e.target.value)} required />
+                      </TableCell>
+                      <TableCell className="min-w-[80px]">
+                        <Input className="h-8 text-xs" value={line.unit} onChange={(e) => updateLine(i, "unit", e.target.value)} />
+                      </TableCell>
+                      <TableCell className="min-w-[100px]">
+                        <Input className="h-8 text-xs text-right" type="number" step="any" min="0.0001" value={line.quantity} onChange={(e) => updateLine(i, "quantity", e.target.value)} required />
+                      </TableCell>
+                      <TableCell className="min-w-[120px]">
+                        <Input className="h-8 text-xs text-right" type="number" step="any" min="0.0001" value={line.unitPrice} onChange={(e) => updateLine(i, "unitPrice", e.target.value)} required />
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {sub.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell>
                       {lines.length > 1 && (
                         <Button type="button" variant="ghost" size="sm" onClick={() => removeLine(i)} className="h-6 w-6 p-0 text-destructive">×</Button>
                       )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot className="border-t bg-muted/30">
-              <tr>
-                <td colSpan={5} className="px-3 py-2 text-right font-medium text-sm">Total del contrato:</td>
-                <td className="px-3 py-2 text-right font-semibold">
-                  {totalValue.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                </td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+              <TableFooter className="bg-muted/30">
+                <TableRow>
+                  <TableCell colSpan={5} className="text-right font-medium text-sm">
+                    Total del contrato:
+                  </TableCell>
+                  <TableCell className="text-right font-semibold">
+                    {totalValue.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                  </TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </TableScroll>
         </div>
       </div>
 

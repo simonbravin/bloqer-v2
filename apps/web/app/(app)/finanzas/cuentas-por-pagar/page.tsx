@@ -5,6 +5,7 @@ import { PayableList } from "@/features/ap";
 import type { PayableListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { listCompanyPayables, ServiceError } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
 
 const STATUSES = ["OPEN", "PARTIAL", "PAID", "OVERDUE", "CANCELLED"] as const;
 
@@ -72,7 +73,7 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
   };
 
   return (
-    <div className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Pagos pendientes</h1>
       </div>
@@ -107,6 +108,6 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
           />
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

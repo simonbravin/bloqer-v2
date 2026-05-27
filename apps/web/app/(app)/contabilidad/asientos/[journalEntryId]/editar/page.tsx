@@ -1,12 +1,12 @@
-import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { JournalEntryForm } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { getCompanies, getJournalEntryById, listAccountingAccounts } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function EditarAsientoPage({
   params,
@@ -32,20 +32,18 @@ export default async function EditarAsientoPage({
   }
   if (entry.status !== "DRAFT") redirect(`/contabilidad/asientos/${journalEntryId}`);
 
-  const [companies, accounts] = await Promise.all([
+  const [companies, accountsResult] = await Promise.all([
     getCompanies(ctx),
     listAccountingAccounts(ctx, { companyId: entry.companyId }),
   ]);
-  const picks = accounts.map((a) => ({ id: a.id, code: a.code, name: a.name }));
+  const picks = accountsResult.data.map((a) => ({ id: a.id, code: a.code, name: a.name }));
 
   const q = cf.companyId ? `?empresa=${encodeURIComponent(cf.companyId)}` : "";
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/contabilidad/asientos/${journalEntryId}${q}`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/contabilidad/asientos/${journalEntryId}${q}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Editar asiento</h1>
       </div>
       <JournalEntryForm
@@ -56,6 +54,6 @@ export default async function EditarAsientoPage({
         companies={companies.map((c) => ({ id: c.id, name: c.name }))}
         defaultCompanyId={current.tenantCtx.companyId}
       />
-    </div>
+    </PageShell>
   );
 }

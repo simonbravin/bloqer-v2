@@ -38,7 +38,7 @@ export function DashboardCashFlowChart({ chart }: { chart: DashboardCashFlowChar
         <div className="space-y-1">
           <CardTitle className="text-base">Flujo de caja</CardTitle>
           <CardDescription>
-            Movimientos confirmados en tesorería. Sin conversión entre monedas.
+            Evolución del neto operativo confirmado en tesorería. Sin conversión entre monedas.
             {multicurrency ? " Mostrando la moneda principal." : null}
           </CardDescription>
         </div>
@@ -67,7 +67,7 @@ export function DashboardCashFlowChart({ chart }: { chart: DashboardCashFlowChar
       </CardHeader>
       <CardContent className="space-y-4">
         {primary && primary.buckets.length > 0 ? (
-          <CashFlowChart data={primary} />
+          <CashFlowChart data={primary} variant="trend" />
         ) : (
           <p className="rounded-lg border border-dashed bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
             No hay movimientos en el período seleccionado.

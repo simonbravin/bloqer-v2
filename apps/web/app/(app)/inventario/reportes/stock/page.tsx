@@ -1,19 +1,19 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 import { getStockBalanceReport } from "@bloqer/services";
 import { StockBalanceTable, StockReportFilters } from "@/features/inventory-reports";
 import { ReportCsvExportLink } from "@/features/reports/report-csv-export-link";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   searchParams: Promise<{
-    warehouseId?:     string;
-    productId?:       string;
-    companyId?:       string;
-    projectId?:       string;
+    warehouseId?: string;
+    productId?: string;
+    companyId?: string;
+    projectId?: string;
     includeZeroStock?: string;
   }>;
 }
@@ -25,17 +25,17 @@ export default async function StockReportPage({ searchParams }: PageProps) {
   const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   const rows = await getStockBalanceReport(
     {
-      warehouseId:     sp.warehouseId  || undefined,
-      productId:       sp.productId    || undefined,
-      companyId:       sp.companyId    || undefined,
-      projectId:       sp.projectId    || undefined,
+      warehouseId: sp.warehouseId || undefined,
+      productId: sp.productId || undefined,
+      companyId: sp.companyId || undefined,
+      projectId: sp.projectId || undefined,
       includeZeroStock: sp.includeZeroStock === "true",
     },
     ctx,
@@ -44,12 +44,10 @@ export default async function StockReportPage({ searchParams }: PageProps) {
   const negative = rows.filter((r) => r.flags.negativeStock).length;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/inventario/reportes">← Reportes</Link>
-          </Button>
+          <PageBackLink href="/inventario/reportes" label="Reportes" />
           <h1 className="text-2xl font-bold tracking-tight">Stock actual</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -70,7 +68,9 @@ export default async function StockReportPage({ searchParams }: PageProps) {
       </div>
 
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span>{rows.length} fila{rows.length !== 1 ? "s" : ""}</span>
+        <span>
+          {rows.length} fila{rows.length !== 1 ? "s" : ""}
+        </span>
         {negative > 0 && (
           <span className="text-red-600 dark:text-red-400 font-medium">
             {negative} con stock negativo
@@ -79,6 +79,6 @@ export default async function StockReportPage({ searchParams }: PageProps) {
       </div>
 
       <StockBalanceTable rows={rows} />
-    </div>
+    </PageShell>
   );
 }

@@ -1,5 +1,4 @@
 import { formatDateTime } from "@/lib/format";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { OVERVIEW_ROLES } from "@bloqer/domain";
 import { getCurrentUser } from "@/lib/auth";
@@ -10,12 +9,14 @@ import {
   getTenantMemberById,
   ServiceError,
 } from "@bloqer/services";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   updateTenantMemberRolesAction,
   updateTenantMemberStatusAction,
 } from "../../configuracion-actions";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ membershipId: string }>;
@@ -45,11 +46,9 @@ export default async function ConfiguracionEquipoDetallePage({ params }: PagePro
   const canEdit = canEditTeamMembership(current.tenantCtx.roles);
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex flex-wrap gap-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/configuracion/equipo">← Equipo</Link>
-        </Button>
+        <PageBackLink href="/configuracion/equipo" label="Equipo" />
       </div>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Miembro</h1>
@@ -98,7 +97,10 @@ export default async function ConfiguracionEquipoDetallePage({ params }: PagePro
 
           <section className="space-y-3 rounded-lg border bg-card p-4">
             <h2 className="text-sm font-semibold">Estado de membresía</h2>
-            <form action={updateTenantMemberStatusAction} className="flex flex-wrap items-end gap-3">
+            <form
+              action={updateTenantMemberStatusAction}
+              className="flex flex-wrap items-end gap-3"
+            >
               <input type="hidden" name="membershipId" value={member.membershipId} />
               <div className="grid gap-1">
                 <Label htmlFor="status">Estado</Label>
@@ -119,8 +121,10 @@ export default async function ConfiguracionEquipoDetallePage({ params }: PagePro
           </section>
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">No tenés permisos para editar roles o estado.</p>
+        <p className="text-sm text-muted-foreground">
+          No tenés permisos para editar roles o estado.
+        </p>
       )}
-    </div>
+    </PageShell>
   );
 }

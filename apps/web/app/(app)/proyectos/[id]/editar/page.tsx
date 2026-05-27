@@ -1,11 +1,12 @@
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { ProjectForm } from "@/features/projects";
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectById, listContacts, ServiceError } from "@bloqer/services";
 import { updateProjectAction } from "../../actions";
 import type { CreateProjectInput } from "@bloqer/validators";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { PageListHeader } from "@/components/ui/page-list-header";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -31,9 +32,13 @@ export default async function EditarProyectoPage({ params }: PageProps) {
     throw err;
   }
 
-  if (project.status === "COMPLETED" || project.status === "CANCELLED") redirect(`/proyectos/${id}`);
+  if (project.status === "COMPLETED" || project.status === "CANCELLED")
+    redirect(`/proyectos/${id}`);
 
-  const { data: clients } = await listContacts({ role: "CLIENT", status: "ACTIVE", pageSize: 100 }, ctx);
+  const { data: clients } = await listContacts(
+    { role: "CLIENT", status: "ACTIVE", pageSize: 100 },
+    ctx,
+  );
 
   const defaultValues: Partial<CreateProjectInput> = {
     code: project.code,
@@ -51,15 +56,11 @@ export default async function EditarProyectoPage({ params }: PageProps) {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}`}>← Volver</Link>
-        </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Editar proyecto</h1>
-      </div>
+    <PageShell variant="form" className="space-y-6">
+      <PageBackLink href={`/proyectos/${id}`} label={project.name} />
+      <PageListHeader title="Editar proyecto" subtitle="Datos generales de la obra" />
 
-      <div className="rounded-lg border bg-card p-6">
+      <div className="rounded-xl border bg-card p-6 shadow-sm">
         <ProjectForm
           clients={clients.map((c) => ({
             id: c.id,
@@ -72,6 +73,6 @@ export default async function EditarProyectoPage({ params }: PageProps) {
           onSubmit={updateProjectAction.bind(null, id)}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }

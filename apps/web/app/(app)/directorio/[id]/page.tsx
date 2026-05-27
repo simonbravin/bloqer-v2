@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { RoleManager } from "@/features/directory/components/role-manager";
 import { getCurrentUser } from "@/lib/auth";
 import { getContactById, ServiceError } from "@bloqer/services";
 import { archiveContactAction, reactivateContactAction } from "../actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -22,8 +24,14 @@ export default async function ContactoDetailPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
-  const doArchive = async () => { "use server"; await archiveContactAction(id); };
-  const doReactivate = async () => { "use server"; await reactivateContactAction(id); };
+  const doArchive = async () => {
+    "use server";
+    await archiveContactAction(id);
+  };
+  const doReactivate = async () => {
+    "use server";
+    await reactivateContactAction(id);
+  };
 
   let contact;
   try {
@@ -34,13 +42,11 @@ export default async function ContactoDetailPage({ params }: PageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/directorio">← Volver</Link>
-          </Button>
+          <PageBackLink href="/directorio" label="Volver" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{contact.legalName}</h1>
             {contact.fantasyName && (
@@ -129,6 +135,6 @@ export default async function ContactoDetailPage({ params }: PageProps) {
           )}
         </dl>
       </div>
-    </div>
+    </PageShell>
   );
 }

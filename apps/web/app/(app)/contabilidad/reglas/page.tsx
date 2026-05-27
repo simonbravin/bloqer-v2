@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { AccountingMappingRuleList } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { listAccountingMappingRules } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 export default async function ContabilidadReglasPage({
   searchParams,
@@ -26,20 +28,21 @@ export default async function ContabilidadReglasPage({
   const q = empresa ? `?empresa=${encodeURIComponent(empresa)}` : "";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/contabilidad">← Volver</Link>
-          </Button>
+          <PageBackLink href="/contabilidad" label="Volver" />
           <h1 className="text-2xl font-bold tracking-tight">Reglas contables</h1>
         </div>
         {can(current.tenantCtx.roles, "EDIT", "ACCOUNTING") && (
-          <Button asChild><Link href={`/contabilidad/reglas/nueva${q}`}>+ Nueva regla</Link></Button>
+          <Button asChild>
+            <Link href={`/contabilidad/reglas/nueva${q}`}>+ Nueva regla</Link>
+          </Button>
         )}
       </div>
       <p className="text-sm text-muted-foreground">
-        Mapeo debe/haber por tipo de evento operativo. Los asientos sugeridos se crean en borrador; la fase 11C puede enlazar botones desde cobranzas, pagos, tesorería e inventario.
+        Mapeo debe/haber por tipo de evento operativo. Los asientos sugeridos se crean en borrador;
+        la fase 11C puede enlazar botones desde cobranzas, pagos, tesorería e inventario.
       </p>
       <div className="rounded-lg border bg-card">
         <div className="border-b px-6 py-4">
@@ -49,6 +52,6 @@ export default async function ContabilidadReglasPage({
           <AccountingMappingRuleList rules={rules} empresa={empresa} />
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

@@ -1,21 +1,28 @@
 import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { SupplierInvoiceStatusBadge } from "@/features/ap";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
-import {
-  getSupplierInvoiceById,
-  listEntityDocuments,
-  ServiceError,
-} from "@bloqer/services";
+import { getSupplierInvoiceById, listEntityDocuments, ServiceError } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   issueSupplierInvoiceAction,
   cancelSupplierInvoiceAction,
 } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; supplierInvoiceId: string }>;
@@ -28,9 +35,9 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
   const { id, supplierInvoiceId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let invoice;
@@ -43,25 +50,20 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
 
   if (invoice.projectId !== id) notFound();
 
-  const invoiceAttachments = await listEntityDocuments(
-    "SUPPLIER_INVOICE",
-    supplierInvoiceId,
-    ctx,
-    { projectId: id },
-  );
+  const invoiceAttachments = await listEntityDocuments("SUPPLIER_INVOICE", supplierInvoiceId, ctx, {
+    projectId: id,
+  });
   const storageConfigured = isStorageConfigured();
   const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "AP");
 
-  const isDraft     = invoice.status === "DRAFT";
-  const isIssued    = invoice.status === "ISSUED";
+  const isDraft = invoice.status === "DRAFT";
+  const isIssued = invoice.status === "ISSUED";
   const isCancelled = invoice.status === "CANCELLED";
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}/facturas-proveedor`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/proyectos/${id}/facturas-proveedor`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
         <SupplierInvoiceStatusBadge status={invoice.status} />
       </div>
@@ -88,28 +90,30 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
 
         <hr />
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-muted-foreground">
-              <th className="pb-2 font-normal">Descripción</th>
-              <th className="pb-2 font-normal text-right">Qty</th>
-              <th className="pb-2 font-normal text-right">Precio</th>
-              <th className="pb-2 font-normal text-right">IVA %</th>
-              <th className="pb-2 font-normal text-right">Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {invoice.lines.map((line) => (
-              <tr key={line.id}>
-                <td className="py-1.5">{line.description}</td>
-                <td className="py-1.5 text-right tabular-nums">{line.quantity}</td>
-                <td className="py-1.5 text-right tabular-nums">{line.unitPrice}</td>
-                <td className="py-1.5 text-right tabular-nums">{line.taxRate}</td>
-                <td className="py-1.5 text-right tabular-nums">{line.lineTotal}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <TableScroll className="border-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Descripción</TableHead>
+                <TableHead className="text-right">Qty</TableHead>
+                <TableHead className="text-right">Precio</TableHead>
+                <TableHead className="text-right">IVA %</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invoice.lines.map((line) => (
+                <TableRow key={line.id}>
+                  <TableCell>{line.description}</TableCell>
+                  <TableCell className="text-right tabular-nums">{line.quantity}</TableCell>
+                  <TableCell className="text-right tabular-nums">{line.unitPrice}</TableCell>
+                  <TableCell className="text-right tabular-nums">{line.taxRate}</TableCell>
+                  <TableCell className="text-right tabular-nums">{line.lineTotal}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableScroll>
 
         <div className="flex justify-end gap-8 text-sm">
           <div className="text-right">
@@ -122,7 +126,9 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
           </div>
           <div className="text-right">
             <p className="font-semibold">Total</p>
-            <p className="font-semibold tabular-nums">{invoice.totalAmount} {invoice.currency}</p>
+            <p className="font-semibold tabular-nums">
+              {invoice.totalAmount} {invoice.currency}
+            </p>
           </div>
         </div>
 
@@ -161,14 +167,14 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
               redirect(`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`);
             }}
           >
-            <Button type="submit" variant="destructive">Anular</Button>
+            <Button type="submit" variant="destructive">
+              Anular
+            </Button>
           </form>
         )}
         {isIssued && (
           <Button asChild variant="outline">
-            <Link href={`/proyectos/${id}/cuentas-por-pagar`}>
-              Ver cuenta por pagar →
-            </Link>
+            <Link href={`/proyectos/${id}/cuentas-por-pagar`}>Ver cuenta por pagar →</Link>
           </Button>
         )}
       </div>
@@ -180,6 +186,6 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
         docs={invoiceAttachments}
         canEdit={canEditAttachments}
       />
-    </div>
+    </PageShell>
   );
 }

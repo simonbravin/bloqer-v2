@@ -1,6 +1,9 @@
 export { TreasuryAccountStatusBadge } from "./components/treasury-account-status-badge";
 export { AccountMovementTypeBadge } from "./components/account-movement-type-badge";
 export { TreasuryAccountList } from "./components/treasury-account-list";
+export { TreasuryAccountTable } from "./components/treasury-account-table";
+export { TreasuryAccountCards } from "./components/treasury-account-cards";
+export { TreasuryAccountListSection } from "./components/treasury-account-list-section";
 export { AccountMovementList } from "./components/account-movement-list";
 export { TreasurySummaryCards } from "./components/treasury-summary-cards";
 export { TreasuryAccountForm } from "./components/treasury-account-form";

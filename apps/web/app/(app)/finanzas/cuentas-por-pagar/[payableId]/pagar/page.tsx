@@ -1,13 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { PaymentForm } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
-import {
-  getCompanyPayableById,
-  listTreasuryAccounts,
-  ServiceError,
-} from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { getCompanyPayableById, listTreasuryAccounts, ServiceError } from "@bloqer/services";
 
 interface PageProps {
   params: Promise<{ payableId: string }>;
@@ -20,20 +17,23 @@ export default async function FinanzasPagarPage({ params }: PageProps) {
   const { payableId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let payable;
   let allAccounts;
   try {
-    [payable, allAccounts] = await Promise.all([
+    const [payableResult, accountsResult] = await Promise.all([
       getCompanyPayableById(payableId, ctx),
       listTreasuryAccounts(ctx),
     ]);
+    payable = payableResult;
+    allAccounts = accountsResult.data;
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     throw err;
   }
 
@@ -44,11 +44,9 @@ export default async function FinanzasPagarPage({ params }: PageProps) {
   const isBlocked = payable.status === "PAID" || payable.status === "CANCELLED";
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/finanzas/cuentas-por-pagar/${payableId}`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/finanzas/cuentas-por-pagar/${payableId}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Registrar pago (empresa)</h1>
       </div>
 
@@ -56,10 +54,8 @@ export default async function FinanzasPagarPage({ params }: PageProps) {
         <div className="rounded-lg border bg-card p-6">
           <p className="text-sm text-muted-foreground">
             Esta cuenta por pagar está en estado{" "}
-            <strong>
-              {payable.status === "PAID" ? "pagada" : "cancelada"}
-            </strong>{" "}
-            y no admite nuevos pagos.{" "}
+            <strong>{payable.status === "PAID" ? "pagada" : "cancelada"}</strong> y no admite nuevos
+            pagos.{" "}
             <Link
               href={`/finanzas/cuentas-por-pagar/${payableId}`}
               className="underline underline-offset-2"
@@ -77,6 +73,6 @@ export default async function FinanzasPagarPage({ params }: PageProps) {
           accounts={activeAccounts}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

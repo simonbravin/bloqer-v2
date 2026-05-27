@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { formatDate } from "@/lib/format";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { JournalEntryView } from "@bloqer/services";
 import { JournalEntryStatusBadge } from "./journal-entry-status-badge";
 
@@ -14,10 +16,11 @@ export function JournalEntryList({
 }) {
   const q = empresa ? `?empresa=${encodeURIComponent(empresa)}` : "";
   if (entries.length === 0) {
-    return <p className="text-sm text-muted-foreground">No hay asientos.</p>;
+    return <ListEmptyState message="No hay asientos." />;
   }
   return (
-    <Table>
+    <div className="rounded-lg border">
+      <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Fecha</TableHead>
@@ -30,7 +33,7 @@ export function JournalEntryList({
         {entries.map((e) => (
           <TableRow key={e.id}>
             <TableCell className="whitespace-nowrap font-mono text-sm">
-              {e.entryDate.toISOString().slice(0, 10)}
+              {formatDate(e.entryDate)}
             </TableCell>
             <TableCell>
               <Link className="text-primary underline-offset-4 hover:underline" href={`/contabilidad/asientos/${e.id}${q}`}>
@@ -42,6 +45,7 @@ export function JournalEntryList({
           </TableRow>
         ))}
       </TableBody>
-    </Table>
+      </Table>
+    </div>
   );
 }

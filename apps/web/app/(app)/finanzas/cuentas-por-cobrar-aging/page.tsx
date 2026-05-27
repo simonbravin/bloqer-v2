@@ -9,6 +9,7 @@ import {
 import { ReportCsvExportLink } from "@/features/reports/report-csv-export-link";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { ReportPdfExportLink } from "@/features/reports/report-pdf-export-link";
+import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
   searchParams: Promise<{
@@ -39,7 +40,7 @@ export default async function ArAgingPage({ searchParams }: PageProps) {
   const report = await getReceivableAgingReport(parseAgingFilters(sp), ctx);
 
   return (
-    <div className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cuentas por cobrar</h1>
@@ -60,6 +61,6 @@ export default async function ArAgingPage({ searchParams }: PageProps) {
       <AgingFilters />
       <AgingSummaryCards report={report} currency={sp.currency} />
       <AgingTable report={report} />
-    </div>
+    </PageShell>
   );
 }

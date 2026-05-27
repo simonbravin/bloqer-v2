@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 import { getProductById, listStockMovements, ServiceError } from "@bloqer/services";
 import { ProductStatusBadge, StockMovementList } from "@/features/inventory";
 import { deactivateProductAction, reactivateProductAction } from "../actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ productId: string }>;
@@ -17,9 +19,9 @@ export default async function ProductoPage({ params }: PageProps) {
   const { productId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let product, movements;
@@ -34,18 +36,22 @@ export default async function ProductoPage({ params }: PageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/inventario/productos">← Productos</Link>
-          </Button>
+          <PageBackLink href="/inventario/productos" label="Productos" />
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">[{product.sku}] {product.name}</h1>
+            <h1 className="text-2xl font-bold tracking-tight">
+              [{product.sku}] {product.name}
+            </h1>
             <div className="flex items-center gap-2 mt-1">
               <ProductStatusBadge status={product.status} />
-              {product.unit && <span className="text-sm text-muted-foreground">Unidad: {product.unit}</span>}
-              {product.category && <span className="text-sm text-muted-foreground">· {product.category}</span>}
+              {product.unit && (
+                <span className="text-sm text-muted-foreground">Unidad: {product.unit}</span>
+              )}
+              {product.category && (
+                <span className="text-sm text-muted-foreground">· {product.category}</span>
+              )}
             </div>
           </div>
         </div>
@@ -54,12 +60,26 @@ export default async function ProductoPage({ params }: PageProps) {
             <Link href={`/inventario/productos/${productId}/stock`}>Stock</Link>
           </Button>
           {product.status === "ACTIVE" ? (
-            <form action={async () => { "use server"; await deactivateProductAction(productId); }}>
-              <Button variant="outline" size="sm" type="submit">Desactivar</Button>
+            <form
+              action={async () => {
+                "use server";
+                await deactivateProductAction(productId);
+              }}
+            >
+              <Button variant="outline" size="sm" type="submit">
+                Desactivar
+              </Button>
             </form>
           ) : (
-            <form action={async () => { "use server"; await reactivateProductAction(productId); }}>
-              <Button variant="outline" size="sm" type="submit">Reactivar</Button>
+            <form
+              action={async () => {
+                "use server";
+                await reactivateProductAction(productId);
+              }}
+            >
+              <Button variant="outline" size="sm" type="submit">
+                Reactivar
+              </Button>
             </form>
           )}
         </div>
@@ -79,6 +99,6 @@ export default async function ProductoPage({ params }: PageProps) {
           <StockMovementList movements={movements} />
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

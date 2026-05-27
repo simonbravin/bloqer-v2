@@ -57,9 +57,21 @@
 }
 
 @layer components {
-  /** Default width content column inside `(app)` main — avoids double horizontal padding with `main`. */
+  /** Default width content column inside `(app)` main — canonical workspace width. */
   .shell-page {
-    @apply mx-auto w-full max-w-6xl space-y-8;
+    @apply mx-auto w-full max-w-6xl space-y-6;
+  }
+
+  .shell-page-wide {
+    @apply mx-auto w-full max-w-7xl space-y-6;
+  }
+
+  .shell-page-form {
+    @apply mx-auto w-full max-w-2xl space-y-6;
+  }
+
+  .shell-page-detail {
+    @apply mx-auto w-full max-w-4xl space-y-6;
   }
 
   .shell-page-narrow {

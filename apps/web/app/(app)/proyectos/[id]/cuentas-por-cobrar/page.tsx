@@ -1,10 +1,13 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { ReceivableList } from "@/features/sales-invoices";
+import { Suspense } from "react";
+import { ListViewToggle } from "@/components/ui/list-view-toggle";
+import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
+import { ProjectPageHeader } from "@/components/layout/project-page-header";
+import { ReceivableListSection } from "@/features/sales-invoices";
 import type { ReceivableListItem } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
-import { listReceivablesByProject, ServiceError } from "@bloqer/services";
+import { getProjectShellInfo, listReceivablesByProject, ServiceError } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -21,6 +24,15 @@ export default async function CuentasPorCobrarPage({ params }: PageProps) {
     companyId: current.tenantCtx.companyId,
     roles: current.tenantCtx.roles,
   };
+
+  let project;
+  try {
+    project = await getProjectShellInfo(id, ctx);
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
 
   let receivables;
   try {
@@ -44,22 +56,22 @@ export default async function CuentasPorCobrarPage({ params }: PageProps) {
   }));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}`}>← Volver</Link>
-        </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Cuentas por cobrar</h1>
-      </div>
+    <PageShell variant="default" className="space-y-6">
+      <ProjectPageHeader
+        projectId={id}
+        projectName={project.name}
+        title="Cuentas por cobrar"
+        subtitle={`${items.length} ${items.length === 1 ? "cuenta" : "cuentas"}`}
+        actions={
+          <Suspense fallback={null}>
+            <ListViewToggle storageKey={`cuentas-por-cobrar-${id}`} />
+          </Suspense>
+        }
+      />
 
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Saldos del proyecto</h2>
-        </div>
-        <div className="p-6">
-          <ReceivableList receivables={items} projectId={id} />
-        </div>
-      </div>
-    </div>
+      <Suspense fallback={<ListSectionSkeleton />}>
+        <ReceivableListSection receivables={items} projectId={id} />
+      </Suspense>
+    </PageShell>
   );
 }

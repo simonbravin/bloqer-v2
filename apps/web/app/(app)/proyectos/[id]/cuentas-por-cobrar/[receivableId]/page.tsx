@@ -1,13 +1,15 @@
 import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { ReceivableStatusBadge } from "@/features/sales-invoices";
 import { CollectionList } from "@/features/collections";
 import type { CollectionListItem } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { getReceivableById, listCollectionsByReceivable, ServiceError } from "@bloqer/services";
 import { cancelReceivableAction } from "../../facturas/actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; receivableId: string }>;
@@ -21,7 +23,9 @@ function fmtMoney(value: string, currency: string) {
   return (
     new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
       parseFloat(value),
-    ) + " " + currency
+    ) +
+    " " +
+    currency
   );
 }
 
@@ -70,12 +74,10 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
   }));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/proyectos/${id}/cuentas-por-cobrar`}>← Volver</Link>
-          </Button>
+          <PageBackLink href={`/proyectos/${id}/cuentas-por-cobrar`} label="Volver" />
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Cuenta por cobrar</h1>
             <ReceivableStatusBadge status={receivable.status} />
@@ -92,7 +94,9 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
           )}
           {receivable.status !== "CANCELLED" && receivable.status !== "PAID" && (
             <form action={doCancel}>
-              <Button variant="ghost" size="sm" className="text-muted-foreground">Cancelar</Button>
+              <Button variant="ghost" size="sm" className="text-muted-foreground">
+                Cancelar
+              </Button>
             </form>
           )}
         </div>
@@ -121,15 +125,21 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
           </div>
           <div>
             <dt className="text-muted-foreground">Monto original</dt>
-            <dd className="font-medium font-mono">{fmtMoney(receivable.originalAmount, receivable.currency)}</dd>
+            <dd className="font-medium font-mono">
+              {fmtMoney(receivable.originalAmount, receivable.currency)}
+            </dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Cobrado</dt>
-            <dd className="font-medium font-mono">{fmtMoney(receivable.paidAmount, receivable.currency)}</dd>
+            <dd className="font-medium font-mono">
+              {fmtMoney(receivable.paidAmount, receivable.currency)}
+            </dd>
           </div>
           <div>
             <dt className="text-muted-foreground font-semibold">Saldo pendiente</dt>
-            <dd className="font-bold font-mono text-lg">{fmtMoney(receivable.balanceDue, receivable.currency)}</dd>
+            <dd className="font-bold font-mono text-lg">
+              {fmtMoney(receivable.balanceDue, receivable.currency)}
+            </dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Factura</dt>
@@ -166,6 +176,6 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
           <CollectionList collections={collectionItems} projectId={id} />
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

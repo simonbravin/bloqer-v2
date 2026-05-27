@@ -1,5 +1,7 @@
 import { Prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
+import { fmtDecimalEs, pushMoneyKpi } from "../dashboard/kpi-helpers";
 import {
   getPayableAgingReport,
   getReceivableAgingReport,
@@ -14,23 +16,6 @@ import type { CompanyFinanceOperationsSummary } from "./company-finance-operatio
 import { getCompanyFinanceOperationsSummary } from "./company-finance-operations-summary.service";
 
 const ZERO = new Prisma.Decimal(0);
-
-function fmtDecimalEs(value: string, currencyCode?: string): string {
-  const n = Number(value);
-  if (Number.isNaN(n)) return value;
-  if (currencyCode) {
-    try {
-      return new Intl.NumberFormat("es-AR", {
-        style:                 "currency",
-        currency:              currencyCode,
-        maximumFractionDigits: 2,
-      }).format(n);
-    } catch {
-      return `${value} ${currencyCode}`;
-    }
-  }
-  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(n);
-}
 
 function countOverdueFromAgingReport(report: { rows: { items: { daysOverdue: number; balanceDue: string }[] }[] }): number {
   let n = 0;
@@ -152,6 +137,8 @@ export type FinanceHubOverview = {
   hasFinanceModules: boolean;
   /** User can see at least one hub section (AR / AP / TREASURY / ACCOUNTING) */
   canSeeAnything: boolean;
+  /** Unified KPI row for hub UI (no duplicate aging cards). */
+  hubKpis: DashboardKpi[];
 };
 
 function buildMoneyCardFromAging(
@@ -584,6 +571,92 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
 
   const hubShortcuts = mergeFinanceHubShortcuts(quickActions, reportLinks);
 
+  function snapshotsOpenMap(snaps: FinanceHubCurrencySnapshot[]): Map<string, Prisma.Decimal> {
+    const m = new Map<string, Prisma.Decimal>();
+    for (const s of snaps) {
+      m.set(s.currency, new Prisma.Decimal(s.openTotal));
+    }
+    return m;
+  }
+
+  function snapshotsOverdueMap(snaps: FinanceHubCurrencySnapshot[]): Map<string, Prisma.Decimal> {
+    const m = new Map<string, Prisma.Decimal>();
+    for (const s of snaps) {
+      m.set(s.currency, new Prisma.Decimal(s.overdueTotal));
+    }
+    return m;
+  }
+
+  const hubKpis: DashboardKpi[] = [];
+
+  if (arInsight?.visible && !arInsight.loadFailed && arInsight.byCurrency.length > 0) {
+    pushMoneyKpi(
+      hubKpis,
+      "ar_open",
+      "Cuentas por cobrar",
+      snapshotsOpenMap(arInsight.byCurrency),
+      arInsight.agingHref,
+    );
+    pushMoneyKpi(
+      hubKpis,
+      "ar_overdue",
+      "C×C vencidas",
+      snapshotsOverdueMap(arInsight.byCurrency),
+      arInsight.agingHref,
+    );
+  }
+
+  if (apGlobalInsight?.visible && !apGlobalInsight.loadFailed && apGlobalInsight.byCurrency.length > 0) {
+    pushMoneyKpi(
+      hubKpis,
+      "ap_open",
+      "Cuentas por pagar",
+      snapshotsOpenMap(apGlobalInsight.byCurrency),
+      apGlobalInsight.agingHref,
+    );
+    pushMoneyKpi(
+      hubKpis,
+      "ap_overdue",
+      "C×P vencidas",
+      snapshotsOverdueMap(apGlobalInsight.byCurrency),
+      apGlobalInsight.agingHref,
+    );
+  }
+
+  if (treasuryCard?.visible && !treasuryCard.loadFailed) {
+    hubKpis.push({
+      key:   "treasury_balance",
+      label: "Saldo tesorería",
+      value: treasuryCard.displayHeadline,
+      href:  treasuryCard.treasuryHref,
+      tone:  treasuryCard.multicurrency ? "muted" : "default",
+    });
+  }
+
+  if (companyOperations?.visible && !companyOperations.loadFailed) {
+    hubKpis.push({
+      key:   "draft_invoices",
+      label: "Facturas en borrador",
+      value: String(companyOperations.draftInvoiceCount),
+      href:  "/finanzas/facturas-proveedor",
+    });
+    hubKpis.push({
+      key:   "corp_ap_open",
+      label: "C×P abiertas (empresa)",
+      value: String(companyOperations.openPayableCount),
+      href:  "/finanzas/gastos-generales",
+    });
+  }
+
+  if (accountingSection?.visible) {
+    hubKpis.push({
+      key:   "accounting",
+      label: "Contabilidad",
+      value: "Abrir",
+      href:  accountingSection.href,
+    });
+  }
+
   return {
     arCard,
     apCard,
@@ -598,5 +671,6 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
     companyOperations,
     hasFinanceModules,
     canSeeAnything,
+    hubKpis,
   };
 }

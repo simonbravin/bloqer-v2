@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function ReportesTesoreriaPage() {
   const current = await getCurrentUser();
@@ -13,14 +14,14 @@ export default async function ReportesTesoreriaPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/tesoreria">← Tesorería</Link>
-        </Button>
+        <PageBackLink href="/tesoreria" label="Tesorería" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Reportes de tesorería</h1>
-          <p className="text-sm text-muted-foreground mt-1">Posición de caja, movimientos y flujo de fondos.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Posición de caja, movimientos y flujo de fondos.
+          </p>
         </div>
       </div>
 
@@ -37,7 +38,9 @@ export default async function ReportesTesoreriaPage() {
           className="rounded-lg border bg-card p-6 hover:bg-accent transition-colors"
         >
           <h2 className="font-semibold">Movimientos</h2>
-          <p className="text-sm text-muted-foreground mt-1">Libro mayor filtrable de caja ejecutada</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Libro mayor filtrable de caja ejecutada
+          </p>
         </Link>
         <Link
           href="/tesoreria/reportes/flujo-caja"
@@ -49,9 +52,9 @@ export default async function ReportesTesoreriaPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Solo movimientos confirmados. No incluye cuentas por cobrar ni cuentas por pagar (ver Finanzas).
-        Sin conversión de moneda: cada moneda se muestra por separado.
+        Solo movimientos confirmados. No incluye cuentas por cobrar ni cuentas por pagar (ver
+        Finanzas). Sin conversión de moneda: cada moneda se muestra por separado.
       </p>
-    </div>
+    </PageShell>
   );
 }

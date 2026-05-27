@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateTenantDisplaySettingsAction } from "./configuracion-actions";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default async function ConfiguracionHomePage() {
   const current = await getCurrentUser();
@@ -25,7 +26,7 @@ export default async function ConfiguracionHomePage() {
   const canEditDisplay = canEditTenantDisplaySettings(current.tenantCtx.roles);
 
   return (
-    <div className="space-y-8">
+    <PageShell variant="default" className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
         <p className="text-sm text-muted-foreground">Ajustes del tenant y administración del equipo.</p>
@@ -116,6 +117,6 @@ export default async function ConfiguracionHomePage() {
           </CardContent>
         </Card>
       ) : null}
-    </div>
+    </PageShell>
   );
 }

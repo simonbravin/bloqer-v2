@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { AccountLedgerTable, AccountTypeBadge } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
@@ -8,6 +6,8 @@ import { getAccountingAccountById, getAccountLedger } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { listAccountLedgerSchema } from "@bloqer/validators";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function CuentaContableDetallePage({
   params,
@@ -35,26 +35,24 @@ export default async function CuentaContableDetallePage({
   const ledgerParsed = listAccountLedgerSchema.safeParse({
     accountId,
     companyId: cf.companyId ?? null,
-    limit:     200,
+    limit: 200,
   });
-  const ledger = ledgerParsed.success
-    ? await getAccountLedger(ctx, ledgerParsed.data)
-    : [];
+  const ledger = ledgerParsed.success ? await getAccountLedger(ctx, ledgerParsed.data) : [];
 
   const q = cf.companyId ? `?empresa=${encodeURIComponent(cf.companyId)}` : "";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex flex-wrap items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/contabilidad/cuentas${q}`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/contabilidad/cuentas${q}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight font-mono">{account.code}</h1>
         <AccountTypeBadge type={account.type} />
       </div>
       <div className="rounded-lg border bg-card p-6 space-y-2">
         <h2 className="text-lg font-semibold">{account.name}</h2>
-        {account.description && <p className="text-sm text-muted-foreground">{account.description}</p>}
+        {account.description && (
+          <p className="text-sm text-muted-foreground">{account.description}</p>
+        )}
         <p className="text-sm text-muted-foreground">{account.isActive ? "Activa" : "Inactiva"}</p>
       </div>
       <div className="rounded-lg border bg-card">
@@ -65,6 +63,6 @@ export default async function CuentaContableDetallePage({
           <AccountLedgerTable rows={ledger} />
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

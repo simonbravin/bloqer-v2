@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { canRunOperationalAlerts } from "@bloqer/services";
 import { OperationalAlertsPanel } from "./operational-alerts-panel";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default async function OperationalAlertsPage() {
   const current = await getCurrentUser();
@@ -18,7 +19,7 @@ export default async function OperationalAlertsPage() {
   if (!canRunOperationalAlerts(ctx)) notFound();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div>
         <p className="text-sm text-muted-foreground">
           <Link href="/notificaciones" className="text-primary underline-offset-4 hover:underline">
@@ -38,6 +39,6 @@ export default async function OperationalAlertsPage() {
       </div>
 
       <OperationalAlertsPanel />
-    </div>
+    </PageShell>
   );
 }

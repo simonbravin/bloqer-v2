@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { ProjectFinanceOverviewView } from "@/features/projects";
 import { getProjectFinanceOverview, ServiceError } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -28,5 +29,9 @@ export default async function ProyectoFinanzasPage({ params }: PageProps) {
     throw err;
   }
 
-  return <ProjectFinanceOverviewView overview={overview} />;
+  return (
+    <PageShell variant="default" className="space-y-6">
+      <ProjectFinanceOverviewView overview={overview} />
+    </PageShell>
+  );
 }

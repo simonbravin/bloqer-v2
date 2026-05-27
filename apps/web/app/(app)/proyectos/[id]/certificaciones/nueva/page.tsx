@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { CertificationForm } from "@/features/certifications";
 import { getCurrentUser } from "@/lib/auth";
 import { listBudgetsByProject, getProjectShellInfo, ServiceError } from "@bloqer/services";
 import { createCertificationAction } from "../actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { ProjectPageHeader } from "@/components/layout/project-page-header";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -38,21 +40,21 @@ export default async function NuevaCertificacionPage({ params }: PageProps) {
 
   if (eligibleBudgets.length === 0) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/proyectos/${projectId}/certificaciones`}>← Certificaciones</Link>
-          </Button>
-          <h1 className="text-2xl font-bold tracking-tight">Nueva certificación</h1>
-        </div>
-        <div className="rounded-lg border bg-card px-6 py-8 text-center text-sm text-muted-foreground">
+      <PageShell variant="form" className="space-y-6">
+        <ProjectPageHeader
+          projectId={projectId}
+          projectName={project.name}
+          title="Nueva certificación"
+          subtitle="Certificación de avance de obra"
+        />
+        <div className="rounded-xl border bg-card px-6 py-8 text-center text-sm text-muted-foreground shadow-sm">
           <p>No hay presupuestos aprobados para este proyecto.</p>
           <p className="mt-1">Apruebe un presupuesto antes de crear una certificación.</p>
           <Button variant="outline" size="sm" className="mt-4" asChild>
             <Link href={`/proyectos/${projectId}/presupuestos`}>Ver presupuestos</Link>
           </Button>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
@@ -64,18 +66,15 @@ export default async function NuevaCertificacionPage({ params }: PageProps) {
   }));
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${projectId}/certificaciones`}>← Certificaciones</Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Nueva certificación</h1>
-          <p className="text-sm text-muted-foreground">{project.name}</p>
-        </div>
-      </div>
+    <PageShell variant="form" className="space-y-6">
+      <ProjectPageHeader
+        projectId={projectId}
+        projectName={project.name}
+        title="Nueva certificación"
+        subtitle="Certificación de avance de obra"
+      />
 
-      <div className="rounded-lg border bg-card p-6">
+      <div className="rounded-xl border bg-card p-6 shadow-sm">
         <CertificationForm
           projectId={projectId}
           budgets={budgetOptions}
@@ -83,6 +82,6 @@ export default async function NuevaCertificacionPage({ params }: PageProps) {
           onSubmit={createCertificationAction.bind(null, projectId)}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }

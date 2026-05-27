@@ -5,6 +5,15 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -131,35 +140,35 @@ export function ReceiptForm({ projectId, purchaseOrderId, purchaseOrderCode, poL
           <Input id="receiptDate" name="receiptDate" type="date" required />
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-muted-foreground">
-                <th className="pb-1 pr-2 font-normal w-[40%]">Descripción</th>
-                <th className="pb-1 pr-2 font-normal w-[12%]">Unidad</th>
-                <th className="pb-1 pr-2 font-normal w-[20%]">Pendiente</th>
-                <th className="pb-1 font-normal w-[28%]">Cantidad recibida</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
+        <TableScroll className="border-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40%]">Descripción</TableHead>
+                <TableHead className="w-[12%]">Unidad</TableHead>
+                <TableHead className="w-[20%]">Pendiente</TableHead>
+                <TableHead className="w-[28%]">Cantidad recibida</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {lines.map((line, i) => (
-                <tr key={line.purchaseOrderLineId} className="align-middle">
-                  <td className="py-2 pr-2">{line.description}</td>
-                  <td className="py-2 pr-2 text-muted-foreground">{line.unit || "—"}</td>
-                  <td className="py-2 pr-2 tabular-nums">{line.remaining}</td>
-                  <td className="py-2">
+                <TableRow key={line.purchaseOrderLineId}>
+                  <TableCell>{line.description}</TableCell>
+                  <TableCell className="text-muted-foreground">{line.unit || "—"}</TableCell>
+                  <TableCell className="tabular-nums">{line.remaining}</TableCell>
+                  <TableCell>
                     <Input
                       value={line.quantityReceived}
                       onChange={(e) => updateQty(i, e.target.value)}
                       placeholder="0"
                       className="h-8 text-sm"
                     />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableScroll>
 
         <div className="space-y-1">
           <Label htmlFor="notes">Notas (opcional)</Label>

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { CollectionStatusBadge } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { generateJournalFromCollectionAction } from "@/app/(app)/contabilidad/source-draft-actions";
@@ -8,6 +7,9 @@ import { getCollectionById, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { cancelCollectionAction } from "../actions";
 import { formatDate } from "@/lib/format";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; collectionId: string }>;
@@ -34,9 +36,9 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
   const contabilidadErr = sp.contabilidad;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let collection;
@@ -56,12 +58,10 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
   const returnPath = `/proyectos/${id}/cobranzas/${collectionId}`;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/proyectos/${id}/cobranzas`}>← Volver</Link>
-          </Button>
+          <PageBackLink href={`/proyectos/${id}/cobranzas`} label="Volver" />
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Cobranza</h1>
             <CollectionStatusBadge status={collection.status} />
@@ -143,7 +143,8 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
         <div className="rounded-lg border bg-card p-6 space-y-3">
           <h2 className="font-semibold">Contabilidad</h2>
           <p className="text-sm text-muted-foreground">
-            Generá un asiento en borrador según la regla activa para cobranzas confirmadas. La contabilización (posteo) se hace manualmente en Contabilidad.
+            Generá un asiento en borrador según la regla activa para cobranzas confirmadas. La
+            contabilización (posteo) se hace manualmente en Contabilidad.
           </p>
           <form action={generateJournalFromCollectionAction.bind(null, collectionId, returnPath)}>
             <Button type="submit" variant="outline">
@@ -152,6 +153,6 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
           </form>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

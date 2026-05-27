@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useMemo, useCallback } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -8,6 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatMoneyAmount } from "@/lib/format-money";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { WbsNodeForm } from "./wbs-node-form";
 import { CostItemPanel } from "./cost-item-panel";
 import type { WbsViewNode, CostItemView } from "@bloqer/services";
@@ -17,13 +20,7 @@ import type {
 } from "@bloqer/validators";
 
 function fmt(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      parseFloat(value),
-    ) +
-    " " +
-    currency
-  );
+  return formatMoneyAmount(value, currency);
 }
 
 function flattenTree(nodes: WbsViewNode[]): WbsViewNode[] {
@@ -128,8 +125,13 @@ export function WbsTree({
     }
     if (!confirm(`¿Eliminar "${node.code} — ${node.name}"?`)) return;
     startRemoveTransition(async () => {
+      const result = await onRemoveNode(node.id);
+      if ("error" in result) {
+        toast.error(result.error);
+        return;
+      }
       if (selectedNodeId === node.id) setSelectedNodeId(null);
-      await onRemoveNode(node.id);
+      toast.success("Nodo eliminado");
     });
   }
 
@@ -146,8 +148,9 @@ export function WbsTree({
         <div
           style={{ paddingLeft: depth * 20 + 8 }}
           className={cn(
-            "flex items-center gap-2 py-1.5 pr-2 rounded cursor-pointer hover:bg-muted/50 group",
-            isSelected && "bg-muted",
+            "flex items-center gap-2 py-1.5 pr-2 rounded-md cursor-pointer hover:bg-muted/50 group",
+            "focus-within:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            isSelected && "bg-primary/10 ring-1 ring-primary/30",
           )}
           onClick={() => {
             if (node.type === "ITEM") setSelectedNodeId(node.id);
@@ -254,10 +257,10 @@ export function WbsTree({
   }
 
   return (
-    <div className="flex gap-4 min-h-[400px]">
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start min-h-[28rem]">
       {/* Tree panel */}
-      <div className="flex-1 rounded-lg border overflow-hidden">
-        <div className="flex items-center justify-between border-b px-4 py-3">
+      <div className="flex-1 min-w-0 rounded-xl border bg-card shadow-sm overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
           <h3 className="text-sm font-semibold">Estructura de trabajo (EDT)</h3>
           {editable && (
             <Button
@@ -271,9 +274,10 @@ export function WbsTree({
         </div>
 
         {nodes.length === 0 ? (
-          <p className="px-4 py-8 text-sm text-muted-foreground text-center">
-            Sin nodos. Agregue el primer elemento de la EDT.
-          </p>
+          <ListEmptyState
+            message="Sin nodos en la EDT. Agregá el primer capítulo o ítem."
+            className="border-0 shadow-none rounded-none"
+          />
         ) : (
           <div className="p-2 space-y-0.5">
             {nodes.map((node) => renderNode(node, 0))}
@@ -282,10 +286,10 @@ export function WbsTree({
       </div>
 
       {/* APU panel */}
-      <div className="w-[480px] shrink-0">
+      <div className="w-full lg:w-[min(100%,28rem)] shrink-0">
         {selectedNode?.type === "ITEM" && selectedNode.costItem ? (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground px-1">
+          <div className="space-y-2 rounded-xl border bg-card p-4 shadow-sm">
+            <p className="text-xs text-muted-foreground">
               <span className="font-mono">{selectedNode.code}</span> — {selectedNode.name}
             </p>
             <CostItemPanel
@@ -299,11 +303,10 @@ export function WbsTree({
             />
           </div>
         ) : (
-          <div className="rounded-lg border h-full flex items-center justify-center p-8">
-            <p className="text-sm text-muted-foreground text-center">
-              Seleccione un ítem (ITEM) del árbol para ver su análisis de precio unitario.
-            </p>
-          </div>
+          <ListEmptyState
+            message="Seleccioná un ítem (ITEM) del árbol para ver y editar su análisis de precio unitario."
+            className="min-h-[20rem] flex items-center justify-center"
+          />
         )}
       </div>
 

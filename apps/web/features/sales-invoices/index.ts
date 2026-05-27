@@ -2,6 +2,9 @@ export { SalesInvoiceStatusBadge } from "./components/sales-invoice-status-badge
 export { ReceivableStatusBadge } from "./components/receivable-status-badge";
 export { SalesInvoiceList } from "./components/sales-invoice-list";
 export { ReceivableList } from "./components/receivable-list";
+export { ReceivableTable } from "./components/receivable-table";
+export { ReceivableCards } from "./components/receivable-cards";
+export { ReceivableListSection } from "./components/receivable-list-section";
 export { CertificationInvoiceForm } from "./components/certification-invoice-form";
 export { InvoiceEditForm } from "./components/invoice-edit-form";
 export { ManualInvoiceForm } from "./components/manual-invoice-form";

@@ -1,14 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
-import {
-  listWarehouses,
-  listProducts,
-  getSourceStockPreview,
-} from "@bloqer/services";
+import { listWarehouses, listProducts, getSourceStockPreview } from "@bloqer/services";
 import { WarehouseTransferForm } from "@/features/warehouse-transfer";
 import { createWarehouseTransferAction } from "../actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   searchParams: Promise<{ sourceWarehouseId?: string; productId?: string }>;
@@ -21,15 +17,16 @@ export default async function NuevaTransferenciaPage({ searchParams }: PageProps
   const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
-  const [warehouses, products] = await Promise.all([
+  const [warehouses, productsResult] = await Promise.all([
     listWarehouses({ status: "ACTIVE" }, ctx),
     listProducts({ status: "ACTIVE" }, ctx),
   ]);
+  const products = productsResult.data;
 
   let sourceStockBalance: string | undefined;
   if (sp.sourceWarehouseId && sp.productId) {
@@ -41,11 +38,9 @@ export default async function NuevaTransferenciaPage({ searchParams }: PageProps
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/inventario/transferencias">← Transferencias</Link>
-        </Button>
+        <PageBackLink href="/inventario/transferencias" label="Transferencias" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva transferencia de depósito</h1>
       </div>
 
@@ -59,6 +54,6 @@ export default async function NuevaTransferenciaPage({ searchParams }: PageProps
           action={createWarehouseTransferAction}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }

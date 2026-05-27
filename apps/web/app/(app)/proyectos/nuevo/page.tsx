@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { ProjectForm } from "@/features/projects";
 import { getCurrentUser } from "@/lib/auth";
 import { listContacts } from "@bloqer/services";
 import { createProjectAction } from "../actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageListHeader } from "@/components/ui/page-list-header";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function NuevoProyectoPage() {
   const current = await getCurrentUser();
@@ -17,18 +18,17 @@ export default async function NuevoProyectoPage() {
     roles: current.tenantCtx.roles,
   };
 
-  const { data: clients } = await listContacts({ role: "CLIENT", status: "ACTIVE", pageSize: 100 }, ctx);
+  const { data: clients } = await listContacts(
+    { role: "CLIENT", status: "ACTIVE", pageSize: 100 },
+    ctx,
+  );
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/proyectos">← Volver</Link>
-        </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Nuevo proyecto</h1>
-      </div>
+    <PageShell variant="form" className="space-y-6">
+      <PageBackLink href="/proyectos" label="Proyectos" />
+      <PageListHeader title="Nuevo proyecto" subtitle="Alta de obra" />
 
-      <div className="rounded-lg border bg-card p-6">
+      <div className="rounded-xl border bg-card p-6 shadow-sm">
         <ProjectForm
           clients={clients.map((c) => ({
             id: c.id,
@@ -38,6 +38,6 @@ export default async function NuevoProyectoPage() {
           onSubmit={createProjectAction}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }

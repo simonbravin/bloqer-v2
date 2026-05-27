@@ -1,13 +1,11 @@
 import { formatDate, formatDateTime } from "@/lib/format";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import {
-  CertificationInvoiceForm, ManualInvoiceForm,
-} from "@/features/sales-invoices";
+import { CertificationInvoiceForm, ManualInvoiceForm } from "@/features/sales-invoices";
 import type { CertSummary, ClientOption } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
 import { getCertificationById, listContacts, ServiceError } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -41,17 +39,19 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
     if (cert.projectId !== projectId) notFound();
     if (cert.status !== "APPROVED") {
       return (
-        <div className="mx-auto max-w-2xl space-y-4">
+        <PageShell variant="form" className="space-y-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href={`/proyectos/${projectId}/certificaciones/${certificationId}`}>← Volver</Link>
-            </Button>
+            <PageBackLink
+              href={`/proyectos/${projectId}/certificaciones/${certificationId}`}
+              label="Volver"
+            />
             <h1 className="text-2xl font-bold tracking-tight">Generar factura</h1>
           </div>
           <p className="rounded border bg-card p-4 text-sm text-muted-foreground">
-            Solo se pueden facturar certificaciones en estado <strong>Aprobada</strong>. Esta certificación está en estado &quot;{cert.status}&quot;.
+            Solo se pueden facturar certificaciones en estado <strong>Aprobada</strong>. Esta
+            certificación está en estado &quot;{cert.status}&quot;.
           </p>
-        </div>
+        </PageShell>
       );
     }
 
@@ -59,29 +59,27 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
       id: cert.id,
       code: cert.code,
       periodStart: formatDate(cert.periodStart),
-      periodEnd:   formatDate(cert.periodEnd),
+      periodEnd: formatDate(cert.periodEnd),
       totalAmount: cert.totalAmount,
-      currency:    cert.currency,
+      currency: cert.currency,
     };
 
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
+      <PageShell variant="form" className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/proyectos/${projectId}/certificaciones/${certificationId}`}>← Volver</Link>
-          </Button>
+          <PageBackLink
+            href={`/proyectos/${projectId}/certificaciones/${certificationId}`}
+            label="Volver"
+          />
           <h1 className="text-2xl font-bold tracking-tight">Generar factura desde certificación</h1>
         </div>
         <CertificationInvoiceForm projectId={projectId} cert={certSummary} />
-      </div>
+      </PageShell>
     );
   }
 
   // ── Manual flow ───────────────────────────────────────────────────────────
-  const { data: contacts } = await listContacts(
-    { role: "CLIENT", status: "ACTIVE" },
-    ctx,
-  );
+  const { data: contacts } = await listContacts({ role: "CLIENT", status: "ACTIVE" }, ctx);
 
   const clients: ClientOption[] = contacts.map((c) => ({
     id: c.id,
@@ -89,14 +87,12 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
   }));
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${projectId}/facturas`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/proyectos/${projectId}/facturas`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva factura</h1>
       </div>
       <ManualInvoiceForm projectId={projectId} clients={clients} />
-    </div>
+    </PageShell>
   );
 }

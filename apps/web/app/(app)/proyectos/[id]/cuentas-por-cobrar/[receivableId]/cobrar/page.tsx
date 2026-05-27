@@ -1,13 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { CollectionForm } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
-import {
-  getReceivableById,
-  listTreasuryAccounts,
-  ServiceError,
-} from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { getReceivableById, listTreasuryAccounts, ServiceError } from "@bloqer/services";
 
 interface PageProps {
   params: Promise<{ id: string; receivableId: string }>;
@@ -20,18 +17,20 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
   const { id, receivableId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let receivable;
   let allAccounts;
   try {
-    [receivable, allAccounts] = await Promise.all([
+    const [receivableResult, accountsResult] = await Promise.all([
       getReceivableById(receivableId, ctx),
       listTreasuryAccounts(ctx),
     ]);
+    receivable = receivableResult;
+    allAccounts = accountsResult.data;
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
@@ -44,11 +43,9 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
   const isBlocked = receivable.status === "PAID" || receivable.status === "CANCELLED";
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}/cuentas-por-cobrar/${receivableId}`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/proyectos/${id}/cuentas-por-cobrar/${receivableId}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Registrar cobro</h1>
       </div>
 
@@ -56,10 +53,8 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
         <div className="rounded-lg border bg-card p-6">
           <p className="text-sm text-muted-foreground">
             Esta cuenta por cobrar está en estado{" "}
-            <strong>
-              {receivable.status === "PAID" ? "cobrada" : "cancelada"}
-            </strong>{" "}
-            y no admite nuevos cobros.{" "}
+            <strong>{receivable.status === "PAID" ? "cobrada" : "cancelada"}</strong> y no admite
+            nuevos cobros.{" "}
             <Link
               href={`/proyectos/${id}/cuentas-por-cobrar/${receivableId}`}
               className="underline underline-offset-2"
@@ -77,6 +72,6 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
           accounts={activeAccounts}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

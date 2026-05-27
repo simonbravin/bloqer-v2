@@ -1,5 +1,8 @@
 export { BudgetStatusBadge } from "./components/budget-status-badge";
 export { BudgetList, type BudgetListItem } from "./components/budget-list";
+export { BudgetTable } from "./components/budget-table";
+export { BudgetCards } from "./components/budget-cards";
+export { BudgetListSection } from "./components/budget-list-section";
 export { BudgetForm } from "./components/budget-form";
 export { BudgetSettingsForm, type SettingsDefaults } from "./components/budget-settings-form";
 export { WbsTree } from "./components/wbs-tree";

@@ -1,4 +1,5 @@
 export { DocumentList }              from "./components/document-list";
+export { DocumentListSection }       from "./components/document-list-section";
 export { DocumentCategoryBadge }     from "./components/document-category-badge";
 export { DocumentStatusBadge }       from "./components/document-status-badge";
 export { DocumentFilters }           from "./components/document-filters";

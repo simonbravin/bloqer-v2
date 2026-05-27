@@ -34,20 +34,34 @@ export async function getInternalTransferById(
   return serialize(t);
 }
 
-export async function listInternalTransfers(ctx: ServiceContext): Promise<InternalTransferView[]> {
+export async function listInternalTransfers(
+  ctx: ServiceContext,
+  opts?: { page?: number; pageSize?: number },
+): Promise<{ data: InternalTransferView[]; total: number }> {
   await assertTreasuryTenantModule(ctx);
   if (!can(ctx.roles, "VIEW", "TREASURY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver transferencias");
   }
-  const rows = await prisma.internalTransfer.findMany({
-    where: { tenantId: ctx.tenantId },
-    include: {
-      sourceAccount:      { select: { name: true } },
-      destinationAccount: { select: { name: true } },
-    },
-    orderBy: { transferDate: "desc" },
-  });
-  return rows.map(serialize);
+
+  const where = { tenantId: ctx.tenantId };
+  const page = opts?.page ?? 1;
+  const pageSize = opts?.pageSize ?? 20;
+
+  const [rows, total] = await Promise.all([
+    prisma.internalTransfer.findMany({
+      where,
+      include: {
+        sourceAccount:      { select: { name: true } },
+        destinationAccount: { select: { name: true } },
+      },
+      orderBy: { transferDate: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.internalTransfer.count({ where }),
+  ]);
+
+  return { data: rows.map(serialize), total };
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────

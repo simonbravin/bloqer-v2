@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { ReceiptForm } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
 import { getPurchaseOrderById, listWarehouses, ServiceError } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string; poId: string }>;
@@ -16,9 +16,9 @@ export default async function NuevaRecepcionPage({ params }: PageProps) {
   const { id, poId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let order, warehouses;
@@ -39,11 +39,9 @@ export default async function NuevaRecepcionPage({ params }: PageProps) {
   const warehouseOptions = warehouses.map((w) => ({ id: w.id, name: w.name }));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${id}/ordenes-compra/${poId}`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/proyectos/${id}/ordenes-compra/${poId}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Registrar recepción</h1>
       </div>
 
@@ -54,6 +52,6 @@ export default async function NuevaRecepcionPage({ params }: PageProps) {
         poLines={order.lines}
         warehouseOptions={warehouseOptions}
       />
-    </div>
+    </PageShell>
   );
 }

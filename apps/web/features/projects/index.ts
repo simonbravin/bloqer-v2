@@ -1,5 +1,8 @@
 export { ProjectTable } from "./components/project-table";
+export { ProjectCards } from "./components/project-cards";
+export { ProjectListSection } from "./components/project-list-section";
 export { ProjectFilters } from "./components/project-filters";
+export { ProjectListExportButton } from "./components/project-list-export-button";
 export { ProjectForm } from "./components/project-form";
 export { ProjectStatusBadge } from "./components/project-status-badge";
 export {

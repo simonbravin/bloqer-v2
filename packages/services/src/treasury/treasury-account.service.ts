@@ -28,21 +28,35 @@ export async function getTreasuryAccountById(
   return serialize(acc, balance);
 }
 
-export async function listTreasuryAccounts(ctx: ServiceContext): Promise<TreasuryAccountView[]> {
+export async function listTreasuryAccounts(
+  ctx: ServiceContext,
+  opts?: { page?: number; pageSize?: number },
+): Promise<{ data: TreasuryAccountView[]; total: number }> {
   await assertTreasuryTenantModule(ctx);
   if (!can(ctx.roles, "VIEW", "TREASURY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas de tesorería");
   }
-  const accounts = await prisma.treasuryAccount.findMany({
-    where: { tenantId: ctx.tenantId },
-    orderBy: { name: "asc" },
-  });
-  const results: TreasuryAccountView[] = [];
+
+  const where = { tenantId: ctx.tenantId };
+  const paginate = opts?.page !== undefined || opts?.pageSize !== undefined;
+  const page = opts?.page ?? 1;
+  const pageSize = opts?.pageSize ?? 20;
+
+  const [accounts, total] = await Promise.all([
+    prisma.treasuryAccount.findMany({
+      where,
+      orderBy: { name: "asc" },
+      ...(paginate ? { skip: (page - 1) * pageSize, take: pageSize } : {}),
+    }),
+    prisma.treasuryAccount.count({ where }),
+  ]);
+
+  const data: TreasuryAccountView[] = [];
   for (const acc of accounts) {
     const balance = await getAccountBalance(acc.id);
-    results.push(serialize(acc, balance));
+    data.push(serialize(acc, balance));
   }
-  return results;
+  return { data, total };
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────

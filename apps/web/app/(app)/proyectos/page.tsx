@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { ProjectTable, ProjectFilters } from "@/features/projects";
+import { ListViewToggle } from "@/components/ui/list-view-toggle";
+import { ProjectListSection, ProjectFilters, ProjectListExportButton } from "@/features/projects";
 import { Pagination } from "@/components/ui/pagination";
 import { getCurrentUser } from "@/lib/auth";
 import { listProjects, ServiceError } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageListHeader } from "@/components/ui/page-list-header";
+import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 
 interface PageProps {
   searchParams: Promise<Record<string, string | undefined>>;
@@ -37,19 +42,32 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Proyectos</h1>
-        <Button asChild>
-          <Link href="/proyectos/nuevo">+ Nuevo proyecto</Link>
-        </Button>
+    <PageShell variant="default" className="space-y-6">
+      <PageListHeader
+        title="Proyectos"
+        subtitle={`${result.total} ${result.total === 1 ? "proyecto" : "proyectos"}`}
+        actions={
+          <>
+            <ProjectListExportButton projects={result.data} />
+            <Button asChild>
+              <Link href="/proyectos/nuevo">+ Nuevo proyecto</Link>
+            </Button>
+          </>
+        }
+      />
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <ProjectFilters />
+        <Suspense fallback={null}>
+          <ListViewToggle storageKey="proyectos" />
+        </Suspense>
       </div>
 
-      <ProjectFilters />
-
-      <ProjectTable projects={result.data} />
+      <Suspense fallback={<ListSectionSkeleton />}>
+        <ProjectListSection projects={result.data} />
+      </Suspense>
 
       <Pagination page={page} pageSize={PAGE_SIZE} total={result.total} />
-    </div>
+    </PageShell>
   );
 }

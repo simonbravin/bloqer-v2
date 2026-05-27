@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -10,7 +11,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { TableScroll } from "@/components/ui/table-scroll";
+import { useClientTableSort } from "@/hooks/use-client-table-sort";
 import { RoleBadge } from "./role-badge";
+import { ContactStatusBadge } from "./contact-status-badge";
 import type { ContactWithRoles } from "@/features/directory/types";
 
 interface ContactTableProps {
@@ -18,29 +24,37 @@ interface ContactTableProps {
 }
 
 export function ContactTable({ contacts }: ContactTableProps) {
+  const accessors = useMemo(
+    () => ({
+      name: (c: ContactWithRoles) => c.legalName,
+      taxId: (c: ContactWithRoles) => c.taxId ?? "",
+      email: (c: ContactWithRoles) => c.email ?? "",
+      status: (c: ContactWithRoles) => c.status,
+    }),
+    [],
+  );
+
+  const { sorted, sortKey, sortDir, toggleSort } = useClientTableSort(contacts, accessors, "name");
+
   if (contacts.length === 0) {
-    return (
-      <div className="rounded-lg border bg-card p-10 text-center text-sm text-muted-foreground">
-        No se encontraron contactos con los filtros aplicados.
-      </div>
-    );
+    return <ListEmptyState message="No se encontraron contactos con los filtros aplicados." />;
   }
 
   return (
-    <div className="rounded-lg border">
+    <TableScroll className="border-0">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Nombre</TableHead>
-            <TableHead>CUIT / ID Fiscal</TableHead>
+            <SortableTableHead label="Nombre" sortKey="name" activeKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+            <SortableTableHead label="CUIT / ID Fiscal" sortKey="taxId" activeKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
             <TableHead>Roles</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Estado</TableHead>
+            <SortableTableHead label="Email" sortKey="email" activeKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+            <SortableTableHead label="Estado" sortKey="status" activeKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
             <TableHead className="w-20" />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {contacts.map((contact) => (
+          {sorted.map((contact) => (
             <TableRow key={contact.id}>
               <TableCell>
                 <div className="font-medium">{contact.legalName}</div>
@@ -65,15 +79,7 @@ export function ContactTable({ contacts }: ContactTableProps) {
                 {contact.email ?? "—"}
               </TableCell>
               <TableCell>
-                <span
-                  className={
-                    contact.status === "ACTIVE"
-                      ? "text-xs font-medium text-green-700"
-                      : "text-xs font-medium text-muted-foreground"
-                  }
-                >
-                  {contact.status === "ACTIVE" ? "Activo" : "Archivado"}
-                </span>
+                <ContactStatusBadge status={contact.status} />
               </TableCell>
               <TableCell>
                 <Button variant="ghost" size="sm" asChild>
@@ -84,6 +90,6 @@ export function ContactTable({ contacts }: ContactTableProps) {
           ))}
         </TableBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

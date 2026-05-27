@@ -5,6 +5,7 @@ import { TreasurySummaryCards } from "@/features/treasury";
 import { getCurrentUser } from "@/lib/auth";
 import { getTreasurySummaryByCompany } from "@bloqer/services";
 import { can } from "@bloqer/domain";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default async function TesoreriaPage() {
   const current = await getCurrentUser();
@@ -24,7 +25,7 @@ export default async function TesoreriaPage() {
   const summaries = await getTreasurySummaryByCompany(ctx);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Tesorería</h1>
       </div>
@@ -42,6 +43,6 @@ export default async function TesoreriaPage() {
           <Link href="/tesoreria/reportes">Reportes</Link>
         </Button>
       </div>
-    </div>
+    </PageShell>
   );
 }

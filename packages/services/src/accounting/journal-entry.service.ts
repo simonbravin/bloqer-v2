@@ -212,7 +212,7 @@ async function validateAccountsAndProjects(
 export async function listJournalEntries(
   ctx: ServiceContext,
   filters: ListJournalEntriesInput,
-): Promise<JournalEntryView[]> {
+): Promise<{ data: JournalEntryView[]; total: number }> {
   await assertView(ctx);
   const companyId = await resolveAccountingCompanyId(ctx, filters.companyId ?? null);
 
@@ -230,19 +230,28 @@ export async function listJournalEntries(
       : {}),
   };
 
-  const rows = await prisma.journalEntry.findMany({
-    where,
-    orderBy: [{ entryDate: "desc" }, { id: "desc" }],
-    take: 200,
-    include: {
-      lines: { include: { account: true }, orderBy: { id: "asc" } },
-    },
-  });
+  const page = filters.page ?? 1;
+  const pageSize = filters.pageSize ?? 20;
 
-  return rows.map((entry) => {
+  const [rows, total] = await Promise.all([
+    prisma.journalEntry.findMany({
+      where,
+      orderBy: [{ entryDate: "desc" }, { id: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        lines: { include: { account: true }, orderBy: { id: "asc" } },
+      },
+    }),
+    prisma.journalEntry.count({ where }),
+  ]);
+
+  const data = rows.map((entry) => {
     const { lines: rawLines, ...rest } = entry;
     return { ...rest, lines: rawLines.map(serializeLine) };
   });
+
+  return { data, total };
 }
 
 export async function getJournalEntryById(

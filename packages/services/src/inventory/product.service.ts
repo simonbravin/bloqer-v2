@@ -23,21 +23,34 @@ export async function getProductById(id: string, ctx: ServiceContext): Promise<P
 }
 
 export async function listProducts(
-  filters: { companyId?: string; status?: ProductStatus },
+  filters: { companyId?: string; status?: ProductStatus; page?: number; pageSize?: number },
   ctx: ServiceContext,
-): Promise<ProductView[]> {
+): Promise<{ data: ProductView[]; total: number }> {
   await assertInventoryTenantModule(ctx);
   if (!can(ctx.roles, "VIEW", "INVENTORY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver productos");
   }
-  return prisma.product.findMany({
-    where: {
-      tenantId:  ctx.tenantId,
-      companyId: filters.companyId ?? undefined,
-      status:    filters.status ?? undefined,
-    },
-    orderBy: [{ name: "asc" }],
-  });
+
+  const where = {
+    tenantId:  ctx.tenantId,
+    companyId: filters.companyId ?? undefined,
+    status:    filters.status ?? undefined,
+  };
+
+  const paginate = filters.page !== undefined || filters.pageSize !== undefined;
+  const page = filters.page ?? 1;
+  const pageSize = filters.pageSize ?? 20;
+
+  const [data, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy: [{ name: "asc" }],
+      ...(paginate ? { skip: (page - 1) * pageSize, take: pageSize } : {}),
+    }),
+    prisma.product.count({ where }),
+  ]);
+
+  return { data, total };
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────

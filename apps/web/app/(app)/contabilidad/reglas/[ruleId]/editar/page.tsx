@@ -1,12 +1,12 @@
-import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { AccountingMappingRuleForm } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { getAccountingMappingRuleById, listAccountingAccounts } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function EditarReglaContablePage({
   params,
@@ -31,17 +31,15 @@ export default async function EditarReglaContablePage({
     notFound();
   }
 
-  const accounts = await listAccountingAccounts(ctx, { companyId: rule.companyId });
+  const { data: accounts } = await listAccountingAccounts(ctx, { companyId: rule.companyId });
   const picks = accounts.map((a) => ({ id: a.id, code: a.code, name: a.name }));
 
   const q = cf.companyId ? `?empresa=${encodeURIComponent(cf.companyId)}` : "";
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/contabilidad/reglas/${ruleId}${q}`}>← Volver</Link>
-        </Button>
+        <PageBackLink href={`/contabilidad/reglas/${ruleId}${q}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Editar regla</h1>
       </div>
       <AccountingMappingRuleForm
@@ -51,6 +49,6 @@ export default async function EditarReglaContablePage({
         accounts={picks}
         defaultCompanyId={rule.companyId}
       />
-    </div>
+    </PageShell>
   );
 }

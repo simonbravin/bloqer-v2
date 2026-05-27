@@ -1,10 +1,21 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { getCurrentUser } from "@/lib/auth";
 import { listWarehouseTransfers } from "@bloqer/services";
 import { WarehouseTransferStatusBadge } from "@/features/warehouse-transfer";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default async function TransferenciasPage() {
   const current = await getCurrentUser();
@@ -12,9 +23,9 @@ export default async function TransferenciasPage() {
 
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   const transfers = await listWarehouseTransfers({}, ctx);
@@ -24,12 +35,10 @@ export default async function TransferenciasPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/inventario">← Inventario</Link>
-          </Button>
+          <PageBackLink href="/inventario" label="Inventario" />
           <h1 className="text-2xl font-bold tracking-tight">Transferencias de depósito</h1>
         </div>
         <Button asChild size="sm">
@@ -38,52 +47,48 @@ export default async function TransferenciasPage() {
       </div>
 
       {transfers.length === 0 ? (
-        <div className="rounded-lg border bg-card p-12 text-center text-sm text-muted-foreground">
-          No hay transferencias registradas.
-        </div>
+        <ListEmptyState message="No hay transferencias registradas." />
       ) : (
-        <div className="rounded-lg border bg-card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-                <th className="px-4 py-2.5 text-left font-medium">N°</th>
-                <th className="px-4 py-2.5 text-left font-medium">Fecha</th>
-                <th className="px-4 py-2.5 text-left font-medium">Origen</th>
-                <th className="px-4 py-2.5 text-left font-medium">Destino</th>
-                <th className="px-4 py-2.5 text-left font-medium">Producto</th>
-                <th className="px-4 py-2.5 text-right font-medium">Cantidad</th>
-                <th className="px-4 py-2.5 text-left font-medium">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>N°</TableHead>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Origen</TableHead>
+                <TableHead>Destino</TableHead>
+                <TableHead>Producto</TableHead>
+                <TableHead className="text-right">Cantidad</TableHead>
+                <TableHead>Estado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {transfers.map((t) => (
-                <tr key={t.id} className="border-t hover:bg-muted/30">
-                  <td className="px-4 py-2.5">
+                <TableRow key={t.id}>
+                  <TableCell>
                     <Link
                       href={`/inventario/transferencias/${t.id}`}
                       className="font-mono text-primary hover:underline"
                     >
                       TR-{String(t.number).padStart(3, "0")}
                     </Link>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    {formatDate(t.transferDate )}
-                  </td>
-                  <td className="px-4 py-2.5">{t.sourceWarehouseName}</td>
-                  <td className="px-4 py-2.5">{t.destinationWarehouseName}</td>
-                  <td className="px-4 py-2.5">{t.productName}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">
+                  </TableCell>
+                  <TableCell>{formatDate(t.transferDate)}</TableCell>
+                  <TableCell>{t.sourceWarehouseName}</TableCell>
+                  <TableCell>{t.destinationWarehouseName}</TableCell>
+                  <TableCell>{t.productName}</TableCell>
+                  <TableCell className="text-right tabular-nums">
                     {fmt(t.quantity)} {t.productUnit}
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell>
                     <WarehouseTransferStatusBadge status={t.status} />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

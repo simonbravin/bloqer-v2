@@ -1,23 +1,40 @@
 import type { CashPositionReport } from "@bloqer/services";
+import { KpiStatCard } from "@/components/ui/kpi-stat-card";
+import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
+import { formatCurrencyDisplay } from "@/lib/format";
 
 const TYPE_LABELS: Record<string, string> = {
-  BANK:           "Banco",
-  CASH:           "Caja",
+  BANK: "Banco",
+  CASH: "Caja",
   DIGITAL_WALLET: "Billetera",
-  OTHER:          "Otro",
+  OTHER: "Otro",
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  ACTIVE:   "Activa",
+  ACTIVE: "Activa",
   INACTIVE: "Inactiva",
-  CLOSED:   "Cerrada",
+  CLOSED: "Cerrada",
 };
 
-function fmt(value: string, currency: string) {
-  return (
-    parseFloat(value).toLocaleString("es-AR", { minimumFractionDigits: 2 }) +
-    " " + currency
-  );
+function formatAmount(value: string) {
+  return new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(parseFloat(value));
+}
+
+function fmtBalance(value: string, currency: string) {
+  return `${formatAmount(value)} ${currency}`;
 }
 
 interface Props {
@@ -26,93 +43,93 @@ interface Props {
 
 export function CashPositionTable({ report }: Props) {
   if (report.accounts.length === 0) {
-    return (
-      <div className="rounded-lg border bg-card p-12 text-center text-sm text-muted-foreground">
-        No hay cuentas con datos.
-      </div>
-    );
+    return <ListEmptyState message="No hay cuentas con datos." />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Summary cards by currency */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <KpiStatGrid title={null} columns={4}>
         {report.byCurrency.map((c) => (
-          <div key={c.currency} className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">{c.currency}</p>
-            <p className="text-2xl font-bold font-mono mt-1 tabular-nums">
-              {parseFloat(c.totalBalance).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">Posición consolidada</p>
-          </div>
+          <KpiStatCard
+            key={c.currency}
+            label={`Posición ${c.currency}`}
+            value={formatAmount(c.totalBalance)}
+            subtitle={formatCurrencyDisplay(c.currency)}
+          />
         ))}
-      </div>
+      </KpiStatGrid>
 
-      {/* Accounts table */}
       <div className="rounded-lg border bg-card overflow-hidden">
         <div className="border-b px-6 py-3">
           <h2 className="font-semibold text-sm">Saldos por cuenta</h2>
         </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-              <th className="px-4 py-2.5 text-left font-medium">Cuenta</th>
-              <th className="px-4 py-2.5 text-left font-medium">Tipo</th>
-              <th className="px-4 py-2.5 text-left font-medium">Empresa</th>
-              <th className="px-4 py-2.5 text-left font-medium">Moneda</th>
-              <th className="px-4 py-2.5 text-left font-medium">Estado</th>
-              <th className="px-4 py-2.5 text-right font-medium">Saldo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {report.accounts.map((acc) => (
-              <tr key={acc.accountId} className="border-t">
-                <td className="px-4 py-2.5 font-medium">{acc.name}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{TYPE_LABELS[acc.type] ?? acc.type}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{acc.companyName ?? "—"}</td>
-                <td className="px-4 py-2.5">{acc.currency}</td>
-                <td className="px-4 py-2.5 text-muted-foreground text-xs">{STATUS_LABELS[acc.status] ?? acc.status}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-mono">
-                  {fmt(acc.balance, acc.currency)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <TableScroll className="border-0 rounded-none">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cuenta</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Empresa</TableHead>
+                <TableHead>Moneda</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Saldo</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {report.accounts.map((acc) => (
+                <TableRow key={acc.accountId}>
+                  <TableCell className="font-medium">{acc.name}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {TYPE_LABELS[acc.type] ?? acc.type}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{acc.companyName ?? "—"}</TableCell>
+                  <TableCell>{formatCurrencyDisplay(acc.currency)}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {STATUS_LABELS[acc.status] ?? acc.status}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums font-mono">
+                    {fmtBalance(acc.balance, acc.currency)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableScroll>
       </div>
 
-      {/* By company breakdown */}
       {report.byCompany.length > 1 && (
         <div className="rounded-lg border bg-card overflow-hidden">
           <div className="border-b px-6 py-3">
             <h2 className="font-semibold text-sm">Por empresa</h2>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-                <th className="px-4 py-2.5 text-left font-medium">Empresa</th>
-                <th className="px-4 py-2.5 text-left font-medium">Moneda</th>
-                <th className="px-4 py-2.5 text-right font-medium">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.byCompany.map((co) =>
-                co.byCurrency.map((c, i) => (
-                  <tr key={`${co.companyId ?? "none"}-${c.currency}`} className="border-t">
-                    {i === 0 && (
-                      <td className="px-4 py-2.5 font-medium" rowSpan={co.byCurrency.length}>
-                        {co.companyName ?? "Sin empresa"}
-                      </td>
-                    )}
-                    <td className="px-4 py-2.5">{c.currency}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-mono">
-                      {fmt(c.totalBalance, c.currency)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <TableScroll className="border-0 rounded-none">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Empresa</TableHead>
+                  <TableHead>Moneda</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {report.byCompany.map((co) =>
+                  co.byCurrency.map((c, i) => (
+                    <TableRow key={`${co.companyId ?? "none"}-${c.currency}`}>
+                      {i === 0 && (
+                        <TableCell rowSpan={co.byCurrency.length} className="font-medium">
+                          {co.companyName ?? "Sin empresa"}
+                        </TableCell>
+                      )}
+                      <TableCell>{formatCurrencyDisplay(c.currency)}</TableCell>
+                      <TableCell className="text-right tabular-nums font-mono">
+                        {fmtBalance(c.totalBalance, c.currency)}
+                      </TableCell>
+                    </TableRow>
+                  )),
+                )}
+              </TableBody>
+            </Table>
+          </TableScroll>
         </div>
       )}
     </div>

@@ -7,6 +7,16 @@ import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import type { SubcontractLineView } from "@bloqer/services";
 
 type Props = {
@@ -87,36 +97,42 @@ export function SubcontractCertificationForm({
       <div className="space-y-2">
         <h3 className="font-medium">Cantidades a certificar</h3>
         <p className="text-sm text-muted-foreground">Ingresá la cantidad a certificar en este período por línea. Dejá en cero las que no se certifican.</p>
-        <div className="rounded-lg border overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-xs uppercase">
-              <tr>
-                <th className="px-3 py-2 text-left">Descripción</th>
-                <th className="px-3 py-2 text-right">Unidad</th>
-                <th className="px-3 py-2 text-right">Contratado</th>
-                <th className="px-3 py-2 text-right">Prev. certif.</th>
-                <th className="px-3 py-2 text-right">Saldo pend.</th>
-                <th className="px-3 py-2 text-right">Precio unit.</th>
-                <th className="px-3 py-2 text-right w-32">Certif. actual</th>
-                <th className="px-3 py-2 text-right">Importe</th>
-              </tr>
-            </thead>
-            <tbody>
+        <TableScroll>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Descripción</TableHead>
+                <TableHead className="text-right">Unidad</TableHead>
+                <TableHead className="text-right">Contratado</TableHead>
+                <TableHead className="text-right">Prev. certif.</TableHead>
+                <TableHead className="text-right">Saldo pend.</TableHead>
+                <TableHead className="text-right">Precio unit.</TableHead>
+                <TableHead className="text-right w-32">Certif. actual</TableHead>
+                <TableHead className="text-right">Importe</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {subcontractLines.map((l) => {
                 const qty       = parseFloat(quantities[l.id] ?? "0") || 0;
                 const importe   = qty * parseFloat(l.unitPrice);
                 const remaining = parseFloat(l.remainingQty);
                 return (
-                  <tr key={l.id} className="border-t">
-                    <td className="px-3 py-2">{l.description}</td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">{l.unit}</td>
-                    <td className="px-3 py-2 text-right">{parseFloat(l.quantity).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</td>
-                    <td className="px-3 py-2 text-right">{parseFloat(l.certifiedQuantity).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</td>
-                    <td className={`px-3 py-2 text-right ${remaining <= 0 ? "text-muted-foreground line-through" : ""}`}>
+                  <TableRow key={l.id}>
+                    <TableCell>{l.description}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{l.unit}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {parseFloat(l.quantity).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {parseFloat(l.certifiedQuantity).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className={`text-right tabular-nums ${remaining <= 0 ? "text-muted-foreground line-through" : ""}`}>
                       {remaining.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-3 py-2 text-right">{parseFloat(l.unitPrice).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</td>
-                    <td className="px-3 py-2">
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {parseFloat(l.unitPrice).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell>
                       <Input
                         className="h-8 text-xs text-right"
                         type="number"
@@ -127,24 +143,26 @@ export function SubcontractCertificationForm({
                         onChange={(e) => setQuantities((prev) => ({ ...prev, [l.id]: e.target.value }))}
                         disabled={remaining <= 0}
                       />
-                    </td>
-                    <td className="px-3 py-2 text-right font-medium">
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
                       {importe > 0 ? importe.toLocaleString("es-AR", { minimumFractionDigits: 2 }) : "—"}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-            <tfoot className="border-t bg-muted/30">
-              <tr>
-                <td colSpan={7} className="px-3 py-2 text-right font-medium text-sm">Total certificado:</td>
-                <td className="px-3 py-2 text-right font-semibold">
+            </TableBody>
+            <TableFooter className="bg-muted/30">
+              <TableRow>
+                <TableCell colSpan={7} className="text-right font-medium">
+                  Total certificado:
+                </TableCell>
+                <TableCell className="text-right font-semibold tabular-nums">
                   {totalAmount.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </TableScroll>
       </div>
 
       <div className="flex gap-2 justify-end">

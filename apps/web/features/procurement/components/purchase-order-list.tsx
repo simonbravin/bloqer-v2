@@ -1,7 +1,8 @@
 "use client";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 import Link from "next/link";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
 
 export type PurchaseOrderListItem = {
@@ -22,11 +23,7 @@ interface Props {
 
 export function PurchaseOrderList({ orders, projectId }: Props) {
   if (orders.length === 0) {
-    return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
-        No hay órdenes de compra registradas.
-      </p>
-    );
+    return <ListEmptyState message="No hay órdenes de compra registradas." />;
   }
 
   return (

@@ -3,6 +3,15 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
@@ -80,29 +89,29 @@ export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productO
         </Button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs text-muted-foreground">
-              <th className="pb-1 pr-2 font-normal w-[15%]">WBS (ITEM)</th>
-              {productOptions.length > 0 && <th className="pb-1 pr-2 font-normal w-[15%]">Producto</th>}
-              <th className="pb-1 pr-2 font-normal w-[20%]">Descripción</th>
-              <th className="pb-1 pr-2 font-normal w-[6%]">Unidad</th>
-              <th className="pb-1 pr-2 font-normal w-[8%]">Cant.</th>
-              <th className="pb-1 pr-2 font-normal w-[12%]">Precio unit.</th>
-              <th className="pb-1 pr-2 font-normal w-[7%]">IVA %</th>
-              <th className="pb-1 pr-2 font-normal w-[10%] text-right">Subtotal</th>
-              <th className="pb-1 pr-2 font-normal w-[7%] text-right">IVA</th>
-              <th className="pb-1 font-normal w-[8%] text-right">Total</th>
-              <th className="pb-1 w-8" />
-            </tr>
-          </thead>
-          <tbody className="divide-y">
+      <TableScroll className="border-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[15%]">WBS (ITEM)</TableHead>
+              {productOptions.length > 0 && <TableHead className="w-[15%]">Producto</TableHead>}
+              <TableHead className="w-[20%]">Descripción</TableHead>
+              <TableHead className="w-[6%]">Unidad</TableHead>
+              <TableHead className="w-[8%]">Cant.</TableHead>
+              <TableHead className="w-[12%]">Precio unit.</TableHead>
+              <TableHead className="w-[7%]">IVA %</TableHead>
+              <TableHead className="w-[10%] text-right">Subtotal</TableHead>
+              <TableHead className="w-[7%] text-right">IVA</TableHead>
+              <TableHead className="w-[8%] text-right">Total</TableHead>
+              <TableHead className="w-8" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {lines.map((line, i) => {
               const p = linePreview(line);
               return (
-                <tr key={i} className="align-top">
-                  <td className="py-1.5 pr-2">
+                <TableRow key={i} className="align-top">
+                  <TableCell className="py-1.5">
                     <Select
                       value={line.wbsNodeId ?? "__none__"}
                       onValueChange={(v) => update(i, "wbsNodeId", v === "__none__" ? null : v)}
@@ -119,9 +128,9 @@ export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productO
                         ))}
                       </SelectContent>
                     </Select>
-                  </td>
+                  </TableCell>
                   {productOptions.length > 0 && (
-                    <td className="py-1.5 pr-2">
+                    <TableCell className="py-1.5">
                       <Select
                         value={line.productId ?? "__none__"}
                         onValueChange={(v) => {
@@ -143,9 +152,9 @@ export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productO
                           ))}
                         </SelectContent>
                       </Select>
-                    </td>
+                    </TableCell>
                   )}
-                  <td className="py-1.5 pr-2">
+                  <TableCell className="py-1.5">
                     <Input
                       required
                       value={line.description}
@@ -153,16 +162,16 @@ export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productO
                       placeholder="Descripción"
                       className="h-8 text-sm"
                     />
-                  </td>
-                  <td className="py-1.5 pr-2">
+                  </TableCell>
+                  <TableCell className="py-1.5">
                     <Input
                       value={line.unit}
                       onChange={(e) => update(i, "unit", e.target.value)}
                       placeholder="un"
                       className="h-8 text-sm"
                     />
-                  </td>
-                  <td className="py-1.5 pr-2">
+                  </TableCell>
+                  <TableCell className="py-1.5">
                     <Input
                       required
                       value={line.quantity}
@@ -170,8 +179,8 @@ export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productO
                       placeholder="1"
                       className="h-8 text-sm"
                     />
-                  </td>
-                  <td className="py-1.5 pr-2">
+                  </TableCell>
+                  <TableCell className="py-1.5">
                     <Input
                       required
                       value={line.unitPrice}
@@ -179,19 +188,19 @@ export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productO
                       placeholder="0.00"
                       className="h-8 text-sm"
                     />
-                  </td>
-                  <td className="py-1.5 pr-2">
+                  </TableCell>
+                  <TableCell className="py-1.5">
                     <Input
                       value={line.taxRate}
                       onChange={(e) => update(i, "taxRate", e.target.value)}
                       placeholder="21"
                       className="h-8 text-sm"
                     />
-                  </td>
-                  <td className="py-1.5 pr-2 text-right tabular-nums pt-3">{fmt(p.subtotal)}</td>
-                  <td className="py-1.5 pr-2 text-right tabular-nums pt-3">{fmt(p.tax)}</td>
-                  <td className="py-1.5 text-right tabular-nums pt-3">{fmt(p.total)}</td>
-                  <td className="py-1.5 pl-2 pt-2">
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">{fmt(p.subtotal)}</TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">{fmt(p.tax)}</TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">{fmt(p.total)}</TableCell>
+                  <TableCell className="align-top pt-2">
                     {lines.length > 1 && (
                       <button
                         type="button"
@@ -202,13 +211,13 @@ export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productO
                         ✕
                       </button>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </TableScroll>
 
       <div className="flex justify-end gap-8 text-sm border-t pt-3">
         <div className="text-right">

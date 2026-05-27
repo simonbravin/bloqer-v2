@@ -370,6 +370,18 @@
 - **Recomendación / cierre Phase 1 (2026-05-14):** opción **(2)** lockeada — [D-037](./DECISION_LOG.md). Opciones **(1)** y **(3)** quedan para decisión futura explícita si el negocio exige C×C formal sin obra u otro documento.
 - **Bloquea:** _(Phase 1 cerrado con D-037)_ “factura de venta empresa” vía **AR sin proyecto** sigue **fuera** hasta nueva decisión; ver [D-035](./DECISION_LOG.md), [D-037](./DECISION_LOG.md). Checklist técnica para ampliaciones futuras: [`Q030_CORPORATE_INCOME_CHECKLIST.md`](../08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md).
 
+### Q-031 — Acciones masivas en listados (directorio / proyectos)
+
+- **Categoría:** UX / Directorio / Proyectos
+- **Estado:** ABIERTA
+- **Impacto si no se resuelve:** no hay selección múltiple para archivar, exportar o reasignar en masa; la UI no debe improvisar mutaciones sin reglas de negocio documentadas.
+- **Opciones identificadas:**
+  1. Archivar contactos / pausar proyectos en lote (requiere permisos y estados en `STATE_MACHINES.md`).
+  2. Exportar CSV de la página actual (solo lectura, sin cambio de estado).
+  3. Postergar hasta definir flujos con Owner.
+- **Recomendación inicial:** opción 3 hasta decisión; si se avanza, priorizar **(2)** antes que mutaciones masivas.
+- **Bloquea:** checkboxes y barra de acciones en listados de directorio y proyectos.
+
 ---
 
 ## Cómo se resuelve una pregunta

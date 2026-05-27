@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default async function InventarioPage() {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Inventario</h1>
         <p className="text-muted-foreground text-sm mt-1">
@@ -52,6 +53,6 @@ export default async function InventarioPage() {
           <p className="text-sm text-muted-foreground mt-1">Stock actual y kardex de movimientos</p>
         </Link>
       </div>
-    </div>
+    </PageShell>
   );
 }

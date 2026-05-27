@@ -7,6 +7,7 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/layout/page-shell";
 import { getCurrentUser } from "@/lib/auth";
 import { ProjectOverviewView } from "@/features/projects/overview/project-overview-view";
 import {
@@ -120,11 +121,13 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
     ) : null;
 
   return (
-    <ProjectOverviewView
-      dashboard={dashboard}
-      projectId={id}
-      fullProject={fullProject}
-      lifecycleActions={lifecycleActions}
-    />
+    <PageShell>
+      <ProjectOverviewView
+        dashboard={dashboard}
+        projectId={id}
+        fullProject={fullProject}
+        lifecycleActions={lifecycleActions}
+      />
+    </PageShell>
   );
 }

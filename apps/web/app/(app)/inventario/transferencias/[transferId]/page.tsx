@@ -1,11 +1,21 @@
 import { formatDate, formatDateTime } from "@/lib/format";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { getCurrentUser } from "@/lib/auth";
 import { getWarehouseTransferById, ServiceError } from "@bloqer/services";
 import { WarehouseTransferStatusBadge } from "@/features/warehouse-transfer";
 import { cancelWarehouseTransferAction } from "../actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ transferId: string }>;
@@ -13,7 +23,7 @@ interface PageProps {
 
 const TYPE_LABELS: Record<string, string> = {
   TRANSFER_OUT: "Salida (origen)",
-  TRANSFER_IN:  "Entrada (destino)",
+  TRANSFER_IN: "Entrada (destino)",
 };
 
 const MOVEMENT_STATUS_LABELS: Record<string, string> = {
@@ -26,7 +36,7 @@ function fmt(v: string) {
 }
 
 function fmtDate(d: string) {
-  return formatDate(d );
+  return formatDate(d);
 }
 
 export default async function TransferenciaDetailPage({ params }: PageProps) {
@@ -36,9 +46,9 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
   const { transferId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let transfer;
@@ -55,12 +65,10 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/inventario/transferencias">← Transferencias</Link>
-          </Button>
+          <PageBackLink href="/inventario/transferencias" label="Transferencias" />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight font-mono">
@@ -68,12 +76,16 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
               </h1>
               <WarehouseTransferStatusBadge status={transfer.status} />
             </div>
-            <p className="text-sm text-muted-foreground">{fmtDate(transfer.transferDate.toISOString().slice(0,10))}</p>
+            <p className="text-sm text-muted-foreground">
+              {fmtDate(transfer.transferDate.toISOString().slice(0, 10))}
+            </p>
           </div>
         </div>
         {transfer.status === "CONFIRMED" && (
           <form action={doCancel}>
-            <Button variant="outline" size="sm" type="submit">Cancelar transferencia</Button>
+            <Button variant="outline" size="sm" type="submit">
+              Cancelar transferencia
+            </Button>
           </form>
         )}
       </div>
@@ -97,7 +109,9 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
           </div>
           <div>
             <dt className="text-muted-foreground">Cantidad</dt>
-            <dd className="font-medium">{fmt(transfer.quantity)} {transfer.productUnit}</dd>
+            <dd className="font-medium">
+              {fmt(transfer.quantity)} {transfer.productUnit}
+            </dd>
           </div>
           {transfer.unitCost && (
             <div>
@@ -124,31 +138,33 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
         <div className="border-b px-6 py-4">
           <h2 className="font-semibold">Movimientos de stock</h2>
         </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-              <th className="px-6 py-2.5 text-left font-medium">Tipo</th>
-              <th className="px-6 py-2.5 text-left font-medium">Depósito</th>
-              <th className="px-6 py-2.5 text-left font-medium">Fecha</th>
-              <th className="px-6 py-2.5 text-right font-medium">Cantidad</th>
-              <th className="px-6 py-2.5 text-left font-medium">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transfer.stockMovements.map((m) => (
-              <tr key={m.id} className="border-t">
-                <td className="px-6 py-2.5">{TYPE_LABELS[m.type] ?? m.type}</td>
-                <td className="px-6 py-2.5">{m.warehouseName}</td>
-                <td className="px-6 py-2.5">{fmtDate(m.movementDate)}</td>
-                <td className="px-6 py-2.5 text-right tabular-nums">{fmt(m.quantity)}</td>
-                <td className="px-6 py-2.5 text-muted-foreground text-xs">
-                  {MOVEMENT_STATUS_LABELS[m.status] ?? m.status}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <TableScroll className="border-0 rounded-none">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Depósito</TableHead>
+                <TableHead>Fecha</TableHead>
+                <TableHead className="text-right">Cantidad</TableHead>
+                <TableHead>Estado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transfer.stockMovements.map((m) => (
+                <TableRow key={m.id}>
+                  <TableCell>{TYPE_LABELS[m.type] ?? m.type}</TableCell>
+                  <TableCell>{m.warehouseName}</TableCell>
+                  <TableCell>{fmtDate(m.movementDate)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmt(m.quantity)}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {MOVEMENT_STATUS_LABELS[m.status] ?? m.status}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableScroll>
       </div>
-    </div>
+    </PageShell>
   );
 }

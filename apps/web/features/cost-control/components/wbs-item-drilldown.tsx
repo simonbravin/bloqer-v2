@@ -1,5 +1,14 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import type { WbsItemCostDetail } from "@bloqer/services";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 
 function fmt(v: string) {
   return parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -157,21 +166,25 @@ function Kv({ label, value }: { label: string; value: string }) {
 
 function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead className="text-xs uppercase bg-muted/50">
-          <tr>
-            {headers.map((h) => <th key={h} className="px-3 py-2 text-left">{h}</th>)}
-          </tr>
-        </thead>
-        <tbody>
+    <TableScroll className="border-0">
+      <Table className="text-xs">
+        <TableHeader>
+          <TableRow>
+            {headers.map((h) => (
+              <TableHead key={h}>{h}</TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.map((row, i) => (
-            <tr key={i} className="border-t">
-              {row.map((cell, j) => <td key={j} className="px-3 py-2">{cell}</td>)}
-            </tr>
+            <TableRow key={i}>
+              {row.map((cell, j) => (
+                <TableCell key={j}>{cell}</TableCell>
+              ))}
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </TableScroll>
   );
 }

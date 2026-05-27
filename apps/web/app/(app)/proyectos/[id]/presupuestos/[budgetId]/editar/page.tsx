@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { BudgetStatusBadge, BudgetSettingsForm } from "@/features/budgets";
 import { getCurrentUser } from "@/lib/auth";
-import { getBudgetById, ServiceError } from "@bloqer/services";
+import { getBudgetById, getProjectShellInfo, ServiceError } from "@bloqer/services";
 import { updateBudgetSettingsAction } from "../../actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { ProjectPageHeader } from "@/components/layout/project-page-header";
 
 interface PageProps {
   params: Promise<{ id: string; budgetId: string }>;
@@ -23,10 +24,15 @@ export default async function EditarPresupuestoPage({ params }: PageProps) {
   };
 
   let budget;
+  let project;
   try {
-    budget = await getBudgetById(budgetId, ctx);
+    [budget, project] = await Promise.all([
+      getBudgetById(budgetId, ctx),
+      getProjectShellInfo(projectId, ctx),
+    ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
@@ -43,23 +49,31 @@ export default async function EditarPresupuestoPage({ params }: PageProps) {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${projectId}/presupuestos/${budgetId}`}>← Volver</Link>
-        </Button>
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight">Configuración del presupuesto</h1>
+    <PageShell variant="form" className="space-y-6">
+      <ProjectPageHeader
+        projectId={projectId}
+        projectName={project.name}
+        title="Configuración del presupuesto"
+        subtitle={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            {budget.name} — v{budget.versionNumber}
             <BudgetStatusBadge status={budget.status} />
-          </div>
-          <p className="text-sm text-muted-foreground">{budget.name} — v{budget.versionNumber}</p>
-        </div>
-      </div>
+          </span>
+        }
+        actions={
+          <Link
+            href={`/proyectos/${projectId}/presupuestos/${budgetId}`}
+            className="text-sm text-primary underline-offset-4 hover:underline"
+          >
+            Volver al editor WBS
+          </Link>
+        }
+      />
 
       {!editable && (
         <div className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">
-          Este presupuesto está en estado <strong>{budget.status}</strong> y no permite cambios en la configuración.
+          Este presupuesto está en estado <strong>{budget.status}</strong> y no permite cambios en
+          la configuración.
         </div>
       )}
 
@@ -70,6 +84,6 @@ export default async function EditarPresupuestoPage({ params }: PageProps) {
           onSubmit={updateBudgetSettingsAction.bind(null, budgetId)}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }

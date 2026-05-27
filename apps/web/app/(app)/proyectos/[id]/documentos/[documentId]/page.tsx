@@ -1,15 +1,12 @@
 import { formatDate, formatDateTime } from "@/lib/format";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 import { getDocumentById, ServiceError } from "@bloqer/services";
 import { DocumentCategoryBadge, DocumentStatusBadge } from "@/features/documents";
-import {
-  archiveDocumentAction,
-  restoreDocumentAction,
-  softDeleteDocumentAction,
-} from "../actions";
+import { PageShell } from "@/components/layout/page-shell";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { archiveDocumentAction, restoreDocumentAction, softDeleteDocumentAction } from "../actions";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; documentId: string }>;
@@ -20,8 +17,8 @@ function fmtDate(iso: string) {
 }
 
 function fmtSize(bytes: number) {
-  if (bytes < 1024)         return `${bytes} B`;
-  if (bytes < 1024 * 1024)  return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
@@ -32,9 +29,9 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
   const { id, documentId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   let doc;
@@ -45,20 +42,27 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
     throw err;
   }
 
-  const canDownload = doc.storageProvider === "R2" &&
-    (doc.status === "ACTIVE" || doc.status === "ARCHIVED");
+  const canDownload =
+    doc.storageProvider === "R2" && (doc.status === "ACTIVE" || doc.status === "ARCHIVED");
 
-  const doArchive = async () => { "use server"; await archiveDocumentAction(documentId, id); };
-  const doRestore = async () => { "use server"; await restoreDocumentAction(documentId, id); };
-  const doDelete  = async () => { "use server"; await softDeleteDocumentAction(documentId, id); };
+  const doArchive = async () => {
+    "use server";
+    await archiveDocumentAction(documentId, id);
+  };
+  const doRestore = async () => {
+    "use server";
+    await restoreDocumentAction(documentId, id);
+  };
+  const doDelete = async () => {
+    "use server";
+    await softDeleteDocumentAction(documentId, id);
+  };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/proyectos/${id}/documentos`}>← Documentos</Link>
-          </Button>
+          <PageBackLink href={`/proyectos/${id}/documentos`} label="Documentos" />
           <h1 className="text-xl font-bold tracking-tight truncate max-w-md">
             {doc.originalFileName}
           </h1>
@@ -71,12 +75,16 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
           )}
           {doc.canMutate && doc.status === "ACTIVE" && (
             <form action={doArchive}>
-              <Button variant="outline" size="sm" type="submit">Archivar</Button>
+              <Button variant="outline" size="sm" type="submit">
+                Archivar
+              </Button>
             </form>
           )}
           {doc.canMutate && doc.status === "ARCHIVED" && (
             <form action={doRestore}>
-              <Button variant="outline" size="sm" type="submit">Restaurar</Button>
+              <Button variant="outline" size="sm" type="submit">
+                Restaurar
+              </Button>
             </form>
           )}
           {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && (
@@ -91,13 +99,15 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
 
       {doc.status === "UPLOADING" && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/10 px-4 py-3 text-sm text-blue-700 dark:text-blue-400">
-          Este documento está siendo procesado. Si persiste en este estado, puede que la subida haya fallado.
+          Este documento está siendo procesado. Si persiste en este estado, puede que la subida haya
+          fallado.
         </div>
       )}
 
       {doc.storageProvider === "PLACEHOLDER" && doc.status === "ACTIVE" && (
         <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10 px-4 py-3 text-sm text-yellow-700 dark:text-yellow-400">
-          Solo se guardó la metadata de este documento. El almacenamiento real no estaba configurado al momento de la subida.
+          Solo se guardó la metadata de este documento. El almacenamiento real no estaba configurado
+          al momento de la subida.
         </div>
       )}
 
@@ -112,11 +122,15 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
           </div>
           <div>
             <dt className="text-muted-foreground">Estado</dt>
-            <dd><DocumentStatusBadge status={doc.status} /></dd>
+            <dd>
+              <DocumentStatusBadge status={doc.status} />
+            </dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Categoría</dt>
-            <dd><DocumentCategoryBadge category={doc.category} /></dd>
+            <dd>
+              <DocumentCategoryBadge category={doc.category} />
+            </dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Tipo MIME</dt>
@@ -150,6 +164,6 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
           )}
         </dl>
       </div>
-    </div>
+    </PageShell>
   );
 }

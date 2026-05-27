@@ -1,54 +1,63 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatCurrencyDisplay, formatDate } from "@/lib/format";
 import type { CollectionDetail } from "@bloqer/services";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 
-function fmt(v: string) {
-  return parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2 });
-}
-
-function fmtDate(d: string) {
-  return formatDate(d );
+function formatAmount(value: string) {
+  return new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(parseFloat(value));
 }
 
 interface Props {
   collections: CollectionDetail[];
-  currency:    string;
+  currency: string;
 }
 
 export function CollectionDetailTable({ collections, currency }: Props) {
   if (collections.length === 0) {
-    return (
-      <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
-        Sin cobranzas confirmadas en el período seleccionado.
-      </div>
-    );
+    return <ListEmptyState message="Sin cobranzas confirmadas en el período seleccionado." />;
   }
+
+  const currencyLabel = formatCurrencyDisplay(currency);
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-            <th className="px-4 py-2.5 text-left font-medium">Fecha</th>
-            <th className="px-4 py-2.5 text-left font-medium">Cliente</th>
-            <th className="px-4 py-2.5 text-left font-medium">Factura</th>
-            <th className="px-4 py-2.5 text-left font-medium">Cuenta</th>
-            <th className="px-4 py-2.5 text-right font-medium">Monto ({currency})</th>
-          </tr>
-        </thead>
-        <tbody>
-          {collections.map((c) => (
-            <tr key={c.collectionId} className="border-t">
-              <td className="px-4 py-2.5 whitespace-nowrap">{fmtDate(c.date)}</td>
-              <td className="px-4 py-2.5 font-medium">{c.clientName}</td>
-              <td className="px-4 py-2.5 text-muted-foreground">#{c.invoiceNumber}</td>
-              <td className="px-4 py-2.5 text-muted-foreground text-xs">{c.accountName}</td>
-              <td className="px-4 py-2.5 text-right tabular-nums font-mono text-emerald-600 dark:text-emerald-400">
-                {fmt(c.amount)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <TableScroll className="border-0 rounded-none">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Cliente</TableHead>
+              <TableHead>Factura</TableHead>
+              <TableHead>Cuenta</TableHead>
+              <TableHead className="text-right">Monto ({currencyLabel})</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {collections.map((c) => (
+              <TableRow key={c.collectionId}>
+                <TableCell className="whitespace-nowrap">{formatDate(c.date)}</TableCell>
+                <TableCell className="font-medium">{c.clientName}</TableCell>
+                <TableCell className="text-muted-foreground">#{c.invoiceNumber}</TableCell>
+                <TableCell className="text-muted-foreground text-xs">{c.accountName}</TableCell>
+                <TableCell className="text-right tabular-nums font-mono text-emerald-600 dark:text-emerald-400">
+                  {formatAmount(c.amount)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableScroll>
     </div>
   );
 }
