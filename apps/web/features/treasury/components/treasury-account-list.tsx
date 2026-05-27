@@ -1,5 +1,4 @@
 import type { TreasuryAccountType, TreasuryAccountStatus } from "@bloqer/database";
-import { TreasuryAccountTable } from "./treasury-account-table";
 
 export type TreasuryAccountListItem = {
   id: string;
@@ -10,12 +9,3 @@ export type TreasuryAccountListItem = {
   status: TreasuryAccountStatus;
   bankName: string | null;
 };
-
-interface TreasuryAccountListProps {
-  accounts: TreasuryAccountListItem[];
-}
-
-/** @deprecated Use TreasuryAccountTable or TreasuryAccountListSection */
-export function TreasuryAccountList({ accounts }: TreasuryAccountListProps) {
-  return <TreasuryAccountTable accounts={accounts} />;
-}

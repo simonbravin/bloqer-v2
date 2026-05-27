@@ -1,13 +1,12 @@
 export { AccountTypeBadge } from "./components/account-type-badge";
 export { JournalEntryStatusBadge } from "./components/journal-entry-status-badge";
-export { AccountingAccountList } from "./components/accounting-account-list";
 export type { AccountingAccountListItem } from "./components/accounting-account-list";
 export { AccountingAccountTable } from "./components/accounting-account-table";
 export { AccountingAccountCards } from "./components/accounting-account-cards";
 export { AccountingAccountListSection } from "./components/accounting-account-list-section";
 export { AccountingAccountForm } from "./components/accounting-account-form";
 export type { CompanyOption } from "./components/accounting-account-form";
-export { JournalEntryList } from "./components/journal-entry-list";
+export { JournalEntryTable } from "./components/journal-entry-table";
 export { JournalEntryForm } from "./components/journal-entry-form";
 export { JournalEntryLinesEditor, initialJournalLines, linesFromJournalEntry } from "./components/journal-entry-lines-editor";
 export type { AccountPick, LineEditorRow } from "./components/journal-entry-lines-editor";

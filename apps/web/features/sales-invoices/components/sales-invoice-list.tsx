@@ -1,8 +1,5 @@
 import type { SalesInvoiceStatus } from "@bloqer/database";
 
-/** @deprecated Use SalesInvoiceTable or SalesInvoiceListSection */
-export { SalesInvoiceTable as SalesInvoiceList } from "./sales-invoice-table";
-
 export type SalesInvoiceListItem = {
   id: string;
   projectId: string;

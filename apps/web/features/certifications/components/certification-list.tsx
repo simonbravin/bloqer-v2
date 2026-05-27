@@ -1,8 +1,5 @@
 import type { CertificationStatus } from "@bloqer/database";
 
-/** @deprecated Use CertificationTable or CertificationListSection */
-export { CertificationTable as CertificationList } from "./certification-table";
-
 export type CertificationListItem = {
   id: string;
   projectId: string;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import type { ProjectStatus } from "@bloqer/database";
 import type { ProjectOverviewDashboard } from "@bloqer/services";
 import type { ProjectWithClient } from "@bloqer/services";

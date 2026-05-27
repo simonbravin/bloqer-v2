@@ -1,5 +1,4 @@
 import type { ReceivableStatus } from "@bloqer/database";
-import { ReceivableTable } from "./receivable-table";
 
 export type ReceivableListItem = {
   id: string;
@@ -13,13 +12,3 @@ export type ReceivableListItem = {
   currency: string;
   clientName: string;
 };
-
-interface ReceivableListProps {
-  receivables: ReceivableListItem[];
-  projectId: string;
-}
-
-/** @deprecated Use ReceivableTable or ReceivableListSection */
-export function ReceivableList({ receivables, projectId }: ReceivableListProps) {
-  return <ReceivableTable receivables={receivables} projectId={projectId} />;
-}

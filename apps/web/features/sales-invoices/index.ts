@@ -1,10 +1,8 @@
 export { SalesInvoiceStatusBadge } from "./components/sales-invoice-status-badge";
 export { ReceivableStatusBadge } from "./components/receivable-status-badge";
-export { SalesInvoiceList } from "./components/sales-invoice-list";
 export { SalesInvoiceTable } from "./components/sales-invoice-table";
 export { SalesInvoiceCards } from "./components/sales-invoice-cards";
 export { SalesInvoiceListSection } from "./components/sales-invoice-list-section";
-export { ReceivableList } from "./components/receivable-list";
 export { ReceivableTable } from "./components/receivable-table";
 export { ReceivableCards } from "./components/receivable-cards";
 export { ReceivableListSection } from "./components/receivable-list-section";

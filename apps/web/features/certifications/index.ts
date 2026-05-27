@@ -1,4 +1,3 @@
-export { CertificationList } from "./components/certification-list";
 export { CertificationTable } from "./components/certification-table";
 export { CertificationCards } from "./components/certification-cards";
 export { CertificationListSection } from "./components/certification-list-section";
