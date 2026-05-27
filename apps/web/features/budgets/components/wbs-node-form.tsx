@@ -15,6 +15,7 @@ import {
   createWbsNodeSchema, updateWbsNodeSchema,
   type CreateWbsNodeInput, type UpdateWbsNodeInput,
 } from "@bloqer/validators";
+import { UnitSelect } from "./unit-select";
 
 type CreateMode = {
   mode: "create";
@@ -53,10 +54,11 @@ function CreateForm({
 }: CreateMode & Shared) {
   const form = useForm<CreateWbsNodeInput>({
     resolver: zodResolver(createWbsNodeSchema),
-    defaultValues: { parentId, type: "GROUP", sortOrder: 0 },
+    defaultValues: { parentId, type: "GROUP", sortOrder: 0, unit: "un" },
   });
 
   const type = form.watch("type");
+  const unit = form.watch("unit") ?? "";
 
   const handleSubmit = form.handleSubmit((data) => {
     setServerError(null);
@@ -108,7 +110,7 @@ function CreateForm({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Unidad</Label>
-            <Input placeholder="m³" {...form.register("unit")} />
+            <UnitSelect value={unit} onChange={(v) => form.setValue("unit", v)} />
           </div>
           <div className="space-y-1.5">
             <Label>Cantidad</Label>

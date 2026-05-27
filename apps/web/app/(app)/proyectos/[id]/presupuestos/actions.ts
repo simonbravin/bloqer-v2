@@ -73,6 +73,7 @@ export async function updateBudgetAction(
 
 export async function updateBudgetSettingsAction(
   budgetId: string,
+  projectId: string,
   data: UpdateBudgetSettingsInput,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
@@ -80,7 +81,8 @@ export async function updateBudgetSettingsAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateBudgetSettings(budgetId, parsed.data, ctx);
-    revalidatePath(`/proyectos`);
+    revalidatePath(`/proyectos/${projectId}/presupuestos`);
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -89,26 +91,39 @@ export async function updateBudgetSettingsAction(
 
 async function lifecycleAction(
   budgetId: string,
+  projectId: string,
   fn: (id: string, ctx: Awaited<ReturnType<typeof getCtx>>) => Promise<unknown>,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
     await fn(budgetId, ctx);
-    revalidatePath(`/proyectos`);
+    revalidatePath(`/proyectos/${projectId}/presupuestos`);
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
 
-export async function submitForReviewAction(id: string) { return lifecycleAction(id, submitBudgetForReview); }
-export async function returnForChangesAction(id: string) { return lifecycleAction(id, returnBudgetForChanges); }
-export async function approveBudgetAction(id: string) { return lifecycleAction(id, approveBudget); }
-export async function closeBudgetAction(id: string) { return lifecycleAction(id, closeBudget); }
-export async function cancelBudgetAction(id: string) { return lifecycleAction(id, cancelBudget); }
+export async function submitForReviewAction(budgetId: string, projectId: string) {
+  return lifecycleAction(budgetId, projectId, submitBudgetForReview);
+}
+export async function returnForChangesAction(budgetId: string, projectId: string) {
+  return lifecycleAction(budgetId, projectId, returnBudgetForChanges);
+}
+export async function approveBudgetAction(budgetId: string, projectId: string) {
+  return lifecycleAction(budgetId, projectId, approveBudget);
+}
+export async function closeBudgetAction(budgetId: string, projectId: string) {
+  return lifecycleAction(budgetId, projectId, closeBudget);
+}
+export async function cancelBudgetAction(budgetId: string, projectId: string) {
+  return lifecycleAction(budgetId, projectId, cancelBudget);
+}
 
 // ─── WBS ──────────────────────────────────────────────────────────────────────
 
 export async function addWbsNodeAction(
   budgetId: string,
+  projectId: string,
   data: CreateWbsNodeInput,
 ): Promise<{ id: string } | Err> {
   const ctx = await getCtx();
@@ -116,13 +131,15 @@ export async function addWbsNodeAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const result = await addWbsNode(budgetId, parsed.data, ctx);
-    revalidatePath(`/proyectos`);
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return result;
   } catch (err) { return handle(err); }
 }
 
 export async function updateWbsNodeAction(
   nodeId: string,
+  projectId: string,
+  budgetId: string,
   data: UpdateWbsNodeInput,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
@@ -130,22 +147,27 @@ export async function updateWbsNodeAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateWbsNode(nodeId, parsed.data, ctx);
-    revalidatePath(`/proyectos`);
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
 
-export async function removeWbsNodeAction(nodeId: string): Promise<Ok | Err> {
+export async function removeWbsNodeAction(
+  nodeId: string,
+  projectId: string,
+  budgetId: string,
+): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
     await removeWbsNode(nodeId, ctx);
-    revalidatePath(`/proyectos`);
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
 
 export async function reorderWbsNodesAction(
   budgetId: string,
+  projectId: string,
   data: ReorderWbsNodesInput,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
@@ -153,7 +175,7 @@ export async function reorderWbsNodesAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await reorderWbsNodes(budgetId, parsed.data, ctx);
-    revalidatePath(`/proyectos`);
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -162,6 +184,8 @@ export async function reorderWbsNodesAction(
 
 export async function updateCostItemAction(
   costItemId: string,
+  projectId: string,
+  budgetId: string,
   data: UpdateCostItemInput,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
@@ -169,7 +193,7 @@ export async function updateCostItemAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateCostItem(costItemId, parsed.data, ctx);
-    revalidatePath(`/proyectos`);
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -177,6 +201,8 @@ export async function updateCostItemAction(
 // ─── CostAnalysisLines ────────────────────────────────────────────────────────
 
 export async function addCostAnalysisLineAction(
+  projectId: string,
+  budgetId: string,
   data: CreateCostAnalysisLineInput,
 ): Promise<{ id: string } | Err> {
   const ctx = await getCtx();
@@ -184,13 +210,15 @@ export async function addCostAnalysisLineAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const line = await addCostAnalysisLine(parsed.data, ctx);
-    revalidatePath(`/proyectos`);
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return { id: line.id };
   } catch (err) { return handle(err); }
 }
 
 export async function updateCostAnalysisLineAction(
   lineId: string,
+  projectId: string,
+  budgetId: string,
   data: UpdateCostAnalysisLineInput,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
@@ -198,16 +226,20 @@ export async function updateCostAnalysisLineAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateCostAnalysisLine(lineId, parsed.data, ctx);
-    revalidatePath(`/proyectos`);
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
 
-export async function removeCostAnalysisLineAction(lineId: string): Promise<Ok | Err> {
+export async function removeCostAnalysisLineAction(
+  lineId: string,
+  projectId: string,
+  budgetId: string,
+): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
     await removeCostAnalysisLine(lineId, ctx);
-    revalidatePath(`/proyectos`);
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return { ok: true };
   } catch (err) { return handle(err); }
 }

@@ -181,9 +181,16 @@ export async function updateProject(
     await _guardClientRole(input.clientContactId, ctx.tenantId);
   }
 
+  const { startDate, expectedEndDate, ...rest } = input;
+
   const updated = await prisma.project.update({
     where: { id },
-    data: { ...input, updatedBy: ctx.actorUserId },
+    data: {
+      ...rest,
+      ...(startDate !== undefined ? { startDate } : {}),
+      ...(expectedEndDate !== undefined ? { expectedEndDate } : {}),
+      updatedBy: ctx.actorUserId,
+    },
   });
 
   await log({

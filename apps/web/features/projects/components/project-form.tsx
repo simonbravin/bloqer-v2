@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createProjectSchema, type CreateProjectInput } from "@bloqer/validators";
+import { createProjectSchema, type CreateProjectInput, type ProjectFormInput } from "@bloqer/validators";
 
 interface ClientOption {
   id: string;
@@ -26,7 +26,7 @@ interface ClientOption {
 
 interface ProjectFormProps {
   clients: ClientOption[];
-  defaultValues?: Partial<CreateProjectInput>;
+  defaultValues?: Partial<ProjectFormInput>;
   submitLabel?: string;
   successRedirect?: string;
   onSubmit: (data: CreateProjectInput) => Promise<{ id: string } | { ok: true } | { error: string }>;
@@ -43,7 +43,7 @@ export function ProjectForm({
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const form = useForm<CreateProjectInput>({
+  const form = useForm<ProjectFormInput>({
     resolver: zodResolver(createProjectSchema),
     defaultValues: {
       type: "PRIVATE",
@@ -54,10 +54,15 @@ export function ProjectForm({
 
   const clientContactId = form.watch("clientContactId");
 
-  const handleSubmit = form.handleSubmit((data) => {
+  const handleSubmit = form.handleSubmit((raw) => {
+    const parsed = createProjectSchema.safeParse(raw);
+    if (!parsed.success) {
+      setServerError(parsed.error.issues[0]?.message ?? "Datos inválidos");
+      return;
+    }
     setServerError(null);
     startTransition(async () => {
-      const result = await onSubmit(data);
+      const result = await onSubmit(parsed.data);
       if ("error" in result) {
         setServerError(result.error);
       } else {

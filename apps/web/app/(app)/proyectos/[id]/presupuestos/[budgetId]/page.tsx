@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { BudgetStatusBadge, WbsTree, BudgetTotalsPanel } from "@/features/budgets";
+import { BudgetStatusBadge, WbsTree, BudgetLifecycleDialog, BudgetMarginConfigSection } from "@/features/budgets";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { getCurrentUser } from "@/lib/auth";
@@ -23,6 +22,7 @@ import {
   approveBudgetAction,
   closeBudgetAction,
   cancelBudgetAction,
+  updateBudgetSettingsAction,
 } from "../actions";
 
 interface PageProps {
@@ -62,6 +62,16 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
       ? formatMoneyAmount(String(saleN - costN), budget.currency)
       : "—";
 
+  const s = budget.settings;
+  const settingsDefaults = {
+    overheadPct: s ? parseFloat(s.overheadPct.toString()) : 0,
+    financialCostPct: s ? parseFloat(s.financialCostPct.toString()) : 0,
+    financialDaysAvg: s ? s.financialDaysAvg : 0,
+    profitPct: s ? parseFloat(s.profitPct.toString()) : 0,
+    taxPct: s ? parseFloat(s.taxPct.toString()) : 0,
+    notes: s?.notes ?? null,
+  };
+
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="space-y-4">
@@ -75,13 +85,22 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
             </div>
             <p className="text-sm text-muted-foreground">Moneda: {budget.currency}</p>
           </div>
-          {editable ? (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/proyectos/${projectId}/presupuestos/${budgetId}/editar`}>
-                Configuración
-              </Link>
-            </Button>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <BudgetLifecycleDialog
+              status={budget.status}
+              onSubmitForReview={submitForReviewAction.bind(null, budgetId, projectId)}
+              onReturnForChanges={returnForChangesAction.bind(null, budgetId, projectId)}
+              onApprove={approveBudgetAction.bind(null, budgetId, projectId)}
+              onClose={closeBudgetAction.bind(null, budgetId, projectId)}
+              onCancel={cancelBudgetAction.bind(null, budgetId, projectId)}
+            />
+            <Link
+              href="#configuracion"
+              className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground"
+            >
+              Configuración
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -98,34 +117,43 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
         <KpiStatCard label="Margen (venta − costo)" value={marginStr} tone="muted" />
       </KpiStatGrid>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_17rem]">
-        <WbsTree
-          nodes={tree}
-          budgetId={budgetId}
+      <WbsTree
+        nodes={tree}
+        budgetId={budgetId}
+        currency={budget.currency}
+        editable={editable}
+        onAddNode={(_budgetId, data) => addWbsNodeAction(budgetId, projectId, data)}
+        onUpdateNode={(nodeId, data) => updateWbsNodeAction(nodeId, projectId, budgetId, data)}
+        onRemoveNode={(nodeId) => removeWbsNodeAction(nodeId, projectId, budgetId)}
+        onReorderNodes={(_budgetId, data) => reorderWbsNodesAction(budgetId, projectId, data)}
+        onUpdateCostItem={(costItemId, data) =>
+          updateCostItemAction(costItemId, projectId, budgetId, data)
+        }
+        onAddLine={(data) => addCostAnalysisLineAction(projectId, budgetId, data)}
+        onUpdateLine={(lineId, data) =>
+          updateCostAnalysisLineAction(lineId, projectId, budgetId, data)
+        }
+        onRemoveLine={(lineId) => removeCostAnalysisLineAction(lineId, projectId, budgetId)}
+      />
+
+      {budget.settings ? (
+        <BudgetMarginConfigSection
+          defaults={settingsDefaults}
+          totalDirectCost={costStr}
+          totalSalePrice={saleStr}
           currency={budget.currency}
           editable={editable}
-          onAddNode={addWbsNodeAction}
-          onUpdateNode={updateWbsNodeAction}
-          onRemoveNode={removeWbsNodeAction}
-          onReorderNodes={reorderWbsNodesAction}
-          onUpdateCostItem={updateCostItemAction}
-          onAddLine={addCostAnalysisLineAction}
-          onUpdateLine={updateCostAnalysisLineAction}
-          onRemoveLine={removeCostAnalysisLineAction}
+          onSubmit={updateBudgetSettingsAction.bind(null, budgetId, projectId)}
         />
-
-        <BudgetTotalsPanel
-          status={budget.status}
-          currency={budget.currency}
-          totalCost={costStr}
-          totalSalePrice={saleStr}
-          onSubmitForReview={submitForReviewAction.bind(null, budgetId)}
-          onReturnForChanges={returnForChangesAction.bind(null, budgetId)}
-          onApprove={approveBudgetAction.bind(null, budgetId)}
-          onClose={closeBudgetAction.bind(null, budgetId)}
-          onCancel={cancelBudgetAction.bind(null, budgetId)}
-        />
-      </div>
+      ) : (
+        <section
+          id="configuracion"
+          className="rounded-xl border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground"
+        >
+          Este presupuesto no tiene parámetros económicos configurados. Contactá soporte si necesitás
+          editar márgenes.
+        </section>
+      )}
     </PageShell>
   );
 }

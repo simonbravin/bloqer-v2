@@ -16,14 +16,8 @@ import {
   type CreateCostAnalysisLineInput, type UpdateCostAnalysisLineInput,
 } from "@bloqer/validators";
 import type { CostCategory } from "@bloqer/database";
-
-const CATEGORY_LABELS: Record<CostCategory, string> = {
-  MATERIAL:    "Material",
-  LABOR:       "Mano de obra",
-  EQUIPMENT:   "Equipos",
-  SUBCONTRACT: "Subcontrato",
-  OTHER:       "Otros",
-};
+import { CATEGORY_LABELS, VISIBLE_COST_CATEGORIES } from "@/lib/budget-categories";
+import { UnitSelect } from "./unit-select";
 
 type CreateMode = {
   mode: "create";
@@ -151,15 +145,21 @@ function LineFormFields({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(Object.keys(CATEGORY_LABELS) as CostCategory[]).map((cat) => (
+              {VISIBLE_COST_CATEGORIES.map((cat) => (
                 <SelectItem key={cat} value={cat}>{CATEGORY_LABELS[cat]}</SelectItem>
               ))}
+              {category === "OTHER" ? (
+                <SelectItem value="OTHER">{CATEGORY_LABELS.OTHER}</SelectItem>
+              ) : null}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1.5">
           <Label>Unidad *</Label>
-          <Input placeholder="m³, kg, gl, h..." {...form.register("unit")} />
+          <UnitSelect
+            value={form.watch("unit") ?? ""}
+            onChange={(v) => form.setValue("unit", v, { shouldValidate: true })}
+          />
           {form.formState.errors.unit && (
             <p className="text-xs text-destructive">{form.formState.errors.unit.message}</p>
           )}

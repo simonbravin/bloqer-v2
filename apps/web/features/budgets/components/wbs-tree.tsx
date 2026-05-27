@@ -1,26 +1,53 @@
 "use client";
 
-import { useState, useTransition, useMemo, useCallback } from "react";
+import { useState, useTransition, useMemo, useCallback, useEffect, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Pencil,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { budgetUnitLabel } from "@/lib/budget-units";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { WbsNodeForm } from "./wbs-node-form";
-import { CostItemPanel } from "./cost-item-panel";
-import type { WbsViewNode, CostItemView } from "@bloqer/services";
+import { WbsTreeToolbar, type WbsViewMode } from "./wbs-tree-toolbar";
+import { CostItemApuDialog } from "./cost-item-apu-dialog";
+import { WbsGroupDialog } from "./wbs-group-dialog";
+import { computeWbsRowMetrics, computeTreeGrandTotals } from "../lib/wbs-metrics";
+import type { WbsViewNode } from "@bloqer/services";
 import type {
-  CreateWbsNodeInput, UpdateWbsNodeInput, ReorderWbsNodesInput,
-  UpdateCostItemInput, CreateCostAnalysisLineInput, UpdateCostAnalysisLineInput,
+  CreateWbsNodeInput,
+  UpdateWbsNodeInput,
+  ReorderWbsNodesInput,
+  UpdateCostItemInput,
+  CreateCostAnalysisLineInput,
+  UpdateCostAnalysisLineInput,
 } from "@bloqer/validators";
 
-function fmt(value: string, currency: string) {
-  return formatMoneyAmount(value, currency);
+function fmt(value: number, currency: string) {
+  return formatMoneyAmount(String(value), currency);
 }
 
 function flattenTree(nodes: WbsViewNode[]): WbsViewNode[] {
@@ -33,6 +60,38 @@ function flattenTree(nodes: WbsViewNode[]): WbsViewNode[] {
   }
   walk(nodes);
   return result;
+}
+
+function nodeMatchesSearch(node: WbsViewNode, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    node.code.toLowerCase().includes(q) ||
+    node.name.toLowerCase().includes(q) ||
+    (node.description?.toLowerCase().includes(q) ?? false)
+  );
+}
+
+function collectMatchingIds(nodes: WbsViewNode[], query: string): Set<string> {
+  const ids = new Set<string>();
+  if (!query.trim()) return ids;
+
+  function walk(ns: WbsViewNode[], ancestors: string[]): boolean {
+    let subtreeMatch = false;
+    for (const n of ns) {
+      const selfMatch = nodeMatchesSearch(n, query);
+      const childMatch = walk(n.children, [...ancestors, n.id]);
+      if (selfMatch || childMatch) {
+        ids.add(n.id);
+        for (const a of ancestors) ids.add(a);
+        subtreeMatch = true;
+      }
+    }
+    return subtreeMatch;
+  }
+
+  walk(nodes, []);
+  return ids;
 }
 
 type DialogState =
@@ -56,10 +115,24 @@ interface WbsTreeProps {
 }
 
 export function WbsTree({
-  nodes, budgetId, currency, editable,
-  onAddNode, onUpdateNode, onRemoveNode, onReorderNodes,
-  onUpdateCostItem, onAddLine, onUpdateLine, onRemoveLine,
+  nodes,
+  budgetId,
+  currency,
+  editable,
+  onAddNode,
+  onUpdateNode,
+  onRemoveNode,
+  onReorderNodes,
+  onUpdateCostItem,
+  onAddLine,
+  onUpdateLine,
+  onRemoveLine,
 }: WbsTreeProps) {
+  const router = useRouter();
+  const storageKey = `wbs-view-mode-${budgetId}`;
+
+  const [viewMode, setViewMode] = useState<WbsViewMode>("breakdown");
+  const [search, setSearch] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
     const ids = new Set<string>();
     function collectGroups(ns: WbsViewNode[]) {
@@ -73,17 +146,38 @@ export function WbsTree({
     collectGroups(nodes);
     return ids;
   });
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [itemDialogNode, setItemDialogNode] = useState<WbsViewNode | null>(null);
+  const [groupDialogNode, setGroupDialogNode] = useState<WbsViewNode | null>(null);
   const [dialogState, setDialogState] = useState<DialogState>({ type: "closed" });
   const [removePending, startRemoveTransition] = useTransition();
   const [reorderPending, startReorderTransition] = useTransition();
 
-  const flatNodes = useMemo(() => flattenTree(nodes), [nodes]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = sessionStorage.getItem(storageKey);
+    if (stored === "breakdown" || stored === "totals") setViewMode(stored);
+  }, [storageKey]);
 
-  const selectedNode = useMemo(
-    () => flatNodes.find((n) => n.id === selectedNodeId) ?? null,
-    [flatNodes, selectedNodeId],
-  );
+  const handleViewModeChange = (mode: WbsViewMode) => {
+    setViewMode(mode);
+    if (typeof window !== "undefined") sessionStorage.setItem(storageKey, mode);
+  };
+
+  const flatNodes = useMemo(() => flattenTree(nodes), [nodes]);
+  const matchingIds = useMemo(() => collectMatchingIds(nodes, search), [nodes, search]);
+
+  useEffect(() => {
+    if (!search.trim()) return;
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of matchingIds) {
+        if (flatNodes.find((n) => n.id === id)?.type === "GROUP") next.add(id);
+      }
+      return next;
+    });
+  }, [search, matchingIds, flatNodes]);
+
+  const grandTotals = useMemo(() => computeTreeGrandTotals(nodes), [nodes]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -111,16 +205,17 @@ export function WbsTree({
     [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
 
     startReorderTransition(async () => {
-      await onReorderNodes(budgetId, {
+      const result = await onReorderNodes(budgetId, {
         parentId: node.parentId ?? null,
         orderedNodeIds: next.map((s) => s.id),
       });
+      if (!("error" in result)) router.refresh();
     });
   }
 
   function handleRemove(node: WbsViewNode) {
     if (node.children.length > 0) {
-      alert("Elimine los subnodos antes de eliminar este nodo.");
+      alert("Eliminá los subnodos antes de eliminar este nodo.");
       return;
     }
     if (!confirm(`¿Eliminar "${node.code} — ${node.name}"?`)) return;
@@ -130,187 +225,278 @@ export function WbsTree({
         toast.error(result.error);
         return;
       }
-      if (selectedNodeId === node.id) setSelectedNodeId(null);
+      if (itemDialogNode?.id === node.id) setItemDialogNode(null);
+      if (groupDialogNode?.id === node.id) setGroupDialogNode(null);
       toast.success("Nodo eliminado");
+      router.refresh();
     });
   }
 
-  function renderNode(node: WbsViewNode, depth: number) {
-    const isExpanded = expandedIds.has(node.id);
-    const isSelected = selectedNodeId === node.id;
-    const siblings = getSiblings(node);
-    const idx = siblings.findIndex((s) => s.id === node.id);
-    const isFirst = idx === 0;
-    const isLast = idx === siblings.length - 1;
+  function handleRowClick(node: WbsViewNode) {
+    if (node.type === "ITEM") setItemDialogNode(node);
+    else setGroupDialogNode(node);
+  }
 
-    return (
-      <div key={node.id}>
-        <div
-          style={{ paddingLeft: depth * 20 + 8 }}
-          className={cn(
-            "flex items-center gap-2 py-1.5 pr-2 rounded-md cursor-pointer hover:bg-muted/50 group",
-            "focus-within:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            isSelected && "bg-primary/10 ring-1 ring-primary/30",
-          )}
-          onClick={() => {
-            if (node.type === "ITEM") setSelectedNodeId(node.id);
-          }}
+  function renderRows(nodeList: WbsViewNode[], depth: number): ReactNode[] {
+    const rows: ReactNode[] = [];
+
+    for (const node of nodeList) {
+      if (search.trim() && !matchingIds.has(node.id)) continue;
+
+      const isExpanded = expandedIds.has(node.id);
+      const metrics = computeWbsRowMetrics(node);
+      const siblings = getSiblings(node);
+      const idx = siblings.findIndex((s) => s.id === node.id);
+      const isFirst = idx === 0;
+      const isLast = idx === siblings.length - 1;
+
+      rows.push(
+        <TableRow
+          key={node.id}
+          className="cursor-pointer hover:bg-muted/40"
+          onClick={() => handleRowClick(node)}
         >
-          {node.type === "GROUP" ? (
-            <button
-              className="text-muted-foreground hover:text-foreground shrink-0"
-              onClick={(e) => { e.stopPropagation(); toggleExpand(node.id); }}
-            >
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4" />
+          <TableCell className="font-mono text-xs text-muted-foreground w-24">
+            <div className="flex items-center gap-1" style={{ paddingLeft: depth * 16 }}>
+              {node.type === "GROUP" ? (
+                <button
+                  type="button"
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleExpand(node.id);
+                  }}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
               ) : (
-                <ChevronRight className="h-4 w-4" />
+                <span className="w-4 shrink-0" />
               )}
-            </button>
+              <span className="truncate">{node.code}</span>
+            </div>
+          </TableCell>
+          <TableCell className="min-w-[12rem] text-sm font-medium">{node.name}</TableCell>
+          <TableCell className="text-sm text-muted-foreground w-20">
+            {metrics.unit ? budgetUnitLabel(metrics.unit) : "—"}
+          </TableCell>
+          <TableCell className="text-right font-mono text-sm w-24">
+            {metrics.quantity != null ? metrics.quantity.toLocaleString("es-AR") : "—"}
+          </TableCell>
+
+          {viewMode === "breakdown" ? (
+            <>
+              <TableCell className="text-right font-mono text-xs w-28">
+                {fmt(metrics.byCategory.MATERIAL, currency)}
+              </TableCell>
+              <TableCell className="text-right font-mono text-xs w-28">
+                {fmt(metrics.byCategory.LABOR, currency)}
+              </TableCell>
+              <TableCell className="text-right font-mono text-xs w-28">
+                {fmt(metrics.byCategory.EQUIPMENT, currency)}
+              </TableCell>
+              <TableCell className="text-right font-mono text-xs w-28">
+                {fmt(metrics.byCategory.SUBCONTRACT, currency)}
+              </TableCell>
+              <TableCell className="text-right font-mono text-sm font-semibold w-28">
+                {fmt(metrics.totalSalePrice, currency)}
+              </TableCell>
+            </>
           ) : (
-            <span className="w-4 shrink-0" />
+            <>
+              <TableCell className="text-right font-mono text-sm w-32">
+                {fmt(metrics.totalCostDirect, currency)}
+              </TableCell>
+              <TableCell className="text-right font-mono text-sm font-semibold w-32">
+                {fmt(metrics.totalSalePrice, currency)}
+              </TableCell>
+            </>
           )}
 
-          <span className="font-mono text-xs text-muted-foreground shrink-0 w-16 truncate">
-            {node.code}
-          </span>
-          <span className="flex-1 text-sm truncate">{node.name}</span>
-
-          <Badge
-            variant={node.type === "GROUP" ? "secondary" : "outline"}
-            className="text-xs shrink-0"
-          >
-            {node.type}
-          </Badge>
-
-          <span className="font-mono text-xs text-muted-foreground shrink-0 w-28 text-right">
-            {fmt(node.totalSalePrice, currency)}
-          </span>
-
-          {editable && (
-            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 shrink-0">
-              {node.type === "GROUP" && (
+          <TableCell className="w-32" onClick={(e) => e.stopPropagation()}>
+            {editable && (
+              <div className="flex items-center justify-end gap-0.5">
+                {node.type === "GROUP" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    title="Agregar subnodo"
+                    onClick={() => setDialogState({ type: "add", parentId: node.id })}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6"
-                  title="Agregar subnodo"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDialogState({ type: "add", parentId: node.id });
-                  }}
+                  className="h-7 w-7"
+                  title="Editar"
+                  onClick={() => setDialogState({ type: "edit", node })}
                 >
-                  <Plus className="h-3 w-3" />
+                  <Pencil className="h-3 w-3" />
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                title="Editar"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDialogState({ type: "edit", node });
-                }}
-              >
-                <Pencil className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                title="Subir"
-                disabled={isFirst || reorderPending}
-                onClick={(e) => { e.stopPropagation(); moveNode(node, "up"); }}
-              >
-                <ArrowUp className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                title="Bajar"
-                disabled={isLast || reorderPending}
-                onClick={(e) => { e.stopPropagation(); moveNode(node, "down"); }}
-              >
-                <ArrowDown className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-destructive"
-                title="Eliminar"
-                disabled={removePending}
-                onClick={(e) => { e.stopPropagation(); handleRemove(node); }}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
-        </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  disabled={isFirst || reorderPending}
+                  onClick={() => moveNode(node, "up")}
+                >
+                  <ArrowUp className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  disabled={isLast || reorderPending}
+                  onClick={() => moveNode(node, "down")}
+                >
+                  <ArrowDown className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-destructive"
+                  disabled={removePending}
+                  onClick={() => handleRemove(node)}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </TableCell>
+        </TableRow>,
+      );
 
-        {node.type === "GROUP" && isExpanded && node.children.map((child) =>
-          renderNode(child, depth + 1),
-        )}
-      </div>
-    );
+      if (node.type === "GROUP" && isExpanded) {
+        rows.push(...renderRows(node.children, depth + 1));
+      }
+    }
+
+    return rows;
   }
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-start min-h-[28rem]">
-      {/* Tree panel */}
-      <div className="flex-1 min-w-0 rounded-xl border bg-card shadow-sm overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
-          <h3 className="text-sm font-semibold">Estructura de trabajo (EDT)</h3>
-          {editable && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDialogState({ type: "add", parentId: undefined })}
-            >
-              <Plus className="h-3 w-3 mr-1" /> Agregar nodo raíz
-            </Button>
-          )}
+    <div className="w-full rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+        <h3 className="text-sm font-semibold">Estructura de trabajo (EDT)</h3>
+        {editable && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDialogState({ type: "add", parentId: undefined })}
+          >
+            <Plus className="h-3 w-3 mr-1" /> Agregar nodo raíz
+          </Button>
+        )}
+      </div>
+
+      <WbsTreeToolbar
+        viewMode={viewMode}
+        onViewModeChange={handleViewModeChange}
+        search={search}
+        onSearchChange={setSearch}
+      />
+
+      {nodes.length === 0 ? (
+        <ListEmptyState
+          message="Sin nodos en la EDT. Agregá el primer capítulo o ítem."
+          className="border-0 shadow-none rounded-none"
+        />
+      ) : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-24">Nº</TableHead>
+                <TableHead>Ítem</TableHead>
+                <TableHead className="w-20">Unidad</TableHead>
+                <TableHead className="text-right w-24">Cantidad</TableHead>
+                {viewMode === "breakdown" ? (
+                  <>
+                    <TableHead className="text-right">Materiales</TableHead>
+                    <TableHead className="text-right">Mano de obra</TableHead>
+                    <TableHead className="text-right">Equipos</TableHead>
+                    <TableHead className="text-right">Subcontrato</TableHead>
+                    <TableHead className="text-right">Total venta</TableHead>
+                  </>
+                ) : (
+                  <>
+                    <TableHead className="text-right">Costo directo</TableHead>
+                    <TableHead className="text-right">Total venta</TableHead>
+                  </>
+                )}
+                <TableHead className="w-32" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {renderRows(nodes, 0)}
+              <TableRow className="bg-muted/50 font-semibold hover:bg-muted/50">
+                <TableCell colSpan={4}>TOTAL GENERAL</TableCell>
+                {viewMode === "breakdown" ? (
+                  <>
+                    <TableCell className="text-right font-mono text-sm">
+                      {fmt(grandTotals.byCategory.MATERIAL, currency)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {fmt(grandTotals.byCategory.LABOR, currency)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {fmt(grandTotals.byCategory.EQUIPMENT, currency)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {fmt(grandTotals.byCategory.SUBCONTRACT, currency)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {fmt(grandTotals.totalSalePrice, currency)}
+                    </TableCell>
+                  </>
+                ) : (
+                  <>
+                    <TableCell className="text-right font-mono text-sm">
+                      {fmt(grandTotals.totalCostDirect, currency)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {fmt(grandTotals.totalSalePrice, currency)}
+                    </TableCell>
+                  </>
+                )}
+                <TableCell />
+              </TableRow>
+            </TableBody>
+          </Table>
         </div>
+      )}
 
-        {nodes.length === 0 ? (
-          <ListEmptyState
-            message="Sin nodos en la EDT. Agregá el primer capítulo o ítem."
-            className="border-0 shadow-none rounded-none"
-          />
-        ) : (
-          <div className="p-2 space-y-0.5">
-            {nodes.map((node) => renderNode(node, 0))}
-          </div>
-        )}
-      </div>
+      <CostItemApuDialog
+        open={itemDialogNode !== null}
+        onOpenChange={(open) => { if (!open) setItemDialogNode(null); }}
+        node={itemDialogNode}
+        currency={currency}
+        editable={editable}
+        onUpdateCostItem={onUpdateCostItem}
+        onAddLine={onAddLine}
+        onUpdateLine={onUpdateLine}
+        onRemoveLine={onRemoveLine}
+      />
 
-      {/* APU panel */}
-      <div className="w-full lg:w-[min(100%,28rem)] shrink-0">
-        {selectedNode?.type === "ITEM" && selectedNode.costItem ? (
-          <div className="space-y-2 rounded-xl border bg-card p-4 shadow-sm">
-            <p className="text-xs text-muted-foreground">
-              <span className="font-mono">{selectedNode.code}</span> — {selectedNode.name}
-            </p>
-            <CostItemPanel
-              costItem={selectedNode.costItem as CostItemView}
-              currency={currency}
-              editable={editable}
-              onUpdateCostItem={(data) => onUpdateCostItem(selectedNode.costItem!.id, data)}
-              onAddLine={onAddLine}
-              onUpdateLine={onUpdateLine}
-              onRemoveLine={onRemoveLine}
-            />
-          </div>
-        ) : (
-          <ListEmptyState
-            message="Seleccioná un ítem (ITEM) del árbol para ver y editar su análisis de precio unitario."
-            className="min-h-[20rem] flex items-center justify-center"
-          />
-        )}
-      </div>
+      <WbsGroupDialog
+        open={groupDialogNode !== null}
+        onOpenChange={(open) => { if (!open) setGroupDialogNode(null); }}
+        node={groupDialogNode}
+        currency={currency}
+        editable={editable}
+        onUpdateNode={async (nodeId, data) => {
+          const result = await onUpdateNode(nodeId, data);
+          if (!("error" in result)) router.refresh();
+          return result;
+        }}
+      />
 
-      {/* Node dialog */}
       <Dialog
         open={dialogState.type !== "closed"}
         onOpenChange={(open) => { if (!open) setDialogState({ type: "closed" }); }}
@@ -325,7 +511,11 @@ export function WbsTree({
             <WbsNodeForm
               mode="create"
               parentId={dialogState.parentId}
-              onSubmit={(data) => onAddNode(budgetId, data)}
+              onSubmit={async (data) => {
+                const result = await onAddNode(budgetId, data);
+                if (!("error" in result)) router.refresh();
+                return result;
+              }}
               onDone={() => setDialogState({ type: "closed" })}
             />
           )}
@@ -337,7 +527,11 @@ export function WbsTree({
                 name: dialogState.node.name,
                 description: dialogState.node.description,
               }}
-              onSubmit={(data) => onUpdateNode(dialogState.type === "edit" ? dialogState.node.id : "", data)}
+              onSubmit={async (data) => {
+                const result = await onUpdateNode(dialogState.node.id, data);
+                if (!("error" in result)) router.refresh();
+                return result;
+              }}
               onDone={() => setDialogState({ type: "closed" })}
             />
           )}

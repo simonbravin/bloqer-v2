@@ -3,7 +3,8 @@ import { ProjectForm } from "@/features/projects";
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectById, listContacts, ServiceError } from "@bloqer/services";
 import { updateProjectAction } from "../../actions";
-import type { CreateProjectInput } from "@bloqer/validators";
+import type { ProjectFormInput } from "@bloqer/validators";
+import { toDateInput } from "@/lib/date-input";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
 import { PageListHeader } from "@/components/ui/page-list-header";
@@ -40,7 +41,7 @@ export default async function EditarProyectoPage({ params }: PageProps) {
     ctx,
   );
 
-  const defaultValues: Partial<CreateProjectInput> = {
+  const defaultValues: Partial<ProjectFormInput> = {
     code: project.code,
     name: project.name,
     description: project.description ?? undefined,
@@ -50,8 +51,8 @@ export default async function EditarProyectoPage({ params }: PageProps) {
     city: project.city ?? undefined,
     province: project.province ?? undefined,
     country: project.country,
-    startDate: project.startDate ?? undefined,
-    expectedEndDate: project.expectedEndDate ?? undefined,
+    startDate: project.startDate ? toDateInput(project.startDate) : undefined,
+    expectedEndDate: project.expectedEndDate ? toDateInput(project.expectedEndDate) : undefined,
     notes: project.notes ?? undefined,
   };
 
