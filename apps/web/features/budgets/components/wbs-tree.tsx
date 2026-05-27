@@ -37,6 +37,7 @@ import { CostItemApuDialog } from "./cost-item-apu-dialog";
 import { WbsGroupDialog } from "./wbs-group-dialog";
 import { computeWbsRowMetrics, computeTreeGrandTotals } from "../lib/wbs-metrics";
 import { suggestChildItemCode, suggestRootGroupCode } from "../lib/wbs-codes";
+import { WBS_EDT_BREAKDOWN_HEADERS, VISIBLE_COST_CATEGORIES } from "@/lib/budget-categories";
 import type { WbsCreatePreset } from "./wbs-node-form";
 import type { WbsViewNode } from "@bloqer/services";
 import type {
@@ -434,11 +435,19 @@ export function WbsTree({
                 <TableHead className="text-right w-24">Cantidad</TableHead>
                 {viewMode === "breakdown" ? (
                   <>
-                    <TableHead className="text-right">Materiales</TableHead>
-                    <TableHead className="text-right">Mano de obra</TableHead>
-                    <TableHead className="text-right">Equipos</TableHead>
-                    <TableHead className="text-right">Subcontrato</TableHead>
-                    <TableHead className="text-right">Total venta</TableHead>
+                    {VISIBLE_COST_CATEGORIES.map((cat) => (
+                      <TableHead
+                        key={cat}
+                        className={cn(
+                          "text-right whitespace-nowrap",
+                          cat === "LABOR" && "min-w-[7.5rem]",
+                        )}
+                        title={WBS_EDT_BREAKDOWN_HEADERS[cat]}
+                      >
+                        {WBS_EDT_BREAKDOWN_HEADERS[cat]}
+                      </TableHead>
+                    ))}
+                    <TableHead className="text-right whitespace-nowrap">Total venta</TableHead>
                   </>
                 ) : (
                   <>

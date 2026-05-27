@@ -7,16 +7,13 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { updateBudgetSettingsSchema, type UpdateBudgetSettingsInput } from "@bloqer/validators";
 
 export type SettingsDefaults = {
   overheadPct: number;
   financialCostPct: number;
-  financialDaysAvg: number;
   profitPct: number;
   taxPct: number;
-  notes: string | null;
 };
 
 interface BudgetSettingsFormProps {
@@ -35,10 +32,8 @@ export function BudgetSettingsForm({ defaults, onSubmit }: BudgetSettingsFormPro
     defaultValues: {
       overheadPct: defaults.overheadPct,
       financialCostPct: defaults.financialCostPct,
-      financialDaysAvg: defaults.financialDaysAvg,
       profitPct: defaults.profitPct,
       taxPct: defaults.taxPct,
-      notes: defaults.notes ?? "",
     },
   });
 
@@ -79,15 +74,6 @@ export function BudgetSettingsForm({ defaults, onSubmit }: BudgetSettingsFormPro
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Días promedio financiamiento</Label>
-          <Input
-            type="number"
-            step="1"
-            min="0"
-            {...form.register("financialDaysAvg", { valueAsNumber: true })}
-          />
-        </div>
-        <div className="space-y-1.5">
           <Label>Utilidad (%)</Label>
           <Input
             type="number"
@@ -107,11 +93,6 @@ export function BudgetSettingsForm({ defaults, onSubmit }: BudgetSettingsFormPro
             {...form.register("taxPct", { valueAsNumber: true })}
           />
         </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label>Notas de configuración</Label>
-        <Textarea rows={3} placeholder="Criterios aplicados..." {...form.register("notes")} />
       </div>
 
       {serverError && (

@@ -12,8 +12,6 @@ export type SaleBreakdown = {
   totalSale: number;
 };
 
-const DAYS_PER_YEAR = 365;
-
 /** Réplica cliente de budget-calc.service.ts a nivel presupuesto. */
 export function computeBudgetSaleBreakdown(
   directCost: number,
@@ -21,8 +19,7 @@ export function computeBudgetSaleBreakdown(
 ): SaleBreakdown {
   const overhead = directCost * (settings.overheadPct / 100);
   const subtotal1 = directCost + overhead;
-  const financialCost =
-    directCost * (settings.financialCostPct / 100) * (settings.financialDaysAvg / DAYS_PER_YEAR);
+  const financialCost = subtotal1 * (settings.financialCostPct / 100);
   const subtotal2 = subtotal1 + financialCost;
   const profit = subtotal2 * (settings.profitPct / 100);
   const subtotal3 = subtotal2 + profit;

@@ -20,13 +20,7 @@ import type { CostItemView, CostAnalysisLineView } from "@bloqer/services";
 import type { CreateCostAnalysisLineInput, UpdateCostAnalysisLineInput, UpdateCostItemInput } from "@bloqer/validators";
 import type { CostCategory } from "@bloqer/database";
 
-const CATEGORY_LABELS: Record<CostCategory, string> = {
-  MATERIAL:    "Material",
-  LABOR:       "M.O.",
-  EQUIPMENT:   "Equipos",
-  SUBCONTRACT: "Subcontrato",
-  OTHER:       "Otros",
-};
+import { CATEGORY_LABELS } from "@/lib/budget-categories";
 
 function fmt(value: string) {
   return new Intl.NumberFormat("es-AR", {

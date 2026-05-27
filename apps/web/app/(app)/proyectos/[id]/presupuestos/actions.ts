@@ -16,6 +16,8 @@ import {
   type CreateBudgetInput, type UpdateBudgetInput, type UpdateBudgetSettingsInput,
   type CreateWbsNodeInput, type UpdateWbsNodeInput, type ReorderWbsNodesInput,
   type UpdateCostItemInput, type CreateCostAnalysisLineInput, type UpdateCostAnalysisLineInput,
+  budgetLifecycleCommentSchema, budgetReturnForChangesSchema,
+  type BudgetLifecycleCommentInput, type BudgetReturnForChangesInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -92,30 +94,77 @@ export async function updateBudgetSettingsAction(
 async function lifecycleAction(
   budgetId: string,
   projectId: string,
-  fn: (id: string, ctx: Awaited<ReturnType<typeof getCtx>>) => Promise<unknown>,
+  fn: (id: string, ctx: Awaited<ReturnType<typeof getCtx>>, input?: { comment?: string }) => Promise<unknown>,
+  input?: { comment?: string },
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
-    await fn(budgetId, ctx);
+    await fn(budgetId, ctx, input);
     revalidatePath(`/proyectos/${projectId}/presupuestos`);
     revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
 
-export async function submitForReviewAction(budgetId: string, projectId: string) {
+export async function submitForReviewAction(
+  budgetId: string,
+  projectId: string,
+  data?: BudgetLifecycleCommentInput,
+) {
+  if (data) {
+    const parsed = budgetLifecycleCommentSchema.safeParse(data);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    return lifecycleAction(budgetId, projectId, submitBudgetForReview, parsed.data);
+  }
   return lifecycleAction(budgetId, projectId, submitBudgetForReview);
 }
-export async function returnForChangesAction(budgetId: string, projectId: string) {
-  return lifecycleAction(budgetId, projectId, returnBudgetForChanges);
+
+export async function returnForChangesAction(
+  budgetId: string,
+  projectId: string,
+  data: BudgetReturnForChangesInput,
+) {
+  const parsed = budgetReturnForChangesSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  return lifecycleAction(budgetId, projectId, returnBudgetForChanges, parsed.data);
 }
-export async function approveBudgetAction(budgetId: string, projectId: string) {
+
+export async function approveBudgetAction(
+  budgetId: string,
+  projectId: string,
+  data?: BudgetLifecycleCommentInput,
+) {
+  if (data) {
+    const parsed = budgetLifecycleCommentSchema.safeParse(data);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    return lifecycleAction(budgetId, projectId, approveBudget, parsed.data);
+  }
   return lifecycleAction(budgetId, projectId, approveBudget);
 }
-export async function closeBudgetAction(budgetId: string, projectId: string) {
+
+export async function closeBudgetAction(
+  budgetId: string,
+  projectId: string,
+  data?: BudgetLifecycleCommentInput,
+) {
+  if (data) {
+    const parsed = budgetLifecycleCommentSchema.safeParse(data);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    return lifecycleAction(budgetId, projectId, closeBudget, parsed.data);
+  }
   return lifecycleAction(budgetId, projectId, closeBudget);
 }
-export async function cancelBudgetAction(budgetId: string, projectId: string) {
+
+export async function cancelBudgetAction(
+  budgetId: string,
+  projectId: string,
+  data?: BudgetLifecycleCommentInput,
+) {
+  if (data) {
+    const parsed = budgetLifecycleCommentSchema.safeParse(data);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    return lifecycleAction(budgetId, projectId, cancelBudget, parsed.data);
+  }
   return lifecycleAction(budgetId, projectId, cancelBudget);
 }
 

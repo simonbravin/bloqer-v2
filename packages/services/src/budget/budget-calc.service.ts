@@ -6,7 +6,6 @@ type TxClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$trans
 
 const D = Prisma.Decimal;
 const HUNDRED = new D(100);
-const DAYS_PER_YEAR = new D(365);
 
 export async function _recalcCostItemTotals(
   tx: TxClient,
@@ -24,13 +23,10 @@ export async function _recalcCostItemTotals(
   );
 
   const overhead = unitCostDirect.times(settings.overheadPct).dividedBy(HUNDRED);
-  const finCost = unitCostDirect
-    .times(settings.financialCostPct)
-    .dividedBy(HUNDRED)
-    .times(settings.financialDaysAvg)
-    .dividedBy(DAYS_PER_YEAR);
+  const subtotal1 = unitCostDirect.plus(overhead);
+  const finCost = subtotal1.times(settings.financialCostPct).dividedBy(HUNDRED);
 
-  const subtotal = unitCostDirect.plus(overhead).plus(finCost);
+  const subtotal = subtotal1.plus(finCost);
   const profit = subtotal.times(settings.profitPct).dividedBy(HUNDRED);
   const tax = subtotal.plus(profit).times(settings.taxPct).dividedBy(HUNDRED);
   const unitSalePrice = subtotal.plus(profit).plus(tax);

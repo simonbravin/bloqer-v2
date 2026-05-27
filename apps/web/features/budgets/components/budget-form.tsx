@@ -28,7 +28,6 @@ export function BudgetForm({ projectId, onSubmit }: BudgetFormProps) {
       currency: "ARS",
       overheadPct: 0,
       financialCostPct: 0,
-      financialDaysAvg: 0,
       profitPct: 0,
       taxPct: 0,
     },
@@ -86,15 +85,6 @@ export function BudgetForm({ projectId, onSubmit }: BudgetFormProps) {
               min="0"
               max="100"
               {...form.register("financialCostPct", { valueAsNumber: true })}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Días promedio financiamiento</Label>
-            <Input
-              type="number"
-              step="1"
-              min="0"
-              {...form.register("financialDaysAvg", { valueAsNumber: true })}
             />
           </div>
           <div className="space-y-1.5">

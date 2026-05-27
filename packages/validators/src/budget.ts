@@ -29,7 +29,16 @@ export const updateBudgetSettingsSchema = z.object({
   financialDaysAvg: z.number().int().min(0).optional(),
   profitPct: z.number().min(0).max(100).optional(),
   taxPct: z.number().min(0).max(100).optional(),
-  notes: z.string().max(2000).optional(),
+});
+
+/** Comentario opcional al avanzar el ciclo de vida del presupuesto. */
+export const budgetLifecycleCommentSchema = z.object({
+  comment: z.string().max(2000).optional(),
+});
+
+/** Observaciones obligatorias al devolver un presupuesto en revisión. */
+export const budgetReturnForChangesSchema = z.object({
+  comment: z.string().min(1, "Las observaciones son obligatorias").max(2000),
 });
 
 export const createWbsNodeSchema = z.object({
@@ -117,4 +126,6 @@ export type ReorderWbsNodesInput = z.infer<typeof reorderWbsNodesSchema>;
 export type UpdateCostItemInput = z.infer<typeof updateCostItemSchema>;
 export type CreateCostAnalysisLineInput = z.infer<typeof createCostAnalysisLineSchema>;
 export type UpdateCostAnalysisLineInput = z.infer<typeof updateCostAnalysisLineSchema>;
+export type BudgetLifecycleCommentInput = z.infer<typeof budgetLifecycleCommentSchema>;
+export type BudgetReturnForChangesInput = z.infer<typeof budgetReturnForChangesSchema>;
 export type BudgetImportRow = z.infer<typeof budgetImportRowSchema>;

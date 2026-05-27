@@ -2,7 +2,7 @@ import { prisma } from "@bloqer/database";
 import type { Budget, BudgetSettings } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreateBudgetInput, UpdateBudgetInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { listEntityAuditLogs, log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 
 import { canViewBudgetsArea } from "../project/project-nav-guards";
@@ -21,6 +21,40 @@ export function assertBudgetEditable(budget: Budget): void {
 }
 
 export type BudgetWithSettings = Budget & { settings: BudgetSettings | null };
+
+export type BudgetLifecycleInput = { comment?: string };
+
+export type BudgetLifecycleLogEntry = {
+  id: string;
+  action: string;
+  fromStatus: string | null;
+  toStatus: string | null;
+  comment: string | null;
+  actorUserId: string | null;
+  actorName: string | null;
+  createdAt: Date;
+};
+
+const BUDGET_LIFECYCLE_ACTIONS = [
+  "budget.created",
+  "budget.submitted_for_review",
+  "budget.returned_for_changes",
+  "budget.approved",
+  "budget.closed",
+  "budget.cancelled",
+] as const;
+
+function parseAuditStatus(json: unknown): string | null {
+  if (!json || typeof json !== "object") return null;
+  const status = (json as { status?: unknown }).status;
+  return typeof status === "string" ? status : null;
+}
+
+function parseAuditComment(json: unknown): string | null {
+  if (!json || typeof json !== "object") return null;
+  const comment = (json as { comment?: unknown }).comment;
+  return typeof comment === "string" && comment.trim() ? comment.trim() : null;
+}
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
@@ -53,6 +87,36 @@ export async function listBudgetsByProject(
     include: { settings: true },
     orderBy: { versionNumber: "asc" },
   });
+}
+
+export async function getBudgetLifecycleLog(
+  budgetId: string,
+  ctx: ServiceContext,
+): Promise<BudgetLifecycleLogEntry[]> {
+  if (!canViewBudgetsArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Insufficient permissions to view budgets");
+  }
+  const budget = await prisma.budget.findUnique({ where: { id: budgetId } });
+  if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
+  if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+
+  const rows = await listEntityAuditLogs(
+    ctx.tenantId,
+    "Budget",
+    budgetId,
+    [...BUDGET_LIFECYCLE_ACTIONS],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    action: row.action,
+    fromStatus: parseAuditStatus(row.before),
+    toStatus: parseAuditStatus(row.after),
+    comment: parseAuditComment(row.after),
+    actorUserId: row.actorUserId,
+    actorName: row.actor?.name ?? row.actor?.email ?? null,
+    createdAt: row.createdAt,
+  }));
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -109,7 +173,7 @@ export async function createBudget(
     action: "budget.created",
     entityType: "Budget",
     entityId: budget.id,
-    after: { name, versionNumber, projectId },
+    after: { status: "DRAFT", name, versionNumber, projectId },
     ipAddress: ctx.ipAddress,
   });
 
@@ -151,15 +215,38 @@ export async function updateBudget(
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
-export async function submitBudgetForReview(id: string, ctx: ServiceContext): Promise<Budget> {
-  return _transition(id, ctx, ["DRAFT", "RETURNED_FOR_CHANGES"], "IN_REVIEW", "budget.submitted_for_review");
+export async function submitBudgetForReview(
+  id: string,
+  ctx: ServiceContext,
+  input?: BudgetLifecycleInput,
+): Promise<Budget> {
+  return _transition(id, ctx, ["DRAFT", "RETURNED_FOR_CHANGES"], "IN_REVIEW", "budget.submitted_for_review", input);
 }
 
-export async function returnBudgetForChanges(id: string, ctx: ServiceContext): Promise<Budget> {
-  return _transition(id, ctx, ["IN_REVIEW"], "RETURNED_FOR_CHANGES", "budget.returned_for_changes");
+export async function returnBudgetForChanges(
+  id: string,
+  ctx: ServiceContext,
+  input?: BudgetLifecycleInput,
+): Promise<Budget> {
+  const comment = input?.comment?.trim();
+  if (!comment) {
+    throw new ServiceError("VALIDATION", "Las observaciones son obligatorias para devolver el presupuesto");
+  }
+  return _transition(
+    id,
+    ctx,
+    ["IN_REVIEW"],
+    "RETURNED_FOR_CHANGES",
+    "budget.returned_for_changes",
+    { comment },
+  );
 }
 
-export async function approveBudget(id: string, ctx: ServiceContext): Promise<Budget> {
+export async function approveBudget(
+  id: string,
+  ctx: ServiceContext,
+  input?: BudgetLifecycleInput,
+): Promise<Budget> {
   if (!can(ctx.roles, "APPROVE", "BUDGETS")) {
     throw new ServiceError("FORBIDDEN", "Se requiere permiso de aprobación");
   }
@@ -187,6 +274,7 @@ export async function approveBudget(id: string, ctx: ServiceContext): Promise<Bu
     data: { status: "APPROVED", updatedBy: ctx.actorUserId },
   });
 
+  const comment = input?.comment?.trim() || null;
   await log({
     tenantId: ctx.tenantId,
     actorUserId: ctx.actorUserId,
@@ -194,27 +282,36 @@ export async function approveBudget(id: string, ctx: ServiceContext): Promise<Bu
     entityType: "Budget",
     entityId: id,
     before: { status: "IN_REVIEW" },
-    after: { status: "APPROVED" },
+    after: { status: "APPROVED", ...(comment ? { comment } : {}) },
     ipAddress: ctx.ipAddress,
   });
 
   return updated;
 }
 
-export async function closeBudget(id: string, ctx: ServiceContext): Promise<Budget> {
+export async function closeBudget(
+  id: string,
+  ctx: ServiceContext,
+  input?: BudgetLifecycleInput,
+): Promise<Budget> {
   if (!can(ctx.roles, "APPROVE", "BUDGETS")) {
     throw new ServiceError("FORBIDDEN", "Se requiere permiso de aprobación");
   }
-  return _transition(id, ctx, ["APPROVED"], "CLOSED", "budget.closed");
+  return _transition(id, ctx, ["APPROVED"], "CLOSED", "budget.closed", input);
 }
 
-export async function cancelBudget(id: string, ctx: ServiceContext): Promise<Budget> {
+export async function cancelBudget(
+  id: string,
+  ctx: ServiceContext,
+  input?: BudgetLifecycleInput,
+): Promise<Budget> {
   return _transition(
     id,
     ctx,
     ["DRAFT", "IN_REVIEW", "RETURNED_FOR_CHANGES"],
     "CANCELLED",
     "budget.cancelled",
+    input,
   );
 }
 
@@ -226,6 +323,7 @@ async function _transition(
   allowedFrom: Budget["status"][],
   to: Budget["status"],
   action: string,
+  input?: BudgetLifecycleInput,
 ): Promise<Budget> {
   if (!can(ctx.roles, "EDIT", "BUDGETS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions");
@@ -236,6 +334,8 @@ async function _transition(
   if (!allowedFrom.includes(budget.status)) {
     throw new ServiceError("CONFLICT", `No se puede cambiar el estado desde "${budget.status}"`);
   }
+
+  const comment = input?.comment?.trim() || null;
 
   const updated = await prisma.budget.update({
     where: { id },
@@ -249,7 +349,7 @@ async function _transition(
     entityType: "Budget",
     entityId: id,
     before: { status: budget.status },
-    after: { status: to },
+    after: { status: to, ...(comment ? { comment } : {}) },
     ipAddress: ctx.ipAddress,
   });
 

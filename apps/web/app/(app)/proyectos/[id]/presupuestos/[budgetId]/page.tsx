@@ -4,7 +4,7 @@ import { BudgetStatusBadge, WbsTree, BudgetLifecycleDialog, BudgetMarginConfigSe
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { getCurrentUser } from "@/lib/auth";
-import { getBudgetById, getWbsTree, ServiceError } from "@bloqer/services";
+import { getBudgetById, getBudgetLifecycleLog, getWbsTree, ServiceError } from "@bloqer/services";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { PageBackLink } from "@/components/layout/page-back-link";
 import { PageShell } from "@/components/layout/page-shell";
@@ -43,8 +43,13 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
 
   let budget;
   let tree;
+  let lifecycleLog;
   try {
-    [budget, tree] = await Promise.all([getBudgetById(budgetId, ctx), getWbsTree(budgetId, ctx)]);
+    [budget, tree, lifecycleLog] = await Promise.all([
+      getBudgetById(budgetId, ctx),
+      getWbsTree(budgetId, ctx),
+      getBudgetLifecycleLog(budgetId, ctx),
+    ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
@@ -66,10 +71,8 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
   const settingsDefaults = {
     overheadPct: s ? parseFloat(s.overheadPct.toString()) : 0,
     financialCostPct: s ? parseFloat(s.financialCostPct.toString()) : 0,
-    financialDaysAvg: s ? s.financialDaysAvg : 0,
     profitPct: s ? parseFloat(s.profitPct.toString()) : 0,
     taxPct: s ? parseFloat(s.taxPct.toString()) : 0,
-    notes: s?.notes ?? null,
   };
 
   return (
@@ -88,6 +91,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
           <div className="flex flex-wrap items-center gap-2">
             <BudgetLifecycleDialog
               status={budget.status}
+              lifecycleLog={lifecycleLog}
               onSubmitForReview={submitForReviewAction.bind(null, budgetId, projectId)}
               onReturnForChanges={returnForChangesAction.bind(null, budgetId, projectId)}
               onApprove={approveBudgetAction.bind(null, budgetId, projectId)}

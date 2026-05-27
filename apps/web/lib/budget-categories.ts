@@ -18,6 +18,14 @@ export const VISIBLE_COST_CATEGORIES = [
 
 export type VisibleCostCategory = (typeof VISIBLE_COST_CATEGORIES)[number];
 
+/** Encabezados de columnas en la tabla EDT (modo desglose). */
+export const WBS_EDT_BREAKDOWN_HEADERS: Record<VisibleCostCategory, string> = {
+  MATERIAL: "Materiales",
+  LABOR: "Mano de obra",
+  EQUIPMENT: "Equipos",
+  SUBCONTRACT: "Subcontrato",
+};
+
 export function isVisibleCostCategory(cat: string): cat is VisibleCostCategory {
   return (VISIBLE_COST_CATEGORIES as readonly string[]).includes(cat);
 }

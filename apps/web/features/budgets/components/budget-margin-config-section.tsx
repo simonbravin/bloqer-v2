@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { updateBudgetSettingsSchema, type UpdateBudgetSettingsInput } from "@bloqer/validators";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { computeBudgetSaleBreakdown } from "../lib/budget-sale-calc";
@@ -26,6 +25,11 @@ interface BudgetMarginConfigSectionProps {
 
 function fmt(value: number, currency: string) {
   return formatMoneyAmount(String(value), currency);
+}
+
+function pctLabel(value: unknown) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
 }
 
 export function BudgetMarginConfigSection({
@@ -45,27 +49,27 @@ export function BudgetMarginConfigSection({
     defaultValues: {
       overheadPct: defaults.overheadPct,
       financialCostPct: defaults.financialCostPct,
-      financialDaysAvg: defaults.financialDaysAvg,
       profitPct: defaults.profitPct,
       taxPct: defaults.taxPct,
-      notes: defaults.notes ?? "",
     },
   });
 
   const watched = form.watch();
   const directCost = parseFloat(totalDirectCost) || 0;
+  const overheadPct = pctLabel(watched.overheadPct);
+  const financialCostPct = pctLabel(watched.financialCostPct);
+  const profitPct = pctLabel(watched.profitPct);
+  const taxPct = pctLabel(watched.taxPct);
 
   const breakdown = useMemo(
     () =>
       computeBudgetSaleBreakdown(directCost, {
-        overheadPct: Number(watched.overheadPct) || 0,
-        financialCostPct: Number(watched.financialCostPct) || 0,
-        financialDaysAvg: Number(watched.financialDaysAvg) || 0,
-        profitPct: Number(watched.profitPct) || 0,
-        taxPct: Number(watched.taxPct) || 0,
-        notes: watched.notes ?? null,
+        overheadPct,
+        financialCostPct,
+        profitPct,
+        taxPct,
       }),
-    [directCost, watched],
+    [directCost, overheadPct, financialCostPct, profitPct, taxPct],
   );
 
   const handleSubmit = form.handleSubmit((data) => {
@@ -89,7 +93,8 @@ export function BudgetMarginConfigSection({
       <div className="border-b px-4 py-3">
         <h2 className="text-base font-semibold">Configuración de márgenes</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Modo simple: un solo juego de porcentajes (GG, CF, utilidad, IVA) se aplica a todas las partidas.
+          Modo simple: un solo juego de porcentajes (GG, GF, utilidad, IVA) se aplica a todas las partidas.
+          Los gastos financieros (GF) se calculan sobre el subtotal 1 (costo directo + GG).
         </p>
       </div>
 
@@ -124,16 +129,6 @@ export function BudgetMarginConfigSection({
               <p className="text-xs font-mono text-muted-foreground">{fmt(breakdown.financialCost, currency)}</p>
             </div>
             <div className="space-y-1.5">
-              <Label>Días prom. financ.</Label>
-              <Input
-                type="number"
-                step="1"
-                min="0"
-                disabled={!editable}
-                {...form.register("financialDaysAvg", { valueAsNumber: true })}
-              />
-            </div>
-            <div className="space-y-1.5">
               <Label>Utilidad %</Label>
               <Input
                 type="number"
@@ -158,10 +153,6 @@ export function BudgetMarginConfigSection({
               <p className="text-xs font-mono text-muted-foreground">{fmt(breakdown.tax, currency)}</p>
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Notas</Label>
-            <Textarea rows={2} disabled={!editable} {...form.register("notes")} />
-          </div>
           {editable && (
             <Button type="submit" disabled={isPending} className="w-full">
               {isPending ? "Guardando..." : "Guardar configuración"}
@@ -180,7 +171,7 @@ export function BudgetMarginConfigSection({
               <dd className="font-mono tabular-nums">{fmt(breakdown.directCost, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">+ GG ({watched.overheadPct}%)</dt>
+              <dt className="text-muted-foreground">+ GG ({overheadPct}%)</dt>
               <dd className="font-mono tabular-nums">{fmt(breakdown.overhead, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2 font-medium">
@@ -188,7 +179,7 @@ export function BudgetMarginConfigSection({
               <dd className="font-mono tabular-nums">{fmt(breakdown.subtotal1, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">+ CF</dt>
+              <dt className="text-muted-foreground">+ GF ({financialCostPct}%)</dt>
               <dd className="font-mono tabular-nums">{fmt(breakdown.financialCost, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2 font-medium">
@@ -196,11 +187,11 @@ export function BudgetMarginConfigSection({
               <dd className="font-mono tabular-nums">{fmt(breakdown.subtotal2, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">+ Benef ({watched.profitPct}%)</dt>
+              <dt className="text-muted-foreground">+ Utilidad ({profitPct}%)</dt>
               <dd className="font-mono tabular-nums">{fmt(breakdown.profit, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">+ IVA ({watched.taxPct}%)</dt>
+              <dt className="text-muted-foreground">+ IVA ({taxPct}%)</dt>
               <dd className="font-mono tabular-nums">{fmt(breakdown.tax, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2 border-t pt-2 text-base font-bold">
