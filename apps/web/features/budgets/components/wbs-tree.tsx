@@ -26,6 +26,7 @@ import {
   Trash2,
   ArrowUp,
   ArrowDown,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMoneyAmount } from "@/lib/format-money";
@@ -35,8 +36,15 @@ import { WbsNodeForm } from "./wbs-node-form";
 import { WbsTreeToolbar, type WbsViewMode } from "./wbs-tree-toolbar";
 import { CostItemApuDialog } from "./cost-item-apu-dialog";
 import { WbsGroupDialog } from "./wbs-group-dialog";
+import { WbsImportDialog, type WbsImportPreview } from "./wbs-import-dialog";
+import type { BudgetImportRow } from "@bloqer/validators";
 import { computeWbsRowMetrics, computeTreeGrandTotals } from "../lib/wbs-metrics";
-import { suggestChildItemCode, suggestRootGroupCode } from "../lib/wbs-codes";
+import {
+  canAddChildItem,
+  canAddSubchapter,
+  suggestChildCode,
+  suggestRootGroupCode,
+} from "../lib/wbs-codes";
 import { WBS_EDT_BREAKDOWN_HEADERS, VISIBLE_COST_CATEGORIES } from "@/lib/budget-categories";
 import type { WbsCreatePreset } from "./wbs-node-form";
 import type { WbsViewNode } from "@bloqer/services";
@@ -105,8 +113,14 @@ type DialogState =
 interface WbsTreeProps {
   nodes: WbsViewNode[];
   budgetId: string;
+  projectId: string;
   currency: string;
   editable: boolean;
+  onPreviewWbsImport?: (rawRows: unknown[][]) => Promise<WbsImportPreview | { error: string }>;
+  onExecuteWbsImport?: (
+    rows: BudgetImportRow[],
+    options: { replaceExisting: boolean },
+  ) => Promise<{ createdNodes: number; createdItems: number } | { error: string }>;
   onAddNode: (data: CreateWbsNodeInput) => Promise<{ id: string } | { error: string }>;
   onUpdateNode: (nodeId: string, data: UpdateWbsNodeInput) => Promise<{ ok: true } | { error: string }>;
   onRemoveNode: (nodeId: string) => Promise<{ ok: true } | { error: string }>;
@@ -120,8 +134,11 @@ interface WbsTreeProps {
 export function WbsTree({
   nodes,
   budgetId,
+  projectId: _projectId,
   currency,
   editable,
+  onPreviewWbsImport,
+  onExecuteWbsImport,
   onAddNode,
   onUpdateNode,
   onRemoveNode,
@@ -152,6 +169,7 @@ export function WbsTree({
   const [itemDialogNode, setItemDialogNode] = useState<WbsViewNode | null>(null);
   const [groupDialogNode, setGroupDialogNode] = useState<WbsViewNode | null>(null);
   const [dialogState, setDialogState] = useState<DialogState>({ type: "closed" });
+  const [importOpen, setImportOpen] = useState(false);
   const [removePending, startRemoveTransition] = useTransition();
   const [reorderPending, startReorderTransition] = useTransition();
 
@@ -322,22 +340,40 @@ export function WbsTree({
           <TableCell className="py-1.5 w-32" onClick={(e) => e.stopPropagation()}>
             {editable && (
               <div className="flex items-center justify-end gap-0.5">
-                {node.type === "GROUP" && (
+                {canAddSubchapter(node) && (
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    title="Agregar subnodo"
+                    title="Agregar subcapítulo"
                     onClick={() =>
-                    setDialogState({
-                      type: "add",
-                      parentId: node.id,
-                      preset: "childItem",
-                      suggestedCode: suggestChildItemCode(node, nodes),
-                    })
-                  }
+                      setDialogState({
+                        type: "add",
+                        parentId: node.id,
+                        preset: "childGroup",
+                        suggestedCode: suggestChildCode(node, nodes),
+                      })
+                    }
                   >
                     <Plus className="h-3 w-3" />
+                  </Button>
+                )}
+                {canAddChildItem(node) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    title="Agregar ítem"
+                    onClick={() =>
+                      setDialogState({
+                        type: "add",
+                        parentId: node.id,
+                        preset: "childItem",
+                        suggestedCode: suggestChildCode(node, nodes),
+                      })
+                    }
+                  >
+                    <Plus className="h-3 w-3 text-primary" />
                   </Button>
                 )}
                 <Button
@@ -395,9 +431,15 @@ export function WbsTree({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
         <h3 className="text-sm font-semibold">Estructura de trabajo (EDT)</h3>
         {editable && (
-          <Button
-            variant="outline"
-            size="sm"
+          <div className="flex flex-wrap gap-2">
+            {onPreviewWbsImport && onExecuteWbsImport && (
+              <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+                <Upload className="h-3 w-3 mr-1" /> Importar WBS
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() =>
                 setDialogState({
                   type: "add",
@@ -408,7 +450,8 @@ export function WbsTree({
               }
             >
               <Plus className="h-3 w-3 mr-1" /> Agregar tarea
-          </Button>
+            </Button>
+          </div>
         )}
       </div>
 
@@ -528,7 +571,9 @@ export function WbsTree({
               {dialogState.type === "add"
                 ? dialogState.preset === "childItem"
                   ? "Agregar ítem"
-                  : "Agregar tarea"
+                  : dialogState.preset === "childGroup"
+                    ? "Agregar subcapítulo"
+                    : "Agregar capítulo"
                 : "Editar nodo"}
             </DialogTitle>
           </DialogHeader>
@@ -564,6 +609,16 @@ export function WbsTree({
           )}
         </DialogContent>
       </Dialog>
+
+      {onPreviewWbsImport && onExecuteWbsImport && (
+        <WbsImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          hasExistingNodes={nodes.length > 0}
+          onPreview={onPreviewWbsImport}
+          onExecute={onExecuteWbsImport}
+        />
+      )}
     </div>
   );
 }

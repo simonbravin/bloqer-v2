@@ -2,14 +2,21 @@ import type { WbsNodeType } from "@bloqer/database";
 
 type WbsNodeRow = { id: string; parentId: string | null; code: string; type: WbsNodeType; sortOrder: number };
 
+/** Máximo de segmentos en el código WBS (p. ej. 1.1.1). */
+export const WBS_MAX_CODE_SEGMENTS = 3;
+
+export function countCodeSegments(code: string): number {
+  return code.split(".").filter((s) => s.length > 0).length;
+}
+
 /** Próximo código para tarea raíz (1, 2, 3… según cantidad de hermanos). */
 export function nextRootGroupCode(roots: WbsNodeRow[]): string {
   const rootCount = roots.filter((n) => n.parentId === null).length;
   return String(rootCount + 1);
 }
 
-/** Próximo código hijo bajo una tarea (p. ej. 1.3 si hay dos ítems bajo 1). */
-export function nextChildItemCode(parentCode: string, siblings: WbsNodeRow[]): string {
+/** Próximo código hijo directo bajo un padre (p. ej. 1.3 o 1.1.2). */
+export function nextChildCode(parentCode: string, siblings: WbsNodeRow[]): string {
   const prefix = `${parentCode}.`;
   let childCount = 0;
   for (const n of siblings) {
@@ -20,6 +27,12 @@ export function nextChildItemCode(parentCode: string, siblings: WbsNodeRow[]): s
   }
   return `${parentCode}.${childCount + 1}`;
 }
+
+/** @deprecated Use nextChildCode */
+export const nextChildItemCode = nextChildCode;
+
+/** @deprecated Use nextChildCode */
+export const nextChildGroupCode = nextChildCode;
 
 /** sortOrder al final entre hermanos. */
 export function nextSortOrder(siblings: WbsNodeRow[]): number {

@@ -43,7 +43,7 @@ Habilitar el **núcleo de obra**: directorio, proyectos, presupuestos (WBS), con
 
 | Riesgo | Mitigación |
 |---|---|
-| Complejidad WBS | Entregar primero WBS 2 niveles + ítems hoja; profundidad después |
+| Complejidad WBS | WBS 3 niveles (capítulo → subcapítulo → ítem hoja) + importación estructura CSV/Excel |
 | Gantt | Mantener detrás de adapter; stub de lista de hitos si falta librería ([`FRONTEND_FEATURE_STRUCTURE.md`](./FRONTEND_FEATURE_STRUCTURE.md)) |
 
 ## Qué NO hacer todavía

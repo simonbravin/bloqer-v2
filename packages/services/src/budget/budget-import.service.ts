@@ -1,139 +1,31 @@
-// Budget CSV/XLSX import foundation.
-// Full UI upload deferred; service contract and validation are implemented now.
-// executeImport: future work — see comment below.
+// Budget CSV/XLSX import — server-side execute and preview with tenant checks.
 
 import { prisma } from "@bloqer/database";
-import { budgetImportRowSchema, IMPORT_TEMPLATE_COLUMNS } from "@bloqer/validators";
 import type { BudgetImportRow } from "@bloqer/validators";
+import { can } from "@bloqer/domain";
+import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertBudgetEditable } from "./budget.service";
+import { _recalcBudgetSummary } from "./budget-calc.service";
+import {
+  type ImportMode,
+  type PreviewResult,
+  previewSpreadsheetImport,
+  validateImportRows,
+} from "./budget-import-pure";
 
-export { IMPORT_TEMPLATE_COLUMNS };
+export * from "./budget-import-pure";
 
-export type ImportError = {
-  row: number;
-  field: string;
-  message: string;
+export type ExecuteImportResult = {
+  createdNodes: number;
+  createdItems: number;
 };
-
-export type ImportWarning = {
-  row: number;
-  message: string;
-};
-
-export type ParseResult = {
-  validRows: (BudgetImportRow & { _row: number })[];
-  errors: ImportError[];
-};
-
-export type PreviewResult = {
-  valid: boolean;
-  rows: (BudgetImportRow & { _row: number; _parentResolved: boolean })[];
-  errors: ImportError[];
-  warnings: ImportWarning[];
-};
-
-// ─── Parse raw unknown rows into typed + validated rows ───────────────────────
-
-export function parseImportRows(rawRows: unknown[]): ParseResult {
-  const validRows: (BudgetImportRow & { _row: number })[] = [];
-  const errors: ImportError[] = [];
-
-  rawRows.forEach((raw, idx) => {
-    const rowNum = idx + 1;
-    const result = budgetImportRowSchema.safeParse(raw);
-    if (!result.success) {
-      result.error.issues.forEach((issue) => {
-        errors.push({
-          row: rowNum,
-          field: issue.path.join(".") || "general",
-          message: issue.message,
-        });
-      });
-    } else {
-      validRows.push({ ...result.data, _row: rowNum });
-    }
-  });
-
-  return { validRows, errors };
-}
-
-// ─── Validate import rows against business rules ──────────────────────────────
-
-export function validateImportRows(
-  rows: (BudgetImportRow & { _row: number })[],
-  existingCodes: string[],
-): { errors: ImportError[]; warnings: ImportWarning[] } {
-  const errors: ImportError[] = [];
-  const warnings: ImportWarning[] = [];
-  const seenCodes = new Set<string>();
-  const existingSet = new Set(existingCodes);
-
-  for (const row of rows) {
-    // Duplicate codes within import batch
-    if (seenCodes.has(row.code)) {
-      errors.push({ row: row._row, field: "code", message: `Código duplicado en la importación: "${row.code}"` });
-    }
-    seenCodes.add(row.code);
-
-    // Collision with existing WBS
-    if (existingSet.has(row.code)) {
-      errors.push({ row: row._row, field: "code", message: `Ya existe un nodo con el código "${row.code}" en este presupuesto` });
-    }
-
-    // ITEM requires unit + quantity
-    if (row.type === "ITEM") {
-      if (!row.unit) {
-        errors.push({ row: row._row, field: "unit", message: "Los ítems requieren unidad de medida" });
-      }
-      if (row.quantity === undefined || row.quantity === null) {
-        errors.push({ row: row._row, field: "quantity", message: "Los ítems requieren cantidad" });
-      }
-    }
-
-    // GROUP should not have cost fields
-    if (row.type === "GROUP") {
-      const hasCosts = row.material_cost || row.labor_cost || row.equipment_cost || row.subcontract_cost || row.other_cost;
-      if (hasCosts) {
-        warnings.push({ row: row._row, message: `El nodo GROUP "${row.code}" tiene costos; serán ignorados` });
-      }
-    }
-  }
-
-  // Validate parent_code references exist (either in batch or existing)
-  const allCodes = new Set([...seenCodes, ...existingSet]);
-  for (const row of rows) {
-    if (row.parent_code && !allCodes.has(row.parent_code)) {
-      errors.push({
-        row: row._row,
-        field: "parent_code",
-        message: `El código padre "${row.parent_code}" no existe en el presupuesto ni en la importación`,
-      });
-    }
-  }
-
-  // Validate parent ordering (parent must appear before child in the batch)
-  const processedCodes = new Set(existingSet);
-  for (const row of rows) {
-    if (row.parent_code && !processedCodes.has(row.parent_code)) {
-      errors.push({
-        row: row._row,
-        field: "parent_code",
-        message: `El padre "${row.parent_code}" debe aparecer antes que su hijo "${row.code}" en el archivo`,
-      });
-    }
-    processedCodes.add(row.code);
-  }
-
-  return { errors, warnings };
-}
-
-// ─── Preview — dry-run with full validation ───────────────────────────────────
 
 export async function previewImport(
   budgetId: string,
-  rawRows: unknown[],
+  rawRows: unknown[][],
   ctx: ServiceContext,
+  mode: ImportMode = "structure_only",
 ): Promise<PreviewResult> {
   const budget = await prisma.budget.findUnique({ where: { id: budgetId } });
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
@@ -146,26 +38,142 @@ export async function previewImport(
   });
   const existingCodes = existingNodes.map((n) => n.code);
 
-  const { validRows, errors: parseErrors } = parseImportRows(rawRows);
-  const { errors: validationErrors, warnings } = validateImportRows(validRows, existingCodes);
-  const allErrors = [...parseErrors, ...validationErrors];
-
-  const rows = validRows.map((r) => ({
-    ...r,
-    _parentResolved: !r.parent_code || existingCodes.includes(r.parent_code) || validRows.some((vr) => vr.code === r.parent_code),
-  }));
-
-  return {
-    valid: allErrors.length === 0,
-    rows,
-    errors: allErrors,
-    warnings,
-  };
+  return previewSpreadsheetImport(rawRows, existingCodes, mode);
 }
 
-// ─── executeImport ────────────────────────────────────────────────────────────
-// Future work: implement after UI upload phase.
-// Contract: accepts validated PreviewResult.rows, creates WbsNode + CostItem + CostAnalysisLines
-// in a transaction, in topological order (parents before children).
-// Must call _recalcAllItems at the end.
-// Must reject if budget is not editable.
+export async function executeImport(
+  budgetId: string,
+  rows: BudgetImportRow[],
+  ctx: ServiceContext,
+  options?: { mode?: ImportMode; replaceExisting?: boolean },
+): Promise<ExecuteImportResult> {
+  if (!can(ctx.roles, "EDIT", "BUDGETS")) {
+    throw new ServiceError("FORBIDDEN", "Insufficient permissions");
+  }
+
+  const mode = options?.mode ?? "structure_only";
+  const budget = await prisma.budget.findUnique({ where: { id: budgetId } });
+  if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
+  if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  assertBudgetEditable(budget);
+
+  const existingNodes = await prisma.wbsNode.findMany({
+    where: { budgetId },
+    select: { id: true, code: true },
+  });
+  const existingCodes = existingNodes.map((n) => n.code);
+
+  if (existingCodes.length > 0 && !options?.replaceExisting) {
+    throw new ServiceError(
+      "CONFLICT",
+      "El presupuesto ya tiene nodos WBS. Eliminá la estructura existente o usá reemplazar en la importación.",
+    );
+  }
+
+  const numbered = rows.map((r, i) => ({ ...r, _row: i + 1 }));
+  const { errors } = validateImportRows(numbered, options?.replaceExisting ? [] : existingCodes, mode);
+  if (errors.length > 0) {
+    throw new ServiceError("CONFLICT", errors[0]!.message);
+  }
+
+  const sorted = topologicalSortRows(rows);
+
+  let createdNodes = 0;
+  let createdItems = 0;
+  const codeToId = new Map<string, string>();
+  const sortOrderByParent = new Map<string | undefined, number>();
+
+  if (options?.replaceExisting && existingNodes.length > 0) {
+    const nodeIds = existingNodes.map((n) => n.id);
+    const [certLines, poLines, jobsiteRefs] = await Promise.all([
+      prisma.certificationLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+      prisma.purchaseOrderLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+      prisma.jobsiteLogProgress.count({ where: { wbsNodeId: { in: nodeIds } } }),
+    ]);
+    if (certLines > 0 || poLines > 0 || jobsiteRefs > 0) {
+      throw new ServiceError(
+        "CONFLICT",
+        "No se puede reemplazar el WBS: hay certificaciones, compras o libro de obra vinculados a ítems existentes.",
+      );
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (options?.replaceExisting && existingNodes.length > 0) {
+      await tx.costAnalysisLine.deleteMany({ where: { budgetId } });
+      await tx.costItem.deleteMany({ where: { budgetId } });
+      await tx.wbsNode.deleteMany({ where: { budgetId } });
+    }
+
+    for (const row of sorted) {
+      const parentKey = row.parent_code;
+      const sortOrder = sortOrderByParent.get(parentKey) ?? 0;
+      sortOrderByParent.set(parentKey, sortOrder + 1);
+      const parentId = row.parent_code ? codeToId.get(row.parent_code) ?? null : null;
+      if (row.parent_code && !parentId) {
+        throw new ServiceError("CONFLICT", `Padre no resuelto: ${row.parent_code}`);
+      }
+
+      const node = await tx.wbsNode.create({
+        data: {
+          budgetId,
+          parentId,
+          type: row.type,
+          code: row.code,
+          name: row.name,
+          description: row.description ?? null,
+          sortOrder,
+        },
+      });
+      codeToId.set(row.code, node.id);
+      createdNodes += 1;
+
+      if (row.type === "ITEM") {
+        await tx.costItem.create({
+          data: {
+            budgetId,
+            wbsNodeId: node.id,
+            unit: row.unit ?? "",
+            quantity: row.quantity ?? 0,
+            notes: row.notes ?? null,
+          },
+        });
+        createdItems += 1;
+      }
+    }
+
+    await _recalcBudgetSummary(tx, budgetId);
+  });
+
+  await log({
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    action: "wbs.imported",
+    entityType: "Budget",
+    entityId: budgetId,
+    after: { createdNodes, createdItems, mode },
+    ipAddress: ctx.ipAddress,
+  });
+
+  return { createdNodes, createdItems };
+}
+
+function topologicalSortRows(rows: BudgetImportRow[]): BudgetImportRow[] {
+  const byCode = new Map(rows.map((r) => [r.code, r]));
+  const sorted: BudgetImportRow[] = [];
+  const done = new Set<string>();
+
+  function visit(code: string) {
+    if (done.has(code)) return;
+    const row = byCode.get(code);
+    if (!row) return;
+    if (row.parent_code) visit(row.parent_code);
+    if (!done.has(code)) {
+      done.add(code);
+      sorted.push(row);
+    }
+  }
+
+  for (const row of rows) visit(row.code);
+  return sorted;
+}

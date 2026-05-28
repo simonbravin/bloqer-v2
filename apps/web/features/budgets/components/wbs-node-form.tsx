@@ -14,7 +14,7 @@ import {
 } from "@bloqer/validators";
 import { UnitSelect } from "./unit-select";
 
-export type WbsCreatePreset = "rootGroup" | "childItem";
+export type WbsCreatePreset = "rootGroup" | "childGroup" | "childItem";
 
 type CreateMode = {
   mode: "create";
@@ -54,14 +54,15 @@ function CreateForm({
   parentId, preset, suggestedCode, onSubmit, isPending, startTransition, serverError, setServerError, onDone,
 }: CreateMode & Shared) {
   const nodeType = preset === "childItem" ? "ITEM" : "GROUP";
+  const isItem = nodeType === "ITEM";
 
   const form = useForm<CreateWbsNodeInput>({
     resolver: zodResolver(createWbsNodeSchema),
     defaultValues: {
       parentId,
       type: nodeType,
-      unit: preset === "childItem" ? "un" : undefined,
-      quantity: preset === "childItem" ? 1 : undefined,
+      unit: isItem ? "un" : undefined,
+      quantity: isItem ? 0 : undefined,
     },
   });
 
@@ -99,7 +100,13 @@ function CreateForm({
       <div className="space-y-1.5">
         <Label>Nombre *</Label>
         <Input
-          placeholder={preset === "childItem" ? "Hormigón H-21" : "Estructura"}
+          placeholder={
+            preset === "childItem"
+              ? "Hormigón H-21"
+              : preset === "childGroup"
+                ? "Preparación del terreno"
+                : "Estructura"
+          }
           autoFocus
           {...form.register("name")}
         />
@@ -108,7 +115,7 @@ function CreateForm({
         )}
       </div>
 
-      {preset === "childItem" && (
+      {isItem && (
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Unidad</Label>

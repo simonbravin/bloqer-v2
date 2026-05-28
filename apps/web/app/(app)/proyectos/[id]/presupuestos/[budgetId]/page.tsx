@@ -13,6 +13,8 @@ import {
   updateWbsNodeAction,
   removeWbsNodeAction,
   reorderWbsNodesAction,
+  previewWbsImportAction,
+  executeWbsImportAction,
   updateCostItemAction,
   addCostAnalysisLineAction,
   updateCostAnalysisLineAction,
@@ -124,8 +126,13 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
       <WbsTree
         nodes={tree}
         budgetId={budgetId}
+        projectId={projectId}
         currency={budget.currency}
         editable={editable}
+        onPreviewWbsImport={previewWbsImportAction.bind(null, budgetId, projectId)}
+        onExecuteWbsImport={(rows, options) =>
+          executeWbsImportAction(budgetId, projectId, rows, options)
+        }
         onAddNode={addWbsNodeAction.bind(null, budgetId, projectId)}
         onUpdateNode={updateWbsNodeAction.bind(null, projectId, budgetId)}
         onRemoveNode={removeWbsNodeAction.bind(null, projectId, budgetId)}

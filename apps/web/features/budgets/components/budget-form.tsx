@@ -9,17 +9,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CurrencySelect } from "@/components/ui/currency-select";
-import { createBudgetSchema, type CreateBudgetInput } from "@bloqer/validators";
+import { createBudgetSchema, type CreateBudgetInput, type BudgetImportRow } from "@bloqer/validators";
+import { BudgetWbsPreloadSection } from "./budget-wbs-preload-section";
 
 interface BudgetFormProps {
   projectId: string;
   onSubmit: (data: CreateBudgetInput) => Promise<{ id: string } | { error: string }>;
+  onImportWbs?: (
+    budgetId: string,
+    rows: BudgetImportRow[],
+  ) => Promise<{ createdNodes: number; createdItems: number } | { error: string }>;
 }
 
-export function BudgetForm({ projectId, onSubmit }: BudgetFormProps) {
+export function BudgetForm({ projectId, onSubmit, onImportWbs }: BudgetFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [pendingWbsRows, setPendingWbsRows] = useState<BudgetImportRow[] | null>(null);
 
   const form = useForm<CreateBudgetInput>({
     resolver: zodResolver(createBudgetSchema),
@@ -39,9 +45,19 @@ export function BudgetForm({ projectId, onSubmit }: BudgetFormProps) {
       const result = await onSubmit(data);
       if ("error" in result) {
         setServerError(result.error);
-      } else {
-        router.push(`/proyectos/${projectId}/presupuestos/${result.id}`);
+        return;
       }
+      if (pendingWbsRows?.length && onImportWbs) {
+        const importResult = await onImportWbs(result.id, pendingWbsRows);
+        if ("error" in importResult) {
+          setServerError(
+            `Presupuesto creado, pero falló la importación WBS: ${importResult.error}`,
+          );
+          router.push(`/proyectos/${projectId}/presupuestos/${result.id}`);
+          return;
+        }
+      }
+      router.push(`/proyectos/${projectId}/presupuestos/${result.id}`);
     });
   });
 
@@ -109,6 +125,13 @@ export function BudgetForm({ projectId, onSubmit }: BudgetFormProps) {
           </div>
         </div>
       </div>
+
+      {onImportWbs && (
+        <BudgetWbsPreloadSection
+          disabled={isPending}
+          onPendingRowsChange={setPendingWbsRows}
+        />
+      )}
 
       <div className="space-y-1.5">
         <Label>Notas internas</Label>

@@ -321,6 +321,7 @@
   2. Copiar desde un presupuesto existente.
   3. Biblioteca de plantillas reutilizables a nivel tenant.
 - **Recomendación:** opción 2 en Fase 1, opción 3 en Fase 2.
+- **Nota (2026-05):** implementada importación parcial de estructura WBS vía CSV/Excel (columna A numerada, sin montos); copiar presupuesto completo sigue pendiente.
 - **Bloquea:** [`02-modules/BUDGETS.md`](../02-modules/BUDGETS.md).
 
 ### Q-027 — Cómputo métrico avanzado

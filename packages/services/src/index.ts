@@ -13,6 +13,8 @@ export * from "./budget/wbs.service";
 export * from "./budget/cost-item.service";
 export * from "./budget/cost-analysis.service";
 export * from "./budget/budget-import.service";
+export * from "./budget/wbs-spreadsheet-parser";
+export { WBS_MAX_CODE_SEGMENTS, countCodeSegments } from "./budget/wbs-codes";
 export * from "./certification/certification.service";
 export * from "./certification/certification-line.service";
 export { canViewArProjectArea } from "./ar/ar-access";

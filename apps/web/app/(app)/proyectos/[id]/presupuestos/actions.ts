@@ -5,6 +5,7 @@ import {
   submitBudgetForReview, returnBudgetForChanges, approveBudget, closeBudget, cancelBudget,
   updateBudgetSettings,
   addWbsNode, updateWbsNode, removeWbsNode, reorderWbsNodes,
+  previewImport, executeImport,
   updateCostItem,
   addCostAnalysisLine, updateCostAnalysisLine, removeCostAnalysisLine,
   ServiceError,
@@ -15,8 +16,10 @@ import {
   updateCostItemSchema, createCostAnalysisLineSchema, updateCostAnalysisLineSchema,
   type CreateBudgetInput, type UpdateBudgetInput, type UpdateBudgetSettingsInput,
   type CreateWbsNodeInput, type UpdateWbsNodeInput, type ReorderWbsNodesInput,
-  type UpdateCostItemInput, type CreateCostAnalysisLineInput, type UpdateCostAnalysisLineInput,
+  type UpdateCostItemInput,   type CreateCostAnalysisLineInput, type UpdateCostAnalysisLineInput,
+  budgetImportRowSchema,
   budgetLifecycleCommentSchema, budgetReturnForChangesSchema,
+  type BudgetImportRow,
   type BudgetLifecycleCommentInput, type BudgetReturnForChangesInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
@@ -227,6 +230,44 @@ export async function reorderWbsNodesAction(
     revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return { ok: true };
   } catch (err) { return handle(err); }
+}
+
+export async function previewWbsImportAction(
+  budgetId: string,
+  projectId: string,
+  rawRows: unknown[][],
+) {
+  const ctx = await getCtx();
+  try {
+    const result = await previewImport(budgetId, rawRows, ctx, "structure_only");
+    return result;
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function executeWbsImportAction(
+  budgetId: string,
+  projectId: string,
+  rows: BudgetImportRow[],
+  options: { replaceExisting: boolean },
+): Promise<{ createdNodes: number; createdItems: number } | Err> {
+  const ctx = await getCtx();
+  const parsed = rows.map((r) => budgetImportRowSchema.safeParse(r));
+  if (parsed.some((p) => !p.success)) {
+    return { error: "Hay filas inválidas en la importación" };
+  }
+  const validRows = parsed.map((p) => p.data!);
+  try {
+    const result = await executeImport(budgetId, validRows, ctx, {
+      mode: "structure_only",
+      replaceExisting: options.replaceExisting,
+    });
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    return result;
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 // ─── CostItem ─────────────────────────────────────────────────────────────────

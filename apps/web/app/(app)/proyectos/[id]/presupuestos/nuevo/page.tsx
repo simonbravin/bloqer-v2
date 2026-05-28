@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { BudgetForm } from "@/features/budgets";
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectShellInfo, ServiceError } from "@bloqer/services";
-import { createBudgetAction } from "../actions";
+import { createBudgetAction, executeWbsImportAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 
@@ -43,6 +43,9 @@ export default async function NuevoPresupuestoPage({ params }: PageProps) {
         <BudgetForm
           projectId={projectId}
           onSubmit={createBudgetAction.bind(null, projectId)}
+          onImportWbs={(budgetId, rows) =>
+            executeWbsImportAction(budgetId, projectId, rows, { replaceExisting: false })
+          }
         />
       </div>
     </PageShell>
