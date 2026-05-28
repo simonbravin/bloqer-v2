@@ -10,17 +10,20 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   createWbsNodeSchema, updateWbsNodeSchema,
-  type CreateWbsNodeInput, type UpdateWbsNodeInput,
+  type CreateWbsNodeInput,
+  type SubdivideApuChoice,
+  type UpdateWbsNodeInput,
 } from "@bloqer/validators";
 import { UnitSelect } from "./unit-select";
 
-export type WbsCreatePreset = "rootGroup" | "childGroup" | "childItem";
+export type WbsCreatePreset = "rootGroup" | "childItem";
 
 type CreateMode = {
   mode: "create";
   parentId?: string;
   preset?: WbsCreatePreset;
   suggestedCode?: string;
+  subdivideApu?: SubdivideApuChoice;
   onSubmit: (data: CreateWbsNodeInput) => Promise<{ id: string } | { error: string }>;
 };
 
@@ -51,7 +54,7 @@ type Shared = {
 };
 
 function CreateForm({
-  parentId, preset, suggestedCode, onSubmit, isPending, startTransition, serverError, setServerError, onDone,
+  parentId, preset, suggestedCode, subdivideApu, onSubmit, isPending, startTransition, serverError, setServerError, onDone,
 }: CreateMode & Shared) {
   const nodeType = preset === "childItem" ? "ITEM" : "GROUP";
   const isItem = nodeType === "ITEM";
@@ -75,6 +78,7 @@ function CreateForm({
       type: nodeType,
       parentId,
       code: suggestedCode || data.code,
+      subdivideApu,
     };
     startTransition(async () => {
       const result = await onSubmit(payload);
@@ -100,13 +104,7 @@ function CreateForm({
       <div className="space-y-1.5">
         <Label>Nombre *</Label>
         <Input
-          placeholder={
-            preset === "childItem"
-              ? "Hormigón H-21"
-              : preset === "childGroup"
-                ? "Preparación del terreno"
-                : "Estructura"
-          }
+          placeholder={preset === "childItem" ? "Hormigón H-21" : "Estructura"}
           autoFocus
           {...form.register("name")}
         />

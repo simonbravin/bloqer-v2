@@ -46,6 +46,9 @@ import {
   suggestChildCode,
   suggestRootGroupCode,
 } from "../lib/wbs-codes";
+import { isLeafApuNode, nodeHasApuData } from "../lib/wbs-apu";
+import { WbsSubdivideApuDialog } from "./wbs-subdivide-apu-dialog";
+import type { SubdivideApuChoice } from "@bloqer/validators";
 import { WBS_EDT_BREAKDOWN_HEADERS, VISIBLE_COST_CATEGORIES } from "@/lib/budget-categories";
 import type { WbsCreatePreset } from "./wbs-node-form";
 import type { WbsViewNode } from "@bloqer/services";
@@ -108,8 +111,20 @@ function collectMatchingIds(nodes: WbsViewNode[], query: string): Set<string> {
 
 type DialogState =
   | { type: "closed" }
-  | { type: "add"; parentId?: string; preset: WbsCreatePreset; suggestedCode: string }
+  | {
+      type: "add";
+      parentId?: string;
+      preset: WbsCreatePreset;
+      suggestedCode: string;
+      subdivideApu?: SubdivideApuChoice;
+    }
   | { type: "edit"; node: WbsViewNode };
+
+type SubdividePromptState = {
+  parent: WbsViewNode;
+  preset: WbsCreatePreset;
+  suggestedCode: string;
+} | null;
 
 interface WbsTreeProps {
   nodes: WbsViewNode[];
@@ -161,20 +176,21 @@ export function WbsTree({
   const [search, setSearch] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
     const ids = new Set<string>();
-    function collectGroups(ns: WbsViewNode[]) {
+    function collectExpandable(ns: WbsViewNode[]) {
       for (const n of ns) {
-        if (n.type === "GROUP") {
+        if (n.children.length > 0) {
           ids.add(n.id);
-          collectGroups(n.children);
+          collectExpandable(n.children);
         }
       }
     }
-    collectGroups(nodes);
+    collectExpandable(nodes);
     return ids;
   });
   const [itemDialogNode, setItemDialogNode] = useState<WbsViewNode | null>(null);
   const [groupDialogNode, setGroupDialogNode] = useState<WbsViewNode | null>(null);
   const [dialogState, setDialogState] = useState<DialogState>({ type: "closed" });
+  const [subdividePrompt, setSubdividePrompt] = useState<SubdividePromptState>(null);
   const canEditStructure = structureEditable ?? editable;
   const [importOpen, setImportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<WbsViewNode | null>(null);
@@ -280,8 +296,38 @@ export function WbsTree({
   }
 
   function handleRowClick(node: WbsViewNode) {
-    if (node.type === "ITEM") setItemDialogNode(node);
+    if (isLeafApuNode(node)) setItemDialogNode(node);
     else setGroupDialogNode(node);
+  }
+
+  function beginAddChild(node: WbsViewNode) {
+    const preset = resolveAddChildPreset(node);
+    if (!preset) return;
+    const suggestedCode = suggestChildCode(node, nodes);
+    if (isLeafApuNode(node) && nodeHasApuData(node)) {
+      setSubdividePrompt({ parent: node, preset, suggestedCode });
+      return;
+    }
+    setDialogState({
+      type: "add",
+      parentId: node.id,
+      preset,
+      suggestedCode,
+      subdivideApu: node.type === "ITEM" ? "discard" : undefined,
+    });
+  }
+
+  function openAddAfterSubdivide(choice: SubdivideApuChoice) {
+    if (!subdividePrompt) return;
+    const { parent, preset, suggestedCode } = subdividePrompt;
+    setSubdividePrompt(null);
+    setDialogState({
+      type: "add",
+      parentId: parent.id,
+      preset,
+      suggestedCode,
+      subdivideApu: choice,
+    });
   }
 
   function renderRows(nodeList: WbsViewNode[], depth: number): ReactNode[] {
@@ -305,7 +351,7 @@ export function WbsTree({
         >
           <TableCell className="py-1.5 font-mono text-xs text-muted-foreground w-24">
             <div className="flex items-center gap-1" style={{ paddingLeft: depth * 16 }}>
-              {node.type === "GROUP" ? (
+              {node.children.length > 0 ? (
                 <button
                   type="button"
                   className="shrink-0 text-muted-foreground hover:text-foreground"
@@ -329,7 +375,7 @@ export function WbsTree({
           <TableCell className="py-1.5 min-w-[12rem] text-sm font-medium">
             <span className="line-clamp-2">{node.name}</span>
             <span className="mt-0.5 block text-[10px] font-normal text-muted-foreground">
-              {node.type === "ITEM" ? "Ítem · clic para APU" : "Capítulo"}
+              {isLeafApuNode(node) ? "Ítem · clic para APU" : "Capítulo"}
             </span>
           </TableCell>
           <TableCell className="py-1.5 text-sm text-muted-foreground w-20">
@@ -377,16 +423,7 @@ export function WbsTree({
                     size="icon"
                     className="h-7 w-7"
                     title={addChildButtonTitle(node)}
-                    onClick={() => {
-                      const preset = resolveAddChildPreset(node);
-                      if (!preset) return;
-                      setDialogState({
-                        type: "add",
-                        parentId: node.id,
-                        preset,
-                        suggestedCode: suggestChildCode(node, nodes),
-                      });
-                    }}
+                    onClick={() => beginAddChild(node)}
                   >
                     <Plus className="h-3 w-3" />
                   </Button>
@@ -433,7 +470,7 @@ export function WbsTree({
         </TableRow>,
       );
 
-      if (node.type === "GROUP" && isExpanded) {
+      if (node.children.length > 0 && isExpanded) {
         rows.push(...renderRows(node.children, depth + 1));
       }
     }
@@ -592,9 +629,7 @@ export function WbsTree({
               {dialogState.type === "add"
                 ? dialogState.preset === "childItem"
                   ? "Agregar ítem"
-                  : dialogState.preset === "childGroup"
-                    ? "Agregar subcapítulo"
-                    : "Agregar capítulo"
+                  : "Agregar capítulo"
                 : "Editar nodo"}
             </DialogTitle>
           </DialogHeader>
@@ -604,6 +639,7 @@ export function WbsTree({
               parentId={dialogState.parentId}
               preset={dialogState.preset}
               suggestedCode={dialogState.suggestedCode}
+              subdivideApu={dialogState.subdivideApu}
               onSubmit={async (data) => {
                 const result = await onAddNode(data);
                 if (!("error" in result)) router.refresh();
@@ -630,6 +666,18 @@ export function WbsTree({
           )}
         </DialogContent>
       </Dialog>
+
+      <WbsSubdivideApuDialog
+        open={subdividePrompt !== null}
+        onOpenChange={(open) => {
+          if (!open) setSubdividePrompt(null);
+        }}
+        parentCode={subdividePrompt?.parent.code ?? ""}
+        parentName={subdividePrompt?.parent.name ?? ""}
+        childCode={subdividePrompt?.suggestedCode ?? ""}
+        onMigrate={() => openAddAfterSubdivide("migrate")}
+        onDiscard={() => openAddAfterSubdivide("discard")}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}

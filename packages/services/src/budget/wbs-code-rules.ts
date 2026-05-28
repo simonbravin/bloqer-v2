@@ -100,15 +100,23 @@ export function detectImportProfile(
   return "simple";
 }
 
-/** Tipo según profundidad del código (importación ignora columna C / unidad). */
-export function inferNodeType(canonicalCode: string, profile: WbsImportProfile): WbsNodeType {
-  const segments = countCodeSegments(canonicalCode);
-
-  if (profile === "multi_discipline") {
-    return segments >= 4 ? "ITEM" : "GROUP";
+/**
+ * Tipo en importación: GROUP si otro código del archivo es hijo directo; si no, ITEM (hoja con APU).
+ * Los rubros raíz (ARQ, EST, …) en multi-rubro son siempre GROUP.
+ */
+export function inferImportNodeType(
+  canonicalCode: string,
+  allCodes: ReadonlySet<string>,
+  profile: WbsImportProfile,
+): WbsNodeType {
+  if (profile === "multi_discipline" && isDisciplineRootCode(canonicalCode)) {
+    return "GROUP";
   }
-
-  return segments >= 3 ? "ITEM" : "GROUP";
+  for (const other of allCodes) {
+    if (other === canonicalCode) continue;
+    if (parentCodeFrom(other) === canonicalCode) return "GROUP";
+  }
+  return "ITEM";
 }
 
 export function validateCanonicalCode(
@@ -124,29 +132,14 @@ export function validateCanonicalCode(
   }
 
   if (profile === "multi_discipline") {
-    if (!isMultiStyleCode(canonicalCode)) {
+    if (!isMultiStyleCode(canonicalCode) && !isDisciplineRootCode(canonicalCode)) {
       return `En presupuestos multi-rubro el código debe incluir prefijo (p. ej. ARQ.1.1)`;
-    }
-    if (type === "GROUP" && segments > 3) {
-      return `El capítulo "${canonicalCode}" supera la profundidad de grupo`;
-    }
-    if (type === "ITEM" && segments < 2) {
-      return `El ítem "${canonicalCode}" debe incluir capítulo (p. ej. ARQ.1.1)`;
-    }
-    if (type === "GROUP" && segments >= 4) {
-      return `El código "${canonicalCode}" supera la profundidad de capítulo`;
     }
     return null;
   }
 
   if (isMultiStyleCode(canonicalCode)) {
     return `Código "${canonicalCode}" no es válido en modo simple`;
-  }
-  if (type === "ITEM" && segments < 2) {
-    return `El ítem "${canonicalCode}" debe estar bajo un capítulo (p. ej. 1.1)`;
-  }
-  if (type === "GROUP" && segments > 2) {
-    return `El código "${canonicalCode}" supera la profundidad de capítulo`;
   }
   return null;
 }
@@ -164,42 +157,13 @@ export function validateManualNodeCode(
     return `El código "${code}" supera la profundidad máxima de ${max} niveles`;
   }
 
-  const multi = isMultiStyleCode(code) || (parentCode != null && isMultiStyleCode(parentCode));
-
-  if (multi) {
-    if (type === "GROUP" && segments > 3) {
-      return "Los capítulos solo pueden estar hasta el nivel subcapítulo (p. ej. ARQ.1.1)";
-    }
-    if (type === "ITEM" && segments < 2) {
-      return "Los ítems deben tener al menos dos segmentos (p. ej. ARQ.1.1)";
-    }
-    if (parentCode) {
-      const pSegs = countCodeSegments(parentCode);
-      if (type === "GROUP" && pSegs >= 3) {
-        return "Los subcapítulos solo se pueden crear bajo un capítulo o rubro";
-      }
-      if (type === "ITEM" && pSegs >= WBS_MAX_CODE_SEGMENTS_MULTI) {
-        return "No se pueden agregar ítems a este nivel de profundidad";
-      }
-    }
-    return null;
-  }
-
-  if (type === "GROUP" && segments > 2) {
-    return "Los capítulos solo pueden estar en el nivel 1 o 2";
-  }
-  if (type === "ITEM" && segments < 2) {
-    return "Los ítems deben tener al menos dos segmentos en el código (p. ej. 1.1)";
-  }
-  if (parentCode) {
-    const pSegs = countCodeSegments(parentCode);
-    if (type === "GROUP" && pSegs !== 1) {
-      return "Los subcapítulos solo se pueden crear bajo un capítulo raíz";
-    }
-    if (type === "ITEM" && pSegs >= WBS_MAX_CODE_SEGMENTS_SIMPLE) {
+  if (parentCode && type === "ITEM") {
+    const parentMax = maxCodeSegmentsForCode(parentCode);
+    if (segments > parentMax) {
       return "No se pueden agregar ítems a este nivel de profundidad";
     }
   }
+
   return null;
 }
 
@@ -207,4 +171,26 @@ export function parentCodeFrom(canonicalCode: string): string | undefined {
   const idx = canonicalCode.lastIndexOf(".");
   if (idx === -1) return undefined;
   return canonicalCode.slice(0, idx);
+}
+
+export function detectProfileFromImportRows(
+  rows: ReadonlyArray<{ code: string }>,
+): WbsImportProfile {
+  if (rows.some((r) => isDisciplineRootCode(r.code) || isMultiStyleCode(r.code))) {
+    return "multi_discipline";
+  }
+  return "simple";
+}
+
+/** Recalcula GROUP/ITEM según hijos en el lote (importación / execute). */
+export function reconcileImportRowTypes<T extends { code: string; type: WbsNodeType }>(
+  rows: T[],
+  profile?: WbsImportProfile,
+): T[] {
+  const resolvedProfile = profile ?? detectProfileFromImportRows(rows);
+  const allCodes = new Set(rows.map((r) => r.code));
+  return rows.map((row) => ({
+    ...row,
+    type: inferImportNodeType(row.code, allCodes, resolvedProfile),
+  }));
 }

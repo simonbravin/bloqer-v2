@@ -266,8 +266,8 @@ export async function addWbsNode(
       if (!parent) throw new ServiceError("NOT_FOUND", "Nodo padre no encontrado");
       code = nextChildCode(parent.code, siblings);
     } else {
-      if (input.type !== "GROUP") {
-        throw new ServiceError("CONFLICT", "Los ítems deben crearse dentro de un capítulo");
+      if (input.type !== "GROUP" && input.type !== "ITEM") {
+        throw new ServiceError("CONFLICT", "Tipo de nodo inválido");
       }
       const hasDisciplineRoots = roots.some((r) => isDisciplineRootCode(r.code));
       if (hasDisciplineRoots) {
@@ -298,9 +298,6 @@ export async function addWbsNode(
     if (!parent || parent.budgetId !== budgetId) {
       throw new ServiceError("NOT_FOUND", "Nodo padre no encontrado");
     }
-    if (parent.type === "ITEM") {
-      throw new ServiceError("CONFLICT", "Un nodo ITEM no puede tener hijos");
-    }
     const parentManualError = validateManualNodeCode(
       code,
       input.type,
@@ -309,7 +306,21 @@ export async function addWbsNode(
     if (parentManualError) throw new ServiceError("CONFLICT", parentManualError);
   }
 
+  if (input.parentId) {
+    const parentForPromote = await prisma.wbsNode.findUnique({
+      where: { id: input.parentId },
+      select: { type: true },
+    });
+    if (parentForPromote?.type === "ITEM") {
+      await assertWbsNodeCanSubdivide(input.parentId);
+    }
+  }
+
+  const subdivideApu = input.subdivideApu ?? "discard";
+
   const node = await prisma.$transaction(async (tx) => {
+    let movedCostItem = false;
+
     const n = await tx.wbsNode.create({
       data: {
         budgetId,
@@ -321,8 +332,30 @@ export async function addWbsNode(
         sortOrder,
       },
     });
-    // ITEM nodes always get a CostItem container
-    if (input.type === "ITEM") {
+
+    if (input.parentId) {
+      const parent = await tx.wbsNode.findUnique({ where: { id: input.parentId } });
+      if (parent?.type === "ITEM") {
+        if (subdivideApu === "migrate" && input.type === "ITEM") {
+          const moved = await tx.costItem.updateMany({
+            where: { wbsNodeId: parent.id },
+            data: { wbsNodeId: n.id },
+          });
+          movedCostItem = moved.count > 0;
+        } else {
+          await tx.costAnalysisLine.deleteMany({
+            where: { costItem: { wbsNodeId: parent.id } },
+          });
+          await tx.costItem.deleteMany({ where: { wbsNodeId: parent.id } });
+        }
+        await tx.wbsNode.update({
+          where: { id: parent.id },
+          data: { type: "GROUP" },
+        });
+      }
+    }
+
+    if (input.type === "ITEM" && !movedCostItem) {
       await tx.costItem.create({
         data: {
           budgetId,
@@ -332,6 +365,8 @@ export async function addWbsNode(
         },
       });
     }
+
+    await _recalcBudgetSummary(tx, budgetId);
     return n;
   });
 
@@ -427,6 +462,22 @@ function sortNodeIdsByDepthDesc(
   return [...nodeIds].sort((a, b) => depth(b) - depth(a));
 }
 
+async function assertWbsNodeCanSubdivide(wbsNodeId: string): Promise<void> {
+  const [certLines, poLines, jobsiteRefs, subcontractLines] = await Promise.all([
+    prisma.certificationLine.count({ where: { wbsNodeId } }),
+    prisma.purchaseOrderLine.count({ where: { wbsNodeId } }),
+    prisma.jobsiteLogProgress.count({ where: { wbsNodeId } }),
+    prisma.subcontractLine.count({ where: { wbsNodeId } }),
+  ]);
+
+  if (certLines > 0 || poLines > 0 || jobsiteRefs > 0 || subcontractLines > 0) {
+    throw new ServiceError(
+      "CONFLICT",
+      "No se puede subdividir este ítem: tiene certificaciones, compras, subcontratos o libro de obra vinculados. Reasigná o eliminá esos vínculos antes de agregar hijos.",
+    );
+  }
+}
+
 async function assertWbsSubtreeDeletable(nodeIds: string[]): Promise<void> {
   if (nodeIds.length === 0) return;
 
@@ -484,6 +535,35 @@ export async function removeWbsNode(id: string, ctx: ServiceContext): Promise<vo
     }
 
     const parentId = node.parentId;
+    if (parentId) {
+      const parent = await tx.wbsNode.findUnique({
+        where: { id: parentId },
+        select: { id: true, type: true, budgetId: true, code: true },
+      });
+      if (
+        parent?.type === "GROUP" &&
+        !isDisciplineRootCode(parent.code)
+      ) {
+        const childCount = await tx.wbsNode.count({
+          where: { budgetId: node.budgetId, parentId },
+        });
+        if (childCount === 0) {
+          await tx.wbsNode.update({
+            where: { id: parentId },
+            data: { type: "ITEM" },
+          });
+          await tx.costItem.create({
+            data: {
+              budgetId: node.budgetId,
+              wbsNodeId: parentId,
+              unit: "",
+              quantity: 0,
+            },
+          });
+        }
+      }
+    }
+
     const siblings = await tx.wbsNode.findMany({
       where: { budgetId: node.budgetId, parentId },
       orderBy: { sortOrder: "asc" },

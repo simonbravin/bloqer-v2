@@ -2,7 +2,9 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   detectImportProfile,
+  inferImportNodeType,
   parseCellA,
+  reconcileImportRowTypes,
   validateManualNodeCode,
 } from "./wbs-code-rules";
 
@@ -49,7 +51,31 @@ describe("validateManualNodeCode", () => {
     assert.equal(validateManualNodeCode("ARQ.1", "GROUP", "ARQ"), null);
   });
 
-  it("blocks subcapítulo bajo ARQ.1.1", () => {
-    assert.ok(validateManualNodeCode("ARQ.1.1.1", "GROUP", "ARQ.1.1"));
+  it("allows ítem hoja bajo ARQ.1.1", () => {
+    assert.equal(validateManualNodeCode("ARQ.1.1.1", "ITEM", "ARQ.1.1"), null);
+  });
+
+  it("allows ítem raíz con código 1", () => {
+    assert.equal(validateManualNodeCode("1", "ITEM", null), null);
+  });
+});
+
+describe("reconcileImportRowTypes", () => {
+  it("fuerza GROUP en padre con hijo aunque el cliente mande ITEM", () => {
+    const rows = reconcileImportRowTypes(
+      [
+        { code: "1", type: "ITEM", name: "Cap" },
+        { code: "1.1", type: "ITEM", name: "Hijo" },
+      ],
+      "simple",
+    );
+    assert.equal(rows[0]?.type, "GROUP");
+    assert.equal(rows[1]?.type, "ITEM");
+  });
+
+  it("mantiene rubro ARQ como GROUP sin hijos", () => {
+    const rows = reconcileImportRowTypes([{ code: "ARQ", type: "ITEM", name: "Arq" }], "multi_discipline");
+    assert.equal(rows[0]?.type, "GROUP");
+    assert.equal(inferImportNodeType("ARQ", new Set(["ARQ"]), "multi_discipline"), "GROUP");
   });
 });

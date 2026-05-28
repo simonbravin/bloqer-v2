@@ -9,15 +9,15 @@ describe("previewSpreadsheetImport", () => {
     assert.ok(result.errors.some((e) => e.field === "general"));
   });
 
-  it("rejects child under ITEM parent", () => {
+  it("reconcilia padre con hijo a GROUP aunque venga como ITEM", () => {
     const { errors } = validateImportRows(
       [
         { code: "1.1.1", type: "ITEM", name: "Ítem hoja", _row: 1 },
-        { code: "1.1.1.1", type: "GROUP", name: "Hijo inválido", parent_code: "1.1.1", _row: 2 },
+        { code: "1.1.1.1", type: "ITEM", name: "Hijo", parent_code: "1.1.1", _row: 2 },
       ],
       [],
     );
-    assert.ok(errors.some((e) => e.field === "parent_code" && e.message.includes("ítem")));
+    assert.equal(errors.length, 0);
   });
 
   it("imports leaf items without unit in structure_only", () => {

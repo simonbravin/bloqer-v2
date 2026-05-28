@@ -35,7 +35,7 @@ describe("parseNumberedSpreadsheetRows — simple (un solo rubro)", () => {
     assert.equal(rows[3]?.code, "1.1.2");
   });
 
-  it("ignores column C (unidad); depth defines ITEM", () => {
+  it("ignores column C; hoja con hijos en archivo es GROUP", () => {
     const { rows, errors } = parseNumberedSpreadsheetRows([
       ["ARQ 2", "CUBIERTAS", ""],
       ["ARQ 2.1", "Cubierta panel sándwich", "m²"],
@@ -46,6 +46,44 @@ describe("parseNumberedSpreadsheetRows — simple (un solo rubro)", () => {
     assert.equal(rows[1]?.code, "2.1");
     assert.equal(rows[2]?.type, "ITEM");
     assert.equal(rows[2]?.code, "2.1.1");
+  });
+
+  it("solo 1 en el archivo → ITEM hoja en raíz", () => {
+    const { rows, errors } = parseNumberedSpreadsheetRows([["1", "Rubro único", ""]]);
+    assert.equal(errors.length, 0);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]?.type, "ITEM");
+    assert.equal(rows[0]?.code, "1");
+  });
+
+  it("1 con 1.1 y 1.2 sin nietos → hijos ITEM, padre GROUP", () => {
+    const { rows, errors } = parseNumberedSpreadsheetRows([
+      ["1", "Capítulo", ""],
+      ["1.1", "A", ""],
+      ["1.2", "B", ""],
+    ]);
+    assert.equal(errors.length, 0);
+    const byCode = Object.fromEntries(rows.map((r) => [r.code, r.type]));
+    assert.equal(byCode["1"], "GROUP");
+    assert.equal(byCode["1.1"], "ITEM");
+    assert.equal(byCode["1.2"], "ITEM");
+  });
+
+  it("rama mixta: 1.1.1 y 1.1.2 hoja; 1.2 hoja sin hijos", () => {
+    const { rows, errors } = parseNumberedSpreadsheetRows([
+      ["1", "Cap", ""],
+      ["1.1", "Sub", ""],
+      ["1.1.1", "Detalle A", ""],
+      ["1.1.2", "Detalle B", ""],
+      ["1.2", "Ítem suelto", ""],
+    ]);
+    assert.equal(errors.length, 0);
+    const byCode = Object.fromEntries(rows.map((r) => [r.code, r.type]));
+    assert.equal(byCode["1"], "GROUP");
+    assert.equal(byCode["1.1"], "GROUP");
+    assert.equal(byCode["1.1.1"], "ITEM");
+    assert.equal(byCode["1.1.2"], "ITEM");
+    assert.equal(byCode["1.2"], "ITEM");
   });
 
   it("rejects depth beyond 3 segments", () => {

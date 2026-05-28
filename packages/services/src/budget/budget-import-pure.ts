@@ -3,7 +3,11 @@
 import { budgetImportRowSchema, IMPORT_TEMPLATE_COLUMNS } from "@bloqer/validators";
 import type { BudgetImportRow } from "@bloqer/validators";
 import { parseNumberedSpreadsheetRows } from "./wbs-spreadsheet-parser";
-import type { WbsImportProfile } from "./wbs-code-rules";
+import {
+  detectProfileFromImportRows,
+  reconcileImportRowTypes,
+  type WbsImportProfile,
+} from "./wbs-code-rules";
 
 export { IMPORT_TEMPLATE_COLUMNS };
 export { parseNumberedSpreadsheetRows, normalizeItemCode } from "./wbs-spreadsheet-parser";
@@ -129,8 +133,10 @@ export function validateImportRows(
   const warnings: ImportWarning[] = [];
   const seenCodes = new Set<string>();
   const existingSet = new Set(existingCodes);
+  const profile = detectProfileFromImportRows(rows);
+  const normalizedRows = reconcileImportRowTypes(rows, profile);
 
-  for (const row of rows) {
+  for (const row of normalizedRows) {
     if (seenCodes.has(row.code)) {
       errors.push({ row: row._row, field: "code", message: `Código duplicado en la importación: "${row.code}"` });
     }
@@ -169,8 +175,8 @@ export function validateImportRows(
     }
   }
 
-  const typeByCode = new Map(rows.map((r) => [r.code, r.type]));
-  for (const row of rows) {
+  const typeByCode = new Map(normalizedRows.map((r) => [r.code, r.type]));
+  for (const row of normalizedRows) {
     if (!row.parent_code) continue;
     const parentType = typeByCode.get(row.parent_code);
     if (parentType === "ITEM") {
@@ -183,7 +189,7 @@ export function validateImportRows(
   }
 
   const allCodes = new Set([...seenCodes, ...existingSet]);
-  for (const row of rows) {
+  for (const row of normalizedRows) {
     if (row.parent_code && !allCodes.has(row.parent_code)) {
       errors.push({
         row: row._row,
@@ -194,7 +200,7 @@ export function validateImportRows(
   }
 
   const processedCodes = new Set(existingSet);
-  for (const row of rows) {
+  for (const row of normalizedRows) {
     if (row.parent_code && !processedCodes.has(row.parent_code)) {
       errors.push({
         row: row._row,

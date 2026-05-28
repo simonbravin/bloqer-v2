@@ -8,6 +8,10 @@ import { ServiceContext, ServiceError } from "../types";
 import { assertBudgetEditable, assertBudgetWbsStructureMutable } from "./budget.service";
 import { _recalcBudgetSummary } from "./budget-calc.service";
 import {
+  detectProfileFromImportRows,
+  reconcileImportRowTypes,
+} from "./wbs-code-rules";
+import {
   type ImportMode,
   type PreviewResult,
   previewSpreadsheetImport,
@@ -71,13 +75,15 @@ export async function executeImport(
     );
   }
 
-  const numbered = rows.map((r, i) => ({ ...r, _row: i + 1 }));
+  const profile = detectProfileFromImportRows(rows);
+  const normalizedRows = reconcileImportRowTypes(rows, profile);
+  const numbered = normalizedRows.map((r, i) => ({ ...r, _row: i + 1 }));
   const { errors } = validateImportRows(numbered, options?.replaceExisting ? [] : existingCodes, mode);
   if (errors.length > 0) {
     throw new ServiceError("CONFLICT", errors[0]!.message);
   }
 
-  const sorted = topologicalSortRows(rows);
+  const sorted = topologicalSortRows(normalizedRows);
 
   let createdNodes = 0;
   let createdItems = 0;

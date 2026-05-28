@@ -2,7 +2,7 @@ import type { BudgetImportRow } from "@bloqer/validators";
 import { suggestSequentialDuplicateFix } from "./wbs-import-code-fix";
 import {
   detectImportProfile,
-  inferNodeType,
+  inferImportNodeType,
   parentCodeFrom,
   parseCellA,
   validateCanonicalCode,
@@ -105,6 +105,8 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
   const rows: ParsedSpreadsheetRow[] = [];
   const seenCodes = new Set<string>();
   const codesInFileOrder: string[] = [];
+  type PendingRow = Omit<ParsedSpreadsheetRow, "type"> & { type?: never };
+  const pending: PendingRow[] = [];
 
   if (profile === "multi_discipline") {
     const disciplines = new Set<string>();
@@ -120,9 +122,8 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
       const code = discipline;
       if (seenCodes.has(code)) continue;
       seenCodes.add(code);
-      rows.push({
+      pending.push({
         code,
-        type: "GROUP",
         name: banner?.name ?? discipline,
         quantity: 0,
         _sourceRow: banner?.rowNum ?? 0,
@@ -156,24 +157,49 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
       }
     }
 
-    const type = inferNodeType(canonical, profile);
-    const structureError = validateCanonicalCode(canonical, type, profile);
-    if (structureError) {
-      errors.push({ row: draft.rowNum, field: "code", message: structureError });
-      continue;
-    }
-
     seenCodes.add(canonical);
     codesInFileOrder.push(canonical);
-    rows.push({
+    pending.push({
       code: canonical,
       parent_code: parentCodeFrom(canonical),
-      type,
       name: draft.name,
       quantity: 0,
       _sourceRow: draft.rowNum,
       _profile: profile,
     });
+  }
+
+  const allCodesDraft = new Set(pending.map((r) => r.code));
+  const typedDraft = pending.map((row) => ({
+    ...row,
+    type: inferImportNodeType(row.code, allCodesDraft, profile),
+  }));
+  const structurallyValid: typeof typedDraft = [];
+  for (const row of typedDraft) {
+    const structureError = validateCanonicalCode(row.code, row.type, profile);
+    if (structureError) {
+      errors.push({
+        row: row._sourceRow,
+        field: "code",
+        message: structureError,
+      });
+      continue;
+    }
+    structurallyValid.push(row);
+  }
+  const validCodes = new Set(structurallyValid.map((r) => r.code));
+  for (const row of structurallyValid) {
+    const type = inferImportNodeType(row.code, validCodes, profile);
+    const structureError = validateCanonicalCode(row.code, type, profile);
+    if (structureError) {
+      errors.push({
+        row: row._sourceRow,
+        field: "code",
+        message: structureError,
+      });
+      continue;
+    }
+    rows.push({ ...row, type });
   }
 
   rows.sort((a, b) => {

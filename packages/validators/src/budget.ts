@@ -41,6 +41,8 @@ export const budgetReturnForChangesSchema = z.object({
   comment: z.string().min(1, "Las observaciones son obligatorias").max(2000),
 });
 
+export const subdivideApuSchema = z.enum(["migrate", "discard"]);
+
 export const createWbsNodeSchema = z.object({
   parentId: z.string().uuid().optional(),
   type: wbsNodeTypeSchema,
@@ -51,6 +53,8 @@ export const createWbsNodeSchema = z.object({
   sortOrder: z.number().int().min(0).optional(),
   unit: z.string().max(50).optional(),
   quantity: z.number().min(0).optional(),
+  /** Al agregar hijo bajo un ítem hoja con APU: migrar CostItem al hijo o descartarlo. */
+  subdivideApu: subdivideApuSchema.optional(),
 });
 
 export const updateWbsNodeSchema = z.object({
@@ -120,6 +124,7 @@ export const budgetImportRowSchema = z.object({
 export type CreateBudgetInput = z.infer<typeof createBudgetSchema>;
 export type UpdateBudgetInput = z.infer<typeof updateBudgetSchema>;
 export type UpdateBudgetSettingsInput = z.infer<typeof updateBudgetSettingsSchema>;
+export type SubdivideApuChoice = z.infer<typeof subdivideApuSchema>;
 export type CreateWbsNodeInput = z.infer<typeof createWbsNodeSchema>;
 export type UpdateWbsNodeInput = z.infer<typeof updateWbsNodeSchema>;
 export type ReorderWbsNodesInput = z.infer<typeof reorderWbsNodesSchema>;

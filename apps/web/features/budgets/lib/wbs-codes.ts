@@ -35,43 +35,29 @@ export function suggestChildCode(parent: WbsViewNode, nodes: WbsViewNode[]): str
   return `${parent.code}.${siblings.length + 1}`;
 }
 
-export const suggestChildItemCode = suggestChildCode;
-export const suggestChildGroupCode = suggestChildCode;
-
 export function getSiblings(nodes: WbsViewNode[], parentId: string | null): NodeLike[] {
   const flat = flatten(nodes);
   return flat.filter((n) => n.parentId === parentId);
 }
 
-export function canAddSubchapter(node: WbsViewNode): boolean {
-  if (node.type !== "GROUP") return false;
-  const segs = countCodeSegments(node.code);
-  if (isMultiStyleCode(node.code)) return segs >= 1 && segs <= 2;
-  return segs === 1;
+function maxSegmentsForNode(node: WbsViewNode): number {
+  return isMultiStyleCode(node.code)
+    ? WBS_MAX_CODE_SEGMENTS_MULTI
+    : WBS_MAX_CODE_SEGMENTS_SIMPLE;
 }
 
-export function canAddChildItem(node: WbsViewNode): boolean {
-  if (node.type !== "GROUP") return false;
-  const segs = countCodeSegments(node.code);
-  const maxParent = isMultiStyleCode(node.code)
-    ? WBS_MAX_CODE_SEGMENTS_MULTI - 1
-    : WBS_MAX_CODE_SEGMENTS_SIMPLE - 1;
-  return segs <= maxParent;
+export function canAddChild(node: WbsViewNode): boolean {
+  return countCodeSegments(node.code) < maxSegmentsForNode(node);
 }
 
-/** Siguiente hijo según profundidad: subcapítulo si aplica, si no ítem hoja. */
-export function resolveAddChildPreset(
-  node: WbsViewNode,
-): "childGroup" | "childItem" | null {
-  if (node.type !== "GROUP") return null;
-  if (canAddSubchapter(node)) return "childGroup";
-  if (canAddChildItem(node)) return "childItem";
+/** Agrega ítem hijo en el siguiente nivel (1 → 1.1 → 1.1.1). */
+export function resolveAddChildPreset(node: WbsViewNode): "childItem" | null {
+  if (!canAddChild(node)) return null;
+  if (node.type === "ITEM" || node.type === "GROUP") return "childItem";
   return null;
 }
 
 export function addChildButtonTitle(node: WbsViewNode): string {
-  const preset = resolveAddChildPreset(node);
-  if (preset === "childGroup") return "Agregar subcapítulo";
-  if (preset === "childItem") return "Agregar ítem";
+  if (resolveAddChildPreset(node)) return "Agregar ítem";
   return "Agregar";
 }
