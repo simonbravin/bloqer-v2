@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Table,
   TableBody,
@@ -176,6 +177,7 @@ export function WbsTree({
   const [dialogState, setDialogState] = useState<DialogState>({ type: "closed" });
   const canEditStructure = structureEditable ?? editable;
   const [importOpen, setImportOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<WbsViewNode | null>(null);
   const [removePending, startRemoveTransition] = useTransition();
   const [reorderPending, startReorderTransition] = useTransition();
 
@@ -249,21 +251,23 @@ export function WbsTree({
   }
 
   function handleRemove(node: WbsViewNode) {
+    setDeleteTarget(node);
+  }
+
+  function confirmRemove() {
+    const node = deleteTarget;
+    if (!node) return;
+
     const descendantCount = countDescendants(node);
-    const confirmMessage =
-      descendantCount > 0
-        ? `¿Eliminar "${node.code} — ${node.name}" y sus ${descendantCount} subnodo(s)? Esta acción no se puede deshacer.`
-        : `¿Eliminar "${node.code} — ${node.name}"?`;
-
-    if (!confirm(confirmMessage)) return;
-
     const removedIds = new Set(collectSubtreeIds(node));
+
     startRemoveTransition(async () => {
       const result = await onRemoveNode(node.id);
       if ("error" in result) {
         toast.error(result.error);
         return;
       }
+      setDeleteTarget(null);
       if (itemDialogNode && removedIds.has(itemDialogNode.id)) setItemDialogNode(null);
       if (groupDialogNode && removedIds.has(groupDialogNode.id)) setGroupDialogNode(null);
       toast.success(
@@ -621,6 +625,48 @@ export function WbsTree({
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !removePending) setDeleteTarget(null);
+        }}
+        title="Eliminar nodo WBS"
+        description={
+          deleteTarget ? (
+            <>
+              <p>
+                {countDescendants(deleteTarget) > 0 ? (
+                  <>
+                    Vas a eliminar{" "}
+                    <span className="font-medium text-foreground">
+                      {deleteTarget.code} — {deleteTarget.name}
+                    </span>{" "}
+                    y sus{" "}
+                    <span className="font-medium text-foreground">
+                      {countDescendants(deleteTarget)} subnodo(s)
+                    </span>
+                    .
+                  </>
+                ) : (
+                  <>
+                    Vas a eliminar{" "}
+                    <span className="font-medium text-foreground">
+                      {deleteTarget.code} — {deleteTarget.name}
+                    </span>
+                    .
+                  </>
+                )}
+              </p>
+              <p>Esta acción no se puede deshacer.</p>
+            </>
+          ) : null
+        }
+        confirmLabel="Eliminar"
+        variant="destructive"
+        pending={removePending}
+        onConfirm={confirmRemove}
+      />
 
       {onPreviewWbsImport && onExecuteWbsImport && (
         <WbsImportDialog
