@@ -116,6 +116,9 @@ interface WbsTreeProps {
   projectId: string;
   currency: string;
   editable: boolean;
+  /** Agregar / borrar / importar / reordenar WBS. Por defecto igual que `editable`. */
+  structureEditable?: boolean;
+  structureLockedReason?: string;
   onPreviewWbsImport?: (rawRows: unknown[][]) => Promise<WbsImportPreview | { error: string }>;
   onExecuteWbsImport?: (
     rows: BudgetImportRow[],
@@ -137,6 +140,8 @@ export function WbsTree({
   projectId: _projectId,
   currency,
   editable,
+  structureEditable,
+  structureLockedReason,
   onPreviewWbsImport,
   onExecuteWbsImport,
   onAddNode,
@@ -169,6 +174,7 @@ export function WbsTree({
   const [itemDialogNode, setItemDialogNode] = useState<WbsViewNode | null>(null);
   const [groupDialogNode, setGroupDialogNode] = useState<WbsViewNode | null>(null);
   const [dialogState, setDialogState] = useState<DialogState>({ type: "closed" });
+  const canEditStructure = structureEditable ?? editable;
   const [importOpen, setImportOpen] = useState(false);
   const [removePending, startRemoveTransition] = useTransition();
   const [reorderPending, startReorderTransition] = useTransition();
@@ -354,7 +360,7 @@ export function WbsTree({
           )}
 
           <TableCell className="py-1.5 w-32" onClick={(e) => e.stopPropagation()}>
-            {editable && (
+            {canEditStructure && (
               <div className="flex items-center justify-end gap-0.5">
                 {resolveAddChildPreset(node) && (
                   <Button
@@ -430,7 +436,7 @@ export function WbsTree({
     <div className="w-full rounded-xl border bg-card shadow-sm overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
         <h3 className="text-sm font-semibold">Estructura de trabajo (EDT)</h3>
-        {editable && (
+        {canEditStructure && (
           <div className="flex flex-wrap gap-2">
             {onPreviewWbsImport && onExecuteWbsImport && (
               <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
@@ -461,6 +467,12 @@ export function WbsTree({
         search={search}
         onSearchChange={setSearch}
       />
+
+      {structureLockedReason && (
+        <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-muted-foreground">
+          {structureLockedReason}
+        </div>
+      )}
 
       {nodes.length === 0 ? (
         <ListEmptyState

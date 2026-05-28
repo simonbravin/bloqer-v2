@@ -4,7 +4,13 @@ import { BudgetStatusBadge, WbsTree, BudgetLifecycleDialog, BudgetMarginConfigSe
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { getCurrentUser } from "@/lib/auth";
-import { getBudgetById, getBudgetLifecycleLog, getWbsTree, ServiceError } from "@bloqer/services";
+import {
+  getBudgetById,
+  getBudgetLifecycleLog,
+  getWbsTree,
+  isBudgetScheduleBaseline,
+  ServiceError,
+} from "@bloqer/services";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { PageBackLink } from "@/components/layout/page-back-link";
 import { PageShell } from "@/components/layout/page-shell";
@@ -46,11 +52,13 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
   let budget;
   let tree;
   let lifecycleLog;
+  let scheduleBaseline = false;
   try {
-    [budget, tree, lifecycleLog] = await Promise.all([
+    [budget, tree, lifecycleLog, scheduleBaseline] = await Promise.all([
       getBudgetById(budgetId, ctx),
       getWbsTree(budgetId, ctx),
       getBudgetLifecycleLog(budgetId, ctx),
+      isBudgetScheduleBaseline(budgetId, ctx.tenantId),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
@@ -60,6 +68,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
   if (budget.projectId !== projectId) notFound();
 
   const editable = budget.status === "DRAFT" || budget.status === "RETURNED_FOR_CHANGES";
+  const wbsStructureEditable = editable && !scheduleBaseline;
   const costStr = budget.totalCost.toString();
   const saleStr = budget.totalSalePrice.toString();
   const costN = parseFloat(costStr);
@@ -129,8 +138,22 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
         projectId={projectId}
         currency={budget.currency}
         editable={editable}
-        onPreviewWbsImport={previewWbsImportAction.bind(null, budgetId, projectId)}
-        onExecuteWbsImport={executeWbsImportAction.bind(null, budgetId, projectId)}
+        structureEditable={wbsStructureEditable}
+        structureLockedReason={
+          editable && scheduleBaseline
+            ? "Este presupuesto es la base del cronograma. La estructura WBS está bloqueada; podés seguir editando APU y costos en los ítems."
+            : undefined
+        }
+        onPreviewWbsImport={
+          wbsStructureEditable
+            ? previewWbsImportAction.bind(null, budgetId, projectId)
+            : undefined
+        }
+        onExecuteWbsImport={
+          wbsStructureEditable
+            ? executeWbsImportAction.bind(null, budgetId, projectId)
+            : undefined
+        }
         onAddNode={addWbsNodeAction.bind(null, budgetId, projectId)}
         onUpdateNode={updateWbsNodeAction.bind(null, projectId, budgetId)}
         onRemoveNode={removeWbsNodeAction.bind(null, projectId, budgetId)}

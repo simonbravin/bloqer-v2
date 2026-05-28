@@ -10,7 +10,8 @@ Estructurar el presupuesto en **jerarquía WBS** y **ítems hoja** con cantidad,
 Sin WBS no hay línea base para certificar ni para imputar compras por ítem.
 
 ## 4. Datos que consume (inputs)
-- **Budget** cuyo `status` **permite** editar estructura económica (`DRAFT`, o `IN_REVIEW` según workflow; **no** `APPROVED` ni `CLOSED` en lo económico) ([BR-BUD-006], [BR-BUD-002]).
+- **Budget** cuyo `status` **permite** editar estructura económica (`DRAFT`, o `RETURNED_FOR_CHANGES`; **no** `APPROVED` ni `CLOSED` en lo económico) ([BR-BUD-006], [BR-BUD-002]).
+- **Presupuesto base del cronograma** (`Schedule.baselineBudgetId`): la **estructura WBS** queda bloqueada aunque el presupuesto siga en `DRAFT` (sí se pueden editar APU/costos en ítems existentes).
 - Catálogos **Unit**, **Category** (rubros), productos inventario opcional.
 
 ## 5. Datos que produce (outputs)

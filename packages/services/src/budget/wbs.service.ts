@@ -4,7 +4,11 @@ import { can } from "@bloqer/domain";
 import type { CreateWbsNodeInput, UpdateWbsNodeInput, ReorderWbsNodesInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
-import { assertBudgetEditable, canViewBudgetsArea } from "./budget.service";
+import {
+  assertBudgetEditable,
+  assertBudgetWbsStructureMutable,
+  canViewBudgetsArea,
+} from "./budget.service";
 import { _recalcBudgetSummary } from "./budget-calc.service";
 import { isDisciplineRootCode, validateManualNodeCode } from "./wbs-code-rules";
 import {
@@ -245,7 +249,7 @@ export async function addWbsNode(
   const budget = await prisma.budget.findUnique({ where: { id: budgetId } });
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  assertBudgetEditable(budget);
+  await assertBudgetWbsStructureMutable(budget, ctx);
 
   const allNodes = await prisma.wbsNode.findMany({
     where: { budgetId },
@@ -357,7 +361,11 @@ export async function updateWbsNode(
 
   const budget = await prisma.budget.findUniqueOrThrow({ where: { id: node.budgetId } });
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  assertBudgetEditable(budget);
+  if (input.code != null && input.code !== node.code) {
+    await assertBudgetWbsStructureMutable(budget, ctx);
+  } else {
+    assertBudgetEditable(budget);
+  }
 
   if (input.code && input.code !== node.code) {
     const conflict = await prisma.wbsNode.findUnique({
@@ -449,7 +457,7 @@ export async function removeWbsNode(id: string, ctx: ServiceContext): Promise<vo
 
   const budget = await prisma.budget.findUniqueOrThrow({ where: { id: node.budgetId } });
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  assertBudgetEditable(budget);
+  await assertBudgetWbsStructureMutable(budget, ctx);
 
   const allNodes = await prisma.wbsNode.findMany({
     where: { budgetId: node.budgetId },
@@ -523,7 +531,7 @@ export async function reorderWbsNodes(
   const budget = await prisma.budget.findUnique({ where: { id: budgetId } });
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  assertBudgetEditable(budget);
+  await assertBudgetWbsStructureMutable(budget, ctx);
 
   const nodes = await prisma.wbsNode.findMany({
     where: { id: { in: input.orderedNodeIds }, budgetId },

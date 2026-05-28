@@ -20,6 +20,31 @@ export function assertBudgetEditable(budget: Budget): void {
   }
 }
 
+/** Presupuesto usado como base del cronograma del proyecto (BR-SCH / línea base WBS). */
+export async function isBudgetScheduleBaseline(
+  budgetId: string,
+  tenantId: string,
+): Promise<boolean> {
+  const count = await prisma.schedule.count({
+    where: { baselineBudgetId: budgetId, tenantId },
+  });
+  return count > 0;
+}
+
+/** WBS: estado editable y no bloqueado por cronograma. */
+export async function assertBudgetWbsStructureMutable(
+  budget: Budget,
+  ctx: ServiceContext,
+): Promise<void> {
+  assertBudgetEditable(budget);
+  if (await isBudgetScheduleBaseline(budget.id, ctx.tenantId)) {
+    throw new ServiceError(
+      "CONFLICT",
+      "Este presupuesto es la base del cronograma. No se puede modificar la estructura WBS.",
+    );
+  }
+}
+
 export type BudgetWithSettings = Budget & { settings: BudgetSettings | null };
 
 export type BudgetLifecycleInput = { comment?: string };

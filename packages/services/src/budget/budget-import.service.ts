@@ -5,7 +5,7 @@ import type { BudgetImportRow } from "@bloqer/validators";
 import { can } from "@bloqer/domain";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
-import { assertBudgetEditable } from "./budget.service";
+import { assertBudgetEditable, assertBudgetWbsStructureMutable } from "./budget.service";
 import { _recalcBudgetSummary } from "./budget-calc.service";
 import {
   type ImportMode,
@@ -56,6 +56,7 @@ export async function executeImport(
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   assertBudgetEditable(budget);
+  await assertBudgetWbsStructureMutable(budget, ctx);
 
   const existingNodes = await prisma.wbsNode.findMany({
     where: { budgetId },
