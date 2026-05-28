@@ -20,4 +20,21 @@ describe("previewSpreadsheetImport", () => {
       result.errors.some((e) => e.field === "parent_code" && e.message.includes("ítem")),
     );
   });
+
+  it("preview multi-rubro is valid with unidades en hojas", () => {
+    const result = previewSpreadsheetImport([
+      ["ARQ", "ARQUITECTURA", ""],
+      ["EST", "ESTRUCTURA", ""],
+      ["ARQ 1", "Cap ARQ", ""],
+      ["EST 1", "Cap EST", ""],
+      ["ARQ 1.1", "Sub ARQ", ""],
+      ["EST 1.1", "Sub EST", ""],
+      ["ARQ 1.1.1", "Ítem ARQ", "m²"],
+      ["EST 1.1.1", "Ítem EST", "gl"],
+    ]);
+    assert.equal(result.profile, "multi_discipline");
+    assert.equal(result.valid, true);
+    assert.ok(result.rows.some((r) => r.code === "ARQ.1.1.1"));
+    assert.ok(result.rows.some((r) => r.code === "EST.1.1.1"));
+  });
 });

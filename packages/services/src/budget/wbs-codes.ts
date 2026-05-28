@@ -1,21 +1,32 @@
 import type { WbsNodeType } from "@bloqer/database";
+import {
+  countCodeSegments,
+  isDisciplineRootCode,
+  isMultiStyleCode,
+  WBS_MAX_CODE_SEGMENTS_MULTI,
+  WBS_MAX_CODE_SEGMENTS_SIMPLE,
+} from "./wbs-code-rules";
+
+export {
+  countCodeSegments,
+  isMultiStyleCode,
+  isDisciplineRootCode,
+  WBS_MAX_CODE_SEGMENTS_SIMPLE,
+  WBS_MAX_CODE_SEGMENTS_MULTI,
+} from "./wbs-code-rules";
+
+/** @deprecated Use WBS_MAX_CODE_SEGMENTS_SIMPLE */
+export const WBS_MAX_CODE_SEGMENTS = WBS_MAX_CODE_SEGMENTS_SIMPLE;
 
 type WbsNodeRow = { id: string; parentId: string | null; code: string; type: WbsNodeType; sortOrder: number };
 
-/** Máximo de segmentos en el código WBS (p. ej. 1.1.1). */
-export const WBS_MAX_CODE_SEGMENTS = 3;
-
-export function countCodeSegments(code: string): number {
-  return code.split(".").filter((s) => s.length > 0).length;
-}
-
-/** Próximo código para tarea raíz (1, 2, 3… según cantidad de hermanos). */
+/** Próximo código para tarea raíz numérica (1, 2, 3…). */
 export function nextRootGroupCode(roots: WbsNodeRow[]): string {
-  const rootCount = roots.filter((n) => n.parentId === null).length;
-  return String(rootCount + 1);
+  const numericRoots = roots.filter((n) => n.parentId === null && /^\d+$/.test(n.code));
+  return String(numericRoots.length + 1);
 }
 
-/** Próximo código hijo directo bajo un padre (p. ej. 1.3 o 1.1.2). */
+/** Próximo código hijo directo bajo un padre (p. ej. 1.3 o ARQ.1.2). */
 export function nextChildCode(parentCode: string, siblings: WbsNodeRow[]): string {
   const prefix = `${parentCode}.`;
   let childCount = 0;
@@ -34,16 +45,11 @@ export const nextChildItemCode = nextChildCode;
 /** @deprecated Use nextChildCode */
 export const nextChildGroupCode = nextChildCode;
 
-/** sortOrder al final entre hermanos. */
 export function nextSortOrder(siblings: WbsNodeRow[]): number {
   if (siblings.length === 0) return 0;
   return Math.max(...siblings.map((s) => s.sortOrder)) + 1;
 }
 
-/**
- * Recalcula códigos según orden de hermanos (sortOrder / orderedNodeIds).
- * Si cambia un capítulo raíz, renumerar también el subárbol (1.x → 2.x).
- */
 export function buildRenumberPlan(
   allNodes: WbsNodeRow[],
   parentId: string | null,
@@ -56,6 +62,11 @@ export function buildRenumberPlan(
   orderedSiblingIds.forEach((id, index) => {
     const node = allNodes.find((n) => n.id === id);
     if (!node) return;
+
+    if (parentId === null && isDisciplineRootCode(node.code)) {
+      return;
+    }
+
     const newCode =
       parentId === null ? String(index + 1) : `${parentCode}.${index + 1}`;
     if (node.code !== newCode) {

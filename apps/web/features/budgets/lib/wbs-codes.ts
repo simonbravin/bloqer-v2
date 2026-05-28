@@ -1,4 +1,12 @@
 import type { WbsViewNode } from "@bloqer/services";
+import {
+  countCodeSegments,
+  isMultiStyleCode,
+  WBS_MAX_CODE_SEGMENTS_MULTI,
+  WBS_MAX_CODE_SEGMENTS_SIMPLE,
+} from "@bloqer/services/budget-import-pure";
+
+export { countCodeSegments, isMultiStyleCode };
 
 type NodeLike = { parentId: string | null; code: string; sortOrder: number };
 
@@ -14,14 +22,11 @@ function flatten(nodes: WbsViewNode[]): WbsViewNode[] {
   return out;
 }
 
-export function countCodeSegments(code: string): number {
-  return code.split(".").filter((s) => s.length > 0).length;
-}
-
 export function suggestRootGroupCode(nodes: WbsViewNode[]): string {
   const flat = flatten(nodes);
   const roots = flat.filter((n) => n.parentId === null);
-  return String(roots.length + 1);
+  const numericRoots = roots.filter((n) => /^\d+$/.test(n.code));
+  return String(numericRoots.length + 1);
 }
 
 export function suggestChildCode(parent: WbsViewNode, nodes: WbsViewNode[]): string {
@@ -30,10 +35,7 @@ export function suggestChildCode(parent: WbsViewNode, nodes: WbsViewNode[]): str
   return `${parent.code}.${siblings.length + 1}`;
 }
 
-/** @deprecated Use suggestChildCode */
 export const suggestChildItemCode = suggestChildCode;
-
-/** @deprecated Use suggestChildCode */
 export const suggestChildGroupCode = suggestChildCode;
 
 export function getSiblings(nodes: WbsViewNode[], parentId: string | null): NodeLike[] {
@@ -42,10 +44,17 @@ export function getSiblings(nodes: WbsViewNode[], parentId: string | null): Node
 }
 
 export function canAddSubchapter(node: WbsViewNode): boolean {
-  return node.type === "GROUP" && countCodeSegments(node.code) === 1;
+  if (node.type !== "GROUP") return false;
+  const segs = countCodeSegments(node.code);
+  if (isMultiStyleCode(node.code)) return segs >= 1 && segs <= 2;
+  return segs === 1;
 }
 
 export function canAddChildItem(node: WbsViewNode): boolean {
   if (node.type !== "GROUP") return false;
-  return countCodeSegments(node.code) < 3;
+  const segs = countCodeSegments(node.code);
+  const maxParent = isMultiStyleCode(node.code)
+    ? WBS_MAX_CODE_SEGMENTS_MULTI - 1
+    : WBS_MAX_CODE_SEGMENTS_SIMPLE - 1;
+  return segs <= maxParent;
 }

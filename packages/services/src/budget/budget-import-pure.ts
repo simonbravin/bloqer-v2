@@ -1,20 +1,20 @@
 // Pure WBS import parsing/validation (safe for client bundles — no Prisma).
 
-import { budgetImportRowSchema } from "@bloqer/validators";
+import { budgetImportRowSchema, IMPORT_TEMPLATE_COLUMNS } from "@bloqer/validators";
 import type { BudgetImportRow } from "@bloqer/validators";
 import { parseNumberedSpreadsheetRows } from "./wbs-spreadsheet-parser";
-
-const WBS_MAX_CODE_SEGMENTS = 3;
-
-function countCodeSegments(code: string): number {
-  return code.split(".").filter((s) => s.length > 0).length;
-}
-
-import { IMPORT_TEMPLATE_COLUMNS } from "@bloqer/validators";
+import type { WbsImportProfile } from "./wbs-code-rules";
 
 export { IMPORT_TEMPLATE_COLUMNS };
 export { parseNumberedSpreadsheetRows, normalizeItemCode } from "./wbs-spreadsheet-parser";
 export type { SpreadsheetParseError, SpreadsheetParseResult } from "./wbs-spreadsheet-parser";
+export {
+  countCodeSegments,
+  isMultiStyleCode,
+  WBS_MAX_CODE_SEGMENTS_SIMPLE,
+  WBS_MAX_CODE_SEGMENTS_MULTI,
+} from "./wbs-code-rules";
+export type { WbsImportProfile } from "./wbs-code-rules";
 
 export type ImportError = {
   row: number;
@@ -32,10 +32,12 @@ export type ImportMode = "structure_only" | "full";
 export type ParseResult = {
   validRows: (BudgetImportRow & { _row: number })[];
   errors: ImportError[];
+  profile: WbsImportProfile;
 };
 
 export type PreviewResult = {
   valid: boolean;
+  profile: WbsImportProfile;
   rows: (BudgetImportRow & { _row: number; _parentResolved: boolean })[];
   errors: ImportError[];
   warnings: ImportWarning[];
@@ -61,15 +63,13 @@ export function parseImportRows(rawRows: unknown[]): ParseResult {
     }
   });
 
-  return { validRows, errors };
+  return { validRows, errors, profile: "simple" };
 }
 
-export function parseSpreadsheetForImport(rawRows: unknown[][]): {
-  validRows: (BudgetImportRow & { _row: number })[];
-  errors: ImportError[];
+export function parseSpreadsheetForImport(rawRows: unknown[][]): ParseResult & {
   skippedRows: number;
 } {
-  const { rows, errors: sheetErrors, skippedRows } = parseNumberedSpreadsheetRows(rawRows);
+  const { profile, rows, errors: sheetErrors, skippedRows } = parseNumberedSpreadsheetRows(rawRows);
   const sheetErrorsMapped: ImportError[] = sheetErrors.map((e) => ({
     row: e.row,
     field: e.field,
@@ -78,10 +78,11 @@ export function parseSpreadsheetForImport(rawRows: unknown[][]): {
 
   if (rows.length > 0) {
     const { validRows, errors: parseErrors } = parseImportRows(
-      rows.map(({ _sourceRow: _, ...row }) => row),
+      rows.map(({ _sourceRow: _, _profile: __, ...row }) => row),
     );
     const rowByCode = new Map(rows.map((r) => [r.code, r._sourceRow]));
     return {
+      profile,
       validRows: validRows.map((r) => ({ ...r, _row: rowByCode.get(r.code) ?? 0 })),
       errors: [...sheetErrorsMapped, ...parseErrors],
       skippedRows,
@@ -91,10 +92,10 @@ export function parseSpreadsheetForImport(rawRows: unknown[][]): {
   const objectRows = rawRows.filter((r) => r && typeof r === "object" && !Array.isArray(r));
   if (objectRows.length > 0) {
     const { validRows, errors } = parseImportRows(objectRows);
-    return { validRows, errors, skippedRows: 0 };
+    return { profile: "simple", validRows, errors, skippedRows: 0 };
   }
 
-  return { validRows: [], errors: sheetErrorsMapped, skippedRows };
+  return { profile, validRows: [], errors: sheetErrorsMapped, skippedRows };
 }
 
 export function validateImportRows(
@@ -131,14 +132,6 @@ export function validateImportRows(
     }
 
     if (row.type === "GROUP") {
-      const segments = countCodeSegments(row.code);
-      if (segments > 2) {
-        errors.push({
-          row: row._row,
-          field: "code",
-          message: `El capítulo "${row.code}" supera 2 niveles; use un ítem hoja con unidad`,
-        });
-      }
       const hasCosts =
         row.material_cost ||
         row.labor_cost ||
@@ -149,24 +142,6 @@ export function validateImportRows(
         warnings.push({
           row: row._row,
           message: `El nodo GROUP "${row.code}" tiene costos; serán ignorados`,
-        });
-      }
-    }
-
-    if (row.type === "ITEM") {
-      const segments = countCodeSegments(row.code);
-      if (segments < 2) {
-        errors.push({
-          row: row._row,
-          field: "code",
-          message: `El ítem "${row.code}" debe tener al menos dos segmentos (p. ej. 1.1)`,
-        });
-      }
-      if (segments > WBS_MAX_CODE_SEGMENTS) {
-        errors.push({
-          row: row._row,
-          field: "code",
-          message: `El ítem "${row.code}" supera ${WBS_MAX_CODE_SEGMENTS} niveles`,
         });
       }
     }
@@ -216,7 +191,7 @@ export function previewSpreadsheetImport(
   existingCodes: string[] = [],
   mode: ImportMode = "structure_only",
 ): PreviewResult {
-  const { validRows, errors: parseErrors } = parseSpreadsheetForImport(rawRows);
+  const { profile, validRows, errors: parseErrors } = parseSpreadsheetForImport(rawRows);
   const { errors: validationErrors, warnings } = validateImportRows(validRows, existingCodes, mode);
   const allErrors = [...parseErrors, ...validationErrors];
 
@@ -238,6 +213,7 @@ export function previewSpreadsheetImport(
 
   return {
     valid: allErrors.length === 0 && validRows.length > 0,
+    profile,
     rows,
     errors: allErrors,
     warnings,

@@ -1,4 +1,12 @@
 import type { BudgetImportRow } from "@bloqer/validators";
+import {
+  detectImportProfile,
+  inferNodeType,
+  parentCodeFrom,
+  parseCellA,
+  validateCanonicalCode,
+  type WbsImportProfile,
+} from "./wbs-code-rules";
 
 export type SpreadsheetParseError = {
   row: number;
@@ -6,45 +14,25 @@ export type SpreadsheetParseError = {
   message: string;
 };
 
-export type ParsedSpreadsheetRow = BudgetImportRow & { _sourceRow: number };
+export type ParsedSpreadsheetRow = BudgetImportRow & {
+  _sourceRow: number;
+  _profile: WbsImportProfile;
+};
 
 export type SpreadsheetParseResult = {
+  profile: WbsImportProfile;
   rows: ParsedSpreadsheetRow[];
   errors: SpreadsheetParseError[];
   skippedRows: number;
 };
 
-const CODE_PATTERN = /^\d+(\.\d+)*$/;
 const SKIP_NAME_PATTERNS = /^(total|presupuesto|subtotal|importe|%)/i;
 
-/** Normaliza celda A: "ARQ 1.1.1" → "1.1.1" (incluye celdas numéricas de Excel). */
+/** @deprecated Use parseCellA from wbs-code-rules */
 export function normalizeItemCode(raw: unknown): string | null {
-  if (raw == null) return null;
-  let s: string;
-  if (typeof raw === "number" && Number.isFinite(raw)) {
-    s = Number.isInteger(raw) ? String(raw) : String(raw);
-  } else {
-    s = String(raw).trim();
-  }
-  if (!s) return null;
-
-  const withoutPrefix = s.replace(/^[A-Za-zÁÉÍÓÚáéíóúñÑ]+\s*/u, "").trim();
-  if (!CODE_PATTERN.test(withoutPrefix)) return null;
-  return withoutPrefix;
-}
-
-function parentCodeFrom(code: string): string | undefined {
-  const idx = code.lastIndexOf(".");
-  if (idx === -1) return undefined;
-  return code.slice(0, idx);
-}
-
-function inferNodeType(code: string, unit: string | undefined): "GROUP" | "ITEM" {
-  const segments = code.split(".").filter(Boolean).length;
-  const hasUnit = Boolean(unit?.trim());
-  if (hasUnit) return "ITEM";
-  if (segments >= 3) return "ITEM";
-  return "GROUP";
+  const parsed = parseCellA(raw, null);
+  if (parsed.kind === "numbered") return parsed.canonical;
+  return null;
 }
 
 function cellString(raw: unknown): string {
@@ -53,74 +41,130 @@ function cellString(raw: unknown): string {
 }
 
 /**
- * Parsea filas crudas de hoja (columna A = código, B = nombre, C = unidad).
- * Perfil: presupuesto oficial con numeración en columna A.
+ * Parsea filas crudas (columna A = código, B = nombre, C = unidad).
+ * Auto-detecta perfil simple vs multi-rubro (ARQ, EST, …).
  */
 export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetParseResult {
-  const rows: ParsedSpreadsheetRow[] = [];
   const errors: SpreadsheetParseError[] = [];
   let skippedRows = 0;
 
+  type NumberedDraft = {
+    rowNum: number;
+    discipline: string | null;
+    numeric: string;
+    name: string;
+    unit?: string;
+  };
+
+  const numberedDrafts: NumberedDraft[] = [];
+  const bannerByDiscipline = new Map<string, { name: string; rowNum: number }>();
+
   rawRows.forEach((rawRow, idx) => {
     const rowNum = idx + 1;
-    const colA = rawRow[0];
-    const colB = rawRow[1];
-    const colC = rawRow[2];
+    const parsed = parseCellA(rawRow[0], rawRow[1]);
+    const name = cellString(rawRow[1]);
 
-    const code = normalizeItemCode(colA);
-    if (!code) {
+    if (parsed.kind === "empty") {
       skippedRows += 1;
       return;
     }
 
-    const name = cellString(colB);
+    if (parsed.kind === "banner") {
+      if (!name || SKIP_NAME_PATTERNS.test(name)) {
+        skippedRows += 1;
+        return;
+      }
+      bannerByDiscipline.set(parsed.discipline, { name, rowNum });
+      return;
+    }
+
     if (!name || SKIP_NAME_PATTERNS.test(name)) {
       skippedRows += 1;
       return;
     }
 
-    const unit = cellString(colC) || undefined;
-    const segments = code.split(".").filter(Boolean).length;
-
-    if (segments > 3) {
-      errors.push({
-        row: rowNum,
-        field: "code",
-        message: `El código "${code}" supera 3 niveles de profundidad`,
-      });
-      return;
-    }
-
-    const type = inferNodeType(code, unit);
-
-    if (type === "ITEM" && segments === 1) {
-      errors.push({
-        row: rowNum,
-        field: "code",
-        message: `El ítem "${code}" debe estar bajo un capítulo (p. ej. 1.1 o 1.1.1)`,
-      });
-      return;
-    }
-
-    if (type === "GROUP" && segments >= 3) {
-      errors.push({
-        row: rowNum,
-        field: "unit",
-        message: `El código "${code}" requiere unidad en columna C para ser ítem hoja`,
-      });
-      return;
-    }
-
-    rows.push({
-      code,
-      parent_code: parentCodeFrom(code),
-      type,
+    const unit = cellString(rawRow[2]) || undefined;
+    numberedDrafts.push({
+      rowNum,
+      discipline: parsed.discipline,
+      numeric: parsed.numeric,
       name,
-      unit: type === "ITEM" ? unit : undefined,
-      quantity: 0,
-      _sourceRow: rowNum,
+      unit,
     });
   });
 
-  return { rows, errors, skippedRows };
+  const profile = detectImportProfile(
+    numberedDrafts.map((d) => ({ discipline: d.discipline, numeric: d.numeric })),
+  );
+
+  const rows: ParsedSpreadsheetRow[] = [];
+  const seenCodes = new Set<string>();
+
+  if (profile === "multi_discipline") {
+    const disciplines = new Set<string>();
+    for (const d of numberedDrafts) {
+      if (d.discipline) disciplines.add(d.discipline);
+    }
+    for (const [discipline, banner] of bannerByDiscipline) {
+      disciplines.add(discipline);
+    }
+
+    for (const discipline of [...disciplines].sort()) {
+      const banner = bannerByDiscipline.get(discipline);
+      const code = discipline;
+      if (seenCodes.has(code)) continue;
+      seenCodes.add(code);
+      rows.push({
+        code,
+        type: "GROUP",
+        name: banner?.name ?? discipline,
+        quantity: 0,
+        _sourceRow: banner?.rowNum ?? 0,
+        _profile: profile,
+      });
+    }
+  }
+
+  for (const draft of numberedDrafts) {
+    const canonical =
+      profile === "multi_discipline" && draft.discipline
+        ? `${draft.discipline}.${draft.numeric}`
+        : draft.numeric;
+
+    if (seenCodes.has(canonical)) {
+      errors.push({
+        row: draft.rowNum,
+        field: "code",
+        message: `Código duplicado en la importación: "${canonical}"`,
+      });
+      continue;
+    }
+
+    const type = inferNodeType(canonical, draft.unit, profile);
+    const structureError = validateCanonicalCode(canonical, type, draft.unit, profile);
+    if (structureError) {
+      errors.push({ row: draft.rowNum, field: "code", message: structureError });
+      continue;
+    }
+
+    seenCodes.add(canonical);
+    rows.push({
+      code: canonical,
+      parent_code: parentCodeFrom(canonical),
+      type,
+      name: draft.name,
+      unit: type === "ITEM" ? draft.unit : undefined,
+      quantity: 0,
+      _sourceRow: draft.rowNum,
+      _profile: profile,
+    });
+  }
+
+  rows.sort((a, b) => {
+    if (a._sourceRow === 0 && b._sourceRow !== 0) return -1;
+    if (b._sourceRow === 0 && a._sourceRow !== 0) return 1;
+    return a._sourceRow - b._sourceRow;
+  });
+
+  return { profile, rows, errors, skippedRows };
 }

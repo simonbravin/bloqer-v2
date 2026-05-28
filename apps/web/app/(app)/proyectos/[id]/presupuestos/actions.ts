@@ -246,6 +246,15 @@ export async function previewWbsImportAction(
   }
 }
 
+/** Import WBS tras crear presupuesto (budgetId dinámico; evita arrow inline en RSC). */
+export async function executeWbsImportOnCreateAction(
+  projectId: string,
+  budgetId: string,
+  rows: BudgetImportRow[],
+): Promise<{ createdNodes: number; createdItems: number } | Err> {
+  return executeWbsImportAction(budgetId, projectId, rows, { replaceExisting: false });
+}
+
 export async function executeWbsImportAction(
   budgetId: string,
   projectId: string,

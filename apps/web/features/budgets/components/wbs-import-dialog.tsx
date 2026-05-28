@@ -27,7 +27,8 @@ import type { BudgetImportRow } from "@bloqer/validators";
 
 export type WbsImportPreview = {
   valid: boolean;
-  rows: (BudgetImportRow & { _row: number })[];
+  profile?: "simple" | "multi_discipline";
+  rows: (BudgetImportRow & { _row: number; _parentResolved?: boolean })[];
   errors: { row: number; field: string; message: string }[];
   warnings: { row: number; message: string }[];
 };
@@ -103,7 +104,7 @@ export function WbsImportDialog({
     }
 
     startTransition(async () => {
-      const rows = preview.rows.map(({ _row: _, ...row }) => row);
+      const rows = preview.rows.map(({ _row: _, _parentResolved: __, ...row }) => row);
       const result = await onExecute(rows, { replaceExisting: hasExistingNodes && replaceExisting });
       if ("error" in result) {
         toast.error(result.error);
@@ -124,8 +125,9 @@ export function WbsImportDialog({
         <DialogHeader>
           <DialogTitle>Importar estructura WBS</DialogTitle>
           <DialogDescription>
-            Columna A: numeración (ej. ARQ 1, ARQ 1.1, ARQ 1.1.1). Columna B: descripción.
-            Columna C: unidad (solo ítems hoja). No se importan importes.
+            Columna A: numeración (ej. ARQ 1, ARQ 1.1) o fila de rubro (ARQ + nombre en B).
+            Columna B: descripción. Columna C: unidad (solo ítems hoja). No se importan importes.
+            Si hay varios rubros (ARQ, EST, ICF…), los códigos se guardan como ARQ.1.1.1.
           </DialogDescription>
         </DialogHeader>
 
@@ -148,13 +150,31 @@ export function WbsImportDialog({
             </Label>
           </div>
 
+          {preview?.profile === "multi_discipline" && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
+              <p className="font-medium text-foreground">Presupuesto multi-rubro detectado</p>
+              <p className="text-muted-foreground mt-1">
+                Se importan rubros como ARQ, EST, ICF… con códigos únicos (ej. ARQ.1.1.1).
+              </p>
+            </div>
+          )}
+
           <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
             <p className="font-medium text-foreground">Cómo interpretamos el archivo</p>
-            <ul className="list-disc pl-4 space-y-0.5">
-              <li>1–2 segmentos sin unidad → capítulo o subcapítulo (GROUP)</li>
-              <li>3 segmentos o unidad en columna C → ítem hoja (ITEM)</li>
-              <li>Profundidad máxima: 3 niveles (ej. 1 → 1.1 → 1.1.1)</li>
-            </ul>
+            {preview?.profile === "multi_discipline" ? (
+              <ul className="list-disc pl-4 space-y-0.5">
+                <li>Rubro (ARQ, EST…) → capítulo raíz del rubro</li>
+                <li>ARQ.1 / ARQ.1.1 sin unidad → capítulo o subcapítulo</li>
+                <li>ARQ.1.1.1 o unidad en columna C → ítem hoja</li>
+                <li>Profundidad máxima: 4 niveles (rubro → capítulo → subcapítulo → ítem)</li>
+              </ul>
+            ) : (
+              <ul className="list-disc pl-4 space-y-0.5">
+                <li>1–2 segmentos sin unidad → capítulo o subcapítulo</li>
+                <li>3 segmentos o unidad en columna C → ítem hoja</li>
+                <li>Profundidad máxima: 3 niveles (1 → 1.1 → 1.1.1)</li>
+              </ul>
+            )}
           </div>
 
           {hasExistingNodes && (
@@ -209,7 +229,7 @@ export function WbsImportDialog({
                 </TableHeader>
                 <TableBody>
                   {preview.rows.slice(0, 50).map((row) => (
-                    <TableRow key={row.code}>
+                    <TableRow key={`${row.code}-${row._row}`}>
                       <TableCell className="font-mono text-xs">{row.code}</TableCell>
                       <TableCell className="text-xs">{row.type === "GROUP" ? "Capítulo" : "Ítem"}</TableCell>
                       <TableCell className="text-sm truncate max-w-[200px]">{row.name}</TableCell>
@@ -232,13 +252,17 @@ export function WbsImportDialog({
               type="checkbox"
               className="mt-1"
               checked={confirmed}
-              disabled={!preview?.valid}
               onChange={(e) => setConfirmed(e.target.checked)}
             />
             <Label htmlFor="confirm-import" className="text-sm leading-snug cursor-pointer">
               Entiendo que Bloqer usa la columna A como jerarquía y no importa montos del archivo
             </Label>
           </div>
+          {preview && !preview.valid && (
+            <p className="text-xs text-destructive">
+              Corregí los errores del archivo para poder importar.
+            </p>
+          )}
         </div>
 
         <DialogFooter>

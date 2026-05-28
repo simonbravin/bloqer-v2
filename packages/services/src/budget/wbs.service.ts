@@ -6,8 +6,8 @@ import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertBudgetEditable, canViewBudgetsArea } from "./budget.service";
 import { _recalcBudgetSummary } from "./budget-calc.service";
+import { isDisciplineRootCode, validateManualNodeCode } from "./wbs-code-rules";
 import {
-  WBS_MAX_CODE_SEGMENTS,
   buildRenumberPlan,
   countCodeSegments,
   nextChildCode,
@@ -260,39 +260,27 @@ export async function addWbsNode(
     if (input.parentId) {
       const parent = allNodes.find((n) => n.id === input.parentId);
       if (!parent) throw new ServiceError("NOT_FOUND", "Nodo padre no encontrado");
-      const parentDepth = countCodeSegments(parent.code);
-      if (input.type === "ITEM") {
-        if (parentDepth >= WBS_MAX_CODE_SEGMENTS) {
-          throw new ServiceError("CONFLICT", "No se pueden agregar ítems a este nivel de profundidad");
-        }
-        code = nextChildCode(parent.code, siblings);
-      } else {
-        if (parentDepth !== 1) {
-          throw new ServiceError("CONFLICT", "Los subcapítulos solo se pueden crear bajo un capítulo raíz");
-        }
-        code = nextChildCode(parent.code, siblings);
-      }
+      code = nextChildCode(parent.code, siblings);
     } else {
       if (input.type !== "GROUP") {
         throw new ServiceError("CONFLICT", "Los ítems deben crearse dentro de un capítulo");
+      }
+      const hasDisciplineRoots = roots.some((r) => isDisciplineRootCode(r.code));
+      if (hasDisciplineRoots) {
+        throw new ServiceError(
+          "CONFLICT",
+          "Agregá capítulos bajo un rubro (ARQ, EST, …) desde el árbol",
+        );
       }
       code = nextRootGroupCode(roots);
     }
   }
 
-  const codeDepth = countCodeSegments(code);
-  if (codeDepth > WBS_MAX_CODE_SEGMENTS) {
-    throw new ServiceError(
-      "CONFLICT",
-      `El código "${code}" supera la profundidad máxima de ${WBS_MAX_CODE_SEGMENTS} niveles`,
-    );
-  }
-  if (input.type === "GROUP" && codeDepth > 2) {
-    throw new ServiceError("CONFLICT", "Los capítulos solo pueden estar en el nivel 1 o 2");
-  }
-  if (input.type === "ITEM" && codeDepth < 2) {
-    throw new ServiceError("CONFLICT", "Los ítems deben tener al menos dos segmentos en el código (p. ej. 1.1)");
-  }
+  const parentCodeForValidation = input.parentId
+    ? allNodes.find((n) => n.id === input.parentId)?.code ?? null
+    : null;
+  const manualError = validateManualNodeCode(code, input.type, parentCodeForValidation);
+  if (manualError) throw new ServiceError("CONFLICT", manualError);
 
   const existing = await prisma.wbsNode.findUnique({
     where: { budgetId_code: { budgetId, code } },
@@ -309,13 +297,12 @@ export async function addWbsNode(
     if (parent.type === "ITEM") {
       throw new ServiceError("CONFLICT", "Un nodo ITEM no puede tener hijos");
     }
-    const parentDepth = countCodeSegments(parent.code);
-    if (input.type === "GROUP" && parentDepth !== 1) {
-      throw new ServiceError("CONFLICT", "Los subcapítulos solo se pueden crear bajo un capítulo raíz");
-    }
-    if (input.type === "ITEM" && parentDepth >= WBS_MAX_CODE_SEGMENTS) {
-      throw new ServiceError("CONFLICT", "No se pueden agregar ítems a este nivel de profundidad");
-    }
+    const parentManualError = validateManualNodeCode(
+      code,
+      input.type,
+      parent.code,
+    );
+    if (parentManualError) throw new ServiceError("CONFLICT", parentManualError);
   }
 
   const node = await prisma.$transaction(async (tx) => {

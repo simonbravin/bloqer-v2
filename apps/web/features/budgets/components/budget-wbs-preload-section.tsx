@@ -30,7 +30,9 @@ export function BudgetWbsPreloadSection({ disabled, onPendingRowsChange }: Props
         const result = previewSpreadsheetImport(rawRows);
         setPreview(result);
         if (result.valid) {
-          onPendingRowsChange(result.rows.map(({ _row: _, ...row }) => row));
+          onPendingRowsChange(
+            result.rows.map(({ _row: _, _parentResolved: __, ...row }) => row),
+          );
         } else {
           onPendingRowsChange(null);
         }
@@ -57,8 +59,8 @@ export function BudgetWbsPreloadSection({ disabled, onPendingRowsChange }: Props
       {expanded && (
         <div className="space-y-3 border-t px-4 py-4">
           <p className="text-xs text-muted-foreground">
-            Columna A: numeración (ARQ 1, 1.1, 1.1.1). Columna B: descripción. Columna C: unidad en ítems hoja.
-            Sin importes.
+            Columna A: numeración (ARQ 1, ARQ 1.1) o rubro (ARQ + nombre en B). Columna B: descripción.
+            Columna C: unidad en ítems hoja. Varios rubros (ARQ, EST…) generan códigos ARQ.1.1.1. Sin importes.
           </p>
 
           <Label
@@ -85,7 +87,9 @@ export function BudgetWbsPreloadSection({ disabled, onPendingRowsChange }: Props
 
           {preview?.valid && (
             <p className="text-xs text-green-700 dark:text-green-400">
-              Listo: {preview.rows.length} nodos se importarán al crear el presupuesto.
+              Listo: {preview.rows.length} nodos
+              {preview.profile === "multi_discipline" ? " (multi-rubro)" : ""} se importarán al crear el
+              presupuesto.
             </p>
           )}
         </div>
