@@ -58,3 +58,20 @@ export function canAddChildItem(node: WbsViewNode): boolean {
     : WBS_MAX_CODE_SEGMENTS_SIMPLE - 1;
   return segs <= maxParent;
 }
+
+/** Siguiente hijo según profundidad: subcapítulo si aplica, si no ítem hoja. */
+export function resolveAddChildPreset(
+  node: WbsViewNode,
+): "childGroup" | "childItem" | null {
+  if (node.type !== "GROUP") return null;
+  if (canAddSubchapter(node)) return "childGroup";
+  if (canAddChildItem(node)) return "childItem";
+  return null;
+}
+
+export function addChildButtonTitle(node: WbsViewNode): string {
+  const preset = resolveAddChildPreset(node);
+  if (preset === "childGroup") return "Agregar subcapítulo";
+  if (preset === "childItem") return "Agregar ítem";
+  return "Agregar";
+}

@@ -1,4 +1,4 @@
-/** Lee CSV o XLSX y devuelve filas crudas (solo primeras 3 columnas relevantes). */
+/** Lee CSV o XLSX y devuelve filas crudas (columnas A y B: código y descripción). */
 export async function readSpreadsheetFile(file: File): Promise<unknown[][]> {
   const ext = file.name.split(".").pop()?.toLowerCase();
 
@@ -15,7 +15,7 @@ export async function readSpreadsheetFile(file: File): Promise<unknown[][]> {
     if (!sheetName) return [];
     const sheet = workbook.Sheets[sheetName]!;
     const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
-    return rows.map((row) => (Array.isArray(row) ? row.slice(0, 3) : []));
+    return rows.map((row) => (Array.isArray(row) ? row.slice(0, 2) : []));
   }
 
   throw new Error("Formato no soportado. Usá .csv o .xlsx");
@@ -45,7 +45,7 @@ function parseCsvLine(line: string, delimiter: "," | ";"): string[] {
     current += ch;
   }
   cells.push(current.trim());
-  return cells.slice(0, 3);
+  return cells.slice(0, 2);
 }
 
 function parseCsvText(text: string): unknown[][] {

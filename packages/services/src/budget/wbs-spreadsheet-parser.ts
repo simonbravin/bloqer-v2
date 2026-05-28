@@ -41,7 +41,7 @@ function cellString(raw: unknown): string {
 }
 
 /**
- * Parsea filas crudas (columna A = código, B = nombre, C = unidad).
+ * Parsea filas crudas (columna A = código, B = nombre). Unidad se completa en el APU.
  * Auto-detecta perfil simple vs multi-rubro (ARQ, EST, …).
  */
 export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetParseResult {
@@ -53,7 +53,6 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
     discipline: string | null;
     numeric: string;
     name: string;
-    unit?: string;
   };
 
   const numberedDrafts: NumberedDraft[] = [];
@@ -83,13 +82,11 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
       return;
     }
 
-    const unit = cellString(rawRow[2]) || undefined;
     numberedDrafts.push({
       rowNum,
       discipline: parsed.discipline,
       numeric: parsed.numeric,
       name,
-      unit,
     });
   });
 
@@ -140,8 +137,8 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
       continue;
     }
 
-    const type = inferNodeType(canonical, draft.unit, profile);
-    const structureError = validateCanonicalCode(canonical, type, draft.unit, profile);
+    const type = inferNodeType(canonical, profile);
+    const structureError = validateCanonicalCode(canonical, type, profile);
     if (structureError) {
       errors.push({ row: draft.rowNum, field: "code", message: structureError });
       continue;
@@ -153,7 +150,6 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
       parent_code: parentCodeFrom(canonical),
       type,
       name: draft.name,
-      unit: type === "ITEM" ? draft.unit : undefined,
       quantity: 0,
       _sourceRow: draft.rowNum,
       _profile: profile,

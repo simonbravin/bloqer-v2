@@ -60,7 +60,7 @@ export function BudgetWbsPreloadSection({ disabled, onPendingRowsChange }: Props
         <div className="space-y-3 border-t px-4 py-4">
           <p className="text-xs text-muted-foreground">
             Columna A: numeración (ARQ 1, ARQ 1.1) o rubro (ARQ + nombre en B). Columna B: descripción.
-            Columna C: unidad en ítems hoja. Varios rubros (ARQ, EST…) generan códigos ARQ.1.1.1. Sin importes.
+            Sin unidades ni importes (unidad en el APU). Varios rubros generan códigos ARQ.1.1.1.
           </p>
 
           <Label

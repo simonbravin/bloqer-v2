@@ -122,18 +122,11 @@ export function validateImportRows(
       });
     }
 
-    if (row.type === "ITEM") {
+    if (row.type === "ITEM" && mode === "full") {
       if (!row.unit?.trim()) {
-        if (mode === "structure_only") {
-          warnings.push({
-            row: row._row,
-            message: `El ítem "${row.code}" no tiene unidad en columna C; podés completarla después en el APU`,
-          });
-        } else {
-          errors.push({ row: row._row, field: "unit", message: "Los ítems requieren unidad de medida" });
-        }
+        errors.push({ row: row._row, field: "unit", message: "Los ítems requieren unidad de medida" });
       }
-      if (mode === "full" && (row.quantity === undefined || row.quantity === null)) {
+      if (row.quantity === undefined || row.quantity === null) {
         errors.push({ row: row._row, field: "quantity", message: "Los ítems requieren cantidad" });
       }
     }

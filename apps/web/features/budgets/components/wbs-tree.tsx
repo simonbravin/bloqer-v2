@@ -40,8 +40,8 @@ import { WbsImportDialog, type WbsImportPreview } from "./wbs-import-dialog";
 import type { BudgetImportRow } from "@bloqer/validators";
 import { computeWbsRowMetrics, computeTreeGrandTotals } from "../lib/wbs-metrics";
 import {
-  canAddChildItem,
-  canAddSubchapter,
+  addChildButtonTitle,
+  resolveAddChildPreset,
   suggestChildCode,
   suggestRootGroupCode,
 } from "../lib/wbs-codes";
@@ -340,40 +340,24 @@ export function WbsTree({
           <TableCell className="py-1.5 w-32" onClick={(e) => e.stopPropagation()}>
             {editable && (
               <div className="flex items-center justify-end gap-0.5">
-                {canAddSubchapter(node) && (
+                {resolveAddChildPreset(node) && (
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    title="Agregar subcapítulo"
-                    onClick={() =>
+                    title={addChildButtonTitle(node)}
+                    onClick={() => {
+                      const preset = resolveAddChildPreset(node);
+                      if (!preset) return;
                       setDialogState({
                         type: "add",
                         parentId: node.id,
-                        preset: "childGroup",
+                        preset,
                         suggestedCode: suggestChildCode(node, nodes),
-                      })
-                    }
+                      });
+                    }}
                   >
                     <Plus className="h-3 w-3" />
-                  </Button>
-                )}
-                {canAddChildItem(node) && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    title="Agregar ítem"
-                    onClick={() =>
-                      setDialogState({
-                        type: "add",
-                        parentId: node.id,
-                        preset: "childItem",
-                        suggestedCode: suggestChildCode(node, nodes),
-                      })
-                    }
-                  >
-                    <Plus className="h-3 w-3 text-primary" />
                   </Button>
                 )}
                 <Button

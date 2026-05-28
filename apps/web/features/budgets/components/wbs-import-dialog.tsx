@@ -126,7 +126,7 @@ export function WbsImportDialog({
           <DialogTitle>Importar estructura WBS</DialogTitle>
           <DialogDescription>
             Columna A: numeración (ej. ARQ 1, ARQ 1.1) o fila de rubro (ARQ + nombre en B).
-            Columna B: descripción. Columna C: unidad (solo ítems hoja). No se importan importes.
+            Columna B: descripción. No se importan unidades ni importes (la unidad se carga en el APU).
             Si hay varios rubros (ARQ, EST, ICF…), los códigos se guardan como ARQ.1.1.1.
           </DialogDescription>
         </DialogHeader>
@@ -164,14 +164,14 @@ export function WbsImportDialog({
             {preview?.profile === "multi_discipline" ? (
               <ul className="list-disc pl-4 space-y-0.5">
                 <li>Rubro (ARQ, EST…) → capítulo raíz del rubro</li>
-                <li>ARQ.1 / ARQ.1.1 sin unidad → capítulo o subcapítulo</li>
-                <li>ARQ.1.1.1 → ítem hoja (unidad en C opcional; se completa en el APU)</li>
+                <li>ARQ.1 / ARQ.1.1 → capítulo o subcapítulo</li>
+                <li>ARQ.1.1.1 → ítem hoja</li>
                 <li>Profundidad máxima: 4 niveles (rubro → capítulo → subcapítulo → ítem)</li>
               </ul>
             ) : (
               <ul className="list-disc pl-4 space-y-0.5">
-                <li>1–2 segmentos sin unidad → capítulo o subcapítulo</li>
-                <li>3 segmentos → ítem hoja (unidad en C opcional; se completa en el APU)</li>
+                <li>1–2 segmentos → capítulo o subcapítulo</li>
+                <li>3 segmentos → ítem hoja</li>
                 <li>Profundidad máxima: 3 niveles (1 → 1.1 → 1.1.1)</li>
               </ul>
             )}
@@ -224,7 +224,6 @@ export function WbsImportDialog({
                     <TableHead className="w-20">Código</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Nombre</TableHead>
-                    <TableHead className="w-16">Unidad</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -233,7 +232,6 @@ export function WbsImportDialog({
                       <TableCell className="font-mono text-xs">{row.code}</TableCell>
                       <TableCell className="text-xs">{row.type === "GROUP" ? "Capítulo" : "Ítem"}</TableCell>
                       <TableCell className="text-sm truncate max-w-[200px]">{row.name}</TableCell>
-                      <TableCell className="text-xs">{row.unit ?? "—"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

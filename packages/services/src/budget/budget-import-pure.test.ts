@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { previewSpreadsheetImport } from "./budget-import-pure";
+import { previewSpreadsheetImport, validateImportRows } from "./budget-import-pure";
 
 describe("previewSpreadsheetImport", () => {
   it("rejects empty spreadsheet", () => {
@@ -10,29 +10,28 @@ describe("previewSpreadsheetImport", () => {
   });
 
   it("rejects child under ITEM parent", () => {
-    const result = previewSpreadsheetImport([
-      ["1", "Capítulo", ""],
-      ["1.1", "Ítem hoja", "m²"],
-      ["1.1.1", "Hijo inválido", "gl"],
-    ]);
-    assert.equal(result.valid, false);
-    assert.ok(
-      result.errors.some((e) => e.field === "parent_code" && e.message.includes("ítem")),
+    const { errors } = validateImportRows(
+      [
+        { code: "1.1.1", type: "ITEM", name: "Ítem hoja", _row: 1 },
+        { code: "1.1.1.1", type: "GROUP", name: "Hijo inválido", parent_code: "1.1.1", _row: 2 },
+      ],
+      [],
     );
+    assert.ok(errors.some((e) => e.field === "parent_code" && e.message.includes("ítem")));
   });
 
-  it("allows ITEM sin unidad en structure_only (advertencia)", () => {
+  it("imports leaf items without unit in structure_only", () => {
     const result = previewSpreadsheetImport([
       ["ARQ 1", "Cap ARQ", ""],
       ["ARQ 1.1", "Sub ARQ", ""],
       ["ARQ 1.1.1", "Limpieza terreno", ""],
     ]);
     assert.equal(result.valid, true);
-    assert.ok(result.warnings.some((w) => w.message.includes("unidad")));
     assert.equal(result.rows.find((r) => r.code === "1.1.1")?.type, "ITEM");
+    assert.equal(result.rows.find((r) => r.code === "1.1.1")?.unit, undefined);
   });
 
-  it("preview multi-rubro is valid with unidades en hojas", () => {
+  it("preview multi-rubro is valid", () => {
     const result = previewSpreadsheetImport([
       ["ARQ", "ARQUITECTURA", ""],
       ["EST", "ESTRUCTURA", ""],

@@ -32,18 +32,20 @@ describe("parseNumberedSpreadsheetRows — simple (un solo rubro)", () => {
     assert.equal(rows[1]?.type, "GROUP");
     assert.equal(rows[1]?.parent_code, "1");
     assert.equal(rows[2]?.type, "ITEM");
-    assert.equal(rows[2]?.unit, "m²");
     assert.equal(rows[3]?.code, "1.1.2");
   });
 
-  it("treats 2-segment row with unit as ITEM", () => {
+  it("ignores column C (unidad); depth defines ITEM", () => {
     const { rows, errors } = parseNumberedSpreadsheetRows([
       ["ARQ 2", "CUBIERTAS", ""],
       ["ARQ 2.1", "Cubierta panel sándwich", "m²"],
+      ["ARQ 2.1.1", "Detalle hoja", "gl"],
     ]);
     assert.equal(errors.length, 0);
-    assert.equal(rows[1]?.type, "ITEM");
+    assert.equal(rows[1]?.type, "GROUP");
     assert.equal(rows[1]?.code, "2.1");
+    assert.equal(rows[2]?.type, "ITEM");
+    assert.equal(rows[2]?.code, "2.1.1");
   });
 
   it("rejects depth beyond 3 segments", () => {

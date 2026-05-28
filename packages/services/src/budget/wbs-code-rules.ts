@@ -100,29 +100,20 @@ export function detectImportProfile(
   return "simple";
 }
 
-export function inferNodeType(
-  canonicalCode: string,
-  unit: string | undefined,
-  profile: WbsImportProfile,
-): WbsNodeType {
+/** Tipo según profundidad del código (importación ignora columna C / unidad). */
+export function inferNodeType(canonicalCode: string, profile: WbsImportProfile): WbsNodeType {
   const segments = countCodeSegments(canonicalCode);
-  const hasUnit = Boolean(unit?.trim());
 
   if (profile === "multi_discipline") {
-    if (hasUnit) return "ITEM";
-    if (segments >= 4) return "ITEM";
-    return "GROUP";
+    return segments >= 4 ? "ITEM" : "GROUP";
   }
 
-  if (hasUnit) return "ITEM";
-  if (segments >= 3) return "ITEM";
-  return "GROUP";
+  return segments >= 3 ? "ITEM" : "GROUP";
 }
 
 export function validateCanonicalCode(
   canonicalCode: string,
   type: WbsNodeType,
-  unit: string | undefined,
   profile: WbsImportProfile,
 ): string | null {
   const segments = countCodeSegments(canonicalCode);
@@ -143,7 +134,7 @@ export function validateCanonicalCode(
       return `El ítem "${canonicalCode}" debe incluir capítulo (p. ej. ARQ.1.1)`;
     }
     if (type === "GROUP" && segments >= 4) {
-      return `El código "${canonicalCode}" con 4 segmentos requiere unidad para ser ítem`;
+      return `El código "${canonicalCode}" supera la profundidad de capítulo`;
     }
     return null;
   }
@@ -155,7 +146,7 @@ export function validateCanonicalCode(
     return `El ítem "${canonicalCode}" debe estar bajo un capítulo (p. ej. 1.1)`;
   }
   if (type === "GROUP" && segments > 2) {
-    return `El código "${canonicalCode}" requiere unidad en columna C para ser ítem hoja`;
+    return `El código "${canonicalCode}" supera la profundidad de capítulo`;
   }
   return null;
 }
