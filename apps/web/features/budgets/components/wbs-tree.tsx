@@ -326,7 +326,12 @@ export function WbsTree({
               <span className="truncate">{node.code}</span>
             </div>
           </TableCell>
-          <TableCell className="py-1.5 min-w-[12rem] text-sm font-medium">{node.name}</TableCell>
+          <TableCell className="py-1.5 min-w-[12rem] text-sm font-medium">
+            <span className="line-clamp-2">{node.name}</span>
+            <span className="mt-0.5 block text-[10px] font-normal text-muted-foreground">
+              {node.type === "ITEM" ? "Ítem · clic para APU" : "Capítulo"}
+            </span>
+          </TableCell>
           <TableCell className="py-1.5 text-sm text-muted-foreground w-20">
             {metrics.unit ? budgetUnitLabel(metrics.unit) : "—"}
           </TableCell>

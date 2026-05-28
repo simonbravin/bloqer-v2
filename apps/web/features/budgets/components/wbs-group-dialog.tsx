@@ -12,6 +12,7 @@ import { WbsNodeForm } from "./wbs-node-form";
 import type { WbsViewNode } from "@bloqer/services";
 import type { UpdateWbsNodeInput } from "@bloqer/validators";
 import { computeWbsRowMetrics } from "../lib/wbs-metrics";
+import { canAddChildItem } from "../lib/wbs-codes";
 
 interface WbsGroupDialogProps {
   open: boolean;
@@ -45,7 +46,21 @@ export function WbsGroupDialog({
             {" — "}
             {node.name}
           </DialogTitle>
+          <p className="text-sm text-muted-foreground pt-1">
+            Capítulo (agrupa ítems). El cómputo y el APU van en los ítems hoja, no acá.
+          </p>
         </DialogHeader>
+
+        {editable && canAddChildItem(node) && (
+          <div className="rounded-md border border-primary/25 bg-primary/5 px-3 py-2.5 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">¿Dónde está el APU?</p>
+            <p className="mt-1">
+              En la fila de este capítulo, usá el botón <strong>+</strong> (Agregar ítem) para crear
+              un ítem hijo (ej. {node.code}.1). Después <strong>hacé clic en esa fila ítem</strong>{" "}
+              para abrir el APU y cargar unidad, cantidad y análisis de costo.
+            </p>
+          </div>
+        )}
 
         <dl className="grid grid-cols-2 gap-3 rounded-lg border bg-muted/30 p-3 text-sm">
           <div>
