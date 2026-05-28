@@ -41,6 +41,12 @@ export * from "./jobsite-log/jobsite-log.service";
 export * from "./schedule/schedule-access";
 export * from "./schedule/schedule.service";
 export * from "./schedule/schedule-workspace.service";
+export type { ScheduleItemAuditEntryDto } from "./schedule/schedule-audit";
+export type {
+  ScheduleItemContextDto,
+  ScheduleItemJobsiteEntry,
+  ScheduleItemCertificationEntry,
+} from "./schedule/schedule-item-context.service";
 export * from "./cost-control/cost-control.service";
 export * from "./aging/aging.service";
 export * from "./finance/finance-hub-overview.service";

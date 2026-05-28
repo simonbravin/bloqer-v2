@@ -5,11 +5,18 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type {
-  ScheduleItemAuditEntryDto,
   ScheduleItemContextDto,
   ScheduleWorkspaceDto,
   ScheduleWorkspaceItemDto,
 } from "@bloqer/services";
+
+type ScheduleItemAuditEntryView = {
+  id: string;
+  action: string;
+  actorName: string | null;
+  createdAt: string;
+  summary: string;
+};
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,7 +75,7 @@ export function ScheduleItemDrawer({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [audit, setAudit] = useState<ScheduleItemAuditEntryDto[]>([]);
+  const [audit, setAudit] = useState<ScheduleItemAuditEntryView[]>([]);
   const [context, setContext] = useState<ScheduleItemContextDto | null>(null);
   const [predecessorPick, setPredecessorPick] = useState("");
   const [progressInput, setProgressInput] = useState("");
