@@ -165,13 +165,13 @@ export function WbsImportDialog({
               <ul className="list-disc pl-4 space-y-0.5">
                 <li>Rubro (ARQ, EST…) → capítulo raíz del rubro</li>
                 <li>ARQ.1 / ARQ.1.1 sin unidad → capítulo o subcapítulo</li>
-                <li>ARQ.1.1.1 o unidad en columna C → ítem hoja</li>
+                <li>ARQ.1.1.1 → ítem hoja (unidad en C opcional; se completa en el APU)</li>
                 <li>Profundidad máxima: 4 niveles (rubro → capítulo → subcapítulo → ítem)</li>
               </ul>
             ) : (
               <ul className="list-disc pl-4 space-y-0.5">
                 <li>1–2 segmentos sin unidad → capítulo o subcapítulo</li>
-                <li>3 segmentos o unidad en columna C → ítem hoja</li>
+                <li>3 segmentos → ítem hoja (unidad en C opcional; se completa en el APU)</li>
                 <li>Profundidad máxima: 3 niveles (1 → 1.1 → 1.1.1)</li>
               </ul>
             )}

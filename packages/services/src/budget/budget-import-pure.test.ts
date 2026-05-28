@@ -21,6 +21,17 @@ describe("previewSpreadsheetImport", () => {
     );
   });
 
+  it("allows ITEM sin unidad en structure_only (advertencia)", () => {
+    const result = previewSpreadsheetImport([
+      ["ARQ 1", "Cap ARQ", ""],
+      ["ARQ 1.1", "Sub ARQ", ""],
+      ["ARQ 1.1.1", "Limpieza terreno", ""],
+    ]);
+    assert.equal(result.valid, true);
+    assert.ok(result.warnings.some((w) => w.message.includes("unidad")));
+    assert.equal(result.rows.find((r) => r.code === "1.1.1")?.type, "ITEM");
+  });
+
   it("preview multi-rubro is valid with unidades en hojas", () => {
     const result = previewSpreadsheetImport([
       ["ARQ", "ARQUITECTURA", ""],
