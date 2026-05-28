@@ -5,12 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { BloqerLogo } from "@/components/brand/bloqer-logo";
 import { CollapsibleNavSection } from "@/features/shell/components/collapsible-nav-section";
+import { NavItem } from "@/features/shell/components/nav-item";
 import { usePlatformNav } from "@/features/platform/platform-nav-context";
 import { PlatformNavIcon } from "@/lib/platform-nav-icons";
-
-function isNavItemActive(pathname: string, href: string, matchExact?: boolean) {
-  return matchExact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
-}
 
 const PLATFORM_LINKS = [
   { href: "/platform", label: "Consola", matchExact: true as const },
@@ -30,45 +27,24 @@ export function PlatformSidebar() {
   }, [pathname]);
 
   const tenantId = activeTenant?.id ?? tenantIdFromPath;
-  const tenantLinks = tenantId
-    ? [
-        { href: `/platform/tenants/${tenantId}`, label: "Resumen", matchExact: true as const },
-        { href: `/platform/tenants/${tenantId}/users`, label: "Usuarios" },
-        { href: `/platform/tenants/${tenantId}/invitations`, label: "Invitaciones" },
-        { href: `/platform/tenants/${tenantId}/modules`, label: "Módulos" },
-        { href: `/platform/tenants/${tenantId}/settings`, label: "Suscripción" },
-      ]
-    : [];
 
-  const sections = useMemo(
-    () => [
-      { title: "Plataforma", items: PLATFORM_LINKS },
-      ...(tenantLinks.length > 0
-        ? [
-            {
-              title: activeTenant?.name ?? "Organización",
-              items: tenantLinks,
-            },
-          ]
-        : []),
-    ],
-    [tenantLinks, activeTenant?.name],
-  );
+  const tenantLinks = useMemo(() => {
+    if (!tenantId) return null;
+    return [
+      { href: `/platform/tenants/${tenantId}`, label: "Resumen", matchExact: true as const },
+      { href: `/platform/tenants/${tenantId}/users`, label: "Usuarios" },
+      { href: `/platform/tenants/${tenantId}/invitations`, label: "Invitaciones" },
+      { href: `/platform/tenants/${tenantId}/modules`, label: "Módulos" },
+      { href: `/platform/tenants/${tenantId}/settings`, label: "Suscripción" },
+    ] as const;
+  }, [tenantId]);
 
-  const [openByTitle, setOpenByTitle] = useState<Record<string, boolean>>({});
+  const tenantSectionTitle = activeTenant?.name ?? "Organización";
+  const [tenantSectionOpen, setTenantSectionOpen] = useState(true);
 
   useEffect(() => {
-    setOpenByTitle((prev) => {
-      const next: Record<string, boolean> = {};
-      for (const s of sections) {
-        const hasActive = s.items.some((item) =>
-          isNavItemActive(pathname, item.href, "matchExact" in item ? item.matchExact : undefined),
-        );
-        next[s.title] = hasActive ? true : (prev[s.title] ?? s.title === "Plataforma");
-      }
-      return next;
-    });
-  }, [pathname, sections]);
+    if (tenantLinks) setTenantSectionOpen(true);
+  }, [tenantId, pathname, tenantLinks]);
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
@@ -80,28 +56,34 @@ export function PlatformSidebar() {
           <BloqerLogo className="h-8 max-w-[9.5rem]" />
         </Link>
       </div>
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3 pr-1">
-        {sections.map((section, sectionIndex) => {
-          const open = openByTitle[section.title] ?? false;
-          return (
-            <CollapsibleNavSection
-              key={section.title}
-              title={section.title}
-              sectionIndex={sectionIndex}
-              open={open}
-              onToggle={() =>
-                setOpenByTitle((prev) => ({
-                  ...prev,
-                  [section.title]: !(prev[section.title] ?? false),
-                }))
-              }
-              items={section.items.map((item) => ({
-                ...item,
-                icon: <PlatformNavIcon href={item.href} tenantId={tenantId ?? undefined} />,
-              }))}
+      <nav className="flex flex-1 flex-col gap-3 overflow-y-auto px-2 py-3 pr-1">
+        <div className="space-y-0.5">
+          <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Plataforma
+          </p>
+          {PLATFORM_LINKS.map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              matchExact={"matchExact" in item ? item.matchExact : undefined}
+              icon={<PlatformNavIcon href={item.href} />}
             />
-          );
-        })}
+          ))}
+        </div>
+
+        {tenantLinks ? (
+          <CollapsibleNavSection
+            title={tenantSectionTitle}
+            sectionIndex={1}
+            open={tenantSectionOpen}
+            onToggle={() => setTenantSectionOpen((v) => !v)}
+            items={tenantLinks.map((item) => ({
+              ...item,
+              icon: <PlatformNavIcon href={item.href} tenantId={tenantId ?? undefined} />,
+            }))}
+          />
+        ) : null}
       </nav>
       {tenantId ? (
         <div className="shrink-0 border-t border-sidebar-border/80 p-3">
