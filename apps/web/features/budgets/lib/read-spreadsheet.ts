@@ -14,8 +14,7 @@ export async function readSpreadsheetFile(file: File): Promise<unknown[][]> {
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) return [];
     const sheet = workbook.Sheets[sheetName]!;
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
-    return rows.map((row) => (Array.isArray(row) ? row.slice(0, 2) : []));
+    return xlsxSheetToRows(sheet, XLSX);
   }
 
   throw new Error("Formato no soportado. Usá .csv o .xlsx");
@@ -46,6 +45,41 @@ function parseCsvLine(line: string, delimiter: "," | ";"): string[] {
   }
   cells.push(current.trim());
   return cells.slice(0, 2);
+}
+
+/** Usa texto formateado de celda (w) para conservar 11.10; Excel guarda 11.1 como número. */
+function xlsxSheetToRows(
+  sheet: { "!ref"?: string; [cell: string]: unknown },
+  XLSX: { utils: { decode_range: (ref: string) => { s: { r: number; c: number }; e: { r: number; c: number } }; encode_cell: (addr: { r: number; c: number }) => string } },
+): unknown[][] {
+  const ref = sheet["!ref"];
+  if (!ref || typeof ref !== "string") return [];
+
+  const range = XLSX.utils.decode_range(ref);
+  const rows: unknown[][] = [];
+
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    const row: unknown[] = [];
+    for (let c = 0; c <= 1; c++) {
+      const cell = sheet[XLSX.utils.encode_cell({ r, c })] as
+        | { w?: string; v?: unknown }
+        | undefined;
+      if (!cell) {
+        row.push("");
+        continue;
+      }
+      if (cell.w != null && String(cell.w).trim() !== "") {
+        row.push(String(cell.w).trim());
+      } else if (cell.v != null && cell.v !== "") {
+        row.push(cell.v);
+      } else {
+        row.push("");
+      }
+    }
+    rows.push(row);
+  }
+
+  return rows;
 }
 
 function parseCsvText(text: string): unknown[][] {

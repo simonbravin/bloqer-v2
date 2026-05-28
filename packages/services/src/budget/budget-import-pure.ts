@@ -7,7 +7,11 @@ import type { WbsImportProfile } from "./wbs-code-rules";
 
 export { IMPORT_TEMPLATE_COLUMNS };
 export { parseNumberedSpreadsheetRows, normalizeItemCode } from "./wbs-spreadsheet-parser";
-export type { SpreadsheetParseError, SpreadsheetParseResult } from "./wbs-spreadsheet-parser";
+export type {
+  SpreadsheetParseError,
+  SpreadsheetParseResult,
+  SpreadsheetParseWarning,
+} from "./wbs-spreadsheet-parser";
 export {
   countCodeSegments,
   isMultiStyleCode,
@@ -68,12 +72,23 @@ export function parseImportRows(rawRows: unknown[]): ParseResult {
 
 export function parseSpreadsheetForImport(rawRows: unknown[][]): ParseResult & {
   skippedRows: number;
+  warnings: ImportWarning[];
 } {
-  const { profile, rows, errors: sheetErrors, skippedRows } = parseNumberedSpreadsheetRows(rawRows);
+  const {
+    profile,
+    rows,
+    errors: sheetErrors,
+    warnings: sheetWarnings,
+    skippedRows,
+  } = parseNumberedSpreadsheetRows(rawRows);
   const sheetErrorsMapped: ImportError[] = sheetErrors.map((e) => ({
     row: e.row,
     field: e.field,
     message: e.message,
+  }));
+  const sheetWarningsMapped: ImportWarning[] = sheetWarnings.map((w) => ({
+    row: w.row,
+    message: w.message,
   }));
 
   if (rows.length > 0) {
@@ -85,6 +100,7 @@ export function parseSpreadsheetForImport(rawRows: unknown[][]): ParseResult & {
       profile,
       validRows: validRows.map((r) => ({ ...r, _row: rowByCode.get(r.code) ?? 0 })),
       errors: [...sheetErrorsMapped, ...parseErrors],
+      warnings: sheetWarningsMapped,
       skippedRows,
     };
   }
@@ -92,10 +108,16 @@ export function parseSpreadsheetForImport(rawRows: unknown[][]): ParseResult & {
   const objectRows = rawRows.filter((r) => r && typeof r === "object" && !Array.isArray(r));
   if (objectRows.length > 0) {
     const { validRows, errors } = parseImportRows(objectRows);
-    return { profile: "simple", validRows, errors, skippedRows: 0 };
+    return { profile: "simple", validRows, errors, warnings: [], skippedRows: 0 };
   }
 
-  return { profile, validRows: [], errors: sheetErrorsMapped, skippedRows };
+  return {
+    profile,
+    validRows: [],
+    errors: sheetErrorsMapped,
+    warnings: sheetWarningsMapped,
+    skippedRows,
+  };
 }
 
 export function validateImportRows(
@@ -191,9 +213,19 @@ export function previewSpreadsheetImport(
   existingCodes: string[] = [],
   mode: ImportMode = "structure_only",
 ): PreviewResult {
-  const { profile, validRows, errors: parseErrors } = parseSpreadsheetForImport(rawRows);
-  const { errors: validationErrors, warnings } = validateImportRows(validRows, existingCodes, mode);
+  const {
+    profile,
+    validRows,
+    errors: parseErrors,
+    warnings: parseWarnings,
+  } = parseSpreadsheetForImport(rawRows);
+  const { errors: validationErrors, warnings: validationWarnings } = validateImportRows(
+    validRows,
+    existingCodes,
+    mode,
+  );
   const allErrors = [...parseErrors, ...validationErrors];
+  const warnings = [...parseWarnings, ...validationWarnings];
 
   const rows = validRows.map((r) => ({
     ...r,

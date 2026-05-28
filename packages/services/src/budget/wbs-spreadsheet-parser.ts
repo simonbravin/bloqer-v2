@@ -1,4 +1,5 @@
 import type { BudgetImportRow } from "@bloqer/validators";
+import { suggestSequentialDuplicateFix } from "./wbs-import-code-fix";
 import {
   detectImportProfile,
   inferNodeType,
@@ -14,6 +15,11 @@ export type SpreadsheetParseError = {
   message: string;
 };
 
+export type SpreadsheetParseWarning = {
+  row: number;
+  message: string;
+};
+
 export type ParsedSpreadsheetRow = BudgetImportRow & {
   _sourceRow: number;
   _profile: WbsImportProfile;
@@ -23,6 +29,7 @@ export type SpreadsheetParseResult = {
   profile: WbsImportProfile;
   rows: ParsedSpreadsheetRow[];
   errors: SpreadsheetParseError[];
+  warnings: SpreadsheetParseWarning[];
   skippedRows: number;
 };
 
@@ -46,6 +53,7 @@ function cellString(raw: unknown): string {
  */
 export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetParseResult {
   const errors: SpreadsheetParseError[] = [];
+  const warnings: SpreadsheetParseWarning[] = [];
   let skippedRows = 0;
 
   type NumberedDraft = {
@@ -96,6 +104,7 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
 
   const rows: ParsedSpreadsheetRow[] = [];
   const seenCodes = new Set<string>();
+  const codesInFileOrder: string[] = [];
 
   if (profile === "multi_discipline") {
     const disciplines = new Set<string>();
@@ -123,18 +132,28 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
   }
 
   for (const draft of numberedDrafts) {
-    const canonical =
+    let canonical =
       profile === "multi_discipline" && draft.discipline
         ? `${draft.discipline}.${draft.numeric}`
         : draft.numeric;
 
     if (seenCodes.has(canonical)) {
-      errors.push({
-        row: draft.rowNum,
-        field: "code",
-        message: `Código duplicado en la importación: "${canonical}"`,
-      });
-      continue;
+      const suggested = suggestSequentialDuplicateFix(canonical, codesInFileOrder);
+      if (suggested && !seenCodes.has(suggested)) {
+        const original = canonical;
+        warnings.push({
+          row: draft.rowNum,
+          message: `Código "${original}" corregido a "${suggested}" (¿quisiste decir ${suggested}? En Excel ${suggested} suele leerse como ${original})`,
+        });
+        canonical = suggested;
+      } else {
+        errors.push({
+          row: draft.rowNum,
+          field: "code",
+          message: `Código duplicado en la importación: "${canonical}"`,
+        });
+        continue;
+      }
     }
 
     const type = inferNodeType(canonical, profile);
@@ -145,6 +164,7 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
     }
 
     seenCodes.add(canonical);
+    codesInFileOrder.push(canonical);
     rows.push({
       code: canonical,
       parent_code: parentCodeFrom(canonical),
@@ -162,5 +182,5 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
     return a._sourceRow - b._sourceRow;
   });
 
-  return { profile, rows, errors, skippedRows };
+  return { profile, rows, errors, warnings, skippedRows };
 }

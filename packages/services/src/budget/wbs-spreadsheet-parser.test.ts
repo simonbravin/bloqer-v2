@@ -71,6 +71,26 @@ describe("parseNumberedSpreadsheetRows — simple (un solo rubro)", () => {
 });
 
 describe("parseNumberedSpreadsheetRows — multi_discipline", () => {
+  it("auto-corrige duplicado tipo Excel 11.1 → 11.10", () => {
+    const { rows, errors, warnings } = parseNumberedSpreadsheetRows([
+      ["11", "ELECTRICIDAD", ""],
+      ["11.1", "Toma", ""],
+      ["11.2", "Tablero", ""],
+      ["11.3", "Seccional", ""],
+      ["11.4", "Canalización", ""],
+      ["11.5", "Iluminación", ""],
+      ["11.6", "Tomas", ""],
+      ["11.7", "Artefactos", ""],
+      ["11.8", "Emergencia", ""],
+      ["11.9", "Splits 3000", ""],
+      ["11.1", "Splits 4500fg", ""],
+      ["11.11", "Corrientes debiles", ""],
+    ]);
+    assert.equal(errors.length, 0);
+    assert.ok(rows.some((r) => r.code === "11.10"));
+    assert.ok(warnings.some((w) => w.message.includes("11.10")));
+  });
+
   it("detecta varios rubros y evita colisión ARQ 1 / EST 1", () => {
     const { profile, rows, errors } = parseNumberedSpreadsheetRows([
       ["ARQ", "ARQUITECTURA", ""],
