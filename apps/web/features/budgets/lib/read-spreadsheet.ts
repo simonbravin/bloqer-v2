@@ -1,5 +1,3 @@
-import * as XLSX from "xlsx";
-
 /** Lee CSV o XLSX y devuelve filas crudas (solo primeras 3 columnas relevantes). */
 export async function readSpreadsheetFile(file: File): Promise<unknown[][]> {
   const ext = file.name.split(".").pop()?.toLowerCase();
@@ -10,6 +8,7 @@ export async function readSpreadsheetFile(file: File): Promise<unknown[][]> {
   }
 
   if (ext === "xlsx" || ext === "xls") {
+    const XLSX = await import("xlsx");
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: "array" });
     const sheetName = workbook.SheetNames[0];

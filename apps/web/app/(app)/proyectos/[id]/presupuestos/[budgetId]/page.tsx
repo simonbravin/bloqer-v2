@@ -130,9 +130,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
         currency={budget.currency}
         editable={editable}
         onPreviewWbsImport={previewWbsImportAction.bind(null, budgetId, projectId)}
-        onExecuteWbsImport={(rows, options) =>
-          executeWbsImportAction(budgetId, projectId, rows, options)
-        }
+        onExecuteWbsImport={executeWbsImportAction.bind(null, budgetId, projectId)}
         onAddNode={addWbsNodeAction.bind(null, budgetId, projectId)}
         onUpdateNode={updateWbsNodeAction.bind(null, projectId, budgetId)}
         onRemoveNode={removeWbsNodeAction.bind(null, projectId, budgetId)}
