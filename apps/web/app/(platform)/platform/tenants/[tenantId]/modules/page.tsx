@@ -34,7 +34,7 @@ export default async function PlatformTenantModulesPage({ params }: PageProps) {
   }
 
   return (
-    <PageShell variant="wide" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Módulos</h1>
         <p className="mt-1 text-sm text-muted-foreground">

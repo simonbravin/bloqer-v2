@@ -25,7 +25,7 @@ export default async function PlatformTenantsNewPage({ searchParams }: PageProps
   }
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex flex-wrap gap-2">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/platform/tenants">← Organizaciones</Link>

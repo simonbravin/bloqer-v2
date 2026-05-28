@@ -25,9 +25,26 @@ export async function updateTenantDisplaySettingsAction(formData: FormData) {
   if (!ctx) redirect("/login");
   const name = String(formData.get("name") ?? "").trim();
   const timezone = String(formData.get("timezone") ?? "").trim();
-  const baseCurrency = String(formData.get("baseCurrency") ?? "").trim();
+  const baseCurrency = String(formData.get("baseCurrency") ?? "").trim().toUpperCase();
+
+  const payload: Record<string, unknown> = { name, timezone, baseCurrency };
+
+  const address = formData.get("address");
+  if (address !== null) payload.address = String(address).trim();
+  const city = formData.get("city");
+  if (city !== null) payload.city = String(city).trim();
+  const country = formData.get("country");
+  if (country !== null) payload.country = String(country).trim().toUpperCase();
+  const phone = formData.get("phone");
+  if (phone !== null) payload.phone = String(phone).trim();
+  const websiteRaw = formData.get("website");
+  if (websiteRaw !== null) {
+    const w = String(websiteRaw).trim();
+    payload.website = w === "" ? null : w;
+  }
+
   try {
-    await updateTenantDisplaySettings({ name, timezone, baseCurrency }, ctx);
+    await updateTenantDisplaySettings(payload, ctx);
   } catch (e) {
     if (e instanceof ServiceError) {
       redirect(`/configuracion?err=${encodeURIComponent(e.message)}`);

@@ -11,15 +11,28 @@ import {
   canReadTenantConfigArea,
 } from "./tenant-settings-guards";
 
+export type TenantPrimaryCompanyView = {
+  id: string;
+  name: string;
+  legalName: string | null;
+  fiscalId: string | null;
+  address: string | null;
+  city: string | null;
+  country: string;
+  phone: string | null;
+  website: string | null;
+};
+
 export type TenantSettingsView = {
-  id:           string;
-  name:         string;
-  slug:         string;
-  timezone:     string;
+  id: string;
+  name: string;
+  slug: string;
+  timezone: string;
   baseCurrency: string;
-  fiscalId:     string | null;
-  status:       string;
-  createdAt:    Date;
+  fiscalId: string | null;
+  status: string;
+  createdAt: Date;
+  primaryCompany: TenantPrimaryCompanyView | null;
 };
 
 export async function getTenantSettings(ctx: ServiceContext): Promise<TenantSettingsView> {
@@ -37,10 +50,30 @@ export async function getTenantSettings(ctx: ServiceContext): Promise<TenantSett
       fiscalId: true,
       status: true,
       createdAt: true,
+      companies: {
+        where: { status: "ACTIVE" },
+        orderBy: { createdAt: "asc" },
+        take: 1,
+        select: {
+          id: true,
+          name: true,
+          legalName: true,
+          fiscalId: true,
+          address: true,
+          city: true,
+          country: true,
+          phone: true,
+          website: true,
+        },
+      },
     },
   });
   if (!row) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
-  return row;
+  const { companies, ...tenant } = row;
+  return {
+    ...tenant,
+    primaryCompany: companies[0] ?? null,
+  };
 }
 
 export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceContext): Promise<void> {
@@ -52,30 +85,118 @@ export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceCont
     const msg = parsed.error.issues.map((i) => i.message).join("; ") || "validación";
     throw new ServiceError("VALIDATION", msg);
   }
+  const { address, city, country, phone, website, ...tenantFields } = parsed.data;
+
   const before = await prisma.tenant.findFirst({
     where: { id: ctx.tenantId },
-    select: { name: true, timezone: true, baseCurrency: true },
+    select: {
+      name: true,
+      timezone: true,
+      baseCurrency: true,
+      companies: {
+        where: { status: "ACTIVE" },
+        orderBy: { createdAt: "asc" },
+        take: 1,
+        select: {
+          id: true,
+          address: true,
+          city: true,
+          country: true,
+          phone: true,
+          website: true,
+        },
+      },
+    },
   });
   if (!before) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
 
-  await prisma.tenant.update({
-    where: { id: ctx.tenantId },
-    data: {
-      name:         parsed.data.name,
-      timezone:     parsed.data.timezone,
-      baseCurrency: parsed.data.baseCurrency,
-    },
+  const primary = before.companies[0];
+  const hasContactPatch =
+    address !== undefined ||
+    city !== undefined ||
+    country !== undefined ||
+    phone !== undefined ||
+    website !== undefined;
+
+  if (hasContactPatch && !primary) {
+    throw new ServiceError("VALIDATION", "No hay empresa activa para actualizar datos de contacto");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.tenant.update({
+      where: { id: ctx.tenantId },
+      data: {
+        name: tenantFields.name,
+        timezone: tenantFields.timezone,
+        baseCurrency: tenantFields.baseCurrency,
+      },
+    });
+
+    if (primary && hasContactPatch) {
+      const companyData: {
+        address?: string;
+        city?: string;
+        country?: string;
+        phone?: string;
+        website?: string | null;
+      } = {};
+      if (address !== undefined) companyData.address = address;
+      if (city !== undefined) companyData.city = city;
+      if (country !== undefined) companyData.country = country;
+      if (phone !== undefined) companyData.phone = phone;
+      if (website !== undefined) companyData.website = website;
+
+      await tx.company.update({
+        where: { id: primary.id },
+        data: companyData,
+      });
+    }
   });
 
+  const auditBefore = {
+    name: before.name,
+    timezone: before.timezone,
+    baseCurrency: before.baseCurrency,
+    ...(primary && hasContactPatch
+      ? {
+          companyContact: {
+            companyId: primary.id,
+            address: primary.address,
+            city: primary.city,
+            country: primary.country,
+            phone: primary.phone,
+            website: primary.website,
+          },
+        }
+      : {}),
+  };
+  const auditAfter = {
+    name: tenantFields.name,
+    timezone: tenantFields.timezone,
+    baseCurrency: tenantFields.baseCurrency,
+    ...(primary && hasContactPatch
+      ? {
+          companyContact: {
+            companyId: primary.id,
+            address: address ?? primary.address,
+            city: city ?? primary.city,
+            country: country ?? primary.country,
+            phone: phone ?? primary.phone,
+            website: website === undefined ? primary.website : website,
+          },
+        }
+      : {}),
+  };
+
   await log({
-    tenantId:    ctx.tenantId,
+    tenantId: ctx.tenantId,
     actorUserId: ctx.actorUserId,
-    action:      "TENANT_DISPLAY_SETTINGS_UPDATED",
-    entityType:  "Tenant",
-    entityId:    ctx.tenantId,
-    before:      { name: before.name, timezone: before.timezone, baseCurrency: before.baseCurrency },
-    after:       { name: parsed.data.name, timezone: parsed.data.timezone, baseCurrency: parsed.data.baseCurrency },
-    ipAddress:   ctx.ipAddress,
+    action: "TENANT_DISPLAY_SETTINGS_UPDATED",
+    entityType: "Tenant",
+    entityId: ctx.tenantId,
+    before: auditBefore,
+    after: auditAfter,
+    ipAddress: ctx.ipAddress,
   });
 }
 

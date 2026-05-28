@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { formatCurrencyDisplay } from "@/lib/format";
 import {
   canEditTenantDisplaySettings,
   canReadTenantConfigArea,
@@ -9,10 +10,27 @@ import {
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { updateTenantDisplaySettingsAction } from "./configuracion-actions";
 import { PageShell } from "@/components/layout/page-shell";
+import { TenantDisplaySettingsForm } from "@/features/tenant-config/tenant-display-settings-form";
+import { updateTenantDisplaySettingsAction } from "./configuracion-actions";
+
+function countryLabel(code: string): string {
+  const labels: Record<string, string> = {
+    AR: "Argentina",
+    UY: "Uruguay",
+    PY: "Paraguay",
+    CL: "Chile",
+    BO: "Bolivia",
+    BR: "Brasil",
+    MX: "México",
+    CO: "Colombia",
+    PE: "Perú",
+    EC: "Ecuador",
+    US: "Estados Unidos",
+    ES: "España",
+  };
+  return labels[code] ?? code;
+}
 
 export default async function ConfiguracionHomePage() {
   const current = await getCurrentUser();
@@ -24,6 +42,9 @@ export default async function ConfiguracionHomePage() {
   const tenant = await getTenantSettings(ctx);
 
   const canEditDisplay = canEditTenantDisplaySettings(current.tenantCtx.roles);
+  const company = tenant.primaryCompany;
+  const fiscalId = company?.fiscalId ?? tenant.fiscalId;
+  const legalName = company?.legalName ?? company?.name ?? null;
 
   return (
     <PageShell variant="default" className="space-y-8">
@@ -59,16 +80,27 @@ export default async function ConfiguracionHomePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Datos del tenant</CardTitle>
-          <CardDescription>Identificación básica (slug no editable desde acá).</CardDescription>
+          <CardTitle className="text-base">Datos fiscales y operativos</CardTitle>
+          <CardDescription>
+            Identificación legal y estado del tenant. Para cambiar el nombre visible en la app, usá los ajustes de
+            abajo.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
-            <p className="text-muted-foreground">Nombre</p>
+            <p className="text-muted-foreground">Nombre a mostrar (actual)</p>
             <p className="font-medium">{tenant.name}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">Slug</p>
+            <p className="text-muted-foreground">Razón social</p>
+            <p className="font-medium">{legalName ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">CUIT / identificador fiscal</p>
+            <p className="font-medium">{fiscalId ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Slug (interno)</p>
             <p className="font-mono text-xs">{tenant.slug}</p>
           </div>
           <div>
@@ -77,12 +109,26 @@ export default async function ConfiguracionHomePage() {
           </div>
           <div>
             <p className="text-muted-foreground">Moneda base</p>
-            <p>{tenant.baseCurrency}</p>
+            <p>{formatCurrencyDisplay(tenant.baseCurrency)}</p>
           </div>
-          <div>
-            <p className="text-muted-foreground">CUIT / identificador fiscal</p>
-            <p>{tenant.fiscalId ?? "—"}</p>
-          </div>
+          {company ? (
+            <>
+              <div className="sm:col-span-2">
+                <p className="text-muted-foreground">Dirección</p>
+                <p>
+                  {[company.address, company.city, countryLabel(company.country)].filter(Boolean).join(", ") || "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Teléfono</p>
+                <p>{company.phone ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Sitio web</p>
+                <p>{company.website ?? "—"}</p>
+              </div>
+            </>
+          ) : null}
           <div>
             <p className="text-muted-foreground">Estado operativo</p>
             <p>{tenant.status}</p>
@@ -93,27 +139,22 @@ export default async function ConfiguracionHomePage() {
       {canEditDisplay ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Ajustes de visualización</CardTitle>
-            <CardDescription>Nombre comercial, zona horaria y moneda base.</CardDescription>
+            <CardTitle className="text-base">Ajustes de visualización y contacto</CardTitle>
+            <CardDescription>
+              Nombre comercial visible, zona horaria, moneda base y datos de contacto editables. No podés modificar CUIT
+              ni razón social desde acá.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <form action={updateTenantDisplaySettingsAction} className="grid max-w-md gap-4">
-              <div className="grid gap-1">
-                <Label htmlFor="name">Nombre</Label>
-                <Input id="name" name="name" defaultValue={tenant.name} maxLength={120} required />
-              </div>
-              <div className="grid gap-1">
-                <Label htmlFor="timezone">Zona horaria</Label>
-                <Input id="timezone" name="timezone" defaultValue={tenant.timezone} maxLength={64} required />
-              </div>
-              <div className="grid gap-1">
-                <Label htmlFor="baseCurrency">Moneda base (ISO 4217, 3 letras)</Label>
-                <Input id="baseCurrency" name="baseCurrency" defaultValue={tenant.baseCurrency} maxLength={3} required />
-              </div>
-              <Button type="submit" size="sm">
-                Guardar
-              </Button>
-            </form>
+            <TenantDisplaySettingsForm
+              tenant={{
+                name: tenant.name,
+                timezone: tenant.timezone,
+                baseCurrency: tenant.baseCurrency,
+              }}
+              company={company}
+              action={updateTenantDisplaySettingsAction}
+            />
           </CardContent>
         </Card>
       ) : null}

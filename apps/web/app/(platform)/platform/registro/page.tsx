@@ -65,7 +65,7 @@ export default async function PlatformRegistroPage({ searchParams }: PageProps) 
   const actionOptions = Object.keys(PLATFORM_AUDIT_ACTION_LABEL_ES);
 
   return (
-    <PageShell variant="wide" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Registro de actividad</h1>
         <p className="text-sm text-muted-foreground">

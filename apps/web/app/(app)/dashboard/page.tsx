@@ -27,13 +27,15 @@ export default async function DashboardPage() {
     const platform = uid ? await isPlatformSuperadmin(uid) : false;
     if (platform) {
       return (
-        <PageShell variant="narrow">
-          <h1 className="text-2xl font-bold tracking-tight">Panel de plataforma</h1>
-          <p className="text-sm text-muted-foreground">
-            No tenés un tenant seleccionado. Desde acá podés administrar organizaciones.
-          </p>
-          <Button asChild variant="link" className="h-auto p-0">
-            <Link href="/platform">Ir al panel de plataforma</Link>
+        <PageShell variant="default" className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Panel de plataforma</h1>
+            <p className="text-sm text-muted-foreground">
+              No tenés un tenant seleccionado. Usá la consola de plataforma para administrar organizaciones.
+            </p>
+          </div>
+          <Button asChild>
+            <Link href="/platform">Ir a la consola de plataforma</Link>
           </Button>
         </PageShell>
       );

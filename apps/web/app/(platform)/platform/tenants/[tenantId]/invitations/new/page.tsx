@@ -42,7 +42,7 @@ export default async function PlatformTenantInvitationsNewPage({ params, searchP
   }
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <Button variant="ghost" size="sm" asChild>
         <Link href={`/platform/tenants/${tenantId}/invitations`}>← Invitaciones</Link>
       </Button>

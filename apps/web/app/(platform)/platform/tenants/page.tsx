@@ -40,7 +40,7 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
   }
 
   return (
-    <PageShell variant="wide" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Organizaciones</h1>

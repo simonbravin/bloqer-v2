@@ -43,6 +43,14 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
     ],
   },
   {
+    title: "Finanzas",
+    items: [
+      { label: "Tablero", href: "/finanzas", matchExact: true, require: FINANCE_AREA },
+      { label: "Cuentas por cobrar", href: "/finanzas/cuentas-por-cobrar-aging", require: { action: "VIEW", module: "AR" } },
+      { label: "Cuentas por pagar", href: "/finanzas/cuentas-por-pagar-aging", require: { action: "VIEW", module: "AP" } },
+    ],
+  },
+  {
     title: "Tesorería",
     items: [
       { label: "Resumen", href: "/tesoreria", matchExact: true, require: { action: "VIEW", module: "TREASURY" } },
@@ -58,14 +66,6 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
       { label: "Plan de cuentas", href: "/contabilidad/cuentas", require: { action: "VIEW", module: "ACCOUNTING" } },
       { label: "Asientos", href: "/contabilidad/asientos", require: { action: "VIEW", module: "ACCOUNTING" } },
       { label: "Reglas", href: "/contabilidad/reglas", require: { action: "VIEW", module: "ACCOUNTING" } },
-    ],
-  },
-  {
-    title: "Finanzas",
-    items: [
-      { label: "Tablero", href: "/finanzas", matchExact: true, require: FINANCE_AREA },
-      { label: "Cuentas por cobrar", href: "/finanzas/cuentas-por-cobrar-aging", require: { action: "VIEW", module: "AR" } },
-      { label: "Cuentas por pagar", href: "/finanzas/cuentas-por-pagar-aging", require: { action: "VIEW", module: "AP" } },
     ],
   },
   {

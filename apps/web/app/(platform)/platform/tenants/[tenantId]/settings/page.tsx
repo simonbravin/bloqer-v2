@@ -35,7 +35,7 @@ export default async function PlatformTenantSettingsPage({ params }: PageProps) 
   const trialStr = tenant.trialEndsAt ? tenant.trialEndsAt.toISOString().slice(0, 10) : "";
 
   return (
-    <PageShell variant="form" className="space-y-8">
+    <PageShell variant="default" className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Suscripción y estado</h1>
         <p className="text-sm text-muted-foreground">

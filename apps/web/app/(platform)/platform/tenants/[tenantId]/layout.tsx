@@ -2,8 +2,7 @@ import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@bloqer/auth";
 import { getPlatformTenantById, ServiceError } from "@bloqer/services";
-import { SectionSubnavLayout } from "@/components/layout/section-subnav-layout";
-import { PlatformTenantSubnav } from "@/features/platform";
+import { PlatformTenantNavBridge } from "@/features/platform/platform-nav-context";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
 
 interface LayoutProps {
@@ -17,16 +16,18 @@ export default async function PlatformTenantLayout({ children, params }: LayoutP
   const { tenantId } = await params;
   const ctx = await getPlatformServiceContext(session.user.id);
 
+  let tenant;
   try {
-    await getPlatformTenantById(tenantId, ctx);
+    tenant = await getPlatformTenantById(tenantId, ctx);
   } catch (e) {
     if (e instanceof ServiceError && (e.code === "NOT_FOUND" || e.code === "FORBIDDEN")) notFound();
     throw e;
   }
 
   return (
-    <SectionSubnavLayout subnav={<PlatformTenantSubnav tenantId={tenantId} />}>
+    <>
+      <PlatformTenantNavBridge tenantId={tenant.id} tenantName={tenant.name} />
       {children}
-    </SectionSubnavLayout>
+    </>
   );
 }
