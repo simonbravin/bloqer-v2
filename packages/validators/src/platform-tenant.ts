@@ -25,5 +25,19 @@ export const updatePlatformTenantPlanMetadataInputSchema = z.object({
   platformInternalNotes: z.union([z.null(), z.string().max(8000)]).optional(),
 });
 
+/** Extends `trialEndsAt` by N days from max(now, current trial end). */
+export const extendPlatformTenantTrialInputSchema = z.object({
+  tenantId: z.string().uuid(),
+  additionalDays: z.coerce.number().int().min(1).max(90),
+});
+
+export const listPlatformAuditLogFiltersSchema = z.object({
+  targetTenantId: z.string().uuid().optional(),
+  action: z.string().trim().min(1).max(128).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+});
+
 export type UpdatePlatformTenantStatusInput = z.infer<typeof updatePlatformTenantStatusInputSchema>;
 export type UpdatePlatformTenantPlanMetadataInput = z.infer<typeof updatePlatformTenantPlanMetadataInputSchema>;
+export type ExtendPlatformTenantTrialInput = z.infer<typeof extendPlatformTenantTrialInputSchema>;
+export type ListPlatformAuditLogFilters = z.infer<typeof listPlatformAuditLogFiltersSchema>;

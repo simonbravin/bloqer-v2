@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@bloqer/auth";
 import { getPlatformTenantById, ServiceError } from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,14 +17,12 @@ const SUB_STATUSES = ["NONE", "TRIAL", "ACTIVE", "PAST_DUE", "CANCELLED"] as con
 
 interface PageProps {
   params: Promise<{ tenantId: string }>;
-  searchParams: Promise<{ ok?: string; err?: string }>;
 }
 
-export default async function PlatformTenantSettingsPage({ params, searchParams }: PageProps) {
+export default async function PlatformTenantSettingsPage({ params }: PageProps) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const { tenantId } = await params;
-  const sp = await searchParams;
   const ctx = await getPlatformServiceContext(session.user.id);
   let tenant;
   try {
@@ -34,28 +32,19 @@ export default async function PlatformTenantSettingsPage({ params, searchParams 
     throw e;
   }
 
-  const trialStr = tenant.trialEndsAt
-    ? tenant.trialEndsAt.toISOString().slice(0, 10)
-    : "";
+  const trialStr = tenant.trialEndsAt ? tenant.trialEndsAt.toISOString().slice(0, 10) : "";
 
   return (
-    <div className="mx-auto max-w-xl space-y-8">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/platform/tenants/${tenantId}`}>← Tenant</Link>
-        </Button>
-      </div>
-      <h1 className="text-2xl font-bold tracking-tight">Ajustes SaaS</h1>
-      {sp.ok ? (
-        <p className="text-sm text-muted-foreground">Cambios guardados.</p>
-      ) : null}
-      {sp.err ? (
-        <p className="text-sm text-destructive" role="alert">
-          {decodeURIComponent(sp.err)}
+    <PageShell variant="form" className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Suscripción y estado</h1>
+        <p className="text-sm text-muted-foreground">
+          Metadatos SaaS internos para <span className="font-medium text-foreground">{tenant.name}</span>.
+          Sin integración de cobro externo en esta fase.
         </p>
-      ) : null}
+      </div>
 
-      <section className="space-y-3 rounded-lg border bg-card p-4">
+      <section className="space-y-3 rounded-xl border border-border/80 bg-card p-4 shadow-sm">
         <h2 className="text-sm font-semibold">Estado operativo</h2>
         <form action={updatePlatformTenantStatusAction} className="grid gap-3">
           <input type="hidden" name="tenantId" value={tenant.id} />
@@ -90,8 +79,8 @@ export default async function PlatformTenantSettingsPage({ params, searchParams 
         </form>
       </section>
 
-      <section className="space-y-3 rounded-lg border bg-card p-4">
-        <h2 className="text-sm font-semibold">Plan y suscripción (interno)</h2>
+      <section className="space-y-3 rounded-xl border border-border/80 bg-card p-4 shadow-sm">
+        <h2 className="text-sm font-semibold">Plan y trial</h2>
         <form action={updatePlatformTenantPlanMetadataAction} className="grid gap-3">
           <input type="hidden" name="tenantId" value={tenant.id} />
           <div className="grid gap-1">
@@ -149,10 +138,10 @@ export default async function PlatformTenantSettingsPage({ params, searchParams 
             </label>
           </div>
           <Button type="submit" size="sm">
-            Guardar metadata
+            Guardar suscripción
           </Button>
         </form>
       </section>
-    </div>
+    </PageShell>
   );
 }

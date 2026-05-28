@@ -1,5 +1,5 @@
-import Image from "next/image";
 import { Suspense } from "react";
+import { BloqerLogo } from "@/components/brand/bloqer-logo";
 import { LoginForm } from "@/features/auth/components/login-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -8,14 +8,7 @@ export default function LoginPage() {
     <Card className="w-full max-w-sm border-border/80 shadow-md">
       <CardHeader className="space-y-4 text-center sm:text-left">
         <div className="flex justify-center sm:justify-start">
-          <Image
-            src="/bloqer-logo.png"
-            alt="Bloqer"
-            width={180}
-            height={52}
-            priority
-            className="h-10 w-auto max-w-[11rem] object-contain object-left"
-          />
+          <BloqerLogo priority className="h-12 max-w-[12.5rem] sm:h-11" />
         </div>
         <div className="space-y-1">
           <CardTitle className="text-2xl font-bold">Iniciar sesión</CardTitle>

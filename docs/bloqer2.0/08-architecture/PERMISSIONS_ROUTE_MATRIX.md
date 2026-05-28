@@ -199,8 +199,12 @@ See [`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md).
 
 | Route | Session | Effective gate | Notes |
 |-------|---------|----------------|--------|
-| `/platform` and `/platform/**` | Required | `isPlatformSuperadmin` | Layout: no access → `redirect("/dashboard")`; login → `/login` |
-| Server Actions `platform-actions.ts` | Required | Same via `assertPlatformAccess` in services | Mutations append **`PlatformAuditLog`** (tenant status / plan metadata) |
+| `/platform` and `/platform/**` | Required | `isPlatformSuperadmin` | `PlatformShell` + `PageShell`; no access → `redirect("/dashboard")`; login → `/login` |
+| `/platform/registro` | Required | Same | `listPlatformAuditLog` — registro global superadmin (actor, acción, tenant, metadata) |
+| `/platform/vencimientos` | Required | Same | `listPlatformExpirationAttention` — trials, mora, sin OWNER; acciones `extendPlatformTenantTrial`, `updatePlatformTenantStatus` |
+| `/platform/tenants/new` | Required | Same | `provisionPlatformTenant` — tenant trial + company + invitación OWNER |
+| `/platform/tenants/[tenantId]/invitations/**` | Required | Same | `createPlatformTenantInvitation`, `cancelPlatformTenantInvitation`; aceptación pública `/invitaciones/aceptar` |
+| Server Actions `platform-actions.ts`, `platform-invitation-actions.ts`, `platform-provision-actions.ts` | Required | Same via `assertPlatformAccess` | Mutations append **`PlatformAuditLog`** |
 
 *App Router:* páginas bajo `apps/web/app/(platform)/platform/` — el segmento `(platform)` es route group (no URL); el prefijo URL `/platform` viene de la carpeta `platform/`.
 

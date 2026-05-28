@@ -1,6 +1,7 @@
 import type { SubscriptionStatus, TenantStatus } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import {
+  extendPlatformTenantTrialInputSchema,
   updatePlatformTenantPlanMetadataInputSchema,
   updatePlatformTenantStatusInputSchema,
 } from "@bloqer/validators";
@@ -45,6 +46,15 @@ function parsePlanMetadata(raw: unknown) {
 
 function parseStatusUpdate(raw: unknown) {
   const parsed = updatePlatformTenantStatusInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map((i) => i.message).join("; ") || "validación";
+    throw new ServiceError("VALIDATION", msg);
+  }
+  return parsed.data;
+}
+
+function parseExtendTrial(raw: unknown) {
+  const parsed = extendPlatformTenantTrialInputSchema.safeParse(raw);
   if (!parsed.success) {
     const msg = parsed.error.issues.map((i) => i.message).join("; ") || "validación";
     throw new ServiceError("VALIDATION", msg);
@@ -255,6 +265,48 @@ export async function updatePlatformTenantPlanMetadata(raw: unknown, ctx: Platfo
             billingCustomerId:
               data.billingCustomerId === undefined ? existing.billingCustomerId : data.billingCustomerId,
           },
+        },
+      },
+      tx,
+    );
+  });
+}
+
+export async function extendPlatformTenantTrial(raw: unknown, ctx: PlatformServiceContext): Promise<void> {
+  await assertPlatformAccess(ctx);
+  const input = parseExtendTrial(raw);
+  const existing = await prisma.tenant.findFirst({
+    where: { id: input.tenantId },
+    select: { id: true, trialEndsAt: true, subscriptionStatus: true },
+  });
+  if (!existing) {
+    throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
+  }
+
+  const now = new Date();
+  const base =
+    existing.trialEndsAt && existing.trialEndsAt.getTime() > now.getTime()
+      ? existing.trialEndsAt
+      : now;
+  const newTrialEndsAt = new Date(base.getTime() + input.additionalDays * 24 * 60 * 60 * 1000);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.tenant.update({
+      where: { id: input.tenantId },
+      data: {
+        trialEndsAt: newTrialEndsAt,
+        subscriptionStatus: existing.subscriptionStatus === "NONE" ? "TRIAL" : existing.subscriptionStatus,
+      },
+    });
+    await createPlatformAuditLog(
+      {
+        actorUserId: ctx.actorUserId,
+        action: "platform.tenant.trial_extended",
+        targetTenantId: input.tenantId,
+        metadata: {
+          additionalDays: input.additionalDays,
+          beforeTrialEndsAt: existing.trialEndsAt?.toISOString() ?? null,
+          afterTrialEndsAt: newTrialEndsAt.toISOString(),
         },
       },
       tx,

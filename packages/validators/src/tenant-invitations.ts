@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const userRoleEnum = z.enum([
+export const userRoleEnum = z.enum([
   "OWNER",
   "ADMIN",
   "FINANCE",

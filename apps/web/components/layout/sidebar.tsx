@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import { BloqerLogo } from "@/components/brand/bloqer-logo";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { CollapsibleNavSection } from "@/features/shell/components/collapsible-nav-section";
@@ -49,14 +49,7 @@ export function Sidebar({ roles, moduleGateSnapshot }: SidebarProps) {
           href="/dashboard"
           className="inline-block rounded-md outline-none ring-offset-sidebar focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <Image
-            src="/bloqer-logo.png"
-            alt="Bloqer"
-            width={140}
-            height={40}
-            priority
-            className="h-8 w-auto max-w-[9.5rem] object-contain object-left"
-          />
+          <BloqerLogo priority className="h-8 max-w-[9.5rem]" />
         </Link>
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3 pr-1">

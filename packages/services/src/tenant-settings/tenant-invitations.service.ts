@@ -1,9 +1,15 @@
-import { createHash, randomBytes } from "node:crypto";
 import { prisma } from "@bloqer/database";
 import type { MembershipStatus, TenantInvitationStatus, UserRole as PrismaUserRole } from "@bloqer/database";
 import type { UserRole } from "@bloqer/domain";
 import { getPublicAppBaseUrl, isEmailConfigured } from "@bloqer/config";
-import { escapeHtml, sendEmail } from "@bloqer/email";
+import {
+  dedupeInvitationRoles,
+  hashInvitationToken,
+  insertTenantInvitation,
+  markExpiredPendingInvitationsForTenant,
+  normalizeInvitationEmail,
+  sendTenantInvitationEmailMessage,
+} from "./tenant-invitation-shared";
 import {
   acceptTenantInvitationSchema,
   cancelTenantInvitationSchema,
@@ -12,51 +18,6 @@ import {
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditTeamMembership, canReadTenantConfigArea } from "./tenant-settings-guards";
-
-function hashToken(raw: string): string {
-  return createHash("sha256").update(raw, "utf8").digest("hex");
-}
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-function dedupeRoles(roles: UserRole[]): PrismaUserRole[] {
-  return [...new Set(roles)] as PrismaUserRole[];
-}
-
-function buildInvitationLink(rawToken: string): string {
-  const path = `/invitaciones/aceptar?token=${encodeURIComponent(rawToken)}`;
-  const base = getPublicAppBaseUrl()?.replace(/\/$/, "") ?? "";
-  return base ? `${base}${path}` : path;
-}
-
-/** Same rules as `notification-email.service` / `report-email.service` (header injection). */
-function sanitizeEmailSubject(s: string): string {
-  return s.replace(/[\r\n\u2028\u2029]+/g, " ").trim().slice(0, 998);
-}
-
-async function sendTenantInvitationEmail(
-  toEmail: string,
-  invitationLink: string,
-  tenantName: string,
-): Promise<boolean> {
-  if (!isEmailConfigured()) return false;
-  const safeTenant = escapeHtml(tenantName);
-  const html = `
-<p>Te invitaron a unirte al equipo en <strong>${safeTenant}</strong> en Bloqer.</p>
-<p><a href="${invitationLink}">Aceptar invitación</a></p>
-<p style="font-size:12px;color:#666">Si no esperabas este correo, podés ignorarlo.</p>
-`.trim();
-  const text = `Te invitaron a unirte a "${tenantName}" en Bloqer.\n\nAceptá acá: ${invitationLink}\n`;
-  const res = await sendEmail({
-    to:       toEmail,
-    subject:  sanitizeEmailSubject(`Invitación a Bloqer — ${tenantName}`),
-    html,
-    text,
-  });
-  return res.ok && res.provider === "resend";
-}
 
 export type AcceptTenantInvitationActorContext = {
   actorUserId: string;
@@ -112,18 +73,11 @@ function assertOwnerInvariantAfterInviteAccept(
   }
 }
 
-async function markExpiredPendingInvitations(tenantId: string): Promise<void> {
-  await prisma.tenantInvitation.updateMany({
-    where: { tenantId, status: "PENDING", expiresAt: { lte: new Date() } },
-    data:  { status: "EXPIRED" },
-  });
-}
-
 export async function listTenantInvitations(ctx: ServiceContext): Promise<TenantInvitationRow[]> {
   if (!canReadTenantConfigArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver invitaciones");
   }
-  await markExpiredPendingInvitations(ctx.tenantId);
+  await markExpiredPendingInvitationsForTenant(ctx.tenantId);
   const rows = await prisma.tenantInvitation.findMany({
     where: { tenantId: ctx.tenantId },
     orderBy: { createdAt: "desc" },
@@ -157,7 +111,7 @@ export async function getTenantInvitationById(
   if (!canReadTenantConfigArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver invitaciones");
   }
-  await markExpiredPendingInvitations(ctx.tenantId);
+  await markExpiredPendingInvitationsForTenant(ctx.tenantId);
   const inv = await prisma.tenantInvitation.findFirst({
     where: { id: invitationId, tenantId: ctx.tenantId },
     select: {
@@ -201,13 +155,13 @@ export async function peekTenantInvitationForAcceptPage(token: string): Promise<
   const parsed = acceptTenantInvitationSchema.safeParse({ token });
   if (!parsed.success) return null;
   const inv = await prisma.tenantInvitation.findFirst({
-    where: { tokenHash: hashToken(parsed.data.token), status: "PENDING" },
+    where: { tokenHash: hashInvitationToken(parsed.data.token), status: "PENDING" },
     select: { expiresAt: true, email: true, tenant: { select: { name: true } } },
   });
   if (!inv) return null;
   if (inv.expiresAt <= new Date()) {
     await prisma.tenantInvitation.updateMany({
-      where: { tokenHash: hashToken(parsed.data.token), status: "PENDING" },
+      where: { tokenHash: hashInvitationToken(parsed.data.token), status: "PENDING" },
       data:  { status: "EXPIRED" },
     });
     return null;
@@ -227,8 +181,8 @@ export async function createTenantInvitation(
     const msg = parsed.error.issues.map((i) => i.message).join("; ") || "Validación";
     throw new ServiceError("VALIDATION", msg);
   }
-  const emailNorm = normalizeEmail(parsed.data.email);
-  const uniqueRoles = dedupeRoles(parsed.data.roles as UserRole[]);
+  const emailNorm = normalizeInvitationEmail(parsed.data.email);
+  const uniqueRoles = dedupeInvitationRoles(parsed.data.roles as UserRole[]);
   let companyId: string | null = parsed.data.companyId ?? null;
   if (companyId === "" || companyId === null) companyId = null;
   if (companyId) {
@@ -239,7 +193,7 @@ export async function createTenantInvitation(
     if (!co) throw new ServiceError("NOT_FOUND", "Empresa no encontrada en el tenant");
   }
 
-  await markExpiredPendingInvitations(ctx.tenantId);
+  await markExpiredPendingInvitationsForTenant(ctx.tenantId);
 
   const userWithEmail = await prisma.user.findFirst({
     where: { email: { equals: emailNorm, mode: "insensitive" } },
@@ -272,24 +226,13 @@ export async function createTenantInvitation(
   });
   if (!tenant) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
 
-  const rawToken = randomBytes(32).toString("hex");
-  const tokenHash = hashToken(rawToken);
-  const now = new Date();
-  const expiresAt = new Date(now);
-  expiresAt.setUTCDate(expiresAt.getUTCDate() + parsed.data.expiresInDays);
-
-  const created = await prisma.tenantInvitation.create({
-    data: {
-      tenantId:        ctx.tenantId,
-      companyId,
-      email:           emailNorm,
-      roles:           uniqueRoles,
-      status:          "PENDING",
-      tokenHash,
-      expiresAt,
-      invitedByUserId: ctx.actorUserId,
-    },
-    select: { id: true },
+  const inserted = await insertTenantInvitation(prisma, {
+    tenantId: ctx.tenantId,
+    invitedByUserId: ctx.actorUserId,
+    emailNorm,
+    roles: uniqueRoles,
+    companyId,
+    expiresInDays: parsed.data.expiresInDays,
   });
 
   await log({
@@ -297,21 +240,29 @@ export async function createTenantInvitation(
     actorUserId: ctx.actorUserId,
     action:      "TENANT_INVITATION_CREATED",
     entityType:  "TenantInvitation",
-    entityId:    created.id,
-    after:       { email: emailNorm, roles: uniqueRoles, expiresAt: expiresAt.toISOString(), companyId },
+    entityId:    inserted.invitationId,
+    after:       {
+      email: emailNorm,
+      roles: uniqueRoles,
+      expiresAt: inserted.expiresAt.toISOString(),
+      companyId,
+    },
     ipAddress:   ctx.ipAddress,
   });
 
-  const invitationLink = buildInvitationLink(rawToken);
   let emailDispatched = false;
   if (isEmailConfigured() && getPublicAppBaseUrl()) {
-    emailDispatched = await sendTenantInvitationEmail(emailNorm, invitationLink, tenant.name);
+    emailDispatched = await sendTenantInvitationEmailMessage(
+      emailNorm,
+      inserted.invitationLink,
+      tenant.name,
+    );
   }
 
   return {
-    invitationId:    created.id,
-    expiresAt,
-    invitationLink,
+    invitationId: inserted.invitationId,
+    expiresAt: inserted.expiresAt,
+    invitationLink: inserted.invitationLink,
     emailDispatched,
   };
 }
@@ -326,7 +277,7 @@ export async function cancelTenantInvitation(invitationId: string, ctx: ServiceC
     throw new ServiceError("VALIDATION", msg);
   }
 
-  await markExpiredPendingInvitations(ctx.tenantId);
+  await markExpiredPendingInvitationsForTenant(ctx.tenantId);
 
   const inv = await prisma.tenantInvitation.findFirst({
     where: { id: parsed.data.invitationId, tenantId: ctx.tenantId },
@@ -371,10 +322,10 @@ export async function acceptTenantInvitation(
   });
   if (!actorUser) throw new ServiceError("NOT_FOUND", "Usuario no encontrado");
 
-  const actorEmailNorm = normalizeEmail(actorUser.email);
+  const actorEmailNorm = normalizeInvitationEmail(actorUser.email);
 
   return prisma.$transaction(async (tx) => {
-    const th = hashToken(parsed.data.token);
+    const th = hashInvitationToken(parsed.data.token);
     const inv = await tx.tenantInvitation.findFirst({
       where: { tokenHash: th },
       select: {
@@ -401,7 +352,7 @@ export async function acceptTenantInvitation(
       throw new ServiceError("CONFLICT", "La invitación expiró");
     }
 
-    if (normalizeEmail(inv.email) !== actorEmailNorm) {
+    if (normalizeInvitationEmail(inv.email) !== actorEmailNorm) {
       throw new ServiceError(
         "FORBIDDEN",
         "Tenés que iniciar sesión con la cuenta invitada (el email no coincide con la invitación)",
@@ -423,7 +374,7 @@ export async function acceptTenantInvitation(
     });
     assertOwnerInvariantAfterInviteAccept(activeRows, existing, inv.roles);
 
-    const invitedRoles = dedupeRoles(inv.roles as UserRole[]);
+    const invitedRoles = dedupeInvitationRoles(inv.roles as UserRole[]);
     const now = new Date();
 
     if (existing) {

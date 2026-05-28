@@ -19,4 +19,6 @@ export * from "./accounting";
 export * from "./accounting-mapping";
 export * from "./schedule";
 export * from "./onboarding";
+export * from "./platform-tenant-invitation";
+export * from "./platform-tenant-provision";
 export * from "./user-profile";

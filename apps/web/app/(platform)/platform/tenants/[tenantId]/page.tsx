@@ -1,11 +1,18 @@
-import { formatDate, formatDateTime } from "@/lib/format";
 import Link from "next/link";
+import { formatDate, formatDateTime } from "@/lib/format";
+import { platformAuditActionLabel } from "@/features/platform/platform-audit-labels";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@bloqer/auth";
-import { getPlatformTenantById, ServiceError } from "@bloqer/services";
+import {
+  getPlatformTenantById,
+  listPlatformAuditLogForTenant,
+  listPlatformTenantUsers,
+  ServiceError,
+} from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
 import { Button } from "@/components/ui/button";
-
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 interface PageProps {
   params: Promise<{ tenantId: string }>;
 }
@@ -16,55 +23,58 @@ export default async function PlatformTenantDetailPage({ params }: PageProps) {
   const { tenantId } = await params;
   const ctx = await getPlatformServiceContext(session.user.id);
   let tenant;
+  let users;
+  let auditRows;
   try {
-    tenant = await getPlatformTenantById(tenantId, ctx);
+    [tenant, users, auditRows] = await Promise.all([
+      getPlatformTenantById(tenantId, ctx),
+      listPlatformTenantUsers(tenantId, ctx),
+      listPlatformAuditLogForTenant(tenantId, ctx, { limit: 15 }),
+    ]);
   } catch (e) {
     if (e instanceof ServiceError && (e.code === "NOT_FOUND" || e.code === "FORBIDDEN")) notFound();
     throw e;
   }
 
+  const hasOwner = users.some(
+    (u) => u.membershipStatus === "ACTIVE" && u.roles.includes("OWNER"),
+  );
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/platform/tenants">← Tenants</Link>
-        </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/platform/tenants/${tenant.id}/modules`}>Módulos</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/platform/tenants/${tenant.id}/users`}>Usuarios</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/platform/tenants/${tenant.id}/settings`}>Ajustes SaaS</Link>
+    <PageShell variant="default" className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{tenant.name}</h1>
+          <p className="font-mono text-sm text-muted-foreground">{tenant.slug}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {!hasOwner ? (
+            <Button asChild size="sm">
+              <Link href={`/platform/tenants/${tenant.id}/invitations/new`}>Invitar OWNER</Link>
+            </Button>
+          ) : null}
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/platform/tenants/${tenant.id}/invitations/new`}>Invitar usuario</Link>
           </Button>
         </div>
       </div>
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{tenant.name}</h1>
-        <p className="text-sm text-muted-foreground font-mono">{tenant.slug}</p>
-      </div>
-      <dl className="grid gap-2 text-sm sm:grid-cols-2">
+
+      <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-muted-foreground">Estado operativo</dt>
-          <dd>{tenant.status}</dd>
+          <dd className="font-medium">{tenant.status}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Suscripción (interno)</dt>
-          <dd>{tenant.subscriptionStatus}</dd>
+          <dd className="font-medium">{tenant.subscriptionStatus}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Plan</dt>
-          <dd>{tenant.saasPlan}</dd>
+          <dd className="font-medium">{tenant.saasPlan}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Trial hasta</dt>
-          <dd>{tenant.trialEndsAt ? formatDate(tenant.trialEndsAt) : "—"}</dd>
-        </div>
-        <div className="sm:col-span-2">
-          <dt className="text-muted-foreground">Billing customer id (placeholder)</dt>
-          <dd className="break-all">{tenant.billingCustomerId ?? "—"}</dd>
+          <dd className="font-medium">{tenant.trialEndsAt ? formatDate(tenant.trialEndsAt) : "—"}</dd>
         </div>
         {tenant.suspendedReason ? (
           <div className="sm:col-span-2">
@@ -73,6 +83,31 @@ export default async function PlatformTenantDetailPage({ params }: PageProps) {
           </div>
         ) : null}
       </dl>
-    </div>
+
+      {auditRows.length > 0 ? (
+        <Card className="rounded-xl border bg-card shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border/60 pb-4">
+            <CardTitle className="text-base">Actividad reciente (plataforma)</CardTitle>
+            <Button variant="link" className="h-auto p-0 text-sm" asChild>
+              <Link href={`/platform/registro?tenantId=${tenant.id}`}>Ver registro completo</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-2 pt-4 text-sm">
+            {auditRows.map((row) => (
+              <div key={row.id} className="flex flex-wrap justify-between gap-2 border-b border-border/40 py-2 last:border-0">
+                <div>
+                  <p className="font-medium">{platformAuditActionLabel(row.action)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {row.actorEmail}
+                    {row.actorName ? ` (${row.actorName})` : ""}
+                  </p>
+                </div>
+                <span className="text-muted-foreground">{formatDateTime(row.createdAt)}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+    </PageShell>
   );
 }

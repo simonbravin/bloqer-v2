@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@bloqer/auth";
 import {
+  extendPlatformTenantTrial,
   ServiceError,
   updatePlatformTenantPlanMetadata,
   updatePlatformTenantStatus,
@@ -21,22 +22,37 @@ export async function updatePlatformTenantStatusAction(formData: FormData) {
   const ctx = await platformCtxOrRedirect();
   const tenantId = String(formData.get("tenantId") ?? "");
   const status = String(formData.get("status") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "").trim();
   const suspendedReasonRaw = formData.get("suspendedReason");
   const suspendedReason =
     suspendedReasonRaw === null || suspendedReasonRaw === ""
       ? null
       : String(suspendedReasonRaw).slice(0, 512);
+  const errRedirect =
+    returnTo.startsWith("/platform")
+      ? `${returnTo}?err=${encodeURIComponent("Error al guardar")}`
+      : `/platform/tenants/${tenantId}/settings?err=${encodeURIComponent("Error al guardar")}`;
   try {
     await updatePlatformTenantStatus({ tenantId, status, suspendedReason }, ctx);
   } catch (e) {
     if (e instanceof ServiceError) {
-      redirect(`/platform/tenants/${tenantId}/settings?err=${encodeURIComponent(e.message)}`);
+      const msg = e.message;
+      if (returnTo.startsWith("/platform")) {
+        redirect(`${returnTo}?err=${encodeURIComponent(msg)}`);
+      }
+      redirect(`/platform/tenants/${tenantId}/settings?err=${encodeURIComponent(msg)}`);
     }
-    redirect(`/platform/tenants/${tenantId}/settings?err=${encodeURIComponent("Error al guardar")}`);
+    redirect(errRedirect);
   }
+  revalidatePath("/platform");
   revalidatePath("/platform/tenants");
+  revalidatePath("/platform/vencimientos");
+  revalidatePath("/platform/registro");
   revalidatePath(`/platform/tenants/${tenantId}`);
   revalidatePath(`/platform/tenants/${tenantId}/settings`);
+  if (returnTo.startsWith("/platform")) {
+    redirect(`${returnTo}?ok=status`);
+  }
   redirect(`/platform/tenants/${tenantId}/settings?ok=1`);
 }
 
@@ -82,9 +98,37 @@ export async function updatePlatformTenantPlanMetadataAction(formData: FormData)
     redirect(`/platform/tenants/${tenantId}/settings?err=${encodeURIComponent("Error al guardar")}`);
   }
   revalidatePath("/platform/tenants");
+  revalidatePath("/platform/vencimientos");
+  revalidatePath("/platform/registro");
   revalidatePath(`/platform/tenants/${tenantId}`);
   revalidatePath(`/platform/tenants/${tenantId}/settings`);
   redirect(`/platform/tenants/${tenantId}/settings?ok=1`);
+}
+
+export async function extendPlatformTenantTrialAction(formData: FormData) {
+  const ctx = await platformCtxOrRedirect();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const additionalDays = Number(formData.get("additionalDays") ?? 7);
+  const returnTo = String(formData.get("returnTo") ?? "").trim();
+  try {
+    await extendPlatformTenantTrial({ tenantId, additionalDays }, ctx);
+  } catch (e) {
+    const msg = e instanceof ServiceError ? e.message : "Error al extender trial";
+    if (returnTo.startsWith("/platform")) {
+      redirect(`${returnTo}?err=${encodeURIComponent(msg)}`);
+    }
+    redirect(`/platform/tenants/${tenantId}/settings?err=${encodeURIComponent(msg)}`);
+  }
+  revalidatePath("/platform");
+  revalidatePath("/platform/tenants");
+  revalidatePath("/platform/vencimientos");
+  revalidatePath("/platform/registro");
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  revalidatePath(`/platform/tenants/${tenantId}/settings`);
+  if (returnTo.startsWith("/platform")) {
+    redirect(`${returnTo}?ok=trial`);
+  }
+  redirect(`/platform/tenants/${tenantId}/settings?ok=trial`);
 }
 
 export async function updatePlatformTenantModuleAction(formData: FormData) {
@@ -110,6 +154,7 @@ export async function updatePlatformTenantModuleAction(formData: FormData) {
     }
     redirect(`/platform/tenants/${tenantId}/modules?err=${encodeURIComponent("Error al guardar")}`);
   }
+  revalidatePath("/platform/registro");
   revalidatePath(`/platform/tenants/${tenantId}/modules`);
   revalidatePath(`/platform/tenants/${tenantId}`);
   redirect(`/platform/tenants/${tenantId}/modules?ok=1`);

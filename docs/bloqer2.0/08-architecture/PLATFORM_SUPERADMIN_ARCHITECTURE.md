@@ -1,8 +1,8 @@
-# Platform superadmin — Phase 10A
+# Platform superadmin — Phase 10A+ (provisioning & invitations)
 
 ## Purpose
 
-Cross-tenant **platform** operations (list tenants, adjust SaaS metadata, suspend) are separate from **tenant RBAC** (`OWNER`, `ADMIN`, module permissions). No tenant role grants platform access.
+Cross-tenant **platform** operations (list tenants, provision organizations, invite users, adjust SaaS metadata, suspend, module toggles) are separate from **tenant RBAC** (`OWNER`, `ADMIN`, module permissions). No tenant role grants platform access.
 
 ## Access model (OR, never AND)
 
@@ -21,17 +21,25 @@ Implementation: `isPlatformSuperadmin` / `assertPlatformAccess` in `packages/ser
 - **`PlatformAuditLog`**: append-only (`id`, `actorUserId`, `action`, `targetTenantId` nullable, `metadata` JSON nullable, `createdAt`). No hard delete in product code.
 - **`Tenant`** SaaS fields (internal billing posture, not a payment provider): `saasPlan` (default `"trial"`), `subscriptionStatus` (`SubscriptionStatus` enum), `trialEndsAt`, `billingCustomerId` (placeholder string), `suspendedReason`, `platformInternalNotes`.
 - **`TenantModuleSetting`** (Phase **12B**): por tenant, `moduleKey` (string validado contra `PermissionModule`), `isEnabled`, `internalNotes`; único `(tenantId, moduleKey)`. Sin fila ⇒ módulo tratado como habilitado en lectura. Solo mutaciones desde **`updateTenantModuleSetting`** con contexto de plataforma (`assertPlatformAccess`).
+- **`TenantInvitation`**: misma tabla que invitaciones de equipo tenant; la plataforma crea filas con `invitedByUserId` = superadmin (aceptación en `/invitaciones/aceptar` sin cambios).
 
 ## Audit
 
-Mutations in `platform-tenant.service.ts` write `PlatformAuditLog` inside the same transaction as the tenant update:
+`PlatformAuditLog` actions in product code:
 
-- `platform.tenant.status_updated` — before/after operational `status`.
-- `platform.tenant.plan_metadata_updated` — before/after plan / subscription fields.
+| Action | Source |
+|--------|--------|
+| `platform.tenant.status_updated` | `updatePlatformTenantStatus` |
+| `platform.tenant.plan_metadata_updated` | `updatePlatformTenantPlanMetadata` |
+| `platform.tenant.module_updated` | `updateTenantModuleSetting` |
+| `platform.tenant.provisioned` | `provisionPlatformTenant` |
+| `platform.tenant.invitation_created` | `createPlatformTenantInvitation`, `provisionPlatformTenant` |
+| `platform.tenant.invitation_cancelled` | `cancelPlatformTenantInvitation` |
+| `platform.tenant.trial_extended` | `extendPlatformTenantTrial` |
 
-`platform-tenant-module.service.ts` writes **`platform.tenant.module_updated`** when a superadmin changes `TenantModuleSetting`.
+Lectura: `listPlatformAuditLog` (registro global con actor y tenant), `listPlatformAuditLogForTenant` (resumen en detalle del tenant).
 
-Metadata is passed through `sanitizePlatformAuditMetadata` in `platform-audit.service.ts` (shallow keys, bounded strings, no obvious secret key names).
+Metadata: `sanitizePlatformAuditMetadata` en `platform-audit.service.ts`.
 
 ## Services (`packages/services/src/platform/`)
 
@@ -39,37 +47,54 @@ Metadata is passed through `sanitizePlatformAuditMetadata` in `platform-audit.se
 |--------|------------------|
 | `platform-auth.service.ts` | `isPlatformSuperadmin`, `assertPlatformAccess`, `PlatformServiceContext` |
 | `platform-audit.service.ts` | `createPlatformAuditLog`, `sanitizePlatformAuditMetadata` |
-| `platform-tenant.service.ts` | Dashboard summary, list/get tenant, `updatePlatformTenantStatus`, `updatePlatformTenantPlanMetadata` |
-| `platform-user.service.ts` | `listPlatformTenantUsers` (memberships for a tenant; `tenantId` validated by DB lookup) |
-| `platform-tenant-module.service.ts` | `listPlatformTenantModuleRows`, `updateTenantModuleSetting` (audit `platform.tenant.module_updated`) |
+| `platform-audit-read.service.ts` | `listPlatformAuditLog`, `listPlatformAuditLogForTenant` |
+| `platform-tenant.service.ts` | Dashboard summary, list/get tenant, status + plan metadata, `extendPlatformTenantTrial` |
+| `platform-operations.service.ts` | `listPlatformTenantsEnriched`, `listPlatformExpirationAttention`, `getPlatformDashboardSummaryExtended` |
+| `platform-user.service.ts` | `listPlatformTenantUsers` |
+| `platform-tenant-module.service.ts` | Module rows + `updateTenantModuleSetting` |
+| `platform-tenant-invitations.service.ts` | List/get/create/cancel invitations; `listPlatformTenantCompanies` |
+| `platform-tenant-provision.service.ts` | `provisionPlatformTenant` — tenant + company + modules + invitación OWNER (sin membresía para el superadmin) |
 
-All use Prisma only inside services. **`tenantId`** for mutations comes from validated Zod input (including path-aligned `tenantId` in server actions), not from a separate client-controlled tenant header.
+Shared helpers: `packages/services/src/onboarding/trial-tenant-bundle.ts`, `packages/services/src/tenant-settings/tenant-invitation-shared.ts`.
+
+Self-service primer tenant sigue en `completeTrialOnboarding` (`/onboarding`) — crea membresía OWNER para el actor.
 
 ## UI (`apps/web/app/(platform)/`)
 
-Dedicated layout (no tenant app sidebar). **URLs públicas** (todo bajo `/platform`):
+Shell: `PlatformShell` + `PageShell` + `ModuleSubnav` (misma estética que app tenant; sin sidebar de producto).
 
-- `/platform` — resumen (`platform/page.tsx`)
-- `/platform/tenants` — lista
-- `/platform/tenants/[tenantId]` — detalle
-- `/platform/tenants/[tenantId]/modules` — toggles de módulo (Phase **12B**)
-- `/platform/tenants/[tenantId]/settings` — metadata SaaS / estado operativo
-- `/platform/tenants/[tenantId]/users` — membresías (vista plataforma)
+**URLs** (prefijo `/platform` desde carpeta `app/(platform)/platform/`):
 
-El segmento `(platform)` es solo **route group** (no aparece en la URL); el segmento de URL `platform` viene de la carpeta `app/(platform)/platform/`.
+| Route | Purpose |
+|-------|---------|
+| `/platform` | Resumen (KPIs trials, mora, sin OWNER) |
+| `/platform/vencimientos` | Bandeja trials/mora/suspensión/sin OWNER |
+| `/platform/registro` | Registro global `PlatformAuditLog` (actor, acción, tenant, metadata) |
+| `/platform/tenants` | Lista enriquecida + alertas + acciones rápidas |
+| `/platform/tenants/new` | Provisionar organización + invitar OWNER |
+| `/platform/tenants/[tenantId]` | Resumen + actividad plataforma |
+| `/platform/tenants/[tenantId]/users` | Membresías |
+| `/platform/tenants/[tenantId]/invitations` | Invitaciones |
+| `/platform/tenants/[tenantId]/invitations/new` | Nueva invitación |
+| `/platform/tenants/[tenantId]/invitations/[invitationId]` | Detalle + link flash |
+| `/platform/tenants/[tenantId]/modules` | Toggles módulo |
+| `/platform/tenants/[tenantId]/settings` | Suscripción y estado operativo |
 
-- Layout and pages: unauthenticated → `/login`; not superadmin → **`redirect("/dashboard")`** (consistent with product shell).
-- Unknown tenant / forbidden from service → **`notFound()`** on entity pages.
-- Avatar menu in main app: **“Plataforma”** link only when `isPlatformSuperadmin` (SSR in `(app)/layout.tsx`).
+Subnav por tenant: Resumen · Usuarios · Invitaciones · Módulos · Suscripción (`PlatformTenantSubnav`).
+
+- Unauthenticated → `/login`; not superadmin → `redirect("/dashboard")`.
+- Server Actions: `platform-actions.ts`, `platform-invitation-actions.ts`, `platform-provision-actions.ts`.
+- Enlace “Plataforma” en header de app cuando `isPlatformSuperadmin`.
 
 ## Security checklist
 
-- No Stripe or other subscription provider integration in 10A.
-- **Database:** Phase 10A does not rely on `db:push`; apply a normal Prisma/Neon migration in your environment when promoting schema changes.
-- No `tenantId` from query string for platform APIs; path param flows into services as `tenantId` string validated against DB.
-- Server Actions re-check session and use `getPlatformServiceContext`; services call `assertPlatformAccess`.
+- No Stripe in platform console.
+- `tenantId` validado en servicios (UUID + existencia en DB).
+- Invitaciones plataforma: mismo token/hash que flujo tenant; **no** bypass de email en aceptación.
+- Superadmin **no** recibe membresía automática al provisionar un tenant ajeno.
 
 ## Related
 
 - [`PERMISSIONS_ROUTE_MATRIX.md`](./PERMISSIONS_ROUTE_MATRIX.md) — platform routes table.
-- [`SECURITY_ARCHITECTURE.md`](./SECURITY_ARCHITECTURE.md) — defense in depth; platform is an additional admin surface.
+- [`SECURITY_ARCHITECTURE.md`](./SECURITY_ARCHITECTURE.md) — platform vs tenant RBAC.
+- [`SAAS_ONBOARDING_ARCHITECTURE.md`](./SAAS_ONBOARDING_ARCHITECTURE.md) — self-service `/onboarding`.
