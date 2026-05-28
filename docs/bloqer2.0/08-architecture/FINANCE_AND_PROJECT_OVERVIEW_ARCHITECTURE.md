@@ -443,7 +443,7 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 
 | Label aspiracional | Ruta | Notas |
 |--------------------|------|--------|
-| Cronograma | **`/proyectos/[id]/cronograma`** | Sin página. |
+| _Cronograma_ | _movido a nav Planificación (2026-05-27)_ | Implementado: `getProjectScheduleWorkspace`, RBAC `VIEW SCHEDULE`, módulo tenant `SCHEDULE`. |
 | Reportes (proyecto) | **`/proyectos/[id]/reportes`** | Sin página; hoy reportes clave = **Flujo de caja** y **Control de costos** con rutas propias. |
 | WBS dedicado | ruta propia | Hoy WBS vive en **Presupuesto** y **Control de costos**; no se duplica link con la misma URL que presupuesto. |
 

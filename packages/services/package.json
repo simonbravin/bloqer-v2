@@ -10,7 +10,8 @@
     "./project-workspace-nav": "./src/project/project-workspace-nav.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/schedule/schedule-helpers.test.ts"
   },
   "dependencies": {
     "@bloqer/config": "workspace:*",
@@ -23,6 +24,7 @@
     "react": "^19"
   },
   "devDependencies": {
+    "tsx": "^4.19.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19",
     "typescript": "^5.5.0"

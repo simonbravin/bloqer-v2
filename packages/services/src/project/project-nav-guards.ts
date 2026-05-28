@@ -13,6 +13,11 @@ export function canViewProjectCostControlReport(roles: UserRole[]): boolean {
   return can(roles, "VIEW", "PROJECTS") || can(roles, "VIEW", "BUDGETS");
 }
 
+/** Project-scoped schedule / cronograma: VIEW SCHEDULE or VIEW PROJECTS. */
+export function canViewProjectScheduleArea(roles: UserRole[]): boolean {
+  return can(roles, "VIEW", "SCHEDULE") || can(roles, "VIEW", "PROJECTS");
+}
+
 /** Project-scoped cash flow report (Phase 7D): not tenant-wide treasury; allows finance roles without VIEW PROJECTS. */
 export function canViewProjectCashFlowReport(roles: UserRole[]): boolean {
   return (

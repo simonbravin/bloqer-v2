@@ -216,7 +216,7 @@
 - **Fecha:** 2026-05-07
 - **Estado:** ACTIVA
 - **Contexto:** la dimensión temporal es clave en construcción; no puede ser un agregado.
-- **Decisión:** el módulo de **cronograma** es parte del núcleo desde Fase 1. Vinculado al proyecto y al WBS. Forma exacta (Gantt, hitos, ambos) a confirmar.
+- **Decisión:** el módulo de **cronograma** es parte del núcleo desde Fase 1. Vinculado al proyecto y al WBS. Forma exacta cerrada en [D-038] (híbrido) y [D-039] (vínculo N:M opcional).
 - **Implicancias:** los proyectos tienen plan temporal. Las tareas/hitos pueden vincularse a ítems del WBS y a certificaciones.
 - **Documentos afectados:** [`02-modules/PROJECT_SCHEDULING.md`](../02-modules/PROJECT_SCHEDULING.md).
 
@@ -470,6 +470,30 @@
 - **Decisión:** para **ingresos de estructura / sin obra** en Phase 1 se usa **solo** el camino **documentado** de **`JournalEntry`** (y líneas) con `projectId` null donde aplique, más movimientos de **tesorería** (`AccountMovement` / cobros manuales no ligados a `Receivable` de obra) según política interna del tenant — alineado a opción **(2)** de Q-030 y a libro único [D-035]. **No** se migra `projectId` a nullable en cadena AR en este corte. Las opciones **(1)** nullable AR y **(3)** nuevo documento quedan para decisión posterior explícita.
 - **Implicancias:** Finanzas empresa y contabilidad reflejan ingresos corporativos sin crear `SalesInvoice` ficticia ni segundo ledger; riesgo operativo = disciplina de uso (documentar en módulo ventas/finanzas).
 - **Documentos afectados:** [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) (Q-030), [`Q030_CORPORATE_INCOME_CHECKLIST.md`](../08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md), [`SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](../08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) §16A.4 (nota de cierre), [`ARCHITECTURE_DECISION_RECORDS.md`](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md) (ADR-Phase1-07).
+
+---
+
+### D-038 — Cronograma híbrido (Gantt + hitos)
+
+- **Fecha:** 2026-05-27
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (cierre Q-003)
+- **Contexto:** empresas chicas operan con hitos; obras grandes requieren tareas, dependencias y barras Gantt ([Q-003](./OPEN_QUESTIONS.md)).
+- **Decisión:** modelo **híbrido**: `Schedule.type` por defecto `HYBRID`; `ScheduleItem.type` = `TASK` | `MILESTONE`; vistas Gantt, calendario, kanban y tabla sobre el mismo dato.
+- **Implicancias:** UI multip vista; dependencias FS en v1; calendario laboral en Fase 2.
+- **Documentos afectados:** [`02-modules/PROJECT_SCHEDULING.md`](../02-modules/PROJECT_SCHEDULING.md), [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) (Q-003), [`ARCHITECTURE_DECISION_RECORDS.md`](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md) (ADR-007).
+
+---
+
+### D-039 — Cronograma y WBS: entidades separadas, vínculo N:M opcional
+
+- **Fecha:** 2026-05-27
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (cierre Q-004)
+- **Contexto:** el tiempo de obra y el costo presupuestado no son 1:1 (tareas sin ítem, ítems sin duración clara); alineado a práctica Procore / cost codes vs schedule activities ([Q-004](./OPEN_QUESTIONS.md)).
+- **Decisión:** cronograma **independiente** del WBS; tabla puente `ScheduleItemWbsLink` (N:M) con un enlace `isPrimary` por par; importación **explícita** desde presupuesto `APPROVED`/`CLOSED` (no auto-expandir todo el árbol). El WBS no se edita desde cronograma.
+- **Implicancias:** métricas económicas por ítem de cronograma vía WBS enlazado; línea base de presupuesto igual que control de costos.
+- **Documentos afectados:** [`02-modules/PROJECT_SCHEDULING.md`](../02-modules/PROJECT_SCHEDULING.md), [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) (Q-004), [`01-domain/CORE_ENTITIES.md`](../01-domain/CORE_ENTITIES.md).
 
 ---
 

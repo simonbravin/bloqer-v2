@@ -66,4 +66,4 @@ PM edita su obra; FOREMAN puede actualizar avance de tareas si se habilita.
 **Fase 1** núcleo; funciones avanzadas (crítico path, calendario laboral) **Fase 2**.
 
 ## 19. Preguntas abiertas
-- Gantt vs hitos vs híbrido ([Q-003]); vínculo WBS ([Q-004]).
+- _No aplica_ — Q-003 y Q-004 cerradas en [D-038](../00-product/DECISION_LOG.md) y [D-039](../00-product/DECISION_LOG.md).

@@ -15,6 +15,7 @@ import {
   getProjectCashFlowReport,
 } from "../project-cash-flow/project-cash-flow.service";
 import { canViewProjectCostControlReport } from "../cost-control/cost-control.service";
+import { computeProjectScheduleProgressPct } from "../schedule/schedule-workspace.service";
 import { canViewArProjectArea } from "../ar/ar-access";
 import { canViewApProjectArea } from "../ap/ap-access";
 import { canViewProcurementProjectArea } from "../procurement/procurement-access";
@@ -252,6 +253,27 @@ export async function getProjectOverviewDashboard(
     }
   }
 
+  if (gate.isEnabled("SCHEDULE") && can(ctx.roles, "VIEW", "SCHEDULE")) {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const delayedCount = await prisma.scheduleItem.count({
+      where: {
+        tenantId: ctx.tenantId,
+        schedule: { projectId },
+        status: { notIn: ["COMPLETED", "CANCELLED"] },
+        endDate: { lt: today },
+      },
+    });
+    if (delayedCount > 0) {
+      alerts.push({
+        label: "Tareas de cronograma atrasadas",
+        description: `${delayedCount} ítem${delayedCount === 1 ? "" : "s"} con fecha de fin vencida.`,
+        severity: "warning",
+        href: `${base}/cronograma?delayedOnly=1`,
+      });
+    }
+  }
+
   let payables: ProjectOverviewPayablesKpi | null = null;
   if (!gate.isEnabled("AP")) {
     sectionsExcluded.push({ module: "AP", section: "payables", reason: "TENANT_MODULE_DISABLED" });
@@ -444,7 +466,20 @@ export async function getProjectOverviewDashboard(
     stockMovementsCount,
   };
 
-  const scheduleProgress = computeScheduleProgress(startDate, estimatedEndDate);
+  let scheduleProgress = computeScheduleProgress(startDate, estimatedEndDate);
+  if (gate.isEnabled("SCHEDULE")) {
+    try {
+      const pct = await computeProjectScheduleProgressPct(projectId, ctx);
+      if (pct != null) {
+        scheduleProgress = {
+          percent: Math.round(Number(pct)),
+          note: "Avance ponderado de tareas del cronograma (distinto del certificado).",
+        };
+      }
+    } catch {
+      // fallback: tiempo transcurrido del proyecto
+    }
+  }
 
   const compactKpis: DashboardKpi[] = [];
 
@@ -454,6 +489,7 @@ export async function getProjectOverviewDashboard(
       label: "Avance de cronograma",
       value: `${scheduleProgress.percent}%`,
       tone:  scheduleProgress.percent >= 100 ? "warning" : "default",
+      href:  gate.isEnabled("SCHEDULE") ? `${base}/cronograma` : undefined,
     });
   } else {
     compactKpis.push({
@@ -461,6 +497,7 @@ export async function getProjectOverviewDashboard(
       label: "Avance de cronograma",
       value: "—",
       tone:  "muted",
+      href:  gate.isEnabled("SCHEDULE") ? `${base}/cronograma` : undefined,
     });
   }
 

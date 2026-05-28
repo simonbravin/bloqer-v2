@@ -1,20 +1,30 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
-import { getProjectShellInfo, ServiceError } from "@bloqer/services";
+import type { ScheduleItemStatus } from "@bloqer/database";
+import {
+  getProjectScheduleWorkspace,
+  getProjectShellInfo,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
+import { ScheduleWorkspace } from "@/features/schedule";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ budgetId?: string; delayedOnly?: string; status?: string }>;
 }
 
-export default async function ProyectoCronogramaPage({ params }: PageProps) {
+export default async function ProyectoCronogramaPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId } = await params;
+  const sp = await searchParams;
+
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -31,47 +41,86 @@ export default async function ProyectoCronogramaPage({ params }: PageProps) {
     throw err;
   }
 
+  let result;
+  try {
+    const statusValues = [
+      "PLANNED",
+      "IN_PROGRESS",
+      "BLOCKED",
+      "COMPLETED",
+      "CANCELLED",
+    ] as const;
+    const status = statusValues.includes(sp.status as ScheduleItemStatus)
+      ? (sp.status as ScheduleItemStatus)
+      : undefined;
+
+    result = await getProjectScheduleWorkspace(
+      projectId,
+      {
+        budgetId: sp.budgetId,
+        delayedOnly: sp.delayedOnly === "1",
+        status,
+      },
+      ctx,
+    );
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
+
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         projectId={projectId}
         projectName={project.name}
         title="Cronograma"
-        subtitle="Planificación temporal de la obra"
+        subtitle={
+          result.type === "WORKSPACE"
+            ? `Presupuesto base: ${result.budgetName}`
+            : "Planificación temporal de la obra"
+        }
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">En diseño</CardTitle>
-          <CardDescription>
-            La vista de Gantt y el calendario de obra están previstos en el roadmap; la forma exacta
-            (Gantt, hitos o ambos) está abierta en la documentación del producto como Q-003.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <p>
-            <strong className="text-foreground">WBS y materiales en presupuesto:</strong> el árbol
-            de ítems y líneas de costo se edita en cada versión de presupuesto desde{" "}
-            <Link
-              className="text-primary underline-offset-4 hover:underline"
-              href={`/proyectos/${projectId}/presupuestos`}
-            >
-              Presupuesto
-            </Link>
-            .
-          </p>
-          <p>
-            <strong className="text-foreground">Seguimiento por ítem en obra:</strong> usá{" "}
-            <Link
-              className="text-primary underline-offset-4 hover:underline"
-              href={`/proyectos/${projectId}/control-costos`}
-            >
-              WBS y costos
-            </Link>{" "}
-            para ver desvíos y drill-down por nodo del presupuesto aprobado.
-          </p>
-        </CardContent>
-      </Card>
+      {result.type === "NO_APPROVED_BUDGETS" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Sin presupuesto aprobado</CardTitle>
+            <CardDescription>
+              Necesitás un presupuesto en estado Aprobado o Cerrado para planificar y comparar
+              costos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href={`/proyectos/${projectId}/presupuestos`}>Ir a Presupuesto</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {result.type === "BUDGET_SELECTION_REQUIRED" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Elegí presupuesto base</CardTitle>
+            <CardDescription>
+              Hay varios presupuestos aprobados o cerrados. Seleccioná uno para el cronograma.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {result.availableBudgets.map((b) => (
+              <Button key={b.id} variant="outline" asChild>
+                <Link href={`/proyectos/${projectId}/cronograma?budgetId=${b.id}`}>
+                  {b.name} ({b.status})
+                </Link>
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {result.type === "WORKSPACE" && (
+        <ScheduleWorkspace projectId={projectId} workspace={result} />
+      )}
     </PageShell>
   );
 }

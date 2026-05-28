@@ -16,7 +16,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getCurrentUser } from "@/lib/auth";
-import { getProjectShellInfo, listJobsiteLogsByProject, ServiceError } from "@bloqer/services";
+import {
+  getProjectShellInfo,
+  getScheduleLinkedWbsNodeIds,
+  listJobsiteLogsByProject,
+  ServiceError,
+} from "@bloqer/services";
 import { JobsiteLogStatusBadge } from "@/features/jobsite-log";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -46,8 +51,12 @@ export default async function LibroObraPage({ params }: PageProps) {
   }
 
   let logs;
+  let scheduleWbsIds = new Set<string>();
   try {
-    logs = await listJobsiteLogsByProject(projectId, ctx);
+    [logs, scheduleWbsIds] = await Promise.all([
+      listJobsiteLogsByProject(projectId, ctx),
+      getScheduleLinkedWbsNodeIds(projectId, ctx).then((ids) => new Set(ids)),
+    ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
@@ -85,7 +94,9 @@ export default async function LibroObraPage({ params }: PageProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {logs.map((l) => (
+                {logs.map((l) => {
+                  const onSchedule = l.progress.some((p) => scheduleWbsIds.has(p.wbsNodeId));
+                  return (
                   <TableRow key={l.id}>
                     <TableCell className="font-mono text-xs">
                       <Link
@@ -106,6 +117,11 @@ export default async function LibroObraPage({ params }: PageProps) {
                     <TableCell className="text-muted-foreground">{l.shift ?? "—"}</TableCell>
                     <TableCell className="text-center text-muted-foreground">
                       {l.progress.length}
+                      {onSchedule && (
+                        <span className="ml-1 inline-block rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                          En cronograma
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-center text-muted-foreground">
                       {l.labor.length}
@@ -117,7 +133,8 @@ export default async function LibroObraPage({ params }: PageProps) {
                       <JobsiteLogStatusBadge status={l.status} />
                     </TableCell>
                   </TableRow>
-                ))}
+                );
+                })}
               </TableBody>
             </Table>
           </TableScroll>

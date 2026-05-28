@@ -18,7 +18,7 @@ Adoptar el stack preferido acordado:
 | Repo | **pnpm workspaces** |
 | Monorepo tooling | **Turborepo** *si* el repo crece a varios paquetes con builds compartidos |
 | Gráficos | **Recharts** |
-| Gantt / planificación | **Componente o librería aislada** detrás de **adapter propio** (intercambiable) |
+| Gantt / planificación | **Kibo UI** (`gantt`, `calendar`, `kanban`) vía **adapters** en `apps/web/features/schedule/adapters/`; vistas MVP implementadas con el mismo contrato de datos (ADR-007) |
 
 ## Justificación para Bloqer 2.0
 

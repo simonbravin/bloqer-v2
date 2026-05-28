@@ -165,6 +165,29 @@ enum WbsNodeType {
   ITEM
 }
 
+enum ScheduleType {
+  GANTT
+  MILESTONES
+  HYBRID
+}
+
+enum ScheduleItemType {
+  TASK
+  MILESTONE
+}
+
+enum ScheduleItemStatus {
+  PLANNED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum ScheduleDependencyType {
+  FS
+}
+
 enum CostCategory {
   MATERIAL
   LABOR
@@ -489,6 +512,7 @@ model Tenant {
   auditLogs      AuditLog[]
   contacts       Contact[]
   projects       Project[]
+  schedules      Schedule[]
   budgets        Budget[]
   certifications    Certification[]
   salesInvoices     SalesInvoice[]
@@ -852,11 +876,102 @@ model Project {
   notifications         Notification[]
   journalEntries        JournalEntry[]
   journalEntryLines     JournalEntryLine[]
+  schedule              Schedule?
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
   @@index([tenantId, clientContactId])
   @@map("projects")
+}
+
+// ─── Schedule / Cronograma ────────────────────────────────────────────────────
+// See: docs/bloqer2.0/02-modules/PROJECT_SCHEDULING.md
+// BR-SCH-001: one Schedule per project (enforced via projectId @unique).
+// BR-SCH-002/003: enforced at service layer.
+
+model Schedule {
+  id               String       @id @default(uuid())
+  tenantId         String
+  projectId        String       @unique
+  baselineBudgetId String?
+  type             ScheduleType @default(HYBRID)
+  metadata         Json?
+  createdBy        String?
+  updatedBy        String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  tenant         Tenant  @relation(fields: [tenantId], references: [id])
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  baselineBudget Budget? @relation(fields: [baselineBudgetId], references: [id], onDelete: SetNull)
+  items          ScheduleItem[]
+
+  @@index([tenantId, projectId])
+  @@map("schedules")
+}
+
+model ScheduleItem {
+  id           String             @id @default(uuid())
+  tenantId     String
+  scheduleId   String
+  parentId     String?
+  sortOrder    Int                @default(0)
+  name         String
+  type         ScheduleItemType   @default(TASK)
+  startDate    DateTime?          @db.Date
+  endDate      DateTime?          @db.Date
+  durationDays Int?
+  progressPct  Decimal            @default(0) @db.Decimal(5, 2)
+  status       ScheduleItemStatus @default(PLANNED)
+  blockReason  String?
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  schedule     Schedule                  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  parent       ScheduleItem?             @relation("ScheduleItemChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children     ScheduleItem[]            @relation("ScheduleItemChildren")
+  wbsLinks     ScheduleItemWbsLink[]
+  predecessors ScheduleItemDependency[]  @relation("ScheduleDependencySuccessor")
+  successors   ScheduleItemDependency[]  @relation("ScheduleDependencyPredecessor")
+
+  @@index([scheduleId, parentId, sortOrder])
+  @@index([tenantId, scheduleId])
+  @@map("schedule_items")
+}
+
+model ScheduleItemDependency {
+  id           String                 @id @default(uuid())
+  tenantId     String
+  predecessorId String
+  successorId  String
+  type         ScheduleDependencyType @default(FS)
+  createdAt    DateTime               @default(now())
+
+  predecessor ScheduleItem @relation("ScheduleDependencyPredecessor", fields: [predecessorId], references: [id], onDelete: Cascade)
+  successor   ScheduleItem @relation("ScheduleDependencySuccessor", fields: [successorId], references: [id], onDelete: Cascade)
+
+  @@unique([predecessorId, successorId])
+  @@index([tenantId, successorId])
+  @@map("schedule_item_dependencies")
+}
+
+model ScheduleItemWbsLink {
+  id             String   @id @default(uuid())
+  tenantId       String
+  scheduleItemId String
+  wbsNodeId      String
+  isPrimary      Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  scheduleItem ScheduleItem @relation(fields: [scheduleItemId], references: [id], onDelete: Cascade)
+  wbsNode      WbsNode      @relation(fields: [wbsNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleItemId, wbsNodeId])
+  @@index([wbsNodeId])
+  @@index([tenantId, scheduleItemId])
+  @@map("schedule_item_wbs_links")
 }
 
 // ─── Budgets / WBS / APU ──────────────────────────────────────────────────────
@@ -894,6 +1009,7 @@ model Budget {
   costItems    CostItem[]
   analysisLines CostAnalysisLine[]
   certifications Certification[]
+  schedulesAsBaseline Schedule[]
 
   @@unique([projectId, versionNumber])
   @@index([projectId, status])
@@ -939,6 +1055,7 @@ model WbsNode {
   stockMovements        StockMovement[]
   subcontractLines      SubcontractLine[]
   jobsiteLogProgress    JobsiteLogProgress[]
+  scheduleItemWbsLinks  ScheduleItemWbsLink[]
 
   @@unique([budgetId, code])
   @@index([budgetId, parentId])

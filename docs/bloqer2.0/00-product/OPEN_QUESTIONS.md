@@ -49,7 +49,7 @@
 ### Q-003 — Cronograma: Gantt, hitos o ambos
 
 - **Categoría:** Cronograma
-- **Estado:** ABIERTA
+- **Estado:** CERRADA — ver [D-038](./DECISION_LOG.md#d-038--cronograma-híbrido-gantt--hitos)
 - **Impacto:** define la complejidad del módulo.
 - **Opciones:**
   1. Gantt clásico con tareas, dependencias, duración.
@@ -61,7 +61,7 @@
 ### Q-004 — Vinculación cronograma ↔ WBS
 
 - **Categoría:** Cronograma / Presupuesto
-- **Estado:** ABIERTA
+- **Estado:** CERRADA — ver [D-039](./DECISION_LOG.md#d-039--cronograma-y-wbs-entidades-separadas-vínculo-nm-opcional)
 - **Impacto:** define si una tarea de cronograma "es" un ítem del WBS o son entidades independientes con relación opcional.
 - **Opciones:**
   1. Tarea de cronograma = ítem del WBS (1:1).
@@ -369,6 +369,18 @@
 - **Matiz arquitectura (2026-05-13):** elegir (1)/(2)/(3) **no** obliga a “segundo libro” operativo: el libro contable único sigue siendo `JournalEntry` con trazabilidad por `sourceType`/`sourceId` ([D-035](./DECISION_LOG.md)). El riesgo es de **alcance de producto** (qué queda en AR vs solo GL/tesorería), no de duplicar montos en dos ledgers paralelos no documentados.
 - **Recomendación / cierre Phase 1 (2026-05-14):** opción **(2)** lockeada — [D-037](./DECISION_LOG.md). Opciones **(1)** y **(3)** quedan para decisión futura explícita si el negocio exige C×C formal sin obra u otro documento.
 - **Bloquea:** _(Phase 1 cerrado con D-037)_ “factura de venta empresa” vía **AR sin proyecto** sigue **fuera** hasta nueva decisión; ver [D-035](./DECISION_LOG.md), [D-037](./DECISION_LOG.md). Checklist técnica para ampliaciones futuras: [`Q030_CORPORATE_INCOME_CHECKLIST.md`](../08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md).
+
+### Q-032 — Asignación de personas/equipo en ítems de cronograma
+
+- **Categoría:** Cronograma / Equipo de obra
+- **Estado:** ABIERTA
+- **Impacto si no se resuelve:** no hay modelo para responsables por tarea; la UI no debe inventar `assignedUserId` ni avatares en Gantt/Kanban sin decisión.
+- **Opciones identificadas:**
+  1. `assignedUserId` en `ScheduleItem` (un responsable por tarea).
+  2. Tabla `ScheduleItemAssignee` N:M (varios por tarea).
+  3. Reutilizar membresía de proyecto / rol de obra cuando exista el modelo “equipo de obra”.
+- **Recomendación inicial:** cerrar con Owner antes de migrar schema; ver [PROJECT_SCHEDULING.md](../02-modules/PROJECT_SCHEDULING.md) y [CORE_ENTITIES.md](../01-domain/CORE_ENTITIES.md).
+- **Bloquea:** asignación visual en cronograma, notificaciones por responsable, permisos FOREMAN por tarea asignada.
 
 ### Q-031 — Acciones masivas en listados (directorio / proyectos)
 

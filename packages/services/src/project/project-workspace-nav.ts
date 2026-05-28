@@ -1,7 +1,12 @@
 import { can, type UserRole } from "@bloqer/domain";
 import { canViewApProjectArea } from "../ap/ap-access";
 import { canViewArProjectArea } from "../ar/ar-access";
-import { canShowProjectFinanzasNavLink, canViewProjectCashFlowReport, canViewProjectCostControlReport } from "./project-nav-guards";
+import {
+  canShowProjectFinanzasNavLink,
+  canViewProjectCashFlowReport,
+  canViewProjectCostControlReport,
+  canViewProjectScheduleArea,
+} from "./project-nav-guards";
 import { canViewProcurementProjectArea } from "../procurement/procurement-access";
 import type { TenantModuleGate } from "../tenant-modules/tenant-module-gate";
 
@@ -32,7 +37,7 @@ export function buildProjectWorkspaceNavSections(
   if (gate.isEnabled("BUDGETS") && canBudgetsArea) {
     planificacion.push({ label: "Presupuesto", href: `${base}/presupuestos` });
   }
-  if (gate.isEnabled("PROJECTS") && can(roles, "VIEW", "PROJECTS")) {
+  if (gate.isEnabled("SCHEDULE") && canViewProjectScheduleArea(roles)) {
     planificacion.push({ label: "Cronograma", href: `${base}/cronograma` });
   }
   if (gate.isEnabled("PROJECTS") && gate.isEnabled("BUDGETS") && canViewProjectCostControlReport(roles)) {

@@ -33,11 +33,22 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 | ADR-004 | Blobs en Cloudflare R2 con metadatos en Postgres | PROPUESTO |
 | ADR-005 | Email transaccional Resend + React Email | PROPUESTO |
 | ADR-006 | pnpm workspaces; Turborepo si ≥2 paquetes compilables | PROPUESTO |
-| ADR-007 | Gantt y cronograma detrás de adapter único | PROPUESTO |
+| ADR-007 | Gantt y cronograma detrás de adapter único (Kibo UI) | ACEPTADO |
 | ADR-008 | Modelo físico: `tenant` + `company` 1:N (legal entity = `company`) con `project.company_id` opcional hasta multi-empresa activa | PROPUESTO |
 | ADR-009 | UUID PK en todas las entidades ERP; numeración humana en columnas separadas | PROPUESTO |
 | ADR-Phase1-06 | Membresía única `(userId, tenantId)` Phase 1 | ACEPTADO |
 | ADR-Phase1-07 | Ingresos corporativos sin obra: GL + tesorería Phase 1 | ACEPTADO |
+
+---
+
+## ADR-007 — Gantt y cronograma detrás de adapter único (Kibo UI)
+
+- **Fecha:** 2026-05-27
+- **Estado:** ACEPTADO
+- **Contexto:** Q-003/Q-004 cerradas ([D-038](../00-product/DECISION_LOG.md), [D-039](../00-product/DECISION_LOG.md)); multip vista (Gantt, calendario, kanban, tabla) sobre un read model servidor.
+- **Decisión:** componentes **Kibo UI** (`gantt`, `calendar`, `kanban`) instalados vía CLI en `apps/web`; el feature `schedule` solo importa **adapters** (`mapScheduleWorkspaceToGanttFeatures`, etc.) que traducen DTOs de `@bloqer/services` a props Kibo y eventos Kibo → Server Actions. Tabla densa con TanStack Table. Sin lógica financiera en React.
+- **Consecuencias:** posible actualización manual si Kibo cambia API; dominio y Prisma no dependen de Kibo. Licencia MIT (copia de código al repo).
+- **Referencias funcionales:** [`TECH_STACK.md`](./TECH_STACK.md), [`FRONTEND_FEATURE_STRUCTURE.md`](./FRONTEND_FEATURE_STRUCTURE.md), [`02-modules/PROJECT_SCHEDULING.md`](../02-modules/PROJECT_SCHEDULING.md).
 
 ---
 
