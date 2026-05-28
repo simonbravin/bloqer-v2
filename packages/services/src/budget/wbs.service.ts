@@ -379,16 +379,71 @@ export async function updateWbsNode(
   });
 }
 
+function collectSubtreeNodeIds(
+  rootId: string,
+  nodes: { id: string; parentId: string | null }[],
+): string[] {
+  const childrenByParent = new Map<string, string[]>();
+  for (const n of nodes) {
+    if (n.parentId == null) continue;
+    const list = childrenByParent.get(n.parentId) ?? [];
+    list.push(n.id);
+    childrenByParent.set(n.parentId, list);
+  }
+
+  const out: string[] = [];
+  function walk(nodeId: string) {
+    out.push(nodeId);
+    for (const childId of childrenByParent.get(nodeId) ?? []) walk(childId);
+  }
+  walk(rootId);
+  return out;
+}
+
+function sortNodeIdsByDepthDesc(
+  nodeIds: string[],
+  nodes: { id: string; parentId: string | null }[],
+): string[] {
+  const parentById = new Map(nodes.map((n) => [n.id, n.parentId]));
+  const depth = (id: string): number => {
+    let d = 0;
+    let cur: string | null | undefined = id;
+    while (cur) {
+      const p = parentById.get(cur);
+      if (!p) break;
+      d += 1;
+      cur = p;
+    }
+    return d;
+  };
+  return [...nodeIds].sort((a, b) => depth(b) - depth(a));
+}
+
+async function assertWbsSubtreeDeletable(nodeIds: string[]): Promise<void> {
+  if (nodeIds.length === 0) return;
+
+  const [certLines, poLines, jobsiteRefs, subcontractLines] = await Promise.all([
+    prisma.certificationLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+    prisma.purchaseOrderLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+    prisma.jobsiteLogProgress.count({ where: { wbsNodeId: { in: nodeIds } } }),
+    prisma.subcontractLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+  ]);
+
+  if (certLines > 0 || poLines > 0 || jobsiteRefs > 0 || subcontractLines > 0) {
+    throw new ServiceError(
+      "CONFLICT",
+      "No se puede eliminar: hay certificaciones, compras, subcontratos o libro de obra vinculados a ítems del subárbol.",
+    );
+  }
+}
+
 export async function removeWbsNode(id: string, ctx: ServiceContext): Promise<void> {
   if (!can(ctx.roles, "EDIT", "BUDGETS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions");
   }
   const node = await prisma.wbsNode.findUnique({
     where: { id },
-    include: {
-      children: true,
-      costItem: { include: { analysisLines: true } },
-    },
+    select: { id: true, budgetId: true, parentId: true, code: true, name: true },
   });
   if (!node) throw new ServiceError("NOT_FOUND", "Nodo WBS no encontrado");
 
@@ -396,29 +451,29 @@ export async function removeWbsNode(id: string, ctx: ServiceContext): Promise<vo
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   assertBudgetEditable(budget);
 
-  if (node.children.length > 0) {
-    throw new ServiceError(
-      "CONFLICT",
-      "No se puede eliminar un nodo con subnodos. Elimine los hijos primero.",
-    );
-  }
+  const allNodes = await prisma.wbsNode.findMany({
+    where: { budgetId: node.budgetId },
+    select: { id: true, parentId: true },
+  });
+  const subtreeIds = collectSubtreeNodeIds(node.id, allNodes);
+  await assertWbsSubtreeDeletable(subtreeIds);
 
-  // Downstream reference guards
-  const certLineCount = await prisma.certificationLine.count({ where: { wbsNodeId: id } });
-  if (certLineCount > 0) {
-    throw new ServiceError(
-      "CONFLICT",
-      "El nodo tiene líneas de certificación asociadas y no puede eliminarse.",
-    );
-  }
-  // TODO: add guards when implemented — PurchaseOrderLine, SubcontractCertification, StockMovement, JobsiteLogEntry
+  const deleteOrder = sortNodeIdsByDepthDesc(subtreeIds, allNodes);
+  const costItems = await prisma.costItem.findMany({
+    where: { wbsNodeId: { in: subtreeIds } },
+    select: { id: true },
+  });
+  const costItemIds = costItems.map((c) => c.id);
 
   await prisma.$transaction(async (tx) => {
-    if (node.costItem) {
-      await tx.costAnalysisLine.deleteMany({ where: { costItemId: node.costItem.id } });
-      await tx.costItem.delete({ where: { id: node.costItem.id } });
+    if (costItemIds.length > 0) {
+      await tx.costAnalysisLine.deleteMany({ where: { costItemId: { in: costItemIds } } });
+      await tx.costItem.deleteMany({ where: { id: { in: costItemIds } } });
     }
-    await tx.wbsNode.delete({ where: { id } });
+
+    for (const nodeId of deleteOrder) {
+      await tx.wbsNode.delete({ where: { id: nodeId } });
+    }
 
     const parentId = node.parentId;
     const siblings = await tx.wbsNode.findMany({
@@ -427,13 +482,13 @@ export async function removeWbsNode(id: string, ctx: ServiceContext): Promise<vo
       select: { id: true, parentId: true, code: true, type: true, sortOrder: true },
     });
     if (siblings.length > 0) {
-      const allNodes = await tx.wbsNode.findMany({
+      const remaining = await tx.wbsNode.findMany({
         where: { budgetId: node.budgetId },
         select: { id: true, parentId: true, code: true, type: true, sortOrder: true },
       });
       await applyRenumberPlanTx(
         tx,
-        allNodes,
+        remaining,
         parentId,
         siblings.map((s) => s.id),
       );
@@ -448,7 +503,11 @@ export async function removeWbsNode(id: string, ctx: ServiceContext): Promise<vo
     action: "wbs_node.removed",
     entityType: "WbsNode",
     entityId: id,
-    after: { code: node.code, budgetId: node.budgetId },
+    after: {
+      code: node.code,
+      budgetId: node.budgetId,
+      removedNodeCount: subtreeIds.length,
+    },
     ipAddress: ctx.ipAddress,
   });
 }

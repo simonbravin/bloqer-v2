@@ -234,21 +234,37 @@ export function WbsTree({
     });
   }
 
+  function countDescendants(n: WbsViewNode): number {
+    return n.children.reduce((sum, child) => sum + 1 + countDescendants(child), 0);
+  }
+
+  function collectSubtreeIds(n: WbsViewNode): string[] {
+    return [n.id, ...n.children.flatMap(collectSubtreeIds)];
+  }
+
   function handleRemove(node: WbsViewNode) {
-    if (node.children.length > 0) {
-      alert("Eliminá los subnodos antes de eliminar este nodo.");
-      return;
-    }
-    if (!confirm(`¿Eliminar "${node.code} — ${node.name}"?`)) return;
+    const descendantCount = countDescendants(node);
+    const confirmMessage =
+      descendantCount > 0
+        ? `¿Eliminar "${node.code} — ${node.name}" y sus ${descendantCount} subnodo(s)? Esta acción no se puede deshacer.`
+        : `¿Eliminar "${node.code} — ${node.name}"?`;
+
+    if (!confirm(confirmMessage)) return;
+
+    const removedIds = new Set(collectSubtreeIds(node));
     startRemoveTransition(async () => {
       const result = await onRemoveNode(node.id);
       if ("error" in result) {
         toast.error(result.error);
         return;
       }
-      if (itemDialogNode?.id === node.id) setItemDialogNode(null);
-      if (groupDialogNode?.id === node.id) setGroupDialogNode(null);
-      toast.success("Nodo eliminado");
+      if (itemDialogNode && removedIds.has(itemDialogNode.id)) setItemDialogNode(null);
+      if (groupDialogNode && removedIds.has(groupDialogNode.id)) setGroupDialogNode(null);
+      toast.success(
+        descendantCount > 0
+          ? `Eliminados ${descendantCount + 1} nodos`
+          : "Nodo eliminado",
+      );
       router.refresh();
     });
   }
