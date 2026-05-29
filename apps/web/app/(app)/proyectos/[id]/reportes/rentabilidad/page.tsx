@@ -81,7 +81,7 @@ export default async function ReporteRentabilidadPage({ params, searchParams }: 
             <ReportExportActions
               exportPath={`/api/reports/proyectos/${projectId}/rentabilidad.csv`}
               params={sp}
-              pdfOnly
+              pdf
             />
           ) : undefined
         }

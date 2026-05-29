@@ -132,6 +132,7 @@ export async function getProjectProfitabilityReport(
   warnings.push(...cc.warnings);
 
   const directCost = new Prisma.Decimal(getDirectCost(cc.totals, costLayer));
+  const directCostAccrued = new Prisma.Decimal(cc.totals.accruedCost);
   const byCurrency: ProfitabilityCurrencySlice[] = [];
   let revenue = new Prisma.Decimal(0);
   const revenueCurrencies = new Set<string>([budgetCurrency]);
@@ -248,15 +249,27 @@ export async function getProjectProfitabilityReport(
     const oh = await getProjectOverheadAmount(
       projectId,
       project.companyId,
-      directCost,
+      directCostAccrued,
       ctx,
+      displayCurrency,
     );
     overheadAmount = oh.totalOverhead;
-    const nm = new Prisma.Decimal(displaySlice?.grossMargin ?? grossMargin.toFixed(2)).minus(
-      oh.totalOverhead,
-    );
-    netMargin = nm.toFixed(2);
-    netMarginAvailableFlag = true;
+    if (oh.currency === displayCurrency) {
+      const nm = new Prisma.Decimal(displaySlice?.grossMargin ?? grossMargin.toFixed(2)).minus(
+        oh.totalOverhead,
+      );
+      netMargin = nm.toFixed(2);
+      netMarginAvailableFlag = true;
+    } else {
+      warnings.push(
+        `Margen neto omitido: GG en ${oh.currency} no coincide con la moneda mostrada (${displayCurrency}).`,
+      );
+    }
+    if (oh.manualRowsExcluded > 0) {
+      warnings.push(
+        "Hay imputaciones manuales de GG en otra moneda; solo se suman las de la moneda del reporte.",
+      );
+    }
   }
 
   return {

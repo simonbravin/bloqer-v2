@@ -62,6 +62,7 @@ export * from "./cost-control/cost-control.service";
 export * from "./reports";
 export * from "./aging/aging.service";
 export * from "./finance/finance-hub-overview.service";
+export * from "./finance/project-overhead.service";
 export * from "./finance/company-finance-operations-summary.service";
 export * from "./project-finance/project-finance-overview.service";
 export * from "./inventory/warehouse-transfer.service";

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import {
   Card,
@@ -10,7 +11,15 @@ import {
 } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
-import { getTenantModuleGate } from "@bloqer/services";
+import {
+  getCompanies,
+  getCompanyOverheadSettings,
+  getTenantModuleGate,
+  listActiveProjectsForOverhead,
+  listProjectOverheadAllocations,
+  ServiceError,
+} from "@bloqer/services";
+import { OverheadAllocationsPanel } from "@/features/finance/overhead-allocations-panel";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
@@ -38,57 +47,87 @@ export default async function GastosGeneralesPage() {
   const canTreasury =
     gate.isEnabled("TREASURY") && can(current.tenantCtx.roles, "VIEW", "TREASURY");
 
+  const companies = await getCompanies(ctx);
+  const companyId = ctx.companyId ?? companies[0]?.id;
+
+  let overheadPanel: ReactNode = null;
+  if (!companyId) {
+    overheadPanel = (
+      <p className="text-sm text-muted-foreground rounded-lg border bg-card p-4">
+        Configurá al menos una empresa activa para imputar gastos generales a obra.
+      </p>
+    );
+  } else {
+    try {
+      const [settings, allocations, projects] = await Promise.all([
+        getCompanyOverheadSettings(companyId, ctx),
+        listProjectOverheadAllocations({ companyId }, ctx),
+        listActiveProjectsForOverhead(companyId, ctx),
+      ]);
+      overheadPanel = (
+        <OverheadAllocationsPanel
+          companyId={companyId}
+          settings={settings}
+          allocations={allocations}
+          projects={projects}
+          canEdit={canEditAp}
+        />
+      );
+    } catch (err) {
+      if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
+    }
+  }
+
   return (
     <PageShell variant="detail" className="space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Gastos generales</h1>
           <p className="text-sm text-muted-foreground max-w-prose">
-            Asistente para cargar <strong>facturas de proveedor sin proyecto</strong>, emitir la
-            obligación (cuenta por pagar) y registrar el pago desde tesorería. Reutiliza el mismo
-            flujo que Finanzas → facturas empresa; no agrega un libro paralelo.
+            Facturas corporativas sin proyecto, imputación de GG a obra (manual y % empresa) y flujo
+            de pago desde tesorería.
           </p>
         </div>
         <PageBackLink href="/finanzas" label="Resumen Finanzas" />
       </div>
 
-      <ol className="list-decimal space-y-6 pl-5 text-sm leading-relaxed">
-        <li>
-          <span className="font-medium text-foreground">Crear borrador</span> — proveedor, líneas,
-          fechas e IVA. Podés adjuntar comprobantes en el detalle luego del alta.
-        </li>
-        <li>
-          <span className="font-medium text-foreground">Emitir factura</span> — genera la cuenta por
-          pagar corporativa.
-        </li>
-        <li>
-          <span className="font-medium text-foreground">Pagar</span> — desde cuentas por pagar de
-          empresa elegís cuenta de tesorería y confirmás el pago (movimiento{" "}
-          <code className="rounded bg-muted px-1">PAYMENT</code>).
-        </li>
-      </ol>
+      {overheadPanel}
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Empezar</CardTitle>
+          <CardTitle className="text-lg">Asistente de facturas corporativas</CardTitle>
           <CardDescription>
-            {canEditAp
-              ? "Creá el borrador; después emití y pagá desde las pantallas enlazadas."
-              : "Tenés permiso de lectura (VIEW AP) pero no de edición: pedí EDIT AP para cargar facturas."}
+            Cargá gastos sin proyecto, emití la cuenta por pagar y pagá desde tesorería.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {canEditAp ? (
-            <Button asChild>
-              <Link href="/finanzas/gastos-generales/nueva">Nueva factura de gasto</Link>
+        <CardContent className="space-y-4">
+          <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed">
+            <li>
+              <span className="font-medium text-foreground">Crear borrador</span> — proveedor, líneas
+              y fechas.
+            </li>
+            <li>
+              <span className="font-medium text-foreground">Emitir factura</span> — genera la cuenta
+              por pagar corporativa.
+            </li>
+            <li>
+              <span className="font-medium text-foreground">Pagar</span> — desde cuentas por pagar
+              de empresa.
+            </li>
+          </ol>
+          <div className="flex flex-wrap gap-2">
+            {canEditAp ? (
+              <Button asChild>
+                <Link href="/finanzas/gastos-generales/nueva">Nueva factura de gasto</Link>
+              </Button>
+            ) : null}
+            <Button asChild variant="outline">
+              <Link href="/finanzas/facturas-proveedor">Ver facturas empresa</Link>
             </Button>
-          ) : null}
-          <Button asChild variant="outline">
-            <Link href="/finanzas/facturas-proveedor">Ver facturas empresa</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/finanzas/cuentas-por-pagar">Pagos pendientes</Link>
-          </Button>
+            <Button asChild variant="outline">
+              <Link href="/finanzas/cuentas-por-pagar">Pagos pendientes</Link>
+            </Button>
+          </div>
         </CardContent>
         {canTreasury ? (
           <CardFooter className="border-t bg-muted/20">

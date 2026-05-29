@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  exportProjectIncomeExpenseCsv,
   exportProjectIncomeExpensePdf,
   getProjectIncomeExpenseReport,
   parseCurrencyView,
   parseProjectReportDateFilters,
 } from "@bloqer/services";
 import {
+  csvResponse,
   pdfResponse,
   reportExportErrorResponse,
   requireReportExportContext,
@@ -24,10 +26,18 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ projectId: 
       ...parseProjectReportDateFilters(sp),
       currencyView: parseCurrencyView(sp.currencyView),
     };
-    const fmt = (sp.format ?? "pdf").toLowerCase();
+    const fmt = (sp.format ?? "csv").toLowerCase();
     if (fmt === "json") {
       const data = await getProjectIncomeExpenseReport(projectId, filters, auth.ctx);
       return NextResponse.json(data);
+    }
+    if (fmt === "csv") {
+      const { content, filename } = await exportProjectIncomeExpenseCsv(
+        projectId,
+        filters,
+        auth.ctx,
+      );
+      return csvResponse(content, filename);
     }
     if (fmt === "pdf") {
       const { buffer, filename } = await exportProjectIncomeExpensePdf(

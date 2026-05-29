@@ -32,6 +32,10 @@ import type { MaterialReportFilters } from "../reports/material-variance.service
 import { getMaterialVarianceReport } from "../reports/material-variance.service";
 import type { ProjectCashFlowFilters } from "../project-cash-flow/project-cash-flow.service";
 import { getProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
+import type { IncomeExpenseFilters } from "../reports/project-income-expense.service";
+import { getProjectIncomeExpenseReport } from "../reports/project-income-expense.service";
+import type { ProfitabilityFilters } from "../reports/project-profitability.service";
+import { getProjectProfitabilityReport } from "../reports/project-profitability.service";
 import { ServiceContext, ServiceError } from "../types";
 import { buildCsv } from "./csv-export.service";
 import { safeReportFilename } from "./filename.service";
@@ -983,6 +987,75 @@ export async function exportMaterialVarianceCsv(
     "",
   ]);
   const fname = `materiales_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
+  return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
+}
+
+export async function exportProjectIncomeExpenseCsv(
+  projectId: string,
+  filters: IncomeExpenseFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
+  const report = await getProjectIncomeExpenseReport(projectId, filters, ctx);
+  const headers = [
+    "Periodo",
+    "Certificado",
+    "Facturado",
+    "Cobrado",
+    "CostoDevengado",
+    "CostoPagado",
+    "MargenBrutoDevengado",
+    "MargenBrutoCaja",
+  ];
+  const rows = report.series.map((p) => [
+    p.periodLabel,
+    p.certifiedAmount,
+    p.invoicedAmount,
+    p.collectedAmount,
+    p.costAccrued,
+    p.costPaid,
+    p.grossMarginAccrued,
+    p.grossMarginCash,
+  ]);
+  rows.push([
+    "TOTAL",
+    report.totals.certifiedAmount,
+    report.totals.invoicedAmount,
+    report.totals.collectedAmount,
+    report.totals.costAccrued,
+    report.totals.costPaid,
+    report.totals.grossMarginAccrued,
+    report.totals.grossMarginCash,
+  ]);
+  const fname = `ingresos_gastos_${projectId}_${report.dateFrom}_${report.dateTo}`;
+  return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
+}
+
+export async function exportProjectProfitabilityCsv(
+  projectId: string,
+  filters: ProfitabilityFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
+  const report = await getProjectProfitabilityReport(projectId, filters, ctx);
+  if (report.type === "NO_APPROVED_BUDGETS") {
+    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar rentabilidad");
+  }
+  const headers = ["Concepto", "Valor", "Moneda"];
+  const rows: string[][] = [
+    ["Presupuesto", report.budgetName, report.currency],
+    ["CapaCosto", report.costLayer, ""],
+    ["BaseIngresos", report.revenueBasis, ""],
+    ["Ingresos", report.revenue, report.currency],
+    ["CostosDirectos", report.directCost, report.currency],
+    ["MargenBruto", report.grossMargin, report.currency],
+    ["MargenBrutoPct", report.grossMarginPct ?? "", "%"],
+    ["MargenProyectado", report.projectedMargin, report.currency],
+    ["VentaPresupuestada", report.budgetTotalSale, report.budgetCurrency],
+  ];
+  if (report.overheadAmount != null) {
+    rows.push(["GastosGenerales", report.overheadAmount, report.currency]);
+    rows.push(["MargenNeto", report.netMargin ?? "", report.currency]);
+  }
+  const fname = `rentabilidad_${projectId}_${report.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
   return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
 }
 

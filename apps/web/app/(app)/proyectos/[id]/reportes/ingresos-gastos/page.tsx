@@ -83,7 +83,7 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
           <ReportExportActions
             exportPath={`/api/reports/proyectos/${projectId}/ingresos-gastos.csv`}
             params={sp}
-            pdfOnly
+            pdf
           />
         }
       />

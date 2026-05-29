@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Banknote,
+  BarChart3,
   CalendarRange,
   ClipboardList,
   FileSpreadsheet,
@@ -22,6 +23,7 @@ const PROJECT_NAV_ICON_BY_LABEL: Record<string, LucideIcon> = {
   Presupuesto: FileSpreadsheet,
   Cronograma: CalendarRange,
   "WBS y costos": FolderKanban,
+  Reportes: BarChart3,
   "Flujo de caja": TrendingUp,
   "Tablero de finanzas": Wallet,
   "Libro de obra": HardHat,

@@ -96,7 +96,7 @@ Tesorería (posición, movimientos, flujo), inventario (stock, movimientos), flu
 - `packages/services/src/report-exports/pdf/` — tipos (`ReportPdfPayload`, constantes límite), `pdf-renderer.service.ts`, `report-pdf-shared.tsx`, `aging-pdf.tsx`, `cost-control-pdf.tsx`
 - `packages/services/src/report-exports/report-pdf-export.service.tsx` — orquestación + nombres de archivo
 - `apps/web/lib/report-export-http.ts` — `pdfResponse`
-- `apps/web/features/reports/report-pdf-export-link.tsx` — “Exportar PDF” (`format=pdf`)
+- `apps/web/features/reports/report-export-actions.tsx` — “Exportar CSV” / “Exportar PDF” (`format=csv|pdf`)
 
 ### Phase 9C — Envío manual por email
 
@@ -124,7 +124,10 @@ Filtros: **mismos query params** que las páginas de reporte (p. ej. `currency`,
 - `/api/reports/proyectos/[projectId]/compras-proveedores.csv` (R-AP-01…03)
 - `/api/reports/proyectos/[projectId]/subcontratos.csv` (R-SCC-*, R-SUB-*)
 - `/api/reports/proyectos/[projectId]/flujo-caja.csv`
-- Hub UI (sin CSV dedicado en 9E): `/proyectos/[id]/reportes/caja`, `ingresos-gastos`, `rentabilidad`
+- `/api/reports/proyectos/[projectId]/materiales.csv` (R-MAT-01)
+- `/api/reports/proyectos/[projectId]/ingresos-gastos.csv` (CSV + PDF)
+- `/api/reports/proyectos/[projectId]/rentabilidad.csv` (CSV + PDF)
+- Hub UI (sin CSV en 9E inicial): `/proyectos/[id]/reportes/caja`
 
 **Respuesta CSV:** `Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment` con nombre saneado.
 
@@ -152,4 +155,4 @@ Filtros: **mismos query params** que las páginas de reporte (p. ej. `currency`,
 
 - `packages/services/src/report-exports/` — tipos, `buildCsv`, `safeReportFilename`, parsers de query alineados a páginas, `export*Csv` y `assertPdfExportNotRequested` (rutas sin PDF).
 - `apps/web/lib/report-export-http.ts` — sesión → contexto, respuesta CSV/PDF, errores.
-- `apps/web/features/reports/report-csv-export-link.tsx` — enlace “Exportar CSV” que **reusa** `searchParams` actuales.
+- `apps/web/features/reports/report-export-actions.tsx` — enlaces que **reusan** `searchParams` actuales.
