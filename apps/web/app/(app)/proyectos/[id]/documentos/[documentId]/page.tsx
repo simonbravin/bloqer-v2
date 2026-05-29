@@ -87,6 +87,13 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
               </Button>
             </form>
           )}
+          {doc.canMutate && doc.status === "UPLOADING" && (
+            <form action={doDelete}>
+              <Button variant="ghost" size="sm" type="submit" className="text-destructive">
+                Cancelar subida
+              </Button>
+            </form>
+          )}
           {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && (
             <form action={doDelete}>
               <Button variant="ghost" size="sm" type="submit" className="text-muted-foreground">
@@ -98,9 +105,9 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
       </div>
 
       {doc.status === "UPLOADING" && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/10 px-4 py-3 text-sm text-blue-700 dark:text-blue-400">
-          Este documento está siendo procesado. Si persiste en este estado, puede que la subida haya
-          fallado.
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+          Esta subida quedó incompleta (por ejemplo, por un error de red). Podés cancelarla con el botón
+          de arriba o recargar la página; las subidas abandonadas se limpian solas al poco tiempo.
         </div>
       )}
 

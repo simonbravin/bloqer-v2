@@ -290,6 +290,25 @@ export function EntityDocumentsPanel({
                               </Button>
                             </form>
                           )}
+                          {doc.canMutate && doc.status === "UPLOADING" && isCompany && (
+                            <form action={softDeleteCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
+                              <Button variant="ghost" size="sm" type="submit" className="text-destructive">
+                                Cancelar subida
+                              </Button>
+                            </form>
+                          )}
+                          {doc.canMutate && doc.status === "UPLOADING" && !isCompany && projectIdForTable && (
+                            <form
+                              action={softDeleteDocumentAction.bind(null, doc.id, projectIdForTable, {
+                                extraPathsToRevalidate: revalidateExtra,
+                                redirectToProjectDocuments: false,
+                              })}
+                            >
+                              <Button variant="ghost" size="sm" type="submit" className="text-destructive">
+                                Cancelar subida
+                              </Button>
+                            </form>
+                          )}
                           {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && isCompany && (
                             <form action={softDeleteCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
                               <Button variant="ghost" size="sm" type="submit" className="text-destructive">

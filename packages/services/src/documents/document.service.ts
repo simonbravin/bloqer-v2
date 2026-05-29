@@ -16,8 +16,11 @@ import {
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024;
 
-/** Default age after which an UPLOADING row is considered abandoned (1 hour). */
+/** Default age after which an UPLOADING row is considered abandoned (1 hour) — admin batch cleanup. */
 const DEFAULT_STALE_UPLOAD_THRESHOLD_MS = 60 * 60 * 1000;
+
+/** Server-side uploads finish in seconds; rows in UPLOADING beyond this are legacy/crashed. */
+const ABANDONED_UPLOAD_THRESHOLD_MS = 60 * 1000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -368,7 +371,14 @@ export async function uploadDocument(
 
   const plan     = await resolveDocumentUploadPlan(input, ctx);
   const provider = configured ? "R2" : "PLACEHOLDER";
-  const status   = configured ? "UPLOADING" : "ACTIVE";
+
+  if (configured) {
+    try {
+      await putObject(plan.storageKey, content, input.mimeType);
+    } catch {
+      throw new ServiceError("VALIDATION", "Error al guardar el archivo. Intentá de nuevo.");
+    }
+  }
 
   const doc = await prisma.documentAttachment.create({
     data: {
@@ -384,29 +394,12 @@ export async function uploadDocument(
       storageKey:       plan.storageKey,
       category:         input.category ?? "OTHER",
       description:      input.description ?? null,
-      status,
+      status:           "ACTIVE",
       linkedEntityType: plan.linkedEntityType,
       linkedEntityId:   plan.linkedEntityId,
       uploadedBy:       ctx.actorUserId,
     },
   });
-
-  if (configured) {
-    try {
-      await putObject(plan.storageKey, content, input.mimeType);
-    } catch {
-      await prisma.documentAttachment.update({
-        where: { id: plan.id },
-        data:  { status: "DELETED" },
-      });
-      throw new ServiceError("VALIDATION", "Error al guardar el archivo. Intentá de nuevo.");
-    }
-
-    await prisma.documentAttachment.update({
-      where: { id: plan.id },
-      data:  { status: "ACTIVE" },
-    });
-  }
 
   await log({
     tenantId:    ctx.tenantId,
@@ -499,6 +492,34 @@ export async function getDocumentById(id: string, ctx: ServiceContext): Promise<
   return serialize(doc, ctx, gate);
 }
 
+/**
+ * Soft-deletes UPLOADING rows older than {@link ABANDONED_UPLOAD_THRESHOLD_MS}.
+ * Called automatically on document list reads — no admin role required.
+ * New uploads never enter UPLOADING; remaining rows are legacy abandoned attempts.
+ */
+async function reconcileAbandonedUploadingDocuments(
+  ctx: ServiceContext,
+  scope?: {
+    projectId?:        string;
+    linkedEntityType?: string;
+    linkedEntityId?:   string;
+  },
+): Promise<void> {
+  const cutoff = new Date(Date.now() - ABANDONED_UPLOAD_THRESHOLD_MS);
+  await prisma.documentAttachment.updateMany({
+    where: {
+      tenantId:  ctx.tenantId,
+      status:    "UPLOADING",
+      createdAt: { lt: cutoff },
+      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+      ...(scope?.linkedEntityType && scope.linkedEntityId
+        ? { linkedEntityType: scope.linkedEntityType as never, linkedEntityId: scope.linkedEntityId }
+        : {}),
+    },
+    data: { status: "DELETED" },
+  });
+}
+
 export async function listProjectDocuments(
   projectId: string,
   filters:   ListProjectDocumentsInput,
@@ -513,6 +534,8 @@ export async function listProjectDocuments(
     select: { id: true, tenantId: true },
   });
   if (!project || project.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+
+  await reconcileAbandonedUploadingDocuments(ctx, { projectId });
 
   const docs = await prisma.documentAttachment.findMany({
     where: {
@@ -604,6 +627,12 @@ export async function listEntityDocuments(
   } else {
     throw new ServiceError("VALIDATION", "Tipo de entidad no soportado para adjuntos");
   }
+
+  await reconcileAbandonedUploadingDocuments(ctx, {
+    projectId:        needsProject ? options?.projectId : undefined,
+    linkedEntityType: entityType,
+    linkedEntityId:   entityId,
+  });
 
   const docs = await prisma.documentAttachment.findMany({
     where: {
