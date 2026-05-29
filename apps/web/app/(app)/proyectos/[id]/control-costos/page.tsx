@@ -82,6 +82,11 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
         actions={
           result.type === "REPORT" ? (
             <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/proyectos/${projectId}/reportes/presupuesto-vs-real?budgetId=${result.budgetId}`}>
+                  Presupuesto vs real
+                </Link>
+              </Button>
               <ReportCsvExportLink
                 exportPath={`/api/reports/proyectos/${projectId}/control-costos.csv`}
                 params={sp}

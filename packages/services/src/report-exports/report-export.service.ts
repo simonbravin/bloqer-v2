@@ -17,6 +17,11 @@ import type { StockBalanceFilters, StockMovementReportFilters } from "../invento
 import { getStockBalanceReport, getStockMovementReport } from "../inventory-reports/inventory-reports.service";
 import type { CostControlFilters } from "../cost-control/cost-control.service";
 import { getProjectCostControl } from "../cost-control/cost-control.service";
+import type { BudgetVarianceFilters } from "../reports/budget-variance.service";
+import {
+  getBudgetVarianceReport,
+  parseCostVarianceLayer,
+} from "../reports/budget-variance.service";
 import type { ProjectCashFlowFilters } from "../project-cash-flow/project-cash-flow.service";
 import { getProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import { ServiceContext, ServiceError } from "../types";
@@ -107,6 +112,13 @@ export function parseCostControlFilters(sp: Record<string, string | undefined>):
     dateFrom: sp.dateFrom,
     dateTo: sp.dateTo,
     wbsSearch: sp.wbsSearch,
+  };
+}
+
+export function parseBudgetVarianceFilters(sp: Record<string, string | undefined>): BudgetVarianceFilters {
+  return {
+    ...parseCostControlFilters(sp),
+    costLayer: parseCostVarianceLayer(sp.costLayer),
   };
 }
 
@@ -622,6 +634,88 @@ export async function exportProjectCostControlCsv(
   }
 
   const fname = `control_costos_${r.projectId}_${r.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
+  return {
+    content: buildCsv(headers, rows),
+    filename: safeReportFilename(fname, "csv"),
+  };
+}
+
+const LAYER_CSV_LABEL: Record<string, string> = {
+  exposure: "ExposicionEsperada",
+  committed: "Comprometido",
+  accrued: "Devengado",
+  paid: "Pagado",
+};
+
+export async function exportBudgetVarianceCsv(
+  projectId: string,
+  filters: BudgetVarianceFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
+  const result = await getBudgetVarianceReport(projectId, filters, ctx);
+  if (result.type === "NO_APPROVED_BUDGETS") {
+    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado o cerrado para exportar");
+  }
+  if (result.type === "BUDGET_SELECTION_REQUIRED") {
+    throw new ServiceError("CONFLICT", "Seleccioná un presupuesto para exportar");
+  }
+  const r = result;
+  const actualCol = `Real_${LAYER_CSV_LABEL[r.costLayer] ?? r.costLayer}`;
+  const headers = [
+    "CodigoWBS",
+    "NombreWBS",
+    "Unidad",
+    "PresupCostoTotal",
+    "PresupVentaTotal",
+    actualCol,
+    "VariacionMonto",
+    "VariacionPct",
+    "EstadoVariacion",
+    "CostoComprometido",
+    "CostoDevengado",
+    "CostoPagado",
+    "ExposicionEsperada",
+    "CertificadoAprobado",
+    "MargenProyectado",
+    "SobrePresupuesto",
+  ];
+  const rows = r.rows.map((x) => [
+    x.wbsCode,
+    x.wbsName,
+    x.unit,
+    x.budgetTotalCost,
+    x.budgetTotalSale,
+    x.actualCost,
+    x.costVariance,
+    x.variancePct ?? "",
+    x.varianceStatus,
+    x.committedCost,
+    x.accruedCost,
+    x.paidCost,
+    x.expectedCostExposure,
+    x.certifiedApproved,
+    x.projectedMargin,
+    x.flags.overBudget ? "Si" : "No",
+  ]);
+  rows.push([
+    "__TOTALES__",
+    "Totales",
+    "",
+    r.totals.budgetTotalCost,
+    r.totals.budgetTotalSale,
+    r.totals.actualCost,
+    r.totals.costVariance,
+    r.totals.variancePct ?? "",
+    "",
+    r.totals.committedCost,
+    r.totals.accruedCost,
+    r.totals.paidCost,
+    r.totals.expectedCostExposure,
+    r.totals.certifiedApproved,
+    r.totals.projectedMargin,
+    "",
+  ]);
+  const fname = `presupuesto_vs_real_${r.projectId}_${r.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
   return {
     content: buildCsv(headers, rows),
     filename: safeReportFilename(fname, "csv"),

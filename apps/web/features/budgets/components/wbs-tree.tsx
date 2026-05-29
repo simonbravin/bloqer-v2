@@ -28,7 +28,15 @@ import {
   ArrowUp,
   ArrowDown,
   Upload,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { budgetUnitLabel } from "@/lib/budget-units";
@@ -63,6 +71,89 @@ import type {
 
 function fmt(value: number, currency: string) {
   return formatMoneyAmount(String(value), currency);
+}
+
+/** Min width for the item name column (wider than before; scroll inside cell if longer). */
+const WBS_ITEM_COL_CLASS =
+  "min-w-[14rem] sm:min-w-[18rem] lg:min-w-[22rem] max-w-[32rem]";
+
+type WbsRowActionsProps = {
+  canAddChild: boolean;
+  addChildTitle: string;
+  isFirst: boolean;
+  isLast: boolean;
+  reorderPending: boolean;
+  removePending: boolean;
+  onAddChild: () => void;
+  onEdit: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onRemove: () => void;
+};
+
+function WbsRowActions({
+  canAddChild,
+  addChildTitle,
+  isFirst,
+  isLast,
+  reorderPending,
+  removePending,
+  onAddChild,
+  onEdit,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
+}: WbsRowActionsProps) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 px-2"
+          aria-label="Acciones"
+        >
+          <MoreHorizontal className="h-4 w-4 shrink-0" />
+          <span className="hidden text-xs sm:inline">Acciones</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        {canAddChild ? (
+          <DropdownMenuItem onSelect={onAddChild}>
+            <Plus className="h-4 w-4" />
+            {addChildTitle}
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem onSelect={onEdit}>
+          <Pencil className="h-4 w-4" />
+          Editar
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={isFirst || reorderPending}
+          onSelect={onMoveUp}
+        >
+          <ArrowUp className="h-4 w-4" />
+          Mover arriba
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={isLast || reorderPending}
+          onSelect={onMoveDown}
+        >
+          <ArrowDown className="h-4 w-4" />
+          Mover abajo
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="text-destructive focus:text-destructive"
+          disabled={removePending}
+          onSelect={onRemove}
+        >
+          <Trash2 className="h-4 w-4" />
+          Eliminar
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function flattenTree(nodes: WbsViewNode[]): WbsViewNode[] {
@@ -390,8 +481,13 @@ export function WbsTree({
               <span>{node.code}</span>
             </div>
           </TableCell>
-          <TableCell className="py-0.5 px-2 text-sm font-medium truncate max-w-[1px] w-full">
-            <span className="truncate">{node.name}</span>
+          <TableCell className={cn("py-0.5 px-2 text-sm font-medium", WBS_ITEM_COL_CLASS)}>
+            <div
+              className="overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1"
+              title={node.name}
+            >
+              <span className="block whitespace-nowrap pr-1">{node.name}</span>
+            </div>
           </TableCell>
           <TableCell className="py-0.5 text-sm text-muted-foreground w-20">
             {metrics.unit ? budgetUnitLabel(metrics.unit) : "—"}
@@ -429,56 +525,22 @@ export function WbsTree({
             </>
           )}
 
-          <TableCell className="py-0.5 w-32" onClick={(e) => e.stopPropagation()}>
+          <TableCell className="py-0.5 w-0 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
             {canEditStructure && (
-              <div className="flex items-center justify-end gap-0.5">
-                {resolveAddChildPreset(node) && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    title={addChildButtonTitle(node)}
-                    onClick={() => beginAddChild(node)}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  title="Editar"
-                  onClick={() => setDialogState({ type: "edit", node })}
-                >
-                  <Pencil className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  disabled={isFirst || reorderPending}
-                  onClick={() => moveNode(node, "up")}
-                >
-                  <ArrowUp className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  disabled={isLast || reorderPending}
-                  onClick={() => moveNode(node, "down")}
-                >
-                  <ArrowDown className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-destructive"
-                  disabled={removePending}
-                  onClick={() => handleRemove(node)}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
+              <div className="flex justify-end">
+                <WbsRowActions
+                  canAddChild={resolveAddChildPreset(node) !== null}
+                  addChildTitle={addChildButtonTitle(node)}
+                  isFirst={isFirst}
+                  isLast={isLast}
+                  reorderPending={reorderPending}
+                  removePending={removePending}
+                  onAddChild={() => beginAddChild(node)}
+                  onEdit={() => setDialogState({ type: "edit", node })}
+                  onMoveUp={() => moveNode(node, "up")}
+                  onMoveDown={() => moveNode(node, "down")}
+                  onRemove={() => handleRemove(node)}
+                />
               </div>
             )}
           </TableCell>
@@ -546,7 +608,7 @@ export function WbsTree({
             <TableHeader>
               <TableRow>
                 <TableHead className="w-0 px-1.5 whitespace-nowrap">Nº</TableHead>
-                <TableHead>Ítem</TableHead>
+                <TableHead className={WBS_ITEM_COL_CLASS}>Ítem</TableHead>
                 <TableHead className="w-20">Unidad</TableHead>
                 <TableHead className="text-right w-24">Cantidad</TableHead>
                 {viewMode === "breakdown" ? (
@@ -571,7 +633,9 @@ export function WbsTree({
                     <TableHead className="text-right">Total venta</TableHead>
                   </>
                 )}
-                <TableHead className="w-32" />
+                <TableHead className="w-0 px-1 text-right whitespace-nowrap">
+                  {canEditStructure ? "Acciones" : null}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

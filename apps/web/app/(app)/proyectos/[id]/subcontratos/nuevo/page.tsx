@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getSubcontractFormWbsPickList,
+  getWbsSubcontractBudgetHints,
   listSubcontractorContacts,
   ServiceError,
 } from "@bloqer/services";
@@ -34,7 +35,10 @@ export default async function NuevoSubcontratoPage({ params }: PageProps) {
     throw err;
   }
 
-  const subcontractorOptions = await listSubcontractorContacts(projectId, ctx);
+  const [subcontractorOptions, budgetHints] = await Promise.all([
+    listSubcontractorContacts(projectId, ctx),
+    getWbsSubcontractBudgetHints(projectId, ctx).catch(() => []),
+  ]);
 
   const companyId = wbsPick.companyId || current.tenantCtx.companyId || "";
 
@@ -50,6 +54,7 @@ export default async function NuevoSubcontratoPage({ params }: PageProps) {
           companyId={companyId}
           subcontractorOptions={subcontractorOptions}
           wbsOptions={wbsPick.wbsOptions}
+          budgetHints={budgetHints}
           action={createSubcontractAction}
         />
       </div>

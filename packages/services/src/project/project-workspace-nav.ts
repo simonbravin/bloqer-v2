@@ -42,6 +42,7 @@ export function buildProjectWorkspaceNavSections(
   }
   if (gate.isEnabled("PROJECTS") && gate.isEnabled("BUDGETS") && canViewProjectCostControlReport(roles)) {
     planificacion.push({ label: "WBS y costos", href: `${base}/control-costos` });
+    planificacion.push({ label: "Reportes", href: `${base}/reportes` });
   }
   if (planificacion.length) sections.push({ title: "Planificación", items: planificacion });
 

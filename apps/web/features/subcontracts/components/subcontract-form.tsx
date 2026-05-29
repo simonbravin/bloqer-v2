@@ -19,6 +19,8 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CurrencySelect } from "@/components/ui/currency-select";
+import type { WbsSubcontractBudgetHint } from "@bloqer/services";
+import { SubcontractBudgetHints } from "./subcontract-budget-hints";
 
 export type SubcontractorOption = { id: string; legalName: string; fantasyName: string | null };
 export type WbsOption           = { id: string; code: string; name: string; unit: string };
@@ -39,6 +41,7 @@ type Props = {
   companyId:             string;
   subcontractorOptions:  SubcontractorOption[];
   wbsOptions:            WbsOption[];
+  budgetHints?:          WbsSubcontractBudgetHint[];
   action: (fd: FormData) => Promise<{ error: string } | { id: string }>;
   defaultValues?: {
     subcontractorContactId: string;
@@ -56,7 +59,7 @@ type Props = {
 };
 
 export function SubcontractForm({
-  projectId, companyId, subcontractorOptions, wbsOptions, action,
+  projectId, companyId, subcontractorOptions, wbsOptions, budgetHints, action,
   defaultValues, submitLabel = "Crear subcontrato",
 }: Props) {
   const router = useRouter();
@@ -76,6 +79,29 @@ export function SubcontractForm({
     setLines((prev) => prev.map((l, idx) =>
       idx === i ? { ...l, wbsNodeId: wbsId, unit: wbs?.unit ?? l.unit } : l,
     ));
+  }
+
+  function applyBudgetHint(hint: WbsSubcontractBudgetHint) {
+    const q = parseFloat(hint.quantity) || 1;
+    const total = parseFloat(hint.budgetSubcontractTotal) || 0;
+    const unitPrice = q > 0 ? (total / q).toFixed(4) : hint.unitSubcontractCost;
+    const newLine: LineState = {
+      wbsNodeId: hint.wbsNodeId,
+      description: hint.name,
+      unit: hint.unit,
+      quantity: hint.quantity,
+      unitPrice,
+      notes: "",
+    };
+    setLines((prev) => {
+      const emptyIdx = prev.findIndex(
+        (l) => l.wbsNodeId === "__none__" && !l.description.trim(),
+      );
+      if (emptyIdx >= 0) {
+        return prev.map((l, i) => (i === emptyIdx ? newLine : l));
+      }
+      return [...prev, newLine];
+    });
   }
 
   const totalValue = lines.reduce((sum, l) => {
@@ -165,6 +191,10 @@ export function SubcontractForm({
           <Textarea id="internalNotes" name="internalNotes" rows={2} defaultValue={defaultValues?.internalNotes} />
         </div>
       </div>
+
+      {budgetHints && budgetHints.length > 0 ? (
+        <SubcontractBudgetHints hints={budgetHints} onPick={applyBudgetHint} />
+      ) : null}
 
       {/* Lines */}
       <div className="space-y-3">
