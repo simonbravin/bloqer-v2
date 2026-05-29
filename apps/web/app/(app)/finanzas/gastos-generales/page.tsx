@@ -86,7 +86,7 @@ export default async function GastosGeneralesPage() {
   }
 
   return (
-    <PageShell variant="detail" className="space-y-8">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Gastos generales</h1>

@@ -26,24 +26,24 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
 
   if (gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP")) {
     links.push({
-      href:  "/finanzas/gastos-generales",
-      label: "Gastos generales",
-      title: "Asistente para facturas de proveedor sin proyecto",
-    });
-    links.push({
-      href:  "/finanzas/facturas-proveedor",
+      href: "/finanzas/facturas-proveedor",
       label: "Facturas y gastos",
       title: "Facturas de proveedor y gastos generales sin proyecto",
     });
     links.push({
-      href:  "/finanzas/cuentas-por-pagar",
+      href: "/finanzas/cuentas-por-pagar",
       label: "Pagos pendientes",
       title: "Obligaciones de empresa sin imputar a obra",
     });
     links.push({
-      href:  "/finanzas/cuentas-por-pagar-aging",
+      href: "/finanzas/cuentas-por-pagar-aging",
       label: "Cuentas por pagar",
       title: "Saldos por proveedor y vencimiento",
+    });
+    links.push({
+      href: "/finanzas/gastos-generales",
+      label: "Gastos generales",
+      title: "Asistente para facturas de proveedor sin proyecto e imputación a obra",
     });
   }
 
