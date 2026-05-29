@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type {
@@ -20,13 +20,7 @@ type ScheduleItemAuditEntryView = {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
 import {
   Sheet,
   SheetContent,
@@ -81,6 +75,18 @@ export function ScheduleItemDrawer({
   const [progressInput, setProgressInput] = useState("");
   const [tab, setTab] = useState<"detail" | "history" | "links">("detail");
 
+  const depCandidates = useMemo(() => {
+    if (!item) return [];
+    return allItems.filter(
+      (i) => i.id !== item.id && !item.predecessorIds.includes(i.id),
+    );
+  }, [allItems, item]);
+
+  const predecessorOptions = useMemo(
+    () => toSearchableOptions(depCandidates.map((c) => ({ id: c.id, label: c.name }))),
+    [depCandidates],
+  );
+
   useEffect(() => {
     if (!open || !item) return;
     setProgressInput(item.progressPct);
@@ -109,10 +115,6 @@ export function ScheduleItemDrawer({
   const succItems = item.successorIds
     .map((id) => allItems.find((i) => i.id === id))
     .filter(Boolean) as ScheduleWorkspaceItemDto[];
-  const depCandidates = allItems.filter(
-    (i) => i.id !== item.id && !item.predecessorIds.includes(i.id),
-  );
-
   function copyPhysical() {
     const pct = m?.operationalProgressPct;
     if (!pct) {
@@ -358,18 +360,14 @@ export function ScheduleItemDrawer({
               )}
               {workspace.canEdit && depCandidates.length > 0 && (
                 <div className="flex gap-2 pt-2">
-                  <Select value={predecessorPick} onValueChange={setPredecessorPick}>
-                    <SelectTrigger className="h-8 text-xs flex-1">
-                      <SelectValue placeholder="Agregar predecesora…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {depCandidates.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableCombobox
+                    className="h-8 flex-1 text-xs"
+                    options={predecessorOptions}
+                    value={predecessorPick}
+                    onValueChange={setPredecessorPick}
+                    placeholder="Agregar predecesora…"
+                    searchPlaceholder="Buscar tarea…"
+                  />
                   <Button size="sm" disabled={pending || !predecessorPick} onClick={addDependency}>
                     +
                   </Button>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
 
 interface Warehouse { id: string; name: string }
 interface Product   { id: string; name: string; unit: string }
@@ -36,6 +37,18 @@ export function WarehouseTransferForm({
 }: Props) {
   const router     = useRouter();
   const [pending, startTransition] = useTransition();
+  const [productId, setProductId] = useState(selectedProductId ?? "");
+
+  const productOptions = useMemo(
+    () =>
+      toSearchableOptions(
+        products.map((p) => ({
+          id: p.id,
+          label: p.unit ? `${p.name} (${p.unit})` : p.name,
+        })),
+      ),
+    [products],
+  );
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -94,23 +107,18 @@ export function WarehouseTransferForm({
 
       <div className="space-y-1.5">
         <Label htmlFor="productId">Producto</Label>
-        <Select
-          name="productId"
-          defaultValue={selectedProductId ?? ""}
-          onValueChange={(v) => onWarehouseOrProductChange("prod", v)}
-          required
-        >
-          <SelectTrigger id="productId">
-            <SelectValue placeholder="Seleccioná un producto" />
-          </SelectTrigger>
-          <SelectContent>
-            {products.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}{p.unit ? ` (${p.unit})` : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <input type="hidden" name="productId" value={productId} />
+        <SearchableCombobox
+          id="productId"
+          options={productOptions}
+          value={productId}
+          onValueChange={(v) => {
+            setProductId(v);
+            onWarehouseOrProductChange("prod", v);
+          }}
+          placeholder="Seleccioná un producto"
+          searchPlaceholder="Buscar producto…"
+        />
         {sourceStockBalance !== undefined && (
           <p className="text-xs text-muted-foreground">
             Stock disponible en origen:{" "}

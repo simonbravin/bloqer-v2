@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button }   from "@/components/ui/button";
@@ -8,6 +8,12 @@ import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  SearchableCombobox,
+  toSearchableOptions,
+  withNoneOption,
+  wbsToSearchableOptions,
+} from "@/components/ui/searchable-combobox";
 import {
   Table,
   TableBody,
@@ -75,6 +81,35 @@ export function JobsiteLogForm({
   const [issues,    setIssues]    = useState<IssueLine[]>(defaultValues?.issues    ?? []);
   const [error,     setError]     = useState<string | null>(null);
   const [pending,   setPending]   = useState(false);
+
+  const progressWbsOptions = useMemo(
+    () => wbsToSearchableOptions(wbsOptions),
+    [wbsOptions],
+  );
+  const contactComboboxOptions = useMemo(
+    () =>
+      withNoneOption(
+        toSearchableOptions(contactOptions.map((c) => ({ id: c.id, label: c.name }))),
+        { label: "— ninguno —" },
+      ),
+    [contactOptions],
+  );
+  const subcontractComboboxOptions = useMemo(
+    () =>
+      withNoneOption(
+        toSearchableOptions(subcontractOptions.map((s) => ({ id: s.id, label: s.code }))),
+        { label: "— ninguno —" },
+      ),
+    [subcontractOptions],
+  );
+  const productComboboxOptions = useMemo(
+    () =>
+      withNoneOption(
+        toSearchableOptions(productOptions.map((p) => ({ id: p.id, label: p.name }))),
+        { label: "— ninguno —" },
+      ),
+    [productOptions],
+  );
 
   function updateProgress(i: number, field: keyof ProgressLine, val: string) {
     setProgress((prev) => prev.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
@@ -224,14 +259,14 @@ export function JobsiteLogForm({
                 {progress.map((row, i) => (
                   <TableRow key={i}>
                     <TableCell className="py-1">
-                      <Select value={row.wbsNodeId} onValueChange={(v) => updateProgress(i, "wbsNodeId", v)}>
-                        <SelectTrigger className="w-48 h-8 text-xs"><SelectValue placeholder="Seleccionar…" /></SelectTrigger>
-                        <SelectContent>
-                          {wbsOptions.map((w) => (
-                            <SelectItem key={w.id} value={w.id}>{w.code} — {w.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableCombobox
+                        className="h-8 w-48 text-xs"
+                        options={progressWbsOptions}
+                        value={row.wbsNodeId}
+                        onValueChange={(v) => updateProgress(i, "wbsNodeId", v)}
+                        placeholder="Seleccionar…"
+                        searchPlaceholder="Buscar partida…"
+                      />
                     </TableCell>
                     <TableCell className="py-1"><Input className="h-8 text-xs w-36" value={row.description} onChange={(e) => updateProgress(i, "description", e.target.value)} /></TableCell>
                     <TableCell className="py-1"><Input className="h-8 text-xs w-24" value={row.quantityCompleted} onChange={(e) => updateProgress(i, "quantityCompleted", e.target.value)} placeholder="0.00" /></TableCell>
@@ -276,22 +311,24 @@ export function JobsiteLogForm({
                 {labor.map((row, i) => (
                   <TableRow key={i}>
                     <TableCell className="py-1">
-                      <Select value={row.contactId} onValueChange={(v) => updateLabor(i, "contactId", v)}>
-                        <SelectTrigger className="w-40 h-8 text-xs"><SelectValue placeholder="— ninguno —" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">— ninguno —</SelectItem>
-                          {contactOptions.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <SearchableCombobox
+                        className="h-8 w-40 text-xs"
+                        options={contactComboboxOptions}
+                        value={row.contactId}
+                        onValueChange={(v) => updateLabor(i, "contactId", v)}
+                        placeholder="— ninguno —"
+                        searchPlaceholder="Buscar contacto…"
+                      />
                     </TableCell>
                     <TableCell className="py-1">
-                      <Select value={row.subcontractId} onValueChange={(v) => updateLabor(i, "subcontractId", v)}>
-                        <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="— ninguno —" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">— ninguno —</SelectItem>
-                          {subcontractOptions.map((s) => <SelectItem key={s.id} value={s.id}>{s.code}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <SearchableCombobox
+                        className="h-8 w-36 text-xs"
+                        options={subcontractComboboxOptions}
+                        value={row.subcontractId}
+                        onValueChange={(v) => updateLabor(i, "subcontractId", v)}
+                        placeholder="— ninguno —"
+                        searchPlaceholder="Buscar subcontrato…"
+                      />
                     </TableCell>
                     <TableCell className="py-1"><Input className="h-8 text-xs w-36" value={row.crewDescription} onChange={(e) => updateLabor(i, "crewDescription", e.target.value)} /></TableCell>
                     <TableCell className="py-1"><Input className="h-8 text-xs w-20" type="number" min="1" value={row.workersCount} onChange={(e) => updateLabor(i, "workersCount", e.target.value)} /></TableCell>
@@ -335,13 +372,14 @@ export function JobsiteLogForm({
                 {materials.map((row, i) => (
                   <TableRow key={i}>
                     <TableCell className="py-1">
-                      <Select value={row.productId} onValueChange={(v) => updateMaterial(i, "productId", v)}>
-                        <SelectTrigger className="w-40 h-8 text-xs"><SelectValue placeholder="— ninguno —" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">— ninguno —</SelectItem>
-                          {productOptions.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <SearchableCombobox
+                        className="h-8 w-40 text-xs"
+                        options={productComboboxOptions}
+                        value={row.productId}
+                        onValueChange={(v) => updateMaterial(i, "productId", v)}
+                        placeholder="— ninguno —"
+                        searchPlaceholder="Buscar producto…"
+                      />
                     </TableCell>
                     <TableCell className="py-1">
                       <Select value={row.warehouseId} onValueChange={(v) => updateMaterial(i, "warehouseId", v)}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,8 +10,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+  SearchableCombobox,
+  wbsToSearchableOptions,
+} from "@/components/ui/searchable-combobox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -225,6 +226,7 @@ function AddLineForm({
   const [physicalPct, setPhysicalPct] = useState("0");
   const [currentQty, setCurrentQty] = useState("0");
   const [notes, setNotes] = useState("");
+  const wbsOptions = useMemo(() => wbsToSearchableOptions(items), [items]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -249,18 +251,13 @@ function AddLineForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1.5">
         <Label>Ítem WBS *</Label>
-        <Select value={wbsNodeId} onValueChange={setWbsNodeId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Seleccionar ítem..." />
-          </SelectTrigger>
-          <SelectContent>
-            {items.map((i) => (
-              <SelectItem key={i.id} value={i.id}>
-                {i.code} — {i.name} ({i.unit})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableCombobox
+          options={wbsOptions}
+          value={wbsNodeId}
+          onValueChange={setWbsNodeId}
+          placeholder="Seleccionar ítem…"
+          searchPlaceholder="Buscar partida…"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-3">

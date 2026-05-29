@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button }   from "@/components/ui/button";
@@ -17,8 +17,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { contactsToSearchableOptions, SearchableCombobox } from "@/components/ui/searchable-combobox";
+import {
+  contactsToSearchableOptions,
+  SearchableCombobox,
+  withNoneOption,
+  wbsToSearchableOptions,
+} from "@/components/ui/searchable-combobox";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import type { WbsSubcontractBudgetHint } from "@bloqer/services";
 import { SubcontractBudgetHints } from "./subcontract-budget-hints";
@@ -72,6 +76,10 @@ export function SubcontractForm({
   const [error, setError]                 = useState<string | null>(null);
   const [pending, setPending]             = useState(false);
   const appliedInitialWbs = useRef(false);
+  const wbsComboboxOptions = useMemo(
+    () => withNoneOption(wbsToSearchableOptions(wbsOptions), { label: "Sin WBS" }),
+    [wbsOptions],
+  );
 
   function addLine() { setLines((prev) => [...prev, { ...DEFAULT_LINE }]); }
   function removeLine(i: number) { setLines((prev) => prev.filter((_, idx) => idx !== i)); }
@@ -240,15 +248,14 @@ export function SubcontractForm({
                   return (
                     <TableRow key={i}>
                       <TableCell className="min-w-[160px]">
-                      <Select value={line.wbsNodeId} onValueChange={(v) => handleWbsChange(i, v)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sin WBS" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Sin WBS</SelectItem>
-                          {wbsOptions.map((w) => (
-                            <SelectItem key={w.id} value={w.id}>[{w.code}] {w.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableCombobox
+                        className="h-8 text-xs"
+                        options={wbsComboboxOptions}
+                        value={line.wbsNodeId}
+                        onValueChange={(v) => handleWbsChange(i, v)}
+                        placeholder="Sin WBS"
+                        searchPlaceholder="Buscar partida…"
+                      />
                       </TableCell>
                       <TableCell className="min-w-[200px]">
                         <Input className="h-8 text-xs" value={line.description} onChange={(e) => updateLine(i, "description", e.target.value)} required />

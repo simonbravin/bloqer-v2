@@ -1,12 +1,14 @@
 "use client";
 
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { CurrencySelect } from "@/components/ui/currency-select";
+import {
+  SearchableCombobox,
+  chartAccountsToSearchableOptions,
+} from "@/components/ui/searchable-combobox";
 
 export interface LineEditorRow {
   key:         string;
@@ -41,6 +43,11 @@ interface Props {
 }
 
 export function JournalEntryLinesEditor({ accounts, lines, onChange }: Props) {
+  const accountOptions = React.useMemo(
+    () => chartAccountsToSearchableOptions(accounts),
+    [accounts],
+  );
+
   function update(idx: number, patch: Partial<LineEditorRow>) {
     const next = lines.map((l, i) => (i === idx ? { ...l, ...patch } : l));
     onChange(next);
@@ -66,21 +73,15 @@ export function JournalEntryLinesEditor({ accounts, lines, onChange }: Props) {
           <div key={line.key} className="grid gap-3 border-b pb-4 last:border-0 last:pb-0 sm:grid-cols-12">
             <div className="sm:col-span-4 space-y-1">
               <Label className="text-xs text-muted-foreground">Cuenta</Label>
-              <Select
-                value={line.accountId || undefined}
+              <SearchableCombobox
+                options={accountOptions}
+                value={line.accountId}
                 onValueChange={(v) => update(idx, { accountId: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.code} — {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Seleccionar cuenta…"
+                searchPlaceholder="Buscar por código o nombre…"
+                emptyText="Ninguna cuenta coincide."
+                className="h-9"
+              />
             </div>
             <div className="sm:col-span-2 space-y-1">
               <Label className="text-xs text-muted-foreground">Debe</Label>

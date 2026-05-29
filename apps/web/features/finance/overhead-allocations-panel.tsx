@@ -26,6 +26,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  projectsToSearchableOptions,
+  SearchableCombobox,
+} from "@/components/ui/searchable-combobox";
+import {
   Table,
   TableBody,
   TableCell,
@@ -71,6 +75,10 @@ export function OverheadAllocationsPanel({
 
   const isAuto = mode === "AUTO_WEIGHT";
 
+  const projectComboboxOptions = useMemo(
+    () => projectsToSearchableOptions(projects),
+    [projects],
+  );
   const selectedProject = useMemo(
     () => projects.find((p) => p.id === projectId),
     [projects, projectId],
@@ -341,18 +349,14 @@ export function OverheadAllocationsPanel({
                 >
                   <div className="space-y-1 sm:col-span-2">
                     <Label>Proyecto</Label>
-                    <Select value={projectId} onValueChange={setProjectId} disabled={pending}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Elegir proyecto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {projects.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.code} — {p.name} ({p.currency})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableCombobox
+                      options={projectComboboxOptions}
+                      value={projectId}
+                      onValueChange={setProjectId}
+                      disabled={pending}
+                      placeholder="Elegir proyecto"
+                      searchPlaceholder="Buscar proyecto…"
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="oh-period">Período</Label>

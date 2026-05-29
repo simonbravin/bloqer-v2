@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,10 +12,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { formatDecimalAr } from "@/lib/format-money";
+import {
+  SearchableCombobox,
+  SEARCHABLE_NONE,
+  productsToSearchableOptions,
+  withNoneOption,
+  wbsToSearchableOptions,
+} from "@/components/ui/searchable-combobox";
 
 export type PurchaseOrderLine = {
   wbsNodeId: string | null;
@@ -55,6 +60,15 @@ const DEFAULT_LINE: PurchaseOrderLine = {
 };
 
 export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productOptions = [] }: Props) {
+  const wbsComboboxOptions = useMemo(
+    () => withNoneOption(wbsToSearchableOptions(wbsOptions), { label: "Sin WBS" }),
+    [wbsOptions],
+  );
+  const productComboboxOptions = useMemo(
+    () => withNoneOption(productsToSearchableOptions(productOptions), { label: "Sin producto" }),
+    [productOptions],
+  );
+
   function update(i: number, field: keyof PurchaseOrderLine, value: string | null) {
     const next = lines.map((l, idx) => idx === i ? { ...l, [field]: value } : l);
     onChange(next);
@@ -109,46 +123,35 @@ export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productO
               return (
                 <TableRow key={i} className="align-top">
                   <TableCell className="py-1.5">
-                    <Select
-                      value={line.wbsNodeId ?? "__none__"}
-                      onValueChange={(v) => update(i, "wbsNodeId", v === "__none__" ? null : v)}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Sin WBS" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Sin WBS</SelectItem>
-                        {wbsOptions.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.code} — {w.name} ({w.budgetName})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableCombobox
+                      className="h-8 text-xs"
+                      options={wbsComboboxOptions}
+                      value={line.wbsNodeId ?? SEARCHABLE_NONE}
+                      onValueChange={(v) =>
+                        update(i, "wbsNodeId", v === SEARCHABLE_NONE ? null : v)
+                      }
+                      placeholder="Sin WBS"
+                      searchPlaceholder="Buscar partida…"
+                    />
                   </TableCell>
                   {productOptions.length > 0 && (
                     <TableCell className="py-1.5">
-                      <Select
-                        value={line.productId ?? "__none__"}
+                      <SearchableCombobox
+                        className="h-8 text-xs"
+                        options={productComboboxOptions}
+                        value={line.productId ?? SEARCHABLE_NONE}
                         onValueChange={(v) => {
                           const selected = productOptions.find((p) => p.id === v);
-                          const next = { ...lines[i], productId: v === "__none__" ? null : v };
+                          const next = {
+                            ...lines[i],
+                            productId: v === SEARCHABLE_NONE ? null : v,
+                          };
                           if (selected && !lines[i].unit) next.unit = selected.unit;
-                          onChange(lines.map((l, idx) => idx === i ? next : l));
+                          onChange(lines.map((l, idx) => (idx === i ? next : l)));
                         }}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Sin producto" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Sin producto</SelectItem>
-                          {productOptions.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              [{p.sku}] {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        placeholder="Sin producto"
+                        searchPlaceholder="Buscar producto…"
+                      />
                     </TableCell>
                   )}
                   <TableCell className="py-1.5">

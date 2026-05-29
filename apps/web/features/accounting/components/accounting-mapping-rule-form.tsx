@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  SearchableCombobox,
+  chartAccountsToSearchableOptions,
+} from "@/components/ui/searchable-combobox";
 import {
   createAccountingMappingRuleAction,
   updateAccountingMappingRuleAction,
@@ -42,6 +46,7 @@ export function AccountingMappingRuleForm({
   const [debitId, setDebitId] = useState(initial?.debitAccountId ?? "");
   const [creditId, setCreditId] = useState(initial?.creditAccountId ?? "");
   const companyId = initial?.companyId ?? defaultCompanyId ?? "";
+  const accountOptions = useMemo(() => chartAccountsToSearchableOptions(accounts), [accounts]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -112,25 +117,23 @@ export function AccountingMappingRuleForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1">
             <Label>Cuenta debe</Label>
-            <Select value={debitId || undefined} onValueChange={setDebitId}>
-              <SelectTrigger><SelectValue placeholder="Cuenta…" /></SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableCombobox
+              options={accountOptions}
+              value={debitId}
+              onValueChange={setDebitId}
+              placeholder="Cuenta debe…"
+              searchPlaceholder="Buscar cuenta…"
+            />
           </div>
           <div className="space-y-1">
             <Label>Cuenta haber</Label>
-            <Select value={creditId || undefined} onValueChange={setCreditId}>
-              <SelectTrigger><SelectValue placeholder="Cuenta…" /></SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableCombobox
+              options={accountOptions}
+              value={creditId}
+              onValueChange={setCreditId}
+              placeholder="Cuenta haber…"
+              searchPlaceholder="Buscar cuenta…"
+            />
           </div>
         </div>
 

@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
+import { SearchableCombobox, SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/components/ui/searchable-combobox";
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine } from "./invoice-lines-editor";
 import { createSupplierInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
@@ -43,6 +40,14 @@ export function SupplierInvoiceForm({
 
   const filteredPOs = poOptions.filter(
     (po) => !supplierContactId || po.supplierContactId === supplierContactId,
+  );
+  const poComboboxOptions = useMemo(
+    () =>
+      withNoneOption(
+        toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code }))),
+        { label: "Sin OC vinculada" },
+      ),
+    [filteredPOs],
   );
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -123,20 +128,15 @@ export function SupplierInvoiceForm({
           {filteredPOs.length > 0 && !companyFinanzas && (
             <div className="col-span-2 space-y-1">
               <Label>Orden de compra (opcional)</Label>
-              <Select
-                onValueChange={(v) => setPurchaseOrderId(v === "__none__" ? null : v)}
-                value={purchaseOrderId ?? "__none__"}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sin OC vinculada" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Sin OC vinculada</SelectItem>
-                  {filteredPOs.map((po) => (
-                    <SelectItem key={po.id} value={po.id}>{po.code}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableCombobox
+                options={poComboboxOptions}
+                value={purchaseOrderId ?? SEARCHABLE_NONE}
+                onValueChange={(v) =>
+                  setPurchaseOrderId(v === SEARCHABLE_NONE ? null : v)
+                }
+                placeholder="Sin OC vinculada"
+                searchPlaceholder="Buscar OC…"
+              />
             </div>
           )}
 

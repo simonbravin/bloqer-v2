@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Combobox con búsqueda para catálogos largos o dinámicos (contactos, WBS, plan de cuentas, productos, proyectos).
+ * Para enums o listas fijas cortas (≤ ~8 opciones) usar `Select` (tipo de cuenta, moneda, severidad, modo GG, etc.).
+ */
+
 import * as React from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -133,4 +138,60 @@ export function contactsToSearchableOptions(
       searchValue: secondary ? `${primary} ${secondary}` : primary,
     };
   });
+}
+
+/** Valor interno para opción vacía en campos opcionales (WBS, OC, depósito, etc.). */
+export const SEARCHABLE_NONE = "__none__";
+
+export function withNoneOption(
+  options: SearchableComboboxOption[],
+  none: { label: string; value?: string } = { label: "Sin asignación" },
+): SearchableComboboxOption[] {
+  const value = none.value ?? SEARCHABLE_NONE;
+  return [{ value, label: none.label, searchValue: none.label }, ...options];
+}
+
+export function wbsToSearchableOptions(
+  items: { id: string; code: string; name: string; budgetName?: string; unit?: string }[],
+): SearchableComboboxOption[] {
+  return items.map((w) => {
+    let label = `${w.code} — ${w.name}`;
+    if (w.unit) label += ` (${w.unit})`;
+    if (w.budgetName) label += ` (${w.budgetName})`;
+    return {
+      value: w.id,
+      label,
+      searchValue: `${w.code} ${w.name} ${w.unit ?? ""} ${w.budgetName ?? ""}`,
+    };
+  });
+}
+
+export function productsToSearchableOptions(
+  items: { id: string; sku: string; name: string }[],
+): SearchableComboboxOption[] {
+  return items.map((p) => ({
+    value: p.id,
+    label: `[${p.sku}] ${p.name}`,
+    searchValue: `${p.sku} ${p.name}`,
+  }));
+}
+
+export function chartAccountsToSearchableOptions(
+  accounts: { id: string; code: string; name: string }[],
+): SearchableComboboxOption[] {
+  return accounts.map((a) => ({
+    value: a.id,
+    label: `${a.code} — ${a.name}`,
+    searchValue: `${a.code} ${a.name}`,
+  }));
+}
+
+export function projectsToSearchableOptions(
+  projects: { id: string; code: string; name: string; currency?: string }[],
+): SearchableComboboxOption[] {
+  return projects.map((p) => ({
+    value: p.id,
+    label: p.currency ? `${p.code} — ${p.name} (${p.currency})` : `${p.code} — ${p.name}`,
+    searchValue: `${p.code} ${p.name}`,
+  }));
 }

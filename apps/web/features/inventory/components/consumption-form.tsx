@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  SearchableCombobox,
+  SEARCHABLE_NONE,
+  productsToSearchableOptions,
+  withNoneOption,
+  wbsToSearchableOptions,
+} from "@/components/ui/searchable-combobox";
 import { createStockConsumptionAction } from "@/app/(app)/proyectos/[id]/consumos/actions";
 
 export type ProductOption   = { id: string; name: string; sku: string; unit: string };
@@ -28,7 +35,13 @@ export function ConsumptionForm({ projectId, products, warehouses, wbsOptions }:
   const [error, setError] = useState<string | null>(null);
   const [productId, setProductId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
-  const [wbsNodeId, setWbsNodeId] = useState<string>("__none__");
+  const [wbsNodeId, setWbsNodeId] = useState<string>(SEARCHABLE_NONE);
+
+  const productOptions = useMemo(() => productsToSearchableOptions(products), [products]);
+  const wbsComboboxOptions = useMemo(
+    () => withNoneOption(wbsToSearchableOptions(wbsOptions), { label: "Sin asignación" }),
+    [wbsOptions],
+  );
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -40,7 +53,7 @@ export function ConsumptionForm({ projectId, products, warehouses, wbsOptions }:
         projectId,
         warehouseId,
         productId,
-        wbsNodeId:    wbsNodeId === "__none__" ? null : wbsNodeId,
+        wbsNodeId:    wbsNodeId === SEARCHABLE_NONE ? null : wbsNodeId,
         quantity:     fd.get("quantity") as string,
         movementDate: fd.get("movementDate") as string,
         notes:        (fd.get("notes") as string) || null,
@@ -59,18 +72,13 @@ export function ConsumptionForm({ projectId, products, warehouses, wbsOptions }:
 
       <div className="space-y-1.5">
         <Label>Producto</Label>
-        <Select value={productId} onValueChange={setProductId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Seleccionar producto…" />
-          </SelectTrigger>
-          <SelectContent>
-            {products.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                [{p.sku}] {p.name} ({p.unit || "un"})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableCombobox
+          options={productOptions}
+          value={productId}
+          onValueChange={setProductId}
+          placeholder="Seleccionar producto…"
+          searchPlaceholder="Buscar por SKU o nombre…"
+        />
       </div>
 
       <div className="space-y-1.5">
@@ -107,19 +115,13 @@ export function ConsumptionForm({ projectId, products, warehouses, wbsOptions }:
       {wbsOptions.length > 0 && (
         <div className="space-y-1.5">
           <Label>Partida WBS (opcional)</Label>
-          <Select value={wbsNodeId} onValueChange={setWbsNodeId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Sin asignación" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Sin asignación</SelectItem>
-              {wbsOptions.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  {w.code} — {w.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            options={wbsComboboxOptions}
+            value={wbsNodeId}
+            onValueChange={setWbsNodeId}
+            placeholder="Sin asignación"
+            searchPlaceholder="Buscar partida…"
+          />
         </div>
       )}
 
