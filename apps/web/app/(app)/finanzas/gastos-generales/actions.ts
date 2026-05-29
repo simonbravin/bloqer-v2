@@ -3,13 +3,19 @@
 import {
   createProjectOverheadAllocation,
   deleteProjectOverheadAllocation,
+  getAutoWeightOverheadPreviewForPeriod,
   ServiceError,
+  updateCompanyOverheadAllocationMode,
   updateCompanyOverheadAllocationPct,
 } from "@bloqer/services";
 import {
+  autoWeightPreviewQuerySchema,
   createProjectOverheadAllocationSchema,
+  updateCompanyOverheadModeSchema,
   updateCompanyOverheadPctSchema,
+  type AutoWeightPreviewQueryInput,
   type CreateProjectOverheadAllocationInput,
+  type UpdateCompanyOverheadModeInput,
   type UpdateCompanyOverheadPctInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
@@ -79,6 +85,47 @@ export async function updateCompanyOverheadPctAction(
     revalidatePath(PATH);
     revalidatePath("/proyectos");
     return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function updateCompanyOverheadModeAction(
+  data: UpdateCompanyOverheadModeInput,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = updateCompanyOverheadModeSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    await updateCompanyOverheadAllocationMode(
+      parsed.data.companyId,
+      parsed.data.overheadAllocationMode,
+      ctx,
+    );
+    revalidatePath(PATH);
+    revalidatePath("/proyectos");
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function fetchAutoWeightPreviewAction(
+  data: AutoWeightPreviewQueryInput,
+): Promise<
+  | { ok: true; preview: Awaited<ReturnType<typeof getAutoWeightOverheadPreviewForPeriod>> }
+  | { error: string }
+> {
+  const ctx = await getCtx();
+  const parsed = autoWeightPreviewQuerySchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    const preview = await getAutoWeightOverheadPreviewForPeriod(
+      parsed.data.companyId,
+      parsed.data.period,
+      ctx,
+    );
+    return { ok: true, preview };
   } catch (err) {
     return handle(err);
   }

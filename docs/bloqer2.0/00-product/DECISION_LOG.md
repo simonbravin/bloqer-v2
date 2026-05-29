@@ -502,12 +502,24 @@
 - **Fecha:** 2026-05-28
 - **Estado:** ACTIVA
 - **Decidido por:** Owner (plan Fase F)
-- **Contexto:** [Q-013](./OPEN_QUESTIONS.md) bloqueaba margen neto (R-004); opción 3 (prorrateo automático por peso de CD) queda para fase posterior.
+- **Contexto:** [Q-013](./OPEN_QUESTIONS.md) bloqueaba margen neto (R-004).
 - **Decisión:**
   1. **Opción 1:** tabla `project_overhead_allocations` — imputación manual por proyecto y período (`YYYY-MM`).
   2. **Opción 2:** `Company.overheadAllocationPct` aplicado sobre **costo directo devengado** del proyecto (distinto de `Budget.overheadPct` markup de venta).
+  3. **Opción 3:** ver [D-041](#d-041--gg-prorrateo-automático-por-peso-de-cd-q-013-opción-3).
 - **Implicancias:** `getProjectOverheadAmount` en services; R-004 expone `netMargin` cuando el rol lo permite ([D-013]).
 - **Documentos afectados:** [`04-formulas/PROFITABILITY_FORMULAS.md`](../04-formulas/PROFITABILITY_FORMULAS.md), [`03-finance/PROFITABILITY_BY_PROJECT.md`](../03-finance/PROFITABILITY_BY_PROJECT.md), [`06-reports/REPORT_CATALOG.md`](../06-reports/REPORT_CATALOG.md).
+
+---
+
+### D-041 — GG: prorrateo automático por peso de CD (Q-013 opción 3)
+
+- **Fecha:** 2026-05-29
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (plan Fase F)
+- **Decisión:** `Company.overheadAllocationMode` (`MANUAL` | `AUTO_WEIGHT`). En `AUTO_WEIGHT`, el pool mensual son facturas AP corporativas emitidas (ARS); cada obra recibe `pool × (CD obra / CD total empresa)` del período. Modos excluyentes: en automático no hay imputaciones manuales ni % empresa.
+- **Implicancias:** `overhead-auto-weight.service.ts`, UI en `/finanzas/gastos-generales`, margen neto R-004 en ARS.
+- **Documentos afectados:** igual que D-040.
 
 ---
 

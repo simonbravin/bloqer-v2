@@ -19,7 +19,7 @@
 
 | ID | Tema | Acción sugerida |
 |---|---|---|
-| P-GG-01 | **Q-013 opción 3** — prorrateo automático de GG según peso del CD del período entre obras | Fase posterior; constante `OVERHEAD_AUTO_WEIGHT_PRORATION_AVAILABLE = false` en `project-overhead.service.ts` |
+| P-GG-01 | ~~**Q-013 opción 3**~~ — prorrateo automático de GG según peso del CD del período | **Hecho:** `Company.overheadAllocationMode` (`MANUAL` \| `AUTO_WEIGHT`); `overhead-auto-weight.service.ts` |
 | P-GG-02 | Filtro de período en margen neto | Rentabilidad suma **todas** las imputaciones manuales históricas; filtro `periodFrom`/`periodTo` en `getProjectOverheadAmount` listo para reportes con rango |
 | P-GG-03 | Moneda de imputación manual | Debe coincidir con presupuesto aprobado del proyecto (validado en servicio) |
 

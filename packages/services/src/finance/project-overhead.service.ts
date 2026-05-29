@@ -1,18 +1,14 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import type { OverheadAllocationMode } from "@bloqer/database";
+import { sumAutoWeightOverheadForProject } from "./overhead-auto-weight.service";
+import { assertOverheadEdit, assertOverheadView } from "./overhead-access";
+import {
+  assertValidOverheadPeriod,
+  type OverheadPeriodFilter,
+} from "./overhead-period";
 import { ServiceContext, ServiceError } from "../types";
 
-function assertOverheadEdit(ctx: ServiceContext) {
-  if (!can(ctx.roles, "EDIT", "AP") && !can(ctx.roles, "APPROVE", "TENANT_SETTINGS")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para editar imputaciones de gastos generales");
-  }
-}
-
-function assertOverheadView(ctx: ServiceContext) {
-  if (!can(ctx.roles, "VIEW", "AP") && !can(ctx.roles, "VIEW", "PROJECTS")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver imputaciones de gastos generales");
-  }
-}
+export { assertValidOverheadPeriod } from "./overhead-period";
 
 export type ProjectOverheadAllocationView = {
   id: string;
@@ -31,30 +27,13 @@ export type CompanyOverheadSettings = {
   companyId: string;
   companyName: string;
   overheadAllocationPct: string;
+  overheadAllocationMode: OverheadAllocationMode;
 };
 
 const ZERO = new Prisma.Decimal(0);
 const HUNDRED = new Prisma.Decimal(100);
 
-/** Q-013 opción 3 — prorrateo automático por peso de CD del período (fase posterior). */
-export const OVERHEAD_AUTO_WEIGHT_PRORATION_AVAILABLE = false;
-
-export type ProjectOverheadPeriodFilter = {
-  /** Inclusive YYYY-MM */
-  periodFrom?: string;
-  /** Inclusive YYYY-MM */
-  periodTo?: string;
-};
-
-export function assertValidOverheadPeriod(period: string): void {
-  if (!/^\d{4}-\d{2}$/.test(period)) {
-    throw new ServiceError("VALIDATION", "Período inválido (use YYYY-MM)");
-  }
-  const month = Number.parseInt(period.slice(5, 7), 10);
-  if (month < 1 || month > 12) {
-    throw new ServiceError("VALIDATION", "Mes inválido en el período (01–12)");
-  }
-}
+export type ProjectOverheadPeriodFilter = OverheadPeriodFilter;
 
 async function resolveProjectBudgetCurrency(projectId: string, ctx: ServiceContext): Promise<string> {
   const budget = await prisma.budget.findFirst({
@@ -77,13 +56,16 @@ function manualRowInPeriod(period: string, filter?: ProjectOverheadPeriodFilter)
 }
 
 export type ProjectOverheadBreakdown = {
+  allocationMode: OverheadAllocationMode;
   manualTotal: string;
   calculatedPct: string;
   calculatedAmount: string;
+  autoWeightAmount: string;
+  autoWeightPct: string | null;
   totalOverhead: string;
   currency: string;
-  /** Imputaciones manuales en otra moneda (no sumadas al total). */
   manualRowsExcluded: number;
+  autoWeightWarnings: string[];
 };
 
 export async function getProjectOverheadAmount(
@@ -105,26 +87,37 @@ export async function getProjectOverheadAmount(
 
   const cid = companyId || project.companyId;
   if (!cid) {
+    return emptyBreakdown(targetCurrency, "MANUAL");
+  }
+
+  const company = await prisma.company.findUnique({
+    where: { id: cid },
+    select: { overheadAllocationPct: true, overheadAllocationMode: true },
+  });
+
+  const mode = company?.overheadAllocationMode ?? "MANUAL";
+
+  if (mode === "AUTO_WEIGHT") {
+    const auto = await sumAutoWeightOverheadForProject(projectId, cid, periodFilter, ctx);
+    const amountStr = auto.amount.toFixed(2);
     return {
+      allocationMode: "AUTO_WEIGHT",
       manualTotal: "0.00",
       calculatedPct: "0.00",
       calculatedAmount: "0.00",
-      totalOverhead: "0.00",
-      currency: targetCurrency,
+      autoWeightAmount: amountStr,
+      autoWeightPct: auto.weightPctDisplay,
+      totalOverhead: amountStr,
+      currency: "ARS",
       manualRowsExcluded: 0,
+      autoWeightWarnings: auto.warnings,
     };
   }
 
-  const [company, manualRows] = await Promise.all([
-    prisma.company.findUnique({
-      where: { id: cid },
-      select: { overheadAllocationPct: true },
-    }),
-    prisma.projectOverheadAllocation.findMany({
-      where: { tenantId: ctx.tenantId, projectId },
-      select: { amount: true, currency: true, period: true },
-    }),
-  ]);
+  const manualRows = await prisma.projectOverheadAllocation.findMany({
+    where: { tenantId: ctx.tenantId, projectId },
+    select: { amount: true, currency: true, period: true },
+  });
 
   const manualInScope = manualRows.filter(
     (r) => r.currency === targetCurrency && manualRowInPeriod(r.period, periodFilter),
@@ -136,12 +129,31 @@ export async function getProjectOverheadAmount(
   const totalOverhead = manualTotal.plus(calculatedAmount);
 
   return {
+    allocationMode: "MANUAL",
     manualTotal: manualTotal.toFixed(2),
     calculatedPct: pct.toFixed(2),
     calculatedAmount: calculatedAmount.toFixed(2),
+    autoWeightAmount: "0.00",
+    autoWeightPct: null,
     totalOverhead: totalOverhead.toFixed(2),
     currency: targetCurrency,
     manualRowsExcluded,
+    autoWeightWarnings: [],
+  };
+}
+
+function emptyBreakdown(currency: string, mode: OverheadAllocationMode): ProjectOverheadBreakdown {
+  return {
+    allocationMode: mode,
+    manualTotal: "0.00",
+    calculatedPct: "0.00",
+    calculatedAmount: "0.00",
+    autoWeightAmount: "0.00",
+    autoWeightPct: null,
+    totalOverhead: "0.00",
+    currency,
+    manualRowsExcluded: 0,
+    autoWeightWarnings: [],
   };
 }
 
@@ -227,7 +239,13 @@ export async function getCompanyOverheadSettings(
   assertOverheadView(ctx);
   const company = await prisma.company.findUnique({
     where: { id: companyId },
-    select: { id: true, name: true, tenantId: true, overheadAllocationPct: true },
+    select: {
+      id: true,
+      name: true,
+      tenantId: true,
+      overheadAllocationPct: true,
+      overheadAllocationMode: true,
+    },
   });
   if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
   if (company.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -235,12 +253,54 @@ export async function getCompanyOverheadSettings(
     companyId: company.id,
     companyName: company.name,
     overheadAllocationPct: company.overheadAllocationPct.toFixed(2),
+    overheadAllocationMode: company.overheadAllocationMode,
   };
 }
 
 export async function updateCompanyOverheadAllocationPct(
   companyId: string,
   overheadAllocationPct: number,
+  ctx: ServiceContext,
+): Promise<CompanyOverheadSettings> {
+  assertOverheadEdit(ctx);
+  const existing = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { tenantId: true, overheadAllocationMode: true },
+  });
+  if (!existing) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
+  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+
+  if (existing.overheadAllocationMode === "AUTO_WEIGHT") {
+    throw new ServiceError(
+      "VALIDATION",
+      "Con prorrateo automático por peso de CD el % empresa no se usa; cambiá a modo manual o dejá el % en 0.",
+    );
+  }
+
+  const company = await prisma.company.update({
+    where: { id: companyId },
+    data: {
+      overheadAllocationPct: new Prisma.Decimal(overheadAllocationPct),
+    },
+    select: {
+      id: true,
+      name: true,
+      tenantId: true,
+      overheadAllocationPct: true,
+      overheadAllocationMode: true,
+    },
+  });
+  return {
+    companyId: company.id,
+    companyName: company.name,
+    overheadAllocationPct: company.overheadAllocationPct.toFixed(2),
+    overheadAllocationMode: company.overheadAllocationMode,
+  };
+}
+
+export async function updateCompanyOverheadAllocationMode(
+  companyId: string,
+  overheadAllocationMode: OverheadAllocationMode,
   ctx: ServiceContext,
 ): Promise<CompanyOverheadSettings> {
   assertOverheadEdit(ctx);
@@ -253,15 +313,20 @@ export async function updateCompanyOverheadAllocationPct(
 
   const company = await prisma.company.update({
     where: { id: companyId },
-    data: {
-      overheadAllocationPct: new Prisma.Decimal(overheadAllocationPct),
+    data: { overheadAllocationMode },
+    select: {
+      id: true,
+      name: true,
+      tenantId: true,
+      overheadAllocationPct: true,
+      overheadAllocationMode: true,
     },
-    select: { id: true, name: true, tenantId: true, overheadAllocationPct: true },
   });
   return {
     companyId: company.id,
     companyName: company.name,
     overheadAllocationPct: company.overheadAllocationPct.toFixed(2),
+    overheadAllocationMode: company.overheadAllocationMode,
   };
 }
 
@@ -303,13 +368,19 @@ export async function createProjectOverheadAllocation(
     }),
     prisma.company.findUnique({
       where: { id: input.companyId },
-      select: { tenantId: true },
+      select: { tenantId: true, overheadAllocationMode: true },
     }),
   ]);
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
   if (project.tenantId !== ctx.tenantId || company.tenantId !== ctx.tenantId) {
     throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  }
+  if (company.overheadAllocationMode === "AUTO_WEIGHT") {
+    throw new ServiceError(
+      "VALIDATION",
+      "La empresa usa prorrateo automático por peso de CD; desactivá ese modo para cargar imputaciones manuales.",
+    );
   }
   if (project.companyId && project.companyId !== input.companyId) {
     throw new ServiceError("VALIDATION", "El proyecto no pertenece a esa empresa");

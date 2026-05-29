@@ -12,6 +12,8 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import {
+  currentOverheadPeriod,
+  getAutoWeightOverheadPreviewForPeriod,
   getCompanies,
   getCompanyOverheadSettings,
   getTenantModuleGate,
@@ -64,6 +66,10 @@ export default async function GastosGeneralesPage() {
         listProjectOverheadAllocations({ companyId }, ctx),
         listActiveProjectsForOverhead(companyId, ctx),
       ]);
+      const initialAutoPreview =
+        settings.overheadAllocationMode === "AUTO_WEIGHT"
+          ? await getAutoWeightOverheadPreviewForPeriod(companyId, currentOverheadPeriod(), ctx)
+          : null;
       overheadPanel = (
         <OverheadAllocationsPanel
           companyId={companyId}
@@ -71,6 +77,7 @@ export default async function GastosGeneralesPage() {
           allocations={allocations}
           projects={projects}
           canEdit={canEditAp}
+          initialAutoPreview={initialAutoPreview}
         />
       );
     } catch (err) {
@@ -84,8 +91,8 @@ export default async function GastosGeneralesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Gastos generales</h1>
           <p className="text-sm text-muted-foreground max-w-prose">
-            Facturas corporativas sin proyecto, imputación de GG a obra (manual y % empresa) y flujo
-            de pago desde tesorería.
+            Facturas corporativas sin proyecto, imputación de GG a obra (manual, % empresa o
+            prorrateo automático por peso del CD) y flujo de pago desde tesorería.
           </p>
         </div>
         <PageBackLink href="/finanzas" label="Resumen Finanzas" />

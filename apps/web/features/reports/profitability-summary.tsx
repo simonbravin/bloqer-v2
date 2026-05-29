@@ -103,22 +103,31 @@ export function ProfitabilitySummary({ report }: Props) {
               <p>
                 GG total imputado:{" "}
                 {report.overheadAmount != null
-                  ? formatMoneyAmount(report.overheadAmount, report.currency)
+                  ? formatMoneyAmount(
+                      report.overheadAmount,
+                      report.overheadManualAmount != null ? report.currency : "ARS",
+                    )
                   : "—"}
               </p>
               {report.overheadManualAmount != null &&
               parseFloat(report.overheadManualAmount) > 0 ? (
                 <p className="text-muted-foreground">
-                  · Manual (todos los períodos):{" "}
+                  · Manual:{" "}
                   {formatMoneyAmount(report.overheadManualAmount, report.currency)}
                 </p>
               ) : null}
               {report.overheadCalculatedAmount != null &&
-              report.overheadCompanyPct != null &&
-              parseFloat(report.overheadCompanyPct) > 0 ? (
+              parseFloat(report.overheadCalculatedAmount) > 0 ? (
                 <p className="text-muted-foreground">
-                  · {report.overheadCompanyPct}% empresa sobre CD devengado:{" "}
-                  {formatMoneyAmount(report.overheadCalculatedAmount, report.currency)}
+                  ·{" "}
+                  {report.overheadManualAmount == null
+                    ? `Prorrateo por peso del CD${report.overheadCompanyPct ? ` (${report.overheadCompanyPct}% del pool)` : ""}`
+                    : `${report.overheadCompanyPct ?? "0"}% empresa sobre CD devengado`}
+                  :{" "}
+                  {formatMoneyAmount(
+                    report.overheadCalculatedAmount,
+                    report.overheadManualAmount != null ? report.currency : "ARS",
+                  )}
                 </p>
               ) : null}
               <p className="font-semibold">

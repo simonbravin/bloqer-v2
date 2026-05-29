@@ -1052,7 +1052,8 @@ export async function exportProjectProfitabilityCsv(
     ["VentaPresupuestada", report.budgetTotalSale, report.budgetCurrency],
   ];
   if (report.overheadAmount != null) {
-    rows.push(["GastosGenerales", report.overheadAmount, report.currency]);
+    const ggCurrency = report.overheadManualAmount != null ? report.currency : "ARS";
+    rows.push(["GastosGenerales", report.overheadAmount, ggCurrency]);
     rows.push(["MargenNeto", report.netMargin ?? "", report.currency]);
   }
   const fname = `rentabilidad_${projectId}_${report.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;

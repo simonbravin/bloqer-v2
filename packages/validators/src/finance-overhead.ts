@@ -20,3 +20,19 @@ export const updateCompanyOverheadPctSchema = z.object({
 });
 
 export type UpdateCompanyOverheadPctInput = z.infer<typeof updateCompanyOverheadPctSchema>;
+
+export const overheadAllocationModeSchema = z.enum(["MANUAL", "AUTO_WEIGHT"]);
+
+export const updateCompanyOverheadModeSchema = z.object({
+  companyId: z.string().uuid(),
+  overheadAllocationMode: overheadAllocationModeSchema,
+});
+
+export type UpdateCompanyOverheadModeInput = z.infer<typeof updateCompanyOverheadModeSchema>;
+
+export const autoWeightPreviewQuerySchema = z.object({
+  companyId: z.string().uuid(),
+  period: z.string().regex(/^\d{4}-\d{2}$/, "Período inválido (use YYYY-MM)"),
+});
+
+export type AutoWeightPreviewQueryInput = z.infer<typeof autoWeightPreviewQuerySchema>;

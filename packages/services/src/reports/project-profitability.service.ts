@@ -247,7 +247,7 @@ export async function getProjectProfitabilityReport(
   let overheadCalculatedAmount: string | null = null;
   let overheadCompanyPct: string | null = null;
   let netMarginNote = netAvailable
-    ? "Margen neto = margen bruto − GG (imputación manual + % empresa sobre CD devengado) [D-040]."
+    ? "Margen neto = margen bruto − GG imputados a la obra [D-040]."
     : "Margen neto visible solo para OWNER, ADMIN o FINANCE [D-013].";
 
   let netMarginAvailableFlag = false;
@@ -260,23 +260,39 @@ export async function getProjectProfitabilityReport(
       displayCurrency,
     );
     overheadAmount = oh.totalOverhead;
-    overheadManualAmount = oh.manualTotal;
-    overheadCalculatedAmount = oh.calculatedAmount;
-    overheadCompanyPct = oh.calculatedPct;
-    if (parseFloat(oh.manualTotal) > 0) {
-      warnings.push(
-        "GG manual: suma de todas las imputaciones por período cargadas a la obra (histórico acumulado).",
-      );
+    if (oh.allocationMode === "AUTO_WEIGHT") {
+      overheadCalculatedAmount = oh.autoWeightAmount;
+      overheadCompanyPct = oh.autoWeightPct;
+      if (parseFloat(oh.autoWeightAmount) > 0) {
+        warnings.push(
+          `GG prorrateados por peso del CD (suma de períodos con facturas corporativas, ARS): ${oh.autoWeightAmount} ARS.`,
+        );
+      }
+      for (const w of oh.autoWeightWarnings) {
+        if (!warnings.includes(w)) warnings.push(w);
+      }
+      if (displayCurrency !== "ARS") {
+        warnings.push(
+          `Margen neto con GG automático solo en ARS; la vista está en ${displayCurrency}.`,
+        );
+      }
+    } else {
+      overheadManualAmount = oh.manualTotal;
+      overheadCalculatedAmount = oh.calculatedAmount;
+      overheadCompanyPct = oh.calculatedPct;
+      if (parseFloat(oh.manualTotal) > 0) {
+        warnings.push(
+          "GG manual: suma de imputaciones por período cargadas a la obra (según filtro de período, o histórico si no hay filtro).",
+        );
+      }
+      if (parseFloat(oh.calculatedPct) > 0) {
+        warnings.push(
+          `GG % empresa (${oh.calculatedPct}% sobre CD devengado): ${oh.calculatedAmount} ${oh.currency}.`,
+        );
+      }
     }
-    if (parseFloat(oh.calculatedPct) > 0) {
-      warnings.push(
-        `GG automático (${oh.calculatedPct}% empresa sobre CD devengado): ${oh.calculatedAmount} ${oh.currency}.`,
-      );
-    }
-    warnings.push(
-      "Prorrateo automático de GG por peso de costo directo entre obras (Q-013 opción 3) no está disponible en esta versión.",
-    );
-    if (oh.currency === displayCurrency) {
+    const overheadCurrency = oh.allocationMode === "AUTO_WEIGHT" ? "ARS" : oh.currency;
+    if (overheadCurrency === displayCurrency) {
       const nm = new Prisma.Decimal(displaySlice?.grossMargin ?? grossMargin.toFixed(2)).minus(
         oh.totalOverhead,
       );
@@ -284,10 +300,10 @@ export async function getProjectProfitabilityReport(
       netMarginAvailableFlag = true;
     } else {
       warnings.push(
-        `Margen neto omitido: GG en ${oh.currency} no coincide con la moneda mostrada (${displayCurrency}).`,
+        `Margen neto omitido: GG en ${overheadCurrency} no coincide con la moneda mostrada (${displayCurrency}).`,
       );
     }
-    if (oh.manualRowsExcluded > 0) {
+    if (oh.allocationMode === "MANUAL" && oh.manualRowsExcluded > 0) {
       warnings.push(
         "Hay imputaciones manuales de GG en otra moneda; solo se suman las de la moneda del reporte.",
       );

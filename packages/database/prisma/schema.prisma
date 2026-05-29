@@ -46,6 +46,12 @@ enum CompanyStatus {
   INACTIVE
 }
 
+/// Q-013 D-040: cómo imputar gastos generales de empresa a obras.
+enum OverheadAllocationMode {
+  MANUAL
+  AUTO_WEIGHT
+}
+
 enum MembershipStatus {
   ACTIVE
   INACTIVE
@@ -610,8 +616,10 @@ model Company {
   industry    String? @db.VarChar(128)
   companySize String? @db.VarChar(64)
   status    CompanyStatus @default(ACTIVE)
-  /// Q-013 opción 2: % sobre costo directo devengado del proyecto (distinto de Budget.overheadPct markup).
+  /// Q-013 opción 2: % sobre costo directo devengado (solo modo MANUAL).
   overheadAllocationPct Decimal @default(0) @db.Decimal(8, 4)
+  /// Q-013 opción 1+2 (MANUAL) vs opción 3 (AUTO_WEIGHT por peso de CD del período).
+  overheadAllocationMode OverheadAllocationMode @default(MANUAL)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 

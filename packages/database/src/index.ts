@@ -54,4 +54,5 @@ export {
   JournalEntryStatus,
   JournalEntrySourceType,
   AccountingMappingEventType,
+  OverheadAllocationMode,
 } from "@prisma/client";
