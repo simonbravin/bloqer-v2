@@ -40,7 +40,7 @@ export default async function GastosGeneralesNuevaPage() {
   }));
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href="/finanzas/gastos-generales" label="Asistente" />
         <h1 className="text-2xl font-bold tracking-tight">Paso 1 — Nueva factura de gasto</h1>

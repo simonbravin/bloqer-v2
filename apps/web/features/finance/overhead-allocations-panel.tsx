@@ -44,12 +44,9 @@ type Props = {
   projects: ProjectOption[];
   canEdit: boolean;
   initialAutoPreview: AutoWeightPeriodPreview | null;
+  /** Período calendario actual (servidor) — evita hydration mismatch en inputs. */
+  calendarPeriod: string;
 };
-
-function currentPeriod(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 
 export function OverheadAllocationsPanel({
   companyId,
@@ -58,6 +55,7 @@ export function OverheadAllocationsPanel({
   projects,
   canEdit,
   initialAutoPreview,
+  calendarPeriod,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -65,8 +63,8 @@ export function OverheadAllocationsPanel({
   const [mode, setMode] = useState(settings.overheadAllocationMode);
   const [pct, setPct] = useState(settings.overheadAllocationPct);
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
-  const [period, setPeriod] = useState(currentPeriod());
-  const [previewPeriod, setPreviewPeriod] = useState(initialAutoPreview?.period ?? currentPeriod());
+  const [period, setPeriod] = useState(calendarPeriod);
+  const [previewPeriod, setPreviewPeriod] = useState(initialAutoPreview?.period ?? calendarPeriod);
   const [autoPreview, setAutoPreview] = useState<AutoWeightPeriodPreview | null>(initialAutoPreview);
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");

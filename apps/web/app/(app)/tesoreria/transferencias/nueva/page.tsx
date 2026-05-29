@@ -22,7 +22,7 @@ export default async function NuevaTransferenciaPage() {
     .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href="/tesoreria/transferencias" label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva transferencia</h1>

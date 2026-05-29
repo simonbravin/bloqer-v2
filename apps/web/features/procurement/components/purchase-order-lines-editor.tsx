@@ -14,6 +14,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { formatDecimalAr } from "@/lib/format-money";
 
 export type PurchaseOrderLine = {
   wbsNodeId: string | null;
@@ -40,10 +41,6 @@ function linePreview(l: PurchaseOrderLine) {
   const subtotal = qty * price;
   const tax      = subtotal * (rate / 100);
   return { subtotal, tax, total: subtotal + tax };
-}
-
-function fmt(n: number) {
-  return n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 interface Props {
@@ -197,9 +194,9 @@ export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productO
                       className="h-8 text-sm"
                     />
                   </TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">{fmt(p.subtotal)}</TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">{fmt(p.tax)}</TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">{fmt(p.total)}</TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.subtotal)}</TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.tax)}</TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.total)}</TableCell>
                   <TableCell className="align-top pt-2">
                     {lines.length > 1 && (
                       <button
@@ -222,15 +219,15 @@ export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productO
       <div className="flex justify-end gap-8 text-sm border-t pt-3">
         <div className="text-right">
           <p className="text-xs text-muted-foreground">Subtotal</p>
-          <p className="tabular-nums font-medium">{fmt(totals.subtotal)}</p>
+          <p className="tabular-nums font-medium">{formatDecimalAr(totals.subtotal)}</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">IVA</p>
-          <p className="tabular-nums font-medium">{fmt(totals.tax)}</p>
+          <p className="tabular-nums font-medium">{formatDecimalAr(totals.tax)}</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground font-semibold">Total (vista previa)</p>
-          <p className="tabular-nums font-semibold">{fmt(totals.total)}</p>
+          <p className="tabular-nums font-semibold">{formatDecimalAr(totals.total)}</p>
         </div>
       </div>
       <p className="text-xs text-muted-foreground">

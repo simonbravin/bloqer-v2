@@ -28,7 +28,7 @@ export default async function NuevaReglaContablePage({
   const defaultCompanyId = current.tenantCtx.companyId ?? cf.companyId ?? null;
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href={`/contabilidad/reglas${q}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva regla contable</h1>

@@ -1,3 +1,12 @@
+/** Decimal estilo AR sin depender del locale del runtime (seguro para SSR + cliente). */
+export function formatDecimalAr(n: number): string {
+  const sign = n < 0 ? "-" : "";
+  const abs = Math.abs(n);
+  const [intPart, decPart = "00"] = abs.toFixed(2).split(".");
+  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${sign}${withThousands},${decPart}`;
+}
+
 /** Formatea un monto decimal string con moneda ISO (es-AR). */
 export function formatMoneyAmount(raw: string, currency?: string): string {
   const n = Number(raw);

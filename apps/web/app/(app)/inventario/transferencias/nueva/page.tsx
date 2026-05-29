@@ -38,7 +38,7 @@ export default async function NuevaTransferenciaPage({ searchParams }: PageProps
   }
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href="/inventario/transferencias" label="Transferencias" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva transferencia de depósito</h1>

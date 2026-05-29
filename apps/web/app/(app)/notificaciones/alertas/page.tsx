@@ -19,7 +19,7 @@ export default async function OperationalAlertsPage() {
   if (!canRunOperationalAlerts(ctx)) notFound();
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div>
         <p className="text-sm text-muted-foreground">
           <Link href="/notificaciones" className="text-primary underline-offset-4 hover:underline">

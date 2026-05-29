@@ -16,7 +16,7 @@ export default async function NuevaCuentaContablePage() {
   const companies = await getCompanies(ctx);
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href="/contabilidad/cuentas" label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva cuenta contable</h1>

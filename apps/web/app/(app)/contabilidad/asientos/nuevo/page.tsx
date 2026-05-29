@@ -25,7 +25,7 @@ export default async function NuevoAsientoPage() {
 
   if (picks.length === 0) {
     return (
-      <PageShell variant="detail" className="space-y-6">
+      <PageShell variant="default" className="space-y-6">
         <div className="flex items-center gap-4">
           <PageBackLink href="/contabilidad/asientos" label="Volver" />
           <h1 className="text-2xl font-bold tracking-tight">Nuevo asiento manual</h1>
@@ -41,7 +41,7 @@ export default async function NuevoAsientoPage() {
   }
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href="/contabilidad/asientos" label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nuevo asiento manual</h1>

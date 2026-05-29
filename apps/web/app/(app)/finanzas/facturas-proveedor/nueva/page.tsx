@@ -34,7 +34,7 @@ export default async function FinanzasNuevaFacturaProveedorPage() {
   }));
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href="/finanzas/facturas-proveedor" label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva factura (empresa)</h1>

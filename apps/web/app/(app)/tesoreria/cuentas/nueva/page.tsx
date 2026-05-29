@@ -9,7 +9,7 @@ export default async function NuevaCuentaPage() {
   if (!current?.tenantCtx) redirect("/login");
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href="/tesoreria/cuentas" label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva cuenta</h1>

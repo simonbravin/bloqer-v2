@@ -9,7 +9,7 @@ export default async function ReportesInventarioPage() {
   if (!current?.tenantCtx) redirect("/login");
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <PageBackLink href="/inventario" label="Inventario" />
         <div>

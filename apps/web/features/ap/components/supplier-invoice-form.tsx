@@ -108,7 +108,10 @@ export function SupplierInvoiceForm({
                 No hay proveedores activos. Cree un contacto con rol Proveedor primero.
               </p>
             ) : (
-              <Select onValueChange={setSupplierContactId} value={supplierContactId}>
+              <Select
+                onValueChange={setSupplierContactId}
+                value={supplierContactId || undefined}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar proveedor…" />
                 </SelectTrigger>

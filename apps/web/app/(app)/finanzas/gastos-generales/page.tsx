@@ -78,6 +78,7 @@ export default async function GastosGeneralesPage() {
           projects={projects}
           canEdit={canEditAp}
           initialAutoPreview={initialAutoPreview}
+          calendarPeriod={currentOverheadPeriod()}
         />
       );
     } catch (err) {

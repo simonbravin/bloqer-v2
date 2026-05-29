@@ -30,7 +30,7 @@ export default async function ConfiguracionEquipoInvitarPage({ searchParams }: P
   }
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex flex-wrap gap-2">
         <PageBackLink href="/configuracion/equipo" label="Equipo" />
       </div>
