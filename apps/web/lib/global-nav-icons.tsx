@@ -14,6 +14,7 @@ import {
   ListTree,
   Package,
   Receipt,
+  ScrollText,
   Settings,
   Shield,
   User,
@@ -35,13 +36,16 @@ const GLOBAL_NAV_ICON_BY_HREF: Record<string, LucideIcon> = {
   "/contabilidad/asientos": BookOpen,
   "/contabilidad/reglas": GitBranch,
   "/finanzas": LayoutDashboard,
+  "/finanzas/transacciones": ArrowLeftRight,
   "/finanzas/cuentas-por-cobrar-aging": Receipt,
+  "/finanzas/facturas-proveedor": Receipt,
   "/finanzas/gastos-generales": Briefcase,
   "/finanzas/cuentas-por-pagar-aging": FileSpreadsheet,
   "/configuracion": Settings,
   "/configuracion/perfil": User,
   "/configuracion/equipo": Users,
   "/configuracion/permisos": Shield,
+  "/configuracion/registro": ScrollText,
 };
 
 export function GlobalNavIcon({ href }: { href: string }) {
