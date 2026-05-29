@@ -13,11 +13,11 @@ export function PlatformShell({
 }) {
   return (
     <PlatformNavProvider>
-      <div className="flex h-screen overflow-hidden bg-background">
+      <div className="flex h-dvh overflow-hidden bg-background">
         <PlatformSidebar />
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <PlatformHeader user={user} />
-          <main className="flex-1 overflow-y-auto bg-muted/20 p-4 sm:p-6 lg:p-8 dark:bg-muted/10">
+          <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain bg-muted/20 p-4 sm:p-6 lg:p-8 dark:bg-muted/10">
             <SearchParamsToast />
             {children}
           </main>

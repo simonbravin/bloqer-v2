@@ -11,6 +11,7 @@ import {
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
+import { PurchaseOrderReceiptBadge } from "./purchase-order-receipt-badge";
 import type { PurchaseOrderListItem } from "./purchase-order-list";
 
 export function PurchaseOrderTable({
@@ -32,7 +33,8 @@ export function PurchaseOrderTable({
             <TableHead>Código</TableHead>
             <TableHead>Proveedor</TableHead>
             <TableHead>Emisión</TableHead>
-            <TableHead>Entrega</TableHead>
+            <TableHead>Entrega prevista</TableHead>
+            <TableHead>Recepción</TableHead>
             <TableHead className="text-right">Total</TableHead>
             <TableHead>Estado</TableHead>
           </TableRow>
@@ -52,6 +54,9 @@ export function PurchaseOrderTable({
               <TableCell className="text-sm text-muted-foreground">{formatDate(order.issueDate)}</TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : "—"}
+              </TableCell>
+              <TableCell>
+                <PurchaseOrderReceiptBadge status={order.status} />
               </TableCell>
               <TableCell className="text-right tabular-nums font-medium">
                 {Number(order.totalAmount).toLocaleString("es-AR", {
