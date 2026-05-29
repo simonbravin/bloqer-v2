@@ -8,6 +8,7 @@ import {
   canViewProjectCostControlReport,
   canViewProjectCashFlowReport,
 } from "@bloqer/services";
+import { can } from "@bloqer/domain";
 import { ReportsHub } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
@@ -43,6 +44,11 @@ export default async function ProjectReportesPage({ params }: PageProps) {
     gate.isEnabled("PROJECTS") &&
     gate.isEnabled("BUDGETS") &&
     canViewProjectCostControlReport(ctx.roles);
+  const canCert =
+    gate.isEnabled("PROJECTS") &&
+    gate.isEnabled("BUDGETS") &&
+    gate.isEnabled("CERTIFICATIONS") &&
+    (can(ctx.roles, "VIEW", "CERTIFICATIONS") || can(ctx.roles, "VIEW", "PROJECTS"));
   const canCash = gate.isEnabled("PROJECTS") && canViewProjectCashFlowReport(ctx.roles);
 
   return (
@@ -54,7 +60,7 @@ export default async function ProjectReportesPage({ params }: PageProps) {
         subtitle="Análisis de costos, varianzas y caja"
       />
 
-      {!canCost && !canCash ? (
+      {!canCost && !canCert && !canCash ? (
         <div className="rounded-lg border bg-card p-8 text-center space-y-3">
           <p className="font-semibold">Sin reportes disponibles</p>
           <p className="text-sm text-muted-foreground">
@@ -65,7 +71,12 @@ export default async function ProjectReportesPage({ params }: PageProps) {
           </Button>
         </div>
       ) : (
-        <ReportsHub projectId={projectId} canCostReports={canCost} canCashFlow={canCash} />
+        <ReportsHub
+          projectId={projectId}
+          canCostReports={canCost}
+          canCertReports={canCert}
+          canCashFlow={canCash}
+        />
       )}
     </PageShell>
   );

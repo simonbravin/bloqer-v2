@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { BarChart3, PieChart, TrendingUp, Wallet } from "lucide-react";
+import { BarChart3, FileCheck2, PieChart, TrendingUp, Wallet } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type ReportCard = {
@@ -15,13 +15,21 @@ type ReportCard = {
 type Props = {
   projectId: string;
   canCostReports: boolean;
+  canCertReports: boolean;
   canCashFlow: boolean;
 };
 
-export function ReportsHub({ projectId, canCostReports, canCashFlow }: Props) {
+export function ReportsHub({ projectId, canCostReports, canCertReports, canCashFlow }: Props) {
   const base = `/proyectos/${projectId}/reportes`;
 
   const cards: ReportCard[] = [
+    {
+      title: "Certificaciones",
+      description: "Evolución certificado / facturado / cobrado, curvas de avance y estado por partida.",
+      href: `${base}/certificaciones`,
+      icon: <FileCheck2 className="h-5 w-5" />,
+      available: canCertReports,
+    },
     {
       title: "Presupuesto vs real",
       description: "Varianzas por partida WBS con capa de costo seleccionable y composición del presupuesto.",
@@ -46,7 +54,7 @@ export function ReportsHub({ projectId, canCostReports, canCashFlow }: Props) {
     },
     {
       title: "Flujo de caja del proyecto",
-      description: "Ingresos y egresos de caja por período (Fase C: evolución vs costos).",
+      description: "Ingresos y egresos de caja por período.",
       href: `/proyectos/${projectId}/flujo-caja`,
       icon: <Wallet className="h-5 w-5" />,
       available: canCashFlow,

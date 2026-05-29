@@ -22,6 +22,8 @@ import {
   getBudgetVarianceReport,
   parseCostVarianceLayer,
 } from "../reports/budget-variance.service";
+import type { CertificationReportFilters } from "../reports/certification-evolution.service";
+import { getCertificationEvolutionReport } from "../reports/certification-evolution.service";
 import type { ProjectCashFlowFilters } from "../project-cash-flow/project-cash-flow.service";
 import { getProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import { ServiceContext, ServiceError } from "../types";
@@ -119,6 +121,16 @@ export function parseBudgetVarianceFilters(sp: Record<string, string | undefined
   return {
     ...parseCostControlFilters(sp),
     costLayer: parseCostVarianceLayer(sp.costLayer),
+  };
+}
+
+export function parseCertificationReportFilters(
+  sp: Record<string, string | undefined>,
+): CertificationReportFilters {
+  return {
+    budgetId: sp.budgetId,
+    dateFrom: sp.dateFrom,
+    dateTo: sp.dateTo,
   };
 }
 
@@ -716,6 +728,93 @@ export async function exportBudgetVarianceCsv(
     "",
   ]);
   const fname = `presupuesto_vs_real_${r.projectId}_${r.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
+  return {
+    content: buildCsv(headers, rows),
+    filename: safeReportFilename(fname, "csv"),
+  };
+}
+
+export async function exportCertificationEvolutionCsv(
+  projectId: string,
+  filters: CertificationReportFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
+  const result = await getCertificationEvolutionReport(projectId, filters, ctx);
+  if (result.type === "NO_APPROVED_BUDGETS") {
+    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar certificaciones");
+  }
+  const headers = [
+    "Tipo",
+    "Codigo",
+    "PeriodoInicio",
+    "PeriodoFin",
+    "Estado",
+    "MontoCertificado",
+    "MontoFacturado",
+    "MontoCobrado",
+    "EstadoCobranza",
+    "VentaPresupuestada",
+    "CertificadoAcum",
+    "PctCertificado",
+    "PendienteCertificar",
+  ];
+  const rows: string[][] = [];
+
+  for (const p of result.portfolio) {
+    rows.push([
+      "CERTIFICACION",
+      p.code,
+      p.periodStart,
+      p.periodEnd,
+      p.status,
+      p.totalAmount,
+      p.invoicedAmount,
+      p.collectedAmount,
+      p.paymentStatus,
+      "",
+      "",
+      "",
+      "",
+    ]);
+  }
+
+  for (const v of result.vsBudget) {
+    rows.push([
+      "PARTIDA",
+      v.wbsCode,
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      v.budgetSale,
+      v.certifiedCumulative,
+      v.certifiedPct ?? "",
+      v.pendingCertify,
+    ]);
+  }
+
+  for (const m of result.monthlySeries) {
+    rows.push([
+      "MES",
+      m.periodKey,
+      "",
+      "",
+      "",
+      m.certifiedAmount,
+      m.invoicedAmount,
+      m.collectedAmount,
+      "",
+      "",
+      "",
+      "",
+      "",
+    ]);
+  }
+
+  const fname = `certificaciones_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
   return {
     content: buildCsv(headers, rows),
     filename: safeReportFilename(fname, "csv"),

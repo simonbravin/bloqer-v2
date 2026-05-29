@@ -2,3 +2,8 @@ export { ReportsHub } from "./reports-hub";
 export { BudgetVarianceFilters } from "./budget-variance-filters";
 export { BudgetVarianceTable } from "./budget-variance-table";
 export { BudgetCompositionChart } from "./budget-composition-chart";
+export { ReportDateFilters } from "./report-date-filters";
+export { CertificationEvolutionChart } from "./certification-evolution-chart";
+export { CertificationProgressChart } from "./certification-progress-chart";
+export { CertificationPortfolioTable } from "./certification-portfolio-table";
+export { CertificationVsBudgetTable } from "./certification-vs-budget-table";
