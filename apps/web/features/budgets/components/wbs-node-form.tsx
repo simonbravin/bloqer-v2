@@ -16,7 +16,7 @@ import {
 } from "@bloqer/validators";
 import { UnitSelect } from "./unit-select";
 
-export type WbsCreatePreset = "rootGroup" | "childItem";
+export type WbsCreatePreset = "childItem";
 
 type CreateMode = {
   mode: "create";
@@ -56,8 +56,8 @@ type Shared = {
 function CreateForm({
   parentId, preset, suggestedCode, subdivideApu, onSubmit, isPending, startTransition, serverError, setServerError, onDone,
 }: CreateMode & Shared) {
-  const nodeType = preset === "childItem" ? "ITEM" : "GROUP";
-  const isItem = nodeType === "ITEM";
+  const nodeType = "ITEM" as const;
+  const isItem = true;
 
   const form = useForm<CreateWbsNodeInput>({
     resolver: zodResolver(createWbsNodeSchema),
@@ -143,7 +143,7 @@ function CreateForm({
           Cancelar
         </Button>
         <Button type="submit" size="sm" disabled={isPending}>
-          {isPending ? "Guardando..." : preset === "childItem" ? "Agregar ítem" : "Agregar tarea"}
+          {isPending ? "Guardando..." : "Agregar"}
         </Button>
       </div>
     </form>

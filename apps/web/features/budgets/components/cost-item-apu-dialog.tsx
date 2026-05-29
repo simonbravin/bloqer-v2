@@ -103,7 +103,8 @@ export function CostItemApuDialog({
   const [activeTab, setActiveTab] = useState<VisibleCostCategory>("MATERIAL");
   const [editLine, setEditLine] = useState<LocalLine | null>(null);
 
-  const costItem = node?.type === "ITEM" ? node.costItem : null;
+  const costItem =
+    node && node.children.length === 0 ? node.costItem : null;
 
   const [unit, setUnit] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -380,7 +381,12 @@ export function CostItemApuDialog({
               {editable && (
                 <div className="space-y-1">
                   <Label className="text-xs">Notas</Label>
-                  <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="text-sm" />
+                  <Textarea
+                    rows={1}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="min-h-8 resize-y text-sm"
+                  />
                 </div>
               )}
             </div>

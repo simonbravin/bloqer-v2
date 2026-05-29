@@ -46,7 +46,7 @@ import {
   suggestChildCode,
   suggestRootGroupCode,
 } from "../lib/wbs-codes";
-import { isLeafApuNode, nodeHasApuData } from "../lib/wbs-apu";
+import { isWbsStructuralLeaf, nodeHasApuData } from "../lib/wbs-apu";
 import { WbsSubdivideApuDialog } from "./wbs-subdivide-apu-dialog";
 import type { SubdivideApuChoice } from "@bloqer/validators";
 import { WBS_EDT_BREAKDOWN_HEADERS, VISIBLE_COST_CATEGORIES } from "@/lib/budget-categories";
@@ -148,6 +148,7 @@ interface WbsTreeProps {
   onAddLine: (data: CreateCostAnalysisLineInput) => Promise<{ id: string } | { error: string }>;
   onUpdateLine: (lineId: string, data: UpdateCostAnalysisLineInput) => Promise<{ ok: true } | { error: string }>;
   onRemoveLine: (lineId: string) => Promise<{ ok: true } | { error: string }>;
+  onEnsureLeafForApu?: (nodeId: string) => Promise<{ node: WbsViewNode } | { error: string }>;
 }
 
 export function WbsTree({
@@ -168,6 +169,7 @@ export function WbsTree({
   onAddLine,
   onUpdateLine,
   onRemoveLine,
+  onEnsureLeafForApu,
 }: WbsTreeProps) {
   const router = useRouter();
   const storageKey = `wbs-view-mode-${budgetId}`;
@@ -196,6 +198,7 @@ export function WbsTree({
   const [deleteTarget, setDeleteTarget] = useState<WbsViewNode | null>(null);
   const [removePending, startRemoveTransition] = useTransition();
   const [reorderPending, startReorderTransition] = useTransition();
+  const [apuPending, startApuTransition] = useTransition();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -296,15 +299,30 @@ export function WbsTree({
   }
 
   function handleRowClick(node: WbsViewNode) {
-    if (isLeafApuNode(node)) setItemDialogNode(node);
-    else setGroupDialogNode(node);
+    if (!isWbsStructuralLeaf(node)) {
+      setGroupDialogNode(node);
+      return;
+    }
+    if (node.costItem || !onEnsureLeafForApu) {
+      setItemDialogNode(node);
+      return;
+    }
+    startApuTransition(async () => {
+      const result = await onEnsureLeafForApu(node.id);
+      if ("error" in result) {
+        toast.error(result.error);
+        return;
+      }
+      setItemDialogNode(result.node);
+      router.refresh();
+    });
   }
 
   function beginAddChild(node: WbsViewNode) {
     const preset = resolveAddChildPreset(node);
     if (!preset) return;
     const suggestedCode = suggestChildCode(node, nodes);
-    if (isLeafApuNode(node) && nodeHasApuData(node)) {
+    if (isWbsStructuralLeaf(node) && nodeHasApuData(node)) {
       setSubdividePrompt({ parent: node, preset, suggestedCode });
       return;
     }
@@ -313,7 +331,7 @@ export function WbsTree({
       parentId: node.id,
       preset,
       suggestedCode,
-      subdivideApu: node.type === "ITEM" ? "discard" : undefined,
+      subdivideApu: nodeHasApuData(node) ? "discard" : undefined,
     });
   }
 
@@ -346,11 +364,11 @@ export function WbsTree({
       rows.push(
         <TableRow
           key={node.id}
-          className="cursor-pointer hover:bg-muted/40 h-9"
+          className="cursor-pointer hover:bg-muted/40 h-8"
           onClick={() => handleRowClick(node)}
         >
-          <TableCell className="py-1.5 font-mono text-xs text-muted-foreground w-24">
-            <div className="flex items-center gap-1" style={{ paddingLeft: depth * 16 }}>
+          <TableCell className="py-0.5 px-1.5 font-mono text-xs text-muted-foreground w-0 whitespace-nowrap">
+            <div className="flex items-center gap-0.5" style={{ paddingLeft: depth * 12 }}>
               {node.children.length > 0 ? (
                 <button
                   type="button"
@@ -361,60 +379,57 @@ export function WbsTree({
                   }}
                 >
                   {isExpanded ? (
-                    <ChevronDown className="h-4 w-4" />
+                    <ChevronDown className="h-3.5 w-3.5" />
                   ) : (
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-3.5 w-3.5" />
                   )}
                 </button>
               ) : (
-                <span className="w-4 shrink-0" />
+                <span className="w-3.5 shrink-0" />
               )}
-              <span className="truncate">{node.code}</span>
+              <span>{node.code}</span>
             </div>
           </TableCell>
-          <TableCell className="py-1.5 min-w-[12rem] text-sm font-medium">
-            <span className="line-clamp-2">{node.name}</span>
-            <span className="mt-0.5 block text-[10px] font-normal text-muted-foreground">
-              {isLeafApuNode(node) ? "Ítem · clic para APU" : "Capítulo"}
-            </span>
+          <TableCell className="py-0.5 px-2 text-sm font-medium truncate max-w-[1px] w-full">
+            <span className="truncate">{node.name}</span>
           </TableCell>
-          <TableCell className="py-1.5 text-sm text-muted-foreground w-20">
+          <TableCell className="py-0.5 text-sm text-muted-foreground w-20">
             {metrics.unit ? budgetUnitLabel(metrics.unit) : "—"}
           </TableCell>
-          <TableCell className="py-1.5 text-right font-mono text-sm w-24">
+          <TableCell className="py-0.5 text-right font-mono text-sm w-24">
             {metrics.quantity != null ? metrics.quantity.toLocaleString("es-AR") : "—"}
           </TableCell>
 
           {viewMode === "breakdown" ? (
             <>
-              <TableCell className="py-1.5 text-right font-mono text-xs w-28">
+              <TableCell className="py-0.5 text-right font-mono text-xs w-28">
                 {fmt(metrics.byCategory.MATERIAL, currency)}
               </TableCell>
-              <TableCell className="py-1.5 text-right font-mono text-xs w-28">
+              <TableCell className="py-0.5 text-right font-mono text-xs w-28">
                 {fmt(metrics.byCategory.LABOR, currency)}
               </TableCell>
-              <TableCell className="py-1.5 text-right font-mono text-xs w-28">
+              <TableCell className="py-0.5 text-right font-mono text-xs w-28">
                 {fmt(metrics.byCategory.EQUIPMENT, currency)}
               </TableCell>
-              <TableCell className="py-1.5 text-right font-mono text-xs w-28">
+              <TableCell className="py-0.5 text-right font-mono text-xs w-28">
                 {fmt(metrics.byCategory.SUBCONTRACT, currency)}
               </TableCell>
-              <TableCell className="py-1.5 text-right font-mono text-sm font-semibold w-28">
+              <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-28">
                 {fmt(metrics.totalSalePrice, currency)}
               </TableCell>
             </>
           ) : (
             <>
-              <TableCell className="py-1.5 text-right font-mono text-sm w-32">
+              <TableCell className="py-0.5 text-right font-mono text-sm w-32">
                 {fmt(metrics.totalCostDirect, currency)}
               </TableCell>
-              <TableCell className="py-1.5 text-right font-mono text-sm font-semibold w-32">
+              <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-32">
                 {fmt(metrics.totalSalePrice, currency)}
               </TableCell>
             </>
           )}
 
-          <TableCell className="py-1.5 w-32" onClick={(e) => e.stopPropagation()}>
+          <TableCell className="py-0.5 w-32" onClick={(e) => e.stopPropagation()}>
             {canEditStructure && (
               <div className="flex items-center justify-end gap-0.5">
                 {resolveAddChildPreset(node) && (
@@ -496,7 +511,7 @@ export function WbsTree({
                 setDialogState({
                   type: "add",
                   parentId: undefined,
-                  preset: "rootGroup",
+                  preset: "childItem",
                   suggestedCode: suggestRootGroupCode(nodes),
                 })
               }
@@ -530,7 +545,7 @@ export function WbsTree({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-24">Nº</TableHead>
+                <TableHead className="w-0 px-1.5 whitespace-nowrap">Nº</TableHead>
                 <TableHead>Ítem</TableHead>
                 <TableHead className="w-20">Unidad</TableHead>
                 <TableHead className="text-right w-24">Cantidad</TableHead>
@@ -627,9 +642,7 @@ export function WbsTree({
           <DialogHeader>
             <DialogTitle>
               {dialogState.type === "add"
-                ? dialogState.preset === "childItem"
-                  ? "Agregar ítem"
-                  : "Agregar capítulo"
+                ? "Agregar tarea"
                 : "Editar nodo"}
             </DialogTitle>
           </DialogHeader>

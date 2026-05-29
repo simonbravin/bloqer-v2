@@ -13,7 +13,7 @@ import type { WbsViewNode } from "@bloqer/services";
 import type { UpdateWbsNodeInput } from "@bloqer/validators";
 import { computeWbsRowMetrics } from "../lib/wbs-metrics";
 import { canAddChild } from "../lib/wbs-codes";
-import { isWbsContainer } from "../lib/wbs-apu";
+import { isWbsStructuralLeaf } from "../lib/wbs-apu";
 
 interface WbsGroupDialogProps {
   open: boolean;
@@ -34,7 +34,7 @@ export function WbsGroupDialog({
 }: WbsGroupDialogProps) {
   const router = useRouter();
 
-  if (!node || !isWbsContainer(node)) return null;
+  if (!node || isWbsStructuralLeaf(node)) return null;
 
   const metrics = computeWbsRowMetrics(node);
 

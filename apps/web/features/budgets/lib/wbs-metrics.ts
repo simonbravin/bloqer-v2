@@ -19,7 +19,7 @@ const ZERO: CategoryAmounts = {
 };
 
 function unitCategoryCosts(node: WbsViewNode): CategoryAmounts {
-  if (node.type !== "ITEM" || !node.costItem) return { ...ZERO };
+  if (node.children.length > 0 || !node.costItem) return { ...ZERO };
   const amounts = { ...ZERO };
   for (const line of node.costItem.analysisLines) {
     if (line.category === "OTHER") continue;
@@ -37,7 +37,7 @@ function unitCategoryCosts(node: WbsViewNode): CategoryAmounts {
 }
 
 export function computeWbsRowMetrics(node: WbsViewNode): WbsRowMetrics {
-  if (node.type === "ITEM" && node.costItem) {
+  if (node.children.length === 0 && node.costItem) {
     const byCategory = unitCategoryCosts(node);
     return {
       unit: node.costItem.unit,
@@ -86,7 +86,7 @@ export function computeTreeGrandTotals(nodes: WbsViewNode[]): WbsRowMetrics {
 
 /** Costos unitarios por categoría (sin multiplicar cantidad). */
 export function computeUnitCategoryCosts(node: WbsViewNode): CategoryAmounts {
-  if (node.type !== "ITEM" || !node.costItem) return { ...ZERO };
+  if (node.children.length > 0 || !node.costItem) return { ...ZERO };
   const amounts = { ...ZERO };
   for (const line of node.costItem.analysisLines) {
     if (line.category === "OTHER") continue;

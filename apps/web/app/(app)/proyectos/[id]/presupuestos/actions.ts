@@ -4,7 +4,7 @@ import {
   createBudget, updateBudget,
   submitBudgetForReview, returnBudgetForChanges, approveBudget, closeBudget, cancelBudget,
   updateBudgetSettings,
-  addWbsNode, updateWbsNode, removeWbsNode, reorderWbsNodes,
+  addWbsNode, updateWbsNode, removeWbsNode, reorderWbsNodes, ensureWbsLeafForApu,
   previewImport, executeImport,
   updateCostItem,
   addCostAnalysisLine, updateCostAnalysisLine, removeCostAnalysisLine,
@@ -172,6 +172,21 @@ export async function cancelBudgetAction(
 }
 
 // ─── WBS ──────────────────────────────────────────────────────────────────────
+
+export async function ensureWbsLeafForApuAction(
+  budgetId: string,
+  projectId: string,
+  nodeId: string,
+): Promise<{ node: Awaited<ReturnType<typeof ensureWbsLeafForApu>> } | Err> {
+  const ctx = await getCtx();
+  try {
+    const node = await ensureWbsLeafForApu(budgetId, nodeId, ctx);
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    return { node };
+  } catch (err) {
+    return handle(err);
+  }
+}
 
 export async function addWbsNodeAction(
   budgetId: string,

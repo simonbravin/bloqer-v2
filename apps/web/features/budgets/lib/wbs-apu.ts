@@ -1,6 +1,13 @@
 import type { WbsViewNode } from "@bloqer/services";
+import { isDisciplineRootCode } from "@bloqer/services/budget-import-pure";
 
-/** True si el ítem hoja tiene cómputo cargado (líneas, cantidad, unidad o costo). */
+/** Sin hijos en el árbol → se puede cargar APU en este nivel (12, 1.1, 1.1.1, etc.). */
+export function isWbsStructuralLeaf(node: WbsViewNode): boolean {
+  if (isDisciplineRootCode(node.code)) return false;
+  return node.children.length === 0;
+}
+
+/** True si el nodo hoja tiene cómputo cargado (líneas, cantidad o costo). */
 export function nodeHasApuData(node: WbsViewNode): boolean {
   const ci = node.costItem;
   if (!ci) return false;
@@ -10,12 +17,5 @@ export function nodeHasApuData(node: WbsViewNode): boolean {
   return false;
 }
 
-/** Ítem hoja: único nivel de la rama donde se edita el APU. */
-export function isLeafApuNode(node: WbsViewNode): boolean {
-  return node.type === "ITEM" && node.children.length === 0;
-}
-
-/** Capítulo / agrupador (con o sin hijos). */
-export function isWbsContainer(node: WbsViewNode): boolean {
-  return !isLeafApuNode(node);
-}
+/** @deprecated Usar isWbsStructuralLeaf */
+export const isLeafApuNode = isWbsStructuralLeaf;

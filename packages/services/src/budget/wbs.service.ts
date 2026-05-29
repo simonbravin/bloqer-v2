@@ -173,7 +173,7 @@ export async function getWbsTree(budgetId: string, ctx: ServiceContext): Promise
   }
 
   function computeTotals(n: InternalNode): { cost: Prisma.Decimal; sale: Prisma.Decimal } {
-    if (n.type === "ITEM" && n.costItem) {
+    if (n.children.length === 0 && n.costItem) {
       n.totalCostDirect = n.costItem.totalCostDirect;
       n.totalSalePrice = n.costItem.totalSalePrice;
       return { cost: n.totalCostDirect, sale: n.totalSalePrice };
@@ -238,6 +238,67 @@ export async function getWbsTree(budgetId: string, ctx: ServiceContext): Promise
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
+function findNodeInTree(roots: WbsViewNode[], nodeId: string): WbsViewNode | null {
+  for (const root of roots) {
+    if (root.id === nodeId) return root;
+    const stack = [...root.children];
+    while (stack.length > 0) {
+      const n = stack.pop()!;
+      if (n.id === nodeId) return n;
+      stack.push(...n.children);
+    }
+  }
+  return null;
+}
+
+/** Prepara un nodo hoja (sin hijos) para editar APU: ITEM + CostItem si faltaba. */
+export async function ensureWbsLeafForApu(
+  budgetId: string,
+  nodeId: string,
+  ctx: ServiceContext,
+): Promise<WbsViewNode> {
+  if (!can(ctx.roles, "EDIT", "BUDGETS")) {
+    throw new ServiceError("FORBIDDEN", "Insufficient permissions");
+  }
+  const budget = await prisma.budget.findUnique({ where: { id: budgetId } });
+  if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
+  if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+
+  const node = await prisma.wbsNode.findUnique({
+    where: { id: nodeId },
+    select: { id: true, budgetId: true, code: true, type: true },
+  });
+  if (!node || node.budgetId !== budgetId) {
+    throw new ServiceError("NOT_FOUND", "Nodo WBS no encontrado");
+  }
+  if (isDisciplineRootCode(node.code)) {
+    throw new ServiceError("CONFLICT", "El rubro agrupa capítulos; agregá un ítem bajo el rubro");
+  }
+
+  const childCount = await prisma.wbsNode.count({ where: { parentId: nodeId } });
+  if (childCount > 0) {
+    throw new ServiceError("CONFLICT", "El APU va en el nivel más bajo de la rama (sin hijos)");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (node.type === "GROUP") {
+      await tx.wbsNode.update({ where: { id: nodeId }, data: { type: "ITEM" } });
+    }
+    const existing = await tx.costItem.findUnique({ where: { wbsNodeId: nodeId } });
+    if (!existing) {
+      await tx.costItem.create({
+        data: { budgetId, wbsNodeId: nodeId, unit: "", quantity: 0 },
+      });
+    }
+    await _recalcBudgetSummary(tx, budgetId);
+  });
+
+  const tree = await getWbsTree(budgetId, ctx);
+  const view = findNodeInTree(tree, nodeId);
+  if (!view) throw new ServiceError("NOT_FOUND", "Nodo WBS no encontrado");
+  return view;
+}
+
 export async function addWbsNode(
   budgetId: string,
   input: CreateWbsNodeInput,
@@ -250,6 +311,8 @@ export async function addWbsNode(
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await assertBudgetWbsStructureMutable(budget, ctx);
+
+  const nodeType: WbsNodeType = "ITEM";
 
   const allNodes = await prisma.wbsNode.findMany({
     where: { budgetId },
@@ -283,7 +346,7 @@ export async function addWbsNode(
   const parentCodeForValidation = input.parentId
     ? allNodes.find((n) => n.id === input.parentId)?.code ?? null
     : null;
-  const manualError = validateManualNodeCode(code, input.type, parentCodeForValidation);
+  const manualError = validateManualNodeCode(code, nodeType, parentCodeForValidation);
   if (manualError) throw new ServiceError("CONFLICT", manualError);
 
   const existing = await prisma.wbsNode.findUnique({
@@ -298,11 +361,7 @@ export async function addWbsNode(
     if (!parent || parent.budgetId !== budgetId) {
       throw new ServiceError("NOT_FOUND", "Nodo padre no encontrado");
     }
-    const parentManualError = validateManualNodeCode(
-      code,
-      input.type,
-      parent.code,
-    );
+    const parentManualError = validateManualNodeCode(code, nodeType, parent.code);
     if (parentManualError) throw new ServiceError("CONFLICT", parentManualError);
   }
 
@@ -311,7 +370,11 @@ export async function addWbsNode(
       where: { id: input.parentId },
       select: { type: true },
     });
-    if (parentForPromote?.type === "ITEM") {
+    const parentCostItem = await prisma.costItem.findUnique({
+      where: { wbsNodeId: input.parentId },
+      select: { id: true },
+    });
+    if (parentForPromote?.type === "ITEM" || parentCostItem) {
       await assertWbsNodeCanSubdivide(input.parentId);
     }
   }
@@ -325,7 +388,7 @@ export async function addWbsNode(
       data: {
         budgetId,
         parentId: input.parentId ?? null,
-        type: input.type,
+        type: nodeType,
         code,
         name: input.name,
         description: input.description,
@@ -335,14 +398,18 @@ export async function addWbsNode(
 
     if (input.parentId) {
       const parent = await tx.wbsNode.findUnique({ where: { id: input.parentId } });
-      if (parent?.type === "ITEM") {
-        if (subdivideApu === "migrate" && input.type === "ITEM") {
+      const parentHadCost = await tx.costItem.findUnique({
+        where: { wbsNodeId: input.parentId },
+        select: { id: true },
+      });
+      if (parent?.type === "ITEM" || parentHadCost) {
+        if (subdivideApu === "migrate") {
           const moved = await tx.costItem.updateMany({
             where: { wbsNodeId: parent.id },
             data: { wbsNodeId: n.id },
           });
           movedCostItem = moved.count > 0;
-        } else {
+        } else if (parentHadCost) {
           await tx.costAnalysisLine.deleteMany({
             where: { costItem: { wbsNodeId: parent.id } },
           });
@@ -355,7 +422,7 @@ export async function addWbsNode(
       }
     }
 
-    if (input.type === "ITEM" && !movedCostItem) {
+    if (nodeType === "ITEM" && !movedCostItem) {
       await tx.costItem.create({
         data: {
           budgetId,

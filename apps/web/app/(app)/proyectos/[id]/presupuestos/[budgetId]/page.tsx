@@ -16,6 +16,7 @@ import { PageBackLink } from "@/components/layout/page-back-link";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   addWbsNodeAction,
+  ensureWbsLeafForApuAction,
   updateWbsNodeAction,
   removeWbsNodeAction,
   reorderWbsNodesAction,
@@ -155,6 +156,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
             : undefined
         }
         onAddNode={addWbsNodeAction.bind(null, budgetId, projectId)}
+        onEnsureLeafForApu={ensureWbsLeafForApuAction.bind(null, budgetId, projectId)}
         onUpdateNode={updateWbsNodeAction.bind(null, projectId, budgetId)}
         onRemoveNode={removeWbsNodeAction.bind(null, projectId, budgetId)}
         onReorderNodes={reorderWbsNodesAction.bind(null, budgetId, projectId)}
