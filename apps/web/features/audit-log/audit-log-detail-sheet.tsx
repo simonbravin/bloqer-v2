@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { TenantAuditLogDetail } from "@bloqer/services";
+import type { AuditLogDetailView } from "./types";
 import { AUDIT_UI_MODULE_LABEL_ES, type AuditUiModule } from "@bloqer/domain";
 import {
   Sheet,
@@ -29,7 +29,7 @@ export function AuditLogDetailSheet({
   open,
   closeHref,
 }: {
-  detail: TenantAuditLogDetail | null;
+  detail: AuditLogDetailView | null;
   open: boolean;
   closeHref: string;
 }) {

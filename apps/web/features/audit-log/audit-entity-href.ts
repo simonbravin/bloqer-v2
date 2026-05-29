@@ -1,8 +1,65 @@
-import { buildFinancialHref } from "@bloqer/services";
-
 type EntityHrefOptions = {
   projectId?: string | null;
+  accountId?: string;
 };
+
+type FinancialEntityType =
+  | "SalesInvoice"
+  | "Receivable"
+  | "Collection"
+  | "SupplierInvoice"
+  | "Payable"
+  | "Payment"
+  | "AccountMovement";
+
+function buildFinancialEntityHref(
+  entityType: FinancialEntityType,
+  entityId: string,
+  options?: EntityHrefOptions,
+): string {
+  const projectId = options?.projectId ?? undefined;
+  if (projectId) {
+    switch (entityType) {
+      case "SalesInvoice":
+        return `/proyectos/${projectId}/facturas/${entityId}`;
+      case "Receivable":
+        return `/proyectos/${projectId}/cuentas-por-cobrar/${entityId}`;
+      case "Collection":
+        return `/proyectos/${projectId}/cobranzas/${entityId}`;
+      case "SupplierInvoice":
+        return `/proyectos/${projectId}/facturas-proveedor/${entityId}`;
+      case "Payable":
+        return `/proyectos/${projectId}/cuentas-por-pagar/${entityId}`;
+      case "Payment":
+        return `/proyectos/${projectId}/pagos/${entityId}`;
+      case "AccountMovement": {
+        const accountId = options?.accountId;
+        return accountId
+          ? `/tesoreria/reportes/movimientos?accountId=${encodeURIComponent(accountId)}`
+          : "/tesoreria/reportes/movimientos";
+      }
+      default:
+        return "/finanzas/transacciones";
+    }
+  }
+
+  switch (entityType) {
+    case "SupplierInvoice":
+      return `/finanzas/facturas-proveedor/${entityId}`;
+    case "Payable":
+      return `/finanzas/cuentas-por-pagar/${entityId}`;
+    case "Payment":
+      return `/finanzas/pagos-proveedor/${entityId}`;
+    case "AccountMovement": {
+      const accountId = options?.accountId;
+      return accountId
+        ? `/tesoreria/reportes/movimientos?accountId=${encodeURIComponent(accountId)}`
+        : "/tesoreria/reportes/movimientos";
+    }
+    default:
+      return "/finanzas/transacciones";
+  }
+}
 
 export function buildAuditEntityHref(
   entityType: string,
@@ -38,11 +95,7 @@ export function buildAuditEntityHref(
     case "Payable":
     case "Payment":
     case "AccountMovement":
-      return buildFinancialHref(
-        entityType as Parameters<typeof buildFinancialHref>[0],
-        entityId,
-        { projectId },
-      );
+      return buildFinancialEntityHref(entityType, entityId, { projectId, accountId: options?.accountId });
     case "Tenant":
     case "UserMembership":
     case "TenantInvitation":

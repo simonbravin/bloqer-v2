@@ -106,7 +106,7 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
   }
 
   const parsed = urlFilters.success ? urlFilters.data : null;
-  const module = parsed?.module;
+  const auditModule = parsed?.module;
   const projectId = parsed?.projectId;
   const actorUserId = parsed?.actorUserId;
   const action = parsed?.action;
@@ -135,7 +135,7 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
     if (parsed) {
       result = await listTenantAuditLog(
         {
-          module,
+          module: auditModule,
           projectId,
           actorUserId,
           action,
@@ -199,7 +199,7 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
           <select
             id="module"
             name="module"
-            defaultValue={module ?? ""}
+            defaultValue={auditModule ?? ""}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
             <option value="">Todos</option>
