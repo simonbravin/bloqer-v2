@@ -36,6 +36,46 @@ export type CompanyOverheadSettings = {
 const ZERO = new Prisma.Decimal(0);
 const HUNDRED = new Prisma.Decimal(100);
 
+/** Q-013 opción 3 — prorrateo automático por peso de CD del período (fase posterior). */
+export const OVERHEAD_AUTO_WEIGHT_PRORATION_AVAILABLE = false;
+
+export type ProjectOverheadPeriodFilter = {
+  /** Inclusive YYYY-MM */
+  periodFrom?: string;
+  /** Inclusive YYYY-MM */
+  periodTo?: string;
+};
+
+export function assertValidOverheadPeriod(period: string): void {
+  if (!/^\d{4}-\d{2}$/.test(period)) {
+    throw new ServiceError("VALIDATION", "Período inválido (use YYYY-MM)");
+  }
+  const month = Number.parseInt(period.slice(5, 7), 10);
+  if (month < 1 || month > 12) {
+    throw new ServiceError("VALIDATION", "Mes inválido en el período (01–12)");
+  }
+}
+
+async function resolveProjectBudgetCurrency(projectId: string, ctx: ServiceContext): Promise<string> {
+  const budget = await prisma.budget.findFirst({
+    where: {
+      projectId,
+      tenantId: ctx.tenantId,
+      status: { in: ["APPROVED", "CLOSED"] },
+    },
+    select: { currency: true },
+    orderBy: { updatedAt: "desc" },
+  });
+  return budget?.currency ?? "ARS";
+}
+
+function manualRowInPeriod(period: string, filter?: ProjectOverheadPeriodFilter): boolean {
+  if (!filter?.periodFrom && !filter?.periodTo) return true;
+  if (filter.periodFrom && period < filter.periodFrom) return false;
+  if (filter.periodTo && period > filter.periodTo) return false;
+  return true;
+}
+
 export type ProjectOverheadBreakdown = {
   manualTotal: string;
   calculatedPct: string;
@@ -53,6 +93,7 @@ export async function getProjectOverheadAmount(
   ctx: ServiceContext,
   /** Moneda del CD devengado / presupuesto — solo suma imputaciones manuales en esta moneda (D-040). */
   targetCurrency = "ARS",
+  periodFilter?: ProjectOverheadPeriodFilter,
 ): Promise<ProjectOverheadBreakdown> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -81,12 +122,15 @@ export async function getProjectOverheadAmount(
     }),
     prisma.projectOverheadAllocation.findMany({
       where: { tenantId: ctx.tenantId, projectId },
-      select: { amount: true, currency: true },
+      select: { amount: true, currency: true, period: true },
     }),
   ]);
 
-  const manualInCurrency = manualRows.filter((r) => r.currency === targetCurrency);
-  const manualTotal = manualInCurrency.reduce((s, r) => s.plus(r.amount), ZERO);
+  const manualInScope = manualRows.filter(
+    (r) => r.currency === targetCurrency && manualRowInPeriod(r.period, periodFilter),
+  );
+  const manualTotal = manualInScope.reduce((s, r) => s.plus(r.amount), ZERO);
+  const manualRowsExcluded = manualRows.length - manualInScope.length;
   const pct = company?.overheadAllocationPct ?? ZERO;
   const calculatedAmount = directCostAccrued.times(pct).div(HUNDRED);
   const totalOverhead = manualTotal.plus(calculatedAmount);
@@ -97,14 +141,14 @@ export async function getProjectOverheadAmount(
     calculatedAmount: calculatedAmount.toFixed(2),
     totalOverhead: totalOverhead.toFixed(2),
     currency: targetCurrency,
-    manualRowsExcluded: manualRows.length - manualInCurrency.length,
+    manualRowsExcluded,
   };
 }
 
 export async function listActiveProjectsForOverhead(
   companyId: string,
   ctx: ServiceContext,
-): Promise<{ id: string; code: string; name: string }[]> {
+): Promise<{ id: string; code: string; name: string; currency: string }[]> {
   assertOverheadView(ctx);
   const company = await prisma.company.findUnique({
     where: { id: companyId },
@@ -113,7 +157,7 @@ export async function listActiveProjectsForOverhead(
   if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
   if (company.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
-  return prisma.project.findMany({
+  const projects = await prisma.project.findMany({
     where: {
       tenantId: ctx.tenantId,
       companyId,
@@ -122,6 +166,26 @@ export async function listActiveProjectsForOverhead(
     select: { id: true, code: true, name: true },
     orderBy: { name: "asc" },
   });
+  if (projects.length === 0) return [];
+
+  const budgets = await prisma.budget.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      projectId: { in: projects.map((p) => p.id) },
+      status: { in: ["APPROVED", "CLOSED"] },
+    },
+    select: { projectId: true, currency: true, updatedAt: true },
+    orderBy: { updatedAt: "desc" },
+  });
+  const currencyByProject = new Map<string, string>();
+  for (const b of budgets) {
+    if (!currencyByProject.has(b.projectId)) currencyByProject.set(b.projectId, b.currency);
+  }
+
+  return projects.map((p) => ({
+    ...p,
+    currency: currencyByProject.get(p.id) ?? "ARS",
+  }));
 }
 
 export async function listProjectOverheadAllocations(
@@ -221,9 +285,7 @@ export async function createProjectOverheadAllocation(
   ctx: ServiceContext,
 ) {
   assertOverheadEdit(ctx);
-  if (!/^\d{4}-\d{2}$/.test(input.period)) {
-    throw new ServiceError("VALIDATION", "Período inválido (use YYYY-MM)");
-  }
+  assertValidOverheadPeriod(input.period);
   let amount: Prisma.Decimal;
   try {
     amount = new Prisma.Decimal(input.amount);
@@ -253,6 +315,15 @@ export async function createProjectOverheadAllocation(
     throw new ServiceError("VALIDATION", "El proyecto no pertenece a esa empresa");
   }
 
+  const budgetCurrency = await resolveProjectBudgetCurrency(input.projectId, ctx);
+  const currency = (input.currency ?? budgetCurrency).toUpperCase();
+  if (currency !== budgetCurrency) {
+    throw new ServiceError(
+      "VALIDATION",
+      `La imputación debe estar en ${budgetCurrency} (moneda del presupuesto aprobado del proyecto)`,
+    );
+  }
+
   try {
     return await prisma.projectOverheadAllocation.create({
       data: {
@@ -260,7 +331,7 @@ export async function createProjectOverheadAllocation(
         companyId: input.companyId,
         projectId: input.projectId,
         period: input.period,
-        currency: input.currency ?? "ARS",
+        currency,
         amount,
         notes: input.notes ?? null,
         createdBy: ctx.actorUserId,

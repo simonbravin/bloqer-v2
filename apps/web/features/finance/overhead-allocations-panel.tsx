@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CompanyOverheadSettings, ProjectOverheadAllocationView } from "@bloqer/services";
 import {
@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { formatMoneyAmount } from "@/lib/format-money";
 
-type ProjectOption = { id: string; code: string; name: string };
+type ProjectOption = { id: string; code: string; name: string; currency: string };
 
 type Props = {
   companyId: string;
@@ -60,12 +60,35 @@ export function OverheadAllocationsPanel({
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
 
+  const selectedProject = useMemo(
+    () => projects.find((p) => p.id === projectId),
+    [projects, projectId],
+  );
+  const allocationCurrency = selectedProject?.currency ?? "ARS";
+
+  useEffect(() => {
+    if (!projectId && projects[0]?.id) setProjectId(projects[0].id);
+  }, [projects, projectId]);
+
   function refresh() {
     router.refresh();
   }
 
   return (
     <div className="space-y-6">
+      <div className="rounded-lg border border-blue-200 bg-blue-50/80 dark:border-blue-900 dark:bg-blue-950/30 p-4 text-sm space-y-2">
+        <p className="font-medium text-foreground">Cómo se imputa GG a la obra (D-040)</p>
+        <p className="text-muted-foreground">
+          Los <strong>gastos generales de empresa</strong> (oficina, vehículos, servicios sin proyecto)
+          se cargan con facturas <em>sin obra</em> en el asistente de abajo. Acá definís cuánto de
+          ese costo corporativo <strong>afectás a cada proyecto</strong> — no es al revés.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          No disponible aún: prorrateo automático por peso del costo directo entre obras (Q-013
+          opción 3).
+        </p>
+      </div>
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Prorrateo automático (% empresa)</CardTitle>
@@ -140,7 +163,7 @@ export function OverheadAllocationsPanel({
                     projectId,
                     period,
                     amount,
-                    currency: "ARS",
+                    currency: allocationCurrency,
                     notes: notes.trim() || null,
                   });
                   if ("error" in res) setError(res.error);
@@ -161,7 +184,7 @@ export function OverheadAllocationsPanel({
                   <SelectContent>
                     {projects.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.code} — {p.name}
+                        {p.code} — {p.name} ({p.currency})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -180,7 +203,7 @@ export function OverheadAllocationsPanel({
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="oh-amount">Monto (ARS)</Label>
+                <Label htmlFor="oh-amount">Monto ({allocationCurrency})</Label>
                 <Input
                   id="oh-amount"
                   inputMode="decimal"
@@ -189,6 +212,9 @@ export function OverheadAllocationsPanel({
                   disabled={pending}
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  Moneda del presupuesto aprobado del proyecto.
+                </p>
               </div>
               <div className="space-y-1 sm:col-span-2 lg:col-span-4">
                 <Label htmlFor="oh-notes">Notas (opcional)</Label>

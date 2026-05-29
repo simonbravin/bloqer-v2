@@ -101,11 +101,26 @@ export function ProfitabilitySummary({ report }: Props) {
           {report.netMarginAvailable && report.netMargin != null ? (
             <>
               <p>
-                GG imputados:{" "}
+                GG total imputado:{" "}
                 {report.overheadAmount != null
                   ? formatMoneyAmount(report.overheadAmount, report.currency)
                   : "—"}
               </p>
+              {report.overheadManualAmount != null &&
+              parseFloat(report.overheadManualAmount) > 0 ? (
+                <p className="text-muted-foreground">
+                  · Manual (todos los períodos):{" "}
+                  {formatMoneyAmount(report.overheadManualAmount, report.currency)}
+                </p>
+              ) : null}
+              {report.overheadCalculatedAmount != null &&
+              report.overheadCompanyPct != null &&
+              parseFloat(report.overheadCompanyPct) > 0 ? (
+                <p className="text-muted-foreground">
+                  · {report.overheadCompanyPct}% empresa sobre CD devengado:{" "}
+                  {formatMoneyAmount(report.overheadCalculatedAmount, report.currency)}
+                </p>
+              ) : null}
               <p className="font-semibold">
                 Margen neto: {formatMoneyAmount(report.netMargin, report.currency)}
               </p>

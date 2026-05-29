@@ -49,6 +49,9 @@ export type ProjectProfitabilityReport = {
   netMarginAvailable: boolean;
   netMargin: string | null;
   overheadAmount: string | null;
+  overheadManualAmount: string | null;
+  overheadCalculatedAmount: string | null;
+  overheadCompanyPct: string | null;
   netMarginNote: string;
   warnings: string[];
   sectionsExcluded: TenantModuleSectionExcludedWarning[];
@@ -240,6 +243,9 @@ export async function getProjectProfitabilityReport(
   const netAvailable = canViewNetMargin(ctx.roles);
   let netMargin: string | null = null;
   let overheadAmount: string | null = null;
+  let overheadManualAmount: string | null = null;
+  let overheadCalculatedAmount: string | null = null;
+  let overheadCompanyPct: string | null = null;
   let netMarginNote = netAvailable
     ? "Margen neto = margen bruto − GG (imputación manual + % empresa sobre CD devengado) [D-040]."
     : "Margen neto visible solo para OWNER, ADMIN o FINANCE [D-013].";
@@ -254,6 +260,22 @@ export async function getProjectProfitabilityReport(
       displayCurrency,
     );
     overheadAmount = oh.totalOverhead;
+    overheadManualAmount = oh.manualTotal;
+    overheadCalculatedAmount = oh.calculatedAmount;
+    overheadCompanyPct = oh.calculatedPct;
+    if (parseFloat(oh.manualTotal) > 0) {
+      warnings.push(
+        "GG manual: suma de todas las imputaciones por período cargadas a la obra (histórico acumulado).",
+      );
+    }
+    if (parseFloat(oh.calculatedPct) > 0) {
+      warnings.push(
+        `GG automático (${oh.calculatedPct}% empresa sobre CD devengado): ${oh.calculatedAmount} ${oh.currency}.`,
+      );
+    }
+    warnings.push(
+      "Prorrateo automático de GG por peso de costo directo entre obras (Q-013 opción 3) no está disponible en esta versión.",
+    );
     if (oh.currency === displayCurrency) {
       const nm = new Prisma.Decimal(displaySlice?.grossMargin ?? grossMargin.toFixed(2)).minus(
         oh.totalOverhead,
@@ -293,6 +315,9 @@ export async function getProjectProfitabilityReport(
     netMarginAvailable: netMarginAvailableFlag,
     netMargin,
     overheadAmount,
+    overheadManualAmount,
+    overheadCalculatedAmount,
+    overheadCompanyPct,
     netMarginNote,
     warnings,
     sectionsExcluded,

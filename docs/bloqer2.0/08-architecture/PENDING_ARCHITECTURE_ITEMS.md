@@ -15,6 +15,14 @@
 | P-ERD-06 | Entidad **línea de extracto** en conciliación bancaria | Tabla vs JSON versionado |
 | P-ERD-07 | **UUID v4 vs v7** | **HECHO 2026-05-07** — UUID v4 elegido. Ver ADR-Phase1-01. |
 
+## Gastos generales → obra (D-040)
+
+| ID | Tema | Acción sugerida |
+|---|---|---|
+| P-GG-01 | **Q-013 opción 3** — prorrateo automático de GG según peso del CD del período entre obras | Fase posterior; constante `OVERHEAD_AUTO_WEIGHT_PRORATION_AVAILABLE = false` en `project-overhead.service.ts` |
+| P-GG-02 | Filtro de período en margen neto | Rentabilidad suma **todas** las imputaciones manuales históricas; filtro `periodFrom`/`periodTo` en `getProjectOverheadAmount` listo para reportes con rango |
+| P-GG-03 | Moneda de imputación manual | Debe coincidir con presupuesto aprobado del proyecto (validado en servicio) |
+
 ## Reportes (ver [`REPORTING_DATA_MODEL.md`](./REPORTING_DATA_MODEL.md))
 
 | ID | Tema | Acción sugerida |
