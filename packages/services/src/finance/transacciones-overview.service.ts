@@ -6,6 +6,10 @@ import {
   fetchCorporatePayableSnapshotRows,
 } from "../ap/corporate-ap-snapshot";
 import { canViewCompanyAp } from "../ap/ap-access";
+import {
+  aggregateCompanyReceivableBalances,
+  fetchCompanyReceivableSnapshotRows,
+} from "../ar/company-ar-snapshot";
 import { fmtDecimalEs, pushMoneyKpi } from "../dashboard/kpi-helpers";
 import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
 import { getCompanyCashProjectionReport } from "../reports/company-cash-projection.service";
@@ -43,6 +47,7 @@ export type TransaccionesOverview = {
 const ZERO = new Prisma.Decimal(0);
 const CORPORATE_OBLIGATIONS_HREF = "/finanzas/transacciones?tab=obligaciones";
 const CORPORATE_OVERDUE_HREF = "/finanzas/transacciones?tab=obligaciones&status=OVERDUE";
+const COMPANY_AR_AGING_HREF = "/finanzas/cuentas-por-cobrar-aging";
 
 function pushUniqueAlert(alerts: TransaccionesAlert[], alert: TransaccionesAlert): void {
   if (!alerts.some((a) => a.message === alert.message)) alerts.push(alert);
@@ -72,6 +77,7 @@ export async function getTransaccionesOverview(ctx: ServiceContext): Promise<Tra
   const gate = await getTenantModuleGate(ctx);
   const canTreasury = gate.isEnabled("TREASURY") && can(ctx.roles, "VIEW", "TREASURY");
   const canAp = gate.isEnabled("AP") && canViewCompanyAp(ctx.roles);
+  const canAr = gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR");
 
   if (!canTreasury && !canAp) {
     return { visible: false, kpis: [], alerts: [], projection: null };
@@ -155,6 +161,49 @@ export async function getTransaccionesOverview(ctx: ServiceContext): Promise<Tra
       pushUniqueAlert(alerts, {
         variant: "info",
         message: "No se pudieron cargar los indicadores de cuentas por pagar corporativas.",
+      });
+    }
+  }
+
+  if (canAr) {
+    try {
+      const companyReceivables = await fetchCompanyReceivableSnapshotRows(ctx);
+      const arSummary = aggregateCompanyReceivableBalances(companyReceivables);
+      const arOpenMap = moneyMapFromRows(arSummary.totalByCurrency);
+      const arOverdueMap = moneyMapFromRows(arSummary.overdueByCurrency);
+      for (const c of arOpenMap.keys()) currenciesSeen.add(c);
+      for (const c of arOverdueMap.keys()) currenciesSeen.add(c);
+
+      pushMoneyKpi(kpis, "tr_ar_open", "C×C abiertas", arOpenMap, COMPANY_AR_AGING_HREF);
+      const arOpenKpi = kpis.find((k) => k.key === "tr_ar_open");
+      if (arOpenKpi) arOpenKpi.helper = "Saldo total abierto (todas las obras)";
+
+      pushMoneyKpi(
+        kpis,
+        "tr_ar_overdue",
+        "C×C vencidas",
+        arOverdueMap,
+        COMPANY_AR_AGING_HREF,
+        "Sin vencidas",
+      );
+      const arOverdueKpi = kpis.find((k) => k.key === "tr_ar_overdue");
+      if (arOverdueKpi) {
+        if (arOverdueKpi.value !== "Sin vencidas" && arOverdueKpi.value !== "—") {
+          arOverdueKpi.tone = "warning";
+        }
+        arOverdueKpi.helper = "Vencidas a la fecha (día calendario UTC)";
+      }
+
+      if (arSummary.overdueByCurrency.length > 0) {
+        pushUniqueAlert(alerts, {
+          variant: "warning",
+          message: "Hay cuentas por cobrar vencidas pendientes de cobro.",
+        });
+      }
+    } catch {
+      pushUniqueAlert(alerts, {
+        variant: "info",
+        message: "No se pudieron cargar los indicadores de cuentas por cobrar.",
       });
     }
   }

@@ -46,7 +46,18 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
     title: "Finanzas",
     items: [
       { label: "Tablero", href: "/finanzas", matchExact: true, require: FINANCE_AREA },
+      {
+        label: "Transacciones",
+        href: "/finanzas/transacciones",
+        require: {
+          anyOf: [
+            { action: "VIEW", module: "AP" },
+            { action: "VIEW", module: "TREASURY" },
+          ],
+        },
+      },
       { label: "Cuentas por cobrar", href: "/finanzas/cuentas-por-cobrar-aging", require: { action: "VIEW", module: "AR" } },
+      { label: "Facturas y gastos", href: "/finanzas/facturas-proveedor", require: { action: "VIEW", module: "AP" } },
       { label: "Cuentas por pagar", href: "/finanzas/cuentas-por-pagar-aging", require: { action: "VIEW", module: "AP" } },
       { label: "Gastos generales", href: "/finanzas/gastos-generales", require: { action: "VIEW", module: "AP" } },
     ],

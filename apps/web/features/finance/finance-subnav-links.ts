@@ -16,14 +16,6 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
   const gate = await getTenantModuleGate(ctx);
   const links: FinanceSubnavLinkDTO[] = [{ href: "/finanzas", label: "Resumen", title: "Tablero financiero de la empresa" }];
 
-  if (gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR")) {
-    links.push({
-      href:  "/finanzas/cuentas-por-cobrar-aging",
-      label: "Cuentas por cobrar",
-      title: "Saldos por cliente y vencimiento",
-    });
-  }
-
   if (
     (gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP")) ||
     (gate.isEnabled("TREASURY") && can(ctx.roles, "VIEW", "TREASURY"))
@@ -32,6 +24,14 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
       href: "/finanzas/transacciones",
       label: "Transacciones",
       title: "Movimientos de caja, operaciones y obligaciones de empresa",
+    });
+  }
+
+  if (gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR")) {
+    links.push({
+      href: "/finanzas/cuentas-por-cobrar-aging",
+      label: "Cuentas por cobrar",
+      title: "Saldos por cliente y vencimiento",
     });
   }
 
@@ -55,10 +55,6 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
 
   if (gate.isEnabled("TREASURY") && can(ctx.roles, "VIEW", "TREASURY")) {
     links.push({ href: "/tesoreria", label: "Tesorería", title: "Caja, bancos y movimientos" });
-  }
-
-  if (gate.isEnabled("ACCOUNTING") && can(ctx.roles, "VIEW", "ACCOUNTING")) {
-    links.push({ href: "/contabilidad", label: "Contabilidad", title: "Libro mayor y asientos" });
   }
 
   return links;

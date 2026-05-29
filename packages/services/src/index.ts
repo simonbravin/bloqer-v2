@@ -78,6 +78,7 @@ export * from "./treasury/register-corporate-treasury-inflow.service";
 export * from "./ar/register-ar-sale.service";
 export * from "./finance/payable-list-filters";
 export * from "./project-finance/project-finance-overview.service";
+export * from "./project-finance/project-finance-snapshot.service";
 export * from "./inventory/warehouse-transfer.service";
 export * from "./treasury-reports/treasury-reports.service";
 export * from "./inventory-reports/inventory-reports.service";

@@ -3,13 +3,14 @@ import { Suspense } from "react";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { getCurrentUser } from "@/lib/auth";
-import { getProjectCashFlowReport, ServiceError } from "@bloqer/services";
+import { getProjectCashFlowReport, getProjectFinanceSnapshot, ServiceError } from "@bloqer/services";
 import {
   ProjectCashFlowFilters,
   ProjectCashFlowTable,
   ProjectCashFlowChart,
   CollectionDetailTable,
   PaymentDetailTable,
+  ProjectFinanceSnapshotPanel,
 } from "@/features/project-cash-flow";
 import { ReportCsvExportLink } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
@@ -50,12 +51,16 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
     sp.period === "day" || sp.period === "week" || sp.period === "month" ? sp.period : undefined;
 
   let report;
+  let financeSnapshot;
   try {
-    report = await getProjectCashFlowReport(
-      id,
-      { dateFrom: sp.dateFrom, dateTo: sp.dateTo, period, currency: sp.currency },
-      ctx,
-    );
+    [report, financeSnapshot] = await Promise.all([
+      getProjectCashFlowReport(
+        id,
+        { dateFrom: sp.dateFrom, dateTo: sp.dateTo, period, currency: sp.currency },
+        ctx,
+      ),
+      getProjectFinanceSnapshot(id, ctx),
+    ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
@@ -84,6 +89,8 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
           </>
         }
       />
+
+      <ProjectFinanceSnapshotPanel snapshot={financeSnapshot} />
 
       {report.warnings.multiCurrency && (
         <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10 px-4 py-3 text-sm text-yellow-700 dark:text-yellow-400">
