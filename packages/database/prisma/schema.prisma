@@ -650,6 +650,7 @@ model Company {
   accountingAccounts    AccountingAccount[]
   journalEntries        JournalEntry[]
   accountingMappingRules AccountingMappingRule[]
+  auditLogs             AuditLog[]
 
   @@index([tenantId])
   @@map("companies")
@@ -730,6 +731,7 @@ model TenantInvitation {
 // ─── Audit ────────────────────────────────────────────────────────────────────
 
 // Append-only: no updatedAt. actorUserId nullable for SYSTEM actions.
+// projectId/companyId: denormalized context for tenant audit filters (see AUDIT_LOG.md).
 model AuditLog {
   id          String   @id @default(uuid())
   tenantId    String
@@ -737,16 +739,22 @@ model AuditLog {
   action      String
   entityType  String
   entityId    String
+  projectId   String?
+  companyId   String?
   before      Json?
   after       Json?
   ipAddress   String?
   createdAt   DateTime @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  actor  User?  @relation(fields: [actorUserId], references: [id])
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  actor   User?    @relation(fields: [actorUserId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt])
   @@index([tenantId, entityType, entityId])
+  @@index([tenantId, projectId, createdAt])
+  @@index([tenantId, companyId, createdAt])
   @@map("audit_logs")
 }
 
@@ -914,6 +922,7 @@ model Project {
   journalEntryLines     JournalEntryLine[]
   schedule              Schedule?
   overheadAllocations   ProjectOverheadAllocation[]
+  auditLogs             AuditLog[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])

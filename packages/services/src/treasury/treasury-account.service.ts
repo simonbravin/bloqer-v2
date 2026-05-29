@@ -1,7 +1,7 @@
 import { Prisma, prisma, TreasuryAccount } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreateTreasuryAccountInput, UpdateTreasuryAccountInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { auditTreasury } from "./treasury-audit";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { getAccountBalance, AccountBalanceSummary } from "./balance.service";
@@ -111,17 +111,16 @@ export async function createTreasuryAccount(
       });
     }
 
-    return created;
-  });
+    await auditTreasury(
+      ctx,
+      "treasury_account.created",
+      "TreasuryAccount",
+      created.id,
+      { companyId: created.companyId },
+      { after: { name: input.name, type: input.type, currency: input.currency }, tx },
+    );
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "treasury_account.created",
-    entityType: "TreasuryAccount",
-    entityId: acc.id,
-    after: { name: input.name, type: input.type, currency: input.currency },
-    ipAddress: ctx.ipAddress,
+    return created;
   });
 
   const balance = await getAccountBalance(acc.id);
@@ -142,26 +141,29 @@ export async function updateTreasuryAccount(
   if (acc.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (acc.status === "CLOSED") throw new ServiceError("CONFLICT", "No se puede editar una cuenta cerrada");
 
-  const updated = await prisma.treasuryAccount.update({
-    where: { id },
-    data: {
-      name:          input.name          ?? undefined,
-      bankName:      input.bankName      ?? undefined,
-      accountNumber: input.accountNumber ?? undefined,
-      alias:         input.alias         ?? undefined,
-      notes:         input.notes         ?? undefined,
-      updatedBy: ctx.actorUserId,
-    },
-  });
+  const updated = await prisma.$transaction(async (tx) => {
+    const updatedAccount = await tx.treasuryAccount.update({
+      where: { id },
+      data: {
+        name:          input.name          ?? undefined,
+        bankName:      input.bankName      ?? undefined,
+        accountNumber: input.accountNumber ?? undefined,
+        alias:         input.alias         ?? undefined,
+        notes:         input.notes         ?? undefined,
+        updatedBy: ctx.actorUserId,
+      },
+    });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "treasury_account.updated",
-    entityType: "TreasuryAccount",
-    entityId: id,
-    after: input,
-    ipAddress: ctx.ipAddress,
+    await auditTreasury(
+      ctx,
+      "treasury_account.updated",
+      "TreasuryAccount",
+      id,
+      { companyId: acc.companyId },
+      { after: { name: updatedAccount.name, ...input }, tx },
+    );
+
+    return updatedAccount;
   });
 
   const balance = await getAccountBalance(id);
@@ -190,19 +192,22 @@ async function _setStatus(
   if (!acc) throw new ServiceError("NOT_FOUND", "Cuenta no encontrada");
   if (acc.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
-  const updated = await prisma.treasuryAccount.update({
-    where: { id },
-    data: { status, updatedBy: ctx.actorUserId },
-  });
+  const updated = await prisma.$transaction(async (tx) => {
+    const updatedAccount = await tx.treasuryAccount.update({
+      where: { id },
+      data: { status, updatedBy: ctx.actorUserId },
+    });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action,
-    entityType: "TreasuryAccount",
-    entityId: id,
-    after: { status },
-    ipAddress: ctx.ipAddress,
+    await auditTreasury(
+      ctx,
+      action,
+      "TreasuryAccount",
+      id,
+      { companyId: acc.companyId },
+      { after: { name: acc.name, status }, tx },
+    );
+
+    return updatedAccount;
   });
 
   return updated;

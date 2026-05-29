@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreateCorporateTreasuryInflowInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { auditTreasury } from "./treasury-audit";
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/register-transaction.types";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
@@ -61,16 +61,15 @@ export async function registerCorporateTreasuryInflow(
         createdBy: ctx.actorUserId,
       },
     });
-  });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "account_movement.confirmed",
-    entityType: "AccountMovement",
-    entityId: movementId,
-    after: { type: "INFLOW", sourceType: "MANUAL_ADJUSTMENT", amount: input.amount },
-    ipAddress: ctx.ipAddress,
+    await auditTreasury(
+      ctx,
+      "account_movement.confirmed",
+      "AccountMovement",
+      movementId,
+      { companyId: ctx.companyId },
+      { after: { type: "INFLOW", sourceType: "MANUAL_ADJUSTMENT", amount: input.amount }, tx },
+    );
   });
 
   const href = buildFinancialHref("AccountMovement", movementId, { accountId: input.accountId });

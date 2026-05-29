@@ -1,6 +1,6 @@
 import { prisma, Payable, Prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import { log } from "../audit/audit.service";
+import { auditAp } from "./ap-audit";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
@@ -272,7 +272,7 @@ export async function cancelPayable(id: string, ctx: ServiceContext): Promise<Pa
 
     const supplierInvoice = await tx.supplierInvoice.findUnique({
       where: { id: row.supplierInvoiceId },
-      select: { status: true },
+      select: { status: true, number: true },
     });
     const activePayments = await tx.payment.count({
       where: { payableId: id, status: "CONFIRMED", tenantId: ctx.tenantId },
@@ -291,17 +291,18 @@ export async function cancelPayable(id: string, ctx: ServiceContext): Promise<Pa
       payableCancel.count,
       "El saldo cambió mientras cancelabas la cuenta. Revisá pagos e intentá de nuevo.",
     );
-    return tx.payable.findUniqueOrThrow({ where: { id } });
-  });
+    const updated = await tx.payable.findUniqueOrThrow({ where: { id } });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "payable.cancelled",
-    entityType: "Payable",
-    entityId: id,
-    after: { status: "CANCELLED" },
-    ipAddress: ctx.ipAddress,
+    await auditAp(
+      ctx,
+      "payable.cancelled",
+      "Payable",
+      id,
+      { projectId: updated.projectId, companyId: updated.companyId },
+      { after: { status: "CANCELLED", number: supplierInvoice?.number ?? null }, tx },
+    );
+
+    return updated;
   });
 
   return updated;

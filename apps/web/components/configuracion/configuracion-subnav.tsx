@@ -1,18 +1,12 @@
 "use client";
 
-import { ModuleSubnav, type ModuleSubnavLink } from "@/components/layout/module-subnav";
+import type { ModuleSubnavLink } from "@/components/layout/module-subnav";
+import { ModuleSubnav } from "@/components/layout/module-subnav";
 
-const LINKS: ModuleSubnavLink[] = [
-  { href: "/configuracion", label: "Resumen", match: "exact" },
-  { href: "/configuracion/perfil", label: "Mi perfil" },
-  { href: "/configuracion/equipo", label: "Equipo" },
-  { href: "/configuracion/permisos", label: "Permisos" },
-];
-
-export function ConfiguracionSubnav() {
+export function ConfiguracionSubnav({ links }: { links: ModuleSubnavLink[] }) {
   return (
     <ModuleSubnav
-      links={LINKS}
+      links={links}
       ariaLabel="Navegación de configuración"
       sectionLabel="Configuración"
     />

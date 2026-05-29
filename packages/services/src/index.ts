@@ -5,6 +5,14 @@ export * from "./user/user.service";
 export * from "./membership/membership.service";
 export * from "./contact/contact.service";
 export * from "./audit/audit.service";
+export * from "./audit/audit-read.service";
+export {
+  parseAuditDateFrom,
+  parseAuditDateToInclusive,
+  formatAuditActorLabel,
+  formatAuditLogExportFilterLine,
+} from "./audit/audit-display";
+export { exportTenantAuditLogPdf } from "./audit/audit-pdf-export.service";
 export * from "./project/project.service";
 export * from "./project/project-overview-dashboard.service";
 export * from "./budget/budget.service";

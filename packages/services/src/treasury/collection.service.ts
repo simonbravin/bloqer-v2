@@ -1,7 +1,7 @@
 import { Prisma, prisma, Collection } from "@bloqer/database";
 import { canEditArArea, canViewArProjectArea } from "../ar/ar-access";
 import type { CreateCollectionInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { auditAr } from "../ar/ar-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
@@ -117,7 +117,7 @@ export async function createCollection(
 
     const salesInvoice = await tx.salesInvoice.findUnique({
       where: { id: receivable.salesInvoiceId },
-      select: { status: true },
+      select: { status: true, number: true },
     });
     if (!salesInvoice) {
       throw new ServiceError("CONFLICT", "La factura de venta asociada no existe");
@@ -179,6 +179,7 @@ export async function createCollection(
       data: {
         tenantId:    ctx.tenantId,
         companyId:   account.companyId,
+        projectId:   receivable.projectId,
         accountId:   input.accountId,
         movementDate: new Date(input.collectionDate),
         type:        "INFLOW",
@@ -212,20 +213,28 @@ export async function createCollection(
       "El saldo cambió mientras registrabas la cobranza. Revisá el saldo pendiente e intentá de nuevo.",
     );
 
-    return tx.collection.findUniqueOrThrow({
+    const result = await tx.collection.findUniqueOrThrow({
       where: { id: collection.id },
       include: { account: { select: { name: true } } },
     });
-  });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "collection.confirmed",
-    entityType: "Collection",
-    entityId: result.id,
-    after: { receivableId: input.receivableId, amount: input.amount },
-    ipAddress: ctx.ipAddress,
+    await auditAr(
+      ctx,
+      "collection.confirmed",
+      "Collection",
+      result.id,
+      { projectId: result.projectId, companyId: result.companyId },
+      {
+        after: {
+          receivableId: input.receivableId,
+          amount: input.amount,
+          number: salesInvoice.number,
+        },
+        tx,
+      },
+    );
+
+    return result;
   });
 
   return serialize(result);
@@ -285,17 +294,23 @@ export async function cancelCollection(
       );
     }
 
-    return tx.collection.findUniqueOrThrow({ where: { id } });
-  });
+    const invoice = await tx.salesInvoice.findUnique({
+      where: { id: c.salesInvoiceId },
+      select: { number: true },
+    });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "collection.cancelled",
-    entityType: "Collection",
-    entityId: id,
-    after: { status: "CANCELLED" },
-    ipAddress: ctx.ipAddress,
+    const updated = await tx.collection.findUniqueOrThrow({ where: { id } });
+
+    await auditAr(
+      ctx,
+      "collection.cancelled",
+      "Collection",
+      id,
+      { projectId: updated.projectId, companyId: updated.companyId },
+      { after: { status: "CANCELLED", number: invoice?.number ?? null }, tx },
+    );
+
+    return updated;
   });
 
   return updated;

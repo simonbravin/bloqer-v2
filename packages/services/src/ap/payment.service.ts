@@ -1,7 +1,7 @@
 import { Prisma, prisma, Payment } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreatePaymentInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { auditAp } from "./ap-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
@@ -202,7 +202,7 @@ export async function createPayment(
 
     const supplierInvoice = await tx.supplierInvoice.findUnique({
       where: { id: payable.supplierInvoiceId },
-      select: { status: true },
+      select: { status: true, number: true },
     });
     if (!supplierInvoice) {
       throw new ServiceError("CONFLICT", "La factura de proveedor asociada no existe");
@@ -265,6 +265,7 @@ export async function createPayment(
       data: {
         tenantId:    ctx.tenantId,
         companyId:   account.companyId,
+        projectId:   payable.projectId,
         accountId:   input.accountId,
         movementDate: new Date(input.paymentDate),
         type:        "OUTFLOW",
@@ -298,20 +299,28 @@ export async function createPayment(
       "El saldo cambió mientras registrabas el pago. Revisá el saldo pendiente e intentá de nuevo.",
     );
 
-    return tx.payment.findUniqueOrThrow({
+    const result = await tx.payment.findUniqueOrThrow({
       where: { id: payment.id },
       include: { account: { select: { name: true } } },
     });
-  });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "payment.confirmed",
-    entityType: "Payment",
-    entityId: result.id,
-    after: { payableId: input.payableId, amount: input.amount },
-    ipAddress: ctx.ipAddress,
+    await auditAp(
+      ctx,
+      "payment.confirmed",
+      "Payment",
+      result.id,
+      { projectId: result.projectId, companyId: result.companyId },
+      {
+        after: {
+          payableId: input.payableId,
+          amount: input.amount,
+          number: supplierInvoice.number,
+        },
+        tx,
+      },
+    );
+
+    return result;
   });
 
   return serialize(result);
@@ -376,17 +385,23 @@ export async function cancelPayment(
       );
     }
 
-    return tx.payment.findUniqueOrThrow({ where: { id } });
-  });
+    const invoice = await tx.supplierInvoice.findUnique({
+      where: { id: p.supplierInvoiceId },
+      select: { number: true },
+    });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "payment.cancelled",
-    entityType: "Payment",
-    entityId: id,
-    after: { status: "CANCELLED" },
-    ipAddress: ctx.ipAddress,
+    const updated = await tx.payment.findUniqueOrThrow({ where: { id } });
+
+    await auditAp(
+      ctx,
+      "payment.cancelled",
+      "Payment",
+      id,
+      { projectId: updated.projectId, companyId: updated.companyId },
+      { after: { status: "CANCELLED", number: invoice?.number ?? null }, tx },
+    );
+
+    return updated;
   });
 
   return updated;

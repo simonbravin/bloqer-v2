@@ -1,6 +1,6 @@
 import { Prisma, prisma, Receivable, ReceivableStatus } from "@bloqer/database";
 import { canEditArArea, canViewArProjectArea } from "./ar-access";
-import { log } from "../audit/audit.service";
+import { auditAr } from "./ar-audit";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
@@ -171,7 +171,7 @@ export async function cancelReceivable(id: string, ctx: ServiceContext): Promise
 
     const salesInvoice = await tx.salesInvoice.findUnique({
       where: { id: r.salesInvoiceId },
-      select: { status: true },
+      select: { status: true, number: true },
     });
     const activeCollections = await tx.collection.count({
       where: { receivableId: id, status: "CONFIRMED", tenantId: ctx.tenantId },
@@ -190,17 +190,18 @@ export async function cancelReceivable(id: string, ctx: ServiceContext): Promise
       receivableCancel.count,
       "El saldo cambió mientras cancelabas la cuenta. Revisá cobranzas e intentá de nuevo.",
     )
-    return tx.receivable.findUniqueOrThrow({ where: { id } });
-  });
+    const updated = await tx.receivable.findUniqueOrThrow({ where: { id } });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "receivable.cancelled",
-    entityType: "Receivable",
-    entityId: id,
-    after: { status: "CANCELLED" },
-    ipAddress: ctx.ipAddress,
+    await auditAr(
+      ctx,
+      "receivable.cancelled",
+      "Receivable",
+      id,
+      { projectId: updated.projectId, companyId: updated.companyId },
+      { after: { status: "CANCELLED", number: salesInvoice?.number ?? null }, tx },
+    );
+
+    return updated;
   });
 
   return updated;

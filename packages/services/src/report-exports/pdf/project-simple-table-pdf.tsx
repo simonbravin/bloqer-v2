@@ -13,11 +13,13 @@ type Props = {
   rows: Record<string, string>[];
   totalsLine?: string;
   warnings?: string[];
+  maxRows?: number;
 };
 
 export function ProjectSimpleTablePdfDocument(props: Props) {
-  const slice = props.rows.slice(0, MAX_PROJECT_REPORT_PDF_ROWS);
-  const truncated = props.rows.length > MAX_PROJECT_REPORT_PDF_ROWS;
+  const rowLimit = props.maxRows ?? MAX_PROJECT_REPORT_PDF_ROWS;
+  const slice = props.rows.slice(0, rowLimit);
+  const truncated = props.rows.length > rowLimit;
 
   return (
     <Document>
@@ -37,7 +39,7 @@ export function ProjectSimpleTablePdfDocument(props: Props) {
           </Text>
         ))}
         <Text style={reportPdfStyles.sectionTitle}>
-          Detalle ({truncated ? `primeras ${MAX_PROJECT_REPORT_PDF_ROWS}` : slice.length} filas)
+          Detalle ({truncated ? `primeras ${rowLimit}` : slice.length} filas)
         </Text>
         <View style={reportPdfStyles.headerRow}>
           {props.columns.map((c) => (

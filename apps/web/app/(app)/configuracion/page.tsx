@@ -8,6 +8,7 @@ import {
   canReadTenantConfigArea,
   getTenantSettings,
 } from "@bloqer/services";
+import { canViewTenantAuditLog } from "@/lib/configuracion-subnav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageShell } from "@/components/layout/page-shell";
@@ -42,6 +43,7 @@ export default async function ConfiguracionHomePage() {
   const tenant = await getTenantSettings(ctx);
 
   const canEditDisplay = canEditTenantDisplaySettings(current.tenantCtx.roles);
+  const canViewRegistro = canViewTenantAuditLog(current.tenantCtx.roles);
   const company = tenant.primaryCompany;
   const fiscalId = company?.fiscalId ?? tenant.fiscalId;
   const legalName = company?.legalName ?? company?.name ?? null;
@@ -76,6 +78,21 @@ export default async function ConfiguracionHomePage() {
             </Button>
           </CardContent>
         </Card>
+        {canViewRegistro ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Registro de actividad</CardTitle>
+              <CardDescription>
+                Trazabilidad de compras, pagos, aprobaciones y cambios críticos del tenant.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/configuracion/registro">Ver registro</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
 
       <Card>

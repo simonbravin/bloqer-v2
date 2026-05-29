@@ -1,7 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { RegisterArSaleInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { auditAr } from "./ar-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -28,6 +28,7 @@ type ArSaleOutcome = {
   receivableId: string;
   number: number;
   projectId: string;
+  companyId: string;
   collectionId?: string;
   movementId?: string;
   collectAccountId?: string;
@@ -265,6 +266,7 @@ export async function registerArSale(
             data: {
               tenantId: ctx.tenantId,
               companyId: account.companyId ?? ctx.companyId ?? receivable.companyId,
+              projectId: receivable.projectId,
               accountId: input.collectNow.accountId,
               movementDate: new Date(input.collectNow.collectionDate),
               type: "INFLOW",
@@ -296,11 +298,42 @@ export async function registerArSale(
           );
         }
 
+        await auditAr(
+          ctx,
+          "sales_invoice.registered_sale",
+          "SalesInvoice",
+          refreshed.id,
+          { projectId: input.projectId, companyId },
+          { after: { number, issued: true, collected: Boolean(input.collectNow) }, tx },
+        );
+
+        if (collectionId) {
+          const collectAmount = input.collectNow!.amount
+            ? new Prisma.Decimal(input.collectNow!.amount)
+            : refreshed.totalAmount;
+          await auditAr(
+            ctx,
+            "collection.confirmed",
+            "Collection",
+            collectionId,
+            { projectId: input.projectId, companyId },
+            {
+              after: {
+                number,
+                receivableId: receivable.id,
+                amount: collectAmount.toString(),
+              },
+              tx,
+            },
+          );
+        }
+
         return {
           invoiceId: refreshed.id,
           receivableId: receivable.id,
           number,
           projectId: input.projectId,
+          companyId,
           collectionId,
           movementId,
           collectAccountId,
@@ -315,16 +348,6 @@ export async function registerArSale(
   if (!outcome) {
     throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
   }
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "sales_invoice.registered_sale",
-    entityType: "SalesInvoice",
-    entityId: outcome.invoiceId,
-    after: { issued: true, collected: Boolean(input.collectNow) },
-    ipAddress: ctx.ipAddress,
-  });
 
   const traceChain = buildArSaleTraceChain(outcome);
 

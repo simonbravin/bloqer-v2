@@ -1,6 +1,7 @@
 import { Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import type { CompleteTrialOnboardingInput } from "@bloqer/validators";
+import { log } from "../audit/audit.service";
 import { ServiceError } from "../types";
 import { createTrialTenantBundle } from "./trial-tenant-bundle";
 
@@ -47,13 +48,14 @@ export async function completeTrialOnboarding(
       },
     });
 
-    await tx.auditLog.create({
-      data: {
+    await log(
+      {
         tenantId: tenant.id,
         actorUserId,
         action: "TENANT_ONBOARDING_COMPLETED",
         entityType: "Tenant",
         entityId: tenant.id,
+        companyId: company.id,
         after: {
           name: tenant.name,
           slug: tenant.slug,
@@ -63,31 +65,36 @@ export async function completeTrialOnboarding(
         },
         ipAddress,
       },
-    });
+      tx,
+    );
 
-    await tx.auditLog.create({
-      data: {
+    await log(
+      {
         tenantId: tenant.id,
         actorUserId,
         action: "COMPANY_CREATED",
         entityType: "Company",
         entityId: company.id,
+        companyId: company.id,
         after: { name: company.name, tenantId: tenant.id },
         ipAddress,
       },
-    });
+      tx,
+    );
 
-    await tx.auditLog.create({
-      data: {
+    await log(
+      {
         tenantId: tenant.id,
         actorUserId,
         action: "MEMBERSHIP_CREATED",
         entityType: "UserMembership",
         entityId: membership.id,
+        companyId: company.id,
         after: { userId: actorUserId, roles: ["OWNER"], companyId: company.id },
         ipAddress,
       },
-    });
+      tx,
+    );
 
     return { status: "created", tenantId: tenant.id };
   });

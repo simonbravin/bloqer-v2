@@ -1,7 +1,7 @@
 import { Prisma, prisma, InternalTransfer } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreateInternalTransferInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { auditTreasury } from "./treasury-audit";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { getAccountBalance } from "./balance.service";
@@ -166,23 +166,31 @@ export async function createInternalTransfer(
       ],
     });
 
-    return tx.internalTransfer.findUniqueOrThrow({
+    const result = await tx.internalTransfer.findUniqueOrThrow({
       where: { id: transfer.id },
       include: {
         sourceAccount:      { select: { name: true } },
         destinationAccount: { select: { name: true } },
       },
     });
-  });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "internal_transfer.created",
-    entityType: "InternalTransfer",
-    entityId: result.id,
-    after: { sourceAccountId: input.sourceAccountId, destinationAccountId: input.destinationAccountId, amount: input.amount },
-    ipAddress: ctx.ipAddress,
+    await auditTreasury(
+      ctx,
+      "internal_transfer.created",
+      "InternalTransfer",
+      result.id,
+      { companyId: result.companyId },
+      {
+        after: {
+          sourceAccountId: input.sourceAccountId,
+          destinationAccountId: input.destinationAccountId,
+          amount: input.amount,
+        },
+        tx,
+      },
+    );
+
+    return result;
   });
 
   return serialize(result);
@@ -209,20 +217,21 @@ export async function cancelInternalTransfer(
       data: { status: "CANCELLED" },
     });
 
-    return tx.internalTransfer.update({
+    const updated = await tx.internalTransfer.update({
       where: { id },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
     });
-  });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "internal_transfer.cancelled",
-    entityType: "InternalTransfer",
-    entityId: id,
-    after: { status: "CANCELLED" },
-    ipAddress: ctx.ipAddress,
+    await auditTreasury(
+      ctx,
+      "internal_transfer.cancelled",
+      "InternalTransfer",
+      id,
+      { companyId: updated.companyId },
+      { after: { status: "CANCELLED", amount: t.amount.toString() }, tx },
+    );
+
+    return updated;
   });
 
   return updated;

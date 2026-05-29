@@ -1,7 +1,7 @@
 import { Prisma, prisma, PurchaseOrder, PurchaseOrderStatus } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreatePurchaseOrderInput, UpdatePurchaseOrderInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { calcLine, recalcPurchaseOrderTotals } from "./purchase-order-calc.service";
@@ -331,16 +331,16 @@ export async function createPurchaseOrder(
 
     await recalcPurchaseOrderTotals(tx, created.id);
 
-    return tx.purchaseOrder.findUniqueOrThrow({ where: { id: created.id }, include: poInclude });
-  });
-
-  await log({
-    tenantId:   ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:     "PURCHASE_ORDER_CREATED",
-    entityType: "PurchaseOrder",
-    entityId:   po.id,
-    after:      { number: po.number },
+    const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id: created.id }, include: poInclude });
+    await auditProcurement(
+      ctx,
+      "purchase_order.created",
+      "PurchaseOrder",
+      po.id,
+      { projectId: po.projectId, companyId: po.companyId },
+      { after: { number: po.number }, tx },
+    );
+    return po;
   });
 
   return serializePO(po);
@@ -431,16 +431,16 @@ export async function updatePurchaseOrder(
       await recalcPurchaseOrderTotals(tx, id);
     }
 
-    return tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: poInclude });
-  });
-
-  await log({
-    tenantId:   ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:     "PURCHASE_ORDER_UPDATED",
-    entityType: "PurchaseOrder",
-    entityId:   id,
-    after:      {},
+    const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: poInclude });
+    await auditProcurement(
+      ctx,
+      "purchase_order.updated",
+      "PurchaseOrder",
+      id,
+      { projectId: po.projectId, companyId: po.companyId },
+      { after: { number: po.number }, tx },
+    );
+    return po;
   });
 
   return serializePO(po);
@@ -469,16 +469,16 @@ export async function issuePurchaseOrder(id: string, ctx: ServiceContext): Promi
     if (updated.totalAmount.lessThanOrEqualTo(0)) {
       throw new ServiceError("CONFLICT", "El monto total de la orden debe ser mayor a cero");
     }
-    return tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: poInclude });
-  });
-
-  await log({
-    tenantId:   ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:     "PURCHASE_ORDER_ISSUED",
-    entityType: "PurchaseOrder",
-    entityId:   id,
-    after:      { totalAmount: po.totalAmount.toString() },
+    const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: poInclude });
+    await auditProcurement(
+      ctx,
+      "purchase_order.issued",
+      "PurchaseOrder",
+      id,
+      { projectId: po.projectId, companyId: po.companyId },
+      { after: { number: po.number, totalAmount: po.totalAmount.toString() }, tx },
+    );
+    return po;
   });
 
   return serializePO(po);
@@ -515,25 +515,57 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
   }
 
   const po = await prisma.$transaction(async (tx) => {
-    // Cancel any DRAFT receipts
-    await tx.purchaseReceipt.updateMany({
+    const draftReceipts = await tx.purchaseReceipt.findMany({
       where: { purchaseOrderId: id, status: "DRAFT" },
-      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+      select: { id: true, projectId: true, companyId: true },
     });
-    return tx.purchaseOrder.update({
+
+    if (draftReceipts.length > 0) {
+      await tx.purchaseReceipt.updateMany({
+        where: { purchaseOrderId: id, status: "DRAFT" },
+        data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+      });
+      for (const receipt of draftReceipts) {
+        await auditProcurement(
+          ctx,
+          "purchase_receipt.cancelled",
+          "PurchaseReceipt",
+          receipt.id,
+          { projectId: receipt.projectId, companyId: receipt.companyId },
+          {
+            after: {
+              purchaseOrderId: id,
+              number: existing.number,
+              cancelledByPurchaseOrder: true,
+            },
+            tx,
+          },
+        );
+      }
+    }
+
+    const cancelled = await tx.purchaseOrder.update({
       where: { id },
       data: { status: PurchaseOrderStatus.CANCELLED, updatedBy: ctx.actorUserId },
       include: poInclude,
     });
-  });
 
-  await log({
-    tenantId:   ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:     "PURCHASE_ORDER_CANCELLED",
-    entityType: "PurchaseOrder",
-    entityId:   id,
-    after:      {},
+    await auditProcurement(
+      ctx,
+      "purchase_order.cancelled",
+      "PurchaseOrder",
+      id,
+      { projectId: cancelled.projectId, companyId: cancelled.companyId },
+      {
+        after: {
+          number: cancelled.number,
+          cancelledDraftReceiptCount: draftReceipts.length,
+        },
+        tx,
+      },
+    );
+
+    return cancelled;
   });
 
   return serializePO(po);

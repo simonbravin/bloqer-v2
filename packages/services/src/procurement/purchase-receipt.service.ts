@@ -1,7 +1,7 @@
 import { Prisma, prisma, PurchaseReceipt, PurchaseReceiptStatus, PurchaseOrderStatus } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreatePurchaseReceiptInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { auditProcurement } from "./procurement-audit";
 import { createReceiptStockMovement, cancelReceiptStockMovements } from "../inventory/stock-movement.service";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -208,16 +208,16 @@ export async function createPurchaseReceipt(
       });
     }
 
-    return tx.purchaseReceipt.findUniqueOrThrow({ where: { id: created.id }, include: receiptInclude });
-  });
-
-  await log({
-    tenantId:   ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:     "PURCHASE_RECEIPT_CREATED",
-    entityType: "PurchaseReceipt",
-    entityId:   receipt.id,
-    after:      { purchaseOrderId: po.id },
+    const receipt = await tx.purchaseReceipt.findUniqueOrThrow({ where: { id: created.id }, include: receiptInclude });
+    await auditProcurement(
+      ctx,
+      "purchase_receipt.created",
+      "PurchaseReceipt",
+      receipt.id,
+      { projectId: receipt.projectId, companyId: receipt.companyId },
+      { after: { purchaseOrderId: po.id, number: po.number }, tx },
+    );
+    return receipt;
   });
 
   return serializeReceipt(receipt);
@@ -276,20 +276,25 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
       }
     }
 
-    return tx.purchaseReceipt.update({
+    const receipt = await tx.purchaseReceipt.update({
       where: { id },
       data: { status: PurchaseReceiptStatus.CONFIRMED, updatedBy: ctx.actorUserId },
       include: receiptInclude,
     });
-  });
 
-  await log({
-    tenantId:   ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:     "PURCHASE_RECEIPT_CONFIRMED",
-    entityType: "PurchaseReceipt",
-    entityId:   id,
-    after:      { purchaseOrderId: existing.purchaseOrderId },
+    const po = await tx.purchaseOrder.findUnique({
+      where: { id: existing.purchaseOrderId },
+      select: { number: true },
+    });
+    await auditProcurement(
+      ctx,
+      "purchase_receipt.confirmed",
+      "PurchaseReceipt",
+      id,
+      { projectId: existing.projectId, companyId: existing.companyId },
+      { after: { purchaseOrderId: existing.purchaseOrderId, number: po?.number ?? null }, tx },
+    );
+    return receipt;
   });
 
   return serializeReceipt(receipt);
@@ -335,20 +340,32 @@ export async function cancelPurchaseReceipt(id: string, ctx: ServiceContext): Pr
       await cancelReceiptStockMovements(tx, existing.id);
     }
 
-    return tx.purchaseReceipt.update({
+    const receipt = await tx.purchaseReceipt.update({
       where: { id },
       data: { status: PurchaseReceiptStatus.CANCELLED, updatedBy: ctx.actorUserId },
       include: receiptInclude,
     });
-  });
 
-  await log({
-    tenantId:   ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:     "PURCHASE_RECEIPT_CANCELLED",
-    entityType: "PurchaseReceipt",
-    entityId:   id,
-    after:      { wasConfirmed: existing.status === "CONFIRMED" },
+    const po = await tx.purchaseOrder.findUnique({
+      where: { id: existing.purchaseOrderId },
+      select: { number: true },
+    });
+    await auditProcurement(
+      ctx,
+      "purchase_receipt.cancelled",
+      "PurchaseReceipt",
+      id,
+      { projectId: existing.projectId, companyId: existing.companyId },
+      {
+        after: {
+          purchaseOrderId: existing.purchaseOrderId,
+          number: po?.number ?? null,
+          wasConfirmed: existing.status === "CONFIRMED",
+        },
+        tx,
+      },
+    );
+    return receipt;
   });
 
   return serializeReceipt(receipt);

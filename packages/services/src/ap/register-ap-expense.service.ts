@@ -1,7 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { RegisterApExpenseInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { auditAp } from "./ap-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -27,6 +27,7 @@ type ApExpenseOutcome = {
   invoiceId: string;
   payableId: string;
   number: number;
+  companyId: string;
   paymentId?: string;
   movementId?: string;
   payAccountId?: string;
@@ -239,6 +240,7 @@ export async function registerApExpense(
         data: {
           tenantId: ctx.tenantId,
           companyId: account.companyId ?? ctx.companyId ?? payable.companyId,
+          projectId: payable.projectId,
           accountId: input.payNow.accountId,
           movementDate: new Date(input.payNow.paymentDate),
           type: "OUTFLOW",
@@ -271,10 +273,31 @@ export async function registerApExpense(
 
     }
 
+    await auditAp(
+      ctx,
+      "supplier_invoice.registered_expense",
+      "SupplierInvoice",
+      refreshed.id,
+      { companyId },
+      { after: { number, issued: true, paid: Boolean(input.payNow) }, tx },
+    );
+
+    if (paymentId) {
+      await auditAp(
+        ctx,
+        "payment.confirmed",
+        "Payment",
+        paymentId,
+        { companyId },
+        { after: { number, payableId: payable.id }, tx },
+      );
+    }
+
     return {
       invoiceId: refreshed.id,
       payableId: payable.id,
       number,
+      companyId,
       paymentId,
       movementId,
       payAccountId,
@@ -288,27 +311,6 @@ export async function registerApExpense(
   }
   if (!outcome) {
     throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
-  }
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "supplier_invoice.registered_expense",
-    entityType: "SupplierInvoice",
-    entityId: outcome.invoiceId,
-    after: { issued: true, paid: Boolean(input.payNow) },
-    ipAddress: ctx.ipAddress,
-  });
-
-  if (outcome.paymentId) {
-    await log({
-      tenantId: ctx.tenantId,
-      actorUserId: ctx.actorUserId,
-      action: "payment.confirmed",
-      entityType: "Payment",
-      entityId: outcome.paymentId,
-      ipAddress: ctx.ipAddress,
-    });
   }
 
   const traceChain = buildApExpenseTraceChain(outcome);

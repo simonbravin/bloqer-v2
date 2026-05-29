@@ -8,3 +8,4 @@ export type ReportPdfPayload = {
 export const MAX_AGING_PDF_LINE_ITEMS = 350;
 export const MAX_COST_CONTROL_PDF_ROWS = 90;
 export const MAX_PROJECT_REPORT_PDF_ROWS = 90;
+export const MAX_AUDIT_LOG_PDF_ROWS = 350;

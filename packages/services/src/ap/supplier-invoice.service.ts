@@ -1,7 +1,7 @@
 import { Prisma, prisma, SupplierInvoice } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreateSupplierInvoiceInput, UpdateSupplierInvoiceInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { auditAp } from "./ap-audit";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { assertCanCancelSupplierInvoice } from "./supplier-invoice-cancel-guards";
@@ -352,23 +352,24 @@ export async function createSupplierInvoice(
 
     await recalcSupplierInvoiceTotals(tx, created.id);
 
-    return tx.supplierInvoice.findUniqueOrThrow({
+    const inv = await tx.supplierInvoice.findUniqueOrThrow({
       where: { id: created.id },
       include: {
         lines: { orderBy: { sortOrder: "asc" } },
         supplierContact: { select: { legalName: true, fantasyName: true } },
       },
     });
-  });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "supplier_invoice.created",
-    entityType: "SupplierInvoice",
-    entityId: inv.id,
-    after: { number, projectId },
-    ipAddress: ctx.ipAddress,
+    await auditAp(
+      ctx,
+      "supplier_invoice.created",
+      "SupplierInvoice",
+      inv.id,
+      { projectId: inv.projectId, companyId: inv.companyId },
+      { after: { number: inv.number, projectId: inv.projectId }, tx },
+    );
+
+    return inv;
   });
 
   return serializeInvoice(inv);
@@ -468,22 +469,24 @@ export async function updateSupplierInvoice(
       await recalcSupplierInvoiceTotals(tx, id);
     }
 
-    return tx.supplierInvoice.findUniqueOrThrow({
+    const inv = await tx.supplierInvoice.findUniqueOrThrow({
       where: { id },
       include: {
         lines: { orderBy: { sortOrder: "asc" } },
         supplierContact: { select: { legalName: true, fantasyName: true } },
       },
     });
-  });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "supplier_invoice.updated",
-    entityType: "SupplierInvoice",
-    entityId: id,
-    ipAddress: ctx.ipAddress,
+    await auditAp(
+      ctx,
+      "supplier_invoice.updated",
+      "SupplierInvoice",
+      id,
+      { projectId: inv.projectId, companyId: inv.companyId },
+      { after: { number: inv.number }, tx },
+    );
+
+    return inv;
   });
 
   return serializeInvoice(inv);
@@ -555,22 +558,24 @@ export async function issueSupplierInvoice(
       },
     });
 
-    return tx.supplierInvoice.findUniqueOrThrow({
+    const result = await tx.supplierInvoice.findUniqueOrThrow({
       where: { id },
       include: {
         lines: { orderBy: { sortOrder: "asc" } },
         supplierContact: { select: { legalName: true, fantasyName: true } },
       },
     });
-  });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "supplier_invoice.issued",
-    entityType: "SupplierInvoice",
-    entityId: id,
-    ipAddress: ctx.ipAddress,
+    await auditAp(
+      ctx,
+      "supplier_invoice.issued",
+      "SupplierInvoice",
+      id,
+      { projectId: result.projectId, companyId: result.companyId },
+      { after: { number: result.number, status: "ISSUED" }, tx },
+    );
+
+    return result;
   });
 
   return serializeInvoice(result);
@@ -600,7 +605,10 @@ export async function cancelSupplierInvoice(
 
     // BR-AP-003: if ISSUED, cancel linked Payable only if no active payments
     if (inv.status === "ISSUED") {
-      const payable = await tx.payable.findUnique({ where: { supplierInvoiceId: id } });
+      const payable = await tx.payable.findUnique({
+        where: { supplierInvoiceId: id },
+        select: { id: true, paidAmount: true, projectId: true, companyId: true },
+      });
       const activePaymentCount = payable
         ? await tx.payment.count({
             where: { payableId: payable.id, status: "CONFIRMED", tenantId: ctx.tenantId },
@@ -625,6 +633,21 @@ export async function cancelSupplierInvoice(
           payableCancel.count,
           "El saldo cambió mientras cancelabas la factura. Revisá pagos e intentá de nuevo.",
         );
+        await auditAp(
+          ctx,
+          "payable.cancelled",
+          "Payable",
+          payable.id,
+          { projectId: payable.projectId, companyId: payable.companyId },
+          {
+            after: {
+              number: inv.number,
+              status: "CANCELLED",
+              cancelledBySupplierInvoice: true,
+            },
+            tx,
+          },
+        );
       }
     }
 
@@ -633,22 +656,24 @@ export async function cancelSupplierInvoice(
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
     });
 
-    return tx.supplierInvoice.findUniqueOrThrow({
+    const result = await tx.supplierInvoice.findUniqueOrThrow({
       where: { id },
       include: {
         lines: { orderBy: { sortOrder: "asc" } },
         supplierContact: { select: { legalName: true, fantasyName: true } },
       },
     });
-  });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "supplier_invoice.cancelled",
-    entityType: "SupplierInvoice",
-    entityId: id,
-    ipAddress: ctx.ipAddress,
+    await auditAp(
+      ctx,
+      "supplier_invoice.cancelled",
+      "SupplierInvoice",
+      id,
+      { projectId: result.projectId, companyId: result.companyId },
+      { after: { number: inv.number, status: "CANCELLED" }, tx },
+    );
+
+    return result;
   });
 
   return serializeInvoice(result);

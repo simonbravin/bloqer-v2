@@ -1,6 +1,6 @@
 import { Prisma, prisma, AccountMovement } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import { log } from "../audit/audit.service";
+import { auditTreasury } from "./treasury-audit";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { assertCanCancelAccountMovement } from "./account-movement-cancel-guards";
@@ -64,19 +64,22 @@ export async function cancelAccountMovement(
     transferId: m.transferId,
   });
 
-  const updated = await prisma.accountMovement.update({
-    where: { id },
-    data: { status: "CANCELLED" },
-  });
+  const updated = await prisma.$transaction(async (tx) => {
+    const updatedMovement = await tx.accountMovement.update({
+      where: { id },
+      data: { status: "CANCELLED" },
+    });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "account_movement.cancelled",
-    entityType: "AccountMovement",
-    entityId: id,
-    after: { status: "CANCELLED" },
-    ipAddress: ctx.ipAddress,
+    await auditTreasury(
+      ctx,
+      "account_movement.cancelled",
+      "AccountMovement",
+      id,
+      { companyId: m.companyId, projectId: m.projectId },
+      { after: { status: "CANCELLED", amount: m.amount.toString() }, tx },
+    );
+
+    return updatedMovement;
   });
 
   return updated;

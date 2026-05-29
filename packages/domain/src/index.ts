@@ -18,3 +18,15 @@ export {
   type PermissionModuleGroupSection,
   type PermissionMatrixGrid,
 } from "./permissions/matrix-overview";
+export {
+  AUDIT_UI_MODULES,
+  AUDIT_UI_MODULE_LABEL_ES,
+  AUDIT_MODULE_ENTITY_TYPES,
+  ALL_PROJECT_SCOPED_ENTITY_TYPES,
+  AUDIT_MODULES_WITHOUT_PROJECT_SCOPE,
+  AUDIT_ACTION_LABELS_ES,
+  resolveAuditModuleForEntityType,
+  entityTypesForAuditModule,
+  resolveAuditActionLabel,
+  type AuditUiModule,
+} from "./audit/audit-catalog";

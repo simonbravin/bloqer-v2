@@ -4,7 +4,7 @@ import type {
   CreateInvoiceFromCertificationInput,
   UpdateSalesInvoiceInput,
 } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { auditAr } from "./ar-audit";
 import { assertCanCancelSalesInvoice } from "./sales-invoice-cancel-guards";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
@@ -223,23 +223,24 @@ export async function createSalesInvoice(
     }
 
     await recalcInvoiceTotals(tx as never, created.id);
-    return tx.salesInvoice.findUniqueOrThrow({
+    const inv = await tx.salesInvoice.findUniqueOrThrow({
       where: { id: created.id },
       include: {
         lines: { orderBy: { sortOrder: "asc" } },
         clientContact: { select: { legalName: true, fantasyName: true } },
       },
     });
-  });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "sales_invoice.created",
-    entityType: "SalesInvoice",
-    entityId: inv.id,
-    after: { number, projectId: input.projectId },
-    ipAddress: ctx.ipAddress,
+    await auditAr(
+      ctx,
+      "sales_invoice.created",
+      "SalesInvoice",
+      inv.id,
+      { projectId: inv.projectId, companyId: inv.companyId },
+      { after: { number: inv.number, projectId: inv.projectId }, tx },
+    );
+
+    return inv;
   });
 
   return serializeInvoice(inv);
@@ -325,23 +326,24 @@ export async function createInvoiceFromCertification(
     }
 
     await recalcInvoiceTotals(tx as never, created.id);
-    return tx.salesInvoice.findUniqueOrThrow({
+    const inv = await tx.salesInvoice.findUniqueOrThrow({
       where: { id: created.id },
       include: {
         lines: { orderBy: { sortOrder: "asc" } },
         clientContact: { select: { legalName: true, fantasyName: true } },
       },
     });
-  });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "sales_invoice.created_from_certification",
-    entityType: "SalesInvoice",
-    entityId: inv.id,
-    after: { number, certificationId: input.certificationId },
-    ipAddress: ctx.ipAddress,
+    await auditAr(
+      ctx,
+      "sales_invoice.created_from_certification",
+      "SalesInvoice",
+      inv.id,
+      { projectId: inv.projectId, companyId: inv.companyId },
+      { after: { number: inv.number, certificationId: input.certificationId }, tx },
+    );
+
+    return inv;
   });
 
   return serializeInvoice(inv);
@@ -361,29 +363,41 @@ export async function updateSalesInvoice(
   if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   assertInvoiceEditable(inv);
 
-  const updated = await prisma.salesInvoice.update({
-    where: { id },
-    data: {
-      issueDate:     input.issueDate ? new Date(input.issueDate) : undefined,
-      dueDate:       input.dueDate   ? new Date(input.dueDate)   : undefined,
-      notes:         input.notes         ?? undefined,
-      internalNotes: input.internalNotes ?? undefined,
-      updatedBy: ctx.actorUserId,
-    },
-    include: {
-      lines: { orderBy: { sortOrder: "asc" } },
-      clientContact: { select: { legalName: true, fantasyName: true } },
-    },
-  });
+  const updated = await prisma.$transaction(async (tx) => {
+    const updatedInvoice = await tx.salesInvoice.update({
+      where: { id },
+      data: {
+        issueDate:     input.issueDate ? new Date(input.issueDate) : undefined,
+        dueDate:       input.dueDate   ? new Date(input.dueDate)   : undefined,
+        notes:         input.notes         ?? undefined,
+        internalNotes: input.internalNotes ?? undefined,
+        updatedBy: ctx.actorUserId,
+      },
+      include: {
+        lines: { orderBy: { sortOrder: "asc" } },
+        clientContact: { select: { legalName: true, fantasyName: true } },
+      },
+    });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "sales_invoice.updated",
-    entityType: "SalesInvoice",
-    entityId: id,
-    after: input,
-    ipAddress: ctx.ipAddress,
+    await auditAr(
+      ctx,
+      "sales_invoice.updated",
+      "SalesInvoice",
+      id,
+      { projectId: updatedInvoice.projectId, companyId: updatedInvoice.companyId },
+      {
+        after: {
+          number: updatedInvoice.number,
+          ...(input.issueDate !== undefined ? { issueDate: input.issueDate } : {}),
+          ...(input.dueDate !== undefined ? { dueDate: input.dueDate } : {}),
+          ...(input.notes !== undefined ? { notes: input.notes } : {}),
+          ...(input.internalNotes !== undefined ? { internalNotes: input.internalNotes } : {}),
+        },
+        tx,
+      },
+    );
+
+    return updatedInvoice;
   });
 
   return serializeInvoice(updated);
@@ -448,18 +462,16 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
       },
     });
 
-    return issued;
-  });
+    await auditAr(
+      ctx,
+      "sales_invoice.issued",
+      "SalesInvoice",
+      id,
+      { projectId: issued.projectId, companyId: issued.companyId },
+      { before: { status: "DRAFT" }, after: { number: issued.number, status: "ISSUED" }, tx },
+    );
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "sales_invoice.issued",
-    entityType: "SalesInvoice",
-    entityId: id,
-    before: { status: "DRAFT" },
-    after: { status: "ISSUED" },
-    ipAddress: ctx.ipAddress,
+    return issued;
   });
 
   return serializeInvoice(result);
@@ -489,7 +501,7 @@ export async function cancelSalesInvoice(id: string, ctx: ServiceContext): Promi
       inv.status === "ISSUED"
         ? await tx.receivable.findUnique({
             where: { salesInvoiceId: id },
-            select: { paidAmount: true },
+            select: { id: true, paidAmount: true, projectId: true, companyId: true },
           })
         : null;
     assertCanCancelSalesInvoice({
@@ -515,22 +527,38 @@ export async function cancelSalesInvoice(id: string, ctx: ServiceContext): Promi
         receivableCancel.count,
         "El saldo cambió mientras anulabas la factura. Revisá cobranzas e intentá de nuevo.",
       );
+      await auditAr(
+        ctx,
+        "receivable.cancelled",
+        "Receivable",
+        receivable.id,
+        { projectId: receivable.projectId, companyId: receivable.companyId },
+        {
+          after: {
+            number: inv.number,
+            status: "CANCELLED",
+            cancelledBySalesInvoice: true,
+          },
+          tx,
+        },
+      );
     }
 
-    return tx.salesInvoice.update({
+    const updated = await tx.salesInvoice.update({
       where: { id },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
     });
-  });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "sales_invoice.cancelled",
-    entityType: "SalesInvoice",
-    entityId: id,
-    after: { status: "CANCELLED" },
-    ipAddress: ctx.ipAddress,
+    await auditAr(
+      ctx,
+      "sales_invoice.cancelled",
+      "SalesInvoice",
+      id,
+      { projectId: updated.projectId, companyId: updated.companyId },
+      { after: { number: inv.number, status: "CANCELLED" }, tx },
+    );
+
+    return updated;
   });
 
   return updated;
