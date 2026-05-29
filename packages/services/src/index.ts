@@ -39,6 +39,7 @@ export * from "./ap/supplier-invoice.service";
 export * from "./ap/payable.service";
 export * from "./ap/payment.service";
 export { canViewProcurementProjectArea } from "./procurement/procurement-access";
+export { canViewSubcontractsArea } from "./subcontracts/subcontract-access";
 export * from "./procurement/purchase-order.service";
 export * from "./procurement/purchase-receipt.service";
 export * from "./inventory/product.service";

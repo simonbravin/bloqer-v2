@@ -24,6 +24,10 @@ import {
 } from "../reports/budget-variance.service";
 import type { CertificationReportFilters } from "../reports/certification-evolution.service";
 import { getCertificationEvolutionReport } from "../reports/certification-evolution.service";
+import type { ProcurementReportFilters } from "../reports/procurement-deviation.service";
+import { getProcurementDeviationReport } from "../reports/procurement-deviation.service";
+import type { SubcontractReportFilters } from "../reports/subcontract-variance.service";
+import { getSubcontractVarianceReport } from "../reports/subcontract-variance.service";
 import type { ProjectCashFlowFilters } from "../project-cash-flow/project-cash-flow.service";
 import { getProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import { ServiceContext, ServiceError } from "../types";
@@ -127,11 +131,27 @@ export function parseBudgetVarianceFilters(sp: Record<string, string | undefined
 export function parseCertificationReportFilters(
   sp: Record<string, string | undefined>,
 ): CertificationReportFilters {
+  return parseProjectReportDateFilters(sp);
+}
+
+export function parseProjectReportDateFilters(sp: Record<string, string | undefined>) {
   return {
     budgetId: sp.budgetId,
     dateFrom: sp.dateFrom,
     dateTo: sp.dateTo,
   };
+}
+
+export function parseProcurementReportFilters(
+  sp: Record<string, string | undefined>,
+): ProcurementReportFilters {
+  return parseProjectReportDateFilters(sp);
+}
+
+export function parseSubcontractReportFilters(
+  sp: Record<string, string | undefined>,
+): SubcontractReportFilters {
+  return parseProjectReportDateFilters(sp);
 }
 
 export function parseProjectCashFlowFilters(sp: Record<string, string | undefined>): ProjectCashFlowFilters {
@@ -819,6 +839,112 @@ export async function exportCertificationEvolutionCsv(
     content: buildCsv(headers, rows),
     filename: safeReportFilename(fname, "csv"),
   };
+}
+
+export async function exportProcurementDeviationCsv(
+  projectId: string,
+  filters: ProcurementReportFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
+  const result = await getProcurementDeviationReport(projectId, filters, ctx);
+  if (result.type === "NO_APPROVED_BUDGETS") {
+    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar compras");
+  }
+  const headers = [
+    "Tipo",
+    "Codigo",
+    "Nombre",
+    "Proveedor",
+    "PresupuestoMaterial",
+    "Comprometido",
+    "Devengado",
+    "Variacion",
+    "VariacionPct",
+  ];
+  const rows: string[][] = result.byWbs.map((r) => [
+    "PARTIDA",
+    r.wbsCode,
+    r.wbsName,
+    "",
+    r.budgetMaterial,
+    r.committedCost,
+    r.accruedCost,
+    r.varianceAmount,
+    r.variancePct ?? "",
+  ]);
+  for (const u of result.unallocated) {
+    rows.push([
+      u.documentType,
+      u.documentCode,
+      u.description,
+      u.supplierName,
+      "",
+      "",
+      u.amount,
+      "",
+      "",
+    ]);
+  }
+  for (const s of result.bySupplier) {
+    rows.push([
+      "PROVEEDOR",
+      "",
+      "",
+      s.supplierName,
+      "",
+      s.committedCost,
+      s.accruedCost,
+      s.paidCost,
+      s.openCommitted,
+    ]);
+  }
+  const fname = `compras_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
+  return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
+}
+
+export async function exportSubcontractVarianceCsv(
+  projectId: string,
+  filters: SubcontractReportFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
+  const result = await getSubcontractVarianceReport(projectId, filters, ctx);
+  if (result.type === "NO_APPROVED_BUDGETS") {
+    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar subcontratos");
+  }
+  const headers = [
+    "Tipo",
+    "Codigo",
+    "Nombre",
+    "PresupuestoSub",
+    "Contratado",
+    "Certificado",
+    "Variacion",
+    "Estado",
+  ];
+  const rows: string[][] = result.byWbs.map((r) => [
+    "PARTIDA",
+    r.wbsCode,
+    r.wbsName,
+    r.budgetSubcontract,
+    r.committedCost,
+    r.certifiedCost,
+    r.varianceCommitted,
+    r.status,
+  ]);
+  for (const c of result.contracts) {
+    rows.push([
+      "CONTRATO",
+      c.code,
+      `${c.title} — ${c.subcontractorName}`,
+      "",
+      c.totalValue,
+      c.certifiedCost,
+      "",
+      c.status,
+    ]);
+  }
+  const fname = `subcontratos_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
+  return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
 }
 
 export async function exportProjectCashFlowCsv(

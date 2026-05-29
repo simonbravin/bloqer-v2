@@ -7,6 +7,8 @@ import {
   ServiceError,
   canViewProjectCostControlReport,
   canViewProjectCashFlowReport,
+  canViewProcurementProjectArea,
+  canViewSubcontractsArea,
 } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { ReportsHub } from "@/features/reports";
@@ -50,6 +52,18 @@ export default async function ProjectReportesPage({ params }: PageProps) {
     gate.isEnabled("CERTIFICATIONS") &&
     (can(ctx.roles, "VIEW", "CERTIFICATIONS") || can(ctx.roles, "VIEW", "PROJECTS"));
   const canCash = gate.isEnabled("PROJECTS") && canViewProjectCashFlowReport(ctx.roles);
+  const canProcurement =
+    gate.isEnabled("PROJECTS") &&
+    gate.isEnabled("BUDGETS") &&
+    gate.isEnabled("PROCUREMENT") &&
+    (canViewProcurementProjectArea(ctx.roles) || can(ctx.roles, "VIEW", "PROJECTS"));
+  const canSubcontracts =
+    gate.isEnabled("PROJECTS") &&
+    gate.isEnabled("BUDGETS") &&
+    gate.isEnabled("SUBCONTRACTS") &&
+    (canViewSubcontractsArea(ctx.roles) || can(ctx.roles, "VIEW", "PROJECTS"));
+
+  const hasAnyReport = canCost || canCert || canCash || canProcurement || canSubcontracts;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -60,7 +74,7 @@ export default async function ProjectReportesPage({ params }: PageProps) {
         subtitle="Análisis de costos, varianzas y caja"
       />
 
-      {!canCost && !canCert && !canCash ? (
+      {!hasAnyReport ? (
         <div className="rounded-lg border bg-card p-8 text-center space-y-3">
           <p className="font-semibold">Sin reportes disponibles</p>
           <p className="text-sm text-muted-foreground">
@@ -75,6 +89,8 @@ export default async function ProjectReportesPage({ params }: PageProps) {
           projectId={projectId}
           canCostReports={canCost}
           canCertReports={canCert}
+          canProcurementReports={canProcurement}
+          canSubcontractReports={canSubcontracts}
           canCashFlow={canCash}
         />
       )}

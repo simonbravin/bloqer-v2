@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { BarChart3, FileCheck2, PieChart, TrendingUp, Wallet } from "lucide-react";
+import { BarChart3, FileCheck2, Package, PieChart, TrendingUp, Users, Wallet } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type ReportCard = {
@@ -16,10 +16,19 @@ type Props = {
   projectId: string;
   canCostReports: boolean;
   canCertReports: boolean;
+  canProcurementReports: boolean;
+  canSubcontractReports: boolean;
   canCashFlow: boolean;
 };
 
-export function ReportsHub({ projectId, canCostReports, canCertReports, canCashFlow }: Props) {
+export function ReportsHub({
+  projectId,
+  canCostReports,
+  canCertReports,
+  canProcurementReports,
+  canSubcontractReports,
+  canCashFlow,
+}: Props) {
   const base = `/proyectos/${projectId}/reportes`;
 
   const cards: ReportCard[] = [
@@ -29,6 +38,20 @@ export function ReportsHub({ projectId, canCostReports, canCertReports, canCashF
       href: `${base}/certificaciones`,
       icon: <FileCheck2 className="h-5 w-5" />,
       available: canCertReports,
+    },
+    {
+      title: "Compras y proveedores",
+      description: "Material presupuestado vs OC/facturas, líneas sin WBS y resumen por proveedor.",
+      href: `${base}/compras-proveedores`,
+      icon: <Package className="h-5 w-5" />,
+      available: canProcurementReports,
+    },
+    {
+      title: "Subcontratos",
+      description: "Varianza SUB por partida, contratos activos y evolución certificado vs pagado.",
+      href: `${base}/subcontratos`,
+      icon: <Users className="h-5 w-5" />,
+      available: canSubcontractReports,
     },
     {
       title: "Presupuesto vs real",
