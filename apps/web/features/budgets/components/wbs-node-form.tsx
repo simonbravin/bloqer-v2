@@ -86,7 +86,7 @@ function CreateForm({
         setServerError(result.error);
         toast.error(result.error);
       } else {
-        toast.success(nodeType === "GROUP" ? "Tarea agregada" : "Ítem agregado");
+        toast.success("Ítem agregado");
         onDone();
       }
     });

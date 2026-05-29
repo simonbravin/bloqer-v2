@@ -399,11 +399,14 @@ export async function addWbsNode(
 
     if (input.parentId) {
       const parent = await tx.wbsNode.findUnique({ where: { id: input.parentId } });
+      if (!parent) {
+        throw new ServiceError("NOT_FOUND", "Nodo padre no encontrado");
+      }
       const parentHadCost = await tx.costItem.findUnique({
         where: { wbsNodeId: input.parentId },
         select: { id: true },
       });
-      if (parent?.type === "ITEM" || parentHadCost) {
+      if (parent.type === "ITEM" || parentHadCost) {
         if (subdivideApu === "migrate") {
           const moved = await tx.costItem.updateMany({
             where: { wbsNodeId: parent.id },
