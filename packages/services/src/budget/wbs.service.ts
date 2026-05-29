@@ -194,6 +194,7 @@ export async function getWbsTree(budgetId: string, ctx: ServiceContext): Promise
   roots.sort((a, b) => a.sortOrder - b.sortOrder);
 
   function serialize(n: InternalNode): WbsViewNode {
+    const isStructuralLeaf = n.children.length === 0;
     return {
       id: n.id,
       budgetId: n.budgetId,
@@ -203,7 +204,7 @@ export async function getWbsTree(budgetId: string, ctx: ServiceContext): Promise
       name: n.name,
       description: n.description,
       sortOrder: n.sortOrder,
-      costItem: n.costItem
+      costItem: isStructuralLeaf && n.costItem
         ? {
             id: n.costItem.id,
             unit: n.costItem.unit,
@@ -419,6 +420,23 @@ export async function addWbsNode(
           where: { id: parent.id },
           data: { type: "GROUP" },
         });
+      }
+
+      const parentChildCount = await tx.wbsNode.count({ where: { parentId: input.parentId } });
+      if (parentChildCount > 0) {
+        if (!movedCostItem) {
+          await tx.costAnalysisLine.deleteMany({
+            where: { costItem: { wbsNodeId: input.parentId } },
+          });
+          await tx.costItem.deleteMany({ where: { wbsNodeId: input.parentId } });
+        }
+        const parentAfter = await tx.wbsNode.findUnique({ where: { id: input.parentId } });
+        if (parentAfter?.type === "ITEM") {
+          await tx.wbsNode.update({
+            where: { id: input.parentId },
+            data: { type: "GROUP" },
+          });
+        }
       }
     }
 

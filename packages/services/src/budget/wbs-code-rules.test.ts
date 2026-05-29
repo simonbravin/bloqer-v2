@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   detectImportProfile,
   inferImportNodeType,
+  isStructuralLeafByCode,
   parseCellA,
   reconcileImportRowTypes,
   validateManualNodeCode,
@@ -57,6 +58,20 @@ describe("validateManualNodeCode", () => {
 
   it("allows ítem raíz con código 1", () => {
     assert.equal(validateManualNodeCode("1", "ITEM", null), null);
+  });
+});
+
+describe("isStructuralLeafByCode", () => {
+  it("12 sin hijos → hoja con APU", () => {
+    assert.equal(isStructuralLeafByCode("12", 0), true);
+  });
+
+  it("12 con hijo 12.1 → sin APU en 12", () => {
+    assert.equal(isStructuralLeafByCode("12", 1), false);
+  });
+
+  it("rubro ARQ sin hijos → no es hoja operativa", () => {
+    assert.equal(isStructuralLeafByCode("ARQ", 0), false);
   });
 });
 

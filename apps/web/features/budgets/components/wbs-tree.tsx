@@ -198,7 +198,7 @@ export function WbsTree({
   const [deleteTarget, setDeleteTarget] = useState<WbsViewNode | null>(null);
   const [removePending, startRemoveTransition] = useTransition();
   const [reorderPending, startReorderTransition] = useTransition();
-  const [apuPending, startApuTransition] = useTransition();
+  const [, startApuTransition] = useTransition();
 
   useEffect(() => {
     if (typeof window === "undefined") return;

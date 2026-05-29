@@ -35,6 +35,12 @@ export function isDisciplineRootCode(code: string): boolean {
   return DISCIPLINE_PREFIX.test(code);
 }
 
+/** Sin hijos en el árbol → puede llevar APU (p. ej. 12 sí, 12 con 12.1 no). */
+export function isStructuralLeafByCode(code: string, childCount: number): boolean {
+  if (isDisciplineRootCode(code)) return false;
+  return childCount === 0;
+}
+
 export type ParsedCellA =
   | { kind: "empty" }
   | { kind: "banner"; discipline: string; name: string }

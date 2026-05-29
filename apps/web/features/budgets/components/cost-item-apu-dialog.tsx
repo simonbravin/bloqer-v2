@@ -103,8 +103,8 @@ export function CostItemApuDialog({
   const [activeTab, setActiveTab] = useState<VisibleCostCategory>("MATERIAL");
   const [editLine, setEditLine] = useState<LocalLine | null>(null);
 
-  const costItem =
-    node && node.children.length === 0 ? node.costItem : null;
+  const canShowApu = node !== null && node.children.length === 0;
+  const costItem = canShowApu ? node.costItem : null;
 
   const [unit, setUnit] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -305,7 +305,7 @@ export function CostItemApuDialog({
     });
   }
 
-  if (!node || node.type !== "ITEM" || !costItem) return null;
+  if (!canShowApu || !costItem) return null;
 
   const saleTotal = parseFloat(costItem.totalSalePrice) || 0;
 

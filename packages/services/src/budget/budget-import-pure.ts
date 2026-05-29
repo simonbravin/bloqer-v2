@@ -19,6 +19,7 @@ export type {
 export {
   countCodeSegments,
   isMultiStyleCode,
+  isStructuralLeafByCode,
   WBS_MAX_CODE_SEGMENTS_SIMPLE,
   WBS_MAX_CODE_SEGMENTS_MULTI,
 } from "./wbs-code-rules";
