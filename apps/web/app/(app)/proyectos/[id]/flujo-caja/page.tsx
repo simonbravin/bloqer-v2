@@ -11,7 +11,7 @@ import {
   CollectionDetailTable,
   PaymentDetailTable,
 } from "@/features/project-cash-flow";
-import { ReportCsvExportLink } from "@/features/reports/report-csv-export-link";
+import { ReportCsvExportLink } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";

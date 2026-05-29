@@ -5,9 +5,10 @@ import {
   getProjectCostControl,
   getProjectIncomeExpenseReport,
   getProjectShellInfo,
+  parseCurrencyView,
   ServiceError,
 } from "@bloqer/services";
-import { IncomeExpenseChart, ReportDateFilters } from "@/features/reports";
+import { IncomeExpenseChart, ReportDateFilters, ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ import { formatMoneyAmount } from "@/lib/format-money";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ budgetId?: string; dateFrom?: string; dateTo?: string }>;
+  searchParams: Promise<{ budgetId?: string; dateFrom?: string; dateTo?: string; currencyView?: string }>;
 }
 
 export default async function ReporteIngresosGastosPage({ params, searchParams }: PageProps) {
@@ -49,7 +50,12 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
     [report, budgetProbe] = await Promise.all([
       getProjectIncomeExpenseReport(
         projectId,
-        { budgetId: sp.budgetId, dateFrom: sp.dateFrom, dateTo: sp.dateTo },
+        {
+          budgetId: sp.budgetId,
+          dateFrom: sp.dateFrom,
+          dateTo: sp.dateTo,
+          currencyView: parseCurrencyView(sp.currencyView),
+        },
         ctx,
       ),
       getProjectCostControl(projectId, { budgetId: sp.budgetId }, ctx),
@@ -73,6 +79,13 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
             ? `${report.budgetName} · ${report.dateFrom} → ${report.dateTo}`
             : `${report.dateFrom} → ${report.dateTo}`
         }
+        actions={
+          <ReportExportActions
+            exportPath={`/api/reports/proyectos/${projectId}/ingresos-gastos.csv`}
+            params={sp}
+            pdfOnly
+          />
+        }
       />
 
       <div className="flex flex-wrap gap-2 text-sm">
@@ -84,7 +97,11 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
         </Button>
       </div>
 
-      <ReportDateFilters budgets={availableBudgets} currentBudgetId={sp.budgetId} />
+      <ReportDateFilters
+        budgets={availableBudgets}
+        currentBudgetId={sp.budgetId}
+        showCurrencyView
+      />
 
       {report.warnings.length > 0 && (
         <div className="rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20 p-3 space-y-1">
@@ -96,18 +113,24 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
         </div>
       )}
 
+      {report.consolidationBlocked ? (
+        <p className="text-xs text-yellow-700 dark:text-yellow-400">
+          Consolidado ARS no disponible; KPIs en moneda del presupuesto ({report.displayCurrency}).
+        </p>
+      ) : null}
+
       <KpiStatGrid title="Totales del período (devengado vs caja)" columns={4}>
         <KpiStatCard
           label="Certificado"
-          value={formatMoneyAmount(report.totals.certifiedAmount, "ARS")}
+          value={formatMoneyAmount(report.totals.certifiedAmount, report.displayCurrency)}
         />
         <KpiStatCard
           label="Costo devengado"
-          value={formatMoneyAmount(report.totals.costAccrued, "ARS")}
+          value={formatMoneyAmount(report.totals.costAccrued, report.displayCurrency)}
         />
         <KpiStatCard
           label="MB devengado"
-          value={formatMoneyAmount(report.totals.grossMarginAccrued, "ARS")}
+          value={formatMoneyAmount(report.totals.grossMarginAccrued, report.displayCurrency)}
           tone={parseFloat(report.totals.grossMarginAccrued) >= 0 ? "success" : "danger"}
         />
         <KpiStatCard
@@ -117,11 +140,17 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
       </KpiStatGrid>
 
       <KpiStatGrid title={null} columns={3}>
-        <KpiStatCard label="Cobrado" value={formatMoneyAmount(report.totals.collectedAmount, "ARS")} />
-        <KpiStatCard label="Pagado" value={formatMoneyAmount(report.totals.costPaid, "ARS")} />
+        <KpiStatCard
+          label="Cobrado"
+          value={formatMoneyAmount(report.totals.collectedAmount, report.displayCurrency)}
+        />
+        <KpiStatCard
+          label="Pagado"
+          value={formatMoneyAmount(report.totals.costPaid, report.displayCurrency)}
+        />
         <KpiStatCard
           label="MB caja"
-          value={formatMoneyAmount(report.totals.grossMarginCash, "ARS")}
+          value={formatMoneyAmount(report.totals.grossMarginCash, report.displayCurrency)}
           tone={parseFloat(report.totals.grossMarginCash) >= 0 ? "success" : "danger"}
         />
       </KpiStatGrid>

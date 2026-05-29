@@ -28,6 +28,8 @@ import type { ProcurementReportFilters } from "../reports/procurement-deviation.
 import { getProcurementDeviationReport } from "../reports/procurement-deviation.service";
 import type { SubcontractReportFilters } from "../reports/subcontract-variance.service";
 import { getSubcontractVarianceReport } from "../reports/subcontract-variance.service";
+import type { MaterialReportFilters } from "../reports/material-variance.service";
+import { getMaterialVarianceReport } from "../reports/material-variance.service";
 import type { ProjectCashFlowFilters } from "../project-cash-flow/project-cash-flow.service";
 import { getProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import { ServiceContext, ServiceError } from "../types";
@@ -944,6 +946,43 @@ export async function exportSubcontractVarianceCsv(
     ]);
   }
   const fname = `subcontratos_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
+  return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
+}
+
+export async function exportMaterialVarianceCsv(
+  projectId: string,
+  filters: MaterialReportFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
+  const result = await getMaterialVarianceReport(projectId, filters, ctx);
+  if (result.type === "NO_APPROVED_BUDGETS") {
+    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar materiales");
+  }
+  const headers = [
+    "CodigoWBS",
+    "NombreWBS",
+    "PresupuestoMaterial",
+    "ConsumoDevengado",
+    "Variacion",
+    "VariacionPct",
+  ];
+  const rows = result.byWbs.map((r) => [
+    r.wbsCode,
+    r.wbsName,
+    r.budgetMaterial,
+    r.consumedCost,
+    r.variance,
+    r.variancePct ?? "",
+  ]);
+  rows.push([
+    "TOTAL",
+    "",
+    result.totals.budgetMaterial,
+    result.totals.consumedCost,
+    result.totals.variance,
+    "",
+  ]);
+  const fname = `materiales_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
   return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
 }
 

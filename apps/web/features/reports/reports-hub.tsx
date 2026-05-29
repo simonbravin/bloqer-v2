@@ -30,6 +30,7 @@ type Props = {
   canSubcontractReports: boolean;
   canCashFlow: boolean;
   canProfitability: boolean;
+  canInventoryReports?: boolean;
 };
 
 export function ReportsHub({
@@ -40,6 +41,7 @@ export function ReportsHub({
   canSubcontractReports,
   canCashFlow,
   canProfitability,
+  canInventoryReports = false,
 }: Props) {
   const base = `/proyectos/${projectId}/reportes`;
 
@@ -57,6 +59,13 @@ export function ReportsHub({
       href: `${base}/compras-proveedores`,
       icon: <Package className="h-5 w-5" />,
       available: canProcurementReports,
+    },
+    {
+      title: "Materiales (stock)",
+      description: "Consumo de inventario vs baseline MATERIAL; líneas APU sin producto.",
+      href: `${base}/materiales`,
+      icon: <Package className="h-5 w-5" />,
+      available: canInventoryReports && canCostReports,
     },
     {
       title: "Subcontratos",

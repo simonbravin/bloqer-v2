@@ -9,3 +9,4 @@ export {
   type AmericasCurrencyCode,
   type CurrencyOption,
 } from "./currencies";
+export { resolveFxAmounts, sumAmountArsStrings, type FxAmountInput } from "./currency-amount";

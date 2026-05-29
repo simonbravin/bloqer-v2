@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
 import { getCashFlowReport } from "@bloqer/services";
 import { CashFlowTable, CashFlowChart, CashFlowFilters } from "@/features/treasury-reports";
-import { ReportCsvExportLink } from "@/features/reports/report-csv-export-link";
+import { ReportCsvExportLink } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";

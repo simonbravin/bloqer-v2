@@ -64,8 +64,19 @@ export default async function ProjectReportesPage({ params }: PageProps) {
     (canViewSubcontractsArea(ctx.roles) || can(ctx.roles, "VIEW", "PROJECTS"));
 
   const canProfitability = canCost;
+  const canInventory =
+    gate.isEnabled("PROJECTS") &&
+    gate.isEnabled("BUDGETS") &&
+    gate.isEnabled("INVENTORY") &&
+    canCost;
   const hasAnyReport =
-    canCost || canCert || canCash || canProcurement || canSubcontracts || canProfitability;
+    canCost ||
+    canCert ||
+    canCash ||
+    canProcurement ||
+    canSubcontracts ||
+    canProfitability ||
+    canInventory;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -95,6 +106,7 @@ export default async function ProjectReportesPage({ params }: PageProps) {
           canSubcontractReports={canSubcontracts}
           canCashFlow={canCash}
           canProfitability={canProfitability}
+          canInventoryReports={canInventory}
         />
       )}
     </PageShell>

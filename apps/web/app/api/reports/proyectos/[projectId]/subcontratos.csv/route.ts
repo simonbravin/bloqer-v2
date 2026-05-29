@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportSubcontractVarianceCsv,
+  exportSubcontractVariancePdf,
   getSubcontractVarianceReport,
   parseSubcontractReportFilters,
 } from "@bloqer/services";
 import {
   csvResponse,
+  pdfResponse,
   reportExportErrorResponse,
   requireReportExportContext,
   searchParamsRecord,
@@ -24,6 +26,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ projectId: 
     if (fmt === "json") {
       const data = await getSubcontractVarianceReport(projectId, filters, auth.ctx);
       return NextResponse.json(data);
+    }
+    if (fmt === "pdf") {
+      const { buffer, filename } = await exportSubcontractVariancePdf(
+        projectId,
+        filters,
+        auth.ctx,
+      );
+      return pdfResponse(buffer, filename);
     }
     if (fmt === "csv") {
       const { content, filename } = await exportSubcontractVarianceCsv(

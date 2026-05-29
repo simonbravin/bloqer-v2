@@ -2,6 +2,7 @@ import { Prisma, prisma, Collection } from "@bloqer/database";
 import { canEditArArea, canViewArProjectArea } from "../ar/ar-access";
 import type { CreateCollectionInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
+import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 
@@ -113,6 +114,7 @@ export async function createCollection(
     }
 
     const companyId = ctx.companyId ?? account.companyId ?? receivable.companyId;
+    const fx = computeDocumentFxAmounts(receivable.currency, amount);
 
     // Create Collection
     const collection = await tx.collection.create({
@@ -127,6 +129,8 @@ export async function createCollection(
         collectionDate: new Date(input.collectionDate),
         currency:       receivable.currency,
         amount,
+        fxRate:         fx.fxRate,
+        amountArs:      fx.amountArs,
         notes:          input.notes ?? null,
         status:         "CONFIRMED",
         createdBy:      ctx.actorUserId,

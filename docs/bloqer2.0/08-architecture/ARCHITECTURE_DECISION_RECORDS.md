@@ -39,6 +39,7 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 | ADR-Phase1-06 | Membresía única `(userId, tenantId)` Phase 1 | ACEPTADO |
 | ADR-Phase1-07 | Ingresos corporativos sin obra: GL + tesorería Phase 1 | ACEPTADO |
 | ADR-010 | Reporting read-layer: agregación on-read sin tablas duplicadas de montos | ACEPTADO |
+| ADR-011 | `fx_rate` + `amount_ars` en comprobantes financieros (D-008) | ACEPTADO |
 
 ---
 
@@ -55,6 +56,16 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
   - Línea APU `SUBCONTRACT` **no** genera `Subcontract` al aprobar presupuesto; el contrato se registra al contratar.
 - **Consecuencias:** consultas más pesadas aceptables en Fase 1; checklist y tablas fuente en [`REPORTING_ERD_GUARDRAILS.md`](./REPORTING_ERD_GUARDRAILS.md); catálogo ampliado en [`REPORT_CATALOG.md`](../06-reports/REPORT_CATALOG.md).
 - **Referencias funcionales:** [`REPORTING_ARCHITECTURE.md`](./REPORTING_ARCHITECTURE.md), [`02-modules/SUBCONTRACTS.md`](../02-modules/SUBCONTRACTS.md), [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md).
+
+---
+
+## ADR-011 — FX manual y `amount_ars` en comprobantes (D-008)
+
+- **Fecha:** 2026-05-28
+- **Estado:** ACEPTADO
+- **Contexto:** [`MULTI_CURRENCY_RULES.md`](../03-finance/MULTI_CURRENCY_RULES.md) y [D-008](../00-product/DECISION_LOG.md) exigen `fx_rate` y `amount_ars` persistidos; el schema operativo no los tenía.
+- **Decisión:** columnas `fxRate` + `amountArs` en `SalesInvoice`, `SupplierInvoice`, `Payment`, `Collection`; cálculo en emisión/confirmación vía `resolveFxAmounts` (`@bloqer/utils`); reportes con `currency_view=ARS` suman `amountArs` cuando el FX está cargado.
+- **Consecuencias:** migración `20260528120000_fx_amount_ars`; sin proveedor FX externo ni diferencia de cambio automática (Q-025).
 
 ---
 

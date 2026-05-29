@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportBudgetVarianceCsv,
+  exportBudgetVariancePdf,
   getBudgetVarianceReport,
   getBudgetCompositionReport,
   parseBudgetVarianceFilters,
 } from "@bloqer/services";
 import {
   csvResponse,
+  pdfResponse,
   reportExportErrorResponse,
   requireReportExportContext,
   searchParamsRecord,
@@ -29,6 +31,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ projectId: 
       }
       const data = await getBudgetVarianceReport(projectId, filters, auth.ctx);
       return NextResponse.json(data);
+    }
+    if (fmt === "pdf") {
+      const { buffer, filename } = await exportBudgetVariancePdf(projectId, filters, auth.ctx);
+      return pdfResponse(buffer, filename);
     }
     if (fmt === "csv") {
       const { content, filename } = await exportBudgetVarianceCsv(projectId, filters, auth.ctx);

@@ -169,7 +169,7 @@
 ### Q-013 — Imputación de gastos generales (GG) a proyectos
 
 - **Categoría:** Costeo
-- **Estado:** ABIERTA
+- **Estado:** RESUELTA → D-040
 - **Impacto:** afecta rentabilidad neta por proyecto.
 - **Opciones:**
   1. Prorrateo manual mensual por Admin.

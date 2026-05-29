@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import type { SubcontractWbsVarianceRow } from "@bloqer/services";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -28,9 +30,10 @@ const STATUS_LABELS: Record<SubcontractWbsVarianceRow["status"], string> = {
 
 type Props = {
   rows: SubcontractWbsVarianceRow[];
+  projectId: string;
 };
 
-export function SubcontractWbsVarianceTable({ rows }: Props) {
+export function SubcontractWbsVarianceTable({ rows, projectId }: Props) {
   return (
     <TableScroll>
       <Table className="text-xs">
@@ -43,6 +46,7 @@ export function SubcontractWbsVarianceTable({ rows }: Props) {
             <TableHead className="text-right">Certificado</TableHead>
             <TableHead className="text-right">Variación</TableHead>
             <TableHead className="w-28">Estado</TableHead>
+            <TableHead className="w-32" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -63,6 +67,17 @@ export function SubcontractWbsVarianceTable({ rows }: Props) {
                   {fmt(row.varianceCommitted)}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{STATUS_LABELS[row.status]}</TableCell>
+                <TableCell>
+                  {row.status === "PENDING_CONTRACT" ? (
+                    <Button variant="outline" size="sm" className="h-7" asChild>
+                      <Link
+                        href={`/proyectos/${projectId}/subcontratos/nuevo?wbsNodeId=${row.wbsNodeId}&from=report-sub`}
+                      >
+                        Crear contrato
+                      </Link>
+                    </Button>
+                  ) : null}
+                </TableCell>
               </TableRow>
             );
           })}

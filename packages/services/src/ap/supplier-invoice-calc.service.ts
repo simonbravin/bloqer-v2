@@ -18,8 +18,22 @@ export async function recalcSupplierInvoiceTotals(tx: TxClient, invoiceId: strin
   const subtotal    = lines.reduce((s, l) => s.plus(l.lineSubtotal), zero);
   const taxAmount   = lines.reduce((s, l) => s.plus(l.lineTax), zero);
   const totalAmount = lines.reduce((s, l) => s.plus(l.lineTotal), zero);
-  await tx.supplierInvoice.update({
+  const inv = await tx.supplierInvoice.update({
     where: { id: invoiceId },
     data: { subtotal, taxAmount, totalAmount },
+    select: { currency: true, totalAmount: true, fxRate: true, status: true },
   });
+
+  if (inv.status === "DRAFT") {
+    const { computeDocumentFxAmounts } = await import("../finance/fx-amount.service");
+    try {
+      const fx = computeDocumentFxAmounts(inv.currency, inv.totalAmount, inv.fxRate);
+      await tx.supplierInvoice.update({
+        where: { id: invoiceId },
+        data: { fxRate: fx.fxRate, amountArs: fx.amountArs },
+      });
+    } catch {
+      // Non-ARS draft without FX — amountArs stays until issue
+    }
+  }
 }

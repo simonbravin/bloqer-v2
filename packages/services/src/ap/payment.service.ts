@@ -2,6 +2,7 @@ import { Prisma, prisma, Payment } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreatePaymentInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
+import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
@@ -146,6 +147,7 @@ export async function createPayment(
     }
 
     const companyId = ctx.companyId ?? account.companyId ?? payable.companyId;
+    const fx = computeDocumentFxAmounts(payable.currency, amount);
 
     // Create Payment
     const payment = await tx.payment.create({
@@ -160,6 +162,8 @@ export async function createPayment(
         paymentDate:       new Date(input.paymentDate),
         currency:          payable.currency,
         amount,
+        fxRate:            fx.fxRate,
+        amountArs:         fx.amountArs,
         notes:             input.notes ?? null,
         status:            "CONFIRMED",
         createdBy:         ctx.actorUserId,

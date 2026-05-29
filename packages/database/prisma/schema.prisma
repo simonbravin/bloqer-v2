@@ -542,6 +542,7 @@ model Tenant {
   journalEntries        JournalEntry[]
   accountingMappingRules AccountingMappingRule[]
   tenantModuleSettings    TenantModuleSetting[]
+  projectOverheadAllocations ProjectOverheadAllocation[]
 
   @@map("tenants")
 }
@@ -609,10 +610,13 @@ model Company {
   industry    String? @db.VarChar(128)
   companySize String? @db.VarChar(64)
   status    CompanyStatus @default(ACTIVE)
+  /// Q-013 opción 2: % sobre costo directo devengado del proyecto (distinto de Budget.overheadPct markup).
+  overheadAllocationPct Decimal @default(0) @db.Decimal(8, 4)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
   tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  projectOverheadAllocations ProjectOverheadAllocation[]
   memberships    UserMembership[]
   projects       Project[]
   budgets        Budget[]
@@ -641,6 +645,30 @@ model Company {
 
   @@index([tenantId])
   @@map("companies")
+}
+
+/// Q-013 opción 1: imputación manual de gastos generales a obra por período.
+model ProjectOverheadAllocation {
+  id        String   @id @default(uuid())
+  tenantId  String
+  companyId String
+  projectId String
+  period    String   @db.VarChar(7)
+  currency  String   @default("ARS") @db.VarChar(8)
+  amount    Decimal  @db.Decimal(18, 4)
+  notes     String?
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([tenantId, projectId, period])
+  @@index([tenantId, companyId])
+  @@map("project_overhead_allocations")
 }
 
 // ─── RBAC ─────────────────────────────────────────────────────────────────────
@@ -877,6 +905,7 @@ model Project {
   journalEntries        JournalEntry[]
   journalEntryLines     JournalEntryLine[]
   schedule              Schedule?
+  overheadAllocations   ProjectOverheadAllocation[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -1097,15 +1126,18 @@ model CostAnalysisLine {
   totalCost         Decimal      @db.Decimal(18, 4)
   sortOrder         Int          @default(0)
   supplierContactId String?
+  productId         String?
   notes             String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
+  product  Product? @relation(fields: [productId], references: [id])
   costItem CostItem @relation(fields: [costItemId], references: [id])
   budget   Budget   @relation(fields: [budgetId], references: [id])
 
   @@index([costItemId])
   @@index([budgetId])
+  @@index([productId])
   @@map("cost_analysis_lines")
 }
 
@@ -1194,6 +1226,8 @@ model SalesInvoice {
   issueDate       DateTime           @db.Date
   dueDate         DateTime           @db.Date
   currency        String             @default("ARS")
+  fxRate          Decimal            @default(1) @db.Decimal(18, 6)
+  amountArs       Decimal            @default(0) @db.Decimal(18, 4)
   subtotal        Decimal            @default(0) @db.Decimal(18, 4)
   taxAmount       Decimal            @default(0) @db.Decimal(18, 4)
   totalAmount     Decimal            @default(0) @db.Decimal(18, 4)
@@ -1474,6 +1508,8 @@ model Collection {
   accountId       String
   collectionDate  DateTime         @db.Date
   currency        String
+  fxRate          Decimal          @default(1) @db.Decimal(18, 6)
+  amountArs       Decimal          @default(0) @db.Decimal(18, 4)
   amount          Decimal          @db.Decimal(18, 4)
   notes           String?
   status          CollectionStatus @default(CONFIRMED)
@@ -1542,6 +1578,8 @@ model SupplierInvoice {
   issueDate         DateTime              @db.Date
   dueDate           DateTime              @db.Date
   currency          String                @default("ARS")
+  fxRate            Decimal               @default(1) @db.Decimal(18, 6)
+  amountArs         Decimal               @default(0) @db.Decimal(18, 4)
   subtotal          Decimal               @default(0) @db.Decimal(18, 4)
   taxAmount         Decimal               @default(0) @db.Decimal(18, 4)
   totalAmount       Decimal               @default(0) @db.Decimal(18, 4)
@@ -1645,6 +1683,8 @@ model Payment {
   accountId         String
   paymentDate       DateTime      @db.Date
   currency          String
+  fxRate            Decimal       @default(1) @db.Decimal(18, 6)
+  amountArs         Decimal       @default(0) @db.Decimal(18, 4)
   amount            Decimal       @db.Decimal(18, 4)
   notes             String?
   status            PaymentStatus @default(CONFIRMED)
@@ -1825,6 +1865,7 @@ model Product {
   stockMovements      StockMovement[]
   jobsiteLogMaterials JobsiteLogMaterialUsage[]
   warehouseTransfers  WarehouseTransfer[]
+  costAnalysisLines   CostAnalysisLine[]
 
   @@unique([tenantId, companyId, sku])
   @@index([tenantId, status])

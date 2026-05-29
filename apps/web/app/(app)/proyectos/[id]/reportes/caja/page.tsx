@@ -11,7 +11,7 @@ import {
 import { CashProjectionChart } from "@/features/reports/cash-projection-chart";
 import { ReportDateFilters } from "@/features/reports";
 import { ProjectCashFlowChart, ProjectCashFlowFilters } from "@/features/project-cash-flow";
-import { ReportCsvExportLink } from "@/features/reports/report-csv-export-link";
+import { ReportCsvExportLink } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";

@@ -56,23 +56,65 @@ export function ProfitabilitySummary({ report }: Props) {
       <KpiStatGrid title={null} columns={2}>
         <KpiStatCard
           label="Venta presupuestada"
-          value={formatMoneyAmount(report.budgetTotalSale, report.currency)}
+          value={formatMoneyAmount(report.budgetTotalSale, report.budgetCurrency)}
         />
         <KpiStatCard
           label="Margen proyectado (presup.)"
-          value={formatMoneyAmount(report.projectedMargin, report.currency)}
+          value={formatMoneyAmount(report.projectedMargin, report.budgetCurrency)}
         />
       </KpiStatGrid>
+
+      {report.currencyView === "original" && report.byCurrency.length > 1 ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Desglose por moneda</CardTitle>
+            <CardDescription>
+              Costos directos imputados solo en {report.budgetCurrency}; otras monedas muestran ingresos facturados.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {report.byCurrency.map((slice) => (
+              <div key={slice.currency} className="flex flex-wrap justify-between gap-2 border-b pb-2 last:border-0">
+                <span className="font-mono font-medium">{slice.currency}</span>
+                <span>
+                  MB {formatMoneyAmount(slice.grossMargin, slice.currency)}
+                  {slice.grossMarginPct != null ? ` (${slice.grossMarginPct}%)` : ""}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {report.consolidationBlocked ? (
+        <p className="text-xs text-yellow-700 dark:text-yellow-400">
+          Consolidado ARS no disponible para este proyecto/período; mostrando moneda del presupuesto ({report.currency}).
+        </p>
+      ) : null}
 
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Margen neto (R-004)</CardTitle>
           <CardDescription>{report.netMarginNote}</CardDescription>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          {report.netMarginAvailable
-            ? "Próximamente con política de gastos generales [Q-013]."
-            : "Consultá con un perfil FINANCE o administrador para ver MN cuando esté disponible."}
+        <CardContent className="text-sm space-y-2">
+          {report.netMarginAvailable && report.netMargin != null ? (
+            <>
+              <p>
+                GG imputados:{" "}
+                {report.overheadAmount != null
+                  ? formatMoneyAmount(report.overheadAmount, report.currency)
+                  : "—"}
+              </p>
+              <p className="font-semibold">
+                Margen neto: {formatMoneyAmount(report.netMargin, report.currency)}
+              </p>
+            </>
+          ) : (
+            <p className="text-muted-foreground">
+              {report.netMarginNote}
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

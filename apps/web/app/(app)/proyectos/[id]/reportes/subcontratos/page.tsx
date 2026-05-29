@@ -13,7 +13,7 @@ import {
   SubcontractContractsTable,
   SubcontractWbsVarianceTable,
 } from "@/features/reports";
-import { ReportCsvExportLink } from "@/features/reports/report-csv-export-link";
+import { ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
@@ -77,10 +77,20 @@ export default async function ReporteSubcontratosPage({ params, searchParams }: 
         }
         actions={
           report.type === "REPORT" ? (
-            <ReportCsvExportLink
-              exportPath={`/api/reports/proyectos/${projectId}/subcontratos.csv`}
-              params={sp}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              {report.pendingContractCount > 0 ? (
+                <Button size="sm" asChild>
+                  <Link href={`/proyectos/${projectId}/subcontratos/nuevo?filter=pending`}>
+                    Crear contrato ({report.pendingContractCount})
+                  </Link>
+                </Button>
+              ) : null}
+              <ReportExportActions
+                exportPath={`/api/reports/proyectos/${projectId}/subcontratos.csv`}
+                params={sp}
+                pdf
+              />
+            </div>
           ) : undefined
         }
       />
@@ -123,7 +133,7 @@ export default async function ReporteSubcontratosPage({ params, searchParams }: 
               <CardDescription>Por partida WBS · capa SUBCONTRACT del APU</CardDescription>
             </CardHeader>
             <CardContent>
-              <SubcontractWbsVarianceTable rows={report.byWbs} />
+              <SubcontractWbsVarianceTable rows={report.byWbs} projectId={projectId} />
             </CardContent>
           </Card>
 

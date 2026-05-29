@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button }   from "@/components/ui/button";
@@ -42,6 +42,8 @@ type Props = {
   subcontractorOptions:  SubcontractorOption[];
   wbsOptions:            WbsOption[];
   budgetHints?:          WbsSubcontractBudgetHint[];
+  /** Pre-select WBS from report deep-link (R-SUB-01). */
+  initialWbsNodeId?:     string;
   action: (fd: FormData) => Promise<{ error: string } | { id: string }>;
   defaultValues?: {
     subcontractorContactId: string;
@@ -59,7 +61,7 @@ type Props = {
 };
 
 export function SubcontractForm({
-  projectId, companyId, subcontractorOptions, wbsOptions, budgetHints, action,
+  projectId, companyId, subcontractorOptions, wbsOptions, budgetHints, initialWbsNodeId, action,
   defaultValues, submitLabel = "Crear subcontrato",
 }: Props) {
   const router = useRouter();
@@ -68,6 +70,7 @@ export function SubcontractForm({
   const [currency, setCurrency] = useState(defaultValues?.currency ?? "ARS");
   const [error, setError]                 = useState<string | null>(null);
   const [pending, setPending]             = useState(false);
+  const appliedInitialWbs = useRef(false);
 
   function addLine() { setLines((prev) => [...prev, { ...DEFAULT_LINE }]); }
   function removeLine(i: number) { setLines((prev) => prev.filter((_, idx) => idx !== i)); }
@@ -103,6 +106,16 @@ export function SubcontractForm({
       return [...prev, newLine];
     });
   }
+
+  useEffect(() => {
+    if (!initialWbsNodeId || appliedInitialWbs.current || !budgetHints?.length) return;
+    const hint = budgetHints.find((h) => h.wbsNodeId === initialWbsNodeId);
+    if (hint) {
+      applyBudgetHint(hint);
+      appliedInitialWbs.current = true;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- apply once when hint list is ready
+  }, [initialWbsNodeId, budgetHints]);
 
   const totalValue = lines.reduce((sum, l) => {
     const qty = parseFloat(l.quantity) || 0;

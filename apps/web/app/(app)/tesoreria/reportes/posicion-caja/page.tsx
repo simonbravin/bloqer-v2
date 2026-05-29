@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getCashPositionReport } from "@bloqer/services";
 import { CashPositionTable } from "@/features/treasury-reports";
-import { ReportCsvExportLink } from "@/features/reports/report-csv-export-link";
+import { ReportCsvExportLink } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";

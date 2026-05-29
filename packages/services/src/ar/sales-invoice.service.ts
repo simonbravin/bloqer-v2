@@ -373,10 +373,18 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
       throw new ServiceError("CONFLICT", "No se puede emitir una factura sin líneas");
     }
 
+    const { computeDocumentFxAmounts } = await import("../finance/fx-amount.service");
+    const fx = computeDocumentFxAmounts(inv.currency, inv.totalAmount, inv.fxRate);
+
     // Issue invoice
     const issued = await tx.salesInvoice.update({
       where: { id },
-      data: { status: "ISSUED", updatedBy: ctx.actorUserId },
+      data: {
+        status: "ISSUED",
+        fxRate: fx.fxRate,
+        amountArs: fx.amountArs,
+        updatedBy: ctx.actorUserId,
+      },
       include: {
         lines: { orderBy: { sortOrder: "asc" } },
         clientContact: { select: { legalName: true, fantasyName: true } },

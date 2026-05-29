@@ -292,6 +292,9 @@ importers:
       '@bloqer/storage':
         specifier: workspace:*
         version: link:../storage
+      '@bloqer/utils':
+        specifier: workspace:*
+        version: link:../utils
       '@bloqer/validators':
         specifier: workspace:*
         version: link:../validators

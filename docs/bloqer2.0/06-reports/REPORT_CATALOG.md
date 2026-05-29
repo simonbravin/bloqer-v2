@@ -42,10 +42,10 @@
 | R-AP-03 | Resumen por proveedor | OP | Comprometido / devengado / pagado / OC abierta (ext. R-009) | 1 | Sí |
 | R-SCC-01 | Evolución cert. subcontrato | OP | Serie mensual certificado vs pagado | 1 | Sí |
 | R-SCC-02 | Contratado vs certificado | OP | Por `Subcontract` y por partida SUB del APU | 1 | Sí |
-| R-SUB-01 | Brecha SUB sin contrato | OP | Partidas con APU sub y sin `Subcontract` ACTIVE | 1 | Parcial |
+| R-SUB-01 | Brecha SUB sin contrato | OP | Partidas con APU sub y sin `Subcontract` ACTIVE; wizard desde reporte | 1 | Completo |
 | R-SUB-02 | Varianza SUB por partida | OP | Presup. sub vs contratado / certificado | 1 | Sí |
-| R-MAT-01 | Consumo vs presupuesto material | INV / OP | Consumo/stock vs baseline MAT | 2 | No |
-| R-MAT-02 | APU material sin producto | INV | Líneas MAT sin `product_id` | 2 | No |
+| R-MAT-01 | Consumo vs presupuesto material | INV / OP | Consumo/stock vs baseline MAT | 2 | Completo |
+| R-MAT-02 | APU material sin producto | INV | Líneas MAT sin `product_id` | 2 | Completo |
 
 ### Hub caja y rentabilidad (Phase E)
 
@@ -54,7 +54,7 @@
 | R-005 | Cashflow real | Sí (detalle + hub) | `/reportes/caja`, `/flujo-caja` |
 | R-006 | Proyección de caja | Sí | `/reportes/caja` |
 | R-003 | Rentabilidad bruta | Sí | `/reportes/rentabilidad` |
-| R-004 | Rentabilidad neta | Parcial (nota Q-013) | `/reportes/rentabilidad` |
+| R-004 | Rentabilidad neta | Completo (GG manual + % empresa [D-040]) | `/reportes/rentabilidad` |
 | — | Ingresos vs gastos | Sí | `/reportes/ingresos-gastos` |
 
 **R-001 (hub):** página *Presupuesto vs real* — capas de costo, composición APU, CSV `presupuesto-vs-real.csv`. Reutiliza agregados de control de costos.

@@ -1,6 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import { canViewProjectCostControlReport } from "../cost-control/cost-control.service";
+import { getProjectAccruedByMonth } from "../cost-control/project-accrued-aggregation";
 import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import {
   assertTenantModuleEnabledWithGate,
@@ -10,11 +10,13 @@ import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenan
 import { ServiceContext, ServiceError } from "../types";
 import { getCertificationEvolutionReport } from "./certification-evolution.service";
 import { defaultReportDateRange, monthKey, monthLabel } from "./report-month";
+import { canConsolidateToArs, parseCurrencyView, type CurrencyView } from "./report-currency-view";
 
 export type IncomeExpenseFilters = {
   budgetId?: string;
   dateFrom?: string;
   dateTo?: string;
+  currencyView?: CurrencyView;
 };
 
 export type IncomeExpensePoint = {
@@ -36,6 +38,9 @@ export type IncomeExpenseReport = {
   budgetName: string | null;
   dateFrom: string;
   dateTo: string;
+  currencyView: CurrencyView;
+  displayCurrency: string;
+  consolidationBlocked: boolean;
   series: IncomeExpensePoint[];
   totals: {
     certifiedAmount: string;
@@ -74,6 +79,7 @@ export async function getProjectIncomeExpenseReport(
     filters.dateFrom && filters.dateTo
       ? { dateFrom: filters.dateFrom, dateTo: filters.dateTo }
       : defaultReportDateRange(12);
+  const currencyView = parseCurrencyView(filters.currencyView);
 
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");
@@ -141,8 +147,8 @@ export async function getProjectIncomeExpenseReport(
   const apEnabled = gate.isEnabled("AP");
   if (!apEnabled) {
     sectionsExcluded.push({ module: "AP", section: "cost_series", reason: "TENANT_MODULE_DISABLED" });
-  } else if (canViewProjectCashFlowReport(ctx.roles) || can(ctx.roles, "VIEW", "AP")) {
-    const [payments, invoices, subCertLines] = await Promise.all([
+  } else if (canViewProjectCashFlowReport(ctx.roles) || canViewProjectCostControlReport(ctx.roles)) {
+    const [payments, accrued] = await Promise.all([
       prisma.payment.findMany({
         where: {
           tenantId: ctx.tenantId,
@@ -152,46 +158,20 @@ export async function getProjectIncomeExpenseReport(
         },
         select: { paymentDate: true, amount: true },
       }),
-      prisma.supplierInvoice.findMany({
-        where: {
-          tenantId: ctx.tenantId,
-          projectId,
-          status: "ISSUED",
-          subcontractCertificationId: null,
-          issueDate: { gte: dateFrom, lte: dateTo },
-        },
-        select: { issueDate: true, totalAmount: true },
-      }),
-      gate.isEnabled("SUBCONTRACTS")
-        ? prisma.subcontractCertificationLine.findMany({
-            where: {
-              certification: {
-                projectId,
-                tenantId: ctx.tenantId,
-                status: "APPROVED",
-                certificationDate: { gte: dateFrom, lte: dateTo },
-              },
-            },
-            select: {
-              lineTotal: true,
-              certification: { select: { certificationDate: true } },
-            },
-          })
-        : Promise.resolve([]),
+      getProjectAccruedByMonth(
+        projectId,
+        { dateFrom: range.dateFrom, dateTo: range.dateTo },
+        ctx,
+      ),
     ]);
 
     for (const p of payments) {
       ensure(monthKey(p.paymentDate)).costPaid = ensure(monthKey(p.paymentDate)).costPaid.plus(p.amount);
     }
-    for (const inv of invoices) {
-      ensure(monthKey(inv.issueDate)).costAccrued = ensure(monthKey(inv.issueDate)).costAccrued.plus(
-        inv.totalAmount,
-      );
+    for (const point of accrued.series) {
+      ensure(point.periodKey).costAccrued = ensure(point.periodKey).costAccrued.plus(point.amount);
     }
-    for (const cl of subCertLines) {
-      const key = monthKey(cl.certification.certificationDate);
-      ensure(key).costAccrued = ensure(key).costAccrued.plus(cl.lineTotal);
-    }
+    warnings.push(...accrued.warnings);
   }
 
   warnings.push(
@@ -237,6 +217,53 @@ export async function getProjectIncomeExpenseReport(
   const gmAcc = totals.certified.minus(totals.costAccrued);
   const gmCash = totals.collected.minus(totals.costPaid);
 
+  let displayCurrency = "ARS";
+  let consolidationBlocked = false;
+  if (budgetId) {
+    const budgetRow = await prisma.budget.findUnique({
+      where: { id: budgetId },
+      select: { currency: true },
+    });
+    displayCurrency = budgetRow?.currency ?? "ARS";
+    const [invCur, payCur] = await Promise.all([
+      prisma.salesInvoice.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          projectId,
+          status: "ISSUED",
+          issueDate: { gte: dateFrom, lte: dateTo },
+        },
+        select: { currency: true },
+        distinct: ["currency"],
+      }),
+      prisma.payment.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          projectId,
+          status: "CONFIRMED",
+          paymentDate: { gte: dateFrom, lte: dateTo },
+        },
+        select: { currency: true },
+        distinct: ["currency"],
+      }),
+    ]);
+    const allCur = new Set([
+      displayCurrency,
+      ...invCur.map((i) => i.currency),
+      ...payCur.map((p) => p.currency),
+    ]);
+    consolidationBlocked = currencyView === "ARS" && !canConsolidateToArs(allCur);
+    if (consolidationBlocked) {
+      warnings.push(
+        "Vista ARS bloqueada: hay movimientos en monedas distintas en el período. Usá «Por moneda» o cargá FX en comprobantes.",
+      );
+    } else if (currencyView === "original") {
+      displayCurrency = budgetRow?.currency ?? "ARS";
+    } else {
+      displayCurrency = "ARS";
+    }
+  }
+
   return {
     type: "REPORT",
     projectId,
@@ -244,6 +271,9 @@ export async function getProjectIncomeExpenseReport(
     budgetName,
     dateFrom: range.dateFrom,
     dateTo: range.dateTo,
+    currencyView,
+    displayCurrency,
+    consolidationBlocked,
     series,
     totals: {
       certifiedAmount: totals.certified.toFixed(2),

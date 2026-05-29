@@ -5,6 +5,7 @@ import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
 import { listApprovedBudgetsForProject, resolveApprovedBudgetForProject } from "./report-budget-resolve";
+import { monthKey, monthLabel } from "./report-month";
 
 export type SubcontractReportFilters = {
   budgetId?: string;
@@ -59,20 +60,6 @@ export type SubcontractVarianceReport = {
 export type SubcontractReportEmpty = { type: "NO_APPROVED_BUDGETS" };
 
 export type SubcontractReportResult = SubcontractVarianceReport | SubcontractReportEmpty;
-
-function monthKey(d: Date): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
-}
-
-function monthLabel(key: string): string {
-  const [y, m] = key.split("-");
-  return new Date(Date.UTC(+y!, +m! - 1, 1)).toLocaleDateString("es-AR", {
-    month: "short",
-    year: "numeric",
-  });
-}
 
 export async function getSubcontractVarianceReport(
   projectId: string,

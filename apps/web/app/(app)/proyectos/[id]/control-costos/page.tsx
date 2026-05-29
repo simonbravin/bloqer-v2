@@ -7,9 +7,8 @@ import {
   CostControlTable,
   CostControlFilters,
 } from "@/features/cost-control";
-import { ReportCsvExportLink } from "@/features/reports/report-csv-export-link";
+import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
-import { ReportPdfExportLink } from "@/features/reports/report-pdf-export-link";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
@@ -87,13 +86,10 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
                   Presupuesto vs real
                 </Link>
               </Button>
-              <ReportCsvExportLink
+              <ReportExportActions
                 exportPath={`/api/reports/proyectos/${projectId}/control-costos.csv`}
                 params={sp}
-              />
-              <ReportPdfExportLink
-                exportPath={`/api/reports/proyectos/${projectId}/control-costos.csv`}
-                params={sp}
+                pdf
               />
               <ReportEmailSendDialog
                 reportType="PROJECT_COST_CONTROL"

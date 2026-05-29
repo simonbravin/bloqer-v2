@@ -266,6 +266,7 @@ export async function createSupplierInvoice(
         issueDate:         new Date(input.issueDate),
         dueDate:           new Date(input.dueDate),
         currency:          input.currency ?? "ARS",
+        fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : new Prisma.Decimal(1),
         notes:             input.notes ?? null,
         internalNotes:     input.internalNotes ?? null,
         purchaseOrderId:   input.purchaseOrderId ?? null,
@@ -383,6 +384,7 @@ export async function updateSupplierInvoice(
         notes:           input.notes,
         internalNotes:   input.internalNotes,
         purchaseOrderId: input.purchaseOrderId !== undefined ? input.purchaseOrderId : undefined,
+        fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : undefined,
         updatedBy:       ctx.actorUserId,
       },
     });
@@ -466,9 +468,17 @@ export async function issueSupplierInvoice(
       throw new ServiceError("CONFLICT", "El total de la factura debe ser mayor a 0");
     }
 
+    const { computeDocumentFxAmounts } = await import("../finance/fx-amount.service");
+    const fx = computeDocumentFxAmounts(refreshed.currency, refreshed.totalAmount, refreshed.fxRate);
+
     await tx.supplierInvoice.update({
       where: { id },
-      data: { status: "ISSUED", updatedBy: ctx.actorUserId },
+      data: {
+        status: "ISSUED",
+        fxRate: fx.fxRate,
+        amountArs: fx.amountArs,
+        updatedBy: ctx.actorUserId,
+      },
     });
 
     // BR-AP-002: create Payable atomically

@@ -14,7 +14,7 @@ import {
   BudgetCompositionChart,
 } from "@/features/reports";
 import { CostControlSummaryCards } from "@/features/cost-control";
-import { ReportCsvExportLink } from "@/features/reports/report-csv-export-link";
+import { ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
@@ -93,9 +93,10 @@ export default async function PresupuestoVsRealPage({ params, searchParams }: Pa
         }
         actions={
           varianceResult.type === "REPORT" ? (
-            <ReportCsvExportLink
+            <ReportExportActions
               exportPath={`/api/reports/proyectos/${projectId}/presupuesto-vs-real.csv`}
               params={exportParams}
+              pdf
             />
           ) : undefined
         }

@@ -17,12 +17,14 @@ type Props = {
   budgets?: AvailableBudget[];
   currentBudgetId?: string;
   showBudget?: boolean;
+  showCurrencyView?: boolean;
 };
 
 export function ReportDateFilters({
   budgets = [],
   currentBudgetId,
   showBudget = true,
+  showCurrencyView = false,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -40,6 +42,9 @@ export function ReportDateFilters({
     if (to) sp.set("dateTo", to);
     const layer = params.get("costLayer");
     if (layer) sp.set("costLayer", layer);
+    const cv = fd.get("currencyView") as string;
+    if (showCurrencyView && cv) sp.set("currencyView", cv);
+    else if (params.get("currencyView")) sp.set("currencyView", params.get("currencyView")!);
     router.push(`${pathname}?${sp.toString()}`);
   }
 
@@ -85,6 +90,20 @@ export function ReportDateFilters({
           defaultValue={params.get("dateTo") ?? ""}
         />
       </div>
+      {showCurrencyView ? (
+        <div className="space-y-1">
+          <Label className="text-xs">Moneda</Label>
+          <Select name="currencyView" defaultValue={params.get("currencyView") ?? "ARS"}>
+            <SelectTrigger className="w-36 h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ARS">Consolidado ARS</SelectItem>
+              <SelectItem value="original">Por moneda</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
       <Button type="submit" size="sm" className="h-8">
         Aplicar
       </Button>

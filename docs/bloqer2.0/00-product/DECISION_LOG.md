@@ -497,6 +497,20 @@
 
 ---
 
+### D-040 — Imputación de gastos generales (Q-013): manual + % empresa
+
+- **Fecha:** 2026-05-28
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (plan Fase F)
+- **Contexto:** [Q-013](./OPEN_QUESTIONS.md) bloqueaba margen neto (R-004); opción 3 (prorrateo automático por peso de CD) queda para fase posterior.
+- **Decisión:**
+  1. **Opción 1:** tabla `project_overhead_allocations` — imputación manual por proyecto y período (`YYYY-MM`).
+  2. **Opción 2:** `Company.overheadAllocationPct` aplicado sobre **costo directo devengado** del proyecto (distinto de `Budget.overheadPct` markup de venta).
+- **Implicancias:** `getProjectOverheadAmount` en services; R-004 expone `netMargin` cuando el rol lo permite ([D-013]).
+- **Documentos afectados:** [`04-formulas/PROFITABILITY_FORMULAS.md`](../04-formulas/PROFITABILITY_FORMULAS.md), [`03-finance/PROFITABILITY_BY_PROJECT.md`](../03-finance/PROFITABILITY_BY_PROJECT.md), [`06-reports/REPORT_CATALOG.md`](../06-reports/REPORT_CATALOG.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

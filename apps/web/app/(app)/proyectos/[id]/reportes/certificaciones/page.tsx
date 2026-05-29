@@ -14,7 +14,7 @@ import {
   CertificationVsBudgetTable,
   ReportDateFilters,
 } from "@/features/reports";
-import { ReportCsvExportLink } from "@/features/reports/report-csv-export-link";
+import { ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
@@ -78,9 +78,10 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
         }
         actions={
           report.type === "REPORT" ? (
-            <ReportCsvExportLink
+            <ReportExportActions
               exportPath={`/api/reports/proyectos/${projectId}/certificaciones.csv`}
               params={sp}
+              pdf
             />
           ) : undefined
         }

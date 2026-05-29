@@ -6,9 +6,8 @@ import {
   AgingFilters,
   AgingTable,
 } from "@/features/aging";
-import { ReportCsvExportLink } from "@/features/reports/report-csv-export-link";
+import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
-import { ReportPdfExportLink } from "@/features/reports/report-pdf-export-link";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
@@ -47,8 +46,7 @@ export default async function ApAgingPage({ searchParams }: PageProps) {
           <p className="text-xs text-muted-foreground">Al {report.asOfDate}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ReportCsvExportLink exportPath="/api/reports/finanzas/ap-aging.csv" params={sp} />
-          <ReportPdfExportLink exportPath="/api/reports/finanzas/ap-aging.csv" params={sp} />
+          <ReportExportActions exportPath="/api/reports/finanzas/ap-aging.csv" params={sp} pdf />
           <ReportEmailSendDialog
             reportType="AP_AGING"
             supportsPdf

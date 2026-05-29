@@ -13,13 +13,15 @@ import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ wbsNodeId?: string; filter?: string; from?: string }>;
 }
 
-export default async function NuevoSubcontratoPage({ params }: PageProps) {
+export default async function NuevoSubcontratoPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId } = await params;
+  const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -37,7 +39,7 @@ export default async function NuevoSubcontratoPage({ params }: PageProps) {
 
   const [subcontractorOptions, budgetHints] = await Promise.all([
     listSubcontractorContacts(projectId, ctx),
-    getWbsSubcontractBudgetHints(projectId, ctx).catch(() => []),
+    getWbsSubcontractBudgetHints(projectId, ctx, { excludeWithActiveContract: true }).catch(() => []),
   ]);
 
   const companyId = wbsPick.companyId || current.tenantCtx.companyId || "";
@@ -55,6 +57,7 @@ export default async function NuevoSubcontratoPage({ params }: PageProps) {
           subcontractorOptions={subcontractorOptions}
           wbsOptions={wbsPick.wbsOptions}
           budgetHints={budgetHints}
+          initialWbsNodeId={sp.wbsNodeId}
           action={createSubcontractAction}
         />
       </div>

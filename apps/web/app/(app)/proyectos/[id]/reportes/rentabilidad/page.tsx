@@ -6,9 +6,10 @@ import {
   getProjectProfitabilityReport,
   getProjectShellInfo,
   parseCostVarianceLayer,
+  parseCurrencyView,
   ServiceError,
 } from "@bloqer/services";
-import { ProfitabilityFilters, ProfitabilitySummary } from "@/features/reports";
+import { ProfitabilityFilters, ProfitabilitySummary, ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ interface PageProps {
     budgetId?: string;
     costLayer?: string;
     revenueBasis?: string;
+    currencyView?: string;
   }>;
 }
 
@@ -49,6 +51,7 @@ export default async function ReporteRentabilidadPage({ params, searchParams }: 
     budgetId: sp.budgetId,
     costLayer: parseCostVarianceLayer(sp.costLayer),
     revenueBasis: sp.revenueBasis === "invoiced" ? ("invoiced" as const) : ("certified" as const),
+    currencyView: parseCurrencyView(sp.currencyView),
   };
 
   let report;
@@ -73,6 +76,15 @@ export default async function ReporteRentabilidadPage({ params, searchParams }: 
         projectName={project.name}
         title="Rentabilidad del proyecto"
         subtitle="R-003 margen bruto · R-004 margen neto (cuando aplique política GG)"
+        actions={
+          report.type === "REPORT" ? (
+            <ReportExportActions
+              exportPath={`/api/reports/proyectos/${projectId}/rentabilidad.csv`}
+              params={sp}
+              pdfOnly
+            />
+          ) : undefined
+        }
       />
 
       <div className="flex flex-wrap gap-2 text-sm">
@@ -92,6 +104,7 @@ export default async function ReporteRentabilidadPage({ params, searchParams }: 
         currentBudgetId={sp.budgetId}
         currentCostLayer={sp.costLayer}
         currentRevenueBasis={sp.revenueBasis}
+        currentCurrencyView={sp.currencyView}
       />
 
       {report.type === "NO_APPROVED_BUDGETS" ? (

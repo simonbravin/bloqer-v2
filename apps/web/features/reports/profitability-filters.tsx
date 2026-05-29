@@ -16,6 +16,7 @@ type Props = {
   currentBudgetId?: string;
   currentCostLayer?: string;
   currentRevenueBasis?: string;
+  currentCurrencyView?: string;
 };
 
 export function ProfitabilityFilters({
@@ -23,15 +24,22 @@ export function ProfitabilityFilters({
   currentBudgetId,
   currentCostLayer,
   currentRevenueBasis,
+  currentCurrencyView,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
 
-  function apply(form: { budgetId?: string; costLayer: string; revenueBasis: string }) {
+  function apply(form: {
+    budgetId?: string;
+    costLayer: string;
+    revenueBasis: string;
+    currencyView: string;
+  }) {
     const sp = new URLSearchParams();
     if (form.budgetId && form.budgetId !== "__all__") sp.set("budgetId", form.budgetId);
     sp.set("costLayer", form.costLayer);
     sp.set("revenueBasis", form.revenueBasis);
+    sp.set("currencyView", form.currencyView);
     router.push(`${pathname}?${sp.toString()}`);
   }
 
@@ -45,6 +53,7 @@ export function ProfitabilityFilters({
           budgetId: (fd.get("budgetId") as string) || undefined,
           costLayer: (fd.get("costLayer") as string) || "accrued",
           revenueBasis: (fd.get("revenueBasis") as string) || "certified",
+          currencyView: (fd.get("currencyView") as string) || "ARS",
         });
       }}
     >
@@ -88,6 +97,18 @@ export function ProfitabilityFilters({
             <SelectContent>
               <SelectItem value="certified">Certificado</SelectItem>
               <SelectItem value="invoiced">Facturado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Moneda</Label>
+          <Select name="currencyView" defaultValue={currentCurrencyView ?? "ARS"}>
+            <SelectTrigger className="w-36 h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ARS">Consolidado ARS</SelectItem>
+              <SelectItem value="original">Por moneda</SelectItem>
             </SelectContent>
           </Select>
         </div>

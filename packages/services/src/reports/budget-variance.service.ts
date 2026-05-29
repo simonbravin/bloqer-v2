@@ -272,10 +272,30 @@ export type WbsSubcontractBudgetHint = {
   unitSubcontractCost: string;
 };
 
+/** WBS node ids with at least one line on an ACTIVE subcontract (R-SUB-01). */
+export async function getWbsIdsWithActiveSubcontract(
+  projectId: string,
+  ctx: ServiceContext,
+): Promise<Set<string>> {
+  const lines = await prisma.subcontractLine.findMany({
+    where: {
+      subcontract: { projectId, tenantId: ctx.tenantId, status: "ACTIVE" },
+      wbsNodeId: { not: null },
+    },
+    select: { wbsNodeId: true },
+  });
+  const ids = new Set<string>();
+  for (const l of lines) {
+    if (l.wbsNodeId) ids.add(l.wbsNodeId);
+  }
+  return ids;
+}
+
 /** Ítems WBS con monto de subcontrato en APU (para sugerencias al crear subcontrato). */
 export async function getWbsSubcontractBudgetHints(
   projectId: string,
   ctx: ServiceContext,
+  options?: { excludeWithActiveContract?: boolean },
 ): Promise<WbsSubcontractBudgetHint[]> {
   const wbsNodes = await prisma.wbsNode.findMany({
     where: {
@@ -324,6 +344,11 @@ export async function getWbsSubcontractBudgetHints(
       budgetSubcontractTotal: total.toFixed(2),
       unitSubcontractCost: unitSub.toFixed(2),
     });
+  }
+
+  if (options?.excludeWithActiveContract !== false) {
+    const covered = await getWbsIdsWithActiveSubcontract(projectId, ctx);
+    return hints.filter((h) => !covered.has(h.wbsNodeId));
   }
 
   return hints;

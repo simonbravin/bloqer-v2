@@ -12,7 +12,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/schedule/schedule-helpers.test.ts src/budget/wbs-code-rules.test.ts src/budget/wbs-import-code-fix.test.ts src/budget/wbs-spreadsheet-parser.test.ts src/budget/budget-import-pure.test.ts src/reports/budget-variance.test.ts"
+    "test": "node --import tsx --test src/schedule/schedule-helpers.test.ts src/budget/wbs-code-rules.test.ts src/budget/wbs-import-code-fix.test.ts src/budget/wbs-spreadsheet-parser.test.ts src/budget/budget-import-pure.test.ts src/reports/budget-variance.test.ts src/cost-control/project-accrued-aggregation.test.ts"
   },
   "dependencies": {
     "@bloqer/config": "workspace:*",
@@ -20,6 +20,7 @@
     "@bloqer/domain": "workspace:*",
     "@bloqer/email": "workspace:*",
     "@bloqer/storage": "workspace:*",
+    "@bloqer/utils": "workspace:*",
     "@bloqer/validators": "workspace:*",
     "@react-pdf/renderer": "^4",
     "react": "^19"
