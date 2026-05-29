@@ -124,6 +124,7 @@ Filtros: **mismos query params** que las páginas de reporte (p. ej. `currency`,
 - `/api/reports/proyectos/[projectId]/compras-proveedores.csv` (R-AP-01…03)
 - `/api/reports/proyectos/[projectId]/subcontratos.csv` (R-SCC-*, R-SUB-*)
 - `/api/reports/proyectos/[projectId]/flujo-caja.csv`
+- Hub UI (sin CSV dedicado en 9E): `/proyectos/[id]/reportes/caja`, `ingresos-gastos`, `rentabilidad`
 
 **Respuesta CSV:** `Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment` con nombre saneado.
 

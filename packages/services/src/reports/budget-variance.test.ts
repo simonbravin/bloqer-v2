@@ -1,15 +1,16 @@
-import { describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import { parseCostVarianceLayer } from "./budget-variance.service";
 
 describe("parseCostVarianceLayer", () => {
   it("defaults to exposure", () => {
-    expect(parseCostVarianceLayer(undefined)).toBe("exposure");
-    expect(parseCostVarianceLayer("invalid")).toBe("exposure");
+    assert.equal(parseCostVarianceLayer(undefined), "exposure");
+    assert.equal(parseCostVarianceLayer("invalid"), "exposure");
   });
 
   it("accepts valid layers", () => {
-    expect(parseCostVarianceLayer("committed")).toBe("committed");
-    expect(parseCostVarianceLayer("accrued")).toBe("accrued");
-    expect(parseCostVarianceLayer("paid")).toBe("paid");
+    assert.equal(parseCostVarianceLayer("committed"), "committed");
+    assert.equal(parseCostVarianceLayer("accrued"), "accrued");
+    assert.equal(parseCostVarianceLayer("paid"), "paid");
   });
 });

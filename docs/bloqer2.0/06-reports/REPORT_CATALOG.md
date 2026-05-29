@@ -47,6 +47,16 @@
 | R-MAT-01 | Consumo vs presupuesto material | INV / OP | Consumo/stock vs baseline MAT | 2 | No |
 | R-MAT-02 | APU material sin producto | INV | Líneas MAT sin `product_id` | 2 | No |
 
+### Hub caja y rentabilidad (Phase E)
+
+| ID | Nombre | Impl. | Ruta UI |
+|----|--------|-------|---------|
+| R-005 | Cashflow real | Sí (detalle + hub) | `/reportes/caja`, `/flujo-caja` |
+| R-006 | Proyección de caja | Sí | `/reportes/caja` |
+| R-003 | Rentabilidad bruta | Sí | `/reportes/rentabilidad` |
+| R-004 | Rentabilidad neta | Parcial (nota Q-013) | `/reportes/rentabilidad` |
+| — | Ingresos vs gastos | Sí | `/reportes/ingresos-gastos` |
+
 **R-001 (hub):** página *Presupuesto vs real* — capas de costo, composición APU, CSV `presupuesto-vs-real.csv`. Reutiliza agregados de control de costos.
 
 ## Filtros globales estándar

@@ -1,6 +1,16 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { BarChart3, FileCheck2, Package, PieChart, TrendingUp, Users, Wallet } from "lucide-react";
+import {
+  BarChart3,
+  FileCheck2,
+  LineChart,
+  Package,
+  PieChart,
+  Percent,
+  TrendingUp,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type ReportCard = {
@@ -19,6 +29,7 @@ type Props = {
   canProcurementReports: boolean;
   canSubcontractReports: boolean;
   canCashFlow: boolean;
+  canProfitability: boolean;
 };
 
 export function ReportsHub({
@@ -28,6 +39,7 @@ export function ReportsHub({
   canProcurementReports,
   canSubcontractReports,
   canCashFlow,
+  canProfitability,
 }: Props) {
   const base = `/proyectos/${projectId}/reportes`;
 
@@ -76,12 +88,34 @@ export function ReportsHub({
       badge: "En presupuesto vs real",
     },
     {
-      title: "Flujo de caja del proyecto",
-      description: "Ingresos y egresos de caja por período.",
+      title: "Caja y proyección",
+      description: "Flujo de caja real (R-005) y cobros/pagos esperados por vencimiento (R-006).",
+      href: `${base}/caja`,
+      icon: <Wallet className="h-5 w-5" />,
+      available: canCashFlow,
+    },
+    {
+      title: "Ingresos vs gastos",
+      description: "Certificado, facturado, cobrado y costos por período con capas etiquetadas.",
+      href: `${base}/ingresos-gastos`,
+      icon: <LineChart className="h-5 w-5" />,
+      available: canProfitability || canCashFlow,
+    },
+    {
+      title: "Rentabilidad",
+      description: "Margen bruto (R-003) por capa de costo; margen neto cuando aplique [Q-013].",
+      href: `${base}/rentabilidad`,
+      icon: <Percent className="h-5 w-5" />,
+      available: canProfitability,
+      badge: "R-003",
+    },
+    {
+      title: "Flujo de caja (detalle)",
+      description: "Cobranzas y pagos confirmados con tablas de detalle.",
       href: `/proyectos/${projectId}/flujo-caja`,
       icon: <Wallet className="h-5 w-5" />,
       available: canCashFlow,
-      badge: "Disponible",
+      badge: "Detalle",
     },
   ];
 

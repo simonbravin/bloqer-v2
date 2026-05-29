@@ -15,6 +15,7 @@ import {
   getProjectCashFlowReport,
 } from "../project-cash-flow/project-cash-flow.service";
 import { canViewProjectCostControlReport } from "../cost-control/cost-control.service";
+import { getProjectProfitabilityKpi } from "../reports/project-profitability.service";
 import { computeProjectScheduleProgressPct } from "../schedule/schedule-workspace.service";
 import { canViewArProjectArea } from "../ar/ar-access";
 import { canViewApProjectArea } from "../ap/ap-access";
@@ -54,6 +55,13 @@ export type ProjectOverviewCashFlowKpi = {
 export type ProjectOverviewCostControlKpi = {
   href: string;
   available: boolean;
+};
+
+export type ProjectOverviewProfitabilityKpi = {
+  href: string;
+  currency: string;
+  grossMargin: string;
+  grossMarginPct: string | null;
 };
 
 export type ProjectOverviewBillingVsCollections = {
@@ -117,6 +125,7 @@ export type ProjectOverviewDashboard = {
     payables: ProjectOverviewPayablesKpi | null;
     cashFlow: ProjectOverviewCashFlowKpi | null;
     costControl: ProjectOverviewCostControlKpi | null;
+    profitability: ProjectOverviewProfitabilityKpi | null;
   };
   billingVsCollections: ProjectOverviewBillingVsCollections | null;
   /** Cobros y pagos imputados al proyecto por mes (primera moneda con datos). */
@@ -533,6 +542,31 @@ export async function getProjectOverviewDashboard(
     });
   }
 
+  let profitability: ProjectOverviewProfitabilityKpi | null = null;
+  if (canCc) {
+    const pk = await getProjectProfitabilityKpi(projectId, ctx);
+    if (pk) {
+      profitability = {
+        href: pk.href,
+        currency: pk.currency,
+        grossMargin: pk.grossMargin,
+        grossMarginPct: pk.grossMarginPct,
+      };
+      compactKpis.push({
+        key: "gross_margin",
+        label: "Margen bruto",
+        value: pk.grossMarginPct != null ? `${pk.grossMarginPct}%` : "Ver",
+        href: pk.href,
+        tone:
+          pk.grossMarginPct != null && parseFloat(pk.grossMarginPct) < 0
+            ? "danger"
+            : pk.grossMarginPct != null && parseFloat(pk.grossMarginPct) > 0
+              ? "success"
+              : "default",
+      });
+    }
+  }
+
   return {
     project: {
       id: shell.id,
@@ -550,6 +584,7 @@ export async function getProjectOverviewDashboard(
       payables,
       cashFlow,
       costControl,
+      profitability,
     },
     billingVsCollections,
     cashFlowMini,

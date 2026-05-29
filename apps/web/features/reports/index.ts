@@ -13,3 +13,7 @@ export { ProcurementSupplierTable } from "./procurement-supplier-table";
 export { SubcontractWbsVarianceTable } from "./subcontract-wbs-variance-table";
 export { SubcontractContractsTable } from "./subcontract-contracts-table";
 export { SubcontractCertChart } from "./subcontract-cert-chart";
+export { IncomeExpenseChart } from "./income-expense-chart";
+export { CashProjectionChart } from "./cash-projection-chart";
+export { ProfitabilitySummary } from "./profitability-summary";
+export { ProfitabilityFilters } from "./profitability-filters";

@@ -74,11 +74,12 @@ export type BudgetCompositionResult =
   | Extract<CostControlResult, { type: "BUDGET_SELECTION_REQUIRED" }>
   | Extract<CostControlResult, { type: "NO_APPROVED_BUDGETS" }>;
 
-const CATEGORY_LABELS: Record<string, string> = {
+const CATEGORY_LABELS: Record<CostCategory, string> = {
   MATERIAL: "Materiales",
   LABOR: "Mano de obra",
   EQUIPMENT: "Equipos",
   SUBCONTRACT: "Subcontrato",
+  OTHER: "Otros",
 };
 
 function getActualCost(row: CostControlRow, layer: CostVarianceLayer): string {
