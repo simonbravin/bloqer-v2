@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine } from "./invoice-lines-editor";
 import { createSupplierInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
@@ -108,19 +109,14 @@ export function SupplierInvoiceForm({
                 No hay proveedores activos. Cree un contacto con rol Proveedor primero.
               </p>
             ) : (
-              <Select
+              <SearchableCombobox
+                options={toSearchableOptions(suppliers)}
+                value={supplierContactId}
                 onValueChange={setSupplierContactId}
-                value={supplierContactId || undefined}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar proveedor…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {suppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Seleccionar proveedor…"
+                searchPlaceholder="Buscar proveedor…"
+                emptyText="Ningún proveedor coincide."
+              />
             )}
           </div>
 

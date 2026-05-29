@@ -6,9 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
 import { createSalesInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 
 export type ClientOption = {
@@ -70,16 +68,14 @@ export function ManualInvoiceForm({ projectId, clients }: Props) {
                 No hay clientes activos en el directorio. Cree un contacto con rol Cliente primero.
               </p>
             ) : (
-              <Select onValueChange={setClientContactId} value={clientContactId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar cliente…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableCombobox
+                options={toSearchableOptions(clients)}
+                value={clientContactId}
+                onValueChange={setClientContactId}
+                placeholder="Seleccionar cliente…"
+                searchPlaceholder="Buscar cliente…"
+                emptyText="Ningún cliente coincide."
+              />
             )}
           </div>
 

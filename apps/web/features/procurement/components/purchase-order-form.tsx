@@ -6,9 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
 import { PurchaseOrderLinesEditor } from "./purchase-order-lines-editor";
 import type { PurchaseOrderLine, WbsOption, ProductOption } from "./purchase-order-lines-editor";
 import { createPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
@@ -75,16 +73,14 @@ export function PurchaseOrderForm({ projectId, suppliers, wbsOptions, productOpt
                 No hay proveedores activos. Cree un contacto con rol Proveedor primero.
               </p>
             ) : (
-              <Select onValueChange={setSupplierContactId} value={supplierContactId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar proveedor…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {suppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableCombobox
+                options={toSearchableOptions(suppliers)}
+                value={supplierContactId}
+                onValueChange={setSupplierContactId}
+                placeholder="Seleccionar proveedor…"
+                searchPlaceholder="Buscar proveedor…"
+                emptyText="Ningún proveedor coincide."
+              />
             )}
           </div>
 

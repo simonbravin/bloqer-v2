@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { contactsToSearchableOptions, SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { createProjectSchema, type CreateProjectInput, type ProjectFormInput } from "@bloqer/validators";
 
 interface ClientOption {
@@ -123,21 +124,14 @@ export function ProjectForm({
             y asignarle el rol Cliente.
           </p>
         ) : (
-          <Select
-            value={clientContactId || undefined}
+          <SearchableCombobox
+            options={contactsToSearchableOptions(clients)}
+            value={clientContactId ?? ""}
             onValueChange={(v) => form.setValue("clientContactId", v, { shouldValidate: true })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar cliente..." />
-            </SelectTrigger>
-            <SelectContent>
-              {clients.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.fantasyName ?? c.legalName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            placeholder="Seleccionar cliente…"
+            searchPlaceholder="Buscar cliente…"
+            emptyText="Ningún cliente coincide."
+          />
         )}
         {form.formState.errors.clientContactId && (
           <p className="text-xs text-destructive">{form.formState.errors.clientContactId.message}</p>

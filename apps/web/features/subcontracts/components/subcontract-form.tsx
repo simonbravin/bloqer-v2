@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { contactsToSearchableOptions, SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import type { WbsSubcontractBudgetHint } from "@bloqer/services";
 import { SubcontractBudgetHints } from "./subcontract-budget-hints";
@@ -66,7 +67,7 @@ export function SubcontractForm({
 }: Props) {
   const router = useRouter();
   const [lines, setLines]                 = useState<LineState[]>(defaultValues?.lines ?? [{ ...DEFAULT_LINE }]);
-  const [subcontractorId, setSubcontractorId] = useState(defaultValues?.subcontractorContactId ?? "__none__");
+  const [subcontractorId, setSubcontractorId] = useState(defaultValues?.subcontractorContactId ?? "");
   const [currency, setCurrency] = useState(defaultValues?.currency ?? "ARS");
   const [error, setError]                 = useState<string | null>(null);
   const [pending, setPending]             = useState(false);
@@ -130,7 +131,12 @@ export function SubcontractForm({
     const fd = new FormData(e.currentTarget);
     fd.set("projectId",  projectId);
     fd.set("companyId",  companyId);
-    fd.set("subcontractorContactId", subcontractorId === "__none__" ? "" : subcontractorId);
+    if (!subcontractorId) {
+      setError("Debe seleccionar un subcontratista");
+      setPending(false);
+      return;
+    }
+    fd.set("subcontractorContactId", subcontractorId);
     fd.set("currency", currency);
     fd.set("lines", JSON.stringify(lines.map((l) => ({
       wbsNodeId:   l.wbsNodeId === "__none__" ? null : l.wbsNodeId || null,
@@ -159,14 +165,14 @@ export function SubcontractForm({
 
         <div className="space-y-1">
           <Label>Subcontratista *</Label>
-          <Select value={subcontractorId} onValueChange={setSubcontractorId} required>
-            <SelectTrigger><SelectValue placeholder="Seleccionar subcontratista" /></SelectTrigger>
-            <SelectContent>
-              {subcontractorOptions.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.fantasyName ?? c.legalName}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            options={contactsToSearchableOptions(subcontractorOptions)}
+            value={subcontractorId}
+            onValueChange={setSubcontractorId}
+            placeholder="Seleccionar subcontratista…"
+            searchPlaceholder="Buscar subcontratista…"
+            emptyText="Ningún subcontratista coincide."
+          />
         </div>
 
         <div className="space-y-1">
