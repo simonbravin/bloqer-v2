@@ -20,6 +20,7 @@ Traducir la **fuente de verdad funcional** (producto, dominio, finanzas, fórmul
 9. [`EMAIL_NOTIFICATIONS_ARCHITECTURE.md`](./EMAIL_NOTIFICATIONS_ARCHITECTURE.md) — Resend + React Email.
 10. [`I18N_STRATEGY.md`](./I18N_STRATEGY.md) — inglés en código, es-AR en UI.
 11. [`REPORTING_ARCHITECTURE.md`](./REPORTING_ARCHITECTURE.md) — KPIs y reconciliación.
+11b. [`REPORTING_ERD_GUARDRAILS.md`](./REPORTING_ERD_GUARDRAILS.md) — checklist Prisma, baseline vs ejecución (ADR-010).
 12. [`BACKGROUND_JOBS_ARCHITECTURE.md`](./BACKGROUND_JOBS_ARCHITECTURE.md) — jobs y eventos programados.
 13. [`OBSERVABILITY_ARCHITECTURE.md`](./OBSERVABILITY_ARCHITECTURE.md) — logs, métricas, trazas.
 14. [`SECURITY_ARCHITECTURE.md`](./SECURITY_ARCHITECTURE.md) — amenazas y controles.

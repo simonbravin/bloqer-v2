@@ -19,6 +19,17 @@ Confundir subcontrato con OC de materiales o con empleado informal.
 - **SubcontractCertification** + **Payable**: capa **`accrued_amount`** al reconocer obligación ([BR-SUB-003]).
 - Pagos parciales → **`paid_amount`** (caja) vía módulo pagos.
 
+### Baseline APU subcontrato vs contrato operativo
+
+| Capa | Qué es | Cuándo existe |
+|------|--------|----------------|
+| **Baseline** | Líneas APU `SUBCONTRACT` en `CostAnalysisLine` del presupuesto `APPROVED`/`CLOSED` | Al aprobar presupuesto (congelado con el WBS) |
+| **Ejecución** | `Subcontract` + certificaciones + AP/pagos | Cuando el PM **contrata** al subcontratista e imputa WBS |
+
+**No** se crea `Subcontract` automáticamente al aprobar el presupuesto. Las brechas (partida con APU sub > 0 y sin contrato `ACTIVE`) se muestran en reportes **R-SUB-01** / **R-SUB-02** ([`REPORT_CATALOG.md`](../06-reports/REPORT_CATALOG.md)), no como entidades duplicadas.
+
+Trazabilidad opcional futura: `SubcontractLine.costAnalysisLineId` (ver plan hub reportes; requiere ADR antes de migrar).
+
 ## 6. Entidades principales
 - **Subcontract**, **SubcontractCertification**, líneas.
 
@@ -52,7 +63,8 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Subcontract y Subco
 - Subcontrato en moneda USD con obra en ARS: FX por certificación/pago.
 
 ## 14. Reportes relacionados
-- Pagos a subcontratistas, retenciones, comparativo contratado vs ejecutado.
+- Hub proyecto → **Subcontratos**: R-SCC-01 (evolución certificado/pagado), R-SCC-02, R-SUB-02 (varianza por partida); export CSV `/api/reports/proyectos/[id]/subcontratos.csv`.
+- Pagos a subcontratistas, retenciones, comparativo contratado vs ejecutado (ver catálogo).
 
 ## 15. Relación con otros módulos
 - **Directorio**, **Proyectos**, **Pagos**, **Impuestos**.

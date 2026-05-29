@@ -27,8 +27,42 @@
 | R-019 | Dashboard ejecutivo | FIN | KPIs consolidados | 1 |
 | R-020 | Conciliación bancaria | FIN | Estado por cuenta/mes | 1 |
 
+### Extensiones hub proyecto (baseline vs ejecución)
+
+> Read-layer y checklist ERD: [`REPORTING_ERD_GUARDRAILS.md`](../08-architecture/REPORTING_ERD_GUARDRAILS.md) · ADR-010.  
+> Hub UI: `/proyectos/[id]/reportes`. **Impl.** = disponible en código actual.
+
+| ID | Nombre | Área | Descripción breve | Fase | Impl. |
+|---|---|---|---|---|---|
+| R-CERT-01 | Estado cartera certificaciones | PRJ | Certificaciones con `payment_status` derivado (AR/cobranzas) | 1 | Sí |
+| R-CERT-02 | Certificado vs venta presupuestada | OP | Por partida WBS: venta presup. vs acum. certificado | 1 | Sí |
+| R-CERT-03 | Pendiente de certificar | OP | Partidas con venta presup. y saldo pendiente | 1 | Sí |
+| R-AP-01 | Desvío compras por partida | OP | APU **MATERIAL** vs comprometido/devengado por `wbsNodeId` | 1 | Sí |
+| R-AP-02 | Líneas sin imputación WBS | OP | Líneas OC / factura con `wbsNodeId` null | 1 | Sí |
+| R-AP-03 | Resumen por proveedor | OP | Comprometido / devengado / pagado / OC abierta (ext. R-009) | 1 | Sí |
+| R-SCC-01 | Evolución cert. subcontrato | OP | Serie mensual certificado vs pagado | 1 | Sí |
+| R-SCC-02 | Contratado vs certificado | OP | Por `Subcontract` y por partida SUB del APU | 1 | Sí |
+| R-SUB-01 | Brecha SUB sin contrato | OP | Partidas con APU sub y sin `Subcontract` ACTIVE | 1 | Parcial |
+| R-SUB-02 | Varianza SUB por partida | OP | Presup. sub vs contratado / certificado | 1 | Sí |
+| R-MAT-01 | Consumo vs presupuesto material | INV / OP | Consumo/stock vs baseline MAT | 2 | No |
+| R-MAT-02 | APU material sin producto | INV | Líneas MAT sin `product_id` | 2 | No |
+
+**R-001 (hub):** página *Presupuesto vs real* — capas de costo, composición APU, CSV `presupuesto-vs-real.csv`. Reutiliza agregados de control de costos.
+
 ## Filtros globales estándar
 `date_from`, `date_to`, `project_id`, `currency_view` (original | ARS), `company_id` (futuro [Q-001]).
 
+## Rutas API proyecto (CSV / JSON)
+
+| Reporte | Ruta |
+|---------|------|
+| R-001 | `/api/reports/proyectos/[projectId]/presupuesto-vs-real.csv` |
+| R-012, R-CERT-* | `/api/reports/proyectos/[projectId]/certificaciones.csv` |
+| R-AP-01…03 | `/api/reports/proyectos/[projectId]/compras-proveedores.csv` |
+| R-SCC-*, R-SUB-* | `/api/reports/proyectos/[projectId]/subcontratos.csv` |
+| Control costos (detalle) | `/api/reports/proyectos/[projectId]/control-costos.csv` |
+| R-005 | `/api/reports/proyectos/[projectId]/flujo-caja.csv` |
+
 ## Referencias
 - [`EXPORT_FORMATS.md`](./EXPORT_FORMATS.md)
+- [`../08-architecture/REPORTING_ARCHITECTURE.md`](../08-architecture/REPORTING_ARCHITECTURE.md)

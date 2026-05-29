@@ -38,6 +38,23 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 | ADR-009 | UUID PK en todas las entidades ERP; numeración humana en columnas separadas | PROPUESTO |
 | ADR-Phase1-06 | Membresía única `(userId, tenantId)` Phase 1 | ACEPTADO |
 | ADR-Phase1-07 | Ingresos corporativos sin obra: GL + tesorería Phase 1 | ACEPTADO |
+| ADR-010 | Reporting read-layer: agregación on-read sin tablas duplicadas de montos | ACEPTADO |
+
+---
+
+## ADR-010 — Reporting read-layer (baseline vs ejecución)
+
+- **Fecha:** 2026-05-28
+- **Estado:** ACEPTADO
+- **Contexto:** Hub de reportes por proyecto (presupuesto vs real, certificaciones, compras, subcontratos, caja) debe reconciliar con [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md) y el ERD Prisma sin introducir silos de KPIs ni auto-crear subcontratos al aprobar presupuesto.
+- **Decisión:**
+  - **Baseline** = `Budget` `APPROVED`/`CLOSED` + `WbsNode` + `CostItem` + `CostAnalysisLine` (APU por categoría MAT/LAB/EQP/SUB).
+  - **Ejecución** = documentos operativos (`PurchaseOrder`, `SupplierInvoice`, `Payable`, `Payment`, `Subcontract`, `SubcontractCertification`, `Certification`, `SalesInvoice`, `Receivable`, `Collection`, `AccountMovement`).
+  - Servicios en `packages/services/src/reports/` **solo lectura**; export CSV/JSON reutiliza los mismos servicios que la UI.
+  - Derivados (`payment_status`, varianzas, aging): **on-read** salvo ADR futuro explícito para MV/snapshot versionado.
+  - Línea APU `SUBCONTRACT` **no** genera `Subcontract` al aprobar presupuesto; el contrato se registra al contratar.
+- **Consecuencias:** consultas más pesadas aceptables en Fase 1; checklist y tablas fuente en [`REPORTING_ERD_GUARDRAILS.md`](./REPORTING_ERD_GUARDRAILS.md); catálogo ampliado en [`REPORT_CATALOG.md`](../06-reports/REPORT_CATALOG.md).
+- **Referencias funcionales:** [`REPORTING_ARCHITECTURE.md`](./REPORTING_ARCHITECTURE.md), [`02-modules/SUBCONTRACTS.md`](../02-modules/SUBCONTRACTS.md), [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md).
 
 ---
 

@@ -57,7 +57,12 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Certification.
 - Anticipos financieros vs certificación física: documentar en notas.
 
 ## 14. Reportes relacionados
-- Evolución certificados, certificado vs cobrado, aging AR.
+- Hub proyecto → **Certificaciones**: R-012 (serie mensual certificado / facturado / cobrado), R-002 (curvas de avance), R-CERT-01/02/03; `payment_status` **derivado** de AR/cobranzas ([BR-CERT-007]); export CSV `certificaciones.csv`.
+- Aging AR (R-007) en finanzas / cuentas por cobrar del proyecto.
+
+### Baseline venta vs certificado
+
+La **venta presupuestada** por ítem (`CostItem`) es baseline; el **certificado acumulado** viene de `CertificationLine`. R-CERT-02 compara ambos por partida WBS sin duplicar montos en otra tabla.
 
 ## 15. Relación con otros módulos
 - **Presupuestos**, **Ventas/Facturación**, **Tesorería/Cobranzas**, **Contratos**.

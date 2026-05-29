@@ -50,3 +50,4 @@ Estos deben **reconciliar** con el ledger: totales de caja vs suma de `account_m
 - [`../06-reports/REPORT_CATALOG.md`](../06-reports/REPORT_CATALOG.md)  
 - [`../04-formulas/DASHBOARD_KPI_FORMULAS.md`](../04-formulas/DASHBOARD_KPI_FORMULAS.md)  
 - [`REPORTING_ARCHITECTURE.md`](./REPORTING_ARCHITECTURE.md)
+- [`REPORTING_ERD_GUARDRAILS.md`](./REPORTING_ERD_GUARDRAILS.md) — checklist y tablas fuente vs prohibidas (ADR-010)

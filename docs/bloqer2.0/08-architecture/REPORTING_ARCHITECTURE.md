@@ -9,6 +9,7 @@ Los **reportes y dashboards** deben **reconciliar** contra **datos fuente** del 
 - El producto separa **comprometido / devengado / pagado / cashflow** ([`../00-product/PRODUCT_PRINCIPLES.md`](../00-product/PRODUCT_PRINCIPLES.md) §7, [`../04-formulas/COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md)); los reportes incorrectos destruyen confianza.
 - **Rentabilidad sensible** ([D-013](../00-product/DECISION_LOG.md)) exige servidor autoritativo.
 - Catálogo de reportes ya definido ([`../06-reports/REPORT_CATALOG.md`](../06-reports/REPORT_CATALOG.md)).
+- Guardrails ERD y checklist Prisma: [`REPORTING_ERD_GUARDRAILS.md`](./REPORTING_ERD_GUARDRAILS.md) (**ADR-010**).
 
 ## Problemas que evita
 
@@ -118,6 +119,10 @@ Filtros: **mismos query params** que las páginas de reporte (p. ej. `currency`,
 - `/api/reports/inventario/stock.csv`
 - `/api/reports/inventario/movimientos.csv`
 - `/api/reports/proyectos/[projectId]/control-costos.csv`
+- `/api/reports/proyectos/[projectId]/presupuesto-vs-real.csv` (R-001)
+- `/api/reports/proyectos/[projectId]/certificaciones.csv` (R-012, R-CERT-*)
+- `/api/reports/proyectos/[projectId]/compras-proveedores.csv` (R-AP-01…03)
+- `/api/reports/proyectos/[projectId]/subcontratos.csv` (R-SCC-*, R-SUB-*)
 - `/api/reports/proyectos/[projectId]/flujo-caja.csv`
 
 **Respuesta CSV:** `Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment` con nombre saneado.
