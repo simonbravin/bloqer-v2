@@ -41,6 +41,23 @@ export const createPaymentSchema = z.object({
   notes:       z.string().optional().nullable(),
 });
 
+
+
+export const payNowSchema = z.object({
+  accountId:   z.string().uuid(),
+  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  amount:      z.string().regex(/^\d+(\.\d+)?$/, "Monto invalido").optional(),
+  notes:       z.string().optional().nullable(),
+});
+
+/** Corporate AP composite flow. */
+export const registerApExpenseSchema = createSupplierInvoiceSchema
+  .omit({ projectId: true, purchaseOrderId: true })
+  .extend({
+    payNow: payNowSchema.optional(),
+  });
+
 export type CreateSupplierInvoiceInput = z.infer<typeof createSupplierInvoiceSchema>;
 export type UpdateSupplierInvoiceInput = z.infer<typeof updateSupplierInvoiceSchema>;
 export type CreatePaymentInput         = z.infer<typeof createPaymentSchema>;
+export type RegisterApExpenseInput     = z.infer<typeof registerApExpenseSchema>;

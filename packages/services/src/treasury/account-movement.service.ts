@@ -3,6 +3,7 @@ import { can } from "@bloqer/domain";
 import { log } from "../audit/audit.service";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { assertCanCancelAccountMovement } from "./account-movement-cancel-guards";
 
 export type AccountMovementView = Omit<AccountMovement, "amount"> & {
   amount: string;
@@ -57,21 +58,11 @@ export async function cancelAccountMovement(
   const m = await prisma.accountMovement.findUnique({ where: { id } });
   if (!m) throw new ServiceError("NOT_FOUND", "Movimiento no encontrado");
   if (m.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (m.status !== "CONFIRMED") {
-    throw new ServiceError("CONFLICT", `El movimiento en estado "${m.status}" no puede cancelarse directamente`);
-  }
-  if (m.transferId) {
-    throw new ServiceError(
-      "CONFLICT",
-      "Este movimiento pertenece a una transferencia interna. Cancele la transferencia en su lugar.",
-    );
-  }
-  if (m.sourceType === "COLLECTION") {
-    throw new ServiceError(
-      "CONFLICT",
-      "Este movimiento fue generado por una cobranza. Cancele la cobranza en su lugar.",
-    );
-  }
+  assertCanCancelAccountMovement({
+    status: m.status,
+    sourceType: m.sourceType,
+    transferId: m.transferId,
+  });
 
   const updated = await prisma.accountMovement.update({
     where: { id },

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
+import { Pagination } from "@/components/ui/pagination";
 import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
@@ -11,15 +12,20 @@ import { getCurrentUser } from "@/lib/auth";
 import { getProjectShellInfo, listCollectionsByProject, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
+const PAGE_SIZE = 20;
+
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ page?: string }>;
 }
 
-export default async function CobranzasPage({ params }: PageProps) {
+export default async function CobranzasPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id } = await params;
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page ?? 1));
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -36,13 +42,16 @@ export default async function CobranzasPage({ params }: PageProps) {
     throw err;
   }
 
-  let collections;
+  let collectionsResult;
   try {
-    collections = await listCollectionsByProject(id, ctx);
+    collectionsResult = await listCollectionsByProject(id, ctx, { page, pageSize: PAGE_SIZE });
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
   }
+
+  const collections = collectionsResult.data;
+  const collectionsTotal = collectionsResult.total;
 
   const items: CollectionListItem[] = collections.map((c) => ({
     id: c.id,
@@ -61,7 +70,7 @@ export default async function CobranzasPage({ params }: PageProps) {
         projectId={id}
         projectName={project.name}
         title="Cobranzas"
-        subtitle={`${items.length} ${items.length === 1 ? "cobranza" : "cobranzas"}`}
+        subtitle={`${collectionsTotal} ${collectionsTotal === 1 ? "cobranza" : "cobranzas"}`}
         actions={
           <>
             <Suspense fallback={null}>
@@ -76,6 +85,10 @@ export default async function CobranzasPage({ params }: PageProps) {
 
       <Suspense fallback={<ListSectionSkeleton />}>
         <CollectionListSection collections={items} projectId={id} />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <Pagination page={page} pageSize={PAGE_SIZE} total={collectionsTotal} />
       </Suspense>
     </PageShell>
   );

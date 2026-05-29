@@ -5,9 +5,12 @@ import type {
   UpdateSalesInvoiceInput,
 } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
+import { assertCanCancelSalesInvoice } from "./sales-invoice-cancel-guards";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea, canViewArProjectArea } from "./ar-access";
+import { resolvePagination } from "../finance/pagination";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
 
 // ─── View types ───────────────────────────────────────────────────────────────
@@ -82,10 +85,18 @@ export async function getActiveInvoiceForCertification(
   return { id: inv.id, code: `FAC-${String(inv.number).padStart(5, "0")}` };
 }
 
+export type ProjectSalesInvoiceListFilters = {
+  page?: number;
+  pageSize?: number;
+};
+
+export type ProjectSalesInvoiceListRow = Omit<SalesInvoiceWithLines, "lines">;
+
 export async function listInvoicesByProject(
   projectId: string,
   ctx: ServiceContext,
-): Promise<SalesInvoiceWithLines[]> {
+  filters?: ProjectSalesInvoiceListFilters,
+): Promise<{ data: ProjectSalesInvoiceListRow[]; total: number }> {
   await assertArTenantModule(ctx);
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas");
@@ -94,18 +105,47 @@ export async function listInvoicesByProject(
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
-  const invoices = await prisma.salesInvoice.findMany({
-    where: { projectId, tenantId: ctx.tenantId },
-    include: {
-      lines: { orderBy: { sortOrder: "asc" } },
-      clientContact: { select: { legalName: true, fantasyName: true } },
-    },
-    orderBy: { number: "asc" },
+  const { skip, take } = resolvePagination({
+    page: filters?.page,
+    pageSize: filters?.pageSize,
   });
-  return invoices.map(serializeInvoice);
+
+  const where = { projectId, tenantId: ctx.tenantId };
+
+  const [invoices, total] = await Promise.all([
+    prisma.salesInvoice.findMany({
+      where,
+      include: {
+        clientContact: { select: { legalName: true, fantasyName: true } },
+      },
+      orderBy: [{ number: "asc" }, { id: "asc" }],
+      skip,
+      take,
+    }),
+    prisma.salesInvoice.count({ where }),
+  ]);
+  return { data: invoices.map(serializeInvoiceListRow), total };
 }
 
 // ─── Resolve company ──────────────────────────────────────────────────────────
+
+
+export async function countOpenSalesInvoicesByProject(
+  projectId: string,
+  ctx: ServiceContext,
+): Promise<number> {
+  await assertArTenantModule(ctx);
+  if (!canViewArProjectArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de venta");
+  }
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+
+  return prisma.salesInvoice.count({
+    where: { projectId, tenantId: ctx.tenantId, status: "ISSUED" },
+  });
+}
 
 async function resolveCompanyId(projectId: string, ctx: ServiceContext): Promise<string> {
   if (ctx.companyId) return ctx.companyId;
@@ -439,11 +479,43 @@ export async function cancelSalesInvoice(id: string, ctx: ServiceContext): Promi
       throw new ServiceError("CONFLICT", "La factura ya está anulada");
     }
 
-    // BR-AR-004: cascade cancel linked Receivable
-    await tx.receivable.updateMany({
-      where: { salesInvoiceId: id, status: { not: "CANCELLED" } },
+    const activeCollectionCount =
+      inv.status === "ISSUED"
+        ? await tx.collection.count({
+            where: { salesInvoiceId: id, status: "CONFIRMED", tenantId: ctx.tenantId },
+          })
+        : 0;
+    const receivable =
+      inv.status === "ISSUED"
+        ? await tx.receivable.findUnique({
+            where: { salesInvoiceId: id },
+            select: { paidAmount: true },
+          })
+        : null;
+    assertCanCancelSalesInvoice({
+      status: inv.status,
+      hasReceivable: receivable != null,
+      activeCollectionCount,
+      receivablePaidAmount: receivable?.paidAmount ?? null,
+    });
+
+    // BR-AR-004: cascade cancel linked Receivable (optimistic lock on paidAmount)
+    const receivableCancel = await tx.receivable.updateMany({
+      where: {
+        salesInvoiceId: id,
+        status: { not: "CANCELLED" },
+        ...(inv.status === "ISSUED" && receivable
+          ? { paidAmount: receivable.paidAmount }
+          : {}),
+      },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
     });
+    if (inv.status === "ISSUED" && receivable) {
+      assertOptimisticRowUpdate(
+        receivableCancel.count,
+        "El saldo cambió mientras anulabas la factura. Revisá cobranzas e intentá de nuevo.",
+      );
+    }
 
     return tx.salesInvoice.update({
       where: { id },
@@ -465,6 +537,21 @@ export async function cancelSalesInvoice(id: string, ctx: ServiceContext): Promi
 }
 
 // ─── Serialization ────────────────────────────────────────────────────────────
+
+type RawInvoiceListRow = SalesInvoice & {
+  clientContact: { legalName: string; fantasyName: string | null };
+};
+
+function serializeInvoiceListRow(inv: RawInvoiceListRow): ProjectSalesInvoiceListRow {
+  return {
+    ...inv,
+    code: `FAC-${String(inv.number).padStart(5, "0")}`,
+    clientName: inv.clientContact.fantasyName ?? inv.clientContact.legalName,
+    subtotal: inv.subtotal.toString(),
+    taxAmount: inv.taxAmount.toString(),
+    totalAmount: inv.totalAmount.toString(),
+  };
+}
 
 type RawInvoice = SalesInvoice & {
   lines: Array<{

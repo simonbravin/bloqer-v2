@@ -380,9 +380,9 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
       href:        "/finanzas/facturas-proveedor",
     });
     reportLinks.push({
-      label:       "Pagos pendientes (empresa)",
-      description: "Obligaciones sin proyecto.",
-      href:        "/finanzas/cuentas-por-pagar",
+      label:       "Transacciones — obligaciones",
+      description: "Obligaciones de empresa sin proyecto.",
+      href:        "/finanzas/transacciones?tab=obligaciones",
     });
   }
   if (trMod && trPerm) {
@@ -500,6 +500,9 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
 
   const quickActions: FinanceHubQuickAction[] = [];
   const qaSeen = new Set<string>();
+  if ((apMod && apPerm) || (trMod && trPerm)) {
+    pushUniqueQuickAction(quickActions, { label: "Transacciones", href: "/finanzas/transacciones" }, qaSeen);
+  }
   if (arMod && arPerm) {
     pushUniqueQuickAction(quickActions, { label: "Cuentas por cobrar", href: "/finanzas/cuentas-por-cobrar-aging" }, qaSeen);
   }
@@ -514,7 +517,6 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
       { label: "Nueva factura (empresa)", href: "/finanzas/facturas-proveedor/nueva" },
       qaSeen,
     );
-    pushUniqueQuickAction(quickActions, { label: "Pagos pendientes", href: "/finanzas/cuentas-por-pagar" }, qaSeen);
     pushUniqueQuickAction(quickActions, { label: "Cuentas por pagar", href: "/finanzas/cuentas-por-pagar-aging" }, qaSeen);
     pushUniqueQuickAction(quickActions, { label: "Facturas y gastos", href: "/finanzas/facturas-proveedor" }, qaSeen);
   }

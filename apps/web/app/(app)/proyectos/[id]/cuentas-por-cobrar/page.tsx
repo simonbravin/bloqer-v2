@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
+import { Pagination } from "@/components/ui/pagination";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
@@ -9,15 +10,20 @@ import { getCurrentUser } from "@/lib/auth";
 import { getProjectShellInfo, listReceivablesByProject, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
+const PAGE_SIZE = 20;
+
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ page?: string }>;
 }
 
-export default async function CuentasPorCobrarPage({ params }: PageProps) {
+export default async function CuentasPorCobrarPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id } = await params;
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page ?? 1));
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -34,13 +40,16 @@ export default async function CuentasPorCobrarPage({ params }: PageProps) {
     throw err;
   }
 
-  let receivables;
+  let receivablesResult;
   try {
-    receivables = await listReceivablesByProject(id, ctx);
+    receivablesResult = await listReceivablesByProject(id, ctx, { page, pageSize: PAGE_SIZE });
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
   }
+
+  const receivables = receivablesResult.data;
+  const receivablesTotal = receivablesResult.total;
 
   const items: ReceivableListItem[] = receivables.map((r) => ({
     id: r.id,
@@ -61,7 +70,7 @@ export default async function CuentasPorCobrarPage({ params }: PageProps) {
         projectId={id}
         projectName={project.name}
         title="Cuentas por cobrar"
-        subtitle={`${items.length} ${items.length === 1 ? "cuenta" : "cuentas"}`}
+        subtitle={`${receivablesTotal} ${receivablesTotal === 1 ? "cuenta" : "cuentas"}`}
         actions={
           <Suspense fallback={null}>
             <ListViewToggle storageKey={`cuentas-por-cobrar-${id}`} />
@@ -71,6 +80,10 @@ export default async function CuentasPorCobrarPage({ params }: PageProps) {
 
       <Suspense fallback={<ListSectionSkeleton />}>
         <ReceivableListSection receivables={items} projectId={id} />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <Pagination page={page} pageSize={PAGE_SIZE} total={receivablesTotal} />
       </Suspense>
     </PageShell>
   );

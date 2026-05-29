@@ -3,11 +3,11 @@ import type { PermissionModule } from "@bloqer/domain";
 import { can, type UserRole } from "@bloqer/domain";
 import { getPayableAgingReport, getReceivableAgingReport } from "../aging/aging.service";
 import { canEditArArea, canViewArProjectArea } from "../ar/ar-access";
-import { listInvoicesByProject } from "../ar/sales-invoice.service";
-import { listReceivablesByProject } from "../ar/receivable.service";
+import { countOpenSalesInvoicesByProject } from "../ar/sales-invoice.service";
+import { summarizeReceivablesByProject } from "../ar/receivable.service";
 import { canViewApProjectArea } from "../ap/ap-access";
-import { listPayablesByProject } from "../ap/payable.service";
-import { listSupplierInvoicesByProject } from "../ap/supplier-invoice.service";
+import { countOpenSupplierInvoicesByProject } from "../ap/supplier-invoice.service";
+import { summarizePayablesByProject } from "../ap/payable.service";
 import { canViewBudgetsArea, listBudgetsByProject } from "../budget/budget.service";
 import { canViewProjectCostControlReport } from "../cost-control/cost-control.service";
 import { getProjectShellInfo } from "../project/project.service";
@@ -107,46 +107,6 @@ function moneyRowsFromMap(m: Map<string, Prisma.Decimal>): ProjectFinanceMoneyBy
     .sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
-function aggregateReceivablesFromList(
-  rows: Awaited<ReturnType<typeof listReceivablesByProject>>,
-): { total: Map<string, Prisma.Decimal>; overdue: Map<string, Prisma.Decimal> } {
-  const total = new Map<string, Prisma.Decimal>();
-  const overdue = new Map<string, Prisma.Decimal>();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  for (const r of rows) {
-    if (r.status === "PAID" || r.status === "CANCELLED") continue;
-    const bal = new Prisma.Decimal(r.balanceDue);
-    if (bal.lessThanOrEqualTo(ZERO)) continue;
-    const cur = r.currency;
-    total.set(cur, (total.get(cur) ?? ZERO).add(bal));
-    const due = new Date(r.dueDate);
-    due.setHours(0, 0, 0, 0);
-    if (due < today) overdue.set(cur, (overdue.get(cur) ?? ZERO).add(bal));
-  }
-  return { total, overdue };
-}
-
-function aggregatePayablesFromList(
-  rows: Awaited<ReturnType<typeof listPayablesByProject>>,
-): { total: Map<string, Prisma.Decimal>; overdue: Map<string, Prisma.Decimal> } {
-  const total = new Map<string, Prisma.Decimal>();
-  const overdue = new Map<string, Prisma.Decimal>();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  for (const p of rows) {
-    if (p.status === "PAID" || p.status === "CANCELLED") continue;
-    const bal = new Prisma.Decimal(p.balanceDue);
-    if (bal.lessThanOrEqualTo(ZERO)) continue;
-    const cur = p.currency;
-    total.set(cur, (total.get(cur) ?? ZERO).add(bal));
-    const due = new Date(p.dueDate);
-    due.setHours(0, 0, 0, 0);
-    if (due < today) overdue.set(cur, (overdue.get(cur) ?? ZERO).add(bal));
-  }
-  return { total, overdue };
-}
-
 function pushUniqueQuickAction(
   out: ProjectFinanceQuickAction[],
   seen: Set<string>,
@@ -219,17 +179,15 @@ export async function getProjectFinanceOverview(
               amount: t.totalOverdue,
             }));
         } else {
-          const list = await listReceivablesByProject(projectId, ctx);
-          const { total, overdue } = aggregateReceivablesFromList(list);
-          totalReceivableByCurrency = moneyRowsFromMap(total);
-          overdueByCurrency         = moneyRowsFromMap(overdue);
+          const summary = await summarizeReceivablesByProject(projectId, ctx);
+          totalReceivableByCurrency = summary.totalByCurrency;
+          overdueByCurrency = summary.overdueByCurrency;
         }
       } catch {
         warnings.push({ module: "AR", section: "ar", reason: "NO_DATA" });
       }
 
-      const invoices = await listInvoicesByProject(projectId, ctx);
-      const openInvoicesCount = invoices.filter((i) => i.status === "ISSUED").length;
+      const openInvoicesCount = await countOpenSalesInvoicesByProject(projectId, ctx);
 
       sections.ar = {
         enabled: true,
@@ -290,17 +248,15 @@ export async function getProjectFinanceOverview(
               amount: t.totalOverdue,
             }));
         } else {
-          const list = await listPayablesByProject(projectId, ctx);
-          const { total, overdue } = aggregatePayablesFromList(list);
-          totalPayableByCurrency = moneyRowsFromMap(total);
-          overdueByCurrency      = moneyRowsFromMap(overdue);
+          const summary = await summarizePayablesByProject(projectId, ctx);
+          totalPayableByCurrency = summary.totalByCurrency;
+          overdueByCurrency = summary.overdueByCurrency;
         }
       } catch {
         warnings.push({ module: "AP", section: "ap", reason: "NO_DATA" });
       }
 
-      const supplierInvoices = await listSupplierInvoicesByProject(projectId, ctx);
-      const openSupplierInvoicesCount = supplierInvoices.filter((i) => i.status === "ISSUED").length;
+      const openSupplierInvoicesCount = await countOpenSupplierInvoicesByProject(projectId, ctx);
 
       sections.ap = {
         enabled: true,

@@ -2,6 +2,8 @@ import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { DEFAULT_CASH_DATE_RANGE_DAYS, defaultDateRangeDays, MAX_CORPORATE_PAYMENT_FILTER_IDS, resolvePagination } from "../finance/pagination";
+import { getAccountBalance, getAccountBalanceAsOf } from "../treasury/balance.service";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -118,6 +120,7 @@ export type CashPositionFilters = {
 
 export type MovementReportFilters = {
   accountId?:               string;
+  companyId?:               string;
   dateFrom?:                string;
   dateTo?:                  string;
   type?:                    string;
@@ -126,6 +129,13 @@ export type MovementReportFilters = {
   includeInternalTransfers?: boolean;
   /** When true: only `PAYMENT` movements whose source payment has `projectId` null (corporate AP outflows). */
   corporateApPaymentsOnly?: boolean;
+  page?:                    number;
+  pageSize?:                number;
+};
+
+export type MovementReportResult = {
+  rows: MovementReportRow[];
+  total: number;
 };
 
 export type CashFlowFilters = {
@@ -158,14 +168,7 @@ export async function getCashPositionReport(
 
   const accountRows: CashPositionAccount[] = [];
   for (const acc of accounts) {
-    const movements = await prisma.accountMovement.findMany({
-      where: { accountId: acc.id, status: "CONFIRMED" },
-      select: { type: true, amount: true },
-    });
-    const balance = movements.reduce(
-      (sum, m) => sum.plus(signedAmount(m.type as string, m.amount)),
-      acc.openingBalance,
-    );
+    const balance = await getAccountBalance(acc.id);
     accountRows.push({
       accountId:   acc.id,
       name:        acc.name,
@@ -218,29 +221,51 @@ export async function getCashPositionReport(
 export async function getAccountMovementReport(
   filters: MovementReportFilters,
   ctx: ServiceContext,
-): Promise<MovementReportRow[]> {
+): Promise<MovementReportResult> {
   await assertTreasuryTenantModule(ctx);
   if (!can(ctx.roles, "VIEW", "TREASURY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver movimientos");
   }
 
+  const paginated = filters.page !== undefined || filters.pageSize !== undefined;
+  const { page, pageSize, skip, take } = resolvePagination(
+    paginated ? { page: filters.page, pageSize: filters.pageSize } : undefined,
+  );
+
+  let dateFrom = filters.dateFrom;
+  let dateTo = filters.dateTo;
+  if (paginated && (!dateFrom || !dateTo)) {
+    const defaults = defaultDateRangeDays(DEFAULT_CASH_DATE_RANGE_DAYS);
+    dateFrom = dateFrom ?? defaults.dateFrom;
+    dateTo = dateTo ?? defaults.dateTo;
+  }
+
+  const companyId = filters.companyId ?? ctx.companyId ?? undefined;
+
   let corporatePaymentIds: string[] | undefined;
   if (filters.corporateApPaymentsOnly) {
+    const paymentWhere = {
+      tenantId: ctx.tenantId,
+      projectId: null as null,
+      ...(companyId ? { companyId } : {}),
+    };
+    const paymentCount = await prisma.payment.count({ where: paymentWhere });
+    if (paymentCount === 0) {
+      return { rows: [], total: 0 };
+    }
+    if (paymentCount > MAX_CORPORATE_PAYMENT_FILTER_IDS) {
+      throw new ServiceError(
+        "VALIDATION",
+        "Demasiados pagos corporativos para filtrar. Acotá el rango de fechas o usá Tesorería.",
+      );
+    }
     const pays = await prisma.payment.findMany({
-      where: {
-        tenantId: ctx.tenantId,
-        projectId: null,
-        ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
-      },
+      where: paymentWhere,
       select: { id: true },
     });
     corporatePaymentIds = pays.map((p) => p.id);
-    if (corporatePaymentIds.length === 0) {
-      return [];
-    }
   }
 
-  // Tenant-guard for accountId
   if (filters.accountId) {
     const acc = await prisma.treasuryAccount.findUnique({
       where: { id: filters.accountId },
@@ -251,79 +276,75 @@ export async function getAccountMovementReport(
     }
   }
 
-  const rows = await prisma.accountMovement.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      status:   "CONFIRMED",
-      ...(filters.accountId  ? { accountId:  filters.accountId              } : {}),
-      ...(filters.currency   ? { currency:   filters.currency               } : {}),
-      ...(filters.type       ? { type:       filters.type as never          } : {}),
-      ...(filters.sourceType ? { sourceType: filters.sourceType as never    } : {}),
-      ...(filters.corporateApPaymentsOnly
-        ? { sourceType: "PAYMENT", sourceId: { in: corporatePaymentIds! } }
-        : {}),
-      ...(filters.includeInternalTransfers === false ? { transferId: null } : {}),
-      ...((filters.dateFrom || filters.dateTo) ? {
-        movementDate: {
-          ...(filters.dateFrom ? { gte: new Date(filters.dateFrom) } : {}),
-          ...(filters.dateTo   ? { lte: new Date(filters.dateTo)   } : {}),
-        },
-      } : {}),
-    },
-    include: { account: { select: { name: true } } },
-    orderBy: [{ movementDate: "asc" }, { createdAt: "asc" }],
-  });
+  const where: Prisma.AccountMovementWhereInput = {
+    tenantId: ctx.tenantId,
+    status: "CONFIRMED",
+    ...(filters.accountId ? { accountId: filters.accountId } : {}),
+    ...(filters.currency ? { currency: filters.currency } : {}),
+    ...(filters.type ? { type: filters.type as never } : {}),
+    ...(filters.sourceType ? { sourceType: filters.sourceType as never } : {}),
+    ...(filters.corporateApPaymentsOnly
+      ? { sourceType: "PAYMENT", sourceId: { in: corporatePaymentIds! } }
+      : {}),
+    ...(filters.includeInternalTransfers === false ? { transferId: null } : {}),
+    ...(dateFrom || dateTo
+      ? {
+          movementDate: {
+            ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+            ...(dateTo ? { lte: new Date(dateTo) } : {}),
+          },
+        }
+      : {}),
+    ...(companyId ? { account: { companyId } } : {}),
+  };
 
-  // Compute opening balance for single-account running balance
+  const orderBy = paginated
+    ? ([{ movementDate: "desc" as const }, { id: "desc" as const }] as const)
+    : ([{ movementDate: "asc" as const }, { createdAt: "asc" as const }] as const);
+
+  const [rawRows, total] = await Promise.all([
+    prisma.accountMovement.findMany({
+      where,
+      include: { account: { select: { name: true } } },
+      orderBy: [...orderBy],
+      ...(paginated ? { skip, take } : {}),
+    }),
+    paginated ? prisma.accountMovement.count({ where }) : Promise.resolve(0),
+  ]);
+
   let runningBalance: Prisma.Decimal | undefined;
-  if (filters.accountId) {
-    const acc = await prisma.treasuryAccount.findUnique({
-      where: { id: filters.accountId },
-      select: { openingBalance: true },
-    });
-    const base = acc?.openingBalance ?? new Prisma.Decimal(0);
-    if (filters.dateFrom) {
-      const pre = await prisma.accountMovement.findMany({
-        where: {
-          accountId: filters.accountId,
-          status: "CONFIRMED",
-          movementDate: { lt: new Date(filters.dateFrom) },
-        },
-        select: { type: true, amount: true },
-      });
-      runningBalance = pre.reduce(
-        (s, m) => s.plus(signedAmount(m.type as string, m.amount)),
-        base,
-      );
-    } else {
-      runningBalance = base;
-    }
+  if (!paginated && filters.accountId) {
+    runningBalance = await getAccountBalanceAsOf(
+      filters.accountId,
+      dateFrom ? { beforeDate: new Date(dateFrom) } : undefined,
+    );
   }
 
-  return rows.map((m) => {
-    // ADJUSTMENT sign is unknown — display raw stored amount; omit from running balance
-    const isAdj  = m.type === "ADJUSTMENT";
+  const rows = rawRows.map((m) => {
+    const isAdj = m.type === "ADJUSTMENT";
     const signed = isAdj ? m.amount : signedAmount(m.type as string, m.amount);
     if (runningBalance !== undefined && !isAdj) {
       runningBalance = runningBalance.plus(signed);
     }
     return {
-      id:                 m.id,
-      accountId:          m.accountId,
-      accountName:        m.account.name,
-      movementDate:       m.movementDate.toISOString().slice(0, 10),
-      type:               m.type as string,
-      sourceType:         m.sourceType as string,
-      sourceLabel:        SOURCE_LABELS[m.sourceType as string] ?? m.sourceType,
-      amount:             m.amount.toString(),
-      signedAmount:       signed.toString(),
-      currency:           m.currency,
-      description:        m.description,
-      transferId:         m.transferId,
+      id: m.id,
+      accountId: m.accountId,
+      accountName: m.account.name,
+      movementDate: m.movementDate.toISOString().slice(0, 10),
+      type: m.type as string,
+      sourceType: m.sourceType as string,
+      sourceLabel: SOURCE_LABELS[m.sourceType as string] ?? m.sourceType,
+      amount: m.amount.toString(),
+      signedAmount: signed.toString(),
+      currency: m.currency,
+      description: m.description,
+      transferId: m.transferId,
       isInternalTransfer: m.transferId !== null,
       ...(runningBalance !== undefined ? { runningBalance: runningBalance.toString() } : {}),
     };
   });
+
+  return { rows, total: paginated ? total : rows.length };
 }
 
 // ─── Cash Flow Report ─────────────────────────────────────────────────────────
@@ -375,25 +396,13 @@ export async function getCashFlowReport(
     const currAccounts = allAccounts.filter((a) => a.currency === currency);
     const accountIds   = currAccounts.map((a) => a.id);
 
-    // Balance as of startDate (pre-period)
-    const baseBalance = currAccounts.reduce(
-      (s, a) => s.plus(a.openingBalance),
-      new Prisma.Decimal(0),
-    );
-    const preMovements = await prisma.accountMovement.findMany({
-      where: {
-        tenantId:    ctx.tenantId,
-        currency,
-        status:      "CONFIRMED",
-        accountId:   { in: accountIds },
-        movementDate: { lt: startDate },
-      },
-      select: { type: true, amount: true },
-    });
-    const openingBalance = preMovements.reduce(
-      (s, m) => s.plus(signedAmount(m.type as string, m.amount)),
-      baseBalance,
-    );
+    // Balance as of startDate (pre-period, P-TRZ-06 safe per account)
+    let openingBalance = new Prisma.Decimal(0);
+    for (const acc of currAccounts) {
+      openingBalance = openingBalance.plus(
+        await getAccountBalanceAsOf(acc.id, { beforeDate: startDate }),
+      );
+    }
 
     // Bucket movements in range
     type BucketAcc = {

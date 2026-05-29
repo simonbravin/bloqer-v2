@@ -37,6 +37,20 @@ export const updateSalesInvoiceSchema = z.object({
   internalNotes: z.string().optional().nullable(),
 });
 
+
+
+export const collectNowSchema = z.object({
+  accountId:      z.string().uuid(),
+  collectionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  amount:         z.string().regex(/^\d+(\.\d+)?$/, "Monto invalido").optional(),
+  notes:          z.string().optional().nullable(),
+});
+
+export const registerArSaleSchema = createSalesInvoiceSchema.extend({
+  collectNow: collectNowSchema.optional(),
+});
+
 export type CreateSalesInvoiceInput          = z.infer<typeof createSalesInvoiceSchema>;
 export type CreateInvoiceFromCertificationInput = z.infer<typeof createInvoiceFromCertificationSchema>;
 export type UpdateSalesInvoiceInput          = z.infer<typeof updateSalesInvoiceSchema>;
+export type RegisterArSaleInput                = z.infer<typeof registerArSaleSchema>;

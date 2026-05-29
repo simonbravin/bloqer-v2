@@ -46,7 +46,7 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
   return (
     <PageShell variant="form" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href="/finanzas/cuentas-por-pagar" label="Cuentas por pagar empresa" />
+        <PageBackLink href="/finanzas/pagos-proveedor" label="Pagos a proveedor" />
         <h1 className="text-2xl font-bold tracking-tight">Pago (empresa)</h1>
         <Badge variant={isConfirmed ? "default" : "destructive"}>
           {isConfirmed ? "Confirmado" : "Cancelado"}

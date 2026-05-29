@@ -18,8 +18,10 @@ export interface KpiStatCardProps {
   value: string;
   href?: string;
   tone?: KpiStatTone;
-  /** Secondary metric line (e.g. currency code), not explanatory helper text. */
+  /** Secondary metric line (e.g. currency code). */
   subtitle?: string;
+  /** Explanatory helper below the value. */
+  helper?: string;
   variant?: "default" | "highlight";
   className?: string;
 }
@@ -30,6 +32,7 @@ export function KpiStatCard({
   href,
   tone = "default",
   subtitle,
+  helper,
   variant = "default",
   className,
 }: KpiStatCardProps) {
@@ -57,6 +60,7 @@ export function KpiStatCard({
           {value}
         </p>
         {subtitle ? <p className="text-xs text-muted-foreground">{subtitle}</p> : null}
+        {helper ? <p className="text-xs leading-snug text-muted-foreground/90">{helper}</p> : null}
       </CardContent>
     </Card>
   );

@@ -4,15 +4,17 @@ import { CollectionForm } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
-import { listReceivablesByProject, listTreasuryAccounts, ServiceError } from "@bloqer/services";
+import {
+  listCollectibleReceivablesByProject,
+  listTreasuryAccounts,
+  ServiceError,
+} from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ receivableId?: string }>;
 }
-
-const OPEN_STATUSES = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
 
 export default async function NuevaCobranzaPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
@@ -28,23 +30,25 @@ export default async function NuevaCobranzaPage({ params, searchParams }: PagePr
     roles: current.tenantCtx.roles,
   };
 
-  let receivables;
+  let openReceivables;
   let allAccounts;
   try {
     const [receivablesResult, accountsResult] = await Promise.all([
-      listReceivablesByProject(id, ctx),
+      listCollectibleReceivablesByProject(id, ctx),
       listTreasuryAccounts(ctx),
     ]);
-    receivables = receivablesResult;
+    openReceivables = receivablesResult;
     allAccounts = accountsResult.data;
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
   }
 
-  const openReceivables = receivables.filter((r) => OPEN_STATUSES.has(r.status));
   const activeAccounts = allAccounts
-    .filter((a) => a.status === "ACTIVE")
+    .filter(
+      (a) =>
+        a.status === "ACTIVE" && (!ctx.companyId || !a.companyId || a.companyId === ctx.companyId),
+    )
     .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
 
   const selected = preSelectedId

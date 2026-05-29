@@ -69,6 +69,21 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 
 ---
 
+## ADR-012 — Transacciones UX: modelo documental + guards de integridad (Fase 0)
+
+- **Fecha:** 2026-05-29
+- **Estado:** ACEPTADO
+- **Contexto:** Plan unificado Finanzas → Transacciones sobre el modelo v2 existente (`SalesInvoice`, `SupplierInvoice`, `Receivable`, `Payable`, `Collection`, `Payment`, `AccountMovement`, `JournalEntry`). Revisión de código detectó huecos de cancelación y lost-update en cobros/pagos concurrentes. El schema documenta que `AccountMovement.projectId` no debe duplicar la verdad de la fuente ([`schema.prisma`](../../../packages/database/prisma/schema.prisma) ~L1473).
+- **Decisión:**
+  - **No** crear entidad genérica `Transaction` en Prisma; la UX de Transacciones es capa de lectura/composición sobre documentos tipados.
+  - **Cancel guards simétricos:** `cancelSalesInvoice` bloquea anulación de facturas `ISSUED` con cobranzas `CONFIRMED` o `receivable.paidAmount > 0` (espeja `cancelSupplierInvoice` en AP). `cancelAccountMovement` bloquea movimientos con `sourceType` `COLLECTION`, `PAYMENT` u `OPENING_BALANCE`, y movimientos con `transferId` — reversión solo vía agregado (`cancelCollection`, `cancelPayment`, transferencia).
+  - **Concurrencia optimista** en `createPayment` / `createCollection` y todas las cancelaciones/reversiones: `updateMany` + `assertOptimisticRowUpdate(count)` exige exactamente 1 fila afectada → `CONFLICT` si no.
+  - **Fase 0 no propaga** `projectId` en `AccountMovement` generado por cobro/pago; filtro por obra en reportes vía join (`Collection.projectId`, `Payment.projectId`).
+- **Consecuencias:** guards extraídos y testeados en `packages/services/src/ar/sales-invoice-cancel-guards.ts`, `.../ap/supplier-invoice-cancel-guards.ts` y `.../treasury/account-movement-cancel-guards.ts`; locking optimista también en cancelación de facturas, obligaciones, cobros/pagos y reversión de saldos; P-TRZ-06 resuelto vía `resolveOpeningBase` en `balance.service.ts`.
+- **Referencias:** plan Finanzas/Transacciones v2; [`02-modules/TREASURY.md`](../02-modules/TREASURY.md), [`02-modules/ACCOUNTS_RECEIVABLE.md`](../02-modules/ACCOUNTS_RECEIVABLE.md).
+
+---
+
 ## ADR-007 — Gantt y cronograma detrás de adapter único (Kibo UI)
 
 - **Fecha:** 2026-05-27

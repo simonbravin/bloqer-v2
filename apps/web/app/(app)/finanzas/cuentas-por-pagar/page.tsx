@@ -4,16 +4,19 @@ import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
+import { TransaccionesDateFilters } from "@/features/finance/components/transacciones-date-filters";
 import { PayableListSection } from "@/features/ap";
 import type { PayableListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { listCompanyPayables, ServiceError } from "@bloqer/services";
+import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
 
+const PAGE_SIZE = 20;
 const STATUSES = ["OPEN", "PARTIAL", "PAID", "OVERDUE", "CANCELLED"] as const;
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ status?: string; from?: string; to?: string; page?: string }>;
 }
 
 export default async function FinanzasCuentasPorPagarPage({ searchParams }: PageProps) {
@@ -21,10 +24,13 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
   if (!current?.tenantCtx) redirect("/login");
 
   const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page ?? 1));
+  const showAllStates = sp.status === "ALL";
   const status =
-    sp.status && (STATUSES as readonly string[]).includes(sp.status)
+    sp.status && !showAllStates && (STATUSES as readonly string[]).includes(sp.status)
       ? (sp.status as (typeof STATUSES)[number])
       : undefined;
+  const pendingOnly = !showAllStates && !status;
 
   const ctx = {
     actorUserId: current.session.user.id!,
@@ -33,19 +39,22 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
     roles:       current.tenantCtx.roles,
   };
 
-  let payables;
+  let result;
   try {
-    payables = await listCompanyPayables(ctx, {
+    result = await listCompanyPayables(ctx, {
       status,
+      pendingOnly,
       dueDateFrom: sp.from,
       dueDateTo:   sp.to,
+      page,
+      pageSize: PAGE_SIZE,
     });
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
-  const items: PayableListItem[] = payables.map((p) => ({
+  const items: PayableListItem[] = result.data.map((p) => ({
     id:                   p.id,
     supplierName:         p.supplierName,
     dueDate:              p.dueDate,
@@ -90,8 +99,13 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted-foreground mr-1">Estado:</span>
-        <Button asChild variant={!status ? "secondary" : "outline"} size="sm">
-          <Link href="/finanzas/cuentas-por-pagar">Todas</Link>
+        <Button asChild variant={pendingOnly ? "secondary" : "outline"} size="sm">
+          <Link href={`/finanzas/cuentas-por-pagar${q({ from: sp.from, to: sp.to })}`}>Pendientes</Link>
+        </Button>
+        <Button asChild variant={showAllStates ? "secondary" : "outline"} size="sm">
+          <Link href={`/finanzas/cuentas-por-pagar${q({ status: "ALL", from: sp.from, to: sp.to })}`}>
+            Todos los estados
+          </Link>
         </Button>
         {STATUSES.map((s) => (
           <Button key={s} asChild variant={status === s ? "secondary" : "outline"} size="sm">
@@ -102,12 +116,20 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
         ))}
       </div>
 
+      <Suspense fallback={null}>
+        <TransaccionesDateFilters preserveParams={["status"]} />
+      </Suspense>
+
       <Suspense fallback={<ListSectionSkeleton />}>
         <PayableListSection
           payables={items}
           hrefPrefix="/finanzas/cuentas-por-pagar"
           supplierInvoiceHrefPrefix="/finanzas/facturas-proveedor"
         />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <Pagination page={page} pageSize={PAGE_SIZE} total={result.total} />
       </Suspense>
     </PageShell>
   );

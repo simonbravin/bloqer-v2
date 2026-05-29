@@ -43,6 +43,7 @@ export async function createCompanyPaymentAction(
     revalidatePath(FIN_AP);
     revalidatePath(`${FIN_AP}/${data.payableId}`);
     revalidatePath(FIN_PAY);
+    revalidatePath("/finanzas/transacciones");
     return { id: payment.id };
   } catch (err) {
     return handle(err);
@@ -58,6 +59,7 @@ export async function cancelCompanyPaymentAction(
     revalidatePath(FIN_AP);
     revalidatePath(FIN_PAY);
     revalidatePath(`${FIN_PAY}/${paymentId}`);
+    revalidatePath("/finanzas/transacciones");
     return { ok: true };
   } catch (err) {
     return handle(err);

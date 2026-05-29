@@ -1,10 +1,14 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { canViewCompanyAp } from "../ap/ap-access";
+import {
+  aggregateCorporatePayableOperations,
+  countCorporateDraftInvoices,
+  fetchCorporatePayableSnapshotRows,
+  type CorporatePayableSnapshotRow,
+} from "../ap/corporate-ap-snapshot";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { ServiceContext } from "../types";
-
-const ZERO = new Prisma.Decimal(0);
 
 export type CompanyOpenPayableBalanceRow = {
   currency: string;
@@ -53,17 +57,32 @@ function emptySummary(visible: boolean, loadFailed: boolean): CompanyFinanceOper
   };
 }
 
+export function buildCompanyFinanceOperationsFromPayables(
+  rows: CorporatePayableSnapshotRow[],
+  draftInvoiceCount: number,
+  recentCorporatePayments: CompanyRecentPaymentRow[],
+): Omit<CompanyFinanceOperationsSummary, "visible" | "loadFailed" | "movimientosCorporateFilterHref"> {
+  const ops = aggregateCorporatePayableOperations(rows);
+  return {
+    draftInvoiceCount,
+    openPayableCount: ops.openPayableCount,
+    openPayableBalancesByCurrency: ops.openPayableBalancesByCurrency,
+    recentCorporatePayments,
+  };
+}
+
 /**
  * Corporate AP operations (projectId null). Returns `visible: false` when AP module off or user lacks VIEW AP.
  */
 export async function getCompanyFinanceOperationsSummary(
   ctx: ServiceContext,
+  opts?: { payableRows?: CorporatePayableSnapshotRow[] },
 ): Promise<CompanyFinanceOperationsSummary> {
   const movimientosCorporateFilterHref =
     "/tesoreria/reportes/movimientos?sourceType=PAYMENT&type=OUTFLOW&corporateApPayments=true";
 
   const gate = await getTenantModuleGate(ctx);
-  if (!gate.isEnabled("AP") || !can(ctx.roles, "VIEW", "AP")) {
+  if (!gate.isEnabled("AP") || !canViewCompanyAp(ctx.roles)) {
     return { ...emptySummary(false, false), movimientosCorporateFilterHref };
   }
 
@@ -72,28 +91,9 @@ export async function getCompanyFinanceOperationsSummary(
 
     const companyWhere = ctx.companyId ? { companyId: ctx.companyId } : {};
 
-    const [draftInvoiceCount, openPayableRows, recentPayRows] = await Promise.all([
-      prisma.supplierInvoice.count({
-        where: {
-          tenantId: ctx.tenantId,
-          projectId: null,
-          status: "DRAFT",
-          ...companyWhere,
-        },
-      }),
-      prisma.payable.findMany({
-        where: {
-          tenantId: ctx.tenantId,
-          projectId: null,
-          status: { in: ["OPEN", "PARTIAL", "OVERDUE"] },
-          ...companyWhere,
-        },
-        select: {
-          originalAmount: true,
-          paidAmount: true,
-          currency: true,
-        },
-      }),
+    const [payableRows, draftInvoiceCount, recentPayRows] = await Promise.all([
+      opts?.payableRows ?? fetchCorporatePayableSnapshotRows(ctx),
+      countCorporateDraftInvoices(ctx),
       prisma.payment.findMany({
         where: {
           tenantId: ctx.tenantId,
@@ -113,27 +113,6 @@ export async function getCompanyFinanceOperationsSummary(
       }),
     ]);
 
-    const byCur = new Map<string, { count: number; sum: Prisma.Decimal }>();
-    let openPayableCount = 0;
-    for (const p of openPayableRows) {
-      const bal = p.originalAmount.minus(p.paidAmount);
-      if (bal.lte(0)) continue;
-      openPayableCount += 1;
-      const cur = p.currency;
-      const agg = byCur.get(cur) ?? { count: 0, sum: ZERO };
-      agg.count += 1;
-      agg.sum = agg.sum.add(bal);
-      byCur.set(cur, agg);
-    }
-
-    const openPayableBalancesByCurrency = [...byCur.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([currency, agg]) => ({
-        currency,
-        openLineCount: agg.count,
-        totalBalanceDue: agg.sum.toString(),
-      }));
-
     const recentCorporatePayments: CompanyRecentPaymentRow[] = recentPayRows.map((r) => ({
       id: r.id,
       paymentDate: r.paymentDate.toISOString().slice(0, 10),
@@ -142,14 +121,17 @@ export async function getCompanyFinanceOperationsSummary(
       supplierLabel: supplierLabel(r.supplierContact.legalName, r.supplierContact.fantasyName),
     }));
 
+    const built = buildCompanyFinanceOperationsFromPayables(
+      payableRows,
+      draftInvoiceCount,
+      recentCorporatePayments,
+    );
+
     return {
       visible: true,
       loadFailed: false,
-      draftInvoiceCount,
-      openPayableCount,
-      openPayableBalancesByCurrency,
-      recentCorporatePayments,
       movimientosCorporateFilterHref,
+      ...built,
     };
   } catch {
     return { ...emptySummary(true, true), movimientosCorporateFilterHref };

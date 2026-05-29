@@ -24,16 +24,22 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
     });
   }
 
+  if (
+    (gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP")) ||
+    (gate.isEnabled("TREASURY") && can(ctx.roles, "VIEW", "TREASURY"))
+  ) {
+    links.push({
+      href: "/finanzas/transacciones",
+      label: "Transacciones",
+      title: "Movimientos de caja, operaciones y obligaciones de empresa",
+    });
+  }
+
   if (gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP")) {
     links.push({
       href: "/finanzas/facturas-proveedor",
       label: "Facturas y gastos",
       title: "Facturas de proveedor y gastos generales sin proyecto",
-    });
-    links.push({
-      href: "/finanzas/cuentas-por-pagar",
-      label: "Pagos pendientes",
-      title: "Obligaciones de empresa sin imputar a obra",
     });
     links.push({
       href: "/finanzas/cuentas-por-pagar-aging",

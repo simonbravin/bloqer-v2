@@ -8,12 +8,14 @@ import { SupplierInvoiceListSection } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { listCompanySupplierInvoices, ServiceError } from "@bloqer/services";
+import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
 
+const PAGE_SIZE = 20;
 const STATUSES = ["DRAFT", "ISSUED", "CANCELLED"] as const;
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ status?: string; from?: string; to?: string; page?: string }>;
 }
 
 export default async function FinanzasFacturasProveedorPage({ searchParams }: PageProps) {
@@ -21,6 +23,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
   if (!current?.tenantCtx) redirect("/login");
 
   const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page ?? 1));
   const status =
     sp.status && (STATUSES as readonly string[]).includes(sp.status)
       ? (sp.status as (typeof STATUSES)[number])
@@ -33,19 +36,21 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     roles: current.tenantCtx.roles,
   };
 
-  let invoices;
+  let result;
   try {
-    invoices = await listCompanySupplierInvoices(ctx, {
+    result = await listCompanySupplierInvoices(ctx, {
       status,
       issueDateFrom: sp.from,
       issueDateTo: sp.to,
+      page,
+      pageSize: PAGE_SIZE,
     });
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
-  const items: SupplierInvoiceListItem[] = invoices.map((inv) => ({
+  const items: SupplierInvoiceListItem[] = result.data.map((inv) => ({
     id: inv.id,
     code: inv.code,
     supplierName: inv.supplierName,
@@ -130,6 +135,10 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
           />
         </Suspense>
       )}
+
+      <Suspense fallback={null}>
+        <Pagination page={page} pageSize={PAGE_SIZE} total={result.total} />
+      </Suspense>
     </PageShell>
   );
 }

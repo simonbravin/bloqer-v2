@@ -31,7 +31,7 @@ const SOURCE_OPTIONS = [
   { value: "MANUAL_ADJUSTMENT",label: "Ajuste manual" },
 ];
 
-export function MovementFilters() {
+export function MovementFilters({ preserveParams = [] }: { preserveParams?: string[] }) {
   const router   = useRouter();
   const pathname = usePathname();
   const sp       = useSearchParams();
@@ -39,7 +39,17 @@ export function MovementFilters() {
   function update(key: string, value: string) {
     const params = new URLSearchParams(sp.toString());
     if (value) params.set(key, value); else params.delete(key);
+    params.delete("page");
     router.push(`${pathname}?${params.toString()}`);
+  }
+
+  function clearFilters() {
+    const params = new URLSearchParams();
+    for (const key of preserveParams) {
+      const v = sp.get(key);
+      if (v) params.set(key, v);
+    }
+    router.push(params.size ? `${pathname}?${params.toString()}` : pathname);
   }
 
   return (
@@ -127,7 +137,7 @@ export function MovementFilters() {
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => router.push(pathname)}
+        onClick={clearFilters}
         className="self-end"
       >
         Limpiar

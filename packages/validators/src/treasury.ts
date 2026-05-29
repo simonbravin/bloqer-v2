@@ -1,3 +1,4 @@
+import { createPaymentSchema, registerApExpenseSchema } from "./ap";
 import { z } from "zod";
 
 export const createTreasuryAccountSchema = z.object({
@@ -36,7 +37,24 @@ export const createInternalTransferSchema = z.object({
   description:          z.string().optional().nullable(),
 });
 
+
+
+export const createCorporateTreasuryInflowSchema = z.object({
+  accountId:     z.string().uuid(),
+  movementDate:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  amount:        z.string().regex(/^\d+(\.\d+)?$/, "Monto invalido"),
+  description:   z.string().min(1, "Descripcion requerida"),
+});
+
+export const registerTransactionSchema = z.discriminatedUnion("kind", [
+  registerApExpenseSchema.extend({ kind: z.literal("AP_EXPENSE") }),
+  createCorporateTreasuryInflowSchema.extend({ kind: z.literal("TREASURY_INFLOW") }),
+  createPaymentSchema.extend({ kind: z.literal("PAYMENT") }),
+]);
+
 export type CreateTreasuryAccountInput   = z.infer<typeof createTreasuryAccountSchema>;
 export type UpdateTreasuryAccountInput   = z.infer<typeof updateTreasuryAccountSchema>;
 export type CreateCollectionInput        = z.infer<typeof createCollectionSchema>;
 export type CreateInternalTransferInput  = z.infer<typeof createInternalTransferSchema>;
+export type CreateCorporateTreasuryInflowInput = z.infer<typeof createCorporateTreasuryInflowSchema>;
+export type RegisterTransactionInput        = z.infer<typeof registerTransactionSchema>;

@@ -9,18 +9,37 @@ function movementSign(type: string): 1 | -1 {
   return type === "INFLOW" || type === "TRANSFER_IN" ? 1 : -1;
 }
 
-export async function getAccountBalance(
+/** P-TRZ-06: avoid double-count when OPENING_BALANCE movement mirrors TreasuryAccount.openingBalance. */
+export function resolveOpeningBase(
+  accountOpeningBalance: Prisma.Decimal,
+  hasOpeningBalanceMovement: boolean,
+): Prisma.Decimal {
+  return hasOpeningBalanceMovement ? new Prisma.Decimal(0) : accountOpeningBalance;
+}
+
+export async function getAccountBalanceAsOf(
   accountId: string,
+  options?: { beforeDate?: Date },
   tx: TxClient = prisma,
 ): Promise<Prisma.Decimal> {
   const account = await tx.treasuryAccount.findUnique({
     where: { id: accountId },
     select: { openingBalance: true },
   });
-  const base = account?.openingBalance ?? new Prisma.Decimal(0);
+  if (!account) return new Prisma.Decimal(0);
+
+  const openingMovement = await tx.accountMovement.findFirst({
+    where: { accountId, status: "CONFIRMED", sourceType: "OPENING_BALANCE" },
+    select: { id: true },
+  });
+  const base = resolveOpeningBase(account.openingBalance, openingMovement != null);
 
   const movements = await tx.accountMovement.findMany({
-    where: { accountId, status: "CONFIRMED" },
+    where: {
+      accountId,
+      status: "CONFIRMED",
+      ...(options?.beforeDate ? { movementDate: { lt: options.beforeDate } } : {}),
+    },
     select: { type: true, amount: true },
   });
 
@@ -30,6 +49,13 @@ export async function getAccountBalance(
       : m.amount.negated();
     return sum.plus(signed);
   }, base);
+}
+
+export async function getAccountBalance(
+  accountId: string,
+  tx: TxClient = prisma,
+): Promise<Prisma.Decimal> {
+  return getAccountBalanceAsOf(accountId, undefined, tx);
 }
 
 export type AccountBalanceSummary = {

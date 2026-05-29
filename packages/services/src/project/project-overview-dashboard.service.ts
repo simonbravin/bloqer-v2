@@ -4,9 +4,7 @@ import { can } from "@bloqer/domain";
 import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
 import { pushMoneyRowsKpi } from "../dashboard/kpi-helpers";
 import { listBudgetsByProject } from "../budget/budget.service";
-import { listInvoicesByProject } from "../ar/sales-invoice.service";
-import { listCollectionsByProject } from "../treasury/collection.service";
-import { listCertificationsByProject } from "../certification/certification.service";
+import { summarizeProjectBillingVsCollections } from "../ar/project-ar-summary.service";
 import { getProjectFinanceOverview } from "../project-finance/project-finance-overview.service";
 import { getProjectById, getProjectShellInfo } from "./project.service";
 import { canViewBudgetsArea } from "./project-nav-guards";
@@ -356,23 +354,10 @@ export async function getProjectOverviewDashboard(
   let billingVsCollections: ProjectOverviewBillingVsCollections | null = null;
   if (gate.isEnabled("AR") && canViewArProjectArea(ctx.roles)) {
     try {
-      const [invoices, collections] = await Promise.all([
-        listInvoicesByProject(projectId, ctx),
-        listCollectionsByProject(projectId, ctx),
-      ]);
-      const invoiced = new Map<string, Prisma.Decimal>();
-      for (const inv of invoices) {
-        if (inv.status !== "ISSUED") continue;
-        addMoneyMap(invoiced, inv.currency, new Prisma.Decimal(inv.totalAmount));
-      }
-      const collected = new Map<string, Prisma.Decimal>();
-      for (const c of collections) {
-        if (c.status !== "CONFIRMED") continue;
-        addMoneyMap(collected, c.currency, new Prisma.Decimal(c.amount));
-      }
+      const summary = await summarizeProjectBillingVsCollections(projectId, ctx);
       billingVsCollections = {
-        invoicedByCurrency: mapMoneyMap(invoiced),
-        collectedByCurrency: mapMoneyMap(collected),
+        invoicedByCurrency: summary.invoicedByCurrency,
+        collectedByCurrency: summary.collectedByCurrency,
       };
     } catch {
       billingVsCollections = null;
@@ -382,7 +367,9 @@ export async function getProjectOverviewDashboard(
   let certificationsCount: number | null = null;
   if (gate.isEnabled("CERTIFICATIONS") && can(ctx.roles, "VIEW", "CERTIFICATIONS")) {
     try {
-      certificationsCount = (await listCertificationsByProject(projectId, ctx)).length;
+      certificationsCount = await prisma.certification.count({
+        where: { tenantId: ctx.tenantId, projectId },
+      });
     } catch {
       certificationsCount = null;
     }

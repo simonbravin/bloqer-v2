@@ -3,6 +3,15 @@ import { can } from "@bloqer/domain";
 import { log } from "../audit/audit.service";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { resolvePagination } from "../finance/pagination";
+import { appendPayableStatusFilter, appendPendingPayablesFilter } from "../finance/payable-list-filters";
+import { deriveObligationDisplayStatus, isObligationOverdue } from "../finance/obligation-date";
+import {
+  aggregateCorporatePayableBalances,
+  fetchCorporatePayableSnapshotRows,
+} from "./corporate-ap-snapshot";
+import { assertCanCancelPayableDirect } from "./payable-cancel-guards";
 import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 
 // ─── View type ────────────────────────────────────────────────────────────────
@@ -38,10 +47,54 @@ export async function getPayableById(
   return serializePayable(p);
 }
 
+export type ProjectPayableListFilters = {
+  page?: number;
+  pageSize?: number;
+};
+
 export async function listPayablesByProject(
   projectId: string,
   ctx: ServiceContext,
-): Promise<PayableView[]> {
+  filters?: ProjectPayableListFilters,
+): Promise<{ data: PayableView[]; total: number }> {
+  await assertApTenantModule(ctx);
+  if (!canViewApProjectArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar");
+  }
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+
+  const { skip, take } = resolvePagination({
+    page: filters?.page,
+    pageSize: filters?.pageSize,
+  });
+
+  const where = { projectId, tenantId: ctx.tenantId };
+
+  const [rows, total] = await Promise.all([
+    prisma.payable.findMany({
+      where,
+      include: { supplierContact: { select: { legalName: true, fantasyName: true } } },
+      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+      skip,
+      take,
+    }),
+    prisma.payable.count({ where }),
+  ]);
+  return { data: rows.map(serializePayable), total };
+}
+
+export type PayablesProjectSummary = {
+  totalByCurrency: { currency: string; amount: string }[];
+  overdueByCurrency: { currency: string; amount: string }[];
+};
+
+/** Lightweight aggregation for project finance overview (no full list). */
+export async function summarizePayablesByProject(
+  projectId: string,
+  ctx: ServiceContext,
+): Promise<PayablesProjectSummary> {
   await assertApTenantModule(ctx);
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar");
@@ -52,17 +105,68 @@ export async function listPayablesByProject(
 
   const rows = await prisma.payable.findMany({
     where: { projectId, tenantId: ctx.tenantId },
-    include: { supplierContact: { select: { legalName: true, fantasyName: true } } },
-    orderBy: { dueDate: "asc" },
+    select: {
+      currency: true,
+      originalAmount: true,
+      paidAmount: true,
+      dueDate: true,
+      status: true,
+    },
   });
-  return rows.map(serializePayable);
+
+  return aggregateOpenPayableBalances(rows);
+}
+
+/** Lightweight aggregation for corporate AP (projectId null). */
+export async function summarizeCompanyPayables(
+  ctx: ServiceContext,
+): Promise<PayablesProjectSummary> {
+  const rows = await fetchCorporatePayableSnapshotRows(ctx);
+  return aggregateCorporatePayableBalances(rows);
+}
+
+function aggregateOpenPayableBalances(
+  rows: Array<{
+    currency: string;
+    originalAmount: Prisma.Decimal;
+    paidAmount: Prisma.Decimal;
+    dueDate: Date;
+    status: string;
+  }>,
+): PayablesProjectSummary {
+  const total = new Map<string, Prisma.Decimal>();
+  const overdue = new Map<string, Prisma.Decimal>();
+  const zero = new Prisma.Decimal(0);
+
+  for (const p of rows) {
+    if (p.status === "PAID" || p.status === "CANCELLED") continue;
+    const bal = p.originalAmount.minus(p.paidAmount);
+    if (bal.lessThanOrEqualTo(0)) continue;
+    const cur = p.currency;
+    total.set(cur, (total.get(cur) ?? zero).add(bal));
+    if (isObligationOverdue(p.dueDate)) {
+      overdue.set(cur, (overdue.get(cur) ?? zero).add(bal));
+    }
+  }
+
+  const toRows = (m: Map<string, Prisma.Decimal>) =>
+    [...m.entries()]
+      .filter(([, v]) => v.greaterThan(zero))
+      .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
+      .sort((a, b) => a.currency.localeCompare(b.currency));
+
+  return { totalByCurrency: toRows(total), overdueByCurrency: toRows(overdue) };
 }
 
 export type CompanyPayableListFilters = {
   status?:            "OPEN" | "PARTIAL" | "PAID" | "OVERDUE" | "CANCELLED";
+  /** When true and no explicit status, excludes PAID/CANCELLED (pending obligations). */
+  pendingOnly?:       boolean;
   supplierContactId?: string;
   dueDateFrom?:       string;
   dueDateTo?:         string;
+  page?:              number;
+  pageSize?:          number;
 };
 
 export type CompanyPayableListRow = PayableView & {
@@ -74,14 +178,19 @@ export type CompanyPayableListRow = PayableView & {
 export async function listCompanyPayables(
   ctx: ServiceContext,
   filters?: CompanyPayableListFilters,
-): Promise<CompanyPayableListRow[]> {
+): Promise<{ data: CompanyPayableListRow[]; total: number }> {
   await assertApTenantModule(ctx);
   if (!canViewCompanyAp(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar a nivel empresa");
   }
 
+  const { skip, take } = resolvePagination({
+    page: filters?.page,
+    pageSize: filters?.pageSize,
+  });
+
   const where: Prisma.PayableWhereInput = {
-    tenantId:  ctx.tenantId,
+    tenantId: ctx.tenantId,
     projectId: null,
     ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     ...(filters?.supplierContactId ? { supplierContactId: filters.supplierContactId } : {}),
@@ -94,27 +203,36 @@ export async function listCompanyPayables(
         }
       : {}),
   };
+  if (filters?.pendingOnly && !filters.status) {
+    appendPendingPayablesFilter(where);
+  }
+  appendPayableStatusFilter(where, filters?.status);
 
-  const rows = await prisma.payable.findMany({
-    where,
-    include: {
-      supplierContact: { select: { legalName: true, fantasyName: true } },
-      supplierInvoice: { select: { number: true } },
-    },
-    orderBy: { dueDate: "asc" },
-  });
+  const [rows, total] = await Promise.all([
+    prisma.payable.findMany({
+      where,
+      include: {
+        supplierContact: { select: { legalName: true, fantasyName: true } },
+        supplierInvoice: { select: { number: true } },
+      },
+      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+      skip,
+      take,
+    }),
+    prisma.payable.count({ where }),
+  ]);
 
-  const mapped: CompanyPayableListRow[] = rows.map((r) => {
+  const data: CompanyPayableListRow[] = rows.map((r) => {
     const { supplierInvoice, ...rest } = r;
     const base = serializePayable(rest);
-    const num  = supplierInvoice?.number;
+    const num = supplierInvoice?.number;
     return {
       ...base,
       supplierInvoiceCode: num != null ? `FP-${String(num).padStart(5, "0")}` : null,
     };
   });
-  if (!filters?.status) return mapped;
-  return mapped.filter((p) => p.status === filters.status);
+
+  return { data, total };
 }
 
 /**
@@ -145,17 +263,35 @@ export async function cancelPayable(id: string, ctx: ServiceContext): Promise<Pa
   if (!can(ctx.roles, "EDIT", "AP")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar cuentas por pagar");
   }
-  const p = await prisma.payable.findUnique({ where: { id } });
-  if (!p) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
-  if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (p.status === "CANCELLED") throw new ServiceError("CONFLICT", "La cuenta ya está cancelada");
-  if (p.paidAmount.greaterThan(0)) {
-    throw new ServiceError("CONFLICT", "No se puede cancelar una cuenta con pagos. Cancele los pagos primero.");
-  }
 
-  const updated = await prisma.payable.update({
-    where: { id },
-    data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+  const updated = await prisma.$transaction(async (tx) => {
+    const row = await tx.payable.findUnique({ where: { id } });
+    if (!row) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
+    if (row.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    if (row.status === "CANCELLED") throw new ServiceError("CONFLICT", "La cuenta ya está cancelada");
+
+    const supplierInvoice = await tx.supplierInvoice.findUnique({
+      where: { id: row.supplierInvoiceId },
+      select: { status: true },
+    });
+    const activePayments = await tx.payment.count({
+      where: { payableId: id, status: "CONFIRMED", tenantId: ctx.tenantId },
+    });
+    assertCanCancelPayableDirect({
+      supplierInvoiceStatus: supplierInvoice?.status,
+      activePaymentCount: activePayments,
+      paidAmount: row.paidAmount,
+    });
+
+    const payableCancel = await tx.payable.updateMany({
+      where: { id, status: { not: "CANCELLED" }, paidAmount: row.paidAmount },
+      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+    });
+    assertOptimisticRowUpdate(
+      payableCancel.count,
+      "El saldo cambió mientras cancelabas la cuenta. Revisá pagos e intentá de nuevo.",
+    );
+    return tx.payable.findUniqueOrThrow({ where: { id } });
   });
 
   await log({
@@ -179,14 +315,7 @@ type RawPayable = Payable & {
 
 export function serializePayable(p: RawPayable): PayableView {
   const balanceDue = p.originalAmount.minus(p.paidAmount);
-  // OVERDUE computed on read — no background job (same as D5 / ReceivableStatus)
-  let status = p.status;
-  if (
-    status !== "PAID" && status !== "CANCELLED" &&
-    balanceDue.greaterThan(0) && p.dueDate < new Date()
-  ) {
-    status = "OVERDUE";
-  }
+  const status = deriveObligationDisplayStatus(p.status, balanceDue, p.dueDate);
   return {
     ...p,
     status,

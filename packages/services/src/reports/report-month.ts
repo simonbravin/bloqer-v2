@@ -32,6 +32,22 @@ export function inDateRange(d: Date, dateFrom?: string, dateTo?: string): boolea
   return true;
 }
 
+/** Payables/receivables due on or before horizon end (includes overdue + upcoming). */
+export function isDueOnOrBeforeHorizon(dueDate: Date, dateTo: string): boolean {
+  return dueDate <= parseFilterDate(dateTo, true);
+}
+
+/**
+ * Month bucket for projection charts.
+ * Overdue items (due before horizon start) roll into the first month of the horizon.
+ */
+export function projectionBucketKey(dueDate: Date, dateFrom: string, dateTo: string): string | null {
+  if (!isDueOnOrBeforeHorizon(dueDate, dateTo)) return null;
+  const horizonStart = parseFilterDate(dateFrom, false);
+  const bucketDate = dueDate < horizonStart ? horizonStart : dueDate;
+  return monthKey(bucketDate);
+}
+
 export function projectionHorizon(daysAhead = 90): { dateFrom: string; dateTo: string } {
   const from = new Date();
   const to = new Date(from);

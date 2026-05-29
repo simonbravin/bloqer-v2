@@ -133,7 +133,7 @@ export default async function GastosGeneralesPage() {
               <Link href="/finanzas/facturas-proveedor">Ver facturas empresa</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/finanzas/cuentas-por-pagar">Pagos pendientes</Link>
+              <Link href="/finanzas/transacciones?tab=obligaciones">Obligaciones pendientes</Link>
             </Button>
           </div>
         </CardContent>

@@ -2,6 +2,9 @@ import { Prisma, prisma, Collection } from "@bloqer/database";
 import { canEditArArea, canViewArProjectArea } from "../ar/ar-access";
 import type { CreateCollectionInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
+import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { resolvePagination } from "../finance/pagination";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -30,20 +33,42 @@ export async function getCollectionById(
   return serialize(c);
 }
 
+export type ProjectCollectionListFilters = {
+  page?: number;
+  pageSize?: number;
+};
+
 export async function listCollectionsByProject(
   projectId: string,
   ctx: ServiceContext,
-): Promise<CollectionView[]> {
+  filters?: ProjectCollectionListFilters,
+): Promise<{ data: CollectionView[]; total: number }> {
   await assertArTenantModule(ctx);
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cobranzas");
   }
-  const rows = await prisma.collection.findMany({
-    where: { projectId, tenantId: ctx.tenantId },
-    include: { account: { select: { name: true } } },
-    orderBy: { collectionDate: "desc" },
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+
+  const { skip, take } = resolvePagination({
+    page: filters?.page,
+    pageSize: filters?.pageSize,
   });
-  return rows.map(serialize);
+
+  const where = { projectId, tenantId: ctx.tenantId };
+
+  const [rows, total] = await Promise.all([
+    prisma.collection.findMany({
+      where,
+      include: { account: { select: { name: true } } },
+      orderBy: [{ collectionDate: "desc" }, { id: "desc" }],
+      skip,
+      take,
+    }),
+    prisma.collection.count({ where }),
+  ]);
+  return { data: rows.map(serialize), total };
 }
 
 export async function listCollectionsByReceivable(
@@ -88,6 +113,17 @@ export async function createCollection(
     }
     if (receivable.status === "PAID") {
       throw new ServiceError("CONFLICT", "La cuenta por cobrar ya está totalmente cobrada");
+    }
+
+    const salesInvoice = await tx.salesInvoice.findUnique({
+      where: { id: receivable.salesInvoiceId },
+      select: { status: true },
+    });
+    if (!salesInvoice) {
+      throw new ServiceError("CONFLICT", "La factura de venta asociada no existe");
+    }
+    if (salesInvoice.status === "CANCELLED") {
+      throw new ServiceError("CONFLICT", "No se puede cobrar una factura de venta cancelada");
     }
 
     const balanceDue = receivable.originalAmount.minus(receivable.paidAmount);
@@ -163,10 +199,18 @@ export async function createCollection(
       : newPaid.greaterThan(0) ? "PARTIAL"
       : "OPEN";
 
-    await tx.receivable.update({
-      where: { id: receivable.id },
+    const receivableUpdate = await tx.receivable.updateMany({
+      where: {
+        id: receivable.id,
+        paidAmount: receivable.paidAmount,
+        status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
+      },
       data: { paidAmount: newPaid, status: newStatus, updatedBy: ctx.actorUserId },
     });
+    assertOptimisticRowUpdate(
+      receivableUpdate.count,
+      "El saldo cambió mientras registrabas la cobranza. Revisá el saldo pendiente e intentá de nuevo.",
+    );
 
     return tx.collection.findUniqueOrThrow({
       where: { id: collection.id },
@@ -204,6 +248,15 @@ export async function cancelCollection(
       throw new ServiceError("CONFLICT", "La cobranza ya está cancelada");
     }
 
+    const collectionCancel = await tx.collection.updateMany({
+      where: { id, status: "CONFIRMED" },
+      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+    });
+    assertOptimisticRowUpdate(
+      collectionCancel.count,
+      "La cobranza ya fue cancelada o modificada. Revisá e intentá de nuevo.",
+    );
+
     // Cancel linked AccountMovement
     await tx.accountMovement.updateMany({
       where: { sourceType: "COLLECTION", sourceId: id, status: "CONFIRMED" },
@@ -218,16 +271,21 @@ export async function cancelCollection(
       const newStatus = newBalance.isZero() ? "PAID"
         : newPaid.greaterThan(0) ? "PARTIAL"
         : "OPEN";
-      await tx.receivable.update({
-        where: { id: receivable.id },
+      const receivableReverse = await tx.receivable.updateMany({
+        where: {
+          id: receivable.id,
+          paidAmount: receivable.paidAmount,
+          status: { not: "CANCELLED" },
+        },
         data: { paidAmount: newPaid, status: newStatus, updatedBy: ctx.actorUserId },
       });
+      assertOptimisticRowUpdate(
+        receivableReverse.count,
+        "El saldo cambió mientras cancelabas la cobranza. Revisá e intentá de nuevo.",
+      );
     }
 
-    return tx.collection.update({
-      where: { id },
-      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
-    });
+    return tx.collection.findUniqueOrThrow({ where: { id } });
   });
 
   await log({

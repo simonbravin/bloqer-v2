@@ -36,6 +36,12 @@ import type { IncomeExpenseFilters } from "../reports/project-income-expense.ser
 import { getProjectIncomeExpenseReport } from "../reports/project-income-expense.service";
 import type { ProfitabilityFilters } from "../reports/project-profitability.service";
 import { getProjectProfitabilityReport } from "../reports/project-profitability.service";
+import { MAX_EXPORT_ROWS, defaultDateRangeDays, DEFAULT_CASH_DATE_RANGE_DAYS } from "../finance/pagination";
+import { listCompanyPayables, type CompanyPayableListFilters } from "../ap/payable.service";
+import {
+  listCompanySupplierInvoices,
+  type CompanySupplierInvoiceListFilters,
+} from "../ap/supplier-invoice.service";
 import { ServiceContext, ServiceError } from "../types";
 import { buildCsv } from "./csv-export.service";
 import { safeReportFilename } from "./filename.service";
@@ -81,6 +87,43 @@ export function parseMovementReportFilters(sp: Record<string, string | undefined
     currency: sp.currency,
     includeInternalTransfers: sp.includeInternalTransfers === "false" ? false : true,
     corporateApPaymentsOnly: sp.corporateApPayments === "true",
+  };
+}
+
+const PAYABLE_EXPORT_STATUSES = ["OPEN", "PARTIAL", "PAID", "OVERDUE", "CANCELLED"] as const;
+const INVOICE_EXPORT_STATUSES = ["DRAFT", "ISSUED", "CANCELLED"] as const;
+
+export function parseCompanyPayableExportFilters(
+  sp: Record<string, string | undefined>,
+): CompanyPayableListFilters {
+  const showAll = sp.status === "ALL";
+  const status =
+    sp.status && !showAll && (PAYABLE_EXPORT_STATUSES as readonly string[]).includes(sp.status)
+      ? (sp.status as (typeof PAYABLE_EXPORT_STATUSES)[number])
+      : undefined;
+  const dueDateFrom = sp.from ?? sp.dueDateFrom;
+  const dueDateTo = sp.to ?? sp.dueDateTo;
+  return {
+    status,
+    pendingOnly: !showAll && !status,
+    ...(dueDateFrom ? { dueDateFrom } : {}),
+    ...(dueDateTo ? { dueDateTo } : {}),
+  };
+}
+
+export function parseCompanySupplierInvoiceExportFilters(
+  sp: Record<string, string | undefined>,
+): CompanySupplierInvoiceListFilters {
+  const status =
+    sp.status && (INVOICE_EXPORT_STATUSES as readonly string[]).includes(sp.status)
+      ? (sp.status as (typeof INVOICE_EXPORT_STATUSES)[number])
+      : undefined;
+  let issueDateFrom = sp.from ?? sp.issueDateFrom;
+  let issueDateTo = sp.to ?? sp.issueDateTo;
+  return {
+    status: status ?? "ISSUED",
+    ...(issueDateFrom ? { issueDateFrom } : {}),
+    ...(issueDateTo ? { issueDateTo } : {}),
   };
 }
 
@@ -285,7 +328,22 @@ export async function exportTreasuryMovementsCsv(
   filters: MovementReportFilters,
   ctx: ServiceContext,
 ): Promise<ReportCsvPayload> {
-  const rows = await getAccountMovementReport(filters, ctx);
+  if (!filters.accountId && (!filters.dateFrom || !filters.dateTo)) {
+    throw new ServiceError(
+      "VALIDATION",
+      "Export de movimientos requiere rango de fechas cuando no hay cuenta seleccionada.",
+    );
+  }
+  const { rows, total } = await getAccountMovementReport(
+    { ...filters, page: 1, pageSize: MAX_EXPORT_ROWS },
+    ctx,
+  );
+  if (total > MAX_EXPORT_ROWS) {
+    throw new ServiceError(
+      "VALIDATION",
+      `El export supera ${MAX_EXPORT_ROWS} filas. Acotá el rango de fechas.`,
+    );
+  }
   const headers = [
     "Fecha",
     "Cuenta",
@@ -315,6 +373,86 @@ export async function exportTreasuryMovementsCsv(
   return {
     content: buildCsv(headers, data),
     filename: safeReportFilename("tesoreria_movimientos", "csv"),
+  };
+}
+
+export async function exportCompanyPayablesCsv(
+  filters: CompanyPayableListFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
+  const { data, total } = await listCompanyPayables(ctx, {
+    ...filters,
+    page: 1,
+    pageSize: MAX_EXPORT_ROWS,
+  });
+  if (total > MAX_EXPORT_ROWS) {
+    throw new ServiceError(
+      "VALIDATION",
+      `El export supera ${MAX_EXPORT_ROWS} filas. Acotá los filtros de vencimiento.`,
+    );
+  }
+  const headers = [
+    "Proveedor",
+    "Factura",
+    "Vencimiento",
+    "Estado",
+    "Moneda",
+    "Original",
+    "Pagado",
+    "Saldo",
+  ];
+  const rows = data.map((p) => [
+    p.supplierName,
+    p.supplierInvoiceCode ?? "",
+    p.dueDate instanceof Date ? p.dueDate.toISOString().slice(0, 10) : String(p.dueDate).slice(0, 10),
+    p.status,
+    p.currency,
+    p.originalAmount,
+    p.paidAmount,
+    p.balanceDue,
+  ]);
+  return {
+    content: buildCsv(headers, rows),
+    filename: safeReportFilename("finanzas_cxp_corporativo", "csv"),
+  };
+}
+
+export async function exportCompanySupplierInvoicesCsv(
+  filters: CompanySupplierInvoiceListFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
+  const { data, total } = await listCompanySupplierInvoices(ctx, {
+    ...filters,
+    page: 1,
+    pageSize: MAX_EXPORT_ROWS,
+  });
+  if (total > MAX_EXPORT_ROWS) {
+    throw new ServiceError(
+      "VALIDATION",
+      `El export supera ${MAX_EXPORT_ROWS} filas. Acotá el rango de fechas de emisión.`,
+    );
+  }
+  const headers = [
+    "Codigo",
+    "Proveedor",
+    "Emision",
+    "Vencimiento",
+    "Estado",
+    "Moneda",
+    "Total",
+  ];
+  const rows = data.map((inv) => [
+    inv.code,
+    inv.supplierName,
+    inv.issueDate instanceof Date ? inv.issueDate.toISOString().slice(0, 10) : String(inv.issueDate).slice(0, 10),
+    inv.dueDate instanceof Date ? inv.dueDate.toISOString().slice(0, 10) : String(inv.dueDate).slice(0, 10),
+    inv.status,
+    inv.currency,
+    inv.totalAmount,
+  ]);
+  return {
+    content: buildCsv(headers, rows),
+    filename: safeReportFilename("finanzas_facturas_proveedor_corporativo", "csv"),
   };
 }
 

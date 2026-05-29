@@ -2,6 +2,9 @@ import { Prisma, prisma, Payment } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreatePaymentInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
+import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { resolvePagination } from "../finance/pagination";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -57,20 +60,42 @@ export async function getCompanyPaymentById(id: string, ctx: ServiceContext): Pr
   return serialize(p);
 }
 
+export type ProjectPaymentListFilters = {
+  page?: number;
+  pageSize?: number;
+};
+
 export async function listPaymentsByProject(
   projectId: string,
   ctx: ServiceContext,
-): Promise<PaymentView[]> {
+  filters?: ProjectPaymentListFilters,
+): Promise<{ data: PaymentView[]; total: number }> {
   await assertApTenantModule(ctx);
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver pagos");
   }
-  const rows = await prisma.payment.findMany({
-    where: { projectId, tenantId: ctx.tenantId },
-    include: { account: { select: { name: true } } },
-    orderBy: { paymentDate: "desc" },
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+
+  const { skip, take } = resolvePagination({
+    page: filters?.page,
+    pageSize: filters?.pageSize,
   });
-  return rows.map(serialize);
+
+  const where = { projectId, tenantId: ctx.tenantId };
+
+  const [rows, total] = await Promise.all([
+    prisma.payment.findMany({
+      where,
+      include: { account: { select: { name: true } } },
+      orderBy: [{ paymentDate: "desc" }, { id: "desc" }],
+      skip,
+      take,
+    }),
+    prisma.payment.count({ where }),
+  ]);
+  return { data: rows.map(serialize), total };
 }
 
 export async function listPaymentsByPayable(
@@ -87,6 +112,59 @@ export async function listPaymentsByPayable(
     orderBy: { paymentDate: "desc" },
   });
   return rows.map(serialize);
+}
+
+export type CompanyPaymentListFilters = {
+  status?:           "CONFIRMED" | "CANCELLED";
+  paymentDateFrom?:  string;
+  paymentDateTo?:    string;
+  page?:             number;
+  pageSize?:         number;
+};
+
+/** Payments for corporate AP (`projectId` null). Requires VIEW AP only. */
+export async function listCompanyPayments(
+  ctx: ServiceContext,
+  filters?: CompanyPaymentListFilters,
+): Promise<{ data: PaymentView[]; total: number }> {
+  await assertApTenantModule(ctx);
+  if (!canViewCompanyAp(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver pagos a nivel empresa");
+  }
+
+  const { skip, take } = resolvePagination({
+    page: filters?.page,
+    pageSize: filters?.pageSize,
+  });
+
+  const where: Prisma.PaymentWhereInput = {
+    tenantId:  ctx.tenantId,
+    projectId: null,
+    ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    ...(filters?.status ? { status: filters.status } : {}),
+    ...(filters?.paymentDateFrom || filters?.paymentDateTo
+      ? {
+          paymentDate: {
+            ...(filters.paymentDateFrom ? { gte: new Date(filters.paymentDateFrom) } : {}),
+            ...(filters.paymentDateTo ? { lte: new Date(filters.paymentDateTo) } : {}),
+          },
+        }
+      : {}),
+  };
+
+  const [rows, total] = await Promise.all([
+    prisma.payment.findMany({
+      where,
+      include: { account: { select: { name: true } } },
+      orderBy: [{ paymentDate: "desc" }, { id: "desc" }],
+      skip,
+      take,
+    }),
+    prisma.payment.count({ where }),
+  ]);
+
+  const data = rows.map(serialize);
+  return { data, total };
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -120,6 +198,17 @@ export async function createPayment(
     }
     if (payable.status === "PAID") {
       throw new ServiceError("CONFLICT", "La cuenta por pagar ya está totalmente pagada");
+    }
+
+    const supplierInvoice = await tx.supplierInvoice.findUnique({
+      where: { id: payable.supplierInvoiceId },
+      select: { status: true },
+    });
+    if (!supplierInvoice) {
+      throw new ServiceError("CONFLICT", "La factura de proveedor asociada no existe");
+    }
+    if (supplierInvoice.status === "CANCELLED") {
+      throw new ServiceError("CONFLICT", "No se puede pagar una factura de proveedor cancelada");
     }
 
     const balanceDue = payable.originalAmount.minus(payable.paidAmount);
@@ -196,10 +285,18 @@ export async function createPayment(
       : newPaid.greaterThan(0) ? "PARTIAL"
       : "OPEN";
 
-    await tx.payable.update({
-      where: { id: payable.id },
+    const payableUpdate = await tx.payable.updateMany({
+      where: {
+        id: payable.id,
+        paidAmount: payable.paidAmount,
+        status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
+      },
       data: { paidAmount: newPaid, status: newStatus, updatedBy: ctx.actorUserId },
     });
+    assertOptimisticRowUpdate(
+      payableUpdate.count,
+      "El saldo cambió mientras registrabas el pago. Revisá el saldo pendiente e intentá de nuevo.",
+    );
 
     return tx.payment.findUniqueOrThrow({
       where: { id: payment.id },
@@ -242,6 +339,15 @@ export async function cancelPayment(
       throw new ServiceError("CONFLICT", "El pago ya está cancelado");
     }
 
+    const paymentCancel = await tx.payment.updateMany({
+      where: { id, status: "CONFIRMED" },
+      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+    });
+    assertOptimisticRowUpdate(
+      paymentCancel.count,
+      "El pago ya fue cancelado o modificado. Revisá e intentá de nuevo.",
+    );
+
     // Cancel linked AccountMovement
     await tx.accountMovement.updateMany({
       where: { sourceType: "PAYMENT", sourceId: id, status: "CONFIRMED" },
@@ -256,16 +362,21 @@ export async function cancelPayment(
       const newStatus  = newBalance.isZero() ? "PAID"
         : newPaid.greaterThan(0) ? "PARTIAL"
         : "OPEN";
-      await tx.payable.update({
-        where: { id: payable.id },
+      const payableReverse = await tx.payable.updateMany({
+        where: {
+          id: payable.id,
+          paidAmount: payable.paidAmount,
+          status: { not: "CANCELLED" },
+        },
         data: { paidAmount: newPaid, status: newStatus, updatedBy: ctx.actorUserId },
       });
+      assertOptimisticRowUpdate(
+        payableReverse.count,
+        "El saldo cambió mientras cancelabas el pago. Revisá e intentá de nuevo.",
+      );
     }
 
-    return tx.payment.update({
-      where: { id },
-      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
-    });
+    return tx.payment.findUniqueOrThrow({ where: { id } });
   });
 
   await log({

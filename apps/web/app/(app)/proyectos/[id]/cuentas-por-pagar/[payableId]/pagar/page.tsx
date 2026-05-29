@@ -37,7 +37,10 @@ export default async function PagarPage({ params }: PageProps) {
   }
 
   const activeAccounts = allAccounts
-    .filter((a) => a.status === "ACTIVE")
+    .filter(
+      (a) =>
+        a.status === "ACTIVE" && (!ctx.companyId || !a.companyId || a.companyId === ctx.companyId),
+    )
     .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
 
   const isBlocked = payable.status === "PAID" || payable.status === "CANCELLED";

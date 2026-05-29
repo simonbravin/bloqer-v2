@@ -46,7 +46,7 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
   const accountingReturnPath = `/tesoreria/reportes/movimientos${qs.size ? `?${qs}` : ""}`;
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
 
-  const rows = await getAccountMovementReport(
+  const { rows } = await getAccountMovementReport(
     {
       accountId: sp.accountId || undefined,
       dateFrom: sp.dateFrom || undefined,

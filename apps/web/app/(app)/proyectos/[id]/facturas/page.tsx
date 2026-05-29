@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
+import { Pagination } from "@/components/ui/pagination";
 import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
@@ -11,15 +12,20 @@ import { getCurrentUser } from "@/lib/auth";
 import { getProjectShellInfo, listInvoicesByProject, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
+const PAGE_SIZE = 20;
+
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ page?: string }>;
 }
 
-export default async function FacturasPage({ params }: PageProps) {
+export default async function FacturasPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id } = await params;
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page ?? 1));
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -36,13 +42,16 @@ export default async function FacturasPage({ params }: PageProps) {
     throw err;
   }
 
-  let invoices;
+  let invoicesResult;
   try {
-    invoices = await listInvoicesByProject(id, ctx);
+    invoicesResult = await listInvoicesByProject(id, ctx, { page, pageSize: PAGE_SIZE });
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
   }
+
+  const invoices = invoicesResult.data;
+  const invoicesTotal = invoicesResult.total;
 
   const items: SalesInvoiceListItem[] = invoices.map((inv) => ({
     id: inv.id,
@@ -62,7 +71,7 @@ export default async function FacturasPage({ params }: PageProps) {
         projectId={id}
         projectName={project.name}
         title="Facturas"
-        subtitle={`${items.length} ${items.length === 1 ? "factura" : "facturas"}`}
+        subtitle={`${invoicesTotal} ${invoicesTotal === 1 ? "factura" : "facturas"}`}
         actions={
           <>
             <Suspense fallback={null}>
@@ -77,6 +86,10 @@ export default async function FacturasPage({ params }: PageProps) {
 
       <Suspense fallback={<ListSectionSkeleton />}>
         <SalesInvoiceListSection invoices={items} projectId={id} />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <Pagination page={page} pageSize={PAGE_SIZE} total={invoicesTotal} />
       </Suspense>
     </PageShell>
   );

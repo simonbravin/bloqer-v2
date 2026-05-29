@@ -61,6 +61,8 @@
 | P-TRZ-03 | **Política de saldo negativo** — `createInternalTransfer` bloquea si `sourceBalance < amount` (D4). No hay "overdraft autorizado" | Agregar flag `allowOverdraft` en `TreasuryAccount` + límite si se necesita para cuentas corrientes |
 | P-TRZ-04 | **Ajustes manuales** — `AccountMovementSourceType.MANUAL_ADJUSTMENT` existe en schema pero no hay UI ni acción para crearlo | Exponer en `/tesoreria/cuentas/[id]/ajuste` con doble autorización en Phase 4 |
 | P-TRZ-05 | **Conciliación bancaria** — `AccountMovementStatus` tiene solo CONFIRMED/CANCELLED. Sin estado RECONCILED ni entidad `BankStatement` | Diseñar en Phase 4; reservar `P-ERD-06` ya documentado |
+| P-TRZ-06 | **Doble conteo saldo inicial** — `getAccountBalance` sumaba `TreasuryAccount.openingBalance` **y** movimientos `OPENING_BALANCE` | **HECHO 2026-05-29** — `resolveOpeningBase` + `getAccountBalanceAsOf` en `balance.service.ts`; reportes tesorería migrados. Cuentas legacy sin movimiento siguen usando el campo. |
+| P-TRZ-07 | **Tests e2e de concurrencia** — locking optimista en create/cancel payment/collection | **HECHO 2026-05-29** — `assertOptimisticRowUpdate` centraliza contrato (`count === 1`); 76 tests unitarios cubren guards + locking + balance. Tests DB paralelos diferidos hasta CI con infra dedicada (no blocker Fase A). |
 
 ## Contradicciones a vigilar
 

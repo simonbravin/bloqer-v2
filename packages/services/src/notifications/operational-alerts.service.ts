@@ -2,6 +2,7 @@ import type { LinkedEntityType, NotificationSeverity, NotificationType, Prisma }
 import { prisma } from "@bloqer/database";
 import { can, type PermissionAction, type PermissionModule } from "@bloqer/domain";
 import { listNegativeStockBalancesForTenant } from "../inventory/stock-balance.service";
+import { isObligationOverdue } from "../finance/obligation-date";
 import { ServiceContext } from "../types";
 import { createSystemNotification } from "./notification.service";
 
@@ -17,11 +18,6 @@ export type OperationalAlertRunSummary = {
 
 function emptySummary(): OperationalAlertRunSummary {
   return { checkedCount: 0, createdCount: 0, skippedCount: 0, errors: [] };
-}
-
-function startOfTodayUtc(): Date {
-  const n = new Date();
-  return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()));
 }
 
 /**
@@ -131,7 +127,6 @@ function mergeUniqueUserIds(...lists: string[][]): string[] {
 
 export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<OperationalAlertRunSummary> {
   const summary = emptySummary();
-  const todayStart = startOfTodayUtc();
   const recipients = await findActiveUsersForPermission(ctx.tenantId, "VIEW", "AR");
 
   const rows = await prisma.receivable.findMany({
@@ -154,7 +149,7 @@ export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<O
   for (const r of rows) {
     const balanceDue = r.originalAmount.minus(r.paidAmount);
     if (balanceDue.lessThanOrEqualTo(0)) continue;
-    if (r.dueDate.getTime() >= todayStart.getTime()) continue;
+    if (!isObligationOverdue(r.dueDate)) continue;
 
     summary.checkedCount += 1;
     const clientName = r.clientContact.fantasyName ?? r.clientContact.legalName;
@@ -188,7 +183,6 @@ export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<O
 
 export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<OperationalAlertRunSummary> {
   const summary = emptySummary();
-  const todayStart = startOfTodayUtc();
   const recipients = await findActiveUsersForPermission(ctx.tenantId, "VIEW", "AP");
 
   const rows = await prisma.payable.findMany({
@@ -211,7 +205,7 @@ export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<Oper
   for (const p of rows) {
     const balanceDue = p.originalAmount.minus(p.paidAmount);
     if (balanceDue.lessThanOrEqualTo(0)) continue;
-    if (p.dueDate.getTime() >= todayStart.getTime()) continue;
+    if (!isObligationOverdue(p.dueDate)) continue;
 
     summary.checkedCount += 1;
     const supplierName = p.supplierContact.fantasyName ?? p.supplierContact.legalName;

@@ -2,6 +2,7 @@ import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { assertApTenantModule, assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { deriveObligationDisplayStatus, obligationDaysOverdue, parseObligationAsOfDate, startOfDayUtc } from "../finance/obligation-date";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -111,15 +112,11 @@ function rowBalance(acc: BucketAcc): string {
 }
 
 function getBucket(daysOverdue: number): AgingBucket {
-  if (daysOverdue <= 0)  return "current";
+  if (daysOverdue <= 0) return "current";
   if (daysOverdue <= 30) return "1_30";
   if (daysOverdue <= 60) return "31_60";
   if (daysOverdue <= 90) return "61_90";
   return "90_plus";
-}
-
-function diffDays(dueDate: Date, asOf: Date): number {
-  return Math.floor((asOf.getTime() - dueDate.getTime()) / 86_400_000);
 }
 
 function toDateStr(d: Date): string {
@@ -146,8 +143,7 @@ export async function getReceivableAgingReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver el aging de cuentas por cobrar");
   }
 
-  const asOf = filters.asOfDate ? new Date(filters.asOfDate) : new Date();
-  asOf.setHours(0, 0, 0, 0);
+  const asOf = parseObligationAsOfDate(filters.asOfDate);
 
   const rows = await prisma.receivable.findMany({
     where: {
@@ -182,17 +178,13 @@ export async function getReceivableAgingReport(
 
     if (filters.search && !matchesSearch(filters.search, contactName, invoiceNumber, projectName)) continue;
 
-    const dueDate    = new Date(r.dueDate); dueDate.setHours(0, 0, 0, 0);
-    const daysOverdue = Math.max(0, diffDays(dueDate, asOf));
-    const bucket      = getBucket(daysOverdue);
+    const dueDate = startOfDayUtc(new Date(r.dueDate));
+    const daysOverdue = obligationDaysOverdue(dueDate, asOf);
+    const bucket = getBucket(daysOverdue);
 
     if (filters.bucket && bucket !== filters.bucket) continue;
 
-    // Derive OVERDUE on read — BR-AR-002 / D5
-    let status = r.status as string;
-    if (status !== "PAID" && status !== "CANCELLED" && balanceDue.greaterThan(ZERO) && daysOverdue > 0) {
-      status = "OVERDUE";
-    }
+    const status = deriveObligationDisplayStatus(r.status, balanceDue, dueDate, asOf);
 
     const item: AgingItem = {
       id:             r.id,
@@ -237,8 +229,7 @@ export async function getPayableAgingReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver el aging de cuentas por pagar");
   }
 
-  const asOf = filters.asOfDate ? new Date(filters.asOfDate) : new Date();
-  asOf.setHours(0, 0, 0, 0);
+  const asOf = parseObligationAsOfDate(filters.asOfDate);
 
   const rows = await prisma.payable.findMany({
     where: {
@@ -272,16 +263,13 @@ export async function getPayableAgingReport(
 
     if (filters.search && !matchesSearch(filters.search, contactName, invoiceNumber, projectName)) continue;
 
-    const dueDate     = new Date(p.dueDate); dueDate.setHours(0, 0, 0, 0);
-    const daysOverdue = Math.max(0, diffDays(dueDate, asOf));
-    const bucket      = getBucket(daysOverdue);
+    const dueDate = startOfDayUtc(new Date(p.dueDate));
+    const daysOverdue = obligationDaysOverdue(dueDate, asOf);
+    const bucket = getBucket(daysOverdue);
 
     if (filters.bucket && bucket !== filters.bucket) continue;
 
-    let status = p.status as string;
-    if (status !== "PAID" && status !== "CANCELLED" && balanceDue.greaterThan(ZERO) && daysOverdue > 0) {
-      status = "OVERDUE";
-    }
+    const status = deriveObligationDisplayStatus(p.status, balanceDue, dueDate, asOf);
 
     const item: AgingItem = {
       id:             p.id,

@@ -57,6 +57,7 @@ export async function issueCompanySupplierInvoiceAction(
     revalidatePath(FIN_LIST);
     revalidatePath(`${FIN_LIST}/${invoiceId}`);
     revalidatePath("/finanzas/cuentas-por-pagar");
+    revalidatePath("/finanzas/transacciones");
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -72,6 +73,7 @@ export async function cancelCompanySupplierInvoiceAction(
     revalidatePath(FIN_LIST);
     revalidatePath(`${FIN_LIST}/${invoiceId}`);
     revalidatePath("/finanzas/cuentas-por-pagar");
+    revalidatePath("/finanzas/transacciones");
     return { ok: true };
   } catch (err) {
     return handle(err);

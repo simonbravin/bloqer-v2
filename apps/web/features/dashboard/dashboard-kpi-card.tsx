@@ -7,6 +7,7 @@ export function DashboardKpiCard({ kpi }: { kpi: DashboardKpi }) {
       label={kpi.label}
       value={kpi.value}
       href={kpi.href}
+      helper={kpi.helper}
       tone={(kpi.tone ?? "default") as KpiStatTone}
     />
   );

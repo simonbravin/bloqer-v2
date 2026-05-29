@@ -6,7 +6,8 @@ import {
 } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
-import { inDateRange, monthKey, monthLabel, projectionHorizon } from "./report-month";
+import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
+import { monthLabel, projectionBucketKey, projectionHorizon } from "./report-month";
 
 export type CashProjectionFilters = {
   dateFrom?: string;
@@ -42,8 +43,7 @@ export type CashProjectionReport = {
   sectionsExcluded: TenantModuleSectionExcludedWarning[];
 };
 
-const OPEN_AR = ["OPEN", "PARTIAL"] as const;
-const OPEN_AP = ["OPEN", "PARTIAL"] as const;
+const OPEN_OBLIGATION = ACTIVE_OBLIGATION_STATUSES;
 
 export async function getProjectCashProjectionReport(
   projectId: string,
@@ -88,7 +88,7 @@ export async function getProjectCashProjectionReport(
       : projectionHorizon(90);
 
   warnings.push(
-    "Proyección basada en saldos pendientes de AR/AP por fecha de vencimiento; no incluye OC abiertas (R-006).",
+    "Proyección basada en saldos pendientes de AR/AP con vencimiento hasta el fin del horizonte (incluye vencidas); no incluye OC abiertas (R-006).",
   );
 
   const [receivables, payables] = await Promise.all([
@@ -97,7 +97,7 @@ export async function getProjectCashProjectionReport(
           where: {
             tenantId: ctx.tenantId,
             projectId,
-            status: { in: [...OPEN_AR] },
+            status: { in: [...OPEN_OBLIGATION] },
             ...(filters.currency ? { currency: filters.currency } : {}),
           },
           select: {
@@ -113,7 +113,7 @@ export async function getProjectCashProjectionReport(
           where: {
             tenantId: ctx.tenantId,
             projectId,
-            status: { in: [...OPEN_AP] },
+            status: { in: [...OPEN_OBLIGATION] },
             ...(filters.currency ? { currency: filters.currency } : {}),
           },
           select: {
@@ -145,9 +145,9 @@ export async function getProjectCashProjectionReport(
     for (const r of receivables.filter((x) => x.currency === cur)) {
       const balance = r.originalAmount.minus(r.paidAmount);
       if (balance.lessThanOrEqualTo(0)) continue;
-      if (!inDateRange(r.dueDate, range.dateFrom, range.dateTo)) continue;
+      const key = projectionBucketKey(r.dueDate, range.dateFrom, range.dateTo);
+      if (!key) continue;
       recvCount += 1;
-      const key = monthKey(r.dueDate);
       ensure(key).in = ensure(key).in.plus(balance);
     }
 
@@ -155,9 +155,9 @@ export async function getProjectCashProjectionReport(
     for (const p of payables.filter((x) => x.currency === cur)) {
       const balance = p.originalAmount.minus(p.paidAmount);
       if (balance.lessThanOrEqualTo(0)) continue;
-      if (!inDateRange(p.dueDate, range.dateFrom, range.dateTo)) continue;
+      const key = projectionBucketKey(p.dueDate, range.dateFrom, range.dateTo);
+      if (!key) continue;
       payCount += 1;
-      const key = monthKey(p.dueDate);
       ensure(key).out = ensure(key).out.plus(balance);
     }
 

@@ -4,6 +4,9 @@ import type { CreateSupplierInvoiceInput, UpdateSupplierInvoiceInput } from "@bl
 import { log } from "../audit/audit.service";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { assertCanCancelSupplierInvoice } from "./supplier-invoice-cancel-guards";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { resolvePagination } from "../finance/pagination";
 import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 
@@ -69,10 +72,18 @@ export async function getSupplierInvoiceById(
   return serializeInvoice(inv);
 }
 
+export type ProjectSupplierInvoiceListFilters = {
+  page?: number;
+  pageSize?: number;
+};
+
+export type ProjectSupplierInvoiceListRow = Omit<SupplierInvoiceView, "lines">;
+
 export async function listSupplierInvoicesByProject(
   projectId: string,
   ctx: ServiceContext,
-): Promise<SupplierInvoiceView[]> {
+  filters?: ProjectSupplierInvoiceListFilters,
+): Promise<{ data: ProjectSupplierInvoiceListRow[]; total: number }> {
   await assertApTenantModule(ctx);
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de proveedor");
@@ -81,15 +92,44 @@ export async function listSupplierInvoicesByProject(
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
-  const invoices = await prisma.supplierInvoice.findMany({
-    where: { projectId, tenantId: ctx.tenantId },
-    include: {
-      lines: { orderBy: { sortOrder: "asc" } },
-      supplierContact: { select: { legalName: true, fantasyName: true } },
-    },
-    orderBy: { number: "asc" },
+  const { skip, take } = resolvePagination({
+    page: filters?.page,
+    pageSize: filters?.pageSize,
   });
-  return invoices.map(serializeInvoice);
+
+  const where = { projectId, tenantId: ctx.tenantId };
+
+  const [invoices, total] = await Promise.all([
+    prisma.supplierInvoice.findMany({
+      where,
+      include: {
+        supplierContact: { select: { legalName: true, fantasyName: true } },
+      },
+      orderBy: [{ number: "asc" }, { id: "asc" }],
+      skip,
+      take,
+    }),
+    prisma.supplierInvoice.count({ where }),
+  ]);
+
+  return { data: invoices.map(serializeInvoiceListRow), total };
+}
+
+export async function countOpenSupplierInvoicesByProject(
+  projectId: string,
+  ctx: ServiceContext,
+): Promise<number> {
+  await assertApTenantModule(ctx);
+  if (!canViewApProjectArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de proveedor");
+  }
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+
+  return prisma.supplierInvoice.count({
+    where: { projectId, tenantId: ctx.tenantId, status: "ISSUED" },
+  });
 }
 
 export type CompanySupplierInvoiceListFilters = {
@@ -97,17 +137,26 @@ export type CompanySupplierInvoiceListFilters = {
   supplierContactId?: string;
   issueDateFrom?:    string;
   issueDateTo?:      string;
+  page?:              number;
+  pageSize?:          number;
 };
+
+export type CompanySupplierInvoiceListRow = Omit<SupplierInvoiceView, "lines">;
 
 /** AP at company level: invoices with no project. Requires VIEW AP (not VIEW PROJECTS). */
 export async function listCompanySupplierInvoices(
   ctx: ServiceContext,
   filters?: CompanySupplierInvoiceListFilters,
-): Promise<SupplierInvoiceView[]> {
+): Promise<{ data: CompanySupplierInvoiceListRow[]; total: number }> {
   await assertApTenantModule(ctx);
   if (!canViewCompanyAp(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de proveedor a nivel empresa");
   }
+
+  const { skip, take } = resolvePagination({
+    page: filters?.page,
+    pageSize: filters?.pageSize,
+  });
 
   const where: Prisma.SupplierInvoiceWhereInput = {
     tenantId:  ctx.tenantId,
@@ -125,15 +174,21 @@ export async function listCompanySupplierInvoices(
       : {}),
   };
 
-  const invoices = await prisma.supplierInvoice.findMany({
-    where,
-    include: {
-      lines: { orderBy: { sortOrder: "asc" } },
-      supplierContact: { select: { legalName: true, fantasyName: true } },
-    },
-    orderBy: { number: "desc" },
-  });
-  return invoices.map(serializeInvoice);
+  const [invoices, total] = await Promise.all([
+    prisma.supplierInvoice.findMany({
+      where,
+      include: {
+        supplierContact: { select: { legalName: true, fantasyName: true } },
+      },
+      orderBy: [{ number: "desc" }, { id: "desc" }],
+      skip,
+      take,
+    }),
+    prisma.supplierInvoice.count({ where }),
+  ]);
+
+  const data = invoices.map(serializeInvoiceListRow);
+  return { data, total };
 }
 
 /**
@@ -169,7 +224,7 @@ export async function getCompanySupplierInvoiceById(
 // ─── Resolve company (AP) ─────────────────────────────────────────────────────
 
 /** companyId anchor: membership company, else project.company, else first ACTIVE company in tenant. */
-async function resolveCompanyIdForAp(
+export async function resolveCompanyIdForAp(
   projectId: string | null | undefined,
   ctx: ServiceContext,
 ): Promise<string> {
@@ -546,20 +601,30 @@ export async function cancelSupplierInvoice(
     // BR-AP-003: if ISSUED, cancel linked Payable only if no active payments
     if (inv.status === "ISSUED") {
       const payable = await tx.payable.findUnique({ where: { supplierInvoiceId: id } });
+      const activePaymentCount = payable
+        ? await tx.payment.count({
+            where: { payableId: payable.id, status: "CONFIRMED", tenantId: ctx.tenantId },
+          })
+        : 0;
+      assertCanCancelSupplierInvoice({
+        status: inv.status,
+        hasPayable: payable != null,
+        activePaymentCount,
+        payablePaidAmount: payable?.paidAmount ?? null,
+      });
       if (payable) {
-        const activePayments = await tx.payment.count({
-          where: { payableId: payable.id, status: "CONFIRMED" },
-        });
-        if (activePayments > 0) {
-          throw new ServiceError(
-            "CONFLICT",
-            "No se puede cancelar: existen pagos confirmados. Cancele los pagos primero.",
-          );
-        }
-        await tx.payable.update({
-          where: { id: payable.id },
+        const payableCancel = await tx.payable.updateMany({
+          where: {
+            id: payable.id,
+            status: { not: "CANCELLED" },
+            paidAmount: payable.paidAmount,
+          },
           data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
         });
+        assertOptimisticRowUpdate(
+          payableCancel.count,
+          "El saldo cambió mientras cancelabas la factura. Revisá pagos e intentá de nuevo.",
+        );
       }
     }
 
@@ -606,6 +671,21 @@ type RawInvoice = SupplierInvoice & {
   }>;
   supplierContact: { legalName: string; fantasyName: string | null };
 };
+
+type RawInvoiceListRow = SupplierInvoice & {
+  supplierContact: { legalName: string; fantasyName: string | null };
+};
+
+function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoiceListRow {
+  return {
+    ...inv,
+    subtotal:    inv.subtotal.toString(),
+    taxAmount:   inv.taxAmount.toString(),
+    totalAmount: inv.totalAmount.toString(),
+    code:        `FP-${String(inv.number).padStart(5, "0")}`,
+    supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
+  };
+}
 
 function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
   return {
