@@ -22,6 +22,38 @@ export const ALLOWED_MIME_TYPES = [
 
 export type AllowedMimeType = typeof ALLOWED_MIME_TYPES[number];
 
+const EXTENSION_MIME_MAP: Record<string, AllowedMimeType> = {
+  pdf:  "application/pdf",
+  jpg:  "image/jpeg",
+  jpeg: "image/jpeg",
+  png:  "image/png",
+  webp: "image/webp",
+  heic: "image/heic",
+  heif: "image/heif",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  doc:  "application/msword",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  xls:  "application/vnd.ms-excel",
+  csv:  "text/csv",
+  txt:  "text/plain",
+};
+
+/** Resolve a canonical allowed MIME type from browser hint and/or file extension. */
+export function resolveAllowedMimeType(
+  fileName:        string,
+  browserMimeType?: string | null,
+): AllowedMimeType | null {
+  const browser = browserMimeType?.trim();
+  if (browser && (ALLOWED_MIME_TYPES as readonly string[]).includes(browser)) {
+    return browser as AllowedMimeType;
+  }
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  if (ext && ext in EXTENSION_MIME_MAP) {
+    return EXTENSION_MIME_MAP[ext]!;
+  }
+  return null;
+}
+
 const MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 export const createDocumentMetadataSchema = z.object({

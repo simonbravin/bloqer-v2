@@ -24,7 +24,11 @@ export default async function NuevoDocumentoPage({ params }: PageProps) {
       </div>
 
       <div className="rounded-lg border bg-card p-6">
-        <DocumentForm projectId={id} storageConfigured={storageConfigured} />
+        <DocumentForm
+          projectId={id}
+          storageConfigured={storageConfigured}
+          revalidatePaths={[`/proyectos/${id}/documentos`]}
+        />
       </div>
     </PageShell>
   );

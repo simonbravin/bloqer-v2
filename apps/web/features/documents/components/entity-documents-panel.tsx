@@ -335,6 +335,7 @@ export function EntityDocumentsPanel({
             defaultCategory={defaultCategory}
             afterUploadPath={afterUploadPath}
             cancelHref={cancelHref}
+            revalidatePaths={[afterUploadPath, ...revalidateExtra]}
             submitLabel="Subir adjunto"
             placeholderWarning="La carga real de archivos no está configurada en este entorno. Solo se guardará la metadata (modo desarrollo)."
           />

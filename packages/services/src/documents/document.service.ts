@@ -1,5 +1,6 @@
 import { prisma } from "@bloqer/database";
-import { buildStorageKey, getPresignedPutUrl, getPresignedGetUrl } from "@bloqer/storage";
+import type { LinkedEntityType } from "@bloqer/database";
+import { buildStorageKey, putObject, getPresignedGetUrl } from "@bloqer/storage";
 import { isStorageConfigured } from "@bloqer/config";
 import { can, type PermissionModule } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
@@ -112,10 +113,28 @@ export async function createDocumentMetadata(
   return serialize(doc, ctx, gate);
 }
 
-export async function initiateDocumentUpload(
+type DocumentUploadPlan = {
+  id:               string;
+  anchorProjectId:  string | null;
+  fileName:         string;
+  storageKey:       string;
+  linkedEntityType:
+    | "PROJECT"
+    | "JOBSITE_LOG"
+    | "CERTIFICATION"
+    | "SUPPLIER_INVOICE"
+    | "PURCHASE_ORDER"
+    | "PURCHASE_RECEIPT"
+    | "SUBCONTRACT"
+    | "SUBCONTRACT_CERTIFICATION"
+    | "BUDGET";
+  linkedEntityId: string;
+};
+
+async function resolveDocumentUploadPlan(
   input: InitiateUploadInput,
   ctx:   ServiceContext,
-): Promise<{ documentId: string; uploadUrl: string | null; storageConfigured: boolean }> {
+): Promise<DocumentUploadPlan> {
   const linkedJobsiteLog =
     input.linkedEntityType === "JOBSITE_LOG" && input.linkedEntityId
       ? { logId: input.linkedEntityId as string }
@@ -202,7 +221,6 @@ export async function initiateDocumentUpload(
   }
 
   let anchorProjectId: string | null = null;
-  /** Non-null for any path that requires a project (all except corporate supplier-invoice upload). */
   let strictProjectId: string | undefined;
 
   if (linkedSupplierInvoice) {
@@ -242,16 +260,7 @@ export async function initiateDocumentUpload(
     strictProjectId   = input.projectId;
   }
 
-  let linkedEntityType:
-    | "PROJECT"
-    | "JOBSITE_LOG"
-    | "CERTIFICATION"
-    | "SUPPLIER_INVOICE"
-    | "PURCHASE_ORDER"
-    | "PURCHASE_RECEIPT"
-    | "SUBCONTRACT"
-    | "SUBCONTRACT_CERTIFICATION"
-    | "BUDGET" = "PROJECT";
+  let linkedEntityType: DocumentUploadPlan["linkedEntityType"] = "PROJECT";
   let linkedEntityId = anchorProjectId ?? "";
   if (linkedJobsiteLog) {
     await assertJobsiteLogDocumentTarget(strictProjectId!, linkedJobsiteLog.logId, ctx);
@@ -290,78 +299,32 @@ export async function initiateDocumentUpload(
     linkedEntityId   = linkedBudget.budgetId;
   }
 
-  const configured = isStorageConfigured();
   const id         = crypto.randomUUID();
   const fileName   = sanitize(input.originalFileName);
   const storageKey = buildStorageKey(ctx.tenantId, anchorProjectId, id, input.originalFileName);
-  const provider   = configured ? "R2" : "PLACEHOLDER";
-  const status     = configured ? "UPLOADING" : "ACTIVE";
 
-  const doc = await prisma.documentAttachment.create({
-    data: {
-      id,
-      tenantId:         ctx.tenantId,
-      companyId:        ctx.companyId ?? null,
-      projectId:        anchorProjectId,
-      originalFileName: input.originalFileName,
-      fileName,
-      mimeType:         input.mimeType,
-      sizeBytes:        input.sizeBytes,
-      storageProvider:  provider,
-      storageKey,
-      category:         input.category ?? "OTHER",
-      description:      input.description ?? null,
-      status,
-      linkedEntityType,
-      linkedEntityId,
-      uploadedBy:       ctx.actorUserId,
-    },
-  });
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "document.upload_initiated",
-    entityType:  "DocumentAttachment",
-    entityId:    doc.id,
-    after:       { originalFileName: doc.originalFileName, storageProvider: provider, status },
-  });
-
-  let uploadUrl: string | null = null;
-  if (configured) {
-    uploadUrl = await getPresignedPutUrl(storageKey, input.mimeType, 300);
-  }
-
-  return { documentId: id, uploadUrl, storageConfigured: configured };
+  return {
+    id,
+    anchorProjectId,
+    fileName,
+    storageKey,
+    linkedEntityType,
+    linkedEntityId,
+  };
 }
 
-export async function confirmDocumentUpload(
-  id:  string,
+async function notifyDocumentUploadConfirmed(
+  doc: {
+    id: string;
+    originalFileName: string;
+    uploadedBy: string | null;
+    companyId: string | null;
+    linkedEntityType: LinkedEntityType | null;
+    linkedEntityId: string | null;
+    projectId: string | null;
+  },
   ctx: ServiceContext,
 ): Promise<void> {
-  const doc = await prisma.documentAttachment.findUnique({ where: { id } });
-  if (!doc || doc.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Documento no encontrado");
-  const gate = await getTenantModuleGate(ctx);
-  assertLinkedEntityTenantModuleEnabled(gate, doc.linkedEntityType);
-  if (!canMutateDocumentByLink(doc.linkedEntityType, ctx)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para confirmar subida");
-  }
-  if (doc.status !== "UPLOADING") throw new ServiceError("CONFLICT", "El documento no está en estado UPLOADING");
-  if (doc.storageProvider !== "R2") {
-    throw new ServiceError("CONFLICT", "Solo se confirman subidas al almacenamiento R2");
-  }
-
-  await prisma.documentAttachment.update({ where: { id }, data: { status: "ACTIVE" } });
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "document.upload_confirmed",
-    entityType:  "DocumentAttachment",
-    entityId:    id,
-    after:       { status: "ACTIVE" },
-  });
-
   try {
     if (doc.uploadedBy?.trim()) {
       await createSystemNotification({
@@ -375,13 +338,88 @@ export async function confirmDocumentUpload(
         linkedEntityType: doc.linkedEntityType,
         linkedEntityId: doc.linkedEntityId,
         projectId: doc.projectId,
-        actionUrl: doc.projectId ? `/proyectos/${doc.projectId}/documentos/${id}` : null,
-        metadata: { documentId: id },
+        actionUrl: doc.projectId ? `/proyectos/${doc.projectId}/documentos/${doc.id}` : null,
+        metadata: { documentId: doc.id },
       });
     }
   } catch {
     /* best-effort in-app notification (Phase 8A) */
   }
+}
+
+export async function uploadDocument(
+  input:   InitiateUploadInput,
+  content: Buffer,
+  ctx:     ServiceContext,
+): Promise<{ documentId: string; storageConfigured: boolean }> {
+  const configured = isStorageConfigured();
+
+  if (input.sizeBytes === 0) {
+    throw new ServiceError("VALIDATION", "El archivo está vacío");
+  }
+  if (configured) {
+    if (content.length === 0) {
+      throw new ServiceError("VALIDATION", "El archivo está vacío");
+    }
+    if (content.length !== input.sizeBytes) {
+      throw new ServiceError("VALIDATION", "El tamaño del archivo no coincide");
+    }
+  }
+
+  const plan     = await resolveDocumentUploadPlan(input, ctx);
+  const provider = configured ? "R2" : "PLACEHOLDER";
+  const status   = configured ? "UPLOADING" : "ACTIVE";
+
+  const doc = await prisma.documentAttachment.create({
+    data: {
+      id:               plan.id,
+      tenantId:         ctx.tenantId,
+      companyId:        ctx.companyId ?? null,
+      projectId:        plan.anchorProjectId,
+      originalFileName: input.originalFileName,
+      fileName:         plan.fileName,
+      mimeType:         input.mimeType,
+      sizeBytes:        input.sizeBytes,
+      storageProvider:  provider,
+      storageKey:       plan.storageKey,
+      category:         input.category ?? "OTHER",
+      description:      input.description ?? null,
+      status,
+      linkedEntityType: plan.linkedEntityType,
+      linkedEntityId:   plan.linkedEntityId,
+      uploadedBy:       ctx.actorUserId,
+    },
+  });
+
+  if (configured) {
+    try {
+      await putObject(plan.storageKey, content, input.mimeType);
+    } catch {
+      await prisma.documentAttachment.update({
+        where: { id: plan.id },
+        data:  { status: "DELETED" },
+      });
+      throw new ServiceError("VALIDATION", "Error al guardar el archivo. Intentá de nuevo.");
+    }
+
+    await prisma.documentAttachment.update({
+      where: { id: plan.id },
+      data:  { status: "ACTIVE" },
+    });
+  }
+
+  await log({
+    tenantId:    ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    action:      "document.uploaded",
+    entityType:  "DocumentAttachment",
+    entityId:    doc.id,
+    after:       { originalFileName: doc.originalFileName, storageProvider: provider, status: "ACTIVE" },
+  });
+
+  await notifyDocumentUploadConfirmed(doc, ctx);
+
+  return { documentId: plan.id, storageConfigured: configured };
 }
 
 export async function getDocumentDownloadUrl(

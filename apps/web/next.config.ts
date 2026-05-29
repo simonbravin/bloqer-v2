@@ -9,6 +9,11 @@ const monorepoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..
 const nextConfig: NextConfig = {
   outputFileTracingRoot: monorepoRoot,
   serverExternalPackages: ["@prisma/client", "@prisma/engines", "prisma"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "52mb",
+    },
+  },
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.plugins = [...(config.plugins ?? []), new PrismaPlugin()];

@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ALLOWED_MIME_TYPES } from "@bloqer/validators";
+import { ALLOWED_MIME_TYPES, resolveAllowedMimeType } from "@bloqer/validators";
+import { uploadDocumentAction } from "../upload-document-action";
 
 const CATEGORY_OPTIONS = [
   { value: "CONTRACT",         label: "Contrato" },
@@ -47,6 +48,8 @@ interface Props {
   cancelHref?:       string;
   submitLabel?:      string;
   placeholderWarning?: string;
+  /** App Router paths to revalidate after a successful upload. */
+  revalidatePaths?:  string[];
 }
 
 export function DocumentForm({
@@ -58,6 +61,7 @@ export function DocumentForm({
   cancelHref,
   submitLabel = "Subir documento",
   placeholderWarning,
+  revalidatePaths,
 }: Props) {
   const router    = useRouter();
   const [error, setError]     = useState<string | null>(null);
@@ -78,8 +82,8 @@ export function DocumentForm({
       return;
     }
 
-    const mime = file.type || "application/octet-stream";
-    if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(mime)) {
+    const mime = resolveAllowedMimeType(file.name, file.type);
+    if (!mime) {
       setError("Tipo de archivo no permitido. Formatos aceptados: PDF, imágenes, Word, Excel, CSV, texto.");
       e.target.value = "";
       setSelectedFile(null);
@@ -101,66 +105,36 @@ export function DocumentForm({
     setPending(true);
 
     try {
-      // 1. Request upload intent from server
-      const initiateRes = await fetch("/api/documents/initiate-upload", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          projectId: projectId ?? null,
-          originalFileName: selectedFile.name,
-          mimeType:         selectedFile.type || "application/octet-stream",
-          sizeBytes:        selectedFile.size,
-          category,
-          description:      description || null,
-          ...(linkedEntity
-            ? { linkedEntityType: linkedEntity.type, linkedEntityId: linkedEntity.id }
-            : {}),
-        }),
-      });
+      const paths = [
+        ...new Set([
+          ...(revalidatePaths ?? []),
+          ...(afterUploadPath ? [afterUploadPath] : []),
+          ...(projectId ? [`/proyectos/${projectId}/documentos`] : []),
+        ]),
+      ];
 
-      const initiateData = await initiateRes.json() as {
-        documentId?: string;
-        uploadUrl?: string | null;
-        storageConfigured?: boolean;
-        error?: string;
-      };
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("category", category);
+      if (description) formData.append("description", description);
+      if (projectId) formData.append("projectId", projectId);
+      if (linkedEntity) {
+        formData.append("linkedEntityType", linkedEntity.type);
+        formData.append("linkedEntityId", linkedEntity.id);
+      }
+      if (paths.length > 0) {
+        formData.append("revalidatePaths", JSON.stringify(paths));
+      }
 
-      if (!initiateRes.ok) {
-        setError(initiateData.error ?? "Error al iniciar la subida");
+      const result = await uploadDocumentAction(formData);
+
+      if ("error" in result) {
+        setError(result.error);
         setPending(false);
         return;
       }
 
-      const { documentId, uploadUrl } = initiateData;
-      if (!documentId) {
-        setError("Respuesta inesperada del servidor");
-        setPending(false);
-        return;
-      }
-
-      // 2. If storage is configured, PUT the file to R2
-      if (uploadUrl) {
-        const putRes = await fetch(uploadUrl, {
-          method:  "PUT",
-          headers: { "Content-Type": selectedFile.type || "application/octet-stream" },
-          body:    selectedFile,
-        });
-
-        if (!putRes.ok) {
-          setError("Error al subir el archivo al almacenamiento. Intentá de nuevo.");
-          setPending(false);
-          return;
-        }
-
-        // 3. Confirm upload
-        const confirmRes = await fetch(`/api/documents/${documentId}/confirm`, { method: "POST" });
-        if (!confirmRes.ok) {
-          setError("El archivo se subió pero no se pudo confirmar. Contactá soporte.");
-          setPending(false);
-          return;
-        }
-      }
-
+      const { documentId } = result;
       const nextPath =
         afterUploadPath ??
         (projectId ? `/proyectos/${projectId}/documentos/${documentId}` : null);
@@ -171,7 +145,7 @@ export function DocumentForm({
       router.refresh();
       setPending(false);
     } catch {
-      setError("Error de red. Verificá tu conexión e intentá de nuevo.");
+      setError("Error al subir el archivo. Intentá de nuevo.");
       setPending(false);
     }
   }

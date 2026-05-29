@@ -41,21 +41,25 @@ function createS3Client() {
   };
 }
 
-// ─── Presigned URLs ───────────────────────────────────────────────────────────
+// ─── Server-side upload ───────────────────────────────────────────────────────
 
-export async function getPresignedPutUrl(
-  storageKey:      string,
-  mimeType:        string,
-  expiresInSeconds = 300,
-): Promise<string> {
+export async function putObject(
+  storageKey: string,
+  body:       Buffer | Uint8Array,
+  mimeType:   string,
+): Promise<void> {
   const { client, bucket } = createS3Client();
-  const command = new PutObjectCommand({
-    Bucket:      bucket,
-    Key:         storageKey,
-    ContentType: mimeType,
-  });
-  return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
+  await client.send(
+    new PutObjectCommand({
+      Bucket:      bucket,
+      Key:         storageKey,
+      Body:        body,
+      ContentType: mimeType,
+    }),
+  );
 }
+
+// ─── Presigned URLs (download) ────────────────────────────────────────────────
 
 export async function getPresignedGetUrl(
   storageKey:      string,

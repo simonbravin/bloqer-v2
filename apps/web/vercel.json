@@ -1,4 +1,10 @@
 {
+  "functions": {
+    "app/**/*.{js,ts}": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/operational-alerts",
