@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
 import { getStockMovementReport } from "@bloqer/services";
 import { StockMovementReportTable, StockReportFilters } from "@/features/inventory-reports";
-import { ReportCsvExportLink } from "@/features/reports";
+import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
@@ -57,7 +57,7 @@ export default async function MovimientosInventarioPage({ searchParams }: PagePr
           <h1 className="text-2xl font-bold tracking-tight">Movimientos de inventario</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ReportCsvExportLink exportPath="/api/reports/inventario/movimientos.csv" params={sp} />
+          <ReportExportActions exportPath="/api/reports/inventario/movimientos.csv" params={sp} pdf />
           <ReportEmailSendDialog
             reportType="INVENTORY_MOVEMENTS"
             supportsPdf={false}

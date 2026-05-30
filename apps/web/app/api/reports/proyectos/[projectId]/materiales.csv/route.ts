@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportMaterialVarianceCsv,
+  exportMaterialVariancePdf,
   getMaterialVarianceReport,
   parseProjectReportDateFilters,
 } from "@bloqer/services";
 import {
   csvResponse,
+  pdfResponse,
   reportExportErrorResponse,
   requireReportExportContext,
   searchParamsRecord,
@@ -24,6 +26,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ projectId: 
     if (fmt === "json") {
       const data = await getMaterialVarianceReport(projectId, filters, auth.ctx);
       return NextResponse.json(data);
+    }
+    if (fmt === "pdf") {
+      const { buffer, filename } = await exportMaterialVariancePdf(projectId, filters, auth.ctx);
+      return pdfResponse(buffer, filename);
     }
     if (fmt === "csv") {
       const { content, filename } = await exportMaterialVarianceCsv(projectId, filters, auth.ctx);

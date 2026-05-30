@@ -9,9 +9,8 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { CashProjectionChart } from "@/features/reports/cash-projection-chart";
-import { ReportDateFilters } from "@/features/reports";
+import { ReportDateFilters, ReportExportActions } from "@/features/reports";
 import { ProjectCashFlowChart, ProjectCashFlowFilters } from "@/features/project-cash-flow";
-import { ReportCsvExportLink } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
@@ -90,9 +89,10 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
         title="Caja — real y proyección"
         subtitle="R-005 flujo de caja confirmado · R-006 cobros/pagos esperados por vencimiento"
         actions={
-          <ReportCsvExportLink
+          <ReportExportActions
             exportPath={`/api/reports/proyectos/${projectId}/flujo-caja.csv`}
             params={sp}
+            pdfOnly
           />
         }
       />

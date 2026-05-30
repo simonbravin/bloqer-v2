@@ -19,6 +19,8 @@ import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { DashboardKpiCard } from "@/features/dashboard/dashboard-kpi-card";
 import { IncomeExpenseChart } from "@/features/reports/income-expense-chart";
 import { CostCompositionChart } from "@/features/projects/cost-composition-chart";
+import { ProjectCashFlowChart } from "@/features/project-cash-flow/components/project-cash-flow-chart";
+import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { formatMoneyAmount } from "@/lib/format-money";
 
 function warningText(w: { module: string; section: string; reason: string }): string {
@@ -61,6 +63,10 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
       ? dashboard.costComposition
       : null;
 
+  const cashCur =
+    dashboard.cashFlow?.currencies.find((c) => c.currency === moneyCurrency) ??
+    dashboard.cashFlow?.currencies[0];
+
   return (
     <div className="space-y-6">
       <ProjectPageHeader
@@ -85,6 +91,141 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
             ))}
           </ul>
         </div>
+      ) : null}
+
+      {(dashboard.monthBalance || dashboard.monthCashFlow) && (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Visión rápida del mes
+            </h2>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={dashboard.months === 6 ? "secondary" : "outline"}
+                onClick={() => setMonths(6)}
+              >
+                6 meses
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={dashboard.months === 12 ? "secondary" : "outline"}
+                onClick={() => setMonths(12)}
+              >
+                12 meses
+              </Button>
+            </div>
+          </div>
+          <KpiStatGrid title={null} columns={4}>
+            {dashboard.monthBalance ? (
+              <>
+                <KpiStatCard
+                  label={`Balance (${dashboard.monthBalance.periodLabel})`}
+                  value={formatMoneyAmount(
+                    dashboard.monthBalance.grossMarginAccrued,
+                    dashboard.monthBalance.currency,
+                  )}
+                  helper="MB devengado del último mes"
+                  tone={
+                    parseFloat(dashboard.monthBalance.grossMarginAccrued) >= 0 ? "success" : "danger"
+                  }
+                />
+                <KpiStatCard
+                  label="Certificado"
+                  value={formatMoneyAmount(
+                    dashboard.monthBalance.certifiedAmount,
+                    dashboard.monthBalance.currency,
+                  )}
+                />
+                <KpiStatCard
+                  label="Costo devengado"
+                  value={formatMoneyAmount(
+                    dashboard.monthBalance.costAccrued,
+                    dashboard.monthBalance.currency,
+                  )}
+                />
+              </>
+            ) : null}
+            {dashboard.monthCashFlow ? (
+              <KpiStatCard
+                label={`Flujo de caja (${dashboard.monthCashFlow.periodLabel})`}
+                value={formatMoneyAmount(
+                  dashboard.monthCashFlow.netCashFlow,
+                  dashboard.monthCashFlow.currency,
+                )}
+                helper={`Entradas ${formatMoneyAmount(dashboard.monthCashFlow.inflows, dashboard.monthCashFlow.currency)} · Salidas ${formatMoneyAmount(dashboard.monthCashFlow.outflows, dashboard.monthCashFlow.currency)}`}
+                tone={
+                  parseFloat(dashboard.monthCashFlow.netCashFlow) >= 0 ? "success" : "danger"
+                }
+              />
+            ) : null}
+          </KpiStatGrid>
+        </section>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {dashboard.incomeExpense && dashboard.incomeExpense.series.length > 0 ? (
+          <IncomeExpenseChart
+            series={dashboard.incomeExpense.series}
+            variant="trend"
+            title="Tendencia mensual"
+            description={`Últimos ${dashboard.months} meses · capa devengada`}
+          />
+        ) : (
+          <Card>
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              Sin tendencia de ingresos vs gastos.{" "}
+              <Link
+                href={`/proyectos/${projectId}/reportes/ingresos-gastos`}
+                className="underline underline-offset-2"
+              >
+                Ver reporte
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+        {composition ? (
+          <CostCompositionChart composition={composition} />
+        ) : (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Composición de gastos</CardTitle>
+              <CardDescription>Costo devengado por rubro APU</CardDescription>
+            </CardHeader>
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              Sin datos de composición.{" "}
+              <Link
+                href={`/proyectos/${projectId}/control-costos`}
+                className="underline underline-offset-2"
+              >
+                Control de costos
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {cashCur && cashCur.periods.length > 0 ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Flujo de caja mensual</CardTitle>
+            <CardDescription>
+              Movimientos confirmados ·{" "}
+              <Link href={`/proyectos/${projectId}/flujo-caja`} className="underline underline-offset-2">
+                Ver detalle
+              </Link>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ProjectCashFlowChart
+              periods={cashCur.periods}
+              currency={cashCur.currency}
+              variant="trend"
+            />
+          </CardContent>
+        </Card>
       ) : null}
 
       {dashboard.kpis.length > 0 ? (
@@ -169,90 +310,53 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
         </Card>
       ) : null}
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Ingresos vs gastos
-          </h2>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={dashboard.months === 6 ? "secondary" : "outline"}
-              onClick={() => setMonths(6)}
-            >
-              6 meses
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={dashboard.months === 12 ? "secondary" : "outline"}
-              onClick={() => setMonths(12)}
-            >
-              12 meses
-            </Button>
-          </div>
-        </div>
-        {dashboard.incomeExpense && dashboard.incomeExpense.series.length > 0 ? (
-          <IncomeExpenseChart series={dashboard.incomeExpense.series} />
-        ) : (
-          <Card>
-            <CardContent className="py-8 text-center text-sm text-muted-foreground">
-              Sin datos de ingresos vs gastos en el rango.{" "}
-              <Link
-                href={`/proyectos/${projectId}/reportes/ingresos-gastos`}
-                className="underline underline-offset-2"
-              >
-                Ver reporte
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      {dashboard.incomeExpense && dashboard.incomeExpense.series.length > 0 ? (
+        <IncomeExpenseChart
+          series={dashboard.incomeExpense.series}
+          title="Ingresos vs gastos (detalle)"
+          description="Certificado vs costo devengado con capa de caja"
+        />
+      ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {composition ? <CostCompositionChart composition={composition} /> : null}
-
-        {dashboard.topSuppliers.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Top proveedores</CardTitle>
-              <CardDescription>Por costo devengado en la obra</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TableScroll>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Proveedor</TableHead>
-                      <TableHead className="text-right">Devengado</TableHead>
-                      <TableHead className="text-right">Pagado</TableHead>
+      {dashboard.topSuppliers.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Top proveedores</CardTitle>
+            <CardDescription>Por costo devengado en la obra</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TableScroll>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Proveedor</TableHead>
+                    <TableHead className="text-right">Devengado</TableHead>
+                    <TableHead className="text-right">Pagado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dashboard.topSuppliers.map((s) => (
+                    <TableRow key={s.supplierContactId}>
+                      <TableCell className="font-medium">{s.supplierName}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoneyAmount(s.accruedCost, moneyCurrency)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {formatMoneyAmount(s.paidCost, moneyCurrency)}
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {dashboard.topSuppliers.map((s) => (
-                      <TableRow key={s.supplierContactId}>
-                        <TableCell className="font-medium">{s.supplierName}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatMoneyAmount(s.accruedCost, moneyCurrency)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                          {formatMoneyAmount(s.paidCost, moneyCurrency)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableScroll>
-              <Button asChild variant="link" size="sm" className="mt-3 px-0">
-                <Link href={`/proyectos/${projectId}/reportes/compras-proveedores`}>
-                  Ver reporte de compras
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ) : null}
-      </div>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableScroll>
+            <Button asChild variant="link" size="sm" className="mt-3 px-0">
+              <Link href={`/proyectos/${projectId}/reportes/compras-proveedores`}>
+                Ver reporte de compras
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {wbs &&
       (wbs.nearCompletion.length > 0 ||

@@ -13,7 +13,7 @@ import {
   ProcurementWbsDeviationTable,
   ReportDateFilters,
 } from "@/features/reports";
-import { ReportCsvExportLink } from "@/features/reports";
+import { ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
@@ -77,9 +77,10 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
         }
         actions={
           report.type === "REPORT" ? (
-            <ReportCsvExportLink
+            <ReportExportActions
               exportPath={`/api/reports/proyectos/${projectId}/compras-proveedores.csv`}
               params={sp}
+              pdf
             />
           ) : undefined
         }

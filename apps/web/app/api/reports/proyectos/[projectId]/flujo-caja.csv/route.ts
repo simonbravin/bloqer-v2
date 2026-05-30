@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  assertPdfExportNotRequested,
   exportProjectCashFlowCsv,
+  exportProjectCashFlowPdf,
   getProjectCashFlowReport,
   parseProjectCashFlowFilters,
 } from "@bloqer/services";
 import {
   csvResponse,
+  pdfResponse,
   reportExportErrorResponse,
   requireReportExportContext,
   searchParamsRecord,
@@ -20,14 +21,21 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ projectId: 
   const { projectId } = await ctx.params;
   const sp = searchParamsRecord(req);
   try {
-    assertPdfExportNotRequested(sp.format);
     const filters = parseProjectCashFlowFilters(sp);
-    if (sp.format === "json") {
+    const fmt = (sp.format ?? "csv").toLowerCase();
+    if (fmt === "json") {
       const data = await getProjectCashFlowReport(projectId, filters, auth.ctx);
       return NextResponse.json(data);
     }
-    const { content, filename } = await exportProjectCashFlowCsv(projectId, filters, auth.ctx);
-    return csvResponse(content, filename);
+    if (fmt === "pdf") {
+      const { buffer, filename } = await exportProjectCashFlowPdf(projectId, filters, auth.ctx);
+      return pdfResponse(buffer, filename);
+    }
+    if (fmt === "csv") {
+      const { content, filename } = await exportProjectCashFlowCsv(projectId, filters, auth.ctx);
+      return csvResponse(content, filename);
+    }
+    return NextResponse.json({ error: "Formato no soportado" }, { status: 400 });
   } catch (e) {
     return reportExportErrorResponse(e);
   }

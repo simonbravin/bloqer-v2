@@ -19,8 +19,31 @@ import {
   getProjectWbsProgressAlerts,
   type ProjectWbsProgressResult,
 } from "./project-wbs-progress-alerts.service";
+import {
+  getProjectCashFlowReport,
+  type ProjectCashFlowReport,
+} from "../project-cash-flow/project-cash-flow.service";
 import { defaultReportDateRange } from "../reports/report-month";
 import type { ServiceContext } from "../types";
+
+export type ProjectFinanceMonthBalance = {
+  periodLabel: string;
+  certifiedAmount: string;
+  costAccrued: string;
+  grossMarginAccrued: string;
+  collectedAmount: string;
+  costPaid: string;
+  grossMarginCash: string;
+  currency: string;
+};
+
+export type ProjectFinanceMonthCashFlow = {
+  periodLabel: string;
+  inflows: string;
+  outflows: string;
+  netCashFlow: string;
+  currency: string;
+};
 
 export type ProjectFinanceTopSupplier = {
   supplierContactId: string;
@@ -33,7 +56,10 @@ export type ProjectFinanceTopSupplier = {
 export type ProjectFinanceDashboard = {
   overview: ProjectFinanceOverview;
   kpis: DashboardKpi[];
+  monthBalance: ProjectFinanceMonthBalance | null;
+  monthCashFlow: ProjectFinanceMonthCashFlow | null;
   incomeExpense: IncomeExpenseReport | null;
+  cashFlow: ProjectCashFlowReport | null;
   cashProjection: CashProjectionReport | null;
   topSuppliers: ProjectFinanceTopSupplier[];
   costComposition: ProjectCostCompositionResult | null;
@@ -54,6 +80,7 @@ export async function getProjectFinanceDashboard(
 
   const [
     incomeExpense,
+    cashFlow,
     cashProjection,
     procurement,
     profitability,
@@ -61,12 +88,16 @@ export async function getProjectFinanceDashboard(
     wbsAlerts,
   ] = await Promise.all([
     safeIncomeExpense(projectId, range, ctx),
+    safeCashFlow(projectId, range, ctx),
     safeCashProjection(projectId, ctx),
     safeProcurement(projectId, budgetFilter, ctx),
     safeProfitability(projectId, ctx),
     safeCostComposition(projectId, budgetFilter, ctx),
     safeWbsAlerts(projectId, budgetFilter, ctx),
   ]);
+
+  const monthBalance = deriveMonthBalance(incomeExpense);
+  const monthCashFlow = deriveMonthCashFlow(cashFlow);
 
   const kpis: DashboardKpi[] = [];
 
@@ -117,13 +148,61 @@ export async function getProjectFinanceDashboard(
   return {
     overview,
     kpis,
+    monthBalance,
+    monthCashFlow,
     incomeExpense,
+    cashFlow,
     cashProjection,
     topSuppliers,
     costComposition,
     wbsAlerts,
     months,
   };
+}
+
+function deriveMonthBalance(report: IncomeExpenseReport | null): ProjectFinanceMonthBalance | null {
+  if (!report || report.series.length === 0) return null;
+  const last = report.series[report.series.length - 1]!;
+  return {
+    periodLabel: last.periodLabel,
+    certifiedAmount: last.certifiedAmount,
+    costAccrued: last.costAccrued,
+    grossMarginAccrued: last.grossMarginAccrued,
+    collectedAmount: last.collectedAmount,
+    costPaid: last.costPaid,
+    grossMarginCash: last.grossMarginCash,
+    currency: report.displayCurrency,
+  };
+}
+
+function deriveMonthCashFlow(report: ProjectCashFlowReport | null): ProjectFinanceMonthCashFlow | null {
+  if (!report) return null;
+  const cur = report.currencies.find((c) => c.currency === "ARS") ?? report.currencies[0];
+  if (!cur || cur.periods.length === 0) return null;
+  const last = cur.periods[cur.periods.length - 1]!;
+  return {
+    periodLabel: last.periodLabel,
+    inflows: last.inflows,
+    outflows: last.outflows,
+    netCashFlow: last.netCashFlow,
+    currency: cur.currency,
+  };
+}
+
+async function safeCashFlow(
+  projectId: string,
+  range: { dateFrom: string; dateTo: string },
+  ctx: ServiceContext,
+): Promise<ProjectCashFlowReport | null> {
+  try {
+    return await getProjectCashFlowReport(
+      projectId,
+      { dateFrom: range.dateFrom, dateTo: range.dateTo, period: "month" },
+      ctx,
+    );
+  } catch {
+    return null;
+  }
 }
 
 async function safeIncomeExpense(

@@ -1,11 +1,12 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
-  assertPdfExportNotRequested,
   exportCompanyPayablesCsv,
+  exportCompanyPayablesPdf,
   parseCompanyPayableExportFilters,
 } from "@bloqer/services";
 import {
   csvResponse,
+  pdfResponse,
   reportExportErrorResponse,
   requireReportExportContext,
   searchParamsRecord,
@@ -18,10 +19,17 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return auth.response;
   const sp = searchParamsRecord(req);
   try {
-    assertPdfExportNotRequested(sp.format);
     const filters = parseCompanyPayableExportFilters(sp);
-    const { content, filename } = await exportCompanyPayablesCsv(filters, auth.ctx);
-    return csvResponse(content, filename);
+    const fmt = (sp.format ?? "csv").toLowerCase();
+    if (fmt === "pdf") {
+      const { buffer, filename } = await exportCompanyPayablesPdf(filters, auth.ctx);
+      return pdfResponse(buffer, filename);
+    }
+    if (fmt === "csv") {
+      const { content, filename } = await exportCompanyPayablesCsv(filters, auth.ctx);
+      return csvResponse(content, filename);
+    }
+    return NextResponse.json({ error: "Formato no soportado" }, { status: 400 });
   } catch (e) {
     return reportExportErrorResponse(e);
   }

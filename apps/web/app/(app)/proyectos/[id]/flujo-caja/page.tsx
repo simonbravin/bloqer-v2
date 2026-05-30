@@ -12,7 +12,7 @@ import {
   PaymentDetailTable,
   ProjectFinanceSnapshotPanel,
 } from "@/features/project-cash-flow";
-import { ReportCsvExportLink } from "@/features/reports";
+import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
@@ -75,9 +75,10 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
         subtitle="Cobros y pagos imputados a la obra"
         actions={
           <>
-            <ReportCsvExportLink
+            <ReportExportActions
               exportPath={`/api/reports/proyectos/${id}/flujo-caja.csv`}
               params={sp}
+              pdf
             />
             <ReportEmailSendDialog
               reportType="PROJECT_CASH_FLOW"

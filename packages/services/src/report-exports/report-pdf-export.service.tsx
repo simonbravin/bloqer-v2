@@ -29,6 +29,35 @@ import {
 } from "../reports/project-profitability.service";
 import { getSubcontractVarianceReport, type SubcontractReportFilters } from "../reports/subcontract-variance.service";
 import { parseSubcontractReportFilters } from "./report-export.service";
+import type { MaterialReportFilters } from "../reports/material-variance.service";
+import { getMaterialVarianceReport } from "../reports/material-variance.service";
+import type { ProcurementReportFilters } from "../reports/procurement-deviation.service";
+import { getProcurementDeviationReport } from "../reports/procurement-deviation.service";
+import type { ProjectCashFlowFilters } from "../project-cash-flow/project-cash-flow.service";
+import { getProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
+import type {
+  CashFlowFilters,
+  CashPositionFilters,
+  MovementReportFilters,
+} from "../treasury-reports/treasury-reports.service";
+import {
+  getAccountMovementReport,
+  getCashFlowReport,
+  getCashPositionReport,
+} from "../treasury-reports/treasury-reports.service";
+import type {
+  StockBalanceFilters,
+  StockMovementReportFilters,
+} from "../inventory-reports/inventory-reports.service";
+import {
+  getStockBalanceReport,
+  getStockMovementReport,
+} from "../inventory-reports/inventory-reports.service";
+import type { CompanyPayableListFilters } from "../ap/payable.service";
+import { listCompanyPayables } from "../ap/payable.service";
+import type { CompanySupplierInvoiceListFilters } from "../ap/supplier-invoice.service";
+import { listCompanySupplierInvoices } from "../ap/supplier-invoice.service";
+import { MAX_EXPORT_ROWS } from "../finance/pagination";
 import { ServiceContext, ServiceError } from "../types";
 import { safeReportFilename } from "./filename.service";
 import { AgingReportPdfDocument } from "./pdf/aging-pdf";
@@ -320,5 +349,431 @@ export async function exportTenantAuditLogPdf(
     : `registro_actividad_${dateStamp}`;
 
   return { buffer, filename: safeReportFilename(base, "pdf") };
+}
+
+export async function exportMaterialVariancePdf(
+  projectId: string,
+  filters: MaterialReportFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const result = await getMaterialVarianceReport(projectId, filters, ctx);
+  if (result.type === "NO_APPROVED_BUDGETS") {
+    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar materiales");
+  }
+  const generatedAtIso = new Date().toISOString();
+  const buffer = await renderReportPdfToBuffer(
+    <ProjectSimpleTablePdfDocument
+      title="Materiales — varianza"
+      subtitle={result.budgetName}
+      generatedAtIso={generatedAtIso}
+      totalsLine={`Presupuesto: ${result.totals.budgetMaterial} · Consumo: ${result.totals.consumedCost} · Var.: ${result.totals.variance}`}
+      columns={[
+        { key: "code", label: "Partida", flex: 0.8 },
+        { key: "name", label: "Ítem", flex: 1.4 },
+        { key: "budget", label: "Presup.", flex: 0.9 },
+        { key: "actual", label: "Consumo", flex: 0.9 },
+        { key: "variance", label: "Var.", flex: 0.8 },
+      ]}
+      rows={result.byWbs.map((r) => ({
+        code: r.wbsCode,
+        name: r.wbsName,
+        budget: r.budgetMaterial,
+        actual: r.consumedCost,
+        variance: r.variance,
+      }))}
+      warnings={result.warnings}
+    />,
+  );
+  return { buffer, filename: safeReportFilename(`materiales_${result.budgetName}`, "pdf") };
+}
+
+export async function exportProcurementDeviationPdf(
+  projectId: string,
+  filters: ProcurementReportFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const result = await getProcurementDeviationReport(projectId, filters, ctx);
+  if (result.type === "NO_APPROVED_BUDGETS") {
+    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar compras");
+  }
+  const generatedAtIso = new Date().toISOString();
+  const buffer = await renderReportPdfToBuffer(
+    <ProjectSimpleTablePdfDocument
+      title="Compras y proveedores"
+      subtitle={result.budgetName}
+      filterLine={filterLineParts({ dateFrom: filters.dateFrom, dateTo: filters.dateTo })}
+      generatedAtIso={generatedAtIso}
+      columns={[
+        { key: "code", label: "Partida", flex: 0.7 },
+        { key: "name", label: "Ítem", flex: 1.2 },
+        { key: "budget", label: "Presup.", flex: 0.85 },
+        { key: "committed", label: "Comprom.", flex: 0.85 },
+        { key: "accrued", label: "Deveng.", flex: 0.85 },
+        { key: "variance", label: "Var.", flex: 0.75 },
+      ]}
+      rows={result.byWbs.map((r) => ({
+        code: r.wbsCode,
+        name: r.wbsName,
+        budget: r.budgetMaterial,
+        committed: r.committedCost,
+        accrued: r.accruedCost,
+        variance: r.varianceAmount,
+      }))}
+      warnings={result.warnings}
+    />,
+  );
+  return { buffer, filename: safeReportFilename(`compras_${result.budgetName}`, "pdf") };
+}
+
+export async function exportProjectCashFlowPdf(
+  projectId: string,
+  filters: ProjectCashFlowFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const report = await getProjectCashFlowReport(projectId, filters, ctx);
+  const cur = report.currencies.find((c) => c.currency === "ARS") ?? report.currencies[0];
+  if (!cur) {
+    throw new ServiceError("CONFLICT", "Sin movimientos de caja para exportar");
+  }
+  const generatedAtIso = new Date().toISOString();
+  const buffer = await renderReportPdfToBuffer(
+    <ProjectSimpleTablePdfDocument
+      title="Flujo de caja — proyecto"
+      subtitle={`${report.project.name} · ${report.dateFrom} → ${report.dateTo}`}
+      filterLine={filterLineParts({ period: filters.period, currency: filters.currency ?? cur.currency })}
+      generatedAtIso={generatedAtIso}
+      totalsLine={`Ingresos: ${cur.totalInflows} · Egresos: ${cur.totalOutflows} · Neto: ${cur.netCashFlow} ${cur.currency}`}
+      columns={[
+        { key: "period", label: "Período", flex: 1.1 },
+        { key: "inflows", label: "Ingresos", flex: 0.9 },
+        { key: "outflows", label: "Egresos", flex: 0.9 },
+        { key: "net", label: "Neto", flex: 0.9 },
+      ]}
+      rows={cur.periods.map((p) => ({
+        period: p.periodLabel,
+        inflows: p.inflows,
+        outflows: p.outflows,
+        net: p.netCashFlow,
+      }))}
+    />,
+  );
+  const slug = `${report.project.code ?? projectId}_${report.dateFrom}_${report.dateTo}`.replace(
+    /[^a-zA-Z0-9._-]+/g,
+    "_",
+  );
+  return { buffer, filename: safeReportFilename(`flujo_caja_${slug}`, "pdf") };
+}
+
+export async function exportTreasuryCashFlowPdf(
+  filters: CashFlowFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const report = await getCashFlowReport(filters, ctx);
+  if (report.length === 0) {
+    throw new ServiceError("CONFLICT", "Sin movimientos para exportar flujo de caja");
+  }
+  const generatedAtIso = new Date().toISOString();
+  const rows: Record<string, string>[] = [];
+  for (const cur of report) {
+    rows.push({
+      period: `${cur.currency} — apertura`,
+      inflows: "",
+      outflows: "",
+      net: cur.openingBalance,
+    });
+    for (const b of cur.buckets) {
+      rows.push({
+        period: `${cur.currency} · ${b.period}`,
+        inflows: b.inflow,
+        outflows: b.outflow,
+        net: b.netCashFlow,
+      });
+    }
+    rows.push({
+      period: `${cur.currency} — cierre`,
+      inflows: "",
+      outflows: "",
+      net: cur.closingBalance,
+    });
+  }
+  const buffer = await renderReportPdfToBuffer(
+    <ProjectSimpleTablePdfDocument
+      title="Flujo de caja — tesorería"
+      filterLine={filterLineParts({
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+        period: filters.period,
+        currency: filters.currency,
+      })}
+      generatedAtIso={generatedAtIso}
+      columns={[
+        { key: "period", label: "Período", flex: 1.3 },
+        { key: "inflows", label: "Ingresos", flex: 0.9 },
+        { key: "outflows", label: "Egresos", flex: 0.9 },
+        { key: "net", label: "Neto / Saldo", flex: 0.9 },
+      ]}
+      rows={rows}
+    />,
+  );
+  return { buffer, filename: safeReportFilename("tesoreria_flujo_caja", "pdf") };
+}
+
+export async function exportTreasuryMovementsPdf(
+  filters: MovementReportFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  if (!filters.accountId && (!filters.dateFrom || !filters.dateTo)) {
+    throw new ServiceError(
+      "VALIDATION",
+      "Export de movimientos requiere rango de fechas cuando no hay cuenta seleccionada.",
+    );
+  }
+  const { rows, total } = await getAccountMovementReport(
+    { ...filters, page: 1, pageSize: MAX_EXPORT_ROWS },
+    ctx,
+  );
+  if (total > MAX_EXPORT_ROWS) {
+    throw new ServiceError(
+      "VALIDATION",
+      `El export supera ${MAX_EXPORT_ROWS} filas. Acotá el rango de fechas.`,
+    );
+  }
+  const generatedAtIso = new Date().toISOString();
+  const buffer = await renderReportPdfToBuffer(
+    <ProjectSimpleTablePdfDocument
+      title="Movimientos de tesorería"
+      filterLine={filterLineParts({
+        accountId: filters.accountId,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+        currency: filters.currency,
+      })}
+      generatedAtIso={generatedAtIso}
+      columns={[
+        { key: "date", label: "Fecha", flex: 0.85 },
+        { key: "account", label: "Cuenta", flex: 1 },
+        { key: "type", label: "Tipo", flex: 0.7 },
+        { key: "amount", label: "Importe", flex: 0.85 },
+        { key: "currency", label: "Mon.", flex: 0.45 },
+        { key: "desc", label: "Descripción", flex: 1.2 },
+      ]}
+      rows={rows.map((r) => ({
+        date: r.movementDate,
+        account: r.accountName,
+        type: r.type,
+        amount: r.signedAmount,
+        currency: r.currency,
+        desc: r.description,
+      }))}
+    />,
+  );
+  return { buffer, filename: safeReportFilename("tesoreria_movimientos", "pdf") };
+}
+
+export async function exportTreasuryCashPositionPdf(
+  filters: CashPositionFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const report = await getCashPositionReport(filters, ctx);
+  const generatedAtIso = new Date().toISOString();
+  const buffer = await renderReportPdfToBuffer(
+    <ProjectSimpleTablePdfDocument
+      title="Posición de caja"
+      filterLine={filterLineParts({
+        companyId: filters.companyId,
+        currency: filters.currency,
+      })}
+      generatedAtIso={generatedAtIso}
+      totalsLine={
+        report.byCurrency.length > 0
+          ? report.byCurrency.map((c) => `${c.currency}: ${c.totalBalance}`).join(" · ")
+          : undefined
+      }
+      columns={[
+        { key: "company", label: "Empresa", flex: 1 },
+        { key: "account", label: "Cuenta", flex: 1.1 },
+        { key: "type", label: "Tipo", flex: 0.7 },
+        { key: "currency", label: "Mon.", flex: 0.5 },
+        { key: "balance", label: "Saldo", flex: 0.9 },
+      ]}
+      rows={report.accounts.map((a) => ({
+        company: a.companyName ?? "",
+        account: a.name,
+        type: a.type,
+        currency: a.currency,
+        balance: a.balance,
+      }))}
+    />,
+  );
+  return { buffer, filename: safeReportFilename("tesoreria_posicion_caja", "pdf") };
+}
+
+export async function exportStockBalancePdf(
+  filters: StockBalanceFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const data = await getStockBalanceReport(filters, ctx);
+  const generatedAtIso = new Date().toISOString();
+  const buffer = await renderReportPdfToBuffer(
+    <ProjectSimpleTablePdfDocument
+      title="Stock actual"
+      generatedAtIso={generatedAtIso}
+      columns={[
+        { key: "sku", label: "SKU", flex: 0.7 },
+        { key: "product", label: "Producto", flex: 1.2 },
+        { key: "warehouse", label: "Depósito", flex: 0.9 },
+        { key: "qty", label: "Cantidad", flex: 0.7 },
+        { key: "unit", label: "Un.", flex: 0.45 },
+      ]}
+      rows={data.map((r) => ({
+        sku: r.productSku,
+        product: r.productName,
+        warehouse: r.warehouseName,
+        qty: r.quantityOnHand,
+        unit: r.productUnit,
+      }))}
+    />,
+  );
+  return { buffer, filename: safeReportFilename("inventario_stock", "pdf") };
+}
+
+export async function exportStockMovementsPdf(
+  filters: StockMovementReportFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const data = await getStockMovementReport(filters, ctx);
+  const generatedAtIso = new Date().toISOString();
+  const buffer = await renderReportPdfToBuffer(
+    <ProjectSimpleTablePdfDocument
+      title="Movimientos de inventario"
+      filterLine={filterLineParts({
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+        warehouseId: filters.warehouseId,
+        productId: filters.productId,
+      })}
+      generatedAtIso={generatedAtIso}
+      columns={[
+        { key: "date", label: "Fecha", flex: 0.85 },
+        { key: "sku", label: "SKU", flex: 0.65 },
+        { key: "product", label: "Producto", flex: 1 },
+        { key: "type", label: "Tipo", flex: 0.65 },
+        { key: "qty", label: "Cant.", flex: 0.6 },
+        { key: "warehouse", label: "Depósito", flex: 0.85 },
+      ]}
+      rows={data.map((r) => ({
+        date: r.movementDate,
+        sku: r.productSku,
+        product: r.productName,
+        type: r.type,
+        qty: r.signedQuantity,
+        warehouse: r.warehouseName,
+      }))}
+    />,
+  );
+  return { buffer, filename: safeReportFilename("inventario_movimientos", "pdf") };
+}
+
+export async function exportCompanyPayablesPdf(
+  filters: CompanyPayableListFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const { data, total } = await listCompanyPayables(ctx, {
+    ...filters,
+    page: 1,
+    pageSize: MAX_EXPORT_ROWS,
+  });
+  if (total > MAX_EXPORT_ROWS) {
+    throw new ServiceError(
+      "VALIDATION",
+      `El export supera ${MAX_EXPORT_ROWS} filas. Acotá los filtros de vencimiento.`,
+    );
+  }
+  const generatedAtIso = new Date().toISOString();
+  const buffer = await renderReportPdfToBuffer(
+    <ProjectSimpleTablePdfDocument
+      title="Cuentas por pagar — corporativo"
+      filterLine={filterLineParts({
+        status: filters.status,
+        dueDateFrom: filters.dueDateFrom,
+        dueDateTo: filters.dueDateTo,
+      })}
+      generatedAtIso={generatedAtIso}
+      columns={[
+        { key: "supplier", label: "Proveedor", flex: 1.1 },
+        { key: "invoice", label: "Factura", flex: 0.7 },
+        { key: "due", label: "Venc.", flex: 0.75 },
+        { key: "status", label: "Estado", flex: 0.65 },
+        { key: "balance", label: "Saldo", flex: 0.85 },
+        { key: "currency", label: "Mon.", flex: 0.45 },
+      ]}
+      rows={data.map((p) => ({
+        supplier: p.supplierName,
+        invoice: p.supplierInvoiceCode ?? "",
+        due:
+          p.dueDate instanceof Date
+            ? p.dueDate.toISOString().slice(0, 10)
+            : String(p.dueDate).slice(0, 10),
+        status: p.status,
+        balance: p.balanceDue,
+        currency: p.currency,
+      }))}
+    />,
+  );
+  return { buffer, filename: safeReportFilename("finanzas_cxp_corporativo", "pdf") };
+}
+
+export async function exportCompanySupplierInvoicesPdf(
+  filters: CompanySupplierInvoiceListFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const { data, total } = await listCompanySupplierInvoices(ctx, {
+    ...filters,
+    page: 1,
+    pageSize: MAX_EXPORT_ROWS,
+  });
+  if (total > MAX_EXPORT_ROWS) {
+    throw new ServiceError(
+      "VALIDATION",
+      `El export supera ${MAX_EXPORT_ROWS} filas. Acotá el rango de fechas de emisión.`,
+    );
+  }
+  const generatedAtIso = new Date().toISOString();
+  const buffer = await renderReportPdfToBuffer(
+    <ProjectSimpleTablePdfDocument
+      title="Facturas de proveedor — corporativo"
+      filterLine={filterLineParts({
+        status: filters.status,
+        issueDateFrom: filters.issueDateFrom,
+        issueDateTo: filters.issueDateTo,
+      })}
+      generatedAtIso={generatedAtIso}
+      columns={[
+        { key: "code", label: "Código", flex: 0.75 },
+        { key: "supplier", label: "Proveedor", flex: 1.1 },
+        { key: "issue", label: "Emisión", flex: 0.75 },
+        { key: "due", label: "Venc.", flex: 0.75 },
+        { key: "status", label: "Estado", flex: 0.65 },
+        { key: "total", label: "Total", flex: 0.85 },
+        { key: "currency", label: "Mon.", flex: 0.45 },
+      ]}
+      rows={data.map((inv) => ({
+        code: inv.code,
+        supplier: inv.supplierName,
+        issue:
+          inv.issueDate instanceof Date
+            ? inv.issueDate.toISOString().slice(0, 10)
+            : String(inv.issueDate).slice(0, 10),
+        due:
+          inv.dueDate instanceof Date
+            ? inv.dueDate.toISOString().slice(0, 10)
+            : String(inv.dueDate).slice(0, 10),
+        status: inv.status,
+        total: inv.totalAmount,
+        currency: inv.currency,
+      }))}
+    />,
+  );
+  return { buffer, filename: safeReportFilename("finanzas_facturas_proveedor_corporativo", "pdf") };
 }
 

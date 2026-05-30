@@ -348,6 +348,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
               <ReportExportActions
                 exportPath="/api/reports/tesoreria/movimientos.csv"
                 params={movementExportParams(sp)}
+                pdf
               />
               <Button asChild variant="outline" size="sm">
                 <Link href={treasuryHref}>Abrir en Tesorería</Link>
@@ -391,6 +392,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
                   from: sp.from,
                   to: sp.to,
                 }}
+                pdf
               />
               <Button asChild variant="outline" size="sm">
                 <Link href="/finanzas/facturas-proveedor/nueva">Nueva factura</Link>
@@ -464,6 +466,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
                   from: sp.from,
                   to: sp.to,
                 }}
+                pdf
               />
               <Button asChild variant="outline" size="sm">
                 <Link href="/finanzas/pagos-proveedor">Ver pagos registrados</Link>

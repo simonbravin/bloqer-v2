@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getCashPositionReport } from "@bloqer/services";
 import { CashPositionTable } from "@/features/treasury-reports";
-import { ReportCsvExportLink } from "@/features/reports";
+import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
@@ -39,7 +39,7 @@ export default async function PosicionCajaPage({ searchParams }: PageProps) {
           <h1 className="text-2xl font-bold tracking-tight">Posición de caja</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ReportCsvExportLink exportPath="/api/reports/tesoreria/posicion-caja.csv" params={sp} />
+          <ReportExportActions exportPath="/api/reports/tesoreria/posicion-caja.csv" params={sp} pdf />
           <ReportEmailSendDialog
             reportType="TREASURY_CASH_POSITION"
             supportsPdf={false}

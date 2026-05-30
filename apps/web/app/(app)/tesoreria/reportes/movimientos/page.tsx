@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getAccountMovementReport } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { MovementLedgerTable, MovementFilters } from "@/features/treasury-reports";
-import { ReportCsvExportLink } from "@/features/reports";
+import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
@@ -70,7 +70,7 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
           <h1 className="text-2xl font-bold tracking-tight">Movimientos</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ReportCsvExportLink exportPath="/api/reports/tesoreria/movimientos.csv" params={sp} />
+          <ReportExportActions exportPath="/api/reports/tesoreria/movimientos.csv" params={sp} pdf />
           <ReportEmailSendDialog
             reportType="TREASURY_MOVEMENTS"
             supportsPdf={false}

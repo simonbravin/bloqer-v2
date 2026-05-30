@@ -72,17 +72,17 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
       </div>
 
       <TableScroll>
-        <Table>
+        <Table className="min-w-[44rem]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[35%]">Descripción</TableHead>
-              <TableHead className="w-[10%]">Cant.</TableHead>
-              <TableHead className="w-[15%]">Precio unit.</TableHead>
-              <TableHead className="w-[10%]">IVA %</TableHead>
-              <TableHead className="w-[15%] text-right">Subtotal</TableHead>
-              <TableHead className="w-[10%] text-right">IVA</TableHead>
-              <TableHead className="w-[10%] text-right">Total</TableHead>
-              <TableHead className="w-8" />
+              <TableHead className="min-w-[14rem]">Descripción</TableHead>
+              <TableHead className="min-w-[5rem] w-[5.5rem]">Cant.</TableHead>
+              <TableHead className="min-w-[7rem] w-[7.5rem]">Precio unit.</TableHead>
+              <TableHead className="min-w-[4.5rem] w-[5rem]">IVA %</TableHead>
+              <TableHead className="min-w-[6rem] text-right">Subtotal</TableHead>
+              <TableHead className="min-w-[5rem] text-right">IVA</TableHead>
+              <TableHead className="min-w-[5.5rem] text-right">Total</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -90,39 +90,39 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
               const p = linePreview(line);
               return (
                 <TableRow key={i} className="align-top">
-                  <TableCell className="py-1.5">
+                  <TableCell className="min-w-[14rem] py-2">
                     <Input
                       required
                       value={line.description}
                       onChange={(e) => update(i, "description", e.target.value)}
                       placeholder="Descripción del ítem"
-                      className="h-8 text-sm"
+                      className="h-9 w-full min-w-[12rem] text-sm"
                     />
                   </TableCell>
-                  <TableCell className="py-1.5">
+                  <TableCell className="py-2">
                     <Input
                       required
                       value={line.quantity}
                       onChange={(e) => update(i, "quantity", e.target.value)}
                       placeholder="1"
-                      className="h-8 text-sm"
+                      className="h-9 w-full min-w-[4rem] text-sm tabular-nums"
                     />
                   </TableCell>
-                  <TableCell className="py-1.5">
+                  <TableCell className="py-2">
                     <Input
                       required
                       value={line.unitPrice}
                       onChange={(e) => update(i, "unitPrice", e.target.value)}
                       placeholder="0.00"
-                      className="h-8 text-sm"
+                      className="h-9 w-full min-w-[5.5rem] text-sm tabular-nums"
                     />
                   </TableCell>
-                  <TableCell className="py-1.5">
+                  <TableCell className="py-2">
                     <Input
                       value={line.taxRate}
                       onChange={(e) => update(i, "taxRate", e.target.value)}
                       placeholder="21"
-                      className="h-8 text-sm"
+                      className="h-9 w-full min-w-[3.5rem] text-sm tabular-nums"
                     />
                   </TableCell>
                   <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.subtotal)}</TableCell>

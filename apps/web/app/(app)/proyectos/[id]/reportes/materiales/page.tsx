@@ -78,6 +78,7 @@ export default async function ReporteMaterialesPage({ params, searchParams }: Pa
             <ReportExportActions
               exportPath={`/api/reports/proyectos/${projectId}/materiales.csv`}
               params={sp}
+              pdf
             />
           ) : undefined
         }

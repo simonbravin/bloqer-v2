@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
 import { getCashFlowReport } from "@bloqer/services";
 import { CashFlowTable, CashFlowChart, CashFlowFilters } from "@/features/treasury-reports";
-import { ReportCsvExportLink } from "@/features/reports";
+import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
@@ -57,7 +57,7 @@ export default async function FlujoCajaPage({ searchParams }: PageProps) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ReportCsvExportLink exportPath="/api/reports/tesoreria/flujo-caja.csv" params={sp} />
+          <ReportExportActions exportPath="/api/reports/tesoreria/flujo-caja.csv" params={sp} pdf />
           <ReportEmailSendDialog
             reportType="TREASURY_CASH_FLOW"
             supportsPdf={false}

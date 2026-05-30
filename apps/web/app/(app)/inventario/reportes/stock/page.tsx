@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
 import { getStockBalanceReport } from "@bloqer/services";
 import { StockBalanceTable, StockReportFilters } from "@/features/inventory-reports";
-import { ReportCsvExportLink } from "@/features/reports";
+import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
@@ -51,7 +51,7 @@ export default async function StockReportPage({ searchParams }: PageProps) {
           <h1 className="text-2xl font-bold tracking-tight">Stock actual</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ReportCsvExportLink exportPath="/api/reports/inventario/stock.csv" params={sp} />
+          <ReportExportActions exportPath="/api/reports/inventario/stock.csv" params={sp} pdf />
           <ReportEmailSendDialog
             reportType="INVENTORY_STOCK"
             supportsPdf={false}
