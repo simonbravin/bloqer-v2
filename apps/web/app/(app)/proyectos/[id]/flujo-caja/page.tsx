@@ -12,6 +12,7 @@ import {
   PaymentDetailTable,
   ProjectFinanceSnapshotPanel,
 } from "@/features/project-cash-flow";
+import { FinanceLayerBadge } from "@/features/finance/components/project-finance-layers-guide";
 import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
@@ -51,19 +52,29 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
     sp.period === "day" || sp.period === "week" || sp.period === "month" ? sp.period : undefined;
 
   let report;
-  let financeSnapshot;
+  let financeSnapshot: Awaited<ReturnType<typeof getProjectFinanceSnapshot>> = {
+    visible: false,
+    obligationKpis: [],
+    attributedCashKpis: [],
+    attributedCashMeta: null,
+    alerts: [],
+  };
+
   try {
-    [report, financeSnapshot] = await Promise.all([
-      getProjectCashFlowReport(
-        id,
-        { dateFrom: sp.dateFrom, dateTo: sp.dateTo, period, currency: sp.currency },
-        ctx,
-      ),
-      getProjectFinanceSnapshot(id, ctx),
-    ]);
+    report = await getProjectCashFlowReport(
+      id,
+      { dateFrom: sp.dateFrom, dateTo: sp.dateTo, period, currency: sp.currency },
+      ctx,
+    );
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
+  }
+
+  try {
+    financeSnapshot = await getProjectFinanceSnapshot(id, ctx);
+  } catch {
+    // Snapshot is supplementary; do not block the cash-flow report.
   }
 
   return (
@@ -72,7 +83,12 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
         projectId={id}
         projectName={report.project.name}
         title="Flujo de caja"
-        subtitle="Cobros y pagos imputados a la obra"
+        subtitle={
+          <span className="flex flex-wrap items-center gap-2">
+            Cobros y pagos confirmados imputados a la obra
+            <FinanceLayerBadge layer="cash" />
+          </span>
+        }
         actions={
           <>
             <ReportExportActions
@@ -136,7 +152,7 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
         <div key={cur.currency} className="space-y-4">
           <h2 className="font-semibold text-lg">{cur.currency}</h2>
 
-          <KpiStatGrid title={null} columns={3}>
+          <KpiStatGrid title="Flujo del período (caja ejecutada)" columns={3}>
             <KpiStatCard
               label="Total ingresos"
               value={formatMoneyAmount(cur.totalInflows, cur.currency)}

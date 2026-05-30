@@ -4,13 +4,16 @@ import {
   createSalesInvoice, createInvoiceFromCertification,
   updateSalesInvoice, issueSalesInvoice, cancelSalesInvoice,
   cancelReceivable,
+  registerArAdvance,
   ServiceError,
 } from "@bloqer/services";
 import {
   createSalesInvoiceSchema, createInvoiceFromCertificationSchema,
   updateSalesInvoiceSchema,
+  registerArAdvanceSchema,
   type CreateSalesInvoiceInput, type CreateInvoiceFromCertificationInput,
   type UpdateSalesInvoiceInput,
+  type RegisterArAdvanceInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -61,6 +64,31 @@ export async function createInvoiceFromCertificationAction(
     revalidatePath(`/proyectos/${projectId}/facturas`);
     return { id: inv.id };
   } catch (err) { return handle(err); }
+}
+
+export async function registerArAdvanceAction(
+  projectId: string,
+  data: RegisterArAdvanceInput,
+): Promise<{ invoiceId: string } | Err> {
+  const ctx = await getCtx();
+  const parsed = registerArAdvanceSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  if (parsed.data.projectId !== projectId) {
+    return { error: "El proyecto del formulario no coincide con la obra" };
+  }
+  try {
+    const result = await registerArAdvance({ ...parsed.data, projectId }, ctx);
+    const invoiceLink = result.traceChain.find((l) => l.entityType === "SalesInvoice");
+    const invoiceId = invoiceLink?.entityId ?? result.primaryEntityId;
+    revalidatePath(`/proyectos/${projectId}/facturas`);
+    revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+    revalidatePath(`/proyectos/${projectId}/cobranzas`);
+    revalidatePath(`/proyectos/${projectId}/flujo-caja`);
+    revalidatePath(`/proyectos/${projectId}/finanzas`);
+    return { invoiceId };
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function updateSalesInvoiceAction(

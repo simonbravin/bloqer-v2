@@ -40,6 +40,8 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 | ADR-Phase1-07 | Ingresos corporativos sin obra: GL + tesorería Phase 1 | ACEPTADO |
 | ADR-010 | Reporting read-layer: agregación on-read sin tablas duplicadas de montos | ACEPTADO |
 | ADR-011 | `fx_rate` + `amount_ars` en comprobantes financieros (D-008) | ACEPTADO |
+| ADR-012 | Transacciones UX: modelo documental + guards de integridad | ACEPTADO |
+| ADR-013 | Anticipos a proveedor: cuenta puente Fase 2 | ACEPTADO |
 
 ---
 
@@ -81,6 +83,20 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
   - **Fase 0 no propaga** `projectId` en `AccountMovement` generado por cobro/pago; filtro por obra en reportes vía join (`Collection.projectId`, `Payment.projectId`).
 - **Consecuencias:** guards extraídos y testeados en `packages/services/src/ar/sales-invoice-cancel-guards.ts`, `.../ap/supplier-invoice-cancel-guards.ts` y `.../treasury/account-movement-cancel-guards.ts`; locking optimista también en cancelación de facturas, obligaciones, cobros/pagos y reversión de saldos; P-TRZ-06 resuelto vía `resolveOpeningBase` en `balance.service.ts`.
 - **Referencias:** plan Finanzas/Transacciones v2; [`02-modules/TREASURY.md`](../02-modules/TREASURY.md), [`02-modules/ACCOUNTS_RECEIVABLE.md`](../02-modules/ACCOUNTS_RECEIVABLE.md).
+
+---
+
+## ADR-013 — Anticipos a proveedor: cuenta puente (Fase 2)
+
+- **Fecha:** 2026-05-29
+- **Estado:** ACEPTADO (implementación diferida Fase 2)
+- **Contexto:** [`EXPENSES_AND_PAYMENTS.md`](../02-modules/EXPENSES_AND_PAYMENTS.md) §13 describe pagos anticipados sin factura. Hoy el flujo AP exige `SupplierInvoice` → `Payable` → `Payment`; un pago directo sin obligación rompe BR-PAY-001 y la trazabilidad documental.
+- **Decisión:**
+  - **Fase 1 (cliente):** anticipo vía `registerArAdvance` — factura de venta con línea "Anticipo de obra" + cobranza inmediata (`registerArSale` con `collectNow`). Sin saldo inicial artificial de proyecto.
+  - **Fase 2 (proveedor):** entidad **`SupplierAdvance`** (o equivalente) como cuenta puente analítica: pago confirmado → OUTFLOW tesorería + saldo anticipo a favor del proveedor por `projectId`; al emitir factura → compensación automática o manual contra el anticipo. Validador `registerSupplierAdvanceSchema` y servicio stub `registerSupplierAdvance` lanzan `NOT_IMPLEMENTED` hasta migración.
+  - **No** usar `Payment` sin `Payable` ni movimiento manual sin ADR en producción.
+- **Consecuencias:** UI `/proyectos/[id]/facturas/anticipo/nueva` para cliente; proveedor documentado en OPEN_QUESTIONS si producto acelera Fase 2.
+- **Referencias:** [`SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md) §anticipo, [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md).
 
 ---
 

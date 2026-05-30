@@ -203,6 +203,11 @@ export async function getProjectFinanceOverview(
       pushUniqueQuickAction(quickActions, seenHrefs, { label: "Ver cobranzas", href: links.collections });
       if (canEditArArea(ctx.roles)) {
         pushUniqueQuickAction(quickActions, seenHrefs, {
+          label: "Registrar anticipo",
+          href: `${base}/facturas/anticipo/nueva`,
+          description: "Factura de anticipo con cobro inmediato al inicio de obra.",
+        });
+        pushUniqueQuickAction(quickActions, seenHrefs, {
           label:        "Registrar cobranza",
           href:         `${base}/cobranzas/nueva`,
           description: "Alta de cobro vinculada al proyecto.",

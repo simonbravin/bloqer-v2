@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { ProjectFinanceLayersGuide, FinanceLayerBadge } from "@/features/finance/components/project-finance-layers-guide";
 
 function MoneyList({ rows, emptyLabel }: { rows: { currency: string; amount: string }[]; emptyLabel: string }) {
   if (rows.length === 0) {
@@ -57,11 +58,16 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
         </div>
       ) : null}
 
+      <ProjectFinanceLayersGuide />
+
       <div className="grid gap-4 md:grid-cols-2">
         {sections.ar ? (
           <Card className={sections.ar.canView ? "" : "border-dashed"}>
             <CardHeader>
-              <CardTitle className="text-base">Cuentas por cobrar</CardTitle>
+              <CardTitle className="text-base flex flex-wrap items-center gap-2">
+                Cuentas por cobrar
+                <FinanceLayerBadge layer="obligations" />
+              </CardTitle>
               <CardDescription>Saldo abierto por moneda (sin convertir entre monedas).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -103,7 +109,10 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
         {sections.ap ? (
           <Card className={sections.ap.canView ? "" : "border-dashed"}>
             <CardHeader>
-              <CardTitle className="text-base">Cuentas por pagar</CardTitle>
+              <CardTitle className="text-base flex flex-wrap items-center gap-2">
+                Cuentas por pagar
+                <FinanceLayerBadge layer="obligations" />
+              </CardTitle>
               <CardDescription>Saldo abierto por moneda (sin convertir entre monedas).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -145,7 +154,10 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
         {sections.treasury ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Flujo de caja</CardTitle>
+              <CardTitle className="text-base flex flex-wrap items-center gap-2">
+                Flujo de caja
+                <FinanceLayerBadge layer="cash" />
+              </CardTitle>
               <CardDescription>Cobros y pagos imputados a la obra (reporte existente).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -166,7 +178,10 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
         {sections.budget ? (
           <Card className={!sections.budget.canViewBudgets && !sections.budget.canViewCostControl ? "border-dashed" : ""}>
             <CardHeader>
-              <CardTitle className="text-base">Presupuesto y costos</CardTitle>
+              <CardTitle className="text-base flex flex-wrap items-center gap-2">
+                Presupuesto y costos
+                <FinanceLayerBadge layer="accrued" />
+              </CardTitle>
               <CardDescription>Enlaces al presupuesto y al control de costos del proyecto.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">

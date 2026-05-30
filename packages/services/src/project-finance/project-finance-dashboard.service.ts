@@ -1,6 +1,14 @@
 import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
 import { fmtDecimalEs } from "../dashboard/kpi-helpers";
+import {
+  getProjectFinanceSnapshot,
+  type ProjectFinanceSnapshot,
+  type ProjectFinanceSnapshotPreload,
+} from "./project-finance-snapshot.service";
 import { getProjectFinanceOverview, type ProjectFinanceOverview } from "./project-finance-overview.service";
+import { getProjectAttributedCashBalance } from "./project-attributed-cash.service";
+import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
+import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { getProjectIncomeExpenseReport, type IncomeExpenseReport } from "../reports/project-income-expense.service";
 import {
   getProjectCashProjectionReport,
@@ -55,6 +63,7 @@ export type ProjectFinanceTopSupplier = {
 
 export type ProjectFinanceDashboard = {
   overview: ProjectFinanceOverview;
+  financeSnapshot: ProjectFinanceSnapshot;
   kpis: DashboardKpi[];
   monthBalance: ProjectFinanceMonthBalance | null;
   monthCashFlow: ProjectFinanceMonthCashFlow | null;
@@ -76,9 +85,19 @@ export async function getProjectFinanceDashboard(
   const range = defaultReportDateRange(months);
   const budgetFilter = { budgetId: opts?.budgetId };
 
-  const overview = await getProjectFinanceOverview(ctx, projectId);
+  const gate = await getTenantModuleGate(ctx);
+
+  const canLoadAttributedCash =
+    canViewProjectCashFlowReport(ctx.roles) &&
+    (gate.isEnabled("AR") || gate.isEnabled("AP"));
+
+  const attributedCashPromise = canLoadAttributedCash
+    ? getProjectAttributedCashBalance(projectId, ctx).catch(() => null)
+    : Promise.resolve(null);
 
   const [
+    overview,
+    attributedCash,
     incomeExpense,
     cashFlow,
     cashProjection,
@@ -87,6 +106,8 @@ export async function getProjectFinanceDashboard(
     costComposition,
     wbsAlerts,
   ] = await Promise.all([
+    getProjectFinanceOverview(ctx, projectId, { gate }),
+    attributedCashPromise,
     safeIncomeExpense(projectId, range, ctx),
     safeCashFlow(projectId, range, ctx),
     safeCashProjection(projectId, ctx),
@@ -95,6 +116,12 @@ export async function getProjectFinanceDashboard(
     safeCostComposition(projectId, budgetFilter, ctx),
     safeWbsAlerts(projectId, budgetFilter, ctx),
   ]);
+
+  const financeSnapshot = await getProjectFinanceSnapshot(projectId, ctx, {
+    ...buildSnapshotPreloadFromOverview(overview),
+    attributedCash: attributedCash ?? undefined,
+    gate,
+  });
 
   const monthBalance = deriveMonthBalance(incomeExpense);
   const monthCashFlow = deriveMonthCashFlow(cashFlow);
@@ -147,6 +174,7 @@ export async function getProjectFinanceDashboard(
 
   return {
     overview,
+    financeSnapshot,
     kpis,
     monthBalance,
     monthCashFlow,
@@ -158,6 +186,35 @@ export async function getProjectFinanceDashboard(
     wbsAlerts,
     months,
   };
+}
+
+function sectionLoadedWithoutError(
+  overview: ProjectFinanceOverview,
+  sectionKey: "ar" | "ap",
+): boolean {
+  return !overview.warnings.some((w) => w.section === sectionKey && w.reason === "NO_DATA");
+}
+
+function buildSnapshotPreloadFromOverview(
+  overview: ProjectFinanceOverview,
+): ProjectFinanceSnapshotPreload {
+  const preload: ProjectFinanceSnapshotPreload = {};
+
+  if (overview.sections.ar?.canView && sectionLoadedWithoutError(overview, "ar")) {
+    preload.arSummary = {
+      totalByCurrency: overview.sections.ar.totalReceivableByCurrency,
+      overdueByCurrency: overview.sections.ar.overdueByCurrency,
+    };
+  }
+
+  if (overview.sections.ap?.canView && sectionLoadedWithoutError(overview, "ap")) {
+    preload.apSummary = {
+      totalByCurrency: overview.sections.ap.totalPayableByCurrency,
+      overdueByCurrency: overview.sections.ap.overdueByCurrency,
+    };
+  }
+
+  return preload;
 }
 
 function deriveMonthBalance(report: IncomeExpenseReport | null): ProjectFinanceMonthBalance | null {

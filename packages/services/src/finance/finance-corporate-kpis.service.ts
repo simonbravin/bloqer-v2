@@ -11,6 +11,10 @@ import {
   aggregateCompanyReceivableBalances,
   fetchCompanyReceivableSnapshotRows,
 } from "../ar/company-ar-snapshot";
+import {
+  buildTreasuryAttributionKpis,
+  getTreasuryAttributionSummary,
+} from "../treasury/treasury-attribution.service";
 import { fmtDecimalEs, pushMoneyKpi } from "../dashboard/kpi-helpers";
 import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
 import { getCompanyCashProjectionReport } from "../reports/company-cash-projection.service";
@@ -103,6 +107,15 @@ export async function buildFinanceCorporateKpis(
       const byCur = treasuryBalanceMap(accounts);
       for (const c of byCur.keys()) currenciesSeen.add(c);
       pushMoneyKpi(kpis, "tr_cash", "Posición de caja", byCur, POSICION_CAJA_HREF);
+      try {
+        const attribution = await getTreasuryAttributionSummary(ctx);
+        kpis.push(...buildTreasuryAttributionKpis(attribution));
+      } catch {
+        pushUniqueFinanceAlert(alerts, {
+          variant: "info",
+          message: "No se pudo cargar el desglose de caja por obra vs corporativo.",
+        });
+      }
     } catch {
       kpis.push({
         key: "tr_cash",

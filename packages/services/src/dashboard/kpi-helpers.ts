@@ -52,6 +52,51 @@ export function pushMoneyKpi(
   });
 }
 
+/** Net balance KPIs (cobros − pagos): includes zero and negative amounts. */
+export function pushSignedNetMoneyKpi(
+  kpis: DashboardKpi[],
+  key: string,
+  label: string,
+  byCurrency: Map<string, Prisma.Decimal>,
+  href: string,
+  emptyLabel = "Sin movimientos",
+) {
+  const entries = [...byCurrency.entries()].filter(([, a]) => !a.isZero());
+  if (entries.length === 0) {
+    const zeroEntries = [...byCurrency.entries()];
+    if (zeroEntries.length === 1) {
+      const [currency] = zeroEntries[0]!;
+      kpis.push({ key, label, value: fmtDecimalEs("0", currency), href, tone: "muted" });
+      return;
+    }
+    if (zeroEntries.length > 1) {
+      kpis.push({ key, label, value: "Multimoneda", href, tone: "muted" });
+      return;
+    }
+    kpis.push({ key, label, value: emptyLabel, href, tone: "muted" });
+    return;
+  }
+  if (entries.length === 1) {
+    const [currency, amount] = entries[0]!;
+    kpis.push({
+      key,
+      label,
+      value: fmtDecimalEs(amount.toString(), currency),
+      href,
+      tone: amount.lessThan(ZERO) ? "warning" : "default",
+    });
+    return;
+  }
+  const anyNegative = entries.some(([, a]) => a.lessThan(ZERO));
+  kpis.push({
+    key,
+    label,
+    value: "Multimoneda",
+    href,
+    tone: anyNegative ? "warning" : "muted",
+  });
+}
+
 export function pushMoneyRowsKpi(
   kpis: DashboardKpi[],
   key: string,

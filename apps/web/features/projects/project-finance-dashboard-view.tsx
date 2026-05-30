@@ -19,7 +19,11 @@ import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { DashboardKpiCard } from "@/features/dashboard/dashboard-kpi-card";
 import { IncomeExpenseChart } from "@/features/reports/income-expense-chart";
 import { CostCompositionChart } from "@/features/projects/cost-composition-chart";
+import { ProjectFinanceSnapshotPanel } from "@/features/project-cash-flow/project-finance-snapshot-panel";
 import { ProjectCashFlowChart } from "@/features/project-cash-flow/components/project-cash-flow-chart";
+import {
+  FinanceLayerBadge,
+} from "@/features/finance/components/project-finance-layers-guide";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { formatMoneyAmount } from "@/lib/format-money";
 
@@ -93,12 +97,15 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
         </div>
       ) : null}
 
+      <ProjectFinanceSnapshotPanel snapshot={dashboard.financeSnapshot} />
+
       {(dashboard.monthBalance || dashboard.monthCashFlow) && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Visión rápida del mes
             </h2>
+            <FinanceLayerBadge layer="accrued" />
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -210,7 +217,10 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
       {cashCur && cashCur.periods.length > 0 ? (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Flujo de caja mensual</CardTitle>
+            <CardTitle className="text-base flex flex-wrap items-center gap-2">
+              Flujo de caja mensual
+              <FinanceLayerBadge layer="cash" />
+            </CardTitle>
             <CardDescription>
               Movimientos confirmados ·{" "}
               <Link href={`/proyectos/${projectId}/flujo-caja`} className="underline underline-offset-2">
@@ -240,7 +250,10 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
         {sections.ar?.canView ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Cuentas por cobrar</CardTitle>
+              <CardTitle className="text-base flex flex-wrap items-center gap-2">
+                Cuentas por cobrar
+                <FinanceLayerBadge layer="obligations" />
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <MoneyList rows={sections.ar.totalReceivableByCurrency} emptyLabel="Sin saldo abierto." />
@@ -254,7 +267,10 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
         {sections.ap?.canView ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Cuentas por pagar</CardTitle>
+              <CardTitle className="text-base flex flex-wrap items-center gap-2">
+                Cuentas por pagar
+                <FinanceLayerBadge layer="obligations" />
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <MoneyList rows={sections.ap.totalPayableByCurrency} emptyLabel="Sin saldo abierto." />

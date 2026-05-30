@@ -56,6 +56,23 @@ export async function getProjectShellInfo(id: string, ctx: ServiceContext): Prom
   return row;
 }
 
+/** Client contact for AR flows without requiring VIEW PROJECTS on the full project record. */
+export async function getProjectClientContactId(
+  projectId: string,
+  ctx: ServiceContext,
+): Promise<string> {
+  if (!canAccessProjectLayout(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para acceder a este proyecto");
+  }
+  const row = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { tenantId: true, clientContactId: true },
+  });
+  if (!row) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  if (row.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  return row.clientContactId;
+}
+
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 export async function getProjectById(id: string, ctx: ServiceContext): Promise<ProjectWithClient> {

@@ -24,3 +24,4 @@ export * from "./platform-tenant-provision";
 export * from "./user-profile";
 export * from "./finance-overhead";
 export * from "./audit-log";
+export * from "./ar-advance";
