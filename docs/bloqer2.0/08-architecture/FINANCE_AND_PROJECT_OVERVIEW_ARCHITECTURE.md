@@ -499,7 +499,9 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 | Hub finanzas (servicio) | `packages/services/src/finance/finance-hub-overview.service.ts` |
 | Hub finanzas (UI) | `apps/web/features/finance/finance-hub-view.tsx` |
 | Hub finanzas **proyecto** | `packages/services/src/project-finance/project-finance-overview.service.ts` |
-| Hub finanzas proyecto (UI) | `apps/web/features/projects/project-finance-overview-view.tsx`, `apps/web/app/(app)/proyectos/[id]/finanzas/page.tsx` |
+| Hub finanzas proyecto (UI) | `apps/web/features/projects/project-finance-dashboard-view.tsx`, `apps/web/app/(app)/proyectos/[id]/finanzas/page.tsx` |
+| Tablero finanzas empresa (Phase 17) | `getFinanceHubOverview` + `getFinanceHubCharts` + `FinanceHubView` / `FinanceHubChartsPanel` — KPIs corporativos (snapshots), proyección 90d, gráficos Caja (R-005) / Económico (`getCompanyIncomeExpenseReport`) |
+| Tablero finanzas proyecto (Phase 17) | `getProjectFinanceDashboard` — ingresos-gastos, proyección caja, composición costo devengado, top proveedores, alertas WBS |
 | Workspace + layout proyecto | `apps/web/app/(app)/proyectos/[id]/layout.tsx`, `apps/web/components/layout/app-nav-column.tsx`, `project-workspace-sidebar.tsx`, `packages/services/src/project/project-workspace-nav.ts`, `GET /api/projects/[id]/shell` |
 | Shell proyecto (servicio) | `packages/services/src/project/project.service.ts` (`getProjectShellInfo`, `canAccessProjectLayout`) |
 | Rutas tesorería | `apps/web/app/(app)/tesoreria/**` |
@@ -510,6 +512,26 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 | Control de costos | `packages/services/src/cost-control/**` |
 | Contabilidad | `packages/services/src/accounting/**` |
 | Aging | `packages/services/src/aging/aging.service.ts` |
+
+---
+
+## Phase 17 — Tablero finanzas empresa y proyecto (2026-05-29)
+
+### 17.1 `/finanzas` (empresa)
+
+- **KPIs:** snapshots corporativos vía `buildFinanceCorporateKpis` (posición de caja, C×P corporativas/vencidas, C×C abiertas/vencidas, facturas borrador si > 0) + enlace contabilidad.
+- **Proyección:** `buildFinanceProjection` → R-006 corporativo (90 días).
+- **Gráficos:** `getFinanceHubCharts` — pestaña **Caja** (`getCashFlowReport`, R-005) y **Económico** (`getCompanyIncomeExpenseReport`, rollup obras + AP corporativo).
+- **UI:** sin card «Accesos rápidos» (sidebar + subnav); `/finanzas/transacciones` solo tabs operativos.
+
+### 17.2 `/proyectos/[id]/finanzas`
+
+- **Orquestador:** `getProjectFinanceDashboard` compone overview, ingresos-gastos, proyección caja, top proveedores (R-AP-03), composición gastos devengados, alertas WBS (avance 85–99%, varianza al 100%).
+- **No duplica** resumen de obra (`/proyectos/[id]`).
+
+### 17.3 Fuera de scope Phase 17
+
+- R-002 triple curva, R-011 ranking materiales, R-009/R-010 tenant multi-proyecto, KPIs contables calculados en hub.
 
 ---
 

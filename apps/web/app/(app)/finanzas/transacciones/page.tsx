@@ -7,7 +7,6 @@ import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { Pagination } from "@/components/ui/pagination";
 import { TransaccionesDateFilters } from "@/features/finance/components/transacciones-date-filters";
 import { TransaccionesTabNav } from "@/features/finance/components/transacciones-tab-nav";
-import { TransaccionesOverviewPanel } from "@/features/finance/components/transacciones-overview-panel";
 import { NewTransactionDialog } from "@/features/finance/components/new-transaction-dialog";
 import { ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
@@ -23,7 +22,6 @@ import { can } from "@bloqer/domain";
 import { canViewCompanyAp } from "@bloqer/services";
 import {
   getTenantModuleGate,
-  getTransaccionesOverview,
   listFinancialActivity,
   listContacts,
   listTreasuryAccounts,
@@ -144,18 +142,6 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
   }
 
   if (!canTreasury && !canAp) redirect("/dashboard");
-
-  let transaccionesOverview: Awaited<ReturnType<typeof getTransaccionesOverview>> = {
-    visible: false,
-    kpis: [],
-    alerts: [],
-    projection: null,
-  };
-  try {
-    transaccionesOverview = await getTransaccionesOverview(ctx);
-  } catch {
-    /* panel omitido si falla el snapshot */
-  }
 
   const tabLinks = [
     ...(canTreasury
@@ -328,7 +314,11 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Transacciones</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Vista unificada de caja, operaciones y obligaciones de la empresa sin imputar a obra.
+            Vista unificada de caja, operaciones y obligaciones de la empresa sin imputar a obra.{" "}
+            <Link href="/finanzas" className="underline underline-offset-2 text-foreground">
+              Indicadores y proyección en Resumen
+            </Link>
+            .
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -345,8 +335,6 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
           </Suspense>
         </div>
       </div>
-
-      <TransaccionesOverviewPanel overview={transaccionesOverview} />
 
       <Suspense fallback={null}><TransaccionesTabNav links={tabLinks} defaultTab={activeTab} /></Suspense>
 

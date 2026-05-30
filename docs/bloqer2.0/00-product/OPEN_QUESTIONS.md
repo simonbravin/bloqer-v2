@@ -395,6 +395,18 @@
 - **Recomendación inicial:** opción 3 hasta decisión; si se avanza, priorizar **(2)** antes que mutaciones masivas.
 - **Bloquea:** checkboxes y barra de acciones en listados de directorio y proyectos.
 
+### Q-032 — Consolidado económico tenant (`getCompanyIncomeExpenseReport`)
+
+- **Categoría:** Finanzas / Reporting
+- **Estado:** ABIERTA
+- **Impacto si no se resuelve:** el tablero `/finanzas` pestaña Económico suma importes nominales entre obras sin FX; puede distorsionar tendencias multimoneda.
+- **Opciones identificadas:**
+  1. Mantener v1 nominal + aviso UI (implementado Phase 17).
+  2. Consolidación ARS con tipos de cambio de comprobantes (alinear a `report-currency-view`).
+  3. Mostrar solo obras de una moneda seleccionada.
+- **Recomendación inicial:** (1) en Phase 17; cerrar (2) o (3) antes de usar el gráfico para decisiones de tesorería cross-moneda.
+- **Bloquea:** FX en rollup tenant y export CSV del consolidado.
+
 ---
 
 ## Cómo se resuelve una pregunta

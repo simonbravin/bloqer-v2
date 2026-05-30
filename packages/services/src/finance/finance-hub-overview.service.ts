@@ -1,7 +1,7 @@
 import { Prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
-import { fmtDecimalEs, pushMoneyKpi } from "../dashboard/kpi-helpers";
+import { fmtDecimalEs } from "../dashboard/kpi-helpers";
 import {
   getPayableAgingReport,
   getReceivableAgingReport,
@@ -14,6 +14,12 @@ import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import type { CompanyFinanceOperationsSummary } from "./company-finance-operations-summary.service";
 import { getCompanyFinanceOperationsSummary } from "./company-finance-operations-summary.service";
+import {
+  buildFinanceCorporateKpis,
+  buildFinanceProjection,
+  resolveFinanceCorporateAccess,
+  type FinanceProjectionSummary,
+} from "./finance-corporate-kpis.service";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -139,6 +145,8 @@ export type FinanceHubOverview = {
   canSeeAnything: boolean;
   /** Unified KPI row for hub UI (no duplicate aging cards). */
   hubKpis: DashboardKpi[];
+  /** Phase 17 — proyección de liquidez corporativa (90 días). */
+  projection: FinanceProjectionSummary | null;
 };
 
 function buildMoneyCardFromAging(
@@ -302,34 +310,8 @@ function buildInsightBlock(
   };
 }
 
-function pushUniqueQuickAction(
-  list: FinanceHubQuickAction[],
-  action: FinanceHubQuickAction,
-  seen: Set<string>,
-) {
-  const key = action.href;
-  if (seen.has(key)) return;
-  seen.add(key);
-  list.push(action);
-}
-
-function mergeFinanceHubShortcuts(
-  quickActions: FinanceHubQuickAction[],
-  reportLinks: FinanceHubReportLink[],
-): FinanceHubReportLink[] {
-  const byHref = new Map<string, FinanceHubReportLink>();
-  const order: string[] = [];
-  for (const r of reportLinks) {
-    byHref.set(r.href, r);
-    order.push(r.href);
-  }
-  for (const q of quickActions) {
-    if (!byHref.has(q.href)) {
-      byHref.set(q.href, { label: q.label, href: q.href, description: "" });
-      order.push(q.href);
-    }
-  }
-  return order.map((h) => byHref.get(h)!);
+function pushUniqueHubAlert(alerts: FinanceHubAlert[], alert: FinanceHubAlert): void {
+  if (!alerts.some((a) => a.message === alert.message)) alerts.push(alert);
 }
 
 /**
@@ -359,46 +341,6 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
     arMod && arPerm ? safeRun(() => getReceivableAgingReport({}, ctx)) : Promise.resolve(null),
     apMod && apPerm ? safeRun(() => getPayableAgingReport({}, ctx)) : Promise.resolve(null),
   ]);
-
-  const reportLinks: FinanceHubReportLink[] = [];
-  if (arMod && arPerm) {
-    reportLinks.push({
-      label:       "Cuentas por cobrar",
-      description: "Por cliente y vencimiento.",
-      href:        "/finanzas/cuentas-por-cobrar-aging",
-    });
-  }
-  if (apMod && apPerm) {
-    reportLinks.push({
-      label:       "Cuentas por pagar",
-      description: "Por proveedor y vencimiento (global).",
-      href:        "/finanzas/cuentas-por-pagar-aging",
-    });
-    reportLinks.push({
-      label:       "Facturas y gastos (empresa)",
-      description: "Gastos generales sin imputar a obra.",
-      href:        "/finanzas/facturas-proveedor",
-    });
-    reportLinks.push({
-      label:       "Transacciones — obligaciones",
-      description: "Obligaciones de empresa sin proyecto.",
-      href:        "/finanzas/transacciones?tab=obligaciones",
-    });
-  }
-  if (trMod && trPerm) {
-    reportLinks.push({
-      label:       "Reportes de tesorería",
-      description: "Posición de caja, movimientos y flujo.",
-      href:        "/tesoreria/reportes",
-    });
-  }
-  if (apMod && apPerm && trMod && trPerm) {
-    reportLinks.push({
-      label:       "Movimientos — pagos empresa (AP)",
-      description: "Egresos bancarios originados en pagos a proveedor sin proyecto.",
-      href:        "/tesoreria/reportes/movimientos?sourceType=PAYMENT&type=OUTFLOW&corporateApPayments=true",
-    });
-  }
 
   let arCard: FinanceHubMoneyCard | undefined;
   if (arMod) {
@@ -498,37 +440,6 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
     };
   }
 
-  const quickActions: FinanceHubQuickAction[] = [];
-  const qaSeen = new Set<string>();
-  if ((apMod && apPerm) || (trMod && trPerm)) {
-    pushUniqueQuickAction(quickActions, { label: "Transacciones", href: "/finanzas/transacciones" }, qaSeen);
-  }
-  if (arMod && arPerm) {
-    pushUniqueQuickAction(quickActions, { label: "Cuentas por cobrar", href: "/finanzas/cuentas-por-cobrar-aging" }, qaSeen);
-  }
-  if (apMod && apPerm) {
-    pushUniqueQuickAction(
-      quickActions,
-      { label: "Gastos generales — asistente", href: "/finanzas/gastos-generales" },
-      qaSeen,
-    );
-    pushUniqueQuickAction(
-      quickActions,
-      { label: "Nueva factura (empresa)", href: "/finanzas/facturas-proveedor/nueva" },
-      qaSeen,
-    );
-    pushUniqueQuickAction(quickActions, { label: "Cuentas por pagar", href: "/finanzas/cuentas-por-pagar-aging" }, qaSeen);
-    pushUniqueQuickAction(quickActions, { label: "Facturas y gastos", href: "/finanzas/facturas-proveedor" }, qaSeen);
-  }
-  if (trMod && trPerm) {
-    pushUniqueQuickAction(quickActions, { label: "Tesorería", href: "/tesoreria" }, qaSeen);
-    pushUniqueQuickAction(quickActions, { label: "Posición de caja", href: "/tesoreria/reportes/posicion-caja" }, qaSeen);
-    pushUniqueQuickAction(quickActions, { label: "Movimientos", href: "/tesoreria/reportes/movimientos" }, qaSeen);
-  }
-  if (acctMod && acctPerm) {
-    pushUniqueQuickAction(quickActions, { label: "Contabilidad", href: "/contabilidad" }, qaSeen);
-  }
-
   const alerts: FinanceHubAlert[] = [];
 
   if (arMod && !arPerm && (apPerm || trPerm || acctPerm)) {
@@ -556,99 +467,17 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
     });
   }
 
-  const anyMulti =
-    Boolean(arInsight?.multicurrency)
-    || Boolean(apGlobalInsight?.multicurrency)
-    || Boolean(treasuryCard?.multicurrency);
-
   const companyOperations = apMod && apPerm ? await getCompanyFinanceOperationsSummary(ctx) : undefined;
 
-  if (anyMulti) {
-    alerts.push({
-      variant: "warning",
-      message:
-        "Hay más de una moneda en juego. Los importes se listan por moneda; no sumamos montos entre monedas distintas.",
-    });
+  const hubShortcuts: FinanceHubReportLink[] = [];
+
+  const corporateAccess = await resolveFinanceCorporateAccess(ctx);
+  const corporateResult = await buildFinanceCorporateKpis(ctx, corporateAccess);
+  for (const a of corporateResult.alerts) {
+    pushUniqueHubAlert(alerts, a);
   }
 
-  const hubShortcuts = mergeFinanceHubShortcuts(quickActions, reportLinks);
-
-  function snapshotsOpenMap(snaps: FinanceHubCurrencySnapshot[]): Map<string, Prisma.Decimal> {
-    const m = new Map<string, Prisma.Decimal>();
-    for (const s of snaps) {
-      m.set(s.currency, new Prisma.Decimal(s.openTotal));
-    }
-    return m;
-  }
-
-  function snapshotsOverdueMap(snaps: FinanceHubCurrencySnapshot[]): Map<string, Prisma.Decimal> {
-    const m = new Map<string, Prisma.Decimal>();
-    for (const s of snaps) {
-      m.set(s.currency, new Prisma.Decimal(s.overdueTotal));
-    }
-    return m;
-  }
-
-  const hubKpis: DashboardKpi[] = [];
-
-  if (arInsight?.visible && !arInsight.loadFailed && arInsight.byCurrency.length > 0) {
-    pushMoneyKpi(
-      hubKpis,
-      "ar_open",
-      "Cuentas por cobrar",
-      snapshotsOpenMap(arInsight.byCurrency),
-      arInsight.agingHref,
-    );
-    pushMoneyKpi(
-      hubKpis,
-      "ar_overdue",
-      "C×C vencidas",
-      snapshotsOverdueMap(arInsight.byCurrency),
-      arInsight.agingHref,
-    );
-  }
-
-  if (apGlobalInsight?.visible && !apGlobalInsight.loadFailed && apGlobalInsight.byCurrency.length > 0) {
-    pushMoneyKpi(
-      hubKpis,
-      "ap_open",
-      "Cuentas por pagar",
-      snapshotsOpenMap(apGlobalInsight.byCurrency),
-      apGlobalInsight.agingHref,
-    );
-    pushMoneyKpi(
-      hubKpis,
-      "ap_overdue",
-      "C×P vencidas",
-      snapshotsOverdueMap(apGlobalInsight.byCurrency),
-      apGlobalInsight.agingHref,
-    );
-  }
-
-  if (treasuryCard?.visible && !treasuryCard.loadFailed) {
-    hubKpis.push({
-      key:   "treasury_balance",
-      label: "Saldo tesorería",
-      value: treasuryCard.displayHeadline,
-      href:  treasuryCard.treasuryHref,
-      tone:  treasuryCard.multicurrency ? "muted" : "default",
-    });
-  }
-
-  if (companyOperations?.visible && !companyOperations.loadFailed) {
-    hubKpis.push({
-      key:   "draft_invoices",
-      label: "Facturas en borrador",
-      value: String(companyOperations.draftInvoiceCount),
-      href:  "/finanzas/facturas-proveedor",
-    });
-    hubKpis.push({
-      key:   "corp_ap_open",
-      label: "C×P abiertas (empresa)",
-      value: String(companyOperations.openPayableCount),
-      href:  "/finanzas/gastos-generales",
-    });
-  }
+  const hubKpis: DashboardKpi[] = [...corporateResult.kpis];
 
   if (accountingSection?.visible) {
     hubKpis.push({
@@ -658,6 +487,13 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
       href:  accountingSection.href,
     });
   }
+
+  const projection = await buildFinanceProjection(
+    ctx,
+    corporateAccess,
+    corporateResult.corporatePayables,
+    alerts,
+  );
 
   return {
     arCard,
@@ -674,5 +510,6 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
     hasFinanceModules,
     canSeeAnything,
     hubKpis,
+    projection,
   };
 }

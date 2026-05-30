@@ -69,6 +69,8 @@ export type {
 export * from "./cost-control/cost-control.service";
 export * from "./reports";
 export * from "./aging/aging.service";
+export * from "./finance/finance-hub-charts.service";
+export * from "./finance/finance-corporate-kpis.service";
 export * from "./finance/finance-hub-overview.service";
 export * from "./finance/project-overhead.service";
 export * from "./finance/overhead-auto-weight.service";
@@ -84,6 +86,9 @@ export * from "./ap/register-ap-expense.service";
 export * from "./treasury/register-corporate-treasury-inflow.service";
 export * from "./ar/register-ar-sale.service";
 export * from "./finance/payable-list-filters";
+export * from "./project-finance/project-finance-dashboard.service";
+export * from "./project-finance/project-cost-composition.service";
+export * from "./project-finance/project-wbs-progress-alerts.service";
 export * from "./project-finance/project-finance-overview.service";
 export * from "./project-finance/project-finance-snapshot.service";
 export * from "./inventory/warehouse-transfer.service";

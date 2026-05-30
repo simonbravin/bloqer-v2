@@ -13,6 +13,7 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { DashboardKpiCard } from "@/features/dashboard/dashboard-kpi-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
+import { FinanceProjectionPanel } from "@/features/finance/components/finance-projection-panel";
 import { Inbox } from "lucide-react";
 
 function formatMoney(raw: string, currency: string): string {
@@ -142,28 +143,7 @@ export function FinanceHubView({ overview }: { overview: FinanceHubOverview }) {
         </KpiStatGrid>
       ) : null}
 
-      {overview.hubShortcuts.length > 0 ? (
-        <Card className="rounded-xl border bg-card shadow-sm">
-          <CardHeader className="border-b border-border/60 pb-4">
-            <CardTitle className="text-base">Accesos rápidos</CardTitle>
-            <CardDescription>Enlaces según tus permisos y módulos activos.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 pt-4 sm:grid-cols-2 lg:grid-cols-3">
-            {overview.hubShortcuts.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
-              >
-                <p className="font-semibold hover:underline">{item.label}</p>
-                {item.description ? (
-                  <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
-                ) : null}
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
+      {overview.projection ? <FinanceProjectionPanel projection={overview.projection} /> : null}
 
       {overview.companyOperations ? (
         <CompanyOperationsSection summary={overview.companyOperations} />

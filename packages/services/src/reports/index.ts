@@ -6,6 +6,7 @@ export * from "./subcontract-variance.service";
 export * from "./project-income-expense.service";
 export * from "./project-cash-projection.service";
 export * from "./company-cash-projection.service";
+export * from "./company-income-expense.service";
 export * from "./project-profitability.service";
 export * from "./report-budget-resolve";
 export * from "./report-month";

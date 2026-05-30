@@ -14,4 +14,5 @@ export type {
 } from "@bloqer/services/project-workspace-nav";
 export { tenantGateFromSnapshot } from "./tenant-gate-from-snapshot";
 export { ProjectFinanceOverviewView } from "./project-finance-overview-view";
+export { ProjectFinanceDashboardView } from "./project-finance-dashboard-view";
 export { ProjectOverviewView } from "./overview/project-overview-view";
