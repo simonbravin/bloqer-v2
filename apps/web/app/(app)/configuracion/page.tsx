@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
@@ -8,8 +7,6 @@ import {
   canReadTenantConfigArea,
   getTenantSettings,
 } from "@bloqer/services";
-import { canViewTenantAuditLog } from "@/lib/configuracion-subnav";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageShell } from "@/components/layout/page-shell";
 import { TenantDisplaySettingsForm } from "@/features/tenant-config/tenant-display-settings-form";
@@ -43,7 +40,6 @@ export default async function ConfiguracionHomePage() {
   const tenant = await getTenantSettings(ctx);
 
   const canEditDisplay = canEditTenantDisplaySettings(current.tenantCtx.roles);
-  const canViewRegistro = canViewTenantAuditLog(current.tenantCtx.roles);
   const company = tenant.primaryCompany;
   const fiscalId = company?.fiscalId ?? tenant.fiscalId;
   const legalName = company?.legalName ?? company?.name ?? null;
@@ -53,46 +49,6 @@ export default async function ConfiguracionHomePage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
         <p className="text-sm text-muted-foreground">Ajustes del tenant y administración del equipo.</p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Equipo</CardTitle>
-            <CardDescription>Miembros, roles y estado de membresía.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/configuracion/equipo">Ir a equipo</Link>
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Permisos</CardTitle>
-            <CardDescription>Matriz de referencia por rol (solo lectura).</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/configuracion/permisos">Ver permisos</Link>
-            </Button>
-          </CardContent>
-        </Card>
-        {canViewRegistro ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Registro de actividad</CardTitle>
-              <CardDescription>
-                Trazabilidad de compras, pagos, aprobaciones y cambios críticos del tenant.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/configuracion/registro">Ver registro</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ) : null}
       </div>
 
       <Card>

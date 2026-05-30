@@ -1,4 +1,11 @@
+import { AUDIT_UI_MODULE_LABEL_ES } from "@bloqer/domain";
 import type { AgingFilters } from "../aging/aging.service";
+import { formatAuditLogExportFilterLine } from "../audit/audit-display";
+import {
+  fetchTenantAuditLogForExport,
+  type ListTenantAuditLogFilters,
+  type TenantAuditLogExportUrlFilters,
+} from "../audit/audit-read.service";
 import { getPayableAgingReport, getReceivableAgingReport } from "../aging/aging.service";
 import type { CostControlFilters } from "../cost-control/cost-control.service";
 import { getProjectCostControl } from "../cost-control/cost-control.service";
@@ -28,6 +35,7 @@ import { AgingReportPdfDocument } from "./pdf/aging-pdf";
 import { CostControlReportPdfDocument } from "./pdf/cost-control-pdf";
 import { ProjectSimpleTablePdfDocument } from "./pdf/project-simple-table-pdf";
 import type { ReportPdfPayload } from "./pdf/pdf-export.types";
+import { MAX_AUDIT_LOG_PDF_ROWS } from "./pdf/pdf-export.types";
 import { renderReportPdfToBuffer } from "./pdf/pdf-renderer.service";
 
 export async function exportReceivableAgingPdf(
@@ -255,5 +263,62 @@ export async function exportProjectProfitabilityPdf(
     />,
   );
   return { buffer, filename: safeReportFilename(`rentabilidad_${report.budgetName}`, "pdf") };
+}
+
+export async function exportTenantAuditLogPdf(
+  filters: Omit<ListTenantAuditLogFilters, "cursor" | "limit">,
+  ctx: ServiceContext,
+  urlFilters?: TenantAuditLogExportUrlFilters,
+): Promise<ReportPdfPayload> {
+  const { rows, truncated } = await fetchTenantAuditLogForExport(
+    filters,
+    ctx,
+    MAX_AUDIT_LOG_PDF_ROWS,
+  );
+
+  const generatedAtIso = new Date().toISOString();
+  const pdfRows = rows.map((r) => ({
+    createdAt: r.createdAt.toISOString().replace("T", " ").slice(0, 19),
+    actor: r.actorLabel,
+    module: r.module ? AUDIT_UI_MODULE_LABEL_ES[r.module] : "—",
+    action: r.actionLabel,
+    reference: r.reference ?? "—",
+    project: r.projectName ?? "—",
+  }));
+
+  const filterLine = formatAuditLogExportFilterLine(urlFilters ?? {});
+  const warnings: string[] = [];
+  if (truncated) {
+    warnings.push(
+      `Detalle truncado: se muestran ${MAX_AUDIT_LOG_PDF_ROWS} filas. Exportá CSV para el detalle completo (hasta 10.000 filas con diff JSON).`,
+    );
+  }
+
+  const buffer = await renderReportPdfToBuffer(
+    <ProjectSimpleTablePdfDocument
+      title="Registro de actividad"
+      subtitle="Trazabilidad de acciones críticas del tenant"
+      filterLine={filterLine}
+      generatedAtIso={generatedAtIso}
+      maxRows={MAX_AUDIT_LOG_PDF_ROWS}
+      columns={[
+        { key: "createdAt", label: "Fecha (UTC)", flex: 1.15 },
+        { key: "actor", label: "Usuario", flex: 1.2 },
+        { key: "module", label: "Módulo", flex: 0.9 },
+        { key: "action", label: "Acción", flex: 1.35 },
+        { key: "reference", label: "Ref.", flex: 0.55 },
+        { key: "project", label: "Proyecto", flex: 1.1 },
+      ]}
+      rows={pdfRows}
+      warnings={warnings}
+    />,
+  );
+
+  const dateStamp = generatedAtIso.slice(0, 10);
+  const base = truncated
+    ? `registro_actividad_${dateStamp}_truncado_${MAX_AUDIT_LOG_PDF_ROWS}`
+    : `registro_actividad_${dateStamp}`;
+
+  return { buffer, filename: safeReportFilename(base, "pdf") };
 }
 

@@ -11,7 +11,7 @@ function canReadConfigNav(roles: UserRole[]): boolean {
 
 export function buildConfiguracionSubnavLinks(roles: UserRole[]): ModuleSubnavLink[] {
   const links: ModuleSubnavLink[] = [
-    { href: "/configuracion", label: "Resumen", match: "exact" },
+    { href: "/configuracion", label: "General", match: "exact" },
     { href: "/configuracion/perfil", label: "Mi perfil" },
   ];
 

@@ -8,7 +8,7 @@ const monorepoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: monorepoRoot,
-  serverExternalPackages: ["@prisma/client", "@prisma/engines", "prisma"],
+  serverExternalPackages: ["@prisma/client", "@prisma/engines", "prisma", "@react-pdf/renderer"],
   experimental: {
     serverActions: {
       bodySizeLimit: "52mb",

@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AuditLogDetailSheet } from "@/features/audit-log/audit-log-detail-sheet";
+import { AuditLogDetailDialog } from "@/features/audit-log/audit-log-detail-dialog";
 import { buildAuditEntityHref } from "@/features/audit-log/audit-entity-href";
 import { ReportExportActions } from "@/features/reports";
 import { getCurrentUser } from "@/lib/auth";
@@ -362,7 +362,7 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
         </div>
       ) : null}
 
-      <AuditLogDetailSheet detail={detail} open={Boolean(entryId)} closeHref={closeHref} />
+      <AuditLogDetailDialog detail={detail} open={Boolean(entryId)} closeHref={closeHref} />
     </PageShell>
   );
 }

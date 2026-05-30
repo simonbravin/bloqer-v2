@@ -12,7 +12,6 @@ export {
   formatAuditActorLabel,
   formatAuditLogExportFilterLine,
 } from "./audit/audit-display";
-export { exportTenantAuditLogPdf } from "./audit/audit-pdf-export.service";
 export * from "./project/project.service";
 export * from "./project/project-overview-dashboard.service";
 export * from "./budget/budget.service";

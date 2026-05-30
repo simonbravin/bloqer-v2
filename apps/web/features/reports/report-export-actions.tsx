@@ -1,5 +1,14 @@
+"use client";
+
 import Link from "next/link";
+import { ChevronDown, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type SearchParamsLike = Record<string, string | string[] | undefined>;
 
@@ -26,7 +35,7 @@ function buildQuery(params: SearchParamsLike, extra?: Record<string, string>): s
 type Props = {
   exportPath: string;
   params: SearchParamsLike;
-  /** When true, shows CSV + PDF. Use `pdfOnly` when the route only supports PDF. */
+  /** When true, shows a single Exportar menu with CSV + PDF. Use `pdfOnly` when the route only supports PDF. */
   pdf?: boolean;
   pdfOnly?: boolean;
 };
@@ -34,26 +43,58 @@ type Props = {
 export function ReportExportActions({ exportPath, params, pdf = false, pdfOnly = false }: Props) {
   const qs = buildQuery(params);
   const csvHref = qs ? `${exportPath}?${qs}` : exportPath;
-  const pdfQs = buildQuery(params, { format: "pdf" });
-  const pdfHref = `${exportPath}?${pdfQs}`;
+  const pdfHref = `${exportPath}?${buildQuery(params, { format: "pdf" })}`;
+
+  if (pdfOnly) {
+    return (
+      <Button type="button" variant="outline" size="sm" asChild>
+        <Link href={pdfHref} prefetch={false} target="_blank" rel="noopener noreferrer">
+          Exportar PDF
+        </Link>
+      </Button>
+    );
+  }
+
+  if (!pdf) {
+    return (
+      <Button type="button" variant="outline" size="sm" asChild>
+        <Link href={csvHref} prefetch={false}>
+          Exportar CSV
+        </Link>
+      </Button>
+    );
+  }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {!pdfOnly ? (
-        <Button type="button" variant="outline" size="sm" asChild>
-          <Link href={csvHref} prefetch={false}>
-            Exportar CSV
-          </Link>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="gap-2">
+          <Download className="h-4 w-4" aria-hidden />
+          Exportar
+          <ChevronDown className="h-4 w-4 opacity-60" aria-hidden />
         </Button>
-      ) : null}
-      {pdf || pdfOnly ? (
-        <Button type="button" variant="outline" size="sm" asChild>
-          <Link href={pdfHref} prefetch={false} target="_blank" rel="noopener noreferrer">
-            Exportar PDF
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem asChild>
+          <Link href={csvHref} prefetch={false} className="flex cursor-pointer items-center gap-2">
+            <FileSpreadsheet className="h-4 w-4" aria-hidden />
+            CSV
           </Link>
-        </Button>
-      ) : null}
-    </div>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link
+            href={pdfHref}
+            prefetch={false}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex cursor-pointer items-center gap-2"
+          >
+            <FileText className="h-4 w-4" aria-hidden />
+            PDF
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
