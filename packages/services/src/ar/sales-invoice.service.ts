@@ -361,6 +361,7 @@ export async function updateSalesInvoice(
   const inv = await prisma.salesInvoice.findUnique({ where: { id } });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(inv.projectId, ctx.tenantId);
   assertInvoiceEditable(inv);
 
   const updated = await prisma.$transaction(async (tx) => {

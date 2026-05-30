@@ -78,6 +78,8 @@ export async function ensureScheduleForProject(projectId: string, ctx: ServiceCo
   const existing = await getScheduleForProject(projectId, ctx);
   if (existing) return existing;
 
+  await assertProjectScheduleMutation(projectId, ctx);
+
   const created = await prisma.schedule.create({
     data: {
       tenantId: ctx.tenantId,

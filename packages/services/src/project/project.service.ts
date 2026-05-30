@@ -11,6 +11,7 @@ import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-
 import {
   assertNoOpenOperationalDocuments,
   getProjectCancellationImpact,
+  resolveReactivationTargetStatus,
 } from "./project-cancellation-impact.service";
 import {
   canCancelActiveProject,
@@ -27,6 +28,7 @@ export {
 } from "./project-lifecycle-access";
 export {
   sanitizeReactivationTargetStatus,
+  resolveReactivationTargetStatus,
   type ProjectCancellationImpact,
 } from "./project-cancellation-impact.service";
 export { getProjectCancellationImpact } from "./project-cancellation-impact.service";
@@ -357,8 +359,7 @@ export async function reactivateProject(
     throw new ServiceError("CONFLICT", "Solo se pueden reactivar proyectos cancelados");
   }
 
-  const impact = await getProjectCancellationImpact(id, ctx);
-  const targetStatus = impact.reactivationTargetStatus;
+  const targetStatus = await resolveReactivationTargetStatus(project);
   if (!targetStatus) {
     throw new ServiceError("CONFLICT", "No se pudo determinar el estado de reactivación");
   }

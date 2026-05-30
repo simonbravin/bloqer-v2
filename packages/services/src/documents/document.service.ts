@@ -13,6 +13,7 @@ import {
   getTenantModuleGate,
   type TenantModuleGate,
 } from "../tenant-modules/tenant-module.service";
+import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024;
 
@@ -75,6 +76,7 @@ export async function createDocumentMetadata(
   });
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsBudgetPlanning(input.projectId, ctx.tenantId);
 
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");
@@ -238,6 +240,7 @@ async function resolveDocumentUploadPlan(
       if (!input.projectId || input.projectId !== inv.projectId) {
         throw new ServiceError("FORBIDDEN", "La factura no pertenece al proyecto indicado");
       }
+      await assertProjectAllowsBudgetPlanning(inv.projectId, ctx.tenantId);
       anchorProjectId = inv.projectId;
       strictProjectId   = inv.projectId;
     } else {
@@ -259,6 +262,7 @@ async function resolveDocumentUploadPlan(
     });
     if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
     if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    await assertProjectAllowsBudgetPlanning(input.projectId, ctx.tenantId);
     anchorProjectId = input.projectId;
     strictProjectId   = input.projectId;
   }

@@ -435,6 +435,7 @@ export async function updateJobsiteLog(
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `El parte en estado "${existing.status}" no puede editarse`);
   }
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
 
   if (input.logDate) {
     const logDate = new Date(input.logDate);
@@ -503,6 +504,7 @@ export async function submitJobsiteLog(id: string, ctx: ServiceContext): Promise
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `El parte en estado "${existing.status}" no puede enviarse`);
   }
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
   const hasContent =
     existing.generalNotes || existing.blockers || existing.incidents || existing.safetyNotes ||
     existing.title || existing.workFront ||

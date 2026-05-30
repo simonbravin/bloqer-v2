@@ -169,6 +169,7 @@ export async function updateCertification(
   const cert = await prisma.certification.findUnique({ where: { id } });
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(cert.projectId, ctx.tenantId);
   assertCertificationEditable(cert);
 
   const updated = await prisma.certification.update({

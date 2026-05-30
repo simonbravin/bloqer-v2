@@ -268,6 +268,7 @@ export async function updateSubcontract(
   const existing = await prisma.subcontract.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `El subcontrato en estado "${existing.status}" no puede editarse. Use actualizar metadatos para campos no económicos.`);
   }
@@ -347,6 +348,7 @@ export async function updateSubcontractMeta(
   if (existing.status === "CANCELLED" || existing.status === "COMPLETED") {
     throw new ServiceError("CONFLICT", `El subcontrato en estado "${existing.status}" es de solo lectura`);
   }
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
 
   const updated = await prisma.subcontract.update({
     where: { id },

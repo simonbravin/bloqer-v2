@@ -105,7 +105,7 @@ export function sanitizeReactivationTargetStatus(status: ProjectStatus): Project
   return REACTIVATION_TARGET_STATUSES.includes(status) ? status : null;
 }
 
-async function resolveReactivationTargetStatus(
+export async function resolveReactivationTargetStatus(
   project: {
     id: string;
     tenantId: string;

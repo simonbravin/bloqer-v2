@@ -395,6 +395,9 @@ export async function updateSupplierInvoice(
   if (projectScopeId !== undefined && existing.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
+  if (existing.projectId) {
+    await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  }
   assertSupplierInvoiceEditable(existing);
 
   if (input.supplierContactId && input.supplierContactId !== existing.supplierContactId) {
