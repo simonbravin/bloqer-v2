@@ -4,6 +4,7 @@ import type { CreateSubcontractInput, UpdateSubcontractInput, UpdateSubcontractM
 import { log } from "../audit/audit.service";
 import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -178,9 +179,7 @@ export async function createSubcontract(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear subcontratos");
   }
 
-  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
   const subcontractorRole = await prisma.contactRole.findUnique({
     where: { contactId_role: { contactId: input.subcontractorContactId, role: "SUBCONTRACTOR" } },
@@ -373,6 +372,7 @@ export async function activateSubcontract(id: string, ctx: ServiceContext): Prom
   const existing = await prisma.subcontract.findUnique({ where: { id }, include: { lines: { select: { id: true } } } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `El subcontrato en estado "${existing.status}" no puede activarse`);
   }

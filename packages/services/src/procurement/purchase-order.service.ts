@@ -6,6 +6,7 @@ import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-e
 import { ServiceContext, ServiceError } from "../types";
 import { calcLine, recalcPurchaseOrderTotals } from "./purchase-order-calc.service";
 import { canViewProcurementProjectArea } from "./procurement-access";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -250,9 +251,7 @@ export async function createPurchaseOrder(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear órdenes de compra");
   }
 
-  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
   // BR-SUP-001: validate supplier role
   const supplierRole = await prisma.contactRole.findUnique({
@@ -359,6 +358,7 @@ export async function updatePurchaseOrder(
   const existing = await prisma.purchaseOrder.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
   assertDraft(existing);
 
   if (input.supplierContactId) {
@@ -455,6 +455,7 @@ export async function issuePurchaseOrder(id: string, ctx: ServiceContext): Promi
   const existing = await prisma.purchaseOrder.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
   assertDraft(existing);
 
   const lineCount = await prisma.purchaseOrderLine.count({ where: { purchaseOrderId: id } });

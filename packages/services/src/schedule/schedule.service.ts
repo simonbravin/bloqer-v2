@@ -19,8 +19,13 @@ import {
   SCHEDULE_ITEM_ENTITY,
   statusChangeAuditAction,
 } from "./schedule-audit";
+import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
 
 const MS_PER_DAY = 86_400_000;
+
+async function assertProjectScheduleMutation(projectId: string, ctx: ServiceContext) {
+  await assertProjectAllowsBudgetPlanning(projectId, ctx.tenantId);
+}
 
 async function assertProjectAccess(projectId: string, ctx: ServiceContext) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
@@ -52,6 +57,12 @@ async function getScheduleItemOrThrow(scheduleItemId: string, ctx: ServiceContex
   if (item.tenantId !== ctx.tenantId) {
     throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   }
+  return item;
+}
+
+async function getScheduleItemForMutation(scheduleItemId: string, ctx: ServiceContext) {
+  const item = await getScheduleItemOrThrow(scheduleItemId, ctx);
+  await assertProjectScheduleMutation(item.schedule.projectId, ctx);
   return item;
 }
 
@@ -101,6 +112,7 @@ export async function importScheduleFromBudget(
   if (!canEditScheduleArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
   }
+  await assertProjectScheduleMutation(projectId, ctx);
   const project = await assertProjectAccess(projectId, ctx);
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "SCHEDULE");
@@ -281,6 +293,7 @@ export async function createScheduleItem(
   if (!canEditScheduleArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
   }
+  await assertProjectScheduleMutation(projectId, ctx);
   await assertProjectAccess(projectId, ctx);
   const schedule = await ensureScheduleForProject(projectId, ctx);
 
@@ -330,7 +343,7 @@ export async function updateScheduleItemName(
   if (!canEditScheduleArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
   }
-  const item = await getScheduleItemOrThrow(scheduleItemId, ctx);
+  const item = await getScheduleItemForMutation(scheduleItemId, ctx);
   const before = scheduleItemSnapshot(item);
   const updated = await prisma.scheduleItem.update({
     where: { id: item.id },
@@ -355,7 +368,7 @@ export async function updateScheduleItemDates(
   if (!canEditScheduleArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
   }
-  const item = await getScheduleItemOrThrow(scheduleItemId, ctx);
+  const item = await getScheduleItemForMutation(scheduleItemId, ctx);
 
   const startDate = input.startDate ? parseDateOnly(input.startDate) : null;
   const endDate = input.endDate ? parseDateOnly(input.endDate) : null;
@@ -394,7 +407,7 @@ export async function updateScheduleItemProgress(
   if (!canEditScheduleArea(ctx.roles) && !can(ctx.roles, "VIEW", "SCHEDULE")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para actualizar avance");
   }
-  const item = await getScheduleItemOrThrow(scheduleItemId, ctx);
+  const item = await getScheduleItemForMutation(scheduleItemId, ctx);
 
   const before = { progressPct: item.progressPct.toFixed(2) };
   const updated = await prisma.scheduleItem.update({
@@ -424,7 +437,7 @@ async function transitionScheduleItem(
   if (!canEditScheduleArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
   }
-  const item = await getScheduleItemOrThrow(scheduleItemId, ctx);
+  const item = await getScheduleItemForMutation(scheduleItemId, ctx);
   assertScheduleStatusTransition(item.status, to);
 
   if (to === "BLOCKED" && !extra?.blockReason?.trim()) {
@@ -475,7 +488,7 @@ export async function moveScheduleItemToStatus(
   ctx: ServiceContext,
   blockReason?: string,
 ) {
-  const item = await getScheduleItemOrThrow(scheduleItemId, ctx);
+  const item = await getScheduleItemForMutation(scheduleItemId, ctx);
   if (item.status === targetStatus) return item;
 
   switch (targetStatus) {
@@ -503,7 +516,7 @@ export async function linkWbsNodesToScheduleItem(
   if (!canEditScheduleArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
   }
-  const item = await getScheduleItemOrThrow(scheduleItemId, ctx);
+  const item = await getScheduleItemForMutation(scheduleItemId, ctx);
   const schedule = await prisma.schedule.findUniqueOrThrow({
     where: { id: item.scheduleId },
   });
@@ -573,7 +586,7 @@ export async function unlinkWbsNodeFromScheduleItem(
   if (!canEditScheduleArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
   }
-  await getScheduleItemOrThrow(scheduleItemId, ctx);
+  await getScheduleItemForMutation(scheduleItemId, ctx);
   await prisma.scheduleItemWbsLink.deleteMany({
     where: { scheduleItemId, wbsNodeId },
   });
@@ -600,6 +613,7 @@ export async function addScheduleDependency(
   if (!schedule || schedule.tenantId !== ctx.tenantId) {
     throw new ServiceError("NOT_FOUND", "Cronograma no encontrado");
   }
+  await assertProjectScheduleMutation(schedule.projectId, ctx);
 
   const [pred, succ] = await Promise.all([
     prisma.scheduleItem.findFirst({ where: { id: predecessorId, scheduleId } }),
@@ -646,6 +660,8 @@ export async function removeScheduleDependency(dependencyId: string, ctx: Servic
   if (dep.tenantId !== ctx.tenantId) {
     throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   }
+  const successor = await getScheduleItemOrThrow(dep.successorId, ctx);
+  await assertProjectScheduleMutation(successor.schedule.projectId, ctx);
   await prisma.scheduleItemDependency.delete({ where: { id: dependencyId } });
   await auditSchedule(
     ctx,

@@ -12,6 +12,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea, canViewArProjectArea } from "./ar-access";
 import { resolvePagination } from "../finance/pagination";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -170,9 +171,7 @@ export async function createSalesInvoice(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas");
   }
 
-  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
   const companyId = await resolveCompanyId(input.projectId, ctx);
 
@@ -264,6 +263,7 @@ export async function createInvoiceFromCertification(
   });
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(cert.projectId, ctx.tenantId);
   if (cert.status !== "ISSUED" && cert.status !== "APPROVED") {
     throw new ServiceError("CONFLICT", "Solo se pueden facturar certificaciones emitidas o aprobadas");
   }
@@ -410,6 +410,14 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
   if (!canEditArArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para emitir facturas");
   }
+
+  const invPreview = await prisma.salesInvoice.findUnique({
+    where: { id },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
+  if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(invPreview.projectId, ctx.tenantId);
 
   const result = await prisma.$transaction(async (tx) => {
     const inv = await tx.salesInvoice.findUnique({

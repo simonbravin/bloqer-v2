@@ -4,6 +4,7 @@ import type { RegisterTransactionResult } from "../finance/register-transaction.
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { registerArSale } from "./register-ar-sale.service";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 const ADVANCE_LINE_DESCRIPTION = "Anticipo de obra";
 
@@ -30,12 +31,13 @@ export async function registerArAdvance(
     );
   }
 
+  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+
   const project = await prisma.project.findUnique({
     where: { id: input.projectId },
     select: { tenantId: true, clientContactId: true, companyId: true },
   });
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (project.clientContactId !== input.clientContactId) {
     throw new ServiceError("VALIDATION", "El cliente seleccionado no corresponde al proyecto");
   }

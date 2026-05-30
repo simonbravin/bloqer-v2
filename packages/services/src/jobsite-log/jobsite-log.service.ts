@@ -5,6 +5,7 @@ import { log } from "../audit/audit.service";
 import { createSystemNotification } from "../notifications/notification.service";
 import { assertJobsiteLogTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 function canViewJobsiteLogArea(roles: ServiceContext["roles"]): boolean {
   return can(roles, "VIEW", "JOBSITE_LOG") || can(roles, "VIEW", "PROJECTS");
@@ -367,9 +368,7 @@ export async function createJobsiteLog(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear partes de obra");
   }
 
-  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
   const logDate = new Date(input.logDate);
   const today   = new Date(); today.setHours(23, 59, 59, 999);

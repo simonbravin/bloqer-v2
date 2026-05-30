@@ -6,6 +6,7 @@ import { log } from "../audit/audit.service";
 import { createSystemNotification } from "../notifications/notification.service";
 import { ServiceContext, ServiceError } from "../types";
 import { _computePreviousQty, _recalcCertificationTotals } from "./certification-calc.service";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 // ─── View types (Decimal fields serialized to string) ─────────────────────────
 
@@ -103,9 +104,7 @@ export async function createCertification(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear certificaciones");
   }
 
-  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
   // BR-CERT-001: budget must be APPROVED or CLOSED
   const budget = await prisma.budget.findUnique({ where: { id: input.budgetId } });
@@ -206,6 +205,14 @@ export async function issueCertification(id: string, ctx: ServiceContext): Promi
   if (!can(ctx.roles, "EDIT", "CERTIFICATIONS")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para emitir certificaciones");
   }
+
+  const certPreview = await prisma.certification.findUnique({
+    where: { id },
+    select: { projectId: true, tenantId: true },
+  });
+  if (!certPreview) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
+  if (certPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(certPreview.projectId, ctx.tenantId);
 
   // All validation, line recalculation, and status transition happen inside a
   // single transaction. This eliminates the check-then-update gap that allowed

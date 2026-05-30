@@ -5,6 +5,7 @@ import { log } from "../audit/audit.service";
 import { assertInventoryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { getStockBalance } from "./stock-balance.service";
 import { ServiceContext, ServiceError } from "../types";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -104,6 +105,10 @@ export async function createStockConsumption(
   if (!product) throw new ServiceError("NOT_FOUND", "Producto no encontrado");
   if (product.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (product.status !== "ACTIVE") throw new ServiceError("CONFLICT", "El producto no está activo");
+
+  if (input.projectId) {
+    await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+  }
 
   if (input.wbsNodeId) {
     const wbs = await prisma.wbsNode.findUnique({ where: { id: input.wbsNodeId } });

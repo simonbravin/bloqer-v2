@@ -24,7 +24,8 @@
 | `project.put_on_hold` | ACTIVE → ON_HOLD | id, reason |
 | `project.resumed` | ON_HOLD → ACTIVE | id |
 | `project.completed` | ACTIVE → COMPLETED | id, completed_at |
-| `project.cancelled` | * → CANCELLED | id, reason |
+| `project.cancelled` | * → CANCELLED | id, reason, previous_status |
+| `project.reactivated` | CANCELLED → DRAFT \| ACTIVE \| ON_HOLD | id, reason, restored_status |
 
 ### 2.2 Budget
 

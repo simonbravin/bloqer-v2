@@ -4,19 +4,14 @@ import { can } from "@bloqer/domain";
 import {
   getProjectById,
   getProjectOverviewDashboard,
+  canCancelActiveProject,
+  canReactivateProject,
   ServiceError,
 } from "@bloqer/services";
-import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/page-shell";
 import { getCurrentUser } from "@/lib/auth";
 import { ProjectOverviewView } from "@/features/projects/overview/project-overview-view";
-import {
-  activateProjectAction,
-  pauseProjectAction,
-  resumeProjectAction,
-  completeProjectAction,
-  cancelProjectAction,
-} from "../actions";
+import { ProjectLifecycleActions } from "@/features/projects/components/project-lifecycle-actions";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -55,69 +50,17 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
   }
 
   const project = fullProject;
-  const isTerminal = project?.status === "COMPLETED" || project?.status === "CANCELLED";
-
-  const doActivate = async () => {
-    "use server";
-    await activateProjectAction(id);
-  };
-  const doPause = async () => {
-    "use server";
-    await pauseProjectAction(id);
-  };
-  const doResume = async () => {
-    "use server";
-    await resumeProjectAction(id);
-  };
-  const doComplete = async () => {
-    "use server";
-    await completeProjectAction(id);
-  };
-  const doCancel = async () => {
-    "use server";
-    await cancelProjectAction(id);
-  };
+  const roles = current.tenantCtx.roles;
 
   const lifecycleActions =
     project ? (
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-        {!isTerminal && (
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${id}/editar`}>Editar</Link>
-          </Button>
-        )}
-        {project.status === "DRAFT" && (
-          <form action={doActivate}>
-            <Button size="sm">Activar</Button>
-          </form>
-        )}
-        {project.status === "ACTIVE" && (
-          <>
-            <form action={doPause}>
-              <Button variant="outline" size="sm">
-                Pausar
-              </Button>
-            </form>
-            <form action={doComplete}>
-              <Button variant="outline" size="sm">
-                Completar
-              </Button>
-            </form>
-          </>
-        )}
-        {project.status === "ON_HOLD" && (
-          <form action={doResume}>
-            <Button size="sm">Reanudar</Button>
-          </form>
-        )}
-        {!isTerminal && (
-          <form action={doCancel}>
-            <Button variant="ghost" size="sm" className="text-muted-foreground">
-              Cancelar proyecto
-            </Button>
-          </form>
-        )}
-      </div>
+      <ProjectLifecycleActions
+        projectId={id}
+        status={project.status}
+        canEditProject={can(roles, "EDIT", "PROJECTS")}
+        canCancelActive={canCancelActiveProject(roles)}
+        canReactivate={canReactivateProject(roles)}
+      />
     ) : null;
 
   return (

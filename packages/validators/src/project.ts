@@ -56,3 +56,20 @@ export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type ProjectFormInput = z.input<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type ListProjectsInput = z.infer<typeof listProjectsSchema>;
+
+export const projectLifecycleInputSchema = z.object({
+  reason: z.string().trim().max(2000).optional(),
+  comment: z.string().trim().max(2000).optional(),
+});
+
+export const projectReactivateInputSchema = projectLifecycleInputSchema.extend({
+  reason: z.string().trim().min(1, "El motivo es obligatorio").max(2000),
+});
+
+export const projectCancelActiveInputSchema = projectLifecycleInputSchema.extend({
+  reason: z.string().trim().min(1, "El motivo es obligatorio").max(2000),
+});
+
+export type ProjectLifecycleInput = z.infer<typeof projectLifecycleInputSchema>;
+export type ProjectReactivateInput = z.infer<typeof projectReactivateInputSchema>;
+export type ProjectCancelActiveInput = z.infer<typeof projectCancelActiveInputSchema>;

@@ -138,7 +138,7 @@
 ### Project
 - **Propósito:** la obra. Unidad central de negocio.
 - **Identidad:** code (interno) + name.
-- **Atributos clave:** code, name, client_id, location, start_date, end_date, project_type (`PUBLIC` / `PRIVATE`), status, currency, total_amount.
+- **Atributos clave:** code, name, client_id, location, start_date, end_date, project_type (`PUBLIC` / `PRIVATE`), status, currency, total_amount, `status_before_cancellation`, `cancellation_reason`, `cancelled_at` (persistidos al cancelar; limpiados al reactivar — [D-042]).
 - **Tenant-scoped:** sí.
 - **Estados:** `DRAFT | ACTIVE | ON_HOLD | COMPLETED | CANCELLED`.
 

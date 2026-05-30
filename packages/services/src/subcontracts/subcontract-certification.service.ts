@@ -4,6 +4,7 @@ import type { CreateSubcontractCertificationInput, UpdateSubcontractCertificatio
 import { log } from "../audit/audit.service";
 import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -140,6 +141,7 @@ export async function createSubcontractCertification(
   });
   if (!sub) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
   if (sub.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(sub.projectId, ctx.tenantId);
   if (sub.status !== "ACTIVE") {
     throw new ServiceError("CONFLICT", `Solo se pueden crear certificaciones en subcontratos activos. Estado actual: "${sub.status}"`);
   }

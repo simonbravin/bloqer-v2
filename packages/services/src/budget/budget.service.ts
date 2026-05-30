@@ -6,6 +6,7 @@ import { listEntityAuditLogs, log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 
 import { canViewBudgetsArea } from "../project/project-nav-guards";
+import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
 
 export { canViewBudgetsArea };
 
@@ -153,9 +154,7 @@ export async function createBudget(
   if (!can(ctx.roles, "EDIT", "BUDGETS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to create budgets");
   }
-  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  const project = await assertProjectAllowsBudgetPlanning(input.projectId, ctx.tenantId);
 
   const maxVersion = await prisma.budget.aggregate({
     where: { projectId: input.projectId },
@@ -216,6 +215,7 @@ export async function updateBudget(
   const existing = await prisma.budget.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsBudgetPlanning(existing.projectId, ctx.tenantId);
   // name/internalNotes allowed in any non-CANCELLED status
   if (existing.status === "CANCELLED") throw new ServiceError("CONFLICT", "No se puede editar un presupuesto cancelado");
 
@@ -356,6 +356,7 @@ async function _transition(
   const budget = await prisma.budget.findUnique({ where: { id } });
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
   if (!allowedFrom.includes(budget.status)) {
     throw new ServiceError("CONFLICT", `No se puede cambiar el estado desde "${budget.status}"`);
   }

@@ -5,6 +5,7 @@ export { ProjectFilters } from "./components/project-filters";
 export { ProjectListExportButton } from "./components/project-list-export-button";
 export { ProjectForm } from "./components/project-form";
 export { ProjectStatusBadge } from "./components/project-status-badge";
+export { ProjectLifecycleActions } from "./components/project-lifecycle-actions";
 export {
   buildProjectWorkspaceNavSections,
 } from "@bloqer/services/project-workspace-nav";

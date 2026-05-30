@@ -127,6 +127,8 @@ Más allá de la matriz, hay permisos atados a **contextos específicos**:
 | Anular movimiento `CONFIRMED` | OWNER, ADMIN | Siempre |
 | Anular certificación `ISSUED` | OWNER, ADMIN, PM (si está en periodo abierto) | Periodo abierto |
 | Reabrir periodo cerrado | OWNER, ADMIN | Cualquier momento (queda auditado) |
+| Cancelar obra `ACTIVE`/`ON_HOLD` | OWNER, ADMIN | Motivo obligatorio; sin documentos operativos abiertos ([BR-PROJ-005], [PERM-007]) |
+| Reactivar obra `CANCELLED` | OWNER, ADMIN | Motivo obligatorio; restaura estado previo ([BR-PROJ-006], [PERM-007]) |
 | Editar comprobante con valor legal emitido | _nadie_ | Nunca; se anula y se reemite |
 | Ver `PROJECT_MANAGER` en obra ajena | OWNER, ADMIN | Siempre |
 | Cambiar tenant de un usuario | OWNER (origen y destino) | Casos excepcionales |
@@ -152,6 +154,7 @@ Más allá de la matriz, hay permisos atados a **contextos específicos**:
 - **PERM-004**: ningún rol distinto a `OWNER` puede transferir la propiedad del tenant.
 - **PERM-005**: ningún rol distinto a `ADMIN` u `OWNER` puede modificar permisos de otros usuarios.
 - **PERM-006**: la rentabilidad neta consolidada está bloqueada para roles fuera de `OWNER` y `ADMIN` salvo habilitación explícita.
+- **PERM-007**: cancelar obra `ACTIVE`/`ON_HOLD` y reactivar obra `CANCELLED` solo **OWNER** o **ADMIN** ([D-042]).
 
 ---
 

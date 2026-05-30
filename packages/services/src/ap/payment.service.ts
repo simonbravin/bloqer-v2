@@ -9,6 +9,7 @@ import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 export type PaymentView = Omit<Payment, "amount"> & {
   amount: string;
@@ -183,6 +184,19 @@ export async function createPayment(
   const amount = new Prisma.Decimal(input.amount);
   if (amount.lessThanOrEqualTo(0)) {
     throw new ServiceError("VALIDATION", "El monto debe ser mayor a 0");
+  }
+
+  const payablePreview = await prisma.payable.findUnique({
+    where: { id: input.payableId },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!payablePreview) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
+  if (payablePreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && payablePreview.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
+  }
+  if (payablePreview.projectId) {
+    await assertProjectAllowsOperationalMutation(payablePreview.projectId, ctx.tenantId);
   }
 
   const result = await prisma.$transaction(async (tx) => {

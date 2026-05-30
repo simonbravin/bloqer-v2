@@ -11,6 +11,7 @@ import { assertArTenantModule, assertTreasuryTenantModule } from "../tenant-modu
 import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea } from "./ar-access";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
@@ -112,9 +113,7 @@ export async function registerArSale(
     );
   }
 
-  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
   const companyId = await resolveCompanyId(input.projectId, ctx);
 

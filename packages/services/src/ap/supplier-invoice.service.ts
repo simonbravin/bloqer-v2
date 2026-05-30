@@ -9,6 +9,7 @@ import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -258,6 +259,7 @@ export async function createSupplierInvoice(
   const projectId = input.projectId ?? null;
 
   if (projectId) {
+    await assertProjectAllowsOperationalMutation(projectId, ctx.tenantId);
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       select: { tenantId: true, companyId: true },
@@ -501,6 +503,16 @@ export async function issueSupplierInvoice(
   await assertApTenantModule(ctx);
   if (!can(ctx.roles, "EDIT", "AP")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para emitir facturas de proveedor");
+  }
+
+  const invPreview = await prisma.supplierInvoice.findUnique({
+    where: { id },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
+  if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (invPreview.projectId) {
+    await assertProjectAllowsOperationalMutation(invPreview.projectId, ctx.tenantId);
   }
 
   const result = await prisma.$transaction(async (tx) => {

@@ -8,13 +8,18 @@ import {
   resumeProject,
   completeProject,
   cancelProject,
+  reactivateProject,
+  getProjectCancellationImpact,
   ServiceError,
 } from "@bloqer/services";
 import {
   createProjectSchema,
   updateProjectSchema,
+  projectLifecycleInputSchema,
+  projectReactivateInputSchema,
   type CreateProjectInput,
   type UpdateProjectInput,
+  type ProjectLifecycleInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -29,6 +34,11 @@ async function getCtx() {
     companyId: current.tenantCtx.companyId,
     roles: current.tenantCtx.roles,
   };
+}
+
+function revalidateProject(id: string) {
+  revalidatePath(`/proyectos/${id}`);
+  revalidatePath("/proyectos");
 }
 
 export async function createProjectAction(
@@ -55,7 +65,7 @@ export async function updateProjectAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateProject(id, parsed.data, ctx);
-    revalidatePath(`/proyectos/${id}`);
+    revalidateProject(id);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -63,11 +73,16 @@ export async function updateProjectAction(
   }
 }
 
-export async function activateProjectAction(id: string): Promise<{ ok: true } | { error: string }> {
+export async function activateProjectAction(
+  id: string,
+  data?: ProjectLifecycleInput,
+): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
+  const parsed = projectLifecycleInputSchema.safeParse(data ?? {});
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
-    await activateProject(id, ctx);
-    revalidatePath(`/proyectos/${id}`);
+    await activateProject(id, ctx, parsed.data);
+    revalidateProject(id);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -75,11 +90,16 @@ export async function activateProjectAction(id: string): Promise<{ ok: true } | 
   }
 }
 
-export async function pauseProjectAction(id: string): Promise<{ ok: true } | { error: string }> {
+export async function pauseProjectAction(
+  id: string,
+  data?: ProjectLifecycleInput,
+): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
+  const parsed = projectLifecycleInputSchema.safeParse(data ?? {});
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
-    await pauseProject(id, ctx);
-    revalidatePath(`/proyectos/${id}`);
+    await pauseProject(id, ctx, parsed.data);
+    revalidateProject(id);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -87,11 +107,16 @@ export async function pauseProjectAction(id: string): Promise<{ ok: true } | { e
   }
 }
 
-export async function resumeProjectAction(id: string): Promise<{ ok: true } | { error: string }> {
+export async function resumeProjectAction(
+  id: string,
+  data?: ProjectLifecycleInput,
+): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
+  const parsed = projectLifecycleInputSchema.safeParse(data ?? {});
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
-    await resumeProject(id, ctx);
-    revalidatePath(`/proyectos/${id}`);
+    await resumeProject(id, ctx, parsed.data);
+    revalidateProject(id);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -99,11 +124,16 @@ export async function resumeProjectAction(id: string): Promise<{ ok: true } | { 
   }
 }
 
-export async function completeProjectAction(id: string): Promise<{ ok: true } | { error: string }> {
+export async function completeProjectAction(
+  id: string,
+  data?: ProjectLifecycleInput,
+): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
+  const parsed = projectLifecycleInputSchema.safeParse(data ?? {});
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
-    await completeProject(id, ctx);
-    revalidatePath(`/proyectos/${id}`);
+    await completeProject(id, ctx, parsed.data);
+    revalidateProject(id);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -111,12 +141,44 @@ export async function completeProjectAction(id: string): Promise<{ ok: true } | 
   }
 }
 
-export async function cancelProjectAction(id: string): Promise<{ ok: true } | { error: string }> {
+export async function cancelProjectAction(
+  id: string,
+  data?: ProjectLifecycleInput,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = projectLifecycleInputSchema.safeParse(data ?? {});
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    await cancelProject(id, ctx, parsed.data);
+    revalidateProject(id);
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof ServiceError) return { error: err.message };
+    return { error: "Error inesperado" };
+  }
+}
+
+export async function reactivateProjectAction(
+  id: string,
+  data: ProjectLifecycleInput,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = projectReactivateInputSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    await reactivateProject(id, ctx, parsed.data);
+    revalidateProject(id);
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof ServiceError) return { error: err.message };
+    return { error: "Error inesperado" };
+  }
+}
+
+export async function getProjectCancellationImpactAction(id: string) {
   const ctx = await getCtx();
   try {
-    await cancelProject(id, ctx);
-    revalidatePath(`/proyectos/${id}`);
-    return { ok: true };
+    return { ok: true as const, impact: await getProjectCancellationImpact(id, ctx) };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
     return { error: "Error inesperado" };

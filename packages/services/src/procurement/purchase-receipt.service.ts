@@ -6,6 +6,7 @@ import { createReceiptStockMovement, cancelReceiptStockMovements } from "../inve
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { canViewProcurementProjectArea } from "./procurement-access";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -152,6 +153,7 @@ export async function createPurchaseReceipt(
   });
   if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(po.projectId, ctx.tenantId);
 
   // BR-PUR-004: receipt only allowed on ISSUED / PARTIALLY_RECEIVED / RECEIVED
   if (!["ISSUED", "PARTIALLY_RECEIVED", "RECEIVED"].includes(po.status)) {
@@ -239,6 +241,7 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
   });
   if (!existing) throw new ServiceError("NOT_FOUND", "Recepción no encontrada");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `La recepción en estado "${existing.status}" no puede confirmarse.`);
   }

@@ -523,6 +523,24 @@
 
 ---
 
+### D-042 — Ciclo de vida de proyecto: cancelación no destructiva, guards y reactivación
+
+- **Fecha:** 2026-05-29
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** cancelación accidental sin vuelta atrás; operaciones financieras posibles en obra `DRAFT`; UI sin confirmación en transiciones de ciclo de vida.
+- **Decisión:**
+  1. Cancelar proyecto **no elimina** presupuestos ni documentos financieros ([BR-PROJ-004]).
+  2. Cancelar desde `ACTIVE`/`ON_HOLD`: solo **OWNER**/**ADMIN** ([PERM-007]); motivo obligatorio; bloqueo si hay documentos operativos abiertos ([BR-PROJ-005]).
+  3. Cancelar desde `DRAFT`: roles con `EDIT PROJECTS`.
+  4. Reactivar `CANCELLED` → estado previo (`status_before_cancellation`); solo **OWNER**/**ADMIN**; motivo obligatorio ([BR-PROJ-006]).
+  5. Mutaciones operativas/financieras de obra solo con proyecto `ACTIVE`; presupuesto/WBS permitido en `DRAFT` y `ACTIVE`.
+  6. UI: diálogos de confirmación en activar, pausar, reanudar, completar, cancelar y reactivar.
+- **Implicancias:** campos `statusBeforeCancellation`, `cancellationReason`, `cancelledAt` en `Project`; guard central `assertProjectAllowsOperationalMutation`; evento `project.reactivated`.
+- **Documentos afectados:** [`01-domain/STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §2, [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) ([BR-PROJ-004]–[BR-PROJ-006]), [`01-domain/EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md), [`01-domain/CORE_ENTITIES.md`](../01-domain/CORE_ENTITIES.md), [`02-modules/PROJECTS.md`](../02-modules/PROJECTS.md), [`00-product/PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md) ([PERM-007]).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

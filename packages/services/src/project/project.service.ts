@@ -1,14 +1,39 @@
 import { prisma } from "@bloqer/database";
 import type { Project, ProjectStatus, Prisma, Contact } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import type { CreateProjectInput, UpdateProjectInput, ListProjectsInput } from "@bloqer/validators";
+import type { CreateProjectInput, UpdateProjectInput, ListProjectsInput, ProjectLifecycleInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { canViewArProjectArea } from "../ar/ar-access";
 import { canViewApProjectArea } from "../ap/ap-access";
 import { canViewProjectCostControlReport } from "../cost-control/cost-control.service";
 import { canViewProcurementProjectArea } from "../procurement/procurement-access";
 import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
+import {
+  assertNoOpenOperationalDocuments,
+  getProjectCancellationImpact,
+} from "./project-cancellation-impact.service";
+import {
+  canCancelActiveProject,
+  canCancelDraftProject,
+  canReactivateProject,
+} from "./project-lifecycle-access";
 import { ServiceContext, ServiceError } from "../types";
+
+export {
+  canCancelActiveProject,
+  canCancelDraftProject,
+  canReactivateProject,
+  canViewProjectCancellationImpact,
+} from "./project-lifecycle-access";
+export {
+  sanitizeReactivationTargetStatus,
+  type ProjectCancellationImpact,
+} from "./project-cancellation-impact.service";
+export { getProjectCancellationImpact } from "./project-cancellation-impact.service";
+export {
+  assertProjectAllowsOperationalMutation,
+  assertProjectAllowsBudgetPlanning,
+} from "./project-operational-guard";
 
 export type ProjectWithClient = Project & {
   client: Pick<Contact, "id" | "legalName" | "fantasyName">;
@@ -226,26 +251,141 @@ export async function updateProject(
 
 // ─── Status transitions ───────────────────────────────────────────────────────
 
-export async function activateProject(id: string, ctx: ServiceContext): Promise<Project> {
-  return _transition(id, ctx, ["DRAFT"], "ACTIVE", "project.activated");
+export async function activateProject(
+  id: string,
+  ctx: ServiceContext,
+  input?: ProjectLifecycleInput,
+): Promise<Project> {
+  return _transition(id, ctx, ["DRAFT"], "ACTIVE", "project.activated", undefined, input);
 }
 
-export async function pauseProject(id: string, ctx: ServiceContext): Promise<Project> {
-  return _transition(id, ctx, ["ACTIVE"], "ON_HOLD", "project.paused");
+export async function pauseProject(
+  id: string,
+  ctx: ServiceContext,
+  input?: ProjectLifecycleInput,
+): Promise<Project> {
+  return _transition(id, ctx, ["ACTIVE"], "ON_HOLD", "project.paused", undefined, input);
 }
 
-export async function resumeProject(id: string, ctx: ServiceContext): Promise<Project> {
-  return _transition(id, ctx, ["ON_HOLD"], "ACTIVE", "project.resumed");
+export async function resumeProject(
+  id: string,
+  ctx: ServiceContext,
+  input?: ProjectLifecycleInput,
+): Promise<Project> {
+  return _transition(id, ctx, ["ON_HOLD"], "ACTIVE", "project.resumed", undefined, input);
 }
 
-export async function completeProject(id: string, ctx: ServiceContext): Promise<Project> {
-  return _transition(id, ctx, ["ACTIVE"], "COMPLETED", "project.completed", (p) => ({
-    actualEndDate: new Date(),
-  }));
+export async function completeProject(
+  id: string,
+  ctx: ServiceContext,
+  input?: ProjectLifecycleInput,
+): Promise<Project> {
+  return _transition(
+    id,
+    ctx,
+    ["ACTIVE"],
+    "COMPLETED",
+    "project.completed",
+    () => ({ actualEndDate: new Date() }),
+    input,
+  );
 }
 
-export async function cancelProject(id: string, ctx: ServiceContext): Promise<Project> {
-  return _transition(id, ctx, ["ACTIVE", "ON_HOLD", "DRAFT"], "CANCELLED", "project.cancelled");
+export async function cancelProject(
+  id: string,
+  ctx: ServiceContext,
+  input?: ProjectLifecycleInput,
+): Promise<Project> {
+  const project = await prisma.project.findUnique({ where: { id } });
+  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+
+  if (project.status === "DRAFT") {
+    if (!canCancelDraftProject(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar el proyecto");
+    }
+  } else if (project.status === "ACTIVE" || project.status === "ON_HOLD") {
+    if (!canCancelActiveProject(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Solo OWNER o ADMIN pueden cancelar una obra en curso");
+    }
+    const reason = input?.reason?.trim();
+    if (!reason) {
+      throw new ServiceError("CONFLICT", "El motivo de cancelación es obligatorio");
+    }
+    await assertNoOpenOperationalDocuments(id, ctx.tenantId);
+  } else {
+    throw new ServiceError("CONFLICT", `No se puede cancelar desde el estado ${project.status}`);
+  }
+
+  const reason = input?.reason?.trim() || null;
+
+  return _transition(
+    id,
+    ctx,
+    ["ACTIVE", "ON_HOLD", "DRAFT"],
+    "CANCELLED",
+    "project.cancelled",
+    () => ({
+      statusBeforeCancellation: project.status,
+      cancellationReason: reason,
+      cancelledAt: new Date(),
+    }),
+    { ...input, reason: reason ?? undefined },
+    { previousStatus: project.status },
+    project,
+  );
+}
+
+export async function reactivateProject(
+  id: string,
+  ctx: ServiceContext,
+  input: ProjectLifecycleInput,
+): Promise<Project> {
+  if (!canReactivateProject(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Solo OWNER o ADMIN pueden reactivar una obra cancelada");
+  }
+
+  const reason = input.reason?.trim();
+  if (!reason) {
+    throw new ServiceError("CONFLICT", "El motivo de reactivación es obligatorio");
+  }
+
+  const project = await prisma.project.findUnique({ where: { id } });
+  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (project.status !== "CANCELLED") {
+    throw new ServiceError("CONFLICT", "Solo se pueden reactivar proyectos cancelados");
+  }
+
+  const impact = await getProjectCancellationImpact(id, ctx);
+  const targetStatus = impact.reactivationTargetStatus;
+  if (!targetStatus) {
+    throw new ServiceError("CONFLICT", "No se pudo determinar el estado de reactivación");
+  }
+
+  const updated = await prisma.project.update({
+    where: { id },
+    data: {
+      status: targetStatus,
+      statusBeforeCancellation: null,
+      cancellationReason: null,
+      cancelledAt: null,
+      updatedBy: ctx.actorUserId,
+    },
+  });
+
+  await log({
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    action: "project.reactivated",
+    entityType: "Project",
+    entityId: id,
+    before: { status: "CANCELLED", previousStatus: project.statusBeforeCancellation },
+    after: { status: targetStatus, reason, restoredStatus: targetStatus },
+    ipAddress: ctx.ipAddress,
+  });
+
+  return updated;
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -270,16 +410,23 @@ async function _transition(
   to: ProjectStatus,
   action: string,
   extraData?: (project: Project) => Partial<Prisma.ProjectUpdateInput>,
+  input?: ProjectLifecycleInput,
+  auditExtra?: Record<string, unknown>,
+  existingProject?: Project,
 ): Promise<Project> {
   if (!can(ctx.roles, "EDIT", "PROJECTS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions");
   }
-  const project = await prisma.project.findUnique({ where: { id } });
+  const project =
+    existingProject ?? (await prisma.project.findUnique({ where: { id } }));
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (!allowedFrom.includes(project.status)) {
     throw new ServiceError("CONFLICT", `No se puede cambiar el estado desde ${project.status}`);
   }
+
+  const comment = input?.comment?.trim() || null;
+  const reason = input?.reason?.trim() || null;
 
   const updated = await prisma.project.update({
     where: { id },
@@ -293,7 +440,12 @@ async function _transition(
     entityType: "Project",
     entityId: id,
     before: { status: project.status },
-    after: { status: to },
+    after: {
+      status: to,
+      ...(comment ? { comment } : {}),
+      ...(reason ? { reason } : {}),
+      ...auditExtra,
+    },
     ipAddress: ctx.ipAddress,
   });
 

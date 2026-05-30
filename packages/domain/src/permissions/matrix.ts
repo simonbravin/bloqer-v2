@@ -208,3 +208,8 @@ export function can(
     return ceiling !== undefined && LEVELS[ceiling] >= LEVELS[action];
   });
 }
+
+/** PERM-007: cancel ACTIVE/ON_HOLD project or reactivate CANCELLED — OWNER/ADMIN only. */
+export function canManageProjectLifecycleAdmin(roles: UserRole[]): boolean {
+  return roles.some((r) => r === "OWNER" || r === "ADMIN");
+}

@@ -34,17 +34,24 @@ stateDiagram-v2
   ON_HOLD --> ACTIVE : reanudar
   ACTIVE --> COMPLETED : finalizar
   ACTIVE --> CANCELLED : cancelar
+  ON_HOLD --> CANCELLED : cancelar
+  CANCELLED --> DRAFT : reactivar
+  CANCELLED --> ACTIVE : reactivar
+  CANCELLED --> ON_HOLD : reactivar
   COMPLETED --> [*]
   CANCELLED --> [*]
 ```
 
 ### Reglas
 
-- `DRAFT` no admite operaciones financieras.
+- `DRAFT` no admite operaciones financieras ni operativas de obra (OC, certificaciones, facturas, pagos, cobros, stock imputado, subcontratos, libro de obra). **Sí** admite presupuesto/WBS en planificación ([BR-PROJ-004], [D-042]).
 - `ACTIVE` admite todas las operaciones.
-- `ON_HOLD` permite ver pero no nuevos movimientos (configurable).
+- `ON_HOLD` permite ver pero **no** nuevos movimientos operativos ni financieros ([BR-PROJ-003]).
 - `COMPLETED` solo lectura (no nuevas certificaciones, OCs, movimientos).
-- `CANCELLED` solo lectura permanente.
+- `CANCELLED` solo lectura permanente; **no** elimina presupuestos ni documentos financieros existentes ([BR-PROJ-004]).
+- Cancelar desde `ACTIVE`/`ON_HOLD`: solo **OWNER** o **ADMIN**; motivo obligatorio; bloqueo si hay documentos operativos abiertos ([BR-PROJ-005], [PERM-007]).
+- Cancelar desde `DRAFT`: roles con `EDIT PROJECTS` (p. ej. PM).
+- Reactivar `CANCELLED` → estado previo (`status_before_cancellation`); solo **OWNER** o **ADMIN**; motivo obligatorio ([BR-PROJ-006], [PERM-007]).
 
 ---
 

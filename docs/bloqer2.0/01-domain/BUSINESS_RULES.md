@@ -68,7 +68,19 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Regla:** `project.project_type` (`PUBLIC` / `PRIVATE`) no se cambia una vez que hay un presupuesto aprobado, porque cambia las reglas de sobrecertificación.
 
 ### BR-PROJ-003 — Estado del proyecto vs operación
-- **Regla:** un proyecto en estado `COMPLETED` o `CANCELLED` no admite nuevas certificaciones, OCs ni movimientos imputados a él. Solo lectura.
+- **Regla:** un proyecto en estado `ON_HOLD`, `COMPLETED` o `CANCELLED` no admite nuevas certificaciones, OCs ni movimientos imputados a él. Solo lectura operativa. Un proyecto `DRAFT` no admite operaciones financieras ni operativas de obra; presupuesto/WBS en planificación sí ([D-042]).
+
+### BR-PROJ-004 — Cancelación no destructiva
+- **Regla:** cancelar un proyecto **no elimina** presupuestos, facturas, pagos, cobros ni movimientos imputados. Congela la obra en solo lectura operativa.
+- **Origen:** [D-042].
+
+### BR-PROJ-005 — Cancelar obra en curso
+- **Regla:** cancelar desde `ACTIVE` o `ON_HOLD` requiere rol **OWNER** o **ADMIN** ([PERM-007]), motivo obligatorio, y **bloqueo** si existen documentos operativos abiertos: OC `ISSUED`/`PARTIALLY_RECEIVED`, certificaciones `DRAFT`/`ISSUED`/`APPROVED`, facturas AP/AR `ISSUED`, cobros/pagos `CONFIRMED`, C×C/C×P `OPEN`/`PARTIAL`/`OVERDUE`, subcontratos `ACTIVE`.
+- **Origen:** [D-042].
+
+### BR-PROJ-006 — Reactivación de obra cancelada
+- **Regla:** `CANCELLED` → estado previo guardado en `status_before_cancellation` al cancelar; solo **OWNER** o **ADMIN** ([PERM-007]); motivo obligatorio; auditado (`project.reactivated`). Si no hay estado previo persistido, fallback conservador: `DRAFT` si la obra no tuvo actividad operativa; si no, `ON_HOLD`.
+- **Origen:** [D-042].
 
 ---
 

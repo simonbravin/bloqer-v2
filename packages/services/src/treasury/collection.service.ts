@@ -8,6 +8,7 @@ import { resolvePagination } from "../finance/pagination";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 export type CollectionView = Omit<Collection, "amount"> & {
   amount: string;
@@ -102,6 +103,14 @@ export async function createCollection(
   if (amount.lessThanOrEqualTo(0)) {
     throw new ServiceError("VALIDATION", "El monto debe ser mayor a 0");
   }
+
+  const receivablePreview = await prisma.receivable.findUnique({
+    where: { id: input.receivableId },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!receivablePreview) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
+  if (receivablePreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(receivablePreview.projectId, ctx.tenantId);
 
   const result = await prisma.$transaction(async (tx) => {
     // Load receivable inside txn for consistency
