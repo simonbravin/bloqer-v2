@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportProcurementDeviationCsv,
-  exportProcurementDeviationPdf,
   getProcurementDeviationReport,
   parseProcurementReportFilters,
 } from "@bloqer/services";
+import { exportProcurementDeviationPdf } from "@bloqer/report-pdf";
 import {
   csvResponse,
   pdfResponse,

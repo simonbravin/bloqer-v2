@@ -1,7 +1,8 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
-import type { AgingFilters, AgingReport } from "../../aging/aging.service";
+import type { AgingFilters, AgingReport } from "@bloqer/services";
+import type { PdfReportBranding } from "../branding/pdf-branding.types";
 import { MAX_AGING_PDF_LINE_ITEMS } from "./pdf-export.types";
-import { PdfMetaBlock, reportPdfStyles, truncateText } from "./report-pdf-shared";
+import { PdfReportFooter, PdfReportHeader, reportPdfStyles, truncateText } from "./report-pdf-shared";
 
 function agingFiltersLine(f: AgingFilters): string {
   const parts: string[] = [];
@@ -20,7 +21,7 @@ type Props = {
   variant: "AR" | "AP";
   report: AgingReport;
   filters: AgingFilters;
-  generatedAtIso: string;
+  branding: PdfReportBranding;
 };
 
 export function AgingReportPdfDocument(props: Props) {
@@ -64,12 +65,16 @@ export function AgingReportPdfDocument(props: Props) {
   const flexSm = { flex: 0.55 };
   const flexMd = { flex: 1 };
 
+  const footerNote = truncated
+    ? `Detalle truncado: ${totalItems - MAX_AGING_PDF_LINE_ITEMS} filas omitidas (límite ${MAX_AGING_PDF_LINE_ITEMS}). Exportá CSV para el detalle completo.`
+    : undefined;
+
   return (
     <Document>
       <Page size="A4" style={reportPdfStyles.page}>
-        <PdfMetaBlock
+        <PdfReportHeader
+          branding={props.branding}
           title={title}
-          generatedAtIso={props.generatedAtIso}
           filterLine={agingFiltersLine(props.filters)}
         />
         <Text style={reportPdfStyles.meta}>Fecha de corte reporte: {props.report.asOfDate}</Text>
@@ -80,7 +85,9 @@ export function AgingReportPdfDocument(props: Props) {
           </Text>
         ))}
 
-        <Text style={reportPdfStyles.sectionTitle}>Detalle ({truncated ? `primeras ${MAX_AGING_PDF_LINE_ITEMS} filas` : `${rows.length} filas`})</Text>
+        <Text style={reportPdfStyles.sectionTitle}>
+          Detalle ({truncated ? `primeras ${MAX_AGING_PDF_LINE_ITEMS} filas` : `${rows.length} filas`})
+        </Text>
         <View style={reportPdfStyles.headerRow}>
           <Text style={[reportPdfStyles.cell, flexContact]}>Cliente / Proveedor</Text>
           <Text style={[reportPdfStyles.cell, flexSm]}>Mon.</Text>
@@ -102,12 +109,7 @@ export function AgingReportPdfDocument(props: Props) {
           </View>
         ))}
 
-        <Text style={reportPdfStyles.footer}>
-          Bloqer · {title}
-          {truncated
-            ? ` · Detalle truncado: ${totalItems - MAX_AGING_PDF_LINE_ITEMS} filas omitidas (límite Phase 9B: ${MAX_AGING_PDF_LINE_ITEMS}). Exportá CSV para el detalle completo.`
-            : ""}
-        </Text>
+        <PdfReportFooter branding={props.branding} extraNote={footerNote} />
       </Page>
     </Document>
   );

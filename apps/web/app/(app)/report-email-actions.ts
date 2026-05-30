@@ -1,6 +1,7 @@
 "use server";
 
-import { sendReportByEmail, ServiceError, type SendReportByEmailResult } from "@bloqer/services";
+import { sendReportByEmail, type SendReportByEmailResult } from "@bloqer/report-pdf";
+import { ServiceError } from "@bloqer/services";
 import { getCurrentUser } from "@/lib/auth";
 
 export type SendReportEmailActionResult =

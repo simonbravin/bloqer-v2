@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportMaterialVarianceCsv,
-  exportMaterialVariancePdf,
   getMaterialVarianceReport,
   parseProjectReportDateFilters,
 } from "@bloqer/services";
+import { exportMaterialVariancePdf } from "@bloqer/report-pdf";
 import {
   csvResponse,
   pdfResponse,

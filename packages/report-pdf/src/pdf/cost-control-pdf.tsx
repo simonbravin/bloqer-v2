@@ -1,7 +1,8 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
-import type { CostControlFilters, ProjectCostControlReport } from "../../cost-control/cost-control.service";
+import type { CostControlFilters, ProjectCostControlReport } from "@bloqer/services";
+import type { PdfReportBranding } from "../branding/pdf-branding.types";
 import { MAX_COST_CONTROL_PDF_ROWS } from "./pdf-export.types";
-import { PdfMetaBlock, reportPdfStyles, truncateText } from "./report-pdf-shared";
+import { PdfReportFooter, PdfReportHeader, reportPdfStyles, truncateText } from "./report-pdf-shared";
 
 function costControlFiltersLine(f: CostControlFilters): string {
   const parts: string[] = [];
@@ -22,7 +23,7 @@ function flagsLabel(flags: { overBudget: boolean; overCertified: boolean; missin
 type Props = {
   report: ProjectCostControlReport;
   filters: CostControlFilters;
-  generatedAtIso: string;
+  branding: PdfReportBranding;
 };
 
 export function CostControlReportPdfDocument(props: Props) {
@@ -35,12 +36,21 @@ export function CostControlReportPdfDocument(props: Props) {
 
   const title = "Control de costos (proyecto)";
 
+  const footerNote = [
+    truncated
+      ? `Truncado: ${props.report.rows.length - MAX_COST_CONTROL_PDF_ROWS} filas omitidas (límite ${MAX_COST_CONTROL_PDF_ROWS}). CSV para detalle completo.`
+      : null,
+    `Costos no asignados WBS: comprom. ${props.report.unallocatedCommittedCost}, recib. ${props.report.unallocatedReceivedCost}, deveng. ${props.report.unallocatedAccruedCost}, pag. ${props.report.unallocatedPaidCost}, inv. ${props.report.unallocatedInventoryConsumedCost}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={reportPdfStyles.page}>
-        <PdfMetaBlock
+        <PdfReportHeader
+          branding={props.branding}
           title={title}
-          generatedAtIso={props.generatedAtIso}
           filterLine={costControlFiltersLine(props.filters)}
         />
         <Text style={reportPdfStyles.meta}>
@@ -99,16 +109,7 @@ export function CostControlReportPdfDocument(props: Props) {
           </View>
         ))}
 
-        <Text style={reportPdfStyles.footer}>
-          Bloqer · {title}
-          {truncated
-            ? ` · Truncado: ${props.report.rows.length - MAX_COST_CONTROL_PDF_ROWS} filas omitidas (límite ${MAX_COST_CONTROL_PDF_ROWS}). CSV para detalle completo.`
-            : ""}
-          {" · "}
-          Costos no asignados a ítem WBS: comprom. {props.report.unallocatedCommittedCost}, recib.{" "}
-          {props.report.unallocatedReceivedCost}, deveng. {props.report.unallocatedAccruedCost}, pag.{" "}
-          {props.report.unallocatedPaidCost}, inv. {props.report.unallocatedInventoryConsumedCost}
-        </Text>
+        <PdfReportFooter branding={props.branding} extraNote={footerNote} />
       </Page>
     </Document>
   );

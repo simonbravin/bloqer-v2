@@ -44,7 +44,7 @@ export function reportExportErrorResponse(e: unknown): NextResponse {
               : 400;
     return NextResponse.json({ error: e.message }, { status });
   }
-  console.error("[report-export]", e instanceof Error ? e.message : e);
+  console.error("[report-export]", e);
   return NextResponse.json({ error: "export_failed" }, { status: 500 });
 }
 

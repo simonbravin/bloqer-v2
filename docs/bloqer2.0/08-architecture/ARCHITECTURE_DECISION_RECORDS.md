@@ -42,6 +42,7 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 | ADR-011 | `fx_rate` + `amount_ars` en comprobantes financieros (D-008) | ACEPTADO |
 | ADR-012 | Transacciones UX: modelo documental + guards de integridad | ACEPTADO |
 | ADR-013 | Anticipos a proveedor: cuenta puente Fase 2 | ACEPTADO |
+| ADR-014 | PDF render boundary en `@bloqer/report-pdf` (monorepo + Next.js) | ACEPTADO |
 
 ---
 
@@ -97,6 +98,21 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
   - **No** usar `Payment` sin `Payable` ni movimiento manual sin ADR en producción.
 - **Consecuencias:** UI `/proyectos/[id]/facturas/anticipo/nueva` para cliente; proveedor documentado en OPEN_QUESTIONS si producto acelera Fase 2.
 - **Referencias:** [`SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md) §anticipo, [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md).
+
+---
+
+## ADR-014 — PDF render boundary en `@bloqer/report-pdf`
+
+- **Fecha:** 2026-05-29
+- **Estado:** ACEPTADO
+- **Contexto:** Export PDF con `@react-pdf/renderer` fallaba en runtime (HTTP 500) cuando `renderToBuffer` y los documentos JSX vivían en `@bloqer/services` y eran importados por Next.js App Router. Es el patrón conocido de resolución de módulos React en monorepos (react-pdf #3285).
+- **Decisión:**
+  - Paquete dedicado **`@bloqer/report-pdf`**: templates React-PDF, `renderToBuffer`, `export*Pdf`, `sendReportByEmail` (adjuntos PDF).
+  - **`@bloqer/services`** conserva lectura de reportes y `export*Csv`; **no** depende de `react` ni `@react-pdf/renderer`.
+  - **`apps/web`** importa PDF directamente desde `@bloqer/report-pdf`; declara `@react-pdf/renderer` y externaliza `@react-pdf/pdfkit` / `fontkit` en `next.config.ts`.
+  - Test de humo: `packages/report-pdf/src/pdf-render.smoke.test.tsx` valida `%PDF` en buffer.
+- **Consecuencias:** 19 rutas `?format=pdf` operativas; encabezado/pie con tenant, empresa, obra (si aplica), usuario y paginación vía `resolvePdfReportBranding`.
+- **Referencias:** [`REPORTING_ARCHITECTURE.md`](./REPORTING_ARCHITECTURE.md) §Phase 9B, [`EXPORT_FORMATS.md`](../06-reports/EXPORT_FORMATS.md).
 
 ---
 

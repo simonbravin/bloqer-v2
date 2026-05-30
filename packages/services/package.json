@@ -21,14 +21,11 @@
     "@bloqer/email": "workspace:*",
     "@bloqer/storage": "workspace:*",
     "@bloqer/utils": "workspace:*",
-    "@bloqer/validators": "workspace:*",
-    "@react-pdf/renderer": "^4",
-    "react": "^19"
+    "@bloqer/validators": "workspace:*"
   },
   "devDependencies": {
     "tsx": "^4.19.0",
     "@types/node": "^22.0.0",
-    "@types/react": "^19",
     "typescript": "^5.5.0"
   }
 }

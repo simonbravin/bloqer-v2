@@ -17,7 +17,7 @@ Run after first production (or staging) deploy, **before** announcing availabili
 | 9 | Invitations | Create invitation (equipo); accept flow on `/invitaciones/aceptar` with matching email; membership appears. |
 | 10 | Notifications | `/notificaciones` inbox loads; badge if applicable. |
 | 11 | CSV export | Trigger a **CSV** report export from UI or `GET /api/reports/...` as documented; file downloads. |
-| 12 | PDF export | Where supported, **PDF** export returns document (or expected “not available” for unsupported types). |
+| 12 | PDF export | Al menos **un reporte corporativo** (`GET /api/reports/finanzas/ar-aging.csv?format=pdf`) y **uno de proyecto** (`GET /api/reports/proyectos/{id}/ingresos-gastos.csv?format=pdf`) descargan PDF válido (`%PDF`); encabezado muestra tenant/empresa y pie paginación. |
 | 13 | Email disabled | With Resend **off**, app still boots; invitation copy-link or transactional email skips gracefully. |
 | 14 | Email enabled | With Resend **on** + public base URL, a test email sends (optional in staging). |
 | 15 | Cron secret | `GET` or `POST` `/api/cron/operational-alerts` **without** `CRON_SECRET` (or too short) → **503** `cron_unconfigured`. |

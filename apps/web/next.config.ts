@@ -8,7 +8,14 @@ const monorepoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: monorepoRoot,
-  serverExternalPackages: ["@prisma/client", "@prisma/engines", "prisma", "@react-pdf/renderer"],
+  serverExternalPackages: [
+    "@prisma/client",
+    "@prisma/engines",
+    "prisma",
+    "@react-pdf/renderer",
+    "@react-pdf/pdfkit",
+    "fontkit",
+  ],
   experimental: {
     serverActions: {
       bodySizeLimit: "52mb",
@@ -25,6 +32,7 @@ const nextConfig: NextConfig = {
     "@bloqer/domain",
     "@bloqer/validators",
     "@bloqer/services",
+    "@bloqer/report-pdf",
     "@bloqer/database",
     "@bloqer/ui",
     "@bloqer/email",

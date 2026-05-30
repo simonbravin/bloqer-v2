@@ -7,7 +7,10 @@
 
 ## PDF
 - **Uso:** presentación a dirección/cliente.
-- **Reglas:** logo tenant, timestamp generación, usuario.
+- **Reglas de encabezado:** tenant / razón social (empresa primaria), **obra** (`código · nombre`) en reportes de proyecto, título, timestamp UTC, filtros activos, usuario generador.
+- **Reglas de pie:** tenant, usuario, paginación (`Página X de Y`), aviso de truncado si aplica.
+- **Logo tenant:** pendiente (campo persistido no implementado aún).
+- **Implementación:** `@react-pdf/renderer` en `@bloqer/report-pdf` (no HTML/Puppeteer). Ver ADR-014.
 
 ## CSV
 - **Uso:** integración con BI externo.

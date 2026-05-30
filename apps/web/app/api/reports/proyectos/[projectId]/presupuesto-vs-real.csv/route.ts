@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportBudgetVarianceCsv,
-  exportBudgetVariancePdf,
   getBudgetVarianceReport,
   getBudgetCompositionReport,
   parseBudgetVarianceFilters,
 } from "@bloqer/services";
+import { exportBudgetVariancePdf } from "@bloqer/report-pdf";
 import {
   csvResponse,
   pdfResponse,

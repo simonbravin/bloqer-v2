@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportPayableAgingCsv,
-  exportPayableAgingPdf,
   getPayableAgingReport,
   parseAgingFilters,
 } from "@bloqer/services";
+import { exportPayableAgingPdf } from "@bloqer/report-pdf";
 import {
   csvResponse,
   pdfResponse,

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportProjectCashFlowCsv,
-  exportProjectCashFlowPdf,
   getProjectCashFlowReport,
   parseProjectCashFlowFilters,
 } from "@bloqer/services";
+import { exportProjectCashFlowPdf } from "@bloqer/report-pdf";
 import {
   csvResponse,
   pdfResponse,

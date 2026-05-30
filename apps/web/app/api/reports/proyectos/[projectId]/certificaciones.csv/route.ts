@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportCertificationEvolutionCsv,
-  exportCertificationEvolutionPdf,
   getCertificationEvolutionReport,
   parseCertificationReportFilters,
 } from "@bloqer/services";
+import { exportCertificationEvolutionPdf } from "@bloqer/report-pdf";
 import {
   csvResponse,
   pdfResponse,

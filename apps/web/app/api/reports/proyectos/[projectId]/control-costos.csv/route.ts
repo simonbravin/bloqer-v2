@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportProjectCostControlCsv,
-  exportProjectCostControlPdf,
   getProjectCostControl,
   parseCostControlFilters,
 } from "@bloqer/services";
+import { exportProjectCostControlPdf } from "@bloqer/report-pdf";
 import {
   csvResponse,
   pdfResponse,

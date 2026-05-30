@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportCompanyPayablesCsv,
-  exportCompanyPayablesPdf,
   parseCompanyPayableExportFilters,
 } from "@bloqer/services";
+import { exportCompanyPayablesPdf } from "@bloqer/report-pdf";
 import {
   csvResponse,
   pdfResponse,

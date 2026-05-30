@@ -59,49 +59,53 @@ Los **reportes y dashboards** deben **reconciliar** contra **datos fuente** del 
 ### Roadmap exportaciones
 
 - **Phase 9B (hecho):** PDF parcial con **`@react-pdf/renderer`** — ver sección 9B.
-- **Phase 9C (hecho):** envío **manual** por email desde la UI (“Enviar por email”): adjuntos CSV/PDF generados con los **mismos builders** que 9A/9B; **sin** cron, **sin** programación, **sin** `EmailDeliveryLog`, **sin** preferencias; si Resend no está configurado → **no-op** controlado (`provider: "disabled"`). Ver [`EMAIL_NOTIFICATIONS_ARCHITECTURE.md`](./EMAIL_NOTIFICATIONS_ARCHITECTURE.md) y `packages/services/src/report-exports/report-email.service.ts`.
+- **Phase 9C (hecho):** envío **manual** por email desde la UI (“Enviar por email”): adjuntos CSV/PDF generados con los **mismos builders** que 9A/9B; **sin** cron, **sin** programación, **sin** `EmailDeliveryLog`, **sin** preferencias; si Resend no está configurado → **no-op** controlado (`provider: "disabled"`). Ver [`EMAIL_NOTIFICATIONS_ARCHITECTURE.md`](./EMAIL_NOTIFICATIONS_ARCHITECTURE.md) y `packages/report-pdf/src/report-email.service.ts`.
 - **Phase 9D+:** paquetes de reportes / ZIP / multi-report; envíos programados o digest (futuro; no confundir con 9C).
 
 ---
 
 ## Phase 9B — PDF server-side (`@react-pdf/renderer`)
 
-**Decisión:** generar PDF en **`@bloqer/services`** con **`@react-pdf/renderer`** (`renderToBuffer`), documentos React específicos de PDF (no el árbol de la app Next). **No Puppeteer** en esta fase: no hace falta HTML/CSS del browser para el alcance actual; menos superficie operativa y memoria en runtime Node de las rutas.
+**Decisión:** generar PDF en **`@bloqer/report-pdf`** con **`@react-pdf/renderer`** (`renderToBuffer`), documentos React específicos de PDF (no el árbol de la app Next). **No Puppeteer** en esta fase: no hace falta HTML/CSS del browser para el alcance actual; menos superficie operativa y memoria en runtime Node de las rutas.
 
-**Dependencias:** `react`, `@react-pdf/renderer` en `packages/services/package.json`.
+**Dependencias:** `react`, `@react-pdf/renderer` en `packages/report-pdf/package.json`; `apps/web` declara `@react-pdf/renderer` y consume `@bloqer/report-pdf` directamente (ver ADR-014).
 
-### Reportes con PDF soportado
+### Reportes con PDF soportado (19 rutas)
 
-| Reporte | Ruta (GET) | Servicio fuente |
-|--------|------------|-----------------|
-| AR Aging | `/api/reports/finanzas/ar-aging.csv?format=pdf` | `getReceivableAgingReport` |
-| AP Aging | `/api/reports/finanzas/ap-aging.csv?format=pdf` | `getPayableAgingReport` |
-| Control de costos | `/api/reports/proyectos/[projectId]/control-costos.csv?format=pdf` | `getProjectCostControl` (misma regla que CSV si falta presupuesto → `409`) |
+Todas las rutas listadas en §Rutas API con `?format=pdf` generan PDF vía `export*Pdf` en `@bloqer/report-pdf`, reutilizando los mismos servicios de lectura que CSV/JSON.
+
+| Ámbito | Ejemplos |
+|--------|----------|
+| Finanzas corporativas | AR/AP aging, CXP corporativo, facturas proveedor |
+| Tesorería | Posición de caja, movimientos, flujo de caja |
+| Inventario | Stock, movimientos |
+| Proyecto | Control de costos, presupuesto vs real, certificaciones, subcontratos, ingresos-gastos, rentabilidad, materiales, compras, flujo de caja |
+| Configuración | Registro de actividad (audit log) |
 
 **Respuesta:** `Content-Type: application/pdf`, `Content-Disposition: attachment`, `filename` vía `safeReportFilename` (extensión `.pdf`).
 
-### Reportes PDF pendientes (9D+ o extensión puntual)
-
-Tesorería (posición, movimientos, flujo), inventario (stock, movimientos), flujo de caja proyecto, etc. Siguen usando `assertPdfExportNotRequested` → mensaje *Exportación PDF no disponible para este reporte*.
-
 ### Reglas de contenido PDF
 
-- Mismos datos que CSV/vista (mismos servicios); **sin** sumar monedas; totales **por moneda** donde el DTO lo expone (`byCurrency` en aging).
-- Encabezado: título, **generado (UTC ISO)**, línea de **filtros** (sin imprimir UUIDs de negocio; filtros estructurales se resumen como “filtro activo” cuando aplica).
-- **Límites de filas (Phase 9B):** aging — máx. **350** líneas de detalle (resto indicado en pie + sugerencia CSV); control de costos — máx. **90** filas WBS en tabla (idem). Una fase futura de PDF puede paginar o multi-página dedicada (no es parte de 9C).
+- Mismos datos que CSV/vista (mismos servicios en `@bloqer/services`); **sin** sumar monedas; totales **por moneda** donde el DTO lo expone (`byCurrency` en aging).
+- **Encabezado (`PdfReportHeader`):** tenant / razón social (empresa primaria activa), **obra** (`código · nombre`) en reportes de proyecto, título del reporte, **generado (UTC ISO)**, línea de **filtros** (sin UUIDs de negocio; filtros estructurales como “filtro activo”).
+- **Pie (`PdfReportFooter`):** tenant, **usuario generador**, paginación `Página X de Y`, avisos de truncado cuando aplica.
+- **Logo tenant:** pendiente (no hay campo persistido); placeholder futuro en [`EXPORT_FORMATS.md`](../06-reports/EXPORT_FORMATS.md).
+- **Límites de filas:** aging — máx. **350**; control de costos y tablas genéricas de proyecto — máx. **90** filas (resto indicado en pie + sugerencia CSV).
 - Sin `storageKey`, metadata interna, stack traces; sin IDs técnicos en cuerpo salvo los ya presentes en DTO usados también por CSV (p. ej. códigos WBS visibles).
 
 ### Código de referencia
 
-- `packages/services/src/report-exports/pdf/` — tipos (`ReportPdfPayload`, constantes límite), `pdf-renderer.service.ts`, `report-pdf-shared.tsx`, `aging-pdf.tsx`, `cost-control-pdf.tsx`
-- `packages/services/src/report-exports/report-pdf-export.service.tsx` — orquestación + nombres de archivo
+- `packages/report-pdf/src/pdf/` — layouts (`aging-pdf`, `cost-control-pdf`, `project-simple-table-pdf`), `report-pdf-shared.tsx`, `pdf-renderer.service.ts`
+- `packages/report-pdf/src/branding/` — `resolvePdfReportBranding`, tipos
+- `packages/report-pdf/src/report-pdf-export.service.tsx` — orquestación + nombres de archivo
+- `packages/report-pdf/src/pdf-render.smoke.test.tsx` — test de humo `%PDF`
 - `apps/web/lib/report-export-http.ts` — `pdfResponse`
 - `apps/web/features/reports/report-export-actions.tsx` — “Exportar CSV” / “Exportar PDF” (`format=csv|pdf`)
 
 ### Phase 9C — Envío manual por email
 
-- **Server Action** `sendReportEmailAction` (`apps/web/app/(app)/report-email-actions.ts`): `tenantId` / contexto solo desde **sesión**; input validado con `@bloqer/validators` (`sendReportByEmailInputSchema`); PDF solo para los mismos reportes que 9B.
-- **Servicio** `sendReportByEmail` en `report-email.service.ts`: construye adjunto vía `export*Csv` / `export*Pdf` existentes (mismos permisos que `GET /api/reports/**`).
+- **Server Action** `sendReportEmailAction` (`apps/web/app/(app)/report-email-actions.ts`): `tenantId` / contexto solo desde **sesión**; input validado con `@bloqer/validators` (`sendReportByEmailInputSchema`); PDF solo para AR/AP aging y control de costos (email).
+- **Servicio** `sendReportByEmail` en `packages/report-pdf/src/report-email.service.ts`: construye adjunto vía `export*Csv` (`@bloqer/services`) / `export*Pdf` (`@bloqer/report-pdf`).
 - **Phase 9D:** cada intento se persiste en **`EmailDeliveryLog`** (`REPORT_MANUAL`); ver [`EMAIL_NOTIFICATIONS_ARCHITECTURE.md`](./EMAIL_NOTIFICATIONS_ARCHITECTURE.md).
 - **UI:** `ReportEmailSendDialog` en pantallas de reporte junto a export CSV/PDF.
 
@@ -153,6 +157,6 @@ Filtros: **mismos query params** que las páginas de reporte (p. ej. `currency`,
 
 ### Código de referencia (CSV / JSON)
 
-- `packages/services/src/report-exports/` — tipos, `buildCsv`, `safeReportFilename`, parsers de query alineados a páginas, `export*Csv` y `assertPdfExportNotRequested` (rutas sin PDF).
+- `packages/services/src/report-exports/` — tipos, `buildCsv`, `safeReportFilename`, parsers de query alineados a páginas, `export*Csv`.
 - `apps/web/lib/report-export-http.ts` — sesión → contexto, respuesta CSV/PDF, errores.
 - `apps/web/features/reports/report-export-actions.tsx` — enlaces que **reusan** `searchParams` actuales.

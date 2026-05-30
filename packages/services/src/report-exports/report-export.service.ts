@@ -1340,10 +1340,3 @@ export async function exportProjectCashFlowCsv(
     filename: safeReportFilename(`flujo_caja_proyecto_${slug}`, "csv"),
   };
 }
-
-/** Phase 9C+: extend when more reports support PDF. */
-export function assertPdfExportNotRequested(format: string | null | undefined): void {
-  if (format?.toLowerCase() === "pdf") {
-    throw new ServiceError("VALIDATION", "Exportación PDF no disponible para este reporte");
-  }
-}

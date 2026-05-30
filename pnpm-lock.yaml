@@ -41,6 +41,9 @@ importers:
       '@bloqer/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@bloqer/report-pdf':
+        specifier: workspace:*
+        version: link:../../packages/report-pdf
       '@bloqer/services':
         specifier: workspace:*
         version: link:../../packages/services
@@ -92,6 +95,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@react-pdf/renderer':
+        specifier: ^4
+        version: 4.5.1(react@19.2.6)
       '@uidotdev/usehooks':
         specifier: ^2.4.1
         version: 2.4.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -281,6 +287,46 @@ importers:
         specifier: ^5.5.0
         version: 5.9.3
 
+  packages/report-pdf:
+    dependencies:
+      '@bloqer/config':
+        specifier: workspace:*
+        version: link:../config
+      '@bloqer/database':
+        specifier: workspace:*
+        version: link:../database
+      '@bloqer/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@bloqer/email':
+        specifier: workspace:*
+        version: link:../email
+      '@bloqer/services':
+        specifier: workspace:*
+        version: link:../services
+      '@bloqer/validators':
+        specifier: workspace:*
+        version: link:../validators
+      '@react-pdf/renderer':
+        specifier: ^4
+        version: 4.5.1(react@19.2.6)
+      react:
+        specifier: ^19
+        version: 19.2.6
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.18
+      '@types/react':
+        specifier: ^19
+        version: 19.2.14
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
   packages/services:
     dependencies:
       '@bloqer/config':
@@ -304,19 +350,10 @@ importers:
       '@bloqer/validators':
         specifier: workspace:*
         version: link:../validators
-      '@react-pdf/renderer':
-        specifier: ^4
-        version: 4.5.1(react@19.2.6)
-      react:
-        specifier: ^19
-        version: 19.2.6
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.18
-      '@types/react':
-        specifier: ^19
-        version: 19.2.14
       tsx:
         specifier: ^4.19.0
         version: 4.21.0

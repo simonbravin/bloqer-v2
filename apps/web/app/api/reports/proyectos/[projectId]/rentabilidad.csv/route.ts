@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportProjectProfitabilityCsv,
-  exportProjectProfitabilityPdf,
   getProjectProfitabilityReport,
   parseCostVarianceLayer,
   parseCurrencyView,
 } from "@bloqer/services";
+import { exportProjectProfitabilityPdf } from "@bloqer/report-pdf";
 import {
   csvResponse,
   pdfResponse,

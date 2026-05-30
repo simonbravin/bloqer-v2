@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportSubcontractVarianceCsv,
-  exportSubcontractVariancePdf,
   getSubcontractVarianceReport,
   parseSubcontractReportFilters,
 } from "@bloqer/services";
+import { exportSubcontractVariancePdf } from "@bloqer/report-pdf";
 import {
   csvResponse,
   pdfResponse,

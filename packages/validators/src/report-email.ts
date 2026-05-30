@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Manual report email (Phase 9C) — must match `sendReportByEmail` switch in services. */
+/** Manual report email (Phase 9C) — must match `sendReportByEmail` switch in @bloqer/report-pdf. */
 export const manualReportTypeSchema = z.enum([
   "AR_AGING",
   "AP_AGING",

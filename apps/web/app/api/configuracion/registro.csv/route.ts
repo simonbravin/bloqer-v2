@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportTenantAuditLogCsv,
-  exportTenantAuditLogPdf,
   resolveTenantAuditLogExportFilters,
 } from "@bloqer/services";
+import { exportTenantAuditLogPdf } from "@bloqer/report-pdf";
 import { exportTenantAuditLogUrlFiltersSchema } from "@bloqer/validators";
 import { canViewTenantAuditLog } from "@/lib/configuracion-subnav";
 import {

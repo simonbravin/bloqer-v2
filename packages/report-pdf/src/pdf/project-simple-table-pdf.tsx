@@ -1,19 +1,21 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
+import type { PdfReportBranding } from "../branding/pdf-branding.types";
 import { MAX_PROJECT_REPORT_PDF_ROWS } from "./pdf-export.types";
-import { PdfMetaBlock, reportPdfStyles, truncateText } from "./report-pdf-shared";
+import { PdfReportFooter, PdfReportHeader, reportPdfStyles, truncateText } from "./report-pdf-shared";
 
 export type SimpleTableColumn = { key: string; label: string; flex?: number };
 
 type Props = {
+  branding: PdfReportBranding;
   title: string;
   subtitle?: string;
   filterLine?: string;
-  generatedAtIso: string;
   columns: SimpleTableColumn[];
   rows: Record<string, string>[];
   totalsLine?: string;
   warnings?: string[];
   maxRows?: number;
+  footerNote?: string;
 };
 
 export function ProjectSimpleTablePdfDocument(props: Props) {
@@ -21,13 +23,19 @@ export function ProjectSimpleTablePdfDocument(props: Props) {
   const slice = props.rows.slice(0, rowLimit);
   const truncated = props.rows.length > rowLimit;
 
+  const footerNote =
+    props.footerNote ??
+    (truncated
+      ? `Detalle truncado: ${props.rows.length - rowLimit} filas omitidas (límite ${rowLimit}). Exportá CSV para el detalle completo.`
+      : undefined);
+
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={reportPdfStyles.page}>
-        <PdfMetaBlock
+        <PdfReportHeader
+          branding={props.branding}
           title={props.title}
-          generatedAtIso={props.generatedAtIso}
-          filterLine={props.filterLine ?? ""}
+          filterLine={props.filterLine}
         />
         {props.subtitle ? <Text style={reportPdfStyles.meta}>{props.subtitle}</Text> : null}
         {props.totalsLine ? (
@@ -57,6 +65,7 @@ export function ProjectSimpleTablePdfDocument(props: Props) {
             ))}
           </View>
         ))}
+        <PdfReportFooter branding={props.branding} extraNote={footerNote} />
       </Page>
     </Document>
   );

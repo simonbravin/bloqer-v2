@@ -1,14 +1,8 @@
 import { sendReportByEmailInputSchema, type SendReportByEmailInputValidated } from "@bloqer/validators";
 import { isEmailConfigured } from "@bloqer/config";
 import { sendEmail, escapeHtml } from "@bloqer/email";
-import { ServiceContext, ServiceError } from "../types";
 import {
   createEmailDeliveryLog,
-  markEmailDeliveryFailed,
-  markEmailDeliverySent,
-  markEmailDeliverySkipped,
-} from "../email-delivery/email-delivery-log.service";
-import {
   exportCashPositionCsv,
   exportPayableAgingCsv,
   exportProjectCashFlowCsv,
@@ -18,6 +12,9 @@ import {
   exportStockMovementsCsv,
   exportTreasuryCashFlowCsv,
   exportTreasuryMovementsCsv,
+  markEmailDeliveryFailed,
+  markEmailDeliverySent,
+  markEmailDeliverySkipped,
   parseAgingFilters,
   parseCashFlowFilters,
   parseCashPositionFilters,
@@ -26,8 +23,14 @@ import {
   parseProjectCashFlowFilters,
   parseStockBalanceFilters,
   parseStockMovementFilters,
-} from "./report-export.service";
-import { exportPayableAgingPdf, exportProjectCostControlPdf, exportReceivableAgingPdf } from "./report-pdf-export.service";
+  ServiceError,
+  type ServiceContext,
+} from "@bloqer/services";
+import {
+  exportPayableAgingPdf,
+  exportProjectCostControlPdf,
+  exportReceivableAgingPdf,
+} from "./report-pdf-export.service";
 
 const REPORT_LABEL: Record<SendReportByEmailInputValidated["reportType"], string> = {
   AR_AGING: "Cuentas por cobrar",
@@ -126,9 +129,7 @@ async function buildReportAttachment(
   }
 }
 
-/**
- * Phase 9C — manual report email with attachment. Reuses CSV/PDF builders (same permissions as exports).
- */
+/** Phase 9C — manual report email with attachment. Reuses CSV/PDF builders (same permissions as exports). */
 export async function sendReportByEmail(
   raw: unknown,
   ctx: ServiceContext,
