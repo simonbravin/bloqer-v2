@@ -47,11 +47,8 @@ export function WbsGroupDialog({
             {" — "}
             {node.name}
           </DialogTitle>
-          <p className="text-sm text-muted-foreground pt-1">
-            Capítulo (agrupa el subárbol). El APU va en cada ítem hoja de esta rama.
-          </p>
           {node.description?.trim() ? (
-            <p className="text-sm leading-relaxed text-foreground">{node.description.trim()}</p>
+            <p className="text-sm leading-relaxed text-foreground pt-1">{node.description.trim()}</p>
           ) : null}
         </DialogHeader>
 

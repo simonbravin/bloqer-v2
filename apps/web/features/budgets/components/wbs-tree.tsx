@@ -22,6 +22,8 @@ import {
 import {
   ChevronDown,
   ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
   Plus,
   Pencil,
   Trash2,
@@ -155,6 +157,20 @@ function WbsRowActions({
   );
 }
 
+function collectExpandableIds(ns: WbsViewNode[]): Set<string> {
+  const ids = new Set<string>();
+  function walk(nodes: WbsViewNode[]) {
+    for (const n of nodes) {
+      if (n.children.length > 0) {
+        ids.add(n.id);
+        walk(n.children);
+      }
+    }
+  }
+  walk(ns);
+  return ids;
+}
+
 function flattenTree(nodes: WbsViewNode[]): WbsViewNode[] {
   const result: WbsViewNode[] = [];
   function walk(ns: WbsViewNode[]) {
@@ -266,19 +282,7 @@ export function WbsTree({
 
   const [viewMode, setViewMode] = useState<WbsViewMode>("breakdown");
   const [search, setSearch] = useState("");
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
-    const ids = new Set<string>();
-    function collectExpandable(ns: WbsViewNode[]) {
-      for (const n of ns) {
-        if (n.children.length > 0) {
-          ids.add(n.id);
-          collectExpandable(n.children);
-        }
-      }
-    }
-    collectExpandable(nodes);
-    return ids;
-  });
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => collectExpandableIds(nodes));
   const [itemDialogNode, setItemDialogNode] = useState<WbsViewNode | null>(null);
   const [groupDialogNode, setGroupDialogNode] = useState<WbsViewNode | null>(null);
   const [dialogState, setDialogState] = useState<DialogState>({ type: "closed" });
@@ -302,6 +306,7 @@ export function WbsTree({
   };
 
   const flatNodes = useMemo(() => flattenTree(nodes), [nodes]);
+  const expandableIds = useMemo(() => collectExpandableIds(nodes), [nodes]);
   const matchingIds = useMemo(() => collectMatchingIds(nodes, search), [nodes, search]);
 
   useEffect(() => {
@@ -325,6 +330,18 @@ export function WbsTree({
       return next;
     });
   }, []);
+
+  const allExpanded = useMemo(() => {
+    if (expandableIds.size === 0) return false;
+    for (const id of expandableIds) {
+      if (!expandedIds.has(id)) return false;
+    }
+    return true;
+  }, [expandableIds, expandedIds]);
+
+  const toggleExpandAll = useCallback(() => {
+    setExpandedIds(allExpanded ? new Set() : new Set(expandableIds));
+  }, [allExpanded, expandableIds]);
 
   function getSiblings(node: WbsViewNode): WbsViewNode[] {
     return flatNodes
@@ -480,7 +497,7 @@ export function WbsTree({
               <span>{node.code}</span>
             </div>
           </TableCell>
-          <TableCell className={cn("py-0.5 px-2 text-sm font-medium", WBS_ITEM_COL_CLASS)}>
+          <TableCell className={cn("py-0.5 px-2 text-sm", WBS_ITEM_COL_CLASS)}>
             <div
               className="overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1"
               title={node.name}
@@ -606,7 +623,26 @@ export function WbsTree({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-0 px-1.5 whitespace-nowrap">Nº</TableHead>
+                <TableHead className="w-0 px-1.5 whitespace-nowrap">
+                  <div className="flex items-center gap-1">
+                    {expandableIds.size > 0 ? (
+                      <button
+                        type="button"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={toggleExpandAll}
+                        title={allExpanded ? "Contraer todo" : "Expandir todo"}
+                        aria-label={allExpanded ? "Contraer todo" : "Expandir todo"}
+                      >
+                        {allExpanded ? (
+                          <ChevronsUp className="h-3.5 w-3.5" />
+                        ) : (
+                          <ChevronsDown className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    ) : null}
+                    <span>Nº</span>
+                  </div>
+                </TableHead>
                 <TableHead className={WBS_ITEM_COL_CLASS}>Ítem</TableHead>
                 <TableHead className="w-20">Unidad</TableHead>
                 <TableHead className="text-right w-24">Cantidad</TableHead>

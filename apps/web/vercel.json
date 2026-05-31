@@ -12,7 +12,7 @@
     },
     {
       "path": "/api/cron/scheduled-reports",
-      "schedule": "5 * * * *"
+      "schedule": "0 23 * * *"
     }
   ]
 }
