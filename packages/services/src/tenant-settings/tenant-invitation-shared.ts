@@ -1,4 +1,6 @@
-import { createHash, randomBytes } from "node:crypto";
+import "server-only";
+
+import { createHash, randomBytes } from "crypto";
 import { prisma, type Prisma, type UserRole as PrismaUserRole } from "@bloqer/database";
 import type { UserRole } from "@bloqer/domain";
 import { getPublicAppBaseUrl, isEmailConfigured } from "@bloqer/config";

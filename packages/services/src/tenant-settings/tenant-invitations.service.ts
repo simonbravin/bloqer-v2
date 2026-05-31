@@ -1,3 +1,5 @@
+import "server-only";
+
 import { prisma } from "@bloqer/database";
 import type { MembershipStatus, TenantInvitationStatus, UserRole as PrismaUserRole } from "@bloqer/database";
 import type { UserRole } from "@bloqer/domain";

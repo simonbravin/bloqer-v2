@@ -21,11 +21,12 @@
     "@bloqer/email": "workspace:*",
     "@bloqer/storage": "workspace:*",
     "@bloqer/utils": "workspace:*",
-    "@bloqer/validators": "workspace:*"
+    "@bloqer/validators": "workspace:*",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
-    "tsx": "^4.19.0",
     "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.5.0"
   }
 }

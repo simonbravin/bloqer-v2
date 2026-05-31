@@ -70,6 +70,11 @@ Esos archivos **quedan abandonados**, se ejecutan con datos viejos y **rompen el
 
 Excepciones aceptables: scripts **ya existentes** de build/CI (`package.json`, Turborepo, hooks de repo) y herramientas documentadas en `08-architecture/` — no crear variantes “temporales”.
 
+## Componentes cliente y `@bloqer/services`
+
+- **No importar** el barrel `@bloqer/services` desde archivos con `"use client"` (ni helpers usados solo por el cliente). Eso puede arrastrar `crypto`, Prisma o email al bundle de Webpack y romper el build en Vercel (`UnhandledSchemeError: node:crypto`).
+- Usar tipos locales en `apps/web/features/.../types.ts`, subpaths documentados (`@bloqer/services/...`) solo en **Server Components** / route handlers / server actions, o duplicar helpers puramente de UI (p. ej. `buildAuditEntityHref`).
+
 ## Referencias
 
 - [`../AGENTS.md`](../AGENTS.md)  
