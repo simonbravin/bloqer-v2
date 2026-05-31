@@ -625,6 +625,7 @@ export function WbsTree({
               <TableRow>
                 <TableHead className="w-0 px-1.5 whitespace-nowrap">
                   <div className="flex items-center gap-1">
+                    <span>Nº</span>
                     {expandableIds.size > 0 ? (
                       <button
                         type="button"
@@ -640,7 +641,6 @@ export function WbsTree({
                         )}
                       </button>
                     ) : null}
-                    <span>Nº</span>
                   </div>
                 </TableHead>
                 <TableHead className={WBS_ITEM_COL_CLASS}>Ítem</TableHead>
