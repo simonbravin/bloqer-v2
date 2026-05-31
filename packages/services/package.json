@@ -12,7 +12,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/schedule/schedule-helpers.test.ts src/budget/wbs-code-rules.test.ts src/budget/wbs-import-code-fix.test.ts src/budget/wbs-spreadsheet-parser.test.ts src/budget/budget-import-pure.test.ts src/reports/budget-variance.test.ts src/reports/report-month-projection.test.ts src/cost-control/project-accrued-aggregation.test.ts src/finance/project-overhead-period.test.ts src/finance/obligation-date.test.ts src/ar/sales-invoice-cancel-guards.test.ts src/treasury/account-movement-cancel-guards.test.ts src/treasury/balance.service.test.ts src/ap/supplier-invoice-cancel-guards.test.ts src/finance/optimistic-lock.test.ts src/ar/receivable-cancel-guards.test.ts src/ap/payable-cancel-guards.test.ts src/finance/payable-list-filters.test.ts src/finance/register-transaction-scope.test.ts src/finance/financial-trace.service.test.ts src/audit/audit.test.ts src/project-finance/project-finance-layers.test.ts src/ap/register-supplier-advance.test.ts src/project/project-lifecycle.test.ts"
+    "test": "node --import tsx --test src/schedule/schedule-helpers.test.ts src/budget/wbs-code-rules.test.ts src/budget/wbs-import-code-fix.test.ts src/budget/wbs-spreadsheet-parser.test.ts src/budget/budget-import-pure.test.ts src/budget/budget-wbs-export.test.ts src/reports/budget-variance.test.ts src/reports/report-month-projection.test.ts src/cost-control/project-accrued-aggregation.test.ts src/finance/project-overhead-period.test.ts src/finance/obligation-date.test.ts src/ar/sales-invoice-cancel-guards.test.ts src/treasury/account-movement-cancel-guards.test.ts src/treasury/balance.service.test.ts src/ap/supplier-invoice-cancel-guards.test.ts src/finance/optimistic-lock.test.ts src/ar/receivable-cancel-guards.test.ts src/ap/payable-cancel-guards.test.ts src/finance/payable-list-filters.test.ts src/finance/register-transaction-scope.test.ts src/finance/financial-trace.service.test.ts src/audit/audit.test.ts src/project-finance/project-finance-layers.test.ts src/ap/register-supplier-advance.test.ts src/project/project-lifecycle.test.ts"
   },
   "dependencies": {
     "@bloqer/config": "workspace:*",
@@ -22,7 +22,8 @@
     "@bloqer/storage": "workspace:*",
     "@bloqer/utils": "workspace:*",
     "@bloqer/validators": "workspace:*",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

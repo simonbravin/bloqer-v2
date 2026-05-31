@@ -10,5 +10,6 @@ export { CostItemPanel } from "./components/cost-item-panel";
 export { BudgetTotalsPanel } from "./components/budget-totals-panel";
 export { BudgetLifecycleDialog } from "./components/budget-lifecycle-dialog";
 export { BudgetMarginConfigSection } from "./components/budget-margin-config-section";
+export { BudgetExportActions } from "./components/budget-export-actions";
 export { CostItemApuDialog } from "./components/cost-item-apu-dialog";
 export { WbsGroupDialog } from "./components/wbs-group-dialog";

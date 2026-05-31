@@ -26,6 +26,10 @@ import {
   ServiceError,
   type AgingFilters,
   type BudgetVarianceFilters,
+  type BudgetWbsExportFilters,
+  budgetWbsExportPdfColumns,
+  budgetWbsExportPdfRowsFromTable,
+  buildBudgetWbsExportPayload,
   type CashFlowFilters,
   type CashPositionFilters,
   type CertificationReportFilters,
@@ -141,6 +145,31 @@ export async function exportBudgetVariancePdf(
         actual: r.actualCost,
         variance: r.costVariance,
       }))}
+    />
+  ));
+}
+
+export async function exportBudgetWbsPdf(
+  budgetId: string,
+  projectId: string,
+  filters: BudgetWbsExportFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const payload = await buildBudgetWbsExportPayload(budgetId, projectId, filters, ctx);
+  const rows = budgetWbsExportPdfRowsFromTable(filters.view, payload.rows);
+  const slug = `${payload.meta.budgetName}_v${payload.meta.versionNumber}_${payload.meta.view}`.replace(
+    /[^a-zA-Z0-9._-]+/g,
+    "_",
+  );
+  return exportPdfDocument(ctx, { projectId }, `presupuesto_edt_${slug}`, (branding) => (
+    <ProjectSimpleTablePdfDocument
+      branding={branding}
+      title="Presupuesto — EDT"
+      subtitle={`${payload.meta.budgetName} · v${payload.meta.versionNumber}`}
+      filterLine={`Moneda: ${payload.meta.currency} · Vista: ${payload.meta.viewLabel}`}
+      totalsLine={`Costo directo: ${payload.meta.totalCostDirect} · Total venta: ${payload.meta.totalSalePrice}`}
+      columns={budgetWbsExportPdfColumns(filters.view)}
+      rows={rows}
     />
   ));
 }

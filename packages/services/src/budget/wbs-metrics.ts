@@ -1,5 +1,14 @@
-import type { WbsViewNode } from "@bloqer/services";
-import type { VisibleCostCategory } from "@/lib/budget-categories";
+import type { WbsViewNode } from "./wbs.service";
+
+/** Visible cost categories in WBS EDT (excludes OTHER). */
+export const VISIBLE_WBS_COST_CATEGORIES = [
+  "MATERIAL",
+  "LABOR",
+  "EQUIPMENT",
+  "SUBCONTRACT",
+] as const;
+
+export type VisibleCostCategory = (typeof VISIBLE_WBS_COST_CATEGORIES)[number];
 
 export type CategoryAmounts = Record<VisibleCostCategory, number>;
 
@@ -84,7 +93,7 @@ export function computeTreeGrandTotals(nodes: WbsViewNode[]): WbsRowMetrics {
   return { unit: "", quantity: null, byCategory, totalCostDirect, totalSalePrice };
 }
 
-/** Costos unitarios por categoría (sin multiplicar cantidad). */
+/** Unit costs by category (without multiplying quantity). */
 export function computeUnitCategoryCosts(node: WbsViewNode): CategoryAmounts {
   if (node.children.length > 0 || !node.costItem) return { ...ZERO };
   const amounts = { ...ZERO };

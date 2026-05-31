@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { BudgetStatusBadge, WbsTree, BudgetLifecycleDialog, BudgetMarginConfigSection } from "@/features/budgets";
+import {
+  BudgetStatusBadge,
+  WbsTree,
+  BudgetLifecycleDialog,
+  BudgetMarginConfigSection,
+  BudgetExportActions,
+} from "@/features/budgets";
+import { BudgetWbsViewProvider } from "@/features/budgets/lib/wbs-view-mode";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { getCurrentUser } from "@/lib/auth";
@@ -88,102 +95,105 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
   };
 
   return (
-    <PageShell variant="default" className="space-y-6">
-      <div className="space-y-4">
-        <PageBackLink href={`/proyectos/${projectId}/presupuestos`} label="Presupuestos" />
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">{budget.name}</h1>
-              <span className="font-mono text-sm text-muted-foreground">v{budget.versionNumber}</span>
-              <BudgetStatusBadge status={budget.status} />
+    <BudgetWbsViewProvider budgetId={budgetId}>
+      <PageShell variant="default" className="space-y-6">
+        <div className="space-y-4">
+          <PageBackLink href={`/proyectos/${projectId}/presupuestos`} label="Presupuestos" />
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-bold tracking-tight">{budget.name}</h1>
+                <span className="font-mono text-sm text-muted-foreground">v{budget.versionNumber}</span>
+                <BudgetStatusBadge status={budget.status} />
+              </div>
+              <p className="text-sm text-muted-foreground">Moneda: {budget.currency}</p>
             </div>
-            <p className="text-sm text-muted-foreground">Moneda: {budget.currency}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <BudgetLifecycleDialog
-              status={budget.status}
-              lifecycleLog={lifecycleLog}
-              onSubmitForReview={submitForReviewAction.bind(null, budgetId, projectId)}
-              onReturnForChanges={returnForChangesAction.bind(null, budgetId, projectId)}
-              onApprove={approveBudgetAction.bind(null, budgetId, projectId)}
-              onClose={closeBudgetAction.bind(null, budgetId, projectId)}
-              onCancel={cancelBudgetAction.bind(null, budgetId, projectId)}
-            />
-            <Link
-              href="#configuracion"
-              className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground"
-            >
-              Configuración
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <BudgetLifecycleDialog
+                status={budget.status}
+                lifecycleLog={lifecycleLog}
+                onSubmitForReview={submitForReviewAction.bind(null, budgetId, projectId)}
+                onReturnForChanges={returnForChangesAction.bind(null, budgetId, projectId)}
+                onApprove={approveBudgetAction.bind(null, budgetId, projectId)}
+                onClose={closeBudgetAction.bind(null, budgetId, projectId)}
+                onCancel={cancelBudgetAction.bind(null, budgetId, projectId)}
+              />
+              <BudgetExportActions projectId={projectId} budgetId={budgetId} />
+              <Link
+                href="#configuracion"
+                className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground"
+              >
+                Configuración
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
 
-      <KpiStatGrid columns={3}>
-        <KpiStatCard
-          label="Costo directo total"
-          value={formatMoneyAmount(costStr, budget.currency)}
-        />
-        <KpiStatCard
-          label="Precio de venta total"
-          value={formatMoneyAmount(saleStr, budget.currency)}
-          variant="highlight"
-        />
-        <KpiStatCard label="Margen (venta − costo)" value={marginStr} tone="muted" />
-      </KpiStatGrid>
+        <KpiStatGrid columns={3}>
+          <KpiStatCard
+            label="Costo directo total"
+            value={formatMoneyAmount(costStr, budget.currency)}
+          />
+          <KpiStatCard
+            label="Precio de venta total"
+            value={formatMoneyAmount(saleStr, budget.currency)}
+            variant="highlight"
+          />
+          <KpiStatCard label="Margen (venta − costo)" value={marginStr} tone="muted" />
+        </KpiStatGrid>
 
-      <WbsTree
-        nodes={tree}
-        budgetId={budgetId}
-        projectId={projectId}
-        currency={budget.currency}
-        editable={editable}
-        structureEditable={wbsStructureEditable}
-        structureLockedReason={
-          editable && scheduleBaseline
-            ? "Este presupuesto es la base del cronograma. La estructura WBS está bloqueada; podés seguir editando APU y costos en los ítems."
-            : undefined
-        }
-        onPreviewWbsImport={
-          wbsStructureEditable
-            ? previewWbsImportAction.bind(null, budgetId, projectId)
-            : undefined
-        }
-        onExecuteWbsImport={
-          wbsStructureEditable
-            ? executeWbsImportAction.bind(null, budgetId, projectId)
-            : undefined
-        }
-        onAddNode={addWbsNodeAction.bind(null, budgetId, projectId)}
-        onEnsureLeafForApu={ensureWbsLeafForApuAction.bind(null, budgetId, projectId)}
-        onUpdateNode={updateWbsNodeAction.bind(null, projectId, budgetId)}
-        onRemoveNode={removeWbsNodeAction.bind(null, projectId, budgetId)}
-        onReorderNodes={reorderWbsNodesAction.bind(null, budgetId, projectId)}
-        onUpdateCostItem={updateCostItemAction.bind(null, projectId, budgetId)}
-        onAddLine={addCostAnalysisLineAction.bind(null, projectId, budgetId)}
-        onUpdateLine={updateCostAnalysisLineAction.bind(null, projectId, budgetId)}
-        onRemoveLine={removeCostAnalysisLineAction.bind(null, projectId, budgetId)}
-      />
-
-      {budget.settings ? (
-        <BudgetMarginConfigSection
-          defaults={settingsDefaults}
-          totalDirectCost={costStr}
-          totalSalePrice={saleStr}
+        <WbsTree
+          nodes={tree}
+          budgetId={budgetId}
+          projectId={projectId}
           currency={budget.currency}
           editable={editable}
-          onSubmit={updateBudgetSettingsAction.bind(null, budgetId, projectId)}
+          structureEditable={wbsStructureEditable}
+          structureLockedReason={
+            editable && scheduleBaseline
+              ? "Este presupuesto es la base del cronograma. La estructura WBS está bloqueada; podés seguir editando APU y costos en los ítems."
+              : undefined
+          }
+          onPreviewWbsImport={
+            wbsStructureEditable
+              ? previewWbsImportAction.bind(null, budgetId, projectId)
+              : undefined
+          }
+          onExecuteWbsImport={
+            wbsStructureEditable
+              ? executeWbsImportAction.bind(null, budgetId, projectId)
+              : undefined
+          }
+          onAddNode={addWbsNodeAction.bind(null, budgetId, projectId)}
+          onEnsureLeafForApu={ensureWbsLeafForApuAction.bind(null, budgetId, projectId)}
+          onUpdateNode={updateWbsNodeAction.bind(null, projectId, budgetId)}
+          onRemoveNode={removeWbsNodeAction.bind(null, projectId, budgetId)}
+          onReorderNodes={reorderWbsNodesAction.bind(null, budgetId, projectId)}
+          onUpdateCostItem={updateCostItemAction.bind(null, projectId, budgetId)}
+          onAddLine={addCostAnalysisLineAction.bind(null, projectId, budgetId)}
+          onUpdateLine={updateCostAnalysisLineAction.bind(null, projectId, budgetId)}
+          onRemoveLine={removeCostAnalysisLineAction.bind(null, projectId, budgetId)}
         />
-      ) : (
-        <section
-          id="configuracion"
-          className="rounded-xl border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground"
-        >
-          Este presupuesto no tiene parámetros económicos configurados. Contactá soporte si necesitás
-          editar márgenes.
-        </section>
-      )}
-    </PageShell>
+
+        {budget.settings ? (
+          <BudgetMarginConfigSection
+            defaults={settingsDefaults}
+            totalDirectCost={costStr}
+            totalSalePrice={saleStr}
+            currency={budget.currency}
+            editable={editable}
+            onSubmit={updateBudgetSettingsAction.bind(null, budgetId, projectId)}
+          />
+        ) : (
+          <section
+            id="configuracion"
+            className="rounded-xl border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground"
+          >
+            Este presupuesto no tiene parámetros económicos configurados. Contactá soporte si necesitás
+            editar márgenes.
+          </section>
+        )}
+      </PageShell>
+    </BudgetWbsViewProvider>
   );
 }

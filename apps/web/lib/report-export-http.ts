@@ -69,3 +69,14 @@ export function pdfResponse(buffer: Buffer, filename: string): NextResponse {
     },
   });
 }
+
+export function xlsxResponse(buffer: Buffer, filename: string): NextResponse {
+  return new NextResponse(new Uint8Array(buffer), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename.replace(/"/g, "")}"`,
+      "Cache-Control": "private, no-store",
+    },
+  });
+}

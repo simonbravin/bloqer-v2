@@ -44,12 +44,14 @@ import { formatMoneyAmount } from "@/lib/format-money";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { WbsNodeForm } from "./wbs-node-form";
-import { WbsTreeToolbar, type WbsViewMode } from "./wbs-tree-toolbar";
+import { WbsTreeToolbar } from "./wbs-tree-toolbar";
+import type { WbsViewMode } from "../lib/wbs-view-mode";
+import { useBudgetWbsViewMode } from "../lib/wbs-view-mode";
 import { CostItemApuDialog } from "./cost-item-apu-dialog";
 import { WbsGroupDialog } from "./wbs-group-dialog";
 import { WbsImportDialog, type WbsImportPreview } from "./wbs-import-dialog";
 import type { BudgetImportRow } from "@bloqer/validators";
-import { computeWbsRowMetrics, computeTreeGrandTotals } from "../lib/wbs-metrics";
+import { computeWbsRowMetrics, computeTreeGrandTotals } from "@bloqer/services";
 import {
   addChildButtonTitle,
   resolveAddChildPreset,
@@ -278,9 +280,8 @@ export function WbsTree({
   onEnsureLeafForApu,
 }: WbsTreeProps) {
   const router = useRouter();
-  const storageKey = `wbs-view-mode-${budgetId}`;
+  const { viewMode, setViewMode } = useBudgetWbsViewMode();
 
-  const [viewMode, setViewMode] = useState<WbsViewMode>("breakdown");
   const [search, setSearch] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => collectExpandableIds(nodes));
   const [itemDialogNode, setItemDialogNode] = useState<WbsViewNode | null>(null);
@@ -294,15 +295,8 @@ export function WbsTree({
   const [reorderPending, startReorderTransition] = useTransition();
   const [, startApuTransition] = useTransition();
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = sessionStorage.getItem(storageKey);
-    if (stored === "breakdown" || stored === "totals") setViewMode(stored);
-  }, [storageKey]);
-
   const handleViewModeChange = (mode: WbsViewMode) => {
     setViewMode(mode);
-    if (typeof window !== "undefined") sessionStorage.setItem(storageKey, mode);
   };
 
   const flatNodes = useMemo(() => flattenTree(nodes), [nodes]);

@@ -4,8 +4,9 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { WbsViewMode } from "../lib/wbs-view-mode";
 
-export type WbsViewMode = "breakdown" | "totals";
+export type { WbsViewMode } from "../lib/wbs-view-mode";
 
 interface WbsTreeToolbarProps {
   viewMode: WbsViewMode;

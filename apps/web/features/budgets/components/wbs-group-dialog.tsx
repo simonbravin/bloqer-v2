@@ -11,7 +11,7 @@ import { formatMoneyAmount } from "@/lib/format-money";
 import { WbsNodeForm } from "./wbs-node-form";
 import type { WbsViewNode } from "@bloqer/services";
 import type { UpdateWbsNodeInput } from "@bloqer/validators";
-import { computeWbsRowMetrics } from "../lib/wbs-metrics";
+import { computeWbsRowMetrics } from "@bloqer/services";
 import { canAddChild } from "../lib/wbs-codes";
 import { isWbsStructuralLeaf } from "../lib/wbs-apu";
 
