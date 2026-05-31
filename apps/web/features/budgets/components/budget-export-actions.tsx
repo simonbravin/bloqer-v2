@@ -23,7 +23,7 @@ function buildExportHref(
   format: "csv" | "xlsx" | "pdf",
 ): string {
   const params = new URLSearchParams({ view, format });
-  return `/api/reports/proyectos/${projectId}/presupuestos/${budgetId}.csv?${params.toString()}`;
+  return `/api/reports/proyectos/${projectId}/presupuestos/${budgetId}/export?${params.toString()}`;
 }
 
 export function BudgetExportActions({ projectId, budgetId }: Props) {
