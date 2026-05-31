@@ -1,5 +1,6 @@
 import type { WbsViewNode } from "./wbs.service";
 
+/** Pure WBS row metrics (safe for client bundles — no Prisma). */
 /** Visible cost categories in WBS EDT (excludes OTHER). */
 export const VISIBLE_WBS_COST_CATEGORIES = [
   "MATERIAL",

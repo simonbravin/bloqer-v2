@@ -51,7 +51,7 @@ import { CostItemApuDialog } from "./cost-item-apu-dialog";
 import { WbsGroupDialog } from "./wbs-group-dialog";
 import { WbsImportDialog, type WbsImportPreview } from "./wbs-import-dialog";
 import type { BudgetImportRow } from "@bloqer/validators";
-import { computeWbsRowMetrics, computeTreeGrandTotals } from "@bloqer/services";
+import { computeWbsRowMetrics, computeTreeGrandTotals } from "@bloqer/services/wbs-metrics";
 import {
   addChildButtonTitle,
   resolveAddChildPreset,
