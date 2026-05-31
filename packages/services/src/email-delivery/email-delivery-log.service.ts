@@ -190,6 +190,8 @@ export type ListEmailDeliveryLogsFilters = {
   recipientEmail?: string;
   dateFrom?: string;
   dateTo?: string;
+  relatedEntityType?: LinkedEntityType;
+  relatedEntityId?: string;
   limit?: number;
 };
 
@@ -224,6 +226,8 @@ export async function listEmailDeliveryLogs(
   if (filters.recipientEmail?.trim()) {
     where.recipientEmail = { contains: filters.recipientEmail.trim(), mode: "insensitive" };
   }
+  if (filters.relatedEntityType) where.relatedEntityType = filters.relatedEntityType;
+  if (filters.relatedEntityId) where.relatedEntityId = filters.relatedEntityId;
   if (filters.dateFrom || filters.dateTo) {
     const createdAt: Prisma.DateTimeFilter = {};
     if (filters.dateFrom) {

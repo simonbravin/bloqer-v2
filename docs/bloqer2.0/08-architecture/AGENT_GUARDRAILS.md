@@ -52,6 +52,24 @@
 - “Confío en el front” para aprobar pago.  
 - Borrar movimiento confirmado en lugar de compensar.
 
+## Scripts provisionales (prohibido)
+
+**No agregar** scripts ejecutables (bash, PowerShell, Node en `scripts/`, seeds ad hoc, “smoke” locales) cuyo propósito sea:
+
+- tapar un bug sin corregir la causa en el producto;
+- migrar o reparar datos “una vez” sin migración Prisma / servicio documentado;
+- simular cron, envío de mail o PDF fuera del flujo real (`apps/web` route + `packages/services`).
+
+Esos archivos **quedan abandonados**, se ejecutan con datos viejos y **rompen el progreso** del sistema.
+
+**En su lugar:**
+
+- bug o regla de negocio → fix en service layer + test si aplica;
+- verificación operativa → pasos en `DEPLOYMENT_SMOKE_TEST.md` (manual, sin script en repo);
+- datos → migración versionada en `packages/database` o herramienta explícita acordada con el equipo (ADR).
+
+Excepciones aceptables: scripts **ya existentes** de build/CI (`package.json`, Turborepo, hooks de repo) y herramientas documentadas en `08-architecture/` — no crear variantes “temporales”.
+
 ## Referencias
 
 - [`../AGENTS.md`](../AGENTS.md)  

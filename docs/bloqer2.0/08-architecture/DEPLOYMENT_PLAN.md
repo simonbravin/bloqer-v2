@@ -31,7 +31,7 @@ Elegir **una** de estas dos convenciones (documentar la elegida en el proyecto V
 8. **Platform superadmin:** `PLATFORM_SUPERADMIN_EMAILS` y/o filas `PlatformAdmin` según [`PLATFORM_SUPERADMIN_ARCHITECTURE.md`](./PLATFORM_SUPERADMIN_ARCHITECTURE.md).
 9. **R2:** crear bucket + API token; setear `R2_*`; hasta entonces uploads usan comportamiento deshabilitado / placeholder sin tumbar la app.
 10. **Resend:** `RESEND_API_KEY` + `RESEND_FROM_EMAIL`; hasta entonces correo transaccional no-op.
-11. **Cron Vercel:** `CRON_SECRET` (≥16 caracteres) alineado con el header que envía el job hacia `/api/cron/operational-alerts`.
+11. **Cron Vercel:** `CRON_SECRET` (≥16 caracteres) alineado con el header que envía los jobs hacia `/api/cron/operational-alerts` y `/api/cron/scheduled-reports` (ver `apps/web/vercel.json`).
 12. **Smoke test:** checklist [`DEPLOYMENT_SMOKE_TEST.md`](./DEPLOYMENT_SMOKE_TEST.md).
 
 **Explícito:** `db:push` es solo para iteración local aislada; **producción y staging compartidos = `migrate deploy`**. Variables de integraciones opcionales se agregan **una vez** creado el recurso (Neon, R2, Resend, etc.).
@@ -55,7 +55,7 @@ Elegir **una** de estas dos convenciones (documentar la elegida en el proyecto V
 
 - `DATABASE_URL`, Auth secrets, R2 credentials — solo env; nunca repo.  
 - **`RESEND_API_KEY`** + **`RESEND_FROM_EMAIL`** — **opcionales** hasta que se quiera enviar correo (cualquier entorno); si faltan o son inválidos, el envío queda deshabilitado sin tumbar el boot ([`EMAIL_NOTIFICATIONS_ARCHITECTURE.md`](./EMAIL_NOTIFICATIONS_ARCHITECTURE.md)).
-- **`CRON_SECRET`** (mín. 16 caracteres): protege `/api/cron/operational-alerts` (operational in-app alerts). Sin valor válido la ruta responde **503** y no ejecuta jobs ([`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md)). En Vercel, alinear con la invocación programada (Bearer automático si aplica).
+- **`CRON_SECRET`** (mín. 16 caracteres): protege `/api/cron/operational-alerts` y `/api/cron/scheduled-reports`. Sin valor válido las rutas responden **503**. En Vercel, alinear con la invocación programada (Bearer automático si aplica). Detalle: [`SCHEDULED_REPORTS_ARCHITECTURE.md`](./SCHEDULED_REPORTS_ARCHITECTURE.md).
 - **Vercel project root:** el cron está declarado en `apps/web/vercel.json`. Si el proyecto en Vercel usa otro root (p. ej. monorepo con root en `/`), ese archivo no aplica hasta mover o duplicar la sección `crons` en el `vercel.json` que Vercel lea, o cambiar el directorio raíz del proyecto.
 - **Variables de entorno:** inventario por categoría en [`ENVIRONMENT_VARIABLES.md`](./ENVIRONMENT_VARIABLES.md); plantilla en [`.env.example`](../../../.env.example).
 - **DB:** flujo productivo = migraciones (`prisma migrate deploy`); no sustituir por `prisma db push` en prod.

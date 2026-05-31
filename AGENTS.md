@@ -30,6 +30,7 @@ Leer en este orden:
 - **Toda mutación importante pasa por el service layer** (`packages/services`).
 - **Los estados de las entidades son los documentados** en `docs/bloqer2.0/01-domain/STATE_MACHINES.md`. No inventar estados nuevos sin actualizar ese documento primero.
 - **Si una decisión es ambigua, parar y preguntar.** No improvisar arquitectura.
+- **No crear scripts one-off ni “parches” ejecutables** (bash, PowerShell, `scripts/*.ts` ad hoc, seeds de emergencia) para tapar bugs, migrar datos a mano o validar algo que debería quedar en el producto (cron, service layer, tests, docs de smoke manual). Si hace falta corregir algo, corregir la causa en código o documentar el procedimiento operativo en `docs/bloqer2.0/` — no dejar scripts sueltos en el repo.
 
 ---
 

@@ -96,6 +96,7 @@ Las rutas bajo **`/finanzas/**`** comparten layout: subnav filtrada por módulo 
 | `/notificaciones` | Authenticated user with active tenant membership | Personal inbox only; **not** gated on `VIEW NOTIFICATIONS` |
 | `/notificaciones/alertas` | **OWNER** or **ADMIN** on active tenant membership (`canRunOperationalAlerts`) | Manual operational alert runner; others get `notFound()` |
 | `/api/cron/operational-alerts` | **No session.** Valid `CRON_SECRET` via `Authorization: Bearer` or `x-cron-secret` | Server-to-server / Vercel Cron; optional `?tenantId=` (UUID, ACTIVE only); respuesta agregada sin PII ([`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md)) |
+| `/api/cron/scheduled-reports` | **No session.** Mismo `CRON_SECRET` | Vercel Cron horario; envíos programados `REPORT_SCHEDULED` ([`SCHEDULED_REPORTS_ARCHITECTURE.md`](./SCHEDULED_REPORTS_ARCHITECTURE.md)) |
 | Header bell + badge | Same as inbox | Count = `getUnreadNotificationCount` (SSR en layout) |
 
 See [`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md).
@@ -222,6 +223,8 @@ En **shell de app** (no `/platform`). No usa `PlatformAdmin`; solo RBAC por memb
 | `/configuracion/equipo/invitaciones/[invitationId]` | Idem | Idem read | `EDIT USERS_PERMISSIONS` — cancelar invitación **PENDING** |
 | `/configuracion/equipo/[membershipId]` | Idem | Idem read | `EDIT USERS_PERMISSIONS` para roles y estado `ACTIVE`/`INACTIVE` |
 | `/configuracion/permisos` | Idem | Idem read (matriz solo lectura `buildPermissionMatrixGrid`) | Notas por módulo: `EDIT USERS_PERMISSIONS` **o** `EDIT TENANT_SETTINGS` (persistencia `Tenant.permissionMatrixNotes`, ADR-Phase1-05) |
+| `/configuracion/reportes`, `/configuracion/reportes/nuevo`, `/configuracion/reportes/[id]` | Idem | **OWNER** o **ADMIN** (`canManageScheduledReports`) | CRUD envíos programados (Phase 17B); sin cron |
+| `/proyectos/[id]/reportes/programados` | Idem proyecto | **OWNER** o **ADMIN** | Listado filtrado por `projectId`; alta vía `/configuracion/reportes/nuevo?scope=PROJECT&projectId=` |
 | `/invitaciones/aceptar` | **Pública** (sin sesión: mensaje + login); con sesión: aceptar con token | Invitación válida (`peek` por token) | Aceptación: usuario autenticado cuyo **email** coincide con la invitación |
 
 - **Protección dominio:** no dejar el tenant **sin** al menos un miembro **ACTIVE** con rol **OWNER** si ya había uno antes del cambio (simulación sobre membresías activas). Desactivar al único OWNER activo queda bloqueado. **Aceptar invitación** respeta el mismo invariante al activar/reactivar membresía.

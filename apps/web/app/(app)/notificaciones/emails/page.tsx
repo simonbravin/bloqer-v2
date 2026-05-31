@@ -17,8 +17,15 @@ import { canRunOperationalAlerts, listEmailDeliveryLogs } from "@bloqer/services
 import type { EmailDeliveryStatus, EmailDeliveryType } from "@bloqer/database";
 import { formatDateTime } from "@/lib/format";
 import { PageShell } from "@/components/layout/page-shell";
+import { EMAIL_DELIVERY_STATUS_LABEL } from "@/features/scheduled-reports/scheduled-report-labels";
 
 const STATUSES: EmailDeliveryStatus[] = ["PENDING", "SENT", "SKIPPED", "FAILED"];
+const EMAIL_TYPE_LABEL: Record<EmailDeliveryType, string> = {
+  NOTIFICATION: "Notificación",
+  OPERATIONAL_ALERT: "Alerta operativa",
+  REPORT_MANUAL: "Reporte manual",
+  REPORT_SCHEDULED: "Reporte programado",
+};
 const EMAIL_TYPES: EmailDeliveryType[] = [
   "NOTIFICATION",
   "OPERATIONAL_ALERT",
@@ -37,11 +44,12 @@ function fmtWhen(iso: Date) {
 
 interface PageProps {
   searchParams: Promise<{
-    status?:         string;
-    emailType?:      string;
+    status?: string;
+    emailType?: string;
     recipientEmail?: string;
-    dateFrom?:       string;
-    dateTo?:         string;
+    dateFrom?: string;
+    dateTo?: string;
+    scheduledReportId?: string;
   }>;
 }
 
@@ -64,14 +72,18 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
   const status = parseEnumParam(sp.status, STATUSES);
   const emailType = parseEnumParam(sp.emailType, EMAIL_TYPES);
 
+  const scheduledReportId = sp.scheduledReportId?.trim() || undefined;
+
   const items = await listEmailDeliveryLogs(
     {
       status,
-      emailType,
+      emailType: scheduledReportId ? "REPORT_SCHEDULED" : emailType,
       recipientEmail: sp.recipientEmail,
-      dateFrom:       sp.dateFrom,
-      dateTo:         sp.dateTo,
-      limit:          80,
+      dateFrom: sp.dateFrom,
+      dateTo: sp.dateTo,
+      relatedEntityType: scheduledReportId ? "SCHEDULED_REPORT" : undefined,
+      relatedEntityId: scheduledReportId,
+      limit: 80,
     },
     ctx,
   );
@@ -82,6 +94,7 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
   if (sp.recipientEmail) qs.set("recipientEmail", sp.recipientEmail);
   if (sp.dateFrom) qs.set("dateFrom", sp.dateFrom);
   if (sp.dateTo) qs.set("dateTo", sp.dateTo);
+  if (scheduledReportId) qs.set("scheduledReportId", scheduledReportId);
   const querySuffix = qs.toString() ? `?${qs.toString()}` : "";
 
   return (
@@ -94,11 +107,30 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight">Historial de emails enviados</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Registro de intentos de envío (reportes manuales, notificaciones y alertas). Solo OWNER o ADMIN.
+          Registro de intentos de envío (reportes manuales, programados, notificaciones y alertas). Solo OWNER o
+          ADMIN.
         </p>
+        {scheduledReportId ? (
+          <p className="mt-2 text-sm">
+            Filtro: envío programado{" "}
+            <Link
+              href={`/configuracion/reportes/${scheduledReportId}`}
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              ver configuración
+            </Link>
+            {" · "}
+            <Link href="/notificaciones/emails" className="text-primary underline-offset-4 hover:underline">
+              quitar filtro
+            </Link>
+          </p>
+        ) : null}
       </div>
 
       <form className="rounded-lg border bg-card p-4 space-y-3" method="get" action="/notificaciones/emails">
+        {scheduledReportId ? (
+          <input type="hidden" name="scheduledReportId" value={scheduledReportId} />
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div className="grid gap-1">
             <Label htmlFor="f-status">Estado</Label>
@@ -111,7 +143,7 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
               <option value="">Todos</option>
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {EMAIL_DELIVERY_STATUS_LABEL[s]}
                 </option>
               ))}
             </select>
@@ -127,7 +159,7 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
               <option value="">Todos</option>
               {EMAIL_TYPES.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {EMAIL_TYPE_LABEL[t]}
                 </option>
               ))}
             </select>
@@ -182,8 +214,20 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
                     {fmtWhen(row.createdAt)}
                   </TableCell>
                   <TableCell className="max-w-[140px] truncate text-sm">{row.recipientEmail}</TableCell>
-                  <TableCell className="text-xs">{row.emailType}</TableCell>
-                  <TableCell className="text-xs">{row.status}</TableCell>
+                  <TableCell className="text-xs">{EMAIL_TYPE_LABEL[row.emailType]}</TableCell>
+                  <TableCell className="text-xs">
+                    <span
+                      className={
+                        row.status === "SENT"
+                          ? "text-green-600 dark:text-green-500"
+                          : row.status === "FAILED"
+                            ? "text-destructive"
+                            : "text-muted-foreground"
+                      }
+                    >
+                      {EMAIL_DELIVERY_STATUS_LABEL[row.status]}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-xs">{row.provider}</TableCell>
                   <TableCell className="max-w-[200px] truncate text-sm" title={row.subject}>
                     {row.subject}

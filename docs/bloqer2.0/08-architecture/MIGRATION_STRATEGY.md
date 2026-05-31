@@ -35,6 +35,7 @@ Usar **migraciones versionadas** alineadas a **Prisma Migrate** contra **Neon Po
 - **Phase 13B:** relaciones Prisma / FKs en `Payment` (`supplierContactId`, `supplierInvoiceId`) — aplicar con **`prisma migrate deploy`** (o migración SQL equivalente) antes de usar producción; **no** `db:push` en Neon compartido/prod.
 - **Phase 16B:** `SupplierInvoice`, `Payable`, `Payment` — `projectId` nullable (AP corporativo); `AccountMovement.projectId` nullable (dimensión analítica opcional). Migración `20260513200000_phase_16b_ap_company_project_optional`. Sin backfill: filas existentes conservan `projectId` no nulo.
 - **Phase1-05 notes:** `20260513220000_tenant_permission_matrix_notes` — `ALTER TABLE tenants ADD permission_matrix_notes JSONB` (revisado; sin backfill).
+- **Phase 17B:** `20260530120000_phase_17b_scheduled_reports` — tablas `scheduled_reports`, `scheduled_report_items`, `scheduled_report_recipients`; enums; `LinkedEntityType.SCHEDULED_REPORT`; CHECKs scope/frecuencia; índice único parcial idempotencia `REPORT_SCHEDULED` en `email_delivery_logs`. Aplicar con `pnpm db:migrate:deploy` antes de UI CRUD.
 
 ## Orden release (código + base de datos)
 

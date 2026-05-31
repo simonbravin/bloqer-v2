@@ -217,6 +217,7 @@ resultado = <expresion matematica clara>
 | Olvidar `tenant_id` en una query | Filtración entre empresas | Capa de acceso a datos siempre filtra por tenant |
 | Borrar un movimiento de tesorería | Pierde auditoría | Anular con estado `CANCELLED` (UI: *Anulado* / *Cancelado*), nunca borrar |
 | Confundir adenda con change order | Procesos legales distintos | Ver [`02-modules/CONTRACTS_AND_ADDENDUMS.md`](./02-modules/CONTRACTS_AND_ADDENDUMS.md) y [`02-modules/CHANGE_ORDERS.md`](./02-modules/CHANGE_ORDERS.md) |
+| Agregar scripts sueltos para “arreglar rápido” | Se pierden, duplican lógica y ensucian el repo | Arreglar en `packages/services` / UI / migraciones; ver [`08-architecture/AGENT_GUARDRAILS.md`](./08-architecture/AGENT_GUARDRAILS.md) §Scripts provisionales |
 
 ---
 

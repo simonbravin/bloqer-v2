@@ -75,8 +75,14 @@ Status: Phase **16E** — UX **`/finanzas`**: jerarquía visual, empty states, b
 | Phase 16C | UI AP empresa bajo `/finanzas` (facturas proveedor / C×P / pago corporativos); `VIEW AP` en servicios `*Company*`; hub con enlaces corporativos | Complete |
 | Phase 16D | Hub `/finanzas` tablero empresa (`finance-hub-overview` + `FinanceHubView`); permisos AR/AP/TREASURY/ACCOUNTING; nav alineado | Complete |
 | Phase 16E | Polish UX hub + subnav finanzas (`layout` + `FinanceSubnav`); copy producto; sin schema | Complete |
+| Phase 17B | Reportes programados por email — **solo CRUD** (`scheduled_reports` + items + recipients); UI `/configuracion/reportes` | Complete |
+| Phase 17D | Cron `/api/cron/scheduled-reports` + runner + `REPORT_SCHEDULED` en `EmailDeliveryLog` (bundle email/adjuntos) | Complete |
+| Phase 17C | UI historial de ejecuciones + panel de estado en detalle de envío programado | Complete |
+| Phase 17E | Ejecutar ahora + reintentar fallidos; documentación de cierre y smoke tests | Complete |
 
-**Siguiente (sugerido):** **16F+** — integración reportes / `AccountMovement.projectId` / indicadores dashboard según [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md). Sin migración mezclada con UX salvo plan explícito.
+**Reportes programados:** feature cerrada para MVP (ver [`SCHEDULED_REPORTS_ARCHITECTURE.md`](./08-architecture/SCHEDULED_REPORTS_ARCHITECTURE.md) §17E). Backlog: externos, cola, ZIP, preferencias.
+
+**Siguiente (sugerido):** **16F+** según [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md).
 
 ---
 

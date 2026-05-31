@@ -407,6 +407,18 @@
 - **Recomendación inicial:** (1) en Phase 17; cerrar (2) o (3) antes de usar el gráfico para decisiones de tesorería cross-moneda.
 - **Bloquea:** FX en rollup tenant y export CSV del consolidado.
 
+### Q-050 — Reportes programados: evolución post-MVP
+
+- **Categoría:** Reporting / email
+- **Estado:** ABIERTA (MVP cerrado Phase 17E — ver [`SCHEDULED_REPORTS_ARCHITECTURE.md`](../08-architecture/SCHEDULED_REPORTS_ARCHITECTURE.md))
+- **Impacto si no se resuelve:** no hay criterio de producto para destinatarios externos, cola de reintentos ni digest ZIP.
+- **Opciones identificadas:**
+  1. Mantener solo usuarios internos + cron + reintento manual (estado actual).
+  2. Agregar `externalEmail` con validación y opt-in legal.
+  3. Worker/cola para reintentos automáticos y paquetes ZIP.
+- **Recomendación inicial:** (1) hasta demanda explícita; cualquier (2)/(3) requiere ADR.
+- **Bloquea:** ampliación de Phase 17 sin decisión.
+
 ---
 
 ## Cómo se resuelve una pregunta

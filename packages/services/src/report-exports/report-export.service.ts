@@ -36,6 +36,7 @@ import type { IncomeExpenseFilters } from "../reports/project-income-expense.ser
 import { getProjectIncomeExpenseReport } from "../reports/project-income-expense.service";
 import type { ProfitabilityFilters } from "../reports/project-profitability.service";
 import { getProjectProfitabilityReport } from "../reports/project-profitability.service";
+import { parseCurrencyView } from "../reports/report-currency-view";
 import { MAX_EXPORT_ROWS, defaultDateRangeDays, DEFAULT_CASH_DATE_RANGE_DAYS } from "../finance/pagination";
 import { listCompanyPayables, type CompanyPayableListFilters } from "../ap/payable.service";
 import {
@@ -188,6 +189,30 @@ export function parseProjectReportDateFilters(sp: Record<string, string | undefi
     budgetId: sp.budgetId,
     dateFrom: sp.dateFrom,
     dateTo: sp.dateTo,
+  };
+}
+
+/** Aligns with project report pages (`ingresos-gastos`, scheduled params). */
+export function parseIncomeExpenseFilters(sp: Record<string, string | undefined>): IncomeExpenseFilters {
+  const currencyViewRaw =
+    sp.currencyView === "original" || sp.currencyView === "ARS"
+      ? sp.currencyView
+      : sp.currency === "original" || sp.currency === "ARS"
+        ? sp.currency
+        : undefined;
+  return {
+    ...parseProjectReportDateFilters(sp),
+    currencyView: parseCurrencyView(currencyViewRaw),
+  };
+}
+
+/** Aligns with `rentabilidad` report routes and CSV export. */
+export function parseProfitabilityFilters(sp: Record<string, string | undefined>): ProfitabilityFilters {
+  return {
+    budgetId: sp.budgetId,
+    costLayer: parseCostVarianceLayer(sp.costLayer),
+    revenueBasis: sp.revenueBasis === "invoiced" ? "invoiced" : "certified",
+    currencyView: parseCurrencyView(sp.currencyView),
   };
 }
 

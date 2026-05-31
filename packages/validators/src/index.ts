@@ -25,3 +25,4 @@ export * from "./user-profile";
 export * from "./finance-overhead";
 export * from "./audit-log";
 export * from "./ar-advance";
+export * from "./scheduled-report";

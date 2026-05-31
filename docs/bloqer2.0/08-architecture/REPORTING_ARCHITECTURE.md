@@ -61,6 +61,8 @@ Los **reportes y dashboards** deben **reconciliar** contra **datos fuente** del 
 - **Phase 9B (hecho):** PDF parcial con **`@react-pdf/renderer`** — ver sección 9B.
 - **Phase 9C (hecho):** envío **manual** por email desde la UI (“Enviar por email”): adjuntos CSV/PDF generados con los **mismos builders** que 9A/9B; **sin** cron, **sin** programación, **sin** `EmailDeliveryLog`, **sin** preferencias; si Resend no está configurado → **no-op** controlado (`provider: "disabled"`). Ver [`EMAIL_NOTIFICATIONS_ARCHITECTURE.md`](./EMAIL_NOTIFICATIONS_ARCHITECTURE.md) y `packages/report-pdf/src/report-email.service.ts`.
 - **Phase 9D+:** paquetes de reportes / ZIP / multi-report; envíos programados o digest (futuro; no confundir con 9C).
+- **Phase 17B (hecho):** configuración CRUD de envíos programados (`ScheduledReport` + ítems + destinatarios internos). UI `/configuracion/reportes`.
+- **Phase 17D (hecho):** cron `/api/cron/scheduled-reports` + envío automático con adjuntos CSV/PDF + `EmailDeliveryLog` (`REPORT_SCHEDULED`). Ver [`SCHEDULED_REPORTS_ARCHITECTURE.md`](./SCHEDULED_REPORTS_ARCHITECTURE.md).
 
 ---
 

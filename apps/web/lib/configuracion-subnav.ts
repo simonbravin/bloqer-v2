@@ -1,6 +1,10 @@
 import { can, type UserRole } from "@bloqer/domain";
 import type { ModuleSubnavLink } from "@/components/layout/module-subnav";
 
+export function canAccessScheduledReportsNav(roles: UserRole[]): boolean {
+  return roles.some((r) => r === "OWNER" || r === "ADMIN");
+}
+
 export function canViewTenantAuditLog(roles: UserRole[]): boolean {
   return can(roles, "VIEW", "AUDIT");
 }
@@ -20,6 +24,10 @@ export function buildConfiguracionSubnavLinks(roles: UserRole[]): ModuleSubnavLi
       { href: "/configuracion/equipo", label: "Equipo" },
       { href: "/configuracion/permisos", label: "Permisos" },
     );
+  }
+
+  if (canAccessScheduledReportsNav(roles)) {
+    links.push({ href: "/configuracion/reportes", label: "Reportes programados" });
   }
 
   if (canViewTenantAuditLog(roles)) {

@@ -443,6 +443,8 @@ model User {
   invitationsAccepted   TenantInvitation[] @relation("TenantInvitationAcceptedBy")
   journalEntriesCreated  JournalEntry[]     @relation("JournalEntryCreatedBy")
   journalEntriesUpdated  JournalEntry[]     @relation("JournalEntryUpdatedBy")
+  scheduledReportsCreated   ScheduledReport[]          @relation("ScheduledReportCreatedBy")
+  scheduledReportRecipients ScheduledReportRecipient[] @relation("ScheduledReportRecipientUser")
 
   @@map("users")
 }
@@ -549,6 +551,7 @@ model Tenant {
   accountingMappingRules AccountingMappingRule[]
   tenantModuleSettings    TenantModuleSetting[]
   projectOverheadAllocations ProjectOverheadAllocation[]
+  scheduledReports        ScheduledReport[]
 
   @@map("tenants")
 }
@@ -651,6 +654,7 @@ model Company {
   journalEntries        JournalEntry[]
   accountingMappingRules AccountingMappingRule[]
   auditLogs             AuditLog[]
+  scheduledReports      ScheduledReport[]
 
   @@index([tenantId])
   @@map("companies")
@@ -926,6 +930,7 @@ model Project {
   schedule              Schedule?
   overheadAllocations   ProjectOverheadAllocation[]
   auditLogs             AuditLog[]
+  scheduledReports      ScheduledReport[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -2256,6 +2261,7 @@ enum LinkedEntityType {
   SUBCONTRACT_CERTIFICATION
   JOBSITE_LOG
   WAREHOUSE_TRANSFER
+  SCHEDULED_REPORT
   OTHER
 }
 
@@ -2446,4 +2452,101 @@ model EmailDeliveryLog {
   @@index([tenantId, relatedEntityType, relatedEntityId])
   @@index([tenantId, idempotencyKey])
   @@map("email_delivery_logs")
+}
+
+// ─── Scheduled email reports (Phase 17B — config only; runner Phase 17D) ───────
+
+enum ScheduledReportScope {
+  TENANT
+  PROJECT
+}
+
+enum ScheduledReportStatus {
+  ACTIVE
+  PAUSED
+  DELETED
+}
+
+enum ScheduledReportFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum ScheduledReportFormat {
+  CSV
+  PDF
+}
+
+enum ScheduledReportRunStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
+  SKIPPED
+}
+
+model ScheduledReport {
+  id              String                   @id @default(uuid())
+  tenantId        String
+  companyId       String?
+  projectId       String?
+  scope           ScheduledReportScope
+  name            String                   @db.VarChar(200)
+  status          ScheduledReportStatus    @default(ACTIVE)
+  frequency       ScheduledReportFrequency
+  dayOfWeek       Int?
+  dayOfMonth      Int?
+  timeOfDay       String                   @db.VarChar(5)
+  timezone        String                   @db.VarChar(64)
+  format          ScheduledReportFormat
+  params          Json?
+  createdByUserId String
+  lastRunAt       DateTime?
+  lastRunStatus   ScheduledReportRunStatus?
+  nextRunAt       DateTime
+  runLockUntil    DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company   Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  createdBy User      @relation("ScheduledReportCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  items     ScheduledReportItem[]
+  recipients ScheduledReportRecipient[]
+
+  @@index([tenantId, status, nextRunAt])
+  @@index([tenantId, projectId])
+  @@index([tenantId, createdByUserId])
+  @@map("scheduled_reports")
+}
+
+model ScheduledReportItem {
+  id                String   @id @default(uuid())
+  tenantId          String
+  scheduledReportId String
+  reportKey         String   @db.VarChar(64)
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+
+  scheduledReport ScheduledReport @relation(fields: [scheduledReportId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduledReportId, reportKey])
+  @@index([tenantId, scheduledReportId])
+  @@map("scheduled_report_items")
+}
+
+model ScheduledReportRecipient {
+  id                String   @id @default(uuid())
+  tenantId          String
+  scheduledReportId String
+  recipientUserId   String
+  createdAt         DateTime @default(now())
+
+  scheduledReport ScheduledReport @relation(fields: [scheduledReportId], references: [id], onDelete: Cascade)
+  recipient       User            @relation("ScheduledReportRecipientUser", fields: [recipientUserId], references: [id], onDelete: Restrict)
+
+  @@unique([scheduledReportId, recipientUserId])
+  @@index([tenantId, scheduledReportId])
+  @@map("scheduled_report_recipients")
 }

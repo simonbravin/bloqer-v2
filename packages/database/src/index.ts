@@ -27,6 +27,9 @@ export type {
   JournalEntryLine,
   AccountingMappingRule,
   TenantModuleSetting,
+  ScheduledReport,
+  ScheduledReportItem,
+  ScheduledReportRecipient,
 } from "@prisma/client";
 export {
   UserStatus, TenantStatus, CompanyStatus, MembershipStatus, UserRole,
@@ -55,4 +58,9 @@ export {
   JournalEntrySourceType,
   AccountingMappingEventType,
   OverheadAllocationMode,
+  ScheduledReportScope,
+  ScheduledReportStatus,
+  ScheduledReportFrequency,
+  ScheduledReportFormat,
+  ScheduledReportRunStatus,
 } from "@prisma/client";

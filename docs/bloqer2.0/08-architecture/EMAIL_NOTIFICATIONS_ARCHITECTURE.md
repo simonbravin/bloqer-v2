@@ -30,7 +30,7 @@ Enviar correos transaccionales con **Resend** cuando el proyecto tenga variables
 - **`sendReportByEmail`:** crea fila `PENDING` antes de generar adjunto; `SKIPPED` + `email_not_configured` si Resend no está configurado; `SENT` / `FAILED` según `sendEmail`; `idempotencyKey` informativa por minuto (no bloquea reenvíos manuales).
 - **`sendNotificationEmail` / `sendOperationalAlertEmail`:** registran cada intento (`NOTIFICATION` / `OPERATIONAL_ALERT`); skips tempranos crean fila `SKIPPED` con placeholder de email interno cuando no hubo destinatario real; **no** se activa envío automático al crear notificaciones in-app.
 - **UI:** `/notificaciones/emails` — tabla con filtros básicos (OWNER/ADMIN).
-- **Pendiente (fuera de 9D):** envío programado de reportes, preferencias por usuario, cola de reintentos, dedupe estricta por `idempotencyKey`.
+- **Pendiente (post-17E):** preferencias por usuario, cola de reintentos automáticos, destinatarios externos, dedupe estricta global. **Reportes programados:** ver [`SCHEDULED_REPORTS_ARCHITECTURE.md`](./SCHEDULED_REPORTS_ARCHITECTURE.md).
 
 ## Justificación para Bloqer 2.0
 
@@ -64,7 +64,7 @@ Enviar correos transaccionales con **Resend** cuando el proyecto tenga variables
 | **P-EMAIL-02** | Preferencias por usuario (opt-in/opt-out por tipo de notificación) |
 | **P-EMAIL-03** | Digest diario/semanal de no leídas |
 | **P-EMAIL-04** | Cola de reintentos / worker para envíos fallidos |
-| **P-EMAIL-05** | Envíos **programados** o digest que adjunten exportes server-side (CSV 9A; PDF subset 9B+), con cola/worker — **no** implementado; Phase **9C** cubre solo envío **manual** desde la app |
+| **P-EMAIL-05** | Envíos **programados** — **MVP implementado** (Phase 17B–17E): CRUD, cron, `REPORT_SCHEDULED`, ejecutar ahora / reintentar fallidos. Pendiente: cola automática, externos, digest ZIP |
 
 ## Referencias funcionales
 

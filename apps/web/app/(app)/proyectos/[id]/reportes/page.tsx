@@ -5,6 +5,7 @@ import {
   getProjectShellInfo,
   getTenantModuleGate,
   ServiceError,
+  canManageScheduledReports,
   canViewProjectCostControlReport,
   canViewProjectCashFlowReport,
   canViewProcurementProjectArea,
@@ -98,16 +99,27 @@ export default async function ProjectReportesPage({ params }: PageProps) {
           </Button>
         </div>
       ) : (
-        <ReportsHub
-          projectId={projectId}
-          canCostReports={canCost}
-          canCertReports={canCert}
-          canProcurementReports={canProcurement}
-          canSubcontractReports={canSubcontracts}
-          canCashFlow={canCash}
-          canProfitability={canProfitability}
-          canInventoryReports={canInventory}
-        />
+        <>
+          {canManageScheduledReports(ctx) ? (
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/proyectos/${projectId}/reportes/programados`}>
+                  Envíos programados por email
+                </Link>
+              </Button>
+            </div>
+          ) : null}
+          <ReportsHub
+            projectId={projectId}
+            canCostReports={canCost}
+            canCertReports={canCert}
+            canProcurementReports={canProcurement}
+            canSubcontractReports={canSubcontracts}
+            canCashFlow={canCash}
+            canProfitability={canProfitability}
+            canInventoryReports={canInventory}
+          />
+        </>
       )}
     </PageShell>
   );
