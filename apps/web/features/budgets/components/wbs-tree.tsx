@@ -109,12 +109,11 @@ function WbsRowActions({
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="sm"
-          className="h-7 gap-1.5 px-2"
-          aria-label="Acciones"
+          size="icon"
+          className="h-8 w-8 shrink-0"
+          aria-label="Acciones del ítem"
         >
-          <MoreHorizontal className="h-4 w-4 shrink-0" />
-          <span className="hidden text-xs sm:inline">Acciones</span>
+          <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
@@ -525,7 +524,7 @@ export function WbsTree({
             </>
           )}
 
-          <TableCell className="py-0.5 w-0 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+          <TableCell className="py-0.5 w-10 px-0 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
             {canEditStructure && (
               <div className="flex justify-end">
                 <WbsRowActions
@@ -633,8 +632,8 @@ export function WbsTree({
                     <TableHead className="text-right">Total venta</TableHead>
                   </>
                 )}
-                <TableHead className="w-0 px-1 text-right whitespace-nowrap">
-                  {canEditStructure ? "Acciones" : null}
+                <TableHead className="w-10 px-0 text-right">
+                  {canEditStructure ? <span className="sr-only">Acciones</span> : null}
                 </TableHead>
               </TableRow>
             </TableHeader>

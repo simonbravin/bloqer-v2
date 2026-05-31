@@ -320,6 +320,9 @@ export function CostItemApuDialog({
             <p className="mt-1 text-sm text-muted-foreground">
               <span className="font-mono">{node.code}</span> — {node.name}
             </p>
+            {node.description?.trim() ? (
+              <p className="mt-2 text-sm leading-relaxed text-foreground">{node.description.trim()}</p>
+            ) : null}
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">

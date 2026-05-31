@@ -50,6 +50,9 @@ export function WbsGroupDialog({
           <p className="text-sm text-muted-foreground pt-1">
             Capítulo (agrupa el subárbol). El APU va en cada ítem hoja de esta rama.
           </p>
+          {node.description?.trim() ? (
+            <p className="text-sm leading-relaxed text-foreground">{node.description.trim()}</p>
+          ) : null}
         </DialogHeader>
 
         {editable && canAddChild(node) && (
