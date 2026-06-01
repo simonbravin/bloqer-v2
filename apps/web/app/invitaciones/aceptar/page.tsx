@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { InvitationAccountSwitch } from "@/features/auth/components/invitation-account-switch";
+import { InvitationLoginLink } from "@/features/auth/components/invitation-login-link";
 import { getCurrentUser } from "@/lib/auth";
+import { buildInvitationAcceptCallbackUrl, invitationEmailsMatch } from "@/lib/invitation-auth";
 import { peekTenantInvitationForAcceptPage } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { acceptTenantInvitationAction } from "./actions";
@@ -46,7 +49,7 @@ export default async function InvitacionesAceptarPage({ searchParams }: PageProp
   }
 
   const current = await getCurrentUser();
-  const callbackUrl = `/invitaciones/aceptar?token=${encodeURIComponent(token)}`;
+  const callbackUrl = buildInvitationAcceptCallbackUrl(token);
 
   if (!current?.session?.user?.id) {
     return (
@@ -56,9 +59,26 @@ export default async function InvitacionesAceptarPage({ searchParams }: PageProp
           Para unirte a <span className="font-medium text-foreground">{peek.tenantName}</span>, iniciá sesión con la
           cuenta de <span className="font-medium text-foreground">{peek.email}</span>.
         </p>
-        <Button asChild>
-          <Link href={`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`}>Iniciar sesión</Link>
-        </Button>
+        <InvitationLoginLink callbackUrl={callbackUrl} invitedEmail={peek.email} />
+      </div>
+    );
+  }
+
+  const sessionEmail = current.session.user.email ?? "";
+  const emailMatches = invitationEmailsMatch(sessionEmail, peek.email);
+
+  if (!emailMatches) {
+    return (
+      <div className="mx-auto flex min-h-[50vh] max-w-md flex-col justify-center gap-4 px-4">
+        <h1 className="text-xl font-semibold">Cambiar cuenta</h1>
+        <p className="text-sm text-muted-foreground">
+          Invitación a <span className="font-medium text-foreground">{peek.tenantName}</span>.
+        </p>
+        <InvitationAccountSwitch
+          invitedEmail={peek.email}
+          currentEmail={sessionEmail || "otra cuenta"}
+          callbackUrl={callbackUrl}
+        />
       </div>
     );
   }

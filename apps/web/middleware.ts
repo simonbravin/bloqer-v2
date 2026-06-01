@@ -1,4 +1,5 @@
 import { auth } from "@bloqer/auth/middleware";
+import { isInvitationAcceptCallbackUrl } from "@/lib/invitation-auth";
 import { NextResponse } from "next/server";
 
 export default auth((req) => {
@@ -12,6 +13,10 @@ export default auth((req) => {
   }
 
   if (isAuthenticated && isAuthRoute) {
+    const callbackUrl = req.nextUrl.searchParams.get("callbackUrl");
+    if (callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//") && isInvitationAcceptCallbackUrl(callbackUrl)) {
+      return NextResponse.redirect(new URL(callbackUrl, req.nextUrl));
+    }
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 

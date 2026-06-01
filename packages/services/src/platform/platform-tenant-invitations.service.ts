@@ -100,7 +100,7 @@ export async function getPlatformTenantInvitationById(
     createdAt:      inv.createdAt,
     cancelledAt:    inv.cancelledAt,
     acceptedAt:     inv.acceptedAt,
-    invitedByEmail: inv.invitedBy.email,
+    invitedByEmail: inv.invitedBy.email ?? "—",
     companyId:      inv.companyId,
   };
 }

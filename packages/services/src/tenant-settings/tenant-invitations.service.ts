@@ -329,6 +329,13 @@ export async function acceptTenantInvitation(
   });
   if (!actorUser) throw new ServiceError("NOT_FOUND", "Usuario no encontrado");
 
+  if (!actorUser.email?.trim()) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      "Tu cuenta no tiene un email válido. Iniciá sesión con la cuenta Google invitada.",
+    );
+  }
+
   const actorEmailNorm = normalizeInvitationEmail(actorUser.email);
 
   return prisma.$transaction(async (tx) => {

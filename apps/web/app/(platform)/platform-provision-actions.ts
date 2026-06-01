@@ -42,7 +42,7 @@ export async function provisionPlatformTenantAction(formData: FormData) {
     const result = await provisionPlatformTenant(raw, ctx);
     if (!result.emailDispatched) {
       const c = await cookies();
-      const flashPath = platformInvitationFlashCookiePath(result.tenantId);
+      const flashPath = platformInvitationFlashCookiePath(result.tenantId, result.invitationId);
       c.set(PLATFORM_INVITE_LINK_FLASH_COOKIE, result.invitationLink, {
         maxAge:   120,
         httpOnly: true,
