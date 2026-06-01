@@ -45,7 +45,7 @@ export function DashboardHeader({
           ) : null}
           {subscription ? (
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <span>Plan: {subscription.saasPlan}</span>
+              <span>Plan de la organización: {subscription.saasPlan}</span>
               <span>·</span>
               <Badge variant="secondary">{subscriptionBadge(subscription.subscriptionStatus)}</Badge>
               {subscription.trialEndsAt ? (

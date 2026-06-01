@@ -3,6 +3,7 @@
 import { signOut } from "next-auth/react";
 import type { Session } from "next-auth";
 import Link from "next/link";
+import { clearActiveTenantCookieAction } from "@/lib/auth-session-actions";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -66,7 +67,11 @@ export function PlatformHeader({ user }: { user: Session["user"] }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
-              onSelect={() => signOut({ callbackUrl: "/login" })}
+              onSelect={() => {
+                void clearActiveTenantCookieAction().finally(() => {
+                  void signOut({ callbackUrl: "/login" });
+                });
+              }}
             >
               Cerrar sesión
             </DropdownMenuItem>

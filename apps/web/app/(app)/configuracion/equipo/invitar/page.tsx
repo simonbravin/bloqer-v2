@@ -37,9 +37,8 @@ export default async function ConfiguracionEquipoInvitarPage({ searchParams }: P
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Invitar usuario</h1>
         <p className="text-sm text-muted-foreground">
-          Si el correo se envía correctamente, el invitado lo recibe con el enlace. Si no se pudo
-          enviar (correo desactivado, URL pública de la app mal configurada o error del proveedor),
-          vas a poder copiar el enlace en el detalle de la invitación.
+          El invitado comparte el plan y la prueba de <span className="font-medium text-foreground">esta organización</span>.
+          Si el correo se envía correctamente, recibe el enlace. Si no, podés copiarlo en el detalle de la invitación.
         </p>
       </div>
       {errMsg ? (
@@ -63,19 +62,7 @@ export default async function ConfiguracionEquipoInvitarPage({ searchParams }: P
             placeholder="nombre@empresa.com"
           />
         </div>
-        <div className="grid gap-2">
-          <Label htmlFor="expiresInDays">Vencimiento (días)</Label>
-          <Input
-            id="expiresInDays"
-            name="expiresInDays"
-            type="number"
-            min={1}
-            max={30}
-            defaultValue={7}
-            className="max-w-[120px]"
-          />
-          <p className="text-xs text-muted-foreground">Entre 1 y 30 días (por defecto 7).</p>
-        </div>
+        <input type="hidden" name="expiresInDays" value="7" />
         <div className="space-y-2">
           <p className="text-sm font-medium">Roles</p>
           <div className="grid gap-2 sm:grid-cols-2">

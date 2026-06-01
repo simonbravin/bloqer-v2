@@ -4,6 +4,7 @@ import type { CompleteTrialOnboardingInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceError } from "../types";
 import { createTrialTenantBundle } from "./trial-tenant-bundle";
+import { normalizeInvitationEmail } from "../tenant-settings/tenant-invitation-shared";
 
 export type CompleteTrialOnboardingResult =
   | { status: "created"; tenantId: string }
@@ -34,6 +35,33 @@ export async function completeTrialOnboarding(
     });
     if (existing) {
       return { status: "already_member", tenantId: existing.tenantId };
+    }
+
+    const actorUser = await tx.user.findFirst({
+      where: { id: actorUserId },
+      select: { email: true },
+    });
+    const actorEmail = actorUser?.email?.trim();
+    if (!actorEmail) {
+      throw new ServiceError(
+        "VALIDATION",
+        "Tu cuenta no tiene un email válido. Usá la misma cuenta Google que recibió la invitación.",
+      );
+    }
+
+    const now = new Date();
+    const pendingInvites = await tx.tenantInvitation.count({
+      where: {
+        email: normalizeInvitationEmail(actorEmail),
+        status: "PENDING",
+        expiresAt: { gt: now },
+      },
+    });
+    if (pendingInvites > 0) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Tenés invitaciones pendientes. Abrí el enlace del correo para unirte a tu organización antes de crear otro espacio.",
+      );
     }
 
     const { tenant, company } = await createTrialTenantBundle(tx, input);

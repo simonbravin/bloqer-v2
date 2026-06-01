@@ -1,6 +1,7 @@
 import { prisma } from "@bloqer/database";
 import type { UserMembership, UserRole } from "@bloqer/database";
 import { can, type UserRole as DomainUserRole } from "@bloqer/domain";
+import { isUuid } from "@bloqer/utils";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 
@@ -12,8 +13,25 @@ export type SessionTenantContext = {
   roles: DomainUserRole[];
 };
 
-export async function getSessionTenantContext(userId: string): Promise<SessionTenantContext | null> {
-  const membership = await getMembershipByUserId(userId);
+export async function getSessionTenantContext(
+  userId: string,
+  options?: { preferredTenantId?: string | null },
+): Promise<SessionTenantContext | null> {
+  let membership: UserMembership | null = null;
+
+  const preferred = options?.preferredTenantId?.trim();
+  if (preferred && isUuid(preferred)) {
+    const preferredMembership = await prisma.userMembership.findUnique({
+      where: { userId_tenantId: { userId, tenantId: preferred } },
+    });
+    if (preferredMembership?.status === "ACTIVE") {
+      membership = preferredMembership;
+    }
+  }
+
+  if (!membership) {
+    membership = await getMembershipByUserId(userId);
+  }
   if (!membership) return null;
   const tenant = await prisma.tenant.findUnique({
     where: { id: membership.tenantId },

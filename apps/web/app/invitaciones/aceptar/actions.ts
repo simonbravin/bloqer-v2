@@ -6,6 +6,7 @@ import { auth } from "@bloqer/auth";
 import { acceptTenantInvitation, peekTenantInvitationForAcceptPage, ServiceError } from "@bloqer/services";
 import { buildInvitationAcceptCallbackUrl, buildInvitationLoginHref } from "@/lib/invitation-auth";
 import { rethrowNextNavigationError } from "@/lib/next-errors";
+import { setActiveTenantCookie } from "@/lib/active-tenant";
 
 export async function acceptTenantInvitationAction(formData: FormData) {
   const token = String(formData.get("token") ?? "").trim();
@@ -30,7 +31,8 @@ export async function acceptTenantInvitationAction(formData: FormData) {
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 
   try {
-    await acceptTenantInvitation(token, { actorUserId: session.user.id, ipAddress: ip });
+    const result = await acceptTenantInvitation(token, { actorUserId: session.user.id, ipAddress: ip });
+    await setActiveTenantCookie(result.tenantId);
   } catch (e) {
     rethrowNextNavigationError(e);
     if (e instanceof ServiceError) {

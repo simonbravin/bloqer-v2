@@ -16,3 +16,4 @@ export {
   type CurrencyOption,
 } from "./currencies";
 export { resolveFxAmounts, sumAmountArsStrings, type FxAmountInput } from "./currency-amount";
+export { isUuid } from "./uuid";

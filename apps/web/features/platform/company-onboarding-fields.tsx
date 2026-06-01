@@ -110,7 +110,7 @@ export function CompanyOnboardingFields({
       </div>
       {showOwnerEmail ? (
         <div className="space-y-2">
-          <Label htmlFor="invitationExpiresInDays">Vencimiento invitación (días)</Label>
+          <Label htmlFor="invitationExpiresInDays">Validez del enlace (días)</Label>
           <Input
             id="invitationExpiresInDays"
             name="invitationExpiresInDays"
@@ -120,6 +120,9 @@ export function CompanyOnboardingFields({
             defaultValue={7}
             className="max-w-[120px]"
           />
+          <p className="text-xs text-muted-foreground">
+            Duración del link del correo. El trial de la organización se define al crear el tenant.
+          </p>
         </div>
       ) : null}
     </>

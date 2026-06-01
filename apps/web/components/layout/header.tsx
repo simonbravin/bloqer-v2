@@ -4,6 +4,7 @@ import { signOut } from "next-auth/react";
 import type { Session } from "next-auth";
 import Link from "next/link";
 import { Bell } from "lucide-react";
+import { clearActiveTenantCookieAction } from "@/lib/auth-session-actions";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -101,7 +102,11 @@ export function Header({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
-              onSelect={() => signOut({ callbackUrl: "/login" })}
+              onSelect={() => {
+                void clearActiveTenantCookieAction().finally(() => {
+                  void signOut({ callbackUrl: "/login" });
+                });
+              }}
             >
               Cerrar sesión
             </DropdownMenuItem>

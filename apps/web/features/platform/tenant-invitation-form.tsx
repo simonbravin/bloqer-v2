@@ -69,7 +69,7 @@ export function TenantInvitationForm({
         </div>
       ) : null}
       <div className="grid gap-2">
-        <Label htmlFor="expiresInDays">Vencimiento (días)</Label>
+        <Label htmlFor="expiresInDays">Validez del enlace (días)</Label>
         <Input
           id="expiresInDays"
           name="expiresInDays"
@@ -79,7 +79,9 @@ export function TenantInvitationForm({
           defaultValue={7}
           className="max-w-[120px]"
         />
-        <p className="text-xs text-muted-foreground">Entre 1 y 30 días (por defecto 7).</p>
+        <p className="text-xs text-muted-foreground">
+          Cuánto dura el link del correo (1–30 días). No modifica el plan ni la prueba de la organización.
+        </p>
       </div>
 
       <div className="space-y-2">

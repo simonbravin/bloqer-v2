@@ -6,6 +6,8 @@ import type { ZodError } from "zod";
 import { auth } from "@bloqer/auth";
 import { completeTrialOnboarding, ServiceError } from "@bloqer/services";
 import { completeTrialOnboardingInputSchema } from "@bloqer/validators";
+import { setActiveTenantCookie } from "@/lib/active-tenant";
+import { rethrowNextNavigationError } from "@/lib/next-errors";
 
 export type OnboardingFormState = {
   error: string | null;
@@ -46,8 +48,10 @@ export async function completeOnboardingAction(
   const ipAddress = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 
   try {
-    await completeTrialOnboarding(session.user.id, parsed.data, { ipAddress });
+    const result = await completeTrialOnboarding(session.user.id, parsed.data, { ipAddress });
+    await setActiveTenantCookie(result.tenantId);
   } catch (e) {
+    rethrowNextNavigationError(e);
     if (e instanceof ServiceError) {
       return { error: e.message };
     }

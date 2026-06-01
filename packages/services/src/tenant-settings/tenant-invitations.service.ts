@@ -76,6 +76,47 @@ function assertOwnerInvariantAfterInviteAccept(
   }
 }
 
+export type PendingInvitationSummary = {
+  invitationId: string;
+  tenantName: string;
+  expiresAt:   Date;
+  roles:       UserRole[];
+};
+
+/** Pending invite links for an email (no token — UI / onboarding gate only). */
+export async function listPendingInvitationsForEmail(email: string): Promise<PendingInvitationSummary[]> {
+  const emailNorm = normalizeInvitationEmail(email);
+  if (!emailNorm.includes("@")) return [];
+
+  const now = new Date();
+  await prisma.tenantInvitation.updateMany({
+    where: { email: emailNorm, status: "PENDING", expiresAt: { lte: now } },
+    data:  { status: "EXPIRED" },
+  });
+
+  const rows = await prisma.tenantInvitation.findMany({
+    where: {
+      email: emailNorm,
+      status: "PENDING",
+      expiresAt: { gt: now },
+    },
+    select: {
+      id: true,
+      expiresAt: true,
+      roles: true,
+      tenant: { select: { name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return rows.map((r) => ({
+    invitationId: r.id,
+    tenantName: r.tenant.name,
+    expiresAt: r.expiresAt,
+    roles: r.roles as UserRole[],
+  }));
+}
+
 export async function listTenantInvitations(ctx: ServiceContext): Promise<TenantInvitationRow[]> {
   if (!canReadTenantConfigArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver invitaciones");
