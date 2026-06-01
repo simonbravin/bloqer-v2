@@ -1,20 +1,51 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
+import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
-import { ReceivableListSection } from "@/features/sales-invoices";
-import type { ReceivableListItem } from "@/features/sales-invoices";
+import { AgingFilters, AgingSummaryCards, AgingTable } from "@/features/aging";
+import {
+  ReceivableListSection,
+  SalesInvoiceListSection,
+  type ReceivableListItem,
+  type SalesInvoiceListItem,
+} from "@/features/sales-invoices";
+import { CollectionListSection, type CollectionListItem } from "@/features/collections";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
-import { getProjectShellInfo, listReceivablesByProject, ServiceError } from "@bloqer/services";
+import {
+  getProjectShellInfo,
+  getReceivableAgingReport,
+  listCollectionsByProject,
+  listInvoicesByProject,
+  listReceivablesByProject,
+  parseAgingFilters,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
 const PAGE_SIZE = 20;
+const RELATED_PAGE_SIZE = 5;
+
+function parsePage(value?: string): number {
+  const parsed = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    search?: string;
+    currency?: string;
+    bucket?: string;
+    asOfDate?: string;
+    contactId?: string;
+    includePaid?: string;
+  }>;
 }
 
 export default async function CuentasPorCobrarPage({ params, searchParams }: PageProps) {
@@ -23,7 +54,7 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
 
   const { id } = await params;
   const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page ?? 1));
+  const page = parsePage(sp.page);
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -41,12 +72,28 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
   }
 
   let receivablesResult;
+  let agingReport;
+  let invoicesResult;
+  let collectionsResult;
   try {
-    receivablesResult = await listReceivablesByProject(id, ctx, { page, pageSize: PAGE_SIZE });
+    [receivablesResult, agingReport] = await Promise.all([
+      listReceivablesByProject(id, ctx, { page, pageSize: PAGE_SIZE }),
+      getReceivableAgingReport(parseAgingFilters({ ...sp, projectId: id }), ctx),
+    ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
     throw err;
   }
+
+  const [invoicesRes, collectionsRes] = await Promise.allSettled([
+    listInvoicesByProject(id, ctx, { page: 1, pageSize: RELATED_PAGE_SIZE }),
+    listCollectionsByProject(id, ctx, { page: 1, pageSize: RELATED_PAGE_SIZE }),
+  ]);
+
+  invoicesResult = invoicesRes.status === "fulfilled" ? invoicesRes.value : { data: [], total: 0 };
+  collectionsResult =
+    collectionsRes.status === "fulfilled" ? collectionsRes.value : { data: [], total: 0 };
 
   const receivables = receivablesResult.data;
   const receivablesTotal = receivablesResult.total;
@@ -63,6 +110,27 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
     currency: r.currency,
     clientName: r.clientName,
   }));
+  const invoices: SalesInvoiceListItem[] = invoicesResult.data.map((inv) => ({
+    id: inv.id,
+    projectId: inv.projectId,
+    code: inv.code,
+    issueDate: inv.issueDate,
+    dueDate: inv.dueDate,
+    status: inv.status,
+    totalAmount: inv.totalAmount,
+    currency: inv.currency,
+    clientName: inv.clientName,
+  }));
+  const collections: CollectionListItem[] = collectionsResult.data.map((c) => ({
+    id: c.id,
+    projectId: c.projectId,
+    collectionDate: c.collectionDate,
+    accountName: c.accountName,
+    currency: c.currency,
+    amount: c.amount,
+    notes: c.notes,
+    status: c.status,
+  }));
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -70,13 +138,63 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
         projectId={id}
         projectName={project.name}
         title="Cuentas por cobrar"
-        subtitle={`${receivablesTotal} ${receivablesTotal === 1 ? "cuenta" : "cuentas"}`}
+        subtitle={`Aging + ${receivablesTotal} ${receivablesTotal === 1 ? "cuenta" : "cuentas"} del proyecto`}
         actions={
           <Suspense fallback={null}>
             <ListViewToggle storageKey={`cuentas-por-cobrar-${id}`} />
           </Suspense>
         }
       />
+
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <p className="text-xs text-muted-foreground">Al {agingReport.asOfDate}</p>
+        <div className="flex gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/proyectos/${id}/facturas`}>Ver facturas</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/proyectos/${id}/cobranzas`}>Ver cobranzas</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/proyectos/${id}/certificaciones`}>Ver certificaciones</Link>
+          </Button>
+        </div>
+      </div>
+
+      <AgingFilters />
+      <AgingSummaryCards report={agingReport} currency={sp.currency} />
+      <AgingTable report={agingReport} />
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Transacciones relacionadas</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-medium">Facturas recientes</h3>
+              <Button asChild variant="link" size="sm" className="px-0">
+                <Link href={`/proyectos/${id}/facturas`}>Ver todas</Link>
+              </Button>
+            </div>
+            <Suspense fallback={<ListSectionSkeleton />}>
+              <SalesInvoiceListSection invoices={invoices} projectId={id} />
+            </Suspense>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-medium">Cobranzas recientes</h3>
+              <Button asChild variant="link" size="sm" className="px-0">
+                <Link href={`/proyectos/${id}/cobranzas`}>Ver todas</Link>
+              </Button>
+            </div>
+            <Suspense fallback={<ListSectionSkeleton />}>
+              <CollectionListSection collections={collections} projectId={id} />
+            </Suspense>
+          </div>
+        </CardContent>
+      </Card>
 
       <Suspense fallback={<ListSectionSkeleton />}>
         <ReceivableListSection receivables={items} projectId={id} />

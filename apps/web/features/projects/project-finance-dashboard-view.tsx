@@ -254,12 +254,22 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
                 Cuentas por cobrar
                 <FinanceLayerBadge layer="obligations" />
               </CardTitle>
+              <CardDescription>
+                La certificación aprobada impacta en facturación y luego en cobranzas.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <MoneyList rows={sections.ar.totalReceivableByCurrency} emptyLabel="Sin saldo abierto." />
-              <Button asChild variant="outline" size="sm">
-                <Link href={sections.ar.links.receivables}>Ver C×C</Link>
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="outline" size="sm">
+                  <Link href={sections.ar.links.receivables}>Ver C×C</Link>
+                </Button>
+                {dashboard.overview.canViewCertifications ? (
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/proyectos/${projectId}/certificaciones`}>Ver certificaciones</Link>
+                  </Button>
+                ) : null}
+              </div>
             </CardContent>
           </Card>
         ) : null}

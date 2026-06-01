@@ -98,6 +98,7 @@ export type ProjectFinanceOverview = {
   };
   quickActions: ProjectFinanceQuickAction[];
   warnings: ProjectFinanceOverviewWarning[];
+  canViewCertifications: boolean;
 };
 
 function moneyRowsFromMap(m: Map<string, Prisma.Decimal>): ProjectFinanceMoneyByCurrency[] {
@@ -134,6 +135,9 @@ export async function getProjectFinanceOverview(
   const quickActions: ProjectFinanceQuickAction[] = [];
   const seenHrefs = new Set<string>();
   const sections: ProjectFinanceOverview["sections"] = {};
+  const canViewCertifications =
+    gate.isEnabled("CERTIFICATIONS") &&
+    (can(ctx.roles, "VIEW", "CERTIFICATIONS") || can(ctx.roles, "VIEW", "PROJECTS"));
 
   const project = {
     id: shell.id,
@@ -361,5 +365,5 @@ export async function getProjectFinanceOverview(
     };
   }
 
-  return { project, sections, quickActions, warnings };
+  return { project, sections, quickActions, warnings, canViewCertifications };
 }

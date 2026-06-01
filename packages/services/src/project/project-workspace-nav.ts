@@ -68,20 +68,25 @@ export function buildProjectWorkspaceNavSections(
   if (gate.isEnabled("PROJECTS") && canViewProjectCashFlowReport(roles)) {
     finanzasProyecto.push({ label: "Flujo de caja", href: `${base}/flujo-caja` });
   }
+  if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) {
+    finanzasProyecto.push({ label: "Compras", href: `${base}/ordenes-compra` });
+  }
+  if (gate.isEnabled("SUBCONTRACTS") && (can(roles, "VIEW", "SUBCONTRACTS") || can(roles, "VIEW", "PROJECTS"))) {
+    finanzasProyecto.push({ label: "Subcontratos", href: `${base}/subcontratos` });
+  }
+  if (gate.isEnabled("AP") && canViewApProjectArea(roles)) {
+    finanzasProyecto.push({ label: "Cuentas por pagar", href: `${base}/cuentas-por-pagar` });
+  }
+  if (gate.isEnabled("AR") && canViewArProjectArea(roles)) {
+    finanzasProyecto.push({ label: "Cuentas por cobrar", href: `${base}/cuentas-por-cobrar` });
+  }
   if (finanzasProyecto.length) {
     sections.push({ title: "Finanzas del proyecto", items: finanzasProyecto });
   }
 
   const compras: ProjectWorkspaceNavLink[] = [];
-  if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) {
-    compras.push({ label: "Compras", href: `${base}/ordenes-compra` });
-  }
-  if (gate.isEnabled("SUBCONTRACTS") && (can(roles, "VIEW", "SUBCONTRACTS") || can(roles, "VIEW", "PROJECTS"))) {
-    compras.push({ label: "Subcontratos", href: `${base}/subcontratos` });
-  }
   if (gate.isEnabled("AP") && canViewApProjectArea(roles)) {
     compras.push({ label: "Facturas proveedor", href: `${base}/facturas-proveedor` });
-    compras.push({ label: "Cuentas por pagar", href: `${base}/cuentas-por-pagar` });
     compras.push({ label: "Pagos", href: `${base}/pagos` });
   }
   if (compras.length) sections.push({ title: "Compras y contratos", items: compras });
@@ -89,7 +94,6 @@ export function buildProjectWorkspaceNavSections(
   const comercial: ProjectWorkspaceNavLink[] = [];
   if (gate.isEnabled("AR") && canViewArProjectArea(roles)) {
     comercial.push({ label: "Facturas", href: `${base}/facturas` });
-    comercial.push({ label: "Cuentas por cobrar", href: `${base}/cuentas-por-cobrar` });
     comercial.push({ label: "Cobranzas", href: `${base}/cobranzas` });
   }
   if (comercial.length) sections.push({ title: "Comercial / Cobranzas", items: comercial });
