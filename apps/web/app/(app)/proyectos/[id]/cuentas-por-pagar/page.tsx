@@ -15,7 +15,7 @@ import {
   type SupplierInvoiceListItem,
   type PaymentListItem,
 } from "@/features/ap";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getPayableAgingReport,
@@ -74,8 +74,6 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
 
   let payablesResult;
   let agingReport;
-  let supplierInvoicesResult;
-  let paymentsResult;
   try {
     [payablesResult, agingReport] = await Promise.all([
       listPayablesByProject(id, ctx, { page, pageSize: PAGE_SIZE }),
@@ -92,9 +90,9 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
     listPaymentsByProject(id, ctx, { page: 1, pageSize: RELATED_PAGE_SIZE }),
   ]);
 
-  supplierInvoicesResult =
+  const supplierInvoicesResult =
     supplierInvoicesRes.status === "fulfilled" ? supplierInvoicesRes.value : { data: [], total: 0 };
-  paymentsResult = paymentsRes.status === "fulfilled" ? paymentsRes.value : { data: [], total: 0 };
+  const paymentsResult = paymentsRes.status === "fulfilled" ? paymentsRes.value : { data: [], total: 0 };
 
   const payables = payablesResult.data;
   const payablesTotal = payablesResult.total;
@@ -152,8 +150,15 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
           <Button asChild variant="outline" size="sm">
             <Link href={`/proyectos/${id}/pagos`}>Ver pagos</Link>
           </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/proyectos/${id}/reportes/caja`}>Reporte de caja</Link>
+          </Button>
         </div>
       </div>
+
+      <p className="text-sm text-muted-foreground">
+        Priorizá este tablero para vencimientos y riesgo de liquidez; usá facturas/pagos para el detalle operativo.
+      </p>
 
       <AgingFilters />
       <AgingSummaryCards report={agingReport} currency={sp.currency} />
@@ -162,6 +167,7 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Transacciones relacionadas</CardTitle>
+          <CardDescription>Últimos comprobantes y movimientos para contexto rápido.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

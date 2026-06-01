@@ -24,6 +24,8 @@ type ReportCard = {
 
 type Props = {
   projectId: string;
+  canAr: boolean;
+  canAp: boolean;
   canCostReports: boolean;
   canCertReports: boolean;
   canProcurementReports: boolean;
@@ -35,6 +37,8 @@ type Props = {
 
 export function ReportsHub({
   projectId,
+  canAr,
+  canAp,
   canCostReports,
   canCertReports,
   canProcurementReports,
@@ -46,6 +50,22 @@ export function ReportsHub({
   const base = `/proyectos/${projectId}/reportes`;
 
   const cards: ReportCard[] = [
+    {
+      title: "Aging Cuentas por cobrar",
+      description: "Deuda abierta por cliente con buckets de vencimiento y foco en riesgo de cobro.",
+      href: `/proyectos/${projectId}/cuentas-por-cobrar`,
+      icon: <Wallet className="h-5 w-5" />,
+      available: canAr,
+      badge: "AR Aging",
+    },
+    {
+      title: "Aging Cuentas por pagar",
+      description: "Obligaciones abiertas por proveedor con buckets de vencimiento y riesgo de pago.",
+      href: `/proyectos/${projectId}/cuentas-por-pagar`,
+      icon: <Wallet className="h-5 w-5" />,
+      available: canAp,
+      badge: "AP Aging",
+    },
     {
       title: "Certificaciones",
       description: "Evolución certificado / facturado / cobrado, curvas de avance y estado por partida.",

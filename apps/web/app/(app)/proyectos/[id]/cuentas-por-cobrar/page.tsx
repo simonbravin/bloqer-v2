@@ -14,7 +14,7 @@ import {
   type SalesInvoiceListItem,
 } from "@/features/sales-invoices";
 import { CollectionListSection, type CollectionListItem } from "@/features/collections";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getProjectShellInfo,
@@ -73,8 +73,6 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
 
   let receivablesResult;
   let agingReport;
-  let invoicesResult;
-  let collectionsResult;
   try {
     [receivablesResult, agingReport] = await Promise.all([
       listReceivablesByProject(id, ctx, { page, pageSize: PAGE_SIZE }),
@@ -91,8 +89,8 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
     listCollectionsByProject(id, ctx, { page: 1, pageSize: RELATED_PAGE_SIZE }),
   ]);
 
-  invoicesResult = invoicesRes.status === "fulfilled" ? invoicesRes.value : { data: [], total: 0 };
-  collectionsResult =
+  const invoicesResult = invoicesRes.status === "fulfilled" ? invoicesRes.value : { data: [], total: 0 };
+  const collectionsResult =
     collectionsRes.status === "fulfilled" ? collectionsRes.value : { data: [], total: 0 };
 
   const receivables = receivablesResult.data;
@@ -158,8 +156,15 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
           <Button asChild variant="outline" size="sm">
             <Link href={`/proyectos/${id}/certificaciones`}>Ver certificaciones</Link>
           </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/proyectos/${id}/reportes/ingresos-gastos`}>Ingresos vs gastos</Link>
+          </Button>
         </div>
       </div>
+
+      <p className="text-sm text-muted-foreground">
+        Esta vista concentra antiguedad de deuda y riesgo de cobro; facturas/cobranzas mantienen el detalle transaccional.
+      </p>
 
       <AgingFilters />
       <AgingSummaryCards report={agingReport} currency={sp.currency} />
@@ -168,6 +173,7 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Transacciones relacionadas</CardTitle>
+          <CardDescription>Últimos comprobantes y cobranzas para navegar sin salir del contexto financiero.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

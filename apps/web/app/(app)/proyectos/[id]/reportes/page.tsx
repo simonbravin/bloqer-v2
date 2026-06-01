@@ -5,6 +5,8 @@ import {
   getProjectShellInfo,
   getTenantModuleGate,
   ServiceError,
+  canViewArProjectArea,
+  canViewApProjectArea,
   canManageScheduledReports,
   canViewProjectCostControlReport,
   canViewProjectCashFlowReport,
@@ -47,6 +49,8 @@ export default async function ProjectReportesPage({ params }: PageProps) {
     gate.isEnabled("PROJECTS") &&
     gate.isEnabled("BUDGETS") &&
     canViewProjectCostControlReport(ctx.roles);
+  const canAr = gate.isEnabled("AR") && canViewArProjectArea(ctx.roles);
+  const canAp = gate.isEnabled("AP") && canViewApProjectArea(ctx.roles);
   const canCert =
     gate.isEnabled("PROJECTS") &&
     gate.isEnabled("BUDGETS") &&
@@ -71,6 +75,8 @@ export default async function ProjectReportesPage({ params }: PageProps) {
     gate.isEnabled("INVENTORY") &&
     canCost;
   const hasAnyReport =
+    canAr ||
+    canAp ||
     canCost ||
     canCert ||
     canCash ||
@@ -111,6 +117,8 @@ export default async function ProjectReportesPage({ params }: PageProps) {
           ) : null}
           <ReportsHub
             projectId={projectId}
+            canAr={canAr}
+            canAp={canAp}
             canCostReports={canCost}
             canCertReports={canCert}
             canProcurementReports={canProcurement}
