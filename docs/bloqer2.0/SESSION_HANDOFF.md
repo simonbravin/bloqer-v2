@@ -133,7 +133,7 @@ Ver matrices: `PERMISSIONS_ROUTE_MATRIX.md`, `SECURITY_ARCHITECTURE.md`.
 /proyectos, /proyectos/nuevo
 /proyectos/[id]
 /proyectos/[id]/finanzas
-/proyectos/[id]/presupuestos, /nueva, /[budgetId], /[budgetId]/editar
+/proyectos/[id]/presupuestos, /nueva, /[budgetId] (configuración WBS: `#configuracion` en el editor)
 /proyectos/[id]/certificaciones, /nueva, /[certId], /[certId]/editar
 /proyectos/[id]/facturas, /nueva, /[invoiceId], /[invoiceId]/editar
 /proyectos/[id]/cuentas-por-cobrar, /[receivableId], /[receivableId]/cobrar
