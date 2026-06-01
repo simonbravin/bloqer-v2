@@ -13,10 +13,7 @@ import { ProjectStatusBadge } from "@/features/projects/components/project-statu
 import type { PermissionModule, UserRole } from "@bloqer/domain";
 import type { ProjectShellInfo } from "@bloqer/services";
 import { ProjectNavIcon } from "@/lib/project-nav-icons";
-
-function isNavItemActive(pathname: string, href: string, matchExact?: boolean) {
-  return matchExact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
-}
+import { isNavLinkActive } from "@/lib/nav-link-active";
 
 type ShellState =
   | { status: "loading" }
@@ -48,7 +45,10 @@ export function ProjectWorkspaceSidebar({
       const next: Record<string, boolean> = {};
       for (const s of sections) {
         const hasActive = s.items.some((item) =>
-          isNavItemActive(pathname, item.href, item.matchExact),
+          isNavLinkActive(pathname, null, item.href, {
+            matchExact: item.matchExact,
+            activeWhenPathPrefix: item.activeWhenPathPrefix,
+          }),
         );
         next[s.title] = hasActive ? true : (prev[s.title] ?? false);
       }

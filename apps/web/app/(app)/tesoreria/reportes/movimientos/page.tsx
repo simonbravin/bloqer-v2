@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
@@ -78,15 +79,26 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
         </Suspense>
       </div>
 
-      <div className="text-sm text-muted-foreground">
-        {rows.length} movimiento{rows.length !== 1 ? "s" : ""} encontrado
-        {rows.length !== 1 ? "s" : ""}.
-        {!sp.accountId && " Saldo acumulado disponible al filtrar por cuenta."}
+      <div className="text-sm text-muted-foreground space-y-2">
+        <p>
+          {rows.length} movimiento{rows.length === 1 ? "" : "s"} encontrado
+          {rows.length === 1 ? "" : "s"}.
+          {!sp.accountId && " Saldo acumulado disponible al filtrar por cuenta."}
+        </p>
+        {sp.sourceType === "MANUAL_ADJUSTMENT" && (
+          <p className="rounded-md border border-border/80 bg-muted/40 px-3 py-2 text-foreground/90">
+            Los movimientos con este origen son <strong>ingresos manuales de caja</strong> registrados desde{" "}
+            <Link href="/finanzas/transacciones" className="font-medium underline underline-offset-4 hover:no-underline">
+              Finanzas → Transacciones
+            </Link>{" "}
+            (tipo «Ingreso de caja»). Todavía no hay pantalla en Tesorería para egresos o ajustes libres por cuenta.
+          </p>
+        )}
         {sp.corporateApPayments === "true" && (
-          <span className="mt-1 block text-foreground/90">
+          <p className="text-foreground/90">
             Filtro activo: egresos por <strong>pago a proveedor</strong> cuya obligación es{" "}
             <strong>sin proyecto</strong> (gastos generales de empresa).
-          </span>
+          </p>
         )}
       </div>
 

@@ -32,12 +32,12 @@ export default async function TesoreriaPage() {
 
       <TreasurySummaryCards summaries={summaries} />
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <Button asChild>
           <Link href="/tesoreria/cuentas">Ver cuentas</Link>
         </Button>
         <Button variant="outline" asChild>
-          <Link href="/tesoreria/reportes/movimientos?sourceType=INTERNAL_TRANSFER">Ver transferencias</Link>
+          <Link href="/tesoreria/transferencias">Transferencias</Link>
         </Button>
         <Button variant="outline" asChild>
           <Link href="/tesoreria/reportes">Reportes</Link>

@@ -27,14 +27,10 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+import { parsePage } from "@/lib/parse-page";
 
 const PAGE_SIZE = 20;
 const RELATED_PAGE_SIZE = 5;
-
-function parsePage(value?: string): number {
-  const parsed = Number.parseInt(value ?? "1", 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
-}
 
 interface PageProps {
   params: Promise<{ id: string }>;

@@ -84,7 +84,7 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
                     <MoneyList rows={sections.ar.overdueByCurrency} emptyLabel="Sin saldo vencido." />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Facturas de venta emitidas (abiertas):{" "}
+                    Facturas emitidas (abiertas):{" "}
                     <span className="font-medium text-foreground">{sections.ar.openInvoicesCount}</span>
                   </p>
                 </>
@@ -93,7 +93,7 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
             {sections.ar.canView ? (
               <CardFooter className="flex flex-wrap gap-2">
                 <Button asChild variant="outline" size="sm">
-                  <Link href={sections.ar.links.invoices}>Facturas</Link>
+                  <Link href={sections.ar.links.invoices}>Facturas emitidas</Link>
                 </Button>
                 <Button asChild variant="outline" size="sm">
                   <Link href={sections.ar.links.receivables}>Cuentas por cobrar</Link>

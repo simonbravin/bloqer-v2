@@ -202,7 +202,7 @@ export async function getProjectFinanceOverview(
         links,
       };
 
-      pushUniqueQuickAction(quickActions, seenHrefs, { label: "Ver facturas de venta", href: links.invoices });
+      pushUniqueQuickAction(quickActions, seenHrefs, { label: "Ver facturas emitidas", href: links.invoices });
       pushUniqueQuickAction(quickActions, seenHrefs, { label: "Ver cuentas por cobrar", href: links.receivables });
       pushUniqueQuickAction(quickActions, seenHrefs, { label: "Ver cobranzas", href: links.collections });
       if (canEditArArea(ctx.roles)) {

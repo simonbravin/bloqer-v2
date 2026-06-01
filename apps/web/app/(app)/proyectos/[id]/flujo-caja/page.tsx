@@ -20,6 +20,7 @@ import { formatMoneyAmount } from "@/lib/format-money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import type { ProjectCashFlowCurrency } from "@bloqer/services";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -37,6 +38,12 @@ const PERIOD_LABELS: Record<string, string> = {
   month: "Por mes",
 };
 
+const LAST_BUCKET_LABELS: Record<string, string> = {
+  day: "Flujo del día",
+  week: "Flujo de la semana",
+  month: "Flujo del mes",
+};
+
 function pctDelta(current: string, previous: string): string {
   const cur = Number.parseFloat(current);
   const prev = Number.parseFloat(previous);
@@ -49,6 +56,18 @@ function toneByAmount(value: string): "success" | "danger" | "muted" {
   if (num > 0) return "success";
   if (num < 0) return "danger";
   return "muted";
+}
+
+function emptyCashCurrency(currency: string): ProjectCashFlowCurrency {
+  return {
+    currency,
+    totalInflows: "0",
+    totalOutflows: "0",
+    netCashFlow: "0",
+    periods: [],
+    collections: [],
+    payments: [],
+  };
 }
 
 export default async function FlujosDeCajaPage({ params, searchParams }: PageProps) {
@@ -83,6 +102,7 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
     );
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
     throw err;
   }
 
@@ -160,127 +180,161 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
         {PERIOD_LABELS[report.period] ?? report.period}
       </p>
 
-      {report.currencies.length === 0 && (
-        <div className="rounded-lg border bg-card p-12 text-center text-sm text-muted-foreground">
-          Sin cobranzas ni pagos confirmados para los filtros seleccionados.
-        </div>
-      )}
+      {(() => {
+        const fallbackCurrency =
+          sp.currency ??
+          projection.currencies.find((c) => c.currency === "ARS")?.currency ??
+          projection.currencies[0]?.currency ??
+          "ARS";
+        const current =
+          report.currencies.find((c) => c.currency === (sp.currency ?? "")) ??
+          report.currencies.find((c) => c.currency === "ARS") ??
+          report.currencies[0] ??
+          emptyCashCurrency(fallbackCurrency);
+        const projectionCur = projectionByCurrency.get(current.currency);
+        const last = current.periods[current.periods.length - 1];
+        const prev = current.periods[current.periods.length - 2];
+        const pendingInflows = projectionCur?.totalExpectedInflows ?? "0";
+        const pendingOutflows = projectionCur?.totalExpectedOutflows ?? "0";
+        const netPeriod = current.netCashFlow;
+        const avgInflows = current.periods.length
+          ? (Number.parseFloat(current.totalInflows) / current.periods.length).toFixed(2)
+          : "0";
+        const avgOutflows = current.periods.length
+          ? (Number.parseFloat(current.totalOutflows) / current.periods.length).toFixed(2)
+          : "0";
+        const marginPct =
+          Number.parseFloat(current.totalInflows) > 0
+            ? ((Number.parseFloat(netPeriod) / Number.parseFloat(current.totalInflows)) * 100).toFixed(1)
+            : "0.0";
 
-      {report.currencies.map((cur) => (
-        <div key={cur.currency} className="space-y-4">
-          <h2 className="font-semibold text-lg">{cur.currency}</h2>
-          {(() => {
-            const last = cur.periods[cur.periods.length - 1];
-            const prev = cur.periods[cur.periods.length - 2];
-            const projectionCur = projectionByCurrency.get(cur.currency);
-            const pendingInflows = projectionCur?.totalExpectedInflows ?? "0";
-            const pendingOutflows = projectionCur?.totalExpectedOutflows ?? "0";
-            const netPeriod = cur.netCashFlow;
-            const avgInflows = cur.periods.length
-              ? (Number.parseFloat(cur.totalInflows) / cur.periods.length).toFixed(2)
-              : "0";
-            const avgOutflows = cur.periods.length
-              ? (Number.parseFloat(cur.totalOutflows) / cur.periods.length).toFixed(2)
-              : "0";
-            const marginPct =
-              Number.parseFloat(cur.totalInflows) > 0
-                ? ((Number.parseFloat(netPeriod) / Number.parseFloat(cur.totalInflows)) * 100).toFixed(1)
-                : "0.0";
+        const lastBucketLabel = LAST_BUCKET_LABELS[report.period] ?? "Flujo del período";
+        const lastPeriodInflowsLabel =
+          report.period === "day"
+            ? "Ingresos del día"
+            : report.period === "week"
+              ? "Ingresos de la semana"
+              : "Ingresos del mes";
+        const lastPeriodOutflowsLabel =
+          report.period === "day"
+            ? "Gastos del día"
+            : report.period === "week"
+              ? "Gastos de la semana"
+              : "Gastos del mes";
+        const lastPeriodBalanceLabel =
+          report.period === "day"
+            ? "Balance del día"
+            : report.period === "week"
+              ? "Balance de la semana"
+              : "Balance del mes";
 
-            return (
-              <>
-                <KpiStatGrid title={null} columns={4}>
-                  <KpiStatCard
-                    label="Total Ingresos (acum.)"
-                    value={formatMoneyAmount(cur.totalInflows, cur.currency)}
-                    helper={`Pendientes: ${formatMoneyAmount(pendingInflows, cur.currency)}`}
-                    tone="success"
-                  />
-                  <KpiStatCard
-                    label="Total Gastos (acum.)"
-                    value={formatMoneyAmount(cur.totalOutflows, cur.currency)}
-                    helper={`Pendientes: ${formatMoneyAmount(pendingOutflows, cur.currency)}`}
-                    tone="danger"
-                  />
-                  <KpiStatCard
-                    label="Balance total (acum.)"
-                    value={formatMoneyAmount(netPeriod, cur.currency)}
-                    helper="Ingresos - Gastos"
-                    tone={toneByAmount(netPeriod)}
-                  />
-                  <KpiStatCard
-                    label="Flujo del Mes"
-                    value={formatMoneyAmount(last?.netCashFlow ?? "0", cur.currency)}
-                    helper={`Ingresos: ${formatMoneyAmount(last?.inflows ?? "0", cur.currency)} | Gastos: ${formatMoneyAmount(last?.outflows ?? "0", cur.currency)}`}
-                    tone={toneByAmount(last?.netCashFlow ?? "0")}
-                  />
-                </KpiStatGrid>
+        return (
+          <div className="space-y-4">
+            <KpiStatGrid title={null} columns={4}>
+              <KpiStatCard
+                label="Total Ingresos (acum.)"
+                value={formatMoneyAmount(current.totalInflows, current.currency)}
+                helper={`Pendientes: ${formatMoneyAmount(pendingInflows, current.currency)}`}
+                tone="success"
+              />
+              <KpiStatCard
+                label="Total Gastos (acum.)"
+                value={formatMoneyAmount(current.totalOutflows, current.currency)}
+                helper={`Pendientes: ${formatMoneyAmount(pendingOutflows, current.currency)}`}
+                tone="danger"
+              />
+              <KpiStatCard
+                label="Balance total (acum.)"
+                value={formatMoneyAmount(netPeriod, current.currency)}
+                helper="Ingresos - Gastos"
+                tone={toneByAmount(netPeriod)}
+              />
+              <KpiStatCard
+                label={lastBucketLabel}
+                value={formatMoneyAmount(last?.netCashFlow ?? "0", current.currency)}
+                helper={`Ingresos: ${formatMoneyAmount(last?.inflows ?? "0", current.currency)} | Gastos: ${formatMoneyAmount(last?.outflows ?? "0", current.currency)}`}
+                tone={toneByAmount(last?.netCashFlow ?? "0")}
+              />
+            </KpiStatGrid>
 
-                <KpiStatGrid title={null} columns={3}>
-                  <KpiStatCard
-                    label="Ingresos del Mes"
-                    value={formatMoneyAmount(last?.inflows ?? "0", cur.currency)}
-                    helper={`${pctDelta(last?.inflows ?? "0", prev?.inflows ?? "0")} vs mes anterior`}
-                    tone="success"
-                  />
-                  <KpiStatCard
-                    label="Gastos del Mes"
-                    value={formatMoneyAmount(last?.outflows ?? "0", cur.currency)}
-                    helper={`${pctDelta(last?.outflows ?? "0", prev?.outflows ?? "0")} vs mes anterior`}
-                    tone="danger"
-                  />
-                  <KpiStatCard
-                    label="Balance del Mes"
-                    value={formatMoneyAmount(last?.netCashFlow ?? "0", cur.currency)}
-                    helper={`${pctDelta(last?.netCashFlow ?? "0", prev?.netCashFlow ?? "0")} vs mes anterior`}
-                    tone={toneByAmount(last?.netCashFlow ?? "0")}
-                  />
-                </KpiStatGrid>
+            <KpiStatGrid title={null} columns={3}>
+              <KpiStatCard
+                label={lastPeriodInflowsLabel}
+                value={formatMoneyAmount(last?.inflows ?? "0", current.currency)}
+                helper={`${pctDelta(last?.inflows ?? "0", prev?.inflows ?? "0")} vs ${report.period === "day" ? "día" : report.period === "week" ? "semana" : "mes"} anterior`}
+                tone="success"
+              />
+              <KpiStatCard
+                label={lastPeriodOutflowsLabel}
+                value={formatMoneyAmount(last?.outflows ?? "0", current.currency)}
+                helper={`${pctDelta(last?.outflows ?? "0", prev?.outflows ?? "0")} vs ${report.period === "day" ? "día" : report.period === "week" ? "semana" : "mes"} anterior`}
+                tone="danger"
+              />
+              <KpiStatCard
+                label={lastPeriodBalanceLabel}
+                value={formatMoneyAmount(last?.netCashFlow ?? "0", current.currency)}
+                helper={`${pctDelta(last?.netCashFlow ?? "0", prev?.netCashFlow ?? "0")} vs ${report.period === "day" ? "día" : report.period === "week" ? "semana" : "mes"} anterior`}
+                tone={toneByAmount(last?.netCashFlow ?? "0")}
+              />
+            </KpiStatGrid>
 
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">
-                      Resumen del Período ({report.dateFrom} - {report.dateTo})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Total Ingresos</p>
-                      <p className="text-lg font-semibold">{formatMoneyAmount(cur.totalInflows, cur.currency)}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Total Gastos</p>
-                      <p className="text-lg font-semibold">{formatMoneyAmount(cur.totalOutflows, cur.currency)}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Balance Período</p>
-                      <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
-                        {formatMoneyAmount(netPeriod, cur.currency)}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Promedio Ingresos/Mes</p>
-                      <p className="text-lg font-semibold">{formatMoneyAmount(avgInflows, cur.currency)}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Promedio Gastos/Mes</p>
-                      <p className="text-lg font-semibold">{formatMoneyAmount(avgOutflows, cur.currency)}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Margen del Período</p>
-                      <p className="text-lg font-semibold">{marginPct}%</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            );
-          })()}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">
+                  Resumen del Período ({report.dateFrom} - {report.dateTo})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Total Ingresos</p>
+                  <p className="text-lg font-semibold">
+                    {formatMoneyAmount(current.totalInflows, current.currency)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Total Gastos</p>
+                  <p className="text-lg font-semibold">
+                    {formatMoneyAmount(current.totalOutflows, current.currency)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Balance Período</p>
+                  <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                    {formatMoneyAmount(netPeriod, current.currency)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Promedio Ingresos/Mes</p>
+                  <p className="text-lg font-semibold">{formatMoneyAmount(avgInflows, current.currency)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Promedio Gastos/Mes</p>
+                  <p className="text-lg font-semibold">{formatMoneyAmount(avgOutflows, current.currency)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Margen del Período</p>
+                  <p className="text-lg font-semibold">{marginPct}%</p>
+                </div>
+              </CardContent>
+            </Card>
 
-          <ProjectCashFlowChart periods={cur.periods} currency={cur.currency} />
-
-          {report.currencies.length > 1 && <hr className="border-border" />}
-        </div>
-      ))}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Evolución temporal</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {current.periods.length > 0 ? (
+                  <ProjectCashFlowChart periods={current.periods} currency={current.currency} />
+                ) : (
+                  <div className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                    Sin cobranzas ni pagos confirmados para los filtros seleccionados.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
     </PageShell>
   );
 }

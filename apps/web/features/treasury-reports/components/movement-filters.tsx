@@ -28,7 +28,7 @@ const SOURCE_OPTIONS = [
   { value: "PAYMENT", label: "Pago" },
   { value: "INTERNAL_TRANSFER", label: "Transferencia interna" },
   { value: "OPENING_BALANCE", label: "Saldo inicial" },
-  { value: "MANUAL_ADJUSTMENT", label: "Ajuste manual" },
+  { value: "MANUAL_ADJUSTMENT", label: "Ingreso manual de caja" },
 ];
 
 const SCOPE_OPTIONS = [

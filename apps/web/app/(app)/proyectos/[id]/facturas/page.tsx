@@ -1,16 +1,15 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Pagination } from "@/components/ui/pagination";
-import { Button } from "@/components/ui/button";
-import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
+import { ProjectFinanceListHeaderActions } from "@/features/projects/components/project-finance-list-header-actions";
 import { SalesInvoiceListSection } from "@/features/sales-invoices";
 import type { SalesInvoiceListItem } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectShellInfo, listInvoicesByProject, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+import { parsePage } from "@/lib/parse-page";
 
 const PAGE_SIZE = 20;
 
@@ -25,7 +24,7 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
 
   const { id } = await params;
   const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page ?? 1));
+  const page = parsePage(sp.page);
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -38,7 +37,7 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
     project = await getProjectShellInfo(id, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
-    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
     throw err;
   }
 
@@ -70,17 +69,14 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
       <ProjectPageHeader
         projectId={id}
         projectName={project.name}
-        title="Facturas"
+        title="Facturas emitidas"
         subtitle={`${invoicesTotal} ${invoicesTotal === 1 ? "factura" : "facturas"}`}
         actions={
-          <>
-            <Suspense fallback={null}>
-              <ListViewToggle storageKey={`facturas-${id}`} />
-            </Suspense>
-            <Button size="sm" asChild>
-              <Link href={`/proyectos/${id}/facturas/nueva`}>Nueva factura</Link>
-            </Button>
-          </>
+          <ProjectFinanceListHeaderActions
+            listViewStorageKey={`facturas-${id}`}
+            secondary={{ href: `/proyectos/${id}/cobranzas`, label: "Ver cobranzas" }}
+            primary={{ href: `/proyectos/${id}/facturas/nueva`, label: "Nueva factura" }}
+          />
         }
       />
 

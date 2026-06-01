@@ -8,6 +8,7 @@ export type CollapsibleNavLink = {
   label: string;
   href: string;
   matchExact?: boolean;
+  activeWhenPathPrefix?: string;
   icon?: React.ReactNode;
 };
 
@@ -64,6 +65,7 @@ export function CollapsibleNavSection({
               label={item.label}
               icon={item.icon}
               matchExact={item.matchExact}
+              activeWhenPathPrefix={item.activeWhenPathPrefix}
             />
           ))}
         </div>

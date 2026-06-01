@@ -21,6 +21,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { isInternalTransferMovimientosHref, navHrefPathname } from "@/lib/nav-link-active";
 
 const GLOBAL_NAV_ICON_BY_HREF: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
@@ -48,8 +49,22 @@ const GLOBAL_NAV_ICON_BY_HREF: Record<string, LucideIcon> = {
   "/configuracion/registro": ScrollText,
 };
 
+function resolveGlobalNavIcon(href: string): LucideIcon | undefined {
+  const direct = GLOBAL_NAV_ICON_BY_HREF[href];
+  if (direct) return direct;
+
+  if (isInternalTransferMovimientosHref(href)) {
+    return ArrowLeftRight;
+  }
+
+  const byPath = GLOBAL_NAV_ICON_BY_HREF[navHrefPathname(href)];
+  if (byPath) return byPath;
+
+  return undefined;
+}
+
 export function GlobalNavIcon({ href }: { href: string }) {
-  const Icon = GLOBAL_NAV_ICON_BY_HREF[href];
+  const Icon = resolveGlobalNavIcon(href);
   if (!Icon) return null;
   return <Icon className="h-4 w-4 shrink-0" aria-hidden />;
 }

@@ -10,7 +10,13 @@ import {
 import { canViewProcurementProjectArea } from "../procurement/procurement-access";
 import type { TenantModuleGate } from "../tenant-modules/tenant-module-gate";
 
-export type ProjectWorkspaceNavLink = { label: string; href: string; matchExact?: boolean };
+export type ProjectWorkspaceNavLink = {
+  label: string;
+  href: string;
+  matchExact?: boolean;
+  /** Highlight this item when pathname matches the prefix (e.g. pagos → facturas proveedor). */
+  activeWhenPathPrefix?: string;
+};
 
 export type ProjectWorkspaceNavSection = { title: string; items: ProjectWorkspaceNavLink[] };
 
@@ -80,23 +86,23 @@ export function buildProjectWorkspaceNavSections(
   if (gate.isEnabled("AR") && canViewArProjectArea(roles)) {
     finanzasProyecto.push({ label: "Cuentas por cobrar", href: `${base}/cuentas-por-cobrar` });
   }
+  if (gate.isEnabled("AP") && canViewApProjectArea(roles)) {
+    finanzasProyecto.push({
+      label: "Facturas proveedor",
+      href: `${base}/facturas-proveedor`,
+      activeWhenPathPrefix: `${base}/pagos`,
+    });
+  }
+  if (gate.isEnabled("AR") && canViewArProjectArea(roles)) {
+    finanzasProyecto.push({
+      label: "Facturas emitidas",
+      href: `${base}/facturas`,
+      activeWhenPathPrefix: `${base}/cobranzas`,
+    });
+  }
   if (finanzasProyecto.length) {
     sections.push({ title: "Finanzas del proyecto", items: finanzasProyecto });
   }
-
-  const compras: ProjectWorkspaceNavLink[] = [];
-  if (gate.isEnabled("AP") && canViewApProjectArea(roles)) {
-    compras.push({ label: "Facturas proveedor", href: `${base}/facturas-proveedor` });
-    compras.push({ label: "Pagos", href: `${base}/pagos` });
-  }
-  if (compras.length) sections.push({ title: "Compras y contratos", items: compras });
-
-  const comercial: ProjectWorkspaceNavLink[] = [];
-  if (gate.isEnabled("AR") && canViewArProjectArea(roles)) {
-    comercial.push({ label: "Facturas", href: `${base}/facturas` });
-    comercial.push({ label: "Cobranzas", href: `${base}/cobranzas` });
-  }
-  if (comercial.length) sections.push({ title: "Comercial / Cobranzas", items: comercial });
 
   const admin: ProjectWorkspaceNavLink[] = [];
   if (gate.isEnabled("PROJECTS") && can(roles, "EDIT", "PROJECTS")) {

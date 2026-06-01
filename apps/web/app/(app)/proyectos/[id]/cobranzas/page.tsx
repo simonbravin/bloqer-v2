@@ -1,16 +1,15 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Pagination } from "@/components/ui/pagination";
-import { Button } from "@/components/ui/button";
-import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
+import { ProjectFinanceListHeaderActions } from "@/features/projects/components/project-finance-list-header-actions";
 import { CollectionListSection } from "@/features/collections";
 import type { CollectionListItem } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectShellInfo, listCollectionsByProject, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+import { parsePage } from "@/lib/parse-page";
 
 const PAGE_SIZE = 20;
 
@@ -25,7 +24,7 @@ export default async function CobranzasPage({ params, searchParams }: PageProps)
 
   const { id } = await params;
   const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page ?? 1));
+  const page = parsePage(sp.page);
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -38,7 +37,7 @@ export default async function CobranzasPage({ params, searchParams }: PageProps)
     project = await getProjectShellInfo(id, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
-    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
     throw err;
   }
 
@@ -72,14 +71,11 @@ export default async function CobranzasPage({ params, searchParams }: PageProps)
         title="Cobranzas"
         subtitle={`${collectionsTotal} ${collectionsTotal === 1 ? "cobranza" : "cobranzas"}`}
         actions={
-          <>
-            <Suspense fallback={null}>
-              <ListViewToggle storageKey={`cobranzas-${id}`} />
-            </Suspense>
-            <Button asChild>
-              <Link href={`/proyectos/${id}/cobranzas/nueva`}>+ Nueva cobranza</Link>
-            </Button>
-          </>
+          <ProjectFinanceListHeaderActions
+            listViewStorageKey={`cobranzas-${id}`}
+            secondary={{ href: `/proyectos/${id}/facturas`, label: "Ver facturas emitidas" }}
+            primary={{ href: `/proyectos/${id}/cobranzas/nueva`, label: "+ Nueva cobranza" }}
+          />
         }
       />
 

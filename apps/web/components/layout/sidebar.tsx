@@ -3,16 +3,13 @@
 import Link from "next/link";
 import { BloqerLogo } from "@/components/brand/bloqer-logo";
 import { useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { CollapsibleNavSection } from "@/features/shell/components/collapsible-nav-section";
 import { tenantGateFromSnapshot } from "@/features/projects/tenant-gate-from-snapshot";
 import type { PermissionModule, UserRole } from "@bloqer/domain";
 import { buildGlobalNavSections } from "@/lib/global-workspace-nav";
 import { GlobalNavIcon } from "@/lib/global-nav-icons";
-
-function isNavItemActive(pathname: string, href: string, matchExact?: boolean) {
-  return matchExact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
-}
+import { isNavLinkActive } from "@/lib/nav-link-active";
 
 interface SidebarProps {
   /** Membership roles; empty = only items without `require` (e.g. Inicio) */
@@ -23,6 +20,7 @@ interface SidebarProps {
 
 export function Sidebar({ roles, moduleGateSnapshot }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const gate = useMemo(() => tenantGateFromSnapshot(moduleGateSnapshot ?? {}), [moduleGateSnapshot]);
   const sections = useMemo(
     () => buildGlobalNavSections(roles, (m) => gate.isEnabled(m)),
@@ -35,12 +33,14 @@ export function Sidebar({ roles, moduleGateSnapshot }: SidebarProps) {
     setOpenByTitle((prev) => {
       const next: Record<string, boolean> = {};
       for (const s of sections) {
-        const hasActive = s.items.some((item) => isNavItemActive(pathname, item.href, item.matchExact));
+        const hasActive = s.items.some((item) =>
+          isNavLinkActive(pathname, searchParams, item.href, { matchExact: item.matchExact }),
+        );
         next[s.title] = hasActive ? true : (prev[s.title] ?? false);
       }
       return next;
     });
-  }, [pathname, sections]);
+  }, [pathname, searchParams, sections]);
 
   return (
     <aside className="flex h-full min-h-0 w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">

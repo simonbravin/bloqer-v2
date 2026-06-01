@@ -72,7 +72,7 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
       { label: "Cuentas", href: "/tesoreria/cuentas", require: { action: "VIEW", module: "TREASURY" } },
       {
         label: "Transferencias",
-        href: "/tesoreria/reportes/movimientos?sourceType=INTERNAL_TRANSFER",
+        href: "/tesoreria/transferencias",
         require: { action: "VIEW", module: "TREASURY" },
       },
       { label: "Reportes", href: "/tesoreria/reportes", require: { action: "VIEW", module: "TREASURY" } },

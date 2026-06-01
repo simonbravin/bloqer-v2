@@ -33,6 +33,7 @@ const PROJECT_NAV_ICON_BY_LABEL: Record<string, LucideIcon> = {
   Compras: ShoppingCart,
   Subcontratos: Users,
   "Facturas proveedor": Receipt,
+  "Facturas emitidas": FileText,
   "Cuentas por pagar": Banknote,
   Pagos: Wallet,
   Facturas: Receipt,

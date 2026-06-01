@@ -409,11 +409,9 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 | Sección UI | Enlaces (mismo criterio que tabla siguiente) |
 |------------|-----------------------------------------------|
 | Resumen | Resumen |
-| Planificación | Presupuesto, Cronograma, WBS y costos |
-| Finanzas del proyecto | Tablero de finanzas (`/finanzas`), Flujo de caja — debajo de Operación |
+| Planificación | Presupuesto, Cronograma, WBS y costos, Reportes |
 | Operación | Libro de obra, Certificaciones, Inventario, Documentos |
-| Compras y contratos | Compras, Subcontratos, Facturas proveedor, Cuentas por pagar, Pagos |
-| Comercial / Cobranzas | Facturas, Cuentas por cobrar, Cobranzas |
+| Finanzas del proyecto | Tablero de finanzas, Flujo de caja, Compras, Subcontratos, Cuentas por pagar, Cuentas por cobrar, Facturas proveedor, Facturas emitidas |
 | Administración | Configuración |
 
 | Label | Ruta | Módulo gate (tenant) | Permiso / helper |
@@ -428,14 +426,14 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 | Subcontratos | `/proyectos/[id]/subcontratos` | `SUBCONTRACTS` | `VIEW SUBCONTRACTS` **o** `VIEW PROJECTS` |
 | Inventario | `/proyectos/[id]/inventario` | `INVENTORY` | `VIEW INVENTORY` |
 | Documentos | `/proyectos/[id]/documentos` | `PROJECTS` | `VIEW PROJECTS` |
-| Facturas | `/proyectos/[id]/facturas` | `AR` | `canViewArProjectArea` |
+| Facturas emitidas | `/proyectos/[id]/facturas` | `AR` | `canViewArProjectArea` — resalta también en `/cobranzas` |
 | Cuentas por cobrar | `/proyectos/[id]/cuentas-por-cobrar` | `AR` | `canViewArProjectArea` |
-| Cobranzas | `/proyectos/[id]/cobranzas` | `AR` | `canViewArProjectArea` |
-| Facturas proveedor | `/proyectos/[id]/facturas-proveedor` | `AP` | `canViewApProjectArea` |
+| Facturas proveedor | `/proyectos/[id]/facturas-proveedor` | `AP` | `canViewApProjectArea` — resalta también en `/pagos` |
 | Cuentas por pagar | `/proyectos/[id]/cuentas-por-pagar` | `AP` | `canViewApProjectArea` |
-| Pagos | `/proyectos/[id]/pagos` | `AP` | `canViewApProjectArea` |
 | Flujo de caja | `/proyectos/[id]/flujo-caja` | `PROJECTS` | `canViewProjectCashFlowReport` (`VIEW PROJECTS` **o** `VIEW AR` **o** `VIEW AP` **o** `VIEW TREASURY`) — coherente con `getProjectCashFlowReport` |
 | Configuración | `/proyectos/[id]/editar` | `PROJECTS` | `EDIT PROJECTS` |
+
+**Rutas contextuales (no en sidebar):** `/proyectos/[id]/pagos` y `/proyectos/[id]/cobranzas` — acceso desde enlaces cruzados en listas de facturas, desde C×P/C×C, tablero de finanzas y detalle de documentos.
 
 **Rutas existentes no incluidas en el nav del workspace** (siguen por enlaces contextuales o menús internos): recepciones, consumos, detalles de facturas/OC/certificados, etc.
 
