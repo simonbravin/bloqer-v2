@@ -14,6 +14,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { DashboardKpiCard } from "@/features/dashboard/dashboard-kpi-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { FinanceProjectionPanel } from "@/features/finance/components/finance-projection-panel";
+import { formatDate } from "@/lib/format";
 import { Inbox } from "lucide-react";
 
 function formatMoney(raw: string, currency: string): string {
@@ -78,7 +79,7 @@ function CompanyOperationsSection({ summary }: { summary: CompanyFinanceOperatio
                         {p.supplierLabel}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{p.paymentDate}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{formatDate(p.paymentDate)}</TableCell>
                     <TableCell className="text-right tabular-nums font-medium">
                       {formatMoney(p.amount, p.currency)}
                     </TableCell>

@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
@@ -9,14 +9,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { SupplierInvoiceStatusBadge } from "@/features/ap";
+import { PayableStatusBadge, SupplierInvoiceStatusBadge } from "@/features/ap";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
-import { getSupplierInvoiceById, listEntityDocuments, ServiceError } from "@bloqer/services";
+import { formatMoneyAmount } from "@/lib/format-money";
+import {
+  getPayableBySupplierInvoiceId,
+  getPurchaseOrderCodeForApLink,
+  getSupplierInvoiceById,
+  getSupplierInvoicePurchaseOrderWarnings,
+  listEntityDocuments,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
 import {
@@ -24,6 +31,7 @@ import {
   cancelSupplierInvoiceAction,
 } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PageProps {
   params: Promise<{ id: string; supplierInvoiceId: string }>;
@@ -42,8 +50,19 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
   };
 
   let invoice;
+  let payable;
+  let warnings: string[] = [];
+  let poCode: string | null = null;
+
   try {
     invoice = await getSupplierInvoiceById(supplierInvoiceId, ctx, id);
+    if (invoice.status === "ISSUED") {
+      payable = await getPayableBySupplierInvoiceId(supplierInvoiceId, ctx, id);
+    }
+    if (invoice.purchaseOrderId) {
+      warnings = await getSupplierInvoicePurchaseOrderWarnings(supplierInvoiceId, ctx);
+      poCode = await getPurchaseOrderCodeForApLink(invoice.purchaseOrderId, ctx);
+    }
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
@@ -60,6 +79,11 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
   const isDraft = invoice.status === "DRAFT";
   const isIssued = invoice.status === "ISSUED";
   const isCancelled = invoice.status === "CANCELLED";
+  const canPay =
+    payable &&
+    (payable.status === "OPEN" ||
+      payable.status === "PARTIAL" ||
+      payable.status === "OVERDUE");
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -68,6 +92,29 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
         <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
         <SupplierInvoiceStatusBadge status={invoice.status} />
       </div>
+
+      {invoice.purchaseOrderId && poCode ? (
+        <p className="text-sm text-muted-foreground">
+          Orden de compra:{" "}
+          <Link
+            href={`/proyectos/${id}/ordenes-compra/${invoice.purchaseOrderId}`}
+            className="text-primary hover:underline font-medium"
+          >
+            {poCode}
+          </Link>
+        </p>
+      ) : null}
+
+      {warnings.length > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-900 dark:text-amber-200 space-y-1">
+          <p className="font-medium">Advertencias de conciliación con la OC</p>
+          <ul className="list-disc list-inside text-xs space-y-1">
+            {warnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -141,7 +188,38 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
         )}
       </div>
 
-      <div className="flex gap-2">
+      {isIssued && payable ? (
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-base">Cuenta por pagar</CardTitle>
+            <PayableStatusBadge status={payable.status} />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm">
+              Saldo pendiente:{" "}
+              <span className="font-semibold tabular-nums">
+                {formatMoneyAmount(payable.balanceDue, payable.currency)}
+              </span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/proyectos/${id}/cuentas-por-pagar/${payable.id}`}>
+                  Ver C×P
+                </Link>
+              </Button>
+              {canPay ? (
+                <Button asChild size="sm">
+                  <Link href={`/proyectos/${id}/cuentas-por-pagar/${payable.id}/pagar`}>
+                    Registrar pago
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <div className="flex gap-2 flex-wrap">
         {isDraft && (
           <>
             <Button asChild variant="outline">
@@ -172,11 +250,6 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
               Anular
             </Button>
           </form>
-        )}
-        {isIssued && (
-          <Button asChild variant="outline">
-            <Link href={`/proyectos/${id}/cuentas-por-pagar`}>Ver cuenta por pagar →</Link>
-          </Button>
         )}
       </div>
 

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { formatDateRange } from "@/lib/format";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -76,8 +77,8 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
         title="Ingresos vs gastos"
         subtitle={
           report.budgetName
-            ? `${report.budgetName} · ${report.dateFrom} → ${report.dateTo}`
-            : `${report.dateFrom} → ${report.dateTo}`
+            ? `${report.budgetName} · ${formatDateRange(report.dateFrom, report.dateTo)}`
+            : formatDateRange(report.dateFrom, report.dateTo)
         }
         actions={
           <ReportExportActions

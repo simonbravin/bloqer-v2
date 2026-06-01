@@ -1,5 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { formatDate } from "@bloqer/utils";
 import { ServiceContext, ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
@@ -31,8 +32,7 @@ function periodKey(date: Date, period: "day" | "week" | "month"): string {
 function periodLabel(key: string, period: "day" | "week" | "month"): string {
   const parts = key.split("-");
   if (period === "day") {
-    return new Date(Date.UTC(+parts[0]!, +parts[1]! - 1, +parts[2]!))
-      .toLocaleDateString("es-AR");
+    return formatDate(key);
   }
   if (period === "month") {
     return new Date(Date.UTC(+parts[0]!, +parts[1]! - 1, 1))

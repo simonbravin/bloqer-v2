@@ -47,6 +47,27 @@ export async function getPayableById(
   return serializePayable(p);
 }
 
+export async function getPayableBySupplierInvoiceId(
+  supplierInvoiceId: string,
+  ctx: ServiceContext,
+  projectScopeId?: string,
+): Promise<PayableView | null> {
+  await assertApTenantModule(ctx);
+  if (!canViewApProjectArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar");
+  }
+  const p = await prisma.payable.findUnique({
+    where: { supplierInvoiceId },
+    include: { supplierContact: { select: { legalName: true, fantasyName: true } } },
+  });
+  if (!p) return null;
+  if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
+  }
+  return serializePayable(p);
+}
+
 export type ProjectPayableListFilters = {
   page?: number;
   pageSize?: number;

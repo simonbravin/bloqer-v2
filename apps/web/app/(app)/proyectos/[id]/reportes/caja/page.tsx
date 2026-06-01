@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { formatDateRange } from "@/lib/format";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -149,7 +150,7 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Evolución por período</CardTitle>
                 <CardDescription>
-                  {cashReport.dateFrom} → {cashReport.dateTo} · solo movimientos confirmados
+                  {formatDateRange(cashReport.dateFrom, cashReport.dateTo)} · solo movimientos confirmados
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -165,7 +166,7 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
       <section className="space-y-4">
         <h2 className="text-sm font-semibold">Proyección de liquidez (R-006)</h2>
         <p className="text-xs text-muted-foreground">
-          Horizonte: {projection.dateFrom} → {projection.dateTo}
+          Horizonte: {formatDateRange(projection.dateFrom, projection.dateTo)}
         </p>
         {projCur ? (
           <>

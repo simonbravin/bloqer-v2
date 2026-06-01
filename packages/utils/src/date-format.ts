@@ -34,6 +34,15 @@ export function formatDate(value: Date | string | number | null | undefined, fal
   return d.toLocaleDateString(LOCALE, DATE_PARTS);
 }
 
+/** Rango corto: dd/mm/yyyy → dd/mm/yyyy (para ISO strings y Date). */
+export function formatDateRange(
+  from: Date | string | number | null | undefined,
+  to: Date | string | number | null | undefined,
+  separator = " → ",
+): string {
+  return `${formatDate(from)}${separator}${formatDate(to)}`;
+}
+
 /** Fecha y hora: dd/mm/yyyy, hh:mm */
 export function formatDateTime(value: Date | string | number | null | undefined, fallback = "—"): string {
   const d = value == null ? null : toDate(value);

@@ -61,3 +61,14 @@ export type CreateSupplierInvoiceInput = z.infer<typeof createSupplierInvoiceSch
 export type UpdateSupplierInvoiceInput = z.infer<typeof updateSupplierInvoiceSchema>;
 export type CreatePaymentInput         = z.infer<typeof createPaymentSchema>;
 export type RegisterApExpenseInput     = z.infer<typeof registerApExpenseSchema>;
+
+export const createSupplierInvoiceFromPurchaseOrderSchema = z.object({
+  projectId:          z.string().uuid(),
+  purchaseOrderId:    z.string().uuid(),
+  purchaseReceiptId:  z.string().uuid().optional().nullable(),
+  basis:              z.enum(["received", "remaining"]).optional().default("received"),
+});
+
+export type CreateSupplierInvoiceFromPurchaseOrderInput = z.infer<
+  typeof createSupplierInvoiceFromPurchaseOrderSchema
+>;

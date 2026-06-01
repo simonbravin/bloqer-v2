@@ -15,6 +15,8 @@ PROCUREMENT.
 3. Registrar **Receipt** cuando ingresa bien/servicio.
 4. Cargar **PurchaseInvoice** del proveedor → **Payable**.
 
+> **Implementación UI (Bloqer v2):** la recepción confirmada **no** crea factura ni C×P automáticamente. Desde el detalle de la OC o de la recepción, usar **Registrar factura desde OC** (prellena borrador con cantidades recibidas). Luego **Emitir factura** en Facturas proveedor para generar la **Payable**; el pago se registra desde **Cuentas por pagar → Registrar pago**.
+
 ## 5. Pasos — Sin OC
 1. Cargar **PurchaseInvoice** directamente imputada → impacta al confirmar factura ([D-006]).
 2. Si hay stock: generar movimiento desde recepción implícita o ajuste (definir política).

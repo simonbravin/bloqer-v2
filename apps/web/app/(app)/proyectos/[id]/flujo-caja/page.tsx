@@ -17,6 +17,7 @@ import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dial
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { formatDateRange } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -182,7 +183,7 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Período: {report.dateFrom} → {report.dateTo} ·{" "}
+        Período: {formatDateRange(report.dateFrom, report.dateTo)} ·{" "}
         {PERIOD_LABELS[report.period] ?? report.period}
       </p>
 
@@ -291,7 +292,7 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">
-                  Resumen del Período ({report.dateFrom} → {report.dateTo})
+                  Resumen del Período ({formatDateRange(report.dateFrom, report.dateTo)})
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

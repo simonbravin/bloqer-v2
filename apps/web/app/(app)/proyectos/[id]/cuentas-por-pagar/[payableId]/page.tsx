@@ -7,7 +7,13 @@ import type { PaymentListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
-import { getPayableById, listPaymentsByPayable, ServiceError } from "@bloqer/services";
+import {
+  getPayableById,
+  getPurchaseOrderCodeForApLink,
+  getSupplierInvoiceById,
+  listPaymentsByPayable,
+  ServiceError,
+} from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -28,11 +34,17 @@ export default async function PayableDetailPage({ params }: PageProps) {
 
   let payable;
   let payments;
+  let invoice;
+  let poCode: string | null = null;
   try {
     [payable, payments] = await Promise.all([
       getPayableById(payableId, ctx, id),
       listPaymentsByPayable(payableId, ctx),
     ]);
+    invoice = await getSupplierInvoiceById(payable.supplierInvoiceId, ctx, id);
+    if (invoice.purchaseOrderId) {
+      poCode = await getPurchaseOrderCodeForApLink(invoice.purchaseOrderId, ctx);
+    }
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
@@ -58,6 +70,27 @@ export default async function PayableDetailPage({ params }: PageProps) {
         <h1 className="text-2xl font-bold tracking-tight">Cuenta por pagar</h1>
         <PayableStatusBadge status={payable.status} />
       </div>
+
+      <p className="text-xs text-muted-foreground">
+        {invoice.purchaseOrderId ? (
+          <>
+            <Link
+              href={`/proyectos/${id}/ordenes-compra/${invoice.purchaseOrderId}`}
+              className="text-primary hover:underline"
+            >
+              {poCode ?? "Orden de compra"}
+            </Link>
+            {" → "}
+          </>
+        ) : null}
+        <Link
+          href={`/proyectos/${id}/facturas-proveedor/${payable.supplierInvoiceId}`}
+          className="text-primary hover:underline"
+        >
+          Factura proveedor
+        </Link>
+        {" → Cuenta por pagar"}
+      </p>
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">

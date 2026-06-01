@@ -11,16 +11,20 @@ import {
 } from "@/components/ui/table";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { PurchaseOrderStatusBadge, PurchaseReceiptTable } from "@/features/procurement";
+import { PurchaseOrderStatusBadge, PurchaseReceiptTable, PoBillingNextStepPanel, canRegisterApInvoice } from "@/features/procurement";
+import { SupplierInvoiceTable } from "@/features/ap";
+import type { SupplierInvoiceListItem } from "@/features/ap";
 import type { PurchaseReceiptListItem } from "@/features/procurement";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import {
+  getPurchaseOrderBillingSummary,
   getPurchaseOrderById,
   listEntityDocuments,
   listReceiptsByPurchaseOrder,
+  listSupplierInvoicesByPurchaseOrder,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -47,11 +51,13 @@ export default async function OrdenCompraDetailPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
-  let order, receipts;
+  let order, receipts, billing, linkedInvoices;
   try {
-    [order, receipts] = await Promise.all([
+    [order, receipts, billing, linkedInvoices] = await Promise.all([
       getPurchaseOrderById(poId, ctx),
       listReceiptsByPurchaseOrder(poId, ctx),
+      getPurchaseOrderBillingSummary(poId, ctx),
+      listSupplierInvoicesByPurchaseOrder(poId, ctx),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
@@ -68,12 +74,25 @@ export default async function OrdenCompraDetailPage({ params }: PageProps) {
   const isCancelled = order.status === "CANCELLED";
   const isReceivable = ["ISSUED", "PARTIALLY_RECEIVED"].includes(order.status);
 
+  const canEditAp = canRegisterApInvoice(current.tenantCtx.roles);
+
   const receiptItems: PurchaseReceiptListItem[] = receipts.map((r) => ({
     id: r.id,
     purchaseOrderCode: r.purchaseOrderCode,
     supplierName: r.supplierName,
     receiptDate: r.receiptDate,
     status: r.status,
+  }));
+
+  const invoiceItems: SupplierInvoiceListItem[] = linkedInvoices.map((inv) => ({
+    id: inv.id,
+    code: inv.code,
+    supplierName: inv.supplierName,
+    issueDate: inv.issueDate,
+    dueDate: inv.dueDate,
+    totalAmount: inv.totalAmount,
+    currency: inv.currency,
+    status: inv.status,
   }));
 
   return (
@@ -168,6 +187,15 @@ export default async function OrdenCompraDetailPage({ params }: PageProps) {
         )}
       </div>
 
+      {!isDraft && !isCancelled && (
+        <PoBillingNextStepPanel
+          projectId={id}
+          purchaseOrderId={poId}
+          billing={billing}
+          canEditAp={canEditAp}
+        />
+      )}
+
       <div className="flex gap-2 flex-wrap">
         {isDraft && (
           <>
@@ -209,6 +237,13 @@ export default async function OrdenCompraDetailPage({ params }: PageProps) {
 
       <DataTableSection title="Recepciones">
         <PurchaseReceiptTable receipts={receiptItems} projectId={id} />
+      </DataTableSection>
+
+      <DataTableSection title="Facturas vinculadas">
+        <SupplierInvoiceTable
+          invoices={invoiceItems}
+          hrefPrefix={`/proyectos/${id}/facturas-proveedor`}
+        />
       </DataTableSection>
 
       <EntityDocumentsPanel

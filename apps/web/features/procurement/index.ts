@@ -12,3 +12,4 @@ export { PurchaseReceiptTable } from "./components/purchase-receipt-table";
 export { PurchaseReceiptCards } from "./components/purchase-receipt-cards";
 export { PurchaseReceiptListSection } from "./components/purchase-receipt-list-section";
 export type { PurchaseReceiptListItem } from "./components/purchase-receipt-list";
+export { PoBillingNextStepPanel, canRegisterApInvoice } from "./components/po-billing-next-step-panel";

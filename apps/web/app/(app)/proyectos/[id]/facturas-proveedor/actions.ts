@@ -2,6 +2,7 @@
 
 import {
   createSupplierInvoice,
+  createSupplierInvoiceDraftFromPurchaseOrder,
   updateSupplierInvoice,
   issueSupplierInvoice,
   cancelSupplierInvoice,
@@ -9,6 +10,7 @@ import {
 } from "@bloqer/services";
 import {
   createSupplierInvoiceSchema,
+  createSupplierInvoiceFromPurchaseOrderSchema,
   updateSupplierInvoiceSchema,
   type CreateSupplierInvoiceInput,
   type UpdateSupplierInvoiceInput,
@@ -33,6 +35,42 @@ function handle(err: unknown): { error: string } {
   return { error: "Error inesperado" };
 }
 
+function revalidateProjectApPaths(projectId: string, extra?: string[]) {
+  revalidatePath(`/proyectos/${projectId}/facturas-proveedor`);
+  revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);
+  revalidatePath(`/proyectos/${projectId}/ordenes-compra`);
+  revalidatePath(`/proyectos/${projectId}/recepciones`);
+  for (const p of extra ?? []) revalidatePath(p);
+}
+
+export async function createSupplierInvoiceFromPurchaseOrderAction(
+  projectId: string,
+  data: {
+    purchaseOrderId: string;
+    purchaseReceiptId?: string | null;
+    basis?: "received" | "remaining";
+  },
+): Promise<{ id: string } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = createSupplierInvoiceFromPurchaseOrderSchema.safeParse({
+    projectId,
+    purchaseOrderId: data.purchaseOrderId,
+    purchaseReceiptId: data.purchaseReceiptId ?? null,
+    basis: data.basis ?? "received",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    const inv = await createSupplierInvoiceDraftFromPurchaseOrder(parsed.data, ctx);
+    revalidateProjectApPaths(projectId, [
+      `/proyectos/${projectId}/ordenes-compra/${data.purchaseOrderId}`,
+      `/proyectos/${projectId}/facturas-proveedor/${inv.id}`,
+    ]);
+    return { id: inv.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
 export async function createSupplierInvoiceAction(
   projectId: string,
   data: Omit<CreateSupplierInvoiceInput, "projectId"> & { projectId?: string | null },
@@ -43,7 +81,7 @@ export async function createSupplierInvoiceAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const inv = await createSupplierInvoice(parsed.data, ctx);
-    revalidatePath(`/proyectos/${projectId}/facturas-proveedor`);
+    revalidateProjectApPaths(projectId);
     return { id: inv.id };
   } catch (err) {
     return handle(err);
@@ -60,8 +98,7 @@ export async function updateSupplierInvoiceAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const inv = await updateSupplierInvoice(invoiceId, parsed.data, ctx, projectId);
-    revalidatePath(`/proyectos/${projectId}/facturas-proveedor`);
-    revalidatePath(`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`);
+    revalidateProjectApPaths(projectId, [`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`]);
     return { id: inv.id };
   } catch (err) {
     return handle(err);
@@ -75,9 +112,7 @@ export async function issueSupplierInvoiceAction(
   const ctx = await getCtx();
   try {
     await issueSupplierInvoice(invoiceId, ctx, projectId);
-    revalidatePath(`/proyectos/${projectId}/facturas-proveedor`);
-    revalidatePath(`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`);
-    revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);
+    revalidateProjectApPaths(projectId, [`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`]);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -91,9 +126,7 @@ export async function cancelSupplierInvoiceAction(
   const ctx = await getCtx();
   try {
     await cancelSupplierInvoice(invoiceId, ctx, projectId);
-    revalidatePath(`/proyectos/${projectId}/facturas-proveedor`);
-    revalidatePath(`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`);
-    revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);
+    revalidateProjectApPaths(projectId, [`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`]);
     return { ok: true };
   } catch (err) {
     return handle(err);

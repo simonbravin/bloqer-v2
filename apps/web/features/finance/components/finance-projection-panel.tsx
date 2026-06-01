@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { formatDate } from "@/lib/format";
 
 function formatMoney(raw: string, currency: string): string {
   const n = Number(raw);
@@ -34,7 +35,7 @@ export function FinanceProjectionPanel({ projection }: { projection: FinanceProj
         <CardTitle className="text-base">Proyección de liquidez (90 días)</CardTitle>
         <CardDescription>
           Saldo de caja hoy menos egresos por C×P corporativas con vencimiento hasta{" "}
-          {projection.dateTo} (incluye vencidas).{" "}
+          {formatDate(projection.dateTo)} (incluye vencidas).{" "}
           <Link href={projection.href} className="underline underline-offset-2">
             Ver obligaciones
           </Link>

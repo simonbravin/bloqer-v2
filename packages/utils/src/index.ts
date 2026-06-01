@@ -1,4 +1,4 @@
-export { formatDate, formatDateLong, formatDateTime } from "./date-format";
+export { formatDate, formatDateLong, formatDateRange, formatDateTime } from "./date-format";
 export {
   AMERICAS_CURRENCY_OPTIONS,
   formatCurrencyDisplay,

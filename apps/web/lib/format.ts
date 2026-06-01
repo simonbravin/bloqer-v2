@@ -1,6 +1,7 @@
 export {
   formatDate,
   formatDateLong,
+  formatDateRange,
   formatDateTime,
   formatCurrencyDisplay,
   formatCurrencyLabel,

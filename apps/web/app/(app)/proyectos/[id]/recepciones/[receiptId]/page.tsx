@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
@@ -11,13 +11,14 @@ import {
 } from "@/components/ui/table";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { PurchaseReceiptStatusBadge } from "@/features/procurement";
+import { PurchaseReceiptStatusBadge, PoBillingNextStepPanel, canRegisterApInvoice } from "@/features/procurement";
 import { StockMovementList } from "@/features/inventory";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import {
+  getPurchaseOrderBillingSummary,
   getPurchaseReceiptById,
   listEntityDocuments,
   listStockMovements,
@@ -47,12 +48,13 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
-  let receipt, stockMovements;
+  let receipt, stockMovements, billing;
   try {
     [receipt, stockMovements] = await Promise.all([
       getPurchaseReceiptById(receiptId, ctx),
       listStockMovements({ purchaseReceiptId: receiptId }, ctx),
     ]);
+    billing = await getPurchaseOrderBillingSummary(receipt.purchaseOrderId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
@@ -68,6 +70,9 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
 
   const isDraft = receipt.status === "DRAFT";
   const isCancelled = receipt.status === "CANCELLED";
+
+  const canEditAp = canRegisterApInvoice(current.tenantCtx.roles);
+  const isConfirmed = receipt.status === "CONFIRMED";
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -134,6 +139,16 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
           </div>
         )}
       </div>
+
+      {isConfirmed && (
+        <PoBillingNextStepPanel
+          projectId={id}
+          purchaseOrderId={receipt.purchaseOrderId}
+          purchaseReceiptId={receiptId}
+          billing={billing}
+          canEditAp={canEditAp}
+        />
+      )}
 
       {stockMovements.length > 0 && (
         <DataTableSection title="Movimientos de stock generados">
