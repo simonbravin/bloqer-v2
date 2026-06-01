@@ -9,7 +9,6 @@ import {
   DashboardCashFlowChart,
   DashboardHeader,
   DashboardKpiGrid,
-  DashboardOnboardingChecklist,
   DashboardProjectsOverview,
   DashboardQuickActions,
 } from "@/features/dashboard";
@@ -50,9 +49,6 @@ export default async function DashboardPage() {
 
   const updatedAt = formatDateTime(dash.generatedAt);
 
-  const onboardingSteps = dash.onboardingSteps ?? [];
-  const showOnboardingCard = dash.operationalOnboarding && onboardingSteps.length > 0;
-
   return (
     <PageShell variant="default">
       <DashboardHeader
@@ -64,15 +60,6 @@ export default async function DashboardPage() {
       />
 
       <DashboardAlertsCard warnings={dash.warnings} />
-
-      {showOnboardingCard ? <DashboardOnboardingChecklist steps={onboardingSteps} /> : null}
-
-      {dash.operationalOnboarding && onboardingSteps.length === 0 ? (
-        <p className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
-          Todavía no hay datos en el tablero. Cuando tengas permisos para crear proyectos, contactos o
-          configuración, van a aparecer pasos sugeridos acá.
-        </p>
-      ) : null}
 
       <DashboardKpiGrid kpis={dash.kpis} />
 

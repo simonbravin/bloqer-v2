@@ -17,6 +17,7 @@ import {
   platformInvitationFlashCookiePath,
 } from "@/lib/platform-invitation-flash";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
+import { rethrowNextNavigationError } from "@/lib/next-errors";
 
 function collectRolesFromForm(formData: FormData): UserRole[] {
   const roles: UserRole[] = [];
@@ -70,6 +71,7 @@ export async function createPlatformTenantInvitationAction(formData: FormData) {
     revalidatePath(`/platform/tenants/${tenantId}/invitations`);
     redirect(`/platform/tenants/${tenantId}/invitations/${result.invitationId}?ok=1`);
   } catch (e) {
+    rethrowNextNavigationError(e);
     if (e instanceof ServiceError) {
       redirect(
         `/platform/tenants/${tenantId}/invitations/new?err=${encodeURIComponent(e.message)}`,
@@ -86,6 +88,7 @@ export async function cancelPlatformTenantInvitationAction(formData: FormData) {
   try {
     await cancelPlatformTenantInvitation(tenantId, invitationId, ctx);
   } catch (e) {
+    rethrowNextNavigationError(e);
     if (e instanceof ServiceError) {
       redirect(
         `/platform/tenants/${tenantId}/invitations/${invitationId}?err=${encodeURIComponent(e.message)}`,

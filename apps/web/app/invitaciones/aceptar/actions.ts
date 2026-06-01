@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@bloqer/auth";
 import { acceptTenantInvitation, peekTenantInvitationForAcceptPage, ServiceError } from "@bloqer/services";
 import { buildInvitationAcceptCallbackUrl, buildInvitationLoginHref } from "@/lib/invitation-auth";
+import { rethrowNextNavigationError } from "@/lib/next-errors";
 
 export async function acceptTenantInvitationAction(formData: FormData) {
   const token = String(formData.get("token") ?? "").trim();
@@ -31,6 +32,7 @@ export async function acceptTenantInvitationAction(formData: FormData) {
   try {
     await acceptTenantInvitation(token, { actorUserId: session.user.id, ipAddress: ip });
   } catch (e) {
+    rethrowNextNavigationError(e);
     if (e instanceof ServiceError) {
       redirect(`/invitaciones/aceptar?token=${encodeURIComponent(token)}&err=${encodeURIComponent(e.message)}`);
     }

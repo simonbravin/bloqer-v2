@@ -124,10 +124,6 @@ export type TenantDashboardView = {
   accountingSummary?: DashboardAccountingSummary;
   unreadNotifications: number;
   showOperationalAlertsLink: boolean;
-  /** Sin proyectos/finanzas/inventario ni notificaciones: mostrar pasos iniciales en UI. */
-  operationalOnboarding: boolean;
-  /** Cuando no hay datos operativos: pasos sugeridos (solo con permiso + módulo). */
-  onboardingSteps?: Array<{ title: string; body: string; href?: string }>;
   warnings: DashboardModuleWarning[];
   quickActions: DashboardQuickAction[];
   /** Flujo de caja tesorería (movimientos confirmados); omitido sin módulo/permiso. */
@@ -787,92 +783,6 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
     accountingSummary = { journalDraftCount, journalPostedCount };
   }
 
-  const hasRichData =
-    (projectSummary?.activeProjectsCount ?? 0) > 0 ||
-    (projectSummary?.draftProjectsCount ?? 0) > 0 ||
-    (financeSummary?.receivablesTotal != null && financeSummary.receivablesTotal !== "0") ||
-    (financeSummary?.payablesTotal != null && financeSummary.payablesTotal !== "0") ||
-    (financeSummary?.receivablesOpenByCurrency?.length ?? 0) > 0 ||
-    (financeSummary?.payablesOpenByCurrency?.length ?? 0) > 0 ||
-    Object.keys(financeSummary?.cashByCurrency ?? {}).length > 0 ||
-    (accountingSummary?.journalDraftCount ?? 0) > 0 ||
-    (accountingSummary?.journalPostedCount ?? 0) > 0;
-
-  const operationalOnboarding = !hasRichData && unreadNotifications === 0;
-
-  const onboardingSteps =
-    operationalOnboarding
-      ? [
-          ...(gate.isEnabled("PROJECTS") && can(ctx.roles, "EDIT", "PROJECTS")
-            ? [
-                {
-                  title: "Crear tu primer proyecto",
-                  body:  "Dá de alta la obra y asociá al cliente.",
-                  href:  "/proyectos/nuevo",
-                },
-              ]
-            : []),
-          ...(gate.isEnabled("DIRECTORY") && can(ctx.roles, "EDIT", "DIRECTORY")
-            ? [
-                {
-                  title: "Cargar contactos",
-                  body:  "Clientes, proveedores y equipo en el directorio.",
-                  href:  "/directorio/nuevo",
-                },
-              ]
-            : []),
-          ...(gate.isEnabled("BUDGETS") &&
-          gate.isEnabled("PROJECTS") &&
-          can(ctx.roles, "VIEW", "PROJECTS")
-            ? [
-                {
-                  title: "Cargar un presupuesto",
-                  body:  "En cada proyecto, creá o aprobá una versión para planificar costos y venta.",
-                  href:  "/proyectos",
-                },
-              ]
-            : []),
-          ...(canReadTenantConfig(gate, ctx)
-            ? [
-                {
-                  title: "Revisar módulos activos",
-                  body:  "Equipo, permisos y ajustes generales del tenant.",
-                  href:  "/configuracion",
-                },
-              ]
-            : []),
-          ...(gate.isEnabled("ACCOUNTING") && can(ctx.roles, "VIEW", "ACCOUNTING")
-            ? [
-                {
-                  title: "Revisar contabilidad",
-                  body:  "Plan de cuentas y mapeos cuando empiecen los movimientos.",
-                  href:  "/contabilidad",
-                },
-              ]
-            : []),
-          ...(gate.isEnabled("TREASURY") && can(ctx.roles, "EDIT", "TREASURY")
-            ? [
-                {
-                  title: "Configurar tesorería",
-                  body:  "Alta de cuentas bancarias y cajas.",
-                  href:  "/tesoreria/cuentas/nueva",
-                },
-              ]
-            : []),
-          ...(gate.isEnabled("USERS_PERMISSIONS") &&
-          canReadTenantConfigArea(ctx.roles) &&
-          canEditTeamMembership(ctx.roles)
-            ? [
-                {
-                  title: "Invitar al equipo",
-                  body:  "Sumá colaboradores con roles acordes.",
-                  href:  "/configuracion/equipo/invitar",
-                },
-              ]
-            : []),
-        ]
-      : undefined;
-
   return {
     tenantName,
     subscription,
@@ -885,8 +795,6 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
     accountingSummary,
     unreadNotifications,
     showOperationalAlertsLink,
-    operationalOnboarding,
-    onboardingSteps,
     warnings,
     quickActions: dedupeQuickActions(quickActions),
     cashFlowChart,

@@ -11,10 +11,11 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { rethrowNextNavigationError } from "@/lib/next-errors";
 import {
   TENANT_INVITE_LINK_FLASH_COOKIE,
   TENANT_INVITE_EMAIL_FLASH_COOKIE,
-  TENANT_INVITE_LINK_FLASH_COOKIE_PATH,
+  tenantInvitationFlashCookiePath,
 } from "@/lib/tenant-invitation-flash";
 
 function collectRolesFromForm(formData: FormData): UserRole[] {
@@ -35,18 +36,19 @@ export async function createTenantInvitationAction(formData: FormData) {
     const result = await createTenantInvitation({ email, roles, expiresInDays }, ctx);
     if (!result.emailDispatched) {
       const c = await cookies();
+      const flashPath = tenantInvitationFlashCookiePath(result.invitationId);
       c.set(TENANT_INVITE_LINK_FLASH_COOKIE, result.invitationLink, {
         maxAge:     120,
         httpOnly:   true,
         sameSite:   "lax",
-        path:       TENANT_INVITE_LINK_FLASH_COOKIE_PATH,
+        path:       flashPath,
       });
       if (result.emailFailureMessage) {
         c.set(TENANT_INVITE_EMAIL_FLASH_COOKIE, result.emailFailureMessage, {
           maxAge:     120,
           httpOnly:   true,
           sameSite:   "lax",
-          path:       TENANT_INVITE_LINK_FLASH_COOKIE_PATH,
+          path:       flashPath,
         });
       }
     }
@@ -54,10 +56,11 @@ export async function createTenantInvitationAction(formData: FormData) {
     revalidatePath(`/configuracion/equipo/invitaciones/${result.invitationId}`);
     redirect(`/configuracion/equipo/invitaciones/${result.invitationId}`);
   } catch (e) {
+    rethrowNextNavigationError(e);
     if (e instanceof ServiceError) {
       redirect(`/configuracion/equipo/invitar?err=${encodeURIComponent(e.message)}`);
     }
-    redirect(`/configuracion/equipo/invitar?err=${encodeURIComponent("No se pudo crear la invitación")}`);
+    throw e;
   }
 }
 
@@ -68,10 +71,11 @@ export async function cancelTenantInvitationAction(formData: FormData) {
   try {
     await cancelTenantInvitation(invitationId, ctx);
   } catch (e) {
+    rethrowNextNavigationError(e);
     if (e instanceof ServiceError) {
       redirect(`/configuracion/equipo/invitaciones/${invitationId}?err=${encodeURIComponent(e.message)}`);
     }
-    redirect(`/configuracion/equipo/invitaciones/${invitationId}?err=${encodeURIComponent("No se pudo cancelar")}`);
+    throw e;
   }
   revalidatePath("/configuracion/equipo");
   revalidatePath(`/configuracion/equipo/invitaciones/${invitationId}`);

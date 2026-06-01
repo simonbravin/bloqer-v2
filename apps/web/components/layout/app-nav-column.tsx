@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import type { PermissionModule, UserRole } from "@bloqer/domain";
+import { isProjectIdSegment } from "@/lib/project-route";
 import { ProjectWorkspaceSidebar } from "./project-workspace-sidebar";
 import { Sidebar } from "./sidebar";
 
@@ -18,7 +19,7 @@ export function AppNavColumn({ roles, moduleGateSnapshot, isTenantUser }: AppNav
   const m = pathname.match(/^\/proyectos\/([^/]+)/);
   const projectId = m?.[1];
 
-  if (isTenantUser && projectId) {
+  if (isTenantUser && projectId && isProjectIdSegment(projectId)) {
     return (
       <ProjectWorkspaceSidebar
         projectId={projectId}

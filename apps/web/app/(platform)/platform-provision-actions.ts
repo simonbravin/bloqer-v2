@@ -11,6 +11,7 @@ import {
   platformInvitationFlashCookiePath,
 } from "@/lib/platform-invitation-flash";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
+import { rethrowNextNavigationError } from "@/lib/next-errors";
 
 function emptyToUndefined(v: FormDataEntryValue | null): string | undefined {
   if (v === null || String(v).trim() === "") return undefined;
@@ -64,6 +65,7 @@ export async function provisionPlatformTenantAction(formData: FormData) {
       `/platform/tenants/${result.tenantId}/invitations/${result.invitationId}?ok=1`,
     );
   } catch (e) {
+    rethrowNextNavigationError(e);
     if (e instanceof ServiceError) {
       redirect(`/platform/tenants/new?err=${encodeURIComponent(e.message)}`);
     }
