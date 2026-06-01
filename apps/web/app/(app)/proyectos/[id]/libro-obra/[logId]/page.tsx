@@ -17,11 +17,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
-import { getJobsiteLogById, listEntityDocuments, ServiceError } from "@bloqer/services";
+import { getJobsiteLogById, getJobsiteLogActivityLog, listEntityDocuments, ServiceError } from "@bloqer/services";
 import {
   JobsiteLogStatusBadge,
   JobsiteLogIssueSeverityBadge,
   JobsiteLogIssueTypeBadge,
+  JobsiteLogLifecycleDialog,
 } from "@/features/jobsite-log";
 import { EntityDocumentsPanel } from "@/features/documents";
 import {
@@ -30,11 +31,19 @@ import {
   returnJobsiteLogAction,
   cancelJobsiteLogAction,
 } from "../actions";
-import { formatDateLong } from "@/lib/format";
+import { formatDateLong, formatDateTime } from "@/lib/format";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
   params: Promise<{ id: string; logId: string }>;
+}
+
+function canContributeJobsiteLog(roles: Parameters<typeof can>[0]): boolean {
+  return can(roles, "EDIT", "JOBSITE_LOG") || can(roles, "EDIT", "PROJECTS");
+}
+
+function canSuperviseJobsiteLog(roles: Parameters<typeof can>[0]): boolean {
+  return can(roles, "APPROVE", "JOBSITE_LOG") || can(roles, "EDIT", "PROJECTS");
 }
 
 export default async function ParteObraDetailPage({ params }: PageProps) {
@@ -42,16 +51,21 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId, logId } = await params;
+  const roles = current.tenantCtx.roles;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
     companyId: current.tenantCtx.companyId,
-    roles: current.tenantCtx.roles,
+    roles,
   };
 
   let log;
+  let activityLog;
   try {
-    log = await getJobsiteLogById(logId, ctx);
+    [log, activityLog] = await Promise.all([
+      getJobsiteLogById(logId, ctx),
+      getJobsiteLogActivityLog(logId, ctx),
+    ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
@@ -61,74 +75,68 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
 
   const logAttachments = await listEntityDocuments("JOBSITE_LOG", logId, ctx, { projectId });
   const storageConfigured = isStorageConfigured();
-  const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "JOBSITE_LOG");
+  const canEditAttachments = canContributeJobsiteLog(roles);
+  const canContribute = canContributeJobsiteLog(roles);
+  const canSupervise = canSuperviseJobsiteLog(roles);
+  const showEditLink = log.status === "DRAFT" && canContribute;
 
-  const doSubmit = async () => {
-    "use server";
-    await submitJobsiteLogAction(logId);
-  };
-  const doApprove = async () => {
-    "use server";
-    await approveJobsiteLogAction(logId);
-  };
-  const doCancel = async () => {
-    "use server";
-    await cancelJobsiteLogAction(logId);
-  };
+  const wasUpdated =
+    log.updatedAt.getTime() - log.createdAt.getTime() > 1000 ||
+    (activityLog.updatedByName !== null &&
+      activityLog.updatedByName !== activityLog.createdByName);
 
   return (
     <PageShell variant="default" className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <PageBackLink href={`/proyectos/${projectId}/libro-obra`} label="Libro de obra" />
-          <div>
-            <div className="flex items-center gap-2">
+      <div className="space-y-4">
+        <PageBackLink href={`/proyectos/${projectId}/libro-obra`} label="Libro de obra" />
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{formatDateLong(log.logDate)}</h1>
               <JobsiteLogStatusBadge status={log.status} />
             </div>
             {(log.title || log.workFront) && (
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="text-sm text-muted-foreground">
                 {[log.title, log.workFront].filter(Boolean).join(" · ")}
               </p>
             )}
+            <p className="text-sm text-muted-foreground">
+              {activityLog.createdByName ? `Creado por ${activityLog.createdByName}` : "Parte de obra"}
+              {" · "}
+              {formatDateTime(new Date(log.createdAt))}
+              {wasUpdated && activityLog.updatedByName ? (
+                <>
+                  {" · "}
+                  Última modificación por {activityLog.updatedByName}
+                  {" · "}
+                  {formatDateTime(new Date(log.updatedAt))}
+                </>
+              ) : null}
+            </p>
           </div>
-        </div>
-        <div className="flex gap-2">
-          {log.status === "DRAFT" && (
-            <>
+          <div className="flex flex-wrap items-center gap-2">
+            <JobsiteLogLifecycleDialog
+              status={log.status}
+              entries={activityLog.entries}
+              canContribute={canContribute}
+              canSupervise={canSupervise}
+              onSubmit={submitJobsiteLogAction.bind(null, logId, projectId)}
+              onReturn={returnJobsiteLogAction.bind(null, logId, projectId)}
+              onApprove={approveJobsiteLogAction.bind(null, logId, projectId)}
+              onCancel={cancelJobsiteLogAction.bind(null, logId, projectId)}
+            />
+            {showEditLink && (
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/proyectos/${projectId}/libro-obra/${logId}/editar`}>Editar</Link>
               </Button>
-              <form action={doSubmit}>
-                <Button size="sm" type="submit">
-                  Enviar
-                </Button>
-              </form>
-              <form action={doCancel}>
-                <Button variant="outline" size="sm" type="submit" className="text-destructive">
-                  Anular
-                </Button>
-              </form>
-            </>
-          )}
-          {log.status === "SUBMITTED" && (
-            <>
-              <form action={doApprove}>
-                <Button size="sm" type="submit">
-                  Aprobar
-                </Button>
-              </form>
-              <ReturnForm logId={logId} />
-            </>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Return notes */}
-      {log.returnNotes && (
-        <div className="rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20 p-4">
-          <p className="text-xs font-medium text-yellow-700 dark:text-yellow-400 uppercase mb-1">
+      {log.status === "DRAFT" && log.returnNotes && (
+        <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 dark:bg-yellow-950/20">
+          <p className="mb-1 text-xs font-medium uppercase text-yellow-700 dark:text-yellow-400">
             Observaciones de devolución
           </p>
           <p className="text-sm">{log.returnNotes}</p>
@@ -148,7 +156,6 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
         </CardContent>
       </Card>
 
-      {/* Text fields */}
       {[
         { label: "Notas generales", value: log.generalNotes },
         { label: "Impedimentos", value: log.blockers },
@@ -158,12 +165,11 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
         .filter((f) => f.value)
         .map((f) => (
           <div key={f.label} className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground uppercase mb-1">{f.label}</p>
-            <p className="text-sm whitespace-pre-wrap">{f.value}</p>
+            <p className="mb-1 text-xs uppercase text-muted-foreground">{f.label}</p>
+            <p className="whitespace-pre-wrap text-sm">{f.value}</p>
           </div>
         ))}
 
-      {/* Progress */}
       {log.progress.length > 0 && (
         <DataTableSection title="Avance de obra">
           <TableScroll>
@@ -193,7 +199,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                     <TableCell className="text-right tabular-nums">
                       {p.physicalPct ? `${p.physicalPct}%` : "—"}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
+                    <TableCell className="text-xs text-muted-foreground">
                       {p.notes ?? "—"}
                     </TableCell>
                   </TableRow>
@@ -204,7 +210,6 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
         </DataTableSection>
       )}
 
-      {/* Labor */}
       {log.labor.length > 0 && (
         <DataTableSection title="Mano de obra">
           <TableScroll>
@@ -229,7 +234,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                     <TableCell className="text-right tabular-nums">
                       {lb.hoursWorked ?? "—"}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
+                    <TableCell className="text-xs text-muted-foreground">
                       {lb.notes ?? "—"}
                     </TableCell>
                   </TableRow>
@@ -240,7 +245,6 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
         </DataTableSection>
       )}
 
-      {/* Materials */}
       {log.materials.length > 0 && (
         <DataTableSection title="Materiales utilizados">
           <TableScroll>
@@ -265,7 +269,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                     <TableCell className="text-right tabular-nums">
                       {parseFloat(m.quantity).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
+                    <TableCell className="text-xs text-muted-foreground">
                       {m.notes ?? "—"}
                     </TableCell>
                   </TableRow>
@@ -276,7 +280,6 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
         </DataTableSection>
       )}
 
-      {/* Issues */}
       {log.issues.length > 0 && (
         <DataTableSection title="Problemas / Incidencias">
           <TableScroll>
@@ -304,10 +307,10 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                       />
                     </TableCell>
                     <TableCell>{iss.description}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs capitalize">
+                    <TableCell className="text-xs capitalize text-muted-foreground">
                       {iss.status.toLowerCase()}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
+                    <TableCell className="text-xs text-muted-foreground">
                       {iss.notes ?? "—"}
                     </TableCell>
                   </TableRow>
@@ -326,26 +329,5 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
         canEdit={canEditAttachments}
       />
     </PageShell>
-  );
-}
-
-// Inline return form — needs returnNotes text input + server action
-function ReturnForm({ logId }: { logId: string }) {
-  async function doReturn(fd: FormData) {
-    "use server";
-    await returnJobsiteLogAction(logId, fd);
-  }
-  return (
-    <form action={doReturn} className="flex gap-2 items-center">
-      <input
-        name="returnNotes"
-        placeholder="Observaciones de devolución…"
-        required
-        className="h-8 px-2 text-sm border rounded w-64"
-      />
-      <Button variant="outline" size="sm" type="submit" className="text-destructive">
-        Devolver
-      </Button>
-    </form>
   );
 }

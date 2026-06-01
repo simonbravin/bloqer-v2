@@ -1,7 +1,7 @@
 import { Prisma, prisma, JobsiteLog } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreateJobsiteLogInput, UpdateJobsiteLogInput, ReturnJobsiteLogInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
+import { listEntityAuditLogs, log } from "../audit/audit.service";
 import { createSystemNotification } from "../notifications/notification.service";
 import { assertJobsiteLogTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -17,7 +17,7 @@ function canMutateJobsiteLogAsContributor(roles: ServiceContext["roles"]): boole
 }
 
 function canSuperviseJobsiteLog(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "EDIT", "PROJECTS");
+  return can(roles, "APPROVE", "JOBSITE_LOG") || can(roles, "EDIT", "PROJECTS");
 }
 
 // ─── View types ───────────────────────────────────────────────────────────────
@@ -79,6 +79,59 @@ export type JobsiteLogView = Omit<JobsiteLog, never> & {
   materials:    JobsiteLogMaterialView[];
   issues:       JobsiteLogIssueView[];
 };
+
+export type JobsiteLogLifecycleLogEntry = {
+  id: string;
+  action: string;
+  fromStatus: string | null;
+  toStatus: string | null;
+  comment: string | null;
+  detail: string | null;
+  actorUserId: string | null;
+  actorName: string | null;
+  createdAt: Date;
+};
+
+export type JobsiteLogActivityLog = {
+  entries: JobsiteLogLifecycleLogEntry[];
+  createdByName: string | null;
+  updatedByName: string | null;
+};
+
+const JOBSITE_LOG_LIFECYCLE_ACTIONS = [
+  "JOBSITE_LOG_CREATED",
+  "JOBSITE_LOG_UPDATED",
+  "JOBSITE_LOG_SUBMITTED",
+  "JOBSITE_LOG_APPROVED",
+  "JOBSITE_LOG_RETURNED",
+  "JOBSITE_LOG_CANCELLED",
+] as const;
+
+const JOBSITE_LOG_DOCUMENT_ACTIONS = [
+  "document.created",
+  "document.uploaded",
+  "document.deleted",
+] as const;
+
+function parseAuditStatus(json: unknown): string | null {
+  if (!json || typeof json !== "object") return null;
+  const status = (json as { status?: unknown }).status;
+  return typeof status === "string" ? status : null;
+}
+
+function parseAuditReturnNotes(json: unknown): string | null {
+  if (!json || typeof json !== "object") return null;
+  const returnNotes = (json as { returnNotes?: unknown }).returnNotes;
+  return typeof returnNotes === "string" && returnNotes.trim() ? returnNotes.trim() : null;
+}
+
+function parseAuditFileName(json: unknown): string | null {
+  if (!json || typeof json !== "object") return null;
+  const originalFileName = (json as { originalFileName?: unknown }).originalFileName;
+  return typeof originalFileName === "string" && originalFileName.trim()
+    ? originalFileName.trim()
+    : null;
+}
 
 // ─── Serializer ───────────────────────────────────────────────────────────────
 
@@ -281,6 +334,87 @@ export async function getJobsiteLogById(id: string, ctx: ServiceContext): Promis
   return serializeLog(l);
 }
 
+export async function getJobsiteLogActivityLog(
+  logId: string,
+  ctx: ServiceContext,
+): Promise<JobsiteLogActivityLog> {
+  await assertJobsiteLogTenantModule(ctx);
+  if (!canViewJobsiteLogArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver partes de obra");
+  }
+
+  const existing = await prisma.jobsiteLog.findUnique({
+    where: { id: logId },
+    select: { id: true, tenantId: true, createdBy: true, updatedBy: true },
+  });
+  if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
+  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+
+  const [lifecycleRows, linkedDocs, actorUsers] = await Promise.all([
+    listEntityAuditLogs(
+      ctx.tenantId,
+      "JobsiteLog",
+      logId,
+      [...JOBSITE_LOG_LIFECYCLE_ACTIONS],
+    ),
+    prisma.documentAttachment.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        linkedEntityType: "JOBSITE_LOG",
+        linkedEntityId: logId,
+      },
+      select: { id: true },
+    }),
+    prisma.user.findMany({
+      where: {
+        id: {
+          in: [existing.createdBy, existing.updatedBy].filter((id): id is string => Boolean(id)),
+        },
+      },
+      select: { id: true, name: true, email: true },
+    }),
+  ]);
+
+  const documentRows =
+    linkedDocs.length > 0
+      ? await prisma.auditLog.findMany({
+          where: {
+            tenantId: ctx.tenantId,
+            entityType: "DocumentAttachment",
+            entityId: { in: linkedDocs.map((doc) => doc.id) },
+            action: { in: [...JOBSITE_LOG_DOCUMENT_ACTIONS] },
+          },
+          include: {
+            actor: { select: { id: true, name: true, email: true } },
+          },
+        })
+      : [];
+
+  const actorNameById = new Map(
+    actorUsers.map((user) => [user.id, user.name ?? user.email ?? null]),
+  );
+
+  const entries = [...lifecycleRows, ...documentRows]
+    .map((row) => ({
+      id: row.id,
+      action: row.action,
+      fromStatus: parseAuditStatus(row.before),
+      toStatus: parseAuditStatus(row.after),
+      comment: parseAuditReturnNotes(row.after),
+      detail: parseAuditFileName(row.after),
+      actorUserId: row.actorUserId,
+      actorName: row.actor?.name ?? row.actor?.email ?? null,
+      createdAt: row.createdAt,
+    }))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  return {
+    entries,
+    createdByName: existing.createdBy ? actorNameById.get(existing.createdBy) ?? null : null,
+    updatedByName: existing.updatedBy ? actorNameById.get(existing.updatedBy) ?? null : null,
+  };
+}
+
 export async function listJobsiteLogsByProject(
   projectId: string,
   ctx: ServiceContext,
@@ -376,8 +510,11 @@ export async function createJobsiteLog(
 
   const hasContent =
     input.generalNotes || input.blockers || input.incidents || input.safetyNotes ||
-    input.title || input.workFront ||
-    (input.progress?.length ?? 0) > 0 || (input.labor?.length ?? 0) > 0;
+    input.title || input.workFront || input.weather || input.shift ||
+    (input.progress?.length ?? 0) > 0 ||
+    (input.labor?.length ?? 0) > 0 ||
+    (input.materials?.length ?? 0) > 0 ||
+    (input.issues?.length ?? 0) > 0;
   if (!hasContent) {
     throw new ServiceError("CONFLICT", "El parte debe tener al menos un campo descriptivo o una entrada");
   }
@@ -409,8 +546,13 @@ export async function createJobsiteLog(
   });
 
   await log({
-    tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
-    action: "JOBSITE_LOG_CREATED", entityType: "JobsiteLog", entityId: result.id,
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    companyId,
+    projectId: input.projectId,
+    action: "JOBSITE_LOG_CREATED",
+    entityType: "JobsiteLog",
+    entityId: result.id,
     after: { projectId: input.projectId, logDate: input.logDate },
   });
 
@@ -480,8 +622,13 @@ export async function updateJobsiteLog(
   });
 
   await log({
-    tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
-    action: "JOBSITE_LOG_UPDATED", entityType: "JobsiteLog", entityId: id,
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    companyId: existing.companyId,
+    projectId: existing.projectId,
+    action: "JOBSITE_LOG_UPDATED",
+    entityType: "JobsiteLog",
+    entityId: id,
     after: { logDate: input.logDate },
   });
 
@@ -497,7 +644,12 @@ export async function submitJobsiteLog(id: string, ctx: ServiceContext): Promise
   }
   const existing = await prisma.jobsiteLog.findUnique({
     where: { id },
-    include: { progress: { select: { id: true } }, labor: { select: { id: true } } },
+    include: {
+      progress: { select: { id: true } },
+      labor: { select: { id: true } },
+      materials: { select: { id: true } },
+      issues: { select: { id: true } },
+    },
   });
   if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -507,18 +659,30 @@ export async function submitJobsiteLog(id: string, ctx: ServiceContext): Promise
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
   const hasContent =
     existing.generalNotes || existing.blockers || existing.incidents || existing.safetyNotes ||
-    existing.title || existing.workFront ||
-    existing.progress.length > 0 || existing.labor.length > 0;
+    existing.title || existing.workFront || existing.weather || existing.shift ||
+    existing.progress.length > 0 ||
+    existing.labor.length > 0 ||
+    existing.materials.length > 0 ||
+    existing.issues.length > 0;
   if (!hasContent) {
     throw new ServiceError("CONFLICT", "El parte debe tener al menos un campo descriptivo antes de enviarse");
   }
 
   const updated = await prisma.jobsiteLog.update({
-    where: { id }, data: { status: "SUBMITTED", updatedBy: ctx.actorUserId }, include: logInclude,
+    where: { id },
+    data: { status: "SUBMITTED", returnNotes: null, updatedBy: ctx.actorUserId },
+    include: logInclude,
   });
   await log({
-    tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
-    action: "JOBSITE_LOG_SUBMITTED", entityType: "JobsiteLog", entityId: id, after: { status: "SUBMITTED" },
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    companyId: existing.companyId,
+    projectId: existing.projectId,
+    action: "JOBSITE_LOG_SUBMITTED",
+    entityType: "JobsiteLog",
+    entityId: id,
+    before: { status: existing.status },
+    after: { status: "SUBMITTED" },
   });
   return serializeLog(updated);
 }
@@ -538,8 +702,15 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
     where: { id }, data: { status: "APPROVED", updatedBy: ctx.actorUserId }, include: logInclude,
   });
   await log({
-    tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
-    action: "JOBSITE_LOG_APPROVED", entityType: "JobsiteLog", entityId: id, after: { status: "APPROVED" },
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    companyId: existing.companyId,
+    projectId: existing.projectId,
+    action: "JOBSITE_LOG_APPROVED",
+    entityType: "JobsiteLog",
+    entityId: id,
+    before: { status: existing.status },
+    after: { status: "APPROVED" },
   });
   return serializeLog(updated);
 }
@@ -565,9 +736,15 @@ export async function returnJobsiteLog(
     include: logInclude,
   });
   await log({
-    tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
-    action: "JOBSITE_LOG_RETURNED", entityType: "JobsiteLog", entityId: id,
-    after: { returnNotes: input.returnNotes },
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    companyId: existing.companyId,
+    projectId: existing.projectId,
+    action: "JOBSITE_LOG_RETURNED",
+    entityType: "JobsiteLog",
+    entityId: id,
+    before: { status: existing.status },
+    after: { status: "DRAFT", returnNotes: input.returnNotes },
   });
 
   const creatorId = existing.createdBy;
@@ -613,8 +790,15 @@ export async function cancelJobsiteLog(id: string, ctx: ServiceContext): Promise
     where: { id }, data: { status: "CANCELLED", updatedBy: ctx.actorUserId }, include: logInclude,
   });
   await log({
-    tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
-    action: "JOBSITE_LOG_CANCELLED", entityType: "JobsiteLog", entityId: id, after: { status: "CANCELLED" },
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    companyId: existing.companyId,
+    projectId: existing.projectId,
+    action: "JOBSITE_LOG_CANCELLED",
+    entityType: "JobsiteLog",
+    entityId: id,
+    before: { status: existing.status },
+    after: { status: "CANCELLED" },
   });
   return serializeLog(updated);
 }
