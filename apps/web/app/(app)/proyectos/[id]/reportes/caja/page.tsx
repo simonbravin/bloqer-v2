@@ -9,7 +9,7 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { CashProjectionChart } from "@/features/reports/cash-projection-chart";
-import { ReportDateFilters, ReportExportActions } from "@/features/reports";
+import { ReportExportActions } from "@/features/reports";
 import { ProjectCashFlowChart, ProjectCashFlowFilters } from "@/features/project-cash-flow";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
@@ -48,12 +48,16 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
     project = await getProjectShellInfo(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
-    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${projectId}`);
     throw err;
   }
 
   const period: "day" | "week" | "month" =
     sp.period === "day" || sp.period === "week" || sp.period === "month" ? sp.period : "month";
+  const userSetDateFilter = Boolean(sp.dateFrom || sp.dateTo);
+  const projectionFilters = userSetDateFilter
+    ? { dateFrom: sp.dateFrom, dateTo: sp.dateTo, currency: sp.currency }
+    : { currency: sp.currency };
 
   const cashFilters = {
     dateFrom: sp.dateFrom,
@@ -67,14 +71,10 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
   try {
     [cashReport, projection] = await Promise.all([
       getProjectCashFlowReport(projectId, cashFilters, ctx),
-      getProjectCashProjectionReport(
-        projectId,
-        { dateFrom: sp.dateFrom, dateTo: sp.dateTo, currency: sp.currency },
-        ctx,
-      ),
+      getProjectCashProjectionReport(projectId, projectionFilters, ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${projectId}`);
     throw err;
   }
 
@@ -115,12 +115,13 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
         </p>
       ))}
 
-      <div className="rounded-lg border bg-card p-4 space-y-3">
+      <div className="rounded-lg border bg-card p-4">
         <Suspense>
-          <ReportDateFilters showBudget={false} />
-        </Suspense>
-        <Suspense>
-          <ProjectCashFlowFilters />
+          <ProjectCashFlowFilters
+            appliedDateFrom={cashReport.dateFrom}
+            appliedDateTo={cashReport.dateTo}
+            appliedPeriod={cashReport.period}
+          />
         </Suspense>
       </div>
 

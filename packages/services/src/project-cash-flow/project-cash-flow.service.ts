@@ -41,6 +41,19 @@ function periodLabel(key: string, period: "day" | "week" | "month"): string {
   return key;
 }
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidIsoDate(value: string): boolean {
+  if (!ISO_DATE.test(value)) return false;
+  const [y, m, d] = value.split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d!));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m! - 1 && dt.getUTCDate() === d!;
+}
+
+function pickIsoDate(value: string | undefined, fallback: string): string {
+  return value && isValidIsoDate(value) ? value : fallback;
+}
+
 function defaultDateRange(): { dateFrom: string; dateTo: string } {
   const to   = new Date();
   const from = new Date(to);
@@ -49,6 +62,20 @@ function defaultDateRange(): { dateFrom: string; dateTo: string } {
     dateFrom: from.toISOString().slice(0, 10),
     dateTo:   to.toISOString().slice(0, 10),
   };
+}
+
+/** Merge partial URL filters with defaults so a single date change still narrows the report. */
+export function resolveProjectCashFlowDateRange(filters: {
+  dateFrom?: string;
+  dateTo?: string;
+}): { dateFrom: string; dateTo: string } {
+  const defaults = defaultDateRange();
+  let dateFrom = pickIsoDate(filters.dateFrom, defaults.dateFrom);
+  let dateTo = pickIsoDate(filters.dateTo, defaults.dateTo);
+  if (dateFrom > dateTo) {
+    [dateFrom, dateTo] = [dateTo, dateFrom];
+  }
+  return { dateFrom, dateTo };
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -163,9 +190,7 @@ export async function getProjectCashFlowReport(
   }
 
   const period = (filters.period ?? "month") as "day" | "week" | "month";
-  const range  = filters.dateFrom && filters.dateTo
-    ? { dateFrom: filters.dateFrom, dateTo: filters.dateTo }
-    : defaultDateRange();
+  const range = resolveProjectCashFlowDateRange(filters);
 
   const dateFrom = new Date(range.dateFrom);
   const dateTo   = new Date(range.dateTo);

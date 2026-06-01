@@ -1,5 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
+import { canViewProjectCashFlowReport, resolveProjectCashFlowDateRange } from "../project-cash-flow/project-cash-flow.service";
 import {
   assertTenantModuleEnabledWithGate,
   getTenantModuleGate,
@@ -83,8 +83,8 @@ export async function getProjectCashProjectionReport(
   }
 
   const range =
-    filters.dateFrom && filters.dateTo
-      ? { dateFrom: filters.dateFrom, dateTo: filters.dateTo }
+    filters.dateFrom || filters.dateTo
+      ? resolveProjectCashFlowDateRange(filters)
       : projectionHorizon(90);
 
   warnings.push(

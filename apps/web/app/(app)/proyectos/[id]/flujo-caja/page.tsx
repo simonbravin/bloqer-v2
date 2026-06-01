@@ -83,23 +83,25 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
     roles: current.tenantCtx.roles,
   };
 
-  const period =
-    sp.period === "day" || sp.period === "week" || sp.period === "month" ? sp.period : undefined;
+  const period: "day" | "week" | "month" =
+    sp.period === "day" || sp.period === "week" || sp.period === "month" ? sp.period : "month";
+  const userSetDateFilter = Boolean(sp.dateFrom || sp.dateTo);
+  const projectionFilters = userSetDateFilter
+    ? { dateFrom: sp.dateFrom, dateTo: sp.dateTo, currency: sp.currency }
+    : { currency: sp.currency };
 
   let report;
   let projection;
 
   try {
-    report = await getProjectCashFlowReport(
-      id,
-      { dateFrom: sp.dateFrom, dateTo: sp.dateTo, period, currency: sp.currency },
-      ctx,
-    );
-    projection = await getProjectCashProjectionReport(
-      id,
-      { dateFrom: sp.dateFrom, dateTo: sp.dateTo, currency: sp.currency },
-      ctx,
-    );
+    [report, projection] = await Promise.all([
+      getProjectCashFlowReport(
+        id,
+        { dateFrom: sp.dateFrom, dateTo: sp.dateTo, period, currency: sp.currency },
+        ctx,
+      ),
+      getProjectCashProjectionReport(id, projectionFilters, ctx),
+    ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
@@ -113,7 +115,7 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
       <ProjectPageHeader
         projectId={id}
         projectName={report.project.name}
-        title="Cashflow del proyecto"
+        title="Flujo de caja"
         subtitle="Ingresos, gastos y balance del período. Desglose por partida EDT."
         actions={
           <>
@@ -171,7 +173,11 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
 
       <div className="rounded-lg border bg-card p-4">
         <Suspense>
-          <ProjectCashFlowFilters />
+          <ProjectCashFlowFilters
+            appliedDateFrom={report.dateFrom}
+            appliedDateTo={report.dateTo}
+            appliedPeriod={report.period}
+          />
         </Suspense>
       </div>
 
@@ -196,6 +202,7 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
         const prev = current.periods[current.periods.length - 2];
         const pendingInflows = projectionCur?.totalExpectedInflows ?? "0";
         const pendingOutflows = projectionCur?.totalExpectedOutflows ?? "0";
+        const pendingHelperPrefix = userSetDateFilter ? "Pendientes" : "Pendientes (90 d)";
         const netPeriod = current.netCashFlow;
         const avgInflows = current.periods.length
           ? (Number.parseFloat(current.totalInflows) / current.periods.length).toFixed(2)
@@ -228,19 +235,22 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
               ? "Balance de la semana"
               : "Balance del mes";
 
+        const avgBucketLabel =
+          report.period === "day" ? "día" : report.period === "week" ? "semana" : "mes";
+
         return (
           <div className="space-y-4">
             <KpiStatGrid title={null} columns={4}>
               <KpiStatCard
                 label="Total Ingresos (acum.)"
                 value={formatMoneyAmount(current.totalInflows, current.currency)}
-                helper={`Pendientes: ${formatMoneyAmount(pendingInflows, current.currency)}`}
+                helper={`${pendingHelperPrefix}: ${formatMoneyAmount(pendingInflows, current.currency)}`}
                 tone="success"
               />
               <KpiStatCard
                 label="Total Gastos (acum.)"
                 value={formatMoneyAmount(current.totalOutflows, current.currency)}
-                helper={`Pendientes: ${formatMoneyAmount(pendingOutflows, current.currency)}`}
+                helper={`${pendingHelperPrefix}: ${formatMoneyAmount(pendingOutflows, current.currency)}`}
                 tone="danger"
               />
               <KpiStatCard
@@ -281,7 +291,7 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">
-                  Resumen del Período ({report.dateFrom} - {report.dateTo})
+                  Resumen del Período ({report.dateFrom} → {report.dateTo})
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -304,11 +314,11 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Promedio Ingresos/Mes</p>
+                  <p className="text-xs text-muted-foreground">Promedio Ingresos/{avgBucketLabel}</p>
                   <p className="text-lg font-semibold">{formatMoneyAmount(avgInflows, current.currency)}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Promedio Gastos/Mes</p>
+                  <p className="text-xs text-muted-foreground">Promedio Gastos/{avgBucketLabel}</p>
                   <p className="text-lg font-semibold">{formatMoneyAmount(avgOutflows, current.currency)}</p>
                 </div>
                 <div className="space-y-1">
