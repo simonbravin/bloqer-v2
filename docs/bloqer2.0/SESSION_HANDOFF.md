@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
 Last updated: 2026-05-13  
-Status: Phase **16E** — UX **`/finanzas`**: jerarquía visual, empty states, barras vencido/al día, accesos rápidos en card; **subnav** en `app/(app)/finanzas/layout.tsx` (`getFinanceSubnavLinks` + `FinanceSubnav`) con rutas reales y gates módulo + `can()`. Copy “Facturas y gastos”, “Pagos pendientes”, “Empresa / gastos generales”. Ver [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) §16E.
+Status: Phase **16E** — UX **`/finanzas`**: jerarquía visual, empty states, barras vencido/al día, accesos rápidos en card; **subnav** en `app/(app)/finanzas/layout.tsx` (`getFinanceSubnavLinks` + `FinanceSubnav`) con rutas reales y gates módulo + `can()` (incl. Facturas y gastos, CxC, CxP, Imputación GG). Ver [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) §16E.
 
 ---
 

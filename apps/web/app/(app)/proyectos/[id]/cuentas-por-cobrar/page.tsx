@@ -150,7 +150,7 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
             <Link href={`/proyectos/${id}/cobranzas`}>Ver cobranzas</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href={`/proyectos/${id}/certificaciones`}>Ver certificaciones</Link>
+            <Link href={`/proyectos/${id}/flujo-caja`}>Flujo de caja</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link href={`/proyectos/${id}/reportes/ingresos-gastos`}>Ingresos vs gastos</Link>

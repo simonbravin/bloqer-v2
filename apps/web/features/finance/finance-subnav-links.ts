@@ -27,6 +27,14 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
     });
   }
 
+  if (gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP")) {
+    links.push({
+      href: "/finanzas/facturas-proveedor",
+      label: "Facturas y gastos",
+      title: "Facturas de proveedor corporativas (sin proyecto)",
+    });
+  }
+
   if (gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR")) {
     links.push({
       href: "/finanzas/cuentas-por-cobrar",

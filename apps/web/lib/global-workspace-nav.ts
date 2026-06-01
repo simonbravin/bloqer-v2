@@ -61,6 +61,11 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
           ],
         },
       },
+      {
+        label: "Facturas y gastos",
+        href: "/finanzas/facturas-proveedor",
+        require: { action: "VIEW", module: "AP" },
+      },
       { label: "Cuentas por cobrar", href: "/finanzas/cuentas-por-cobrar", require: { action: "VIEW", module: "AR" } },
       { label: "Cuentas por pagar", href: "/finanzas/cuentas-por-pagar", require: { action: "VIEW", module: "AP" } },
       { label: "Imputación GG", href: "/finanzas/gastos-generales", require: { action: "VIEW", module: "AP" } },

@@ -82,7 +82,7 @@ Relacionado: [`TENANT_DASHBOARD_ARCHITECTURE.md`](./TENANT_DASHBOARD_ARCHITECTUR
 | **16B** | **Hecho (2026-05-13):** ver §Phase 16B — migración + servicios + validators + aging AP + documentos; **sin** UI global de alta corporativa (→ 16C). |
 | **16C** | **Hecho (2026-05-13):** UI bajo `/finanzas/facturas-proveedor/**`, `/finanzas/cuentas-por-pagar/**`, `/finanzas/pagos-proveedor/[paymentId]`; servicios `listCompany*` / `getCompany*` con **`VIEW AP` only**; hub con enlaces; adjuntos corporativos. Ver §Phase 16C. |
 | **16D** | **Hecho (2026-05-13):** hub `/finanzas` tablero empresa — `getFinanceHubOverview` + `FinanceHubView`: multimoneda, split AP aging, accesos rápidos, tesorería, enlace contabilidad; nav shell Finanzas con `VIEW TREASURY` / `VIEW ACCOUNTING`. |
-| **16E** | **Hecho (2026-05-13):** subnav bajo `/finanzas` + polish UI hub + copy (“Facturas y gastos”, “Pagos pendientes”, “Empresa / gastos generales”). Ver §Phase 16E. |
+| **16E** | **Hecho (2026-05-13):** subnav bajo `/finanzas` + polish UI hub + copy (“Facturas y gastos”, “Cuentas por pagar/cobrar”, “Imputación GG”). Ver §Phase 16E. |
 | **16F** | **Integración proyecto:** filtros “solo obra” / “mixto”; reportes distribución por proyecto y por categoría; alinear `getProjectCashFlowReport` / cost control con movimientos que expongan dimensión corporativa donde aplique. |
 | **16G** | **Indicadores** en `/dashboard` y/o hub: deuda próxima, cobros próximos, cash forecast — solo métricas ya definibles desde datos existentes o desde 16B; nuevas métricas → doc de fórmulas / `OPEN_QUESTIONS`. |
 
@@ -178,14 +178,14 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 
 ### 16E.1 Alcance
 
-- **Subnav:** `apps/web/app/(app)/finanzas/layout.tsx` + `apps/web/features/finance/finance-subnav.tsx` + `finance-subnav-links.ts` — `getFinanceSubnavLinks(ctx)` con `getTenantModuleGate` + `can()`; solo rutas reales (Resumen, CxC aging, facturas y gastos, pagos pendientes, aging proveedores, Tesorería, Contabilidad). Enlaces a `/tesoreria` y `/contabilidad` salen del segmento `/finanzas` pero siguen en la barra cuando el rol califica.
+- **Subnav:** `apps/web/app/(app)/finanzas/layout.tsx` + `apps/web/features/finance/finance-subnav.tsx` + `finance-subnav-links.ts` — `getFinanceSubnavLinks(ctx)` con `getTenantModuleGate` + `can()`; solo rutas reales (Resumen, Transacciones, Facturas y gastos, Cuentas por cobrar, Cuentas por pagar, Imputación GG, Tesorería). Sidebar global (`global-workspace-nav.ts`) replica Facturas y gastos + CxC/CxP. Sin rutas `-aging` ni redirects legados.
 - **Hub:** refinamiento visual de `FinanceHubView` (jerarquía, cards, empty states, barra vencido vs al día con tokens, accesos rápidos en card).
-- **Copy:** “Facturas y gastos”, “Pagos pendientes”, “Empresa / gastos generales”; páginas listado/aging alineadas en títulos y textos cortos.
+- **Copy:** “Facturas y gastos”, “Cuentas por pagar” / “Cuentas por cobrar”, “Imputación GG”; páginas unificadas aging + listado en `/finanzas/cuentas-por-pagar` y `/finanzas/cuentas-por-cobrar`.
 - **Sin** schema, **sin** `Expense`, **sin** automatismos contables; **sin** cambios al contrato DTO de `getFinanceHubOverview` (solo strings de labels en servicio donde aplica).
 
 ### 16E.2 Fuera de alcance
 
-- Phase **17B** refinada (2026-05): `/finanzas/gastos-generales` = **imputación GG** (manual + AUTO_WEIGHT por período); alta corporativa en `facturas-proveedor` o `transacciones?register=ap`; `/gastos-generales/nueva` redirige a alta de factura. Cierre de período AUTO: [D-043](../00-product/DECISION_LOG.md).
+- Phase **17B** refinada (2026-05): `/finanzas/gastos-generales` = **imputación GG** (manual + AUTO_WEIGHT por período); alta corporativa en `/finanzas/facturas-proveedor/nueva` o `transacciones?register=ap`. Cierre de período AUTO: [D-043](../00-product/DECISION_LOG.md).
 
 ---
 
