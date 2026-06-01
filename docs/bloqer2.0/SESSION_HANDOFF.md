@@ -162,8 +162,8 @@ Ver matrices: `PERMISSIONS_ROUTE_MATRIX.md`, `SECURITY_ARCHITECTURE.md`.
 /proyectos/[id]/libro-obra, /nuevo, /[logId], /[logId]/editar
 /proyectos/[id]/control-costos, /[wbsNodeId]
 /finanzas
-/finanzas/cuentas-por-cobrar-aging
-/finanzas/cuentas-por-pagar-aging
+/finanzas/cuentas-por-cobrar
+/finanzas/cuentas-por-pagar
 /tesoreria
 /contabilidad
 /contabilidad/cuentas, /nueva, /[accountId]
@@ -468,7 +468,7 @@ R2 endpoint: `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
 - **`ar-access.ts`:** `canViewArProjectArea` = `VIEW AR | VIEW PROJECTS`; `canEditArArea` = `EDIT AR`.
 - **Sales invoice, receivable (reads), collection (reads):** `canViewArProjectArea`.
 - **Sales invoice mutations, receivable cancel, collection create/cancel:** `canEditArArea` = `EDIT AR` (Phase 7C: módulo `SALES_COLLECTIONS` eliminado del dominio).
-- **Aging AR global** (`getReceivableAgingReport`, `/finanzas/cuentas-por-cobrar-aging`): **`VIEW AR` only**.
+- **Aging AR global** (`getReceivableAgingReport`, `/finanzas/cuentas-por-cobrar`): **`VIEW AR` only**.
 - **Roles:** `PROJECT_MANAGER` tiene `AR: "EDIT"` en `matrix.ts` (alineado con Phase 7B). Rol `SALES` sigue con `AR: "EDIT"`.
 
 ### Phase 7C — Matrix + seeds documentation
