@@ -8,7 +8,7 @@ import { getPlatformServiceContext } from "@/lib/platform-service-context";
 import { formatDateTime } from "@/lib/format";
 import {
   PLATFORM_INVITE_LINK_FLASH_COOKIE,
-  platformInvitationFlashCookiePath,
+  PLATFORM_INVITE_EMAIL_FLASH_COOKIE,
 } from "@/lib/platform-invitation-flash";
 import { cancelPlatformTenantInvitationAction } from "@/app/(platform)/platform-invitation-actions";
 import { Button } from "@/components/ui/button";
@@ -47,11 +47,8 @@ export default async function PlatformTenantInvitationDetailPage({ params }: Pag
   }
 
   const c = await cookies();
-  const flashPath = platformInvitationFlashCookiePath(tenantId);
   const flashLink = c.get(PLATFORM_INVITE_LINK_FLASH_COOKIE)?.value ?? null;
-  if (flashLink) {
-    c.delete({ name: PLATFORM_INVITE_LINK_FLASH_COOKIE, path: flashPath });
-  }
+  const flashEmailNote = c.get(PLATFORM_INVITE_EMAIL_FLASH_COOKIE)?.value ?? null;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -67,8 +64,8 @@ export default async function PlatformTenantInvitationDetailPage({ params }: Pag
         <section className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 dark:bg-amber-500/10">
           <h2 className="text-sm font-semibold">Enlace de invitación (copiá y compartí)</h2>
           <p className="text-xs text-muted-foreground">
-            El correo no se despachó. Este enlace incluye un token secreto: compartilo solo con el
-            destinatario.
+            {flashEmailNote ??
+              "El correo no se despachó. Este enlace incluye un token secreto: compartilo solo con el destinatario."}
           </p>
           <p className="break-all font-mono text-xs">{flashLink}</p>
         </section>

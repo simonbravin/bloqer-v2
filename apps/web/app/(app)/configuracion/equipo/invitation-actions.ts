@@ -13,6 +13,7 @@ import {
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import {
   TENANT_INVITE_LINK_FLASH_COOKIE,
+  TENANT_INVITE_EMAIL_FLASH_COOKIE,
   TENANT_INVITE_LINK_FLASH_COOKIE_PATH,
 } from "@/lib/tenant-invitation-flash";
 
@@ -40,6 +41,14 @@ export async function createTenantInvitationAction(formData: FormData) {
         sameSite:   "lax",
         path:       TENANT_INVITE_LINK_FLASH_COOKIE_PATH,
       });
+      if (result.emailFailureMessage) {
+        c.set(TENANT_INVITE_EMAIL_FLASH_COOKIE, result.emailFailureMessage, {
+          maxAge:     120,
+          httpOnly:   true,
+          sameSite:   "lax",
+          path:       TENANT_INVITE_LINK_FLASH_COOKIE_PATH,
+        });
+      }
     }
     revalidatePath("/configuracion/equipo");
     revalidatePath(`/configuracion/equipo/invitaciones/${result.invitationId}`);

@@ -7,6 +7,7 @@ import { auth } from "@bloqer/auth";
 import { provisionPlatformTenant, ServiceError } from "@bloqer/services";
 import {
   PLATFORM_INVITE_LINK_FLASH_COOKIE,
+  PLATFORM_INVITE_EMAIL_FLASH_COOKIE,
   platformInvitationFlashCookiePath,
 } from "@/lib/platform-invitation-flash";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
@@ -41,12 +42,21 @@ export async function provisionPlatformTenantAction(formData: FormData) {
     const result = await provisionPlatformTenant(raw, ctx);
     if (!result.emailDispatched) {
       const c = await cookies();
+      const flashPath = platformInvitationFlashCookiePath(result.tenantId);
       c.set(PLATFORM_INVITE_LINK_FLASH_COOKIE, result.invitationLink, {
         maxAge:   120,
         httpOnly: true,
         sameSite: "lax",
-        path:     platformInvitationFlashCookiePath(result.tenantId),
+        path:     flashPath,
       });
+      if (result.emailFailureMessage) {
+        c.set(PLATFORM_INVITE_EMAIL_FLASH_COOKIE, result.emailFailureMessage, {
+          maxAge:   120,
+          httpOnly: true,
+          sameSite: "lax",
+          path:     flashPath,
+        });
+      }
     }
     revalidatePath("/platform/tenants");
     revalidatePath(`/platform/tenants/${result.tenantId}`);

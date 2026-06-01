@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
   TENANT_INVITE_LINK_FLASH_COOKIE,
-  TENANT_INVITE_LINK_FLASH_COOKIE_PATH,
+  TENANT_INVITE_EMAIL_FLASH_COOKIE,
 } from "@/lib/tenant-invitation-flash";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import {
@@ -56,9 +56,7 @@ export default async function ConfiguracionEquipoInvitacionDetallePage({ params 
 
   const c = await cookies();
   const flashLink = c.get(TENANT_INVITE_LINK_FLASH_COOKIE)?.value ?? null;
-  if (flashLink) {
-    c.delete({ name: TENANT_INVITE_LINK_FLASH_COOKIE, path: TENANT_INVITE_LINK_FLASH_COOKIE_PATH });
-  }
+  const flashEmailNote = c.get(TENANT_INVITE_EMAIL_FLASH_COOKIE)?.value ?? null;
 
   const canEdit = canEditTeamMembership(current.tenantCtx.roles);
 
@@ -76,9 +74,8 @@ export default async function ConfiguracionEquipoInvitacionDetallePage({ params 
         <section className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 dark:bg-amber-500/10">
           <h2 className="text-sm font-semibold">Enlace de invitación (copiá y compartí)</h2>
           <p className="text-xs text-muted-foreground">
-            El correo no se despachó (integración desactivada, URL pública de la app ausente o
-            inválida, o fallo del proveedor). Este enlace incluye un token secreto: no lo publiques
-            en lugares públicos.
+            {flashEmailNote ??
+              "El correo no se despachó (integración desactivada, URL pública de la app ausente o inválida, o fallo del proveedor). Este enlace incluye un token secreto: no lo publiques en lugares públicos."}
           </p>
           <p className="break-all font-mono text-xs">{flashLink}</p>
         </section>

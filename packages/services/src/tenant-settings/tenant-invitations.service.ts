@@ -3,7 +3,6 @@ import "server-only";
 import { prisma } from "@bloqer/database";
 import type { MembershipStatus, TenantInvitationStatus, UserRole as PrismaUserRole } from "@bloqer/database";
 import type { UserRole } from "@bloqer/domain";
-import { getPublicAppBaseUrl, isEmailConfigured } from "@bloqer/config";
 import {
   dedupeInvitationRoles,
   hashInvitationToken,
@@ -11,6 +10,7 @@ import {
   markExpiredPendingInvitationsForTenant,
   normalizeInvitationEmail,
   sendTenantInvitationEmailMessage,
+  tenantInvitationEmailFailureMessage,
 } from "./tenant-invitation-shared";
 import {
   acceptTenantInvitationSchema,
@@ -48,6 +48,7 @@ export type CreateTenantInvitationResult = {
   /** Full or relative URL with token query (actor-only). */
   invitationLink: string;
   emailDispatched: boolean;
+  emailFailureMessage?: string;
 };
 
 /** Owner invariant when activating or creating membership via invitation (only active members count before). */
@@ -253,12 +254,15 @@ export async function createTenantInvitation(
   });
 
   let emailDispatched = false;
-  if (isEmailConfigured() && getPublicAppBaseUrl()) {
-    emailDispatched = await sendTenantInvitationEmailMessage(
-      emailNorm,
-      inserted.invitationLink,
-      tenant.name,
-    );
+  let emailFailureMessage: string | undefined;
+  const emailDispatch = await sendTenantInvitationEmailMessage(
+    emailNorm,
+    inserted.invitationLink,
+    tenant.name,
+  );
+  emailDispatched = emailDispatch.dispatched;
+  if (!emailDispatch.dispatched) {
+    emailFailureMessage = tenantInvitationEmailFailureMessage(emailDispatch);
   }
 
   return {
@@ -266,6 +270,7 @@ export async function createTenantInvitation(
     expiresAt: inserted.expiresAt,
     invitationLink: inserted.invitationLink,
     emailDispatched,
+    emailFailureMessage,
   };
 }
 

@@ -28,12 +28,37 @@ function sanitizeEmailSubject(s: string): string {
   return s.replace(/[\r\n\u2028\u2029]+/g, " ").trim().slice(0, 998);
 }
 
+export type TenantInvitationEmailDispatch = {
+  dispatched: boolean;
+  skipReason?: "email_not_configured" | "app_url_missing";
+  providerError?: string;
+};
+
+export function tenantInvitationEmailFailureMessage(dispatch: TenantInvitationEmailDispatch): string {
+  if (dispatch.dispatched) return "";
+  if (dispatch.skipReason === "email_not_configured") {
+    return "Resend no está configurado (faltan RESEND_API_KEY o RESEND_FROM_EMAIL en el entorno).";
+  }
+  if (dispatch.skipReason === "app_url_missing") {
+    return "Falta la URL pública de la app (AUTH_URL, NEXT_PUBLIC_APP_URL o APP_URL).";
+  }
+  if (dispatch.providerError) {
+    return `Resend rechazó el envío: ${dispatch.providerError}`;
+  }
+  return "No se pudo enviar el correo de invitación.";
+}
+
 export async function sendTenantInvitationEmailMessage(
   toEmail: string,
   invitationLink: string,
   tenantName: string,
-): Promise<boolean> {
-  if (!isEmailConfigured()) return false;
+): Promise<TenantInvitationEmailDispatch> {
+  if (!isEmailConfigured()) {
+    return { dispatched: false, skipReason: "email_not_configured" };
+  }
+  if (!getPublicAppBaseUrl()) {
+    return { dispatched: false, skipReason: "app_url_missing" };
+  }
   const safeTenant = escapeHtml(tenantName);
   const html = `
 <p>Te invitaron a unirte al equipo en <strong>${safeTenant}</strong> en Bloqer.</p>
@@ -47,7 +72,13 @@ export async function sendTenantInvitationEmailMessage(
     html,
     text,
   });
-  return res.ok && res.provider === "resend";
+  if (res.ok && res.provider === "resend") {
+    return { dispatched: true };
+  }
+  return {
+    dispatched: false,
+    providerError: res.error ?? "send_failed",
+  };
 }
 
 export async function markExpiredPendingInvitationsForTenant(

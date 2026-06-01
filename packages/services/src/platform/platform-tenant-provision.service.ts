@@ -1,6 +1,5 @@
 import { prisma } from "@bloqer/database";
 import type { UserRole } from "@bloqer/domain";
-import { getPublicAppBaseUrl, isEmailConfigured } from "@bloqer/config";
 import { provisionPlatformTenantInputSchema } from "@bloqer/validators";
 import { createTrialTenantBundle } from "../onboarding/trial-tenant-bundle";
 import {
@@ -8,6 +7,7 @@ import {
   insertTenantInvitation,
   normalizeInvitationEmail,
   sendTenantInvitationEmailMessage,
+  tenantInvitationEmailFailureMessage,
 } from "../tenant-settings/tenant-invitation-shared";
 import { ServiceError } from "../types";
 import { assertPlatformAccess, type PlatformServiceContext } from "./platform-auth.service";
@@ -19,6 +19,8 @@ export type ProvisionPlatformTenantResult = {
   invitationId: string;
   invitationLink: string;
   emailDispatched: boolean;
+  /** Set when `emailDispatched` is false (for operator UI). */
+  emailFailureMessage?: string;
 };
 
 export async function provisionPlatformTenant(
@@ -51,7 +53,7 @@ export async function provisionPlatformTenant(
     companySize: input.companySize,
   };
 
-  return prisma.$transaction(async (tx) => {
+  const provisioned = await prisma.$transaction(async (tx) => {
     const { tenant, company } = await createTrialTenantBundle(tx, onboardingFields);
 
     const inserted = await insertTenantInvitation(tx, {
@@ -91,21 +93,29 @@ export async function provisionPlatformTenant(
       tx,
     );
 
-    let emailDispatched = false;
-    if (isEmailConfigured() && getPublicAppBaseUrl()) {
-      emailDispatched = await sendTenantInvitationEmailMessage(
-        emailNorm,
-        inserted.invitationLink,
-        tenant.name,
-      );
-    }
-
     return {
       tenantId: tenant.id,
+      tenantName: tenant.name,
       companyId: company.id,
       invitationId: inserted.invitationId,
       invitationLink: inserted.invitationLink,
-      emailDispatched,
     };
   });
+
+  const emailDispatch = await sendTenantInvitationEmailMessage(
+    emailNorm,
+    provisioned.invitationLink,
+    provisioned.tenantName,
+  );
+
+  return {
+    tenantId: provisioned.tenantId,
+    companyId: provisioned.companyId,
+    invitationId: provisioned.invitationId,
+    invitationLink: provisioned.invitationLink,
+    emailDispatched: emailDispatch.dispatched,
+    emailFailureMessage: emailDispatch.dispatched
+      ? undefined
+      : tenantInvitationEmailFailureMessage(emailDispatch),
+  };
 }

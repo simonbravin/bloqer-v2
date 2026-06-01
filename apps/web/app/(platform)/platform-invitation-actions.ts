@@ -13,6 +13,7 @@ import {
 } from "@bloqer/services";
 import {
   PLATFORM_INVITE_LINK_FLASH_COOKIE,
+  PLATFORM_INVITE_EMAIL_FLASH_COOKIE,
   platformInvitationFlashCookiePath,
 } from "@/lib/platform-invitation-flash";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
@@ -50,12 +51,21 @@ export async function createPlatformTenantInvitationAction(formData: FormData) {
     );
     if (!result.emailDispatched) {
       const c = await cookies();
+      const flashPath = platformInvitationFlashCookiePath(tenantId);
       c.set(PLATFORM_INVITE_LINK_FLASH_COOKIE, result.invitationLink, {
         maxAge:   120,
         httpOnly: true,
         sameSite: "lax",
-        path:     platformInvitationFlashCookiePath(tenantId),
+        path:     flashPath,
       });
+      if (result.emailFailureMessage) {
+        c.set(PLATFORM_INVITE_EMAIL_FLASH_COOKIE, result.emailFailureMessage, {
+          maxAge:   120,
+          httpOnly: true,
+          sameSite: "lax",
+          path:     flashPath,
+        });
+      }
     }
     revalidatePath(`/platform/tenants/${tenantId}/invitations`);
     redirect(`/platform/tenants/${tenantId}/invitations/${result.invitationId}?ok=1`);

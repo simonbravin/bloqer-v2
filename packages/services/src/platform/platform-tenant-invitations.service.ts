@@ -1,6 +1,5 @@
 import { prisma } from "@bloqer/database";
 import type { UserRole } from "@bloqer/domain";
-import { getPublicAppBaseUrl, isEmailConfigured } from "@bloqer/config";
 import {
   cancelTenantInvitationSchema,
   createPlatformTenantInvitationInputSchema,
@@ -12,6 +11,7 @@ import {
   markExpiredPendingInvitationsForTenant,
   normalizeInvitationEmail,
   sendTenantInvitationEmailMessage,
+  tenantInvitationEmailFailureMessage,
 } from "../tenant-settings/tenant-invitation-shared";
 import type { CreateTenantInvitationResult, TenantInvitationDetail, TenantInvitationRow } from "../tenant-settings/tenant-invitations.service";
 import { ServiceError } from "../types";
@@ -198,12 +198,15 @@ export async function createPlatformTenantInvitation(
   });
 
   let emailDispatched = false;
-  if (isEmailConfigured() && getPublicAppBaseUrl()) {
-    emailDispatched = await sendTenantInvitationEmailMessage(
-      emailNorm,
-      inserted.invitationLink,
-      tenant.name,
-    );
+  let emailFailureMessage: string | undefined;
+  const emailDispatch = await sendTenantInvitationEmailMessage(
+    emailNorm,
+    inserted.invitationLink,
+    tenant.name,
+  );
+  emailDispatched = emailDispatch.dispatched;
+  if (!emailDispatch.dispatched) {
+    emailFailureMessage = tenantInvitationEmailFailureMessage(emailDispatch);
   }
 
   return {
@@ -211,6 +214,7 @@ export async function createPlatformTenantInvitation(
     expiresAt: inserted.expiresAt,
     invitationLink: inserted.invitationLink,
     emailDispatched,
+    emailFailureMessage,
   };
 }
 
