@@ -37,7 +37,7 @@ export default async function TesoreriaPage() {
           <Link href="/tesoreria/cuentas">Ver cuentas</Link>
         </Button>
         <Button variant="outline" asChild>
-          <Link href="/tesoreria/transferencias">Ver transferencias</Link>
+          <Link href="/tesoreria/reportes/movimientos?sourceType=INTERNAL_TRANSFER">Ver transferencias</Link>
         </Button>
         <Button variant="outline" asChild>
           <Link href="/tesoreria/reportes">Reportes</Link>

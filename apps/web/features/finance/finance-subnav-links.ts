@@ -23,7 +23,7 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
     links.push({
       href: "/finanzas/transacciones",
       label: "Transacciones",
-      title: "Movimientos de caja, operaciones y obligaciones de empresa",
+      title: "Libro de caja consolidado (obra + empresa) y alta corporativa",
     });
   }
 
@@ -36,11 +36,6 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
   }
 
   if (gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP")) {
-    links.push({
-      href: "/finanzas/facturas-proveedor",
-      label: "Facturas y gastos",
-      title: "Facturas de proveedor y gastos generales sin proyecto",
-    });
     links.push({
       href: "/finanzas/cuentas-por-pagar-aging",
       label: "Cuentas por pagar",

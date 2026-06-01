@@ -79,6 +79,7 @@ export function parseCashPositionFilters(sp: Record<string, string | undefined>)
 }
 
 export function parseMovementReportFilters(sp: Record<string, string | undefined>): MovementReportFilters {
+  const scope = sp.scope;
   return {
     accountId: sp.accountId,
     dateFrom: sp.dateFrom,
@@ -88,6 +89,9 @@ export function parseMovementReportFilters(sp: Record<string, string | undefined
     currency: sp.currency,
     includeInternalTransfers: sp.includeInternalTransfers === "false" ? false : true,
     corporateApPaymentsOnly: sp.corporateApPayments === "true",
+    projectId: sp.projectId,
+    corporateOnly: scope === "corporate" || sp.corporateOnly === "true",
+    projectOnly: scope === "project" || sp.projectOnly === "true",
   };
 }
 
@@ -375,6 +379,7 @@ export async function exportTreasuryMovementsCsv(
     "Tipo",
     "Origen",
     "EtiquetaOrigen",
+    "Proyecto",
     "Importe",
     "ImporteSignado",
     "Moneda",
@@ -388,6 +393,7 @@ export async function exportTreasuryMovementsCsv(
     r.type,
     r.sourceType,
     r.sourceLabel,
+    r.projectName ?? (r.projectId ? r.projectId : "Empresa"),
     r.amount,
     r.signedAmount,
     r.currency,

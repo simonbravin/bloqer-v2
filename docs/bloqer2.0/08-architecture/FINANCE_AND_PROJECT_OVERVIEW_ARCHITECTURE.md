@@ -522,7 +522,7 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 - **KPIs:** snapshots corporativos vía `buildFinanceCorporateKpis` (posición de caja, C×P corporativas/vencidas, C×C abiertas/vencidas, facturas borrador si > 0) + enlace contabilidad.
 - **Proyección:** `buildFinanceProjection` → R-006 corporativo (90 días).
 - **Gráficos:** `getFinanceHubCharts` — pestaña **Caja** (`getCashFlowReport`, R-005) y **Económico** (`getCompanyIncomeExpenseReport`, rollup obras + AP corporativo).
-- **UI:** sin card «Accesos rápidos» (sidebar + subnav); `/finanzas/transacciones` solo tabs operativos.
+- **UI:** sin card «Accesos rápidos» (sidebar + subnav); `/finanzas/transacciones` — libro de caja consolidado (obra + empresa), columna Proyecto, alta corporativa; sin tabs Caja/Obligaciones/Operaciones. «Facturas y gastos» fuera del subnav (ruta `/finanzas/facturas-proveedor` conservada para borradores/edición).
 
 ### 17.2 `/proyectos/[id]/finanzas`
 

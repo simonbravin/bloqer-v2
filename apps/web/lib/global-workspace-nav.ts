@@ -61,7 +61,6 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
         },
       },
       { label: "Cuentas por cobrar", href: "/finanzas/cuentas-por-cobrar-aging", require: { action: "VIEW", module: "AR" } },
-      { label: "Facturas y gastos", href: "/finanzas/facturas-proveedor", require: { action: "VIEW", module: "AP" } },
       { label: "Cuentas por pagar", href: "/finanzas/cuentas-por-pagar-aging", require: { action: "VIEW", module: "AP" } },
       { label: "Gastos generales", href: "/finanzas/gastos-generales", require: { action: "VIEW", module: "AP" } },
     ],
@@ -71,7 +70,11 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
     items: [
       { label: "Resumen", href: "/tesoreria", matchExact: true, require: { action: "VIEW", module: "TREASURY" } },
       { label: "Cuentas", href: "/tesoreria/cuentas", require: { action: "VIEW", module: "TREASURY" } },
-      { label: "Transferencias", href: "/tesoreria/transferencias", require: { action: "VIEW", module: "TREASURY" } },
+      {
+        label: "Transferencias",
+        href: "/tesoreria/reportes/movimientos?sourceType=INTERNAL_TRANSFER",
+        require: { action: "VIEW", module: "TREASURY" },
+      },
       { label: "Reportes", href: "/tesoreria/reportes", require: { action: "VIEW", module: "TREASURY" } },
     ],
   },

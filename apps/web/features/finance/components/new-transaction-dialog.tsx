@@ -150,7 +150,7 @@ export function NewTransactionDialog({ suppliers, treasuryAccounts, canAp, canTr
         <DialogHeader>
           <DialogTitle>Registrar transacción</DialogTitle>
           <DialogDescription>
-            Alta rápida de gasto corporativo o ingreso manual de caja (sin imputar a obra).
+            Alta rápida de gasto corporativo (factura de proveedor) o ingreso manual de caja, sin imputar a obra.
           </DialogDescription>
         </DialogHeader>
 

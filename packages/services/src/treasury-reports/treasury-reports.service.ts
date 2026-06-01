@@ -88,6 +88,8 @@ export type MovementReportRow = {
   description:        string;
   transferId:         string | null;
   isInternalTransfer: boolean;
+  projectId:          string | null;
+  projectName:        string | null;
   runningBalance?:    string;
 };
 
@@ -129,6 +131,12 @@ export type MovementReportFilters = {
   includeInternalTransfers?: boolean;
   /** When true: only `PAYMENT` movements whose source payment has `projectId` null (corporate AP outflows). */
   corporateApPaymentsOnly?: boolean;
+  /** Filter movements imputed to a specific project (`AccountMovement.projectId`). */
+  projectId?:               string;
+  /** When true: only movements without project (`projectId` null). */
+  corporateOnly?:           boolean;
+  /** When true: only movements with a project (`projectId` not null). */
+  projectOnly?:             boolean;
   page?:                    number;
   pageSize?:                number;
 };
@@ -216,6 +224,118 @@ export async function getCashPositionReport(
   return { accounts: accountRows, byCurrency, byCompany };
 }
 
+type RawMovementRow = {
+  id: string;
+  accountId: string;
+  movementDate: Date;
+  type: string;
+  sourceType: string;
+  sourceId: string;
+  amount: Prisma.Decimal;
+  currency: string;
+  description: string;
+  transferId: string | null;
+  projectId: string | null;
+  account: { name: string };
+};
+
+async function resolveMovementProjectIds(
+  rawRows: RawMovementRow[],
+  tenantId: string,
+): Promise<Map<string, string | null>> {
+  const resolved = new Map<string, string | null>();
+  for (const m of rawRows) {
+    resolved.set(m.id, m.projectId);
+  }
+
+  const paymentSourceIds = rawRows
+    .filter((m) => m.projectId === null && m.sourceType === "PAYMENT")
+    .map((m) => m.sourceId);
+  const collectionSourceIds = rawRows
+    .filter((m) => m.projectId === null && m.sourceType === "COLLECTION")
+    .map((m) => m.sourceId);
+
+  const [payments, collections] = await Promise.all([
+    paymentSourceIds.length > 0
+      ? prisma.payment.findMany({
+          where: { tenantId, id: { in: paymentSourceIds } },
+          select: { id: true, projectId: true },
+        })
+      : Promise.resolve([]),
+    collectionSourceIds.length > 0
+      ? prisma.collection.findMany({
+          where: { tenantId, id: { in: collectionSourceIds } },
+          select: { id: true, projectId: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const paymentProject = new Map(payments.map((p) => [p.id, p.projectId]));
+  const collectionProject = new Map(collections.map((c) => [c.id, c.projectId]));
+
+  for (const m of rawRows) {
+    if (m.projectId !== null) continue;
+    if (m.sourceType === "PAYMENT") {
+      resolved.set(m.id, paymentProject.get(m.sourceId) ?? null);
+    } else if (m.sourceType === "COLLECTION") {
+      resolved.set(m.id, collectionProject.get(m.sourceId) ?? null);
+    }
+  }
+
+  return resolved;
+}
+
+async function loadProjectNames(
+  tenantId: string,
+  projectIds: string[],
+): Promise<Map<string, string>> {
+  if (projectIds.length === 0) return new Map();
+  const projects = await prisma.project.findMany({
+    where: { tenantId, id: { in: projectIds } },
+    select: { id: true, name: true },
+  });
+  return new Map(projects.map((p) => [p.id, p.name]));
+}
+
+async function movementProjectWhere(
+  filters: MovementReportFilters,
+  tenantId: string,
+): Promise<Prisma.AccountMovementWhereInput> {
+  if (filters.projectId) {
+    const [payments, collections] = await Promise.all([
+      prisma.payment.findMany({
+        where: { tenantId, projectId: filters.projectId },
+        select: { id: true },
+      }),
+      prisma.collection.findMany({
+        where: { tenantId, projectId: filters.projectId },
+        select: { id: true },
+      }),
+    ]);
+
+    const paymentIds = payments.map((p) => p.id);
+    const collectionIds = collections.map((c) => c.id);
+    return {
+      OR: [
+        { projectId: filters.projectId },
+        ...(paymentIds.length > 0
+          ? [{ sourceType: "PAYMENT", sourceId: { in: paymentIds } } as Prisma.AccountMovementWhereInput]
+          : []),
+        ...(collectionIds.length > 0
+          ? [{ sourceType: "COLLECTION", sourceId: { in: collectionIds } } as Prisma.AccountMovementWhereInput]
+          : []),
+      ],
+    };
+  }
+  if (filters.corporateOnly) {
+    return { projectId: null };
+  }
+  if (filters.projectOnly) {
+    return { projectId: { not: null } };
+  }
+  return {};
+}
+
 // ─── Account Movement Report ──────────────────────────────────────────────────
 
 export async function getAccountMovementReport(
@@ -276,6 +396,8 @@ export async function getAccountMovementReport(
     }
   }
 
+  const projectWhere = await movementProjectWhere(filters, ctx.tenantId);
+
   const where: Prisma.AccountMovementWhereInput = {
     tenantId: ctx.tenantId,
     status: "CONFIRMED",
@@ -296,6 +418,7 @@ export async function getAccountMovementReport(
         }
       : {}),
     ...(companyId ? { account: { companyId } } : {}),
+    ...projectWhere,
   };
 
   const orderBy = paginated
@@ -320,12 +443,22 @@ export async function getAccountMovementReport(
     );
   }
 
-  const rows = rawRows.map((m) => {
+  const typedRawRows = rawRows as RawMovementRow[];
+  const projectIdByMovement = await resolveMovementProjectIds(typedRawRows, ctx.tenantId);
+  const uniqueProjectIds = [
+    ...new Set(
+      [...projectIdByMovement.values()].filter((id): id is string => id !== null),
+    ),
+  ];
+  const projectNames = await loadProjectNames(ctx.tenantId, uniqueProjectIds);
+
+  const rows: MovementReportRow[] = typedRawRows.map((m) => {
     const isAdj = m.type === "ADJUSTMENT";
     const signed = isAdj ? m.amount : signedAmount(m.type as string, m.amount);
     if (runningBalance !== undefined && !isAdj) {
       runningBalance = runningBalance.plus(signed);
     }
+    const resolvedProjectId = projectIdByMovement.get(m.id) ?? null;
     return {
       id: m.id,
       accountId: m.accountId,
@@ -340,6 +473,8 @@ export async function getAccountMovementReport(
       description: m.description,
       transferId: m.transferId,
       isInternalTransfer: m.transferId !== null,
+      projectId: resolvedProjectId,
+      projectName: resolvedProjectId ? (projectNames.get(resolvedProjectId) ?? null) : null,
       ...(runningBalance !== undefined ? { runningBalance: runningBalance.toString() } : {}),
     };
   });

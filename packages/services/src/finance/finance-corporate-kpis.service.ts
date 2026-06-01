@@ -45,8 +45,8 @@ export type FinanceProjectionSummary = {
   moduleWarnings: string[];
 };
 
-export const CORPORATE_OBLIGATIONS_HREF = "/finanzas/transacciones?tab=obligaciones";
-export const CORPORATE_OVERDUE_HREF = "/finanzas/transacciones?tab=obligaciones&status=OVERDUE";
+export const CORPORATE_OBLIGATIONS_HREF = "/finanzas/cuentas-por-pagar";
+export const CORPORATE_OVERDUE_HREF = "/finanzas/cuentas-por-pagar?status=OVERDUE";
 export const COMPANY_AR_AGING_HREF = "/finanzas/cuentas-por-cobrar-aging";
 export const POSICION_CAJA_HREF = "/tesoreria/reportes/posicion-caja";
 

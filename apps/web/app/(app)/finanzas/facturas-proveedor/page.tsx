@@ -77,8 +77,19 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
           <h1 className="text-2xl font-bold tracking-tight">Facturas y gastos</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Gastos generales de la empresa: facturas de proveedor{" "}
-            <strong>sin imputar a un proyecto</strong>. Al emitirlas generan obligaciones en pagos
-            pendientes. Las compras de obra se cargan desde{" "}
+            <strong>sin imputar a un proyecto</strong>. Acceso desde el menú lateral en{" "}
+            <Link href="/finanzas/transacciones" className="font-medium text-foreground underline underline-offset-4 hover:no-underline">
+              Transacciones
+            </Link>
+            ,{" "}
+            <Link href="/finanzas" className="font-medium text-foreground underline underline-offset-4 hover:no-underline">
+              Resumen
+            </Link>{" "}
+            (borradores) o{" "}
+            <Link href="/finanzas/gastos-generales" className="font-medium text-foreground underline underline-offset-4 hover:no-underline">
+              Gastos generales
+            </Link>
+            . Las compras de obra se cargan desde{" "}
             <Link
               href="/proyectos"
               className="font-medium text-foreground underline underline-offset-4 hover:no-underline"

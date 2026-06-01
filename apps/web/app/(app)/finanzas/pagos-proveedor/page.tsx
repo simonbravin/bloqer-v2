@@ -82,7 +82,7 @@ export default async function FinanzasPagosProveedorPage({ searchParams }: PageP
             <ListViewToggle storageKey="finanzas-pagos-proveedor" />
           </Suspense>
           <Button asChild variant="outline">
-            <Link href="/finanzas/transacciones?tab=obligaciones">Ver obligaciones</Link>
+            <Link href="/finanzas/cuentas-por-pagar">Pagos pendientes</Link>
           </Button>
         </div>
       </div>

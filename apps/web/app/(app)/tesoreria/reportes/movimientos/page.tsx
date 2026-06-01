@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
-import { getAccountMovementReport } from "@bloqer/services";
+import { getAccountMovementReport, parseMovementReportFilters } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { MovementLedgerTable, MovementFilters } from "@/features/treasury-reports";
 import { ReportExportActions } from "@/features/reports";
@@ -19,6 +19,8 @@ interface PageProps {
     currency?: string;
     includeInternalTransfers?: string;
     corporateApPayments?: string;
+    scope?: string;
+    projectId?: string;
   }>;
 }
 
@@ -43,22 +45,12 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
   if (sp.currency) qs.set("currency", sp.currency);
   if (sp.includeInternalTransfers === "false") qs.set("includeInternalTransfers", "false");
   if (sp.corporateApPayments === "true") qs.set("corporateApPayments", "true");
+  if (sp.scope) qs.set("scope", sp.scope);
+  if (sp.projectId) qs.set("projectId", sp.projectId);
   const accountingReturnPath = `/tesoreria/reportes/movimientos${qs.size ? `?${qs}` : ""}`;
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
 
-  const { rows } = await getAccountMovementReport(
-    {
-      accountId: sp.accountId || undefined,
-      dateFrom: sp.dateFrom || undefined,
-      dateTo: sp.dateTo || undefined,
-      type: sp.type || undefined,
-      sourceType: sp.sourceType || undefined,
-      currency: sp.currency || undefined,
-      includeInternalTransfers: sp.includeInternalTransfers === "false" ? false : true,
-      corporateApPaymentsOnly: sp.corporateApPayments === "true",
-    },
-    ctx,
-  );
+  const { rows } = await getAccountMovementReport(parseMovementReportFilters(sp), ctx);
 
   const showRunningBalance = !!sp.accountId;
 
@@ -101,6 +93,7 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
       <MovementLedgerTable
         rows={rows}
         showRunningBalance={showRunningBalance}
+        showProjectColumn={Boolean(sp.scope || sp.projectId)}
         accountingReturnPath={accountingReturnPath}
         canEditAccounting={canEditAccounting}
       />

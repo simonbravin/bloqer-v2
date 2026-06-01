@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatDate } from "@/lib/format";
 import type { MovementReportRow } from "@bloqer/services";
 import { TreasuryMovementAccountingButton } from "@/features/accounting";
@@ -39,6 +40,8 @@ function fmtSigned(signed: string) {
 interface Props {
   rows: MovementReportRow[];
   showRunningBalance: boolean;
+  showProjectColumn?: boolean;
+  canLinkProjects?: boolean;
   accountingReturnPath?: string;
   canEditAccounting?: boolean;
 }
@@ -46,6 +49,8 @@ interface Props {
 export function MovementLedgerTable({
   rows,
   showRunningBalance,
+  showProjectColumn = false,
+  canLinkProjects = false,
   accountingReturnPath,
   canEditAccounting,
 }: Props) {
@@ -64,6 +69,7 @@ export function MovementLedgerTable({
               <TableHead>Tipo</TableHead>
               <TableHead>Origen</TableHead>
               <TableHead>Descripción</TableHead>
+              {showProjectColumn && <TableHead>Proyecto</TableHead>}
               <TableHead>Moneda</TableHead>
               <TableHead className="text-right">Importe</TableHead>
               {showRunningBalance && <TableHead className="text-right">Saldo</TableHead>}
@@ -86,6 +92,22 @@ export function MovementLedgerTable({
                   <TableCell className="max-w-[200px] truncate text-muted-foreground">
                     {m.description}
                   </TableCell>
+                  {showProjectColumn && (
+                    <TableCell className="max-w-[160px] truncate text-muted-foreground text-xs">
+                      {m.projectId && canLinkProjects ? (
+                        <Link
+                          href={`/proyectos/${m.projectId}`}
+                          className="underline underline-offset-2 hover:text-foreground"
+                        >
+                          {m.projectName ?? m.projectId}
+                        </Link>
+                      ) : m.projectId ? (
+                        (m.projectName ?? "Obra")
+                      ) : (
+                        "Empresa"
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell>{m.currency}</TableCell>
                   <TableCell
                     className={`text-right tabular-nums font-mono ${
