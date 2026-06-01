@@ -523,6 +523,22 @@
 
 ---
 
+### D-043 — GG AUTO_WEIGHT: cierre de período y snapshots (extiende D-041)
+
+- **Fecha:** 2026-05-31
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (auditoría UX gastos generales)
+- **Contexto:** D-041 calcula prorrateo al leer; un proyecto nuevo alteraba retrospectivamente la imputación de períodos ya cerrados en la práctica.
+- **Decisión:**
+  1. Por cada `(companyId, period YYYY-MM)` en modo `AUTO_WEIGHT`, estado **OPEN** (preview dinámico) o **FROZEN** (snapshots persistidos).
+  2. **Cerrar período** persiste `overhead_period_closes` + `overhead_auto_period_snapshots` por proyecto; margen neto (R-004) usa snapshots en períodos FROZEN.
+  3. **Reabrir período** (solo `EDIT AP`) elimina snapshots y vuelve a OPEN; no recálculo silencioso.
+  4. Al cerrar, el denominador de CD **excluye proyectos DRAFT** (solo ACTIVE y ON_HOLD).
+- **Implicancias:** `overhead-period-freeze.service.ts`, UI en `/finanzas/gastos-generales`; operación AP corporativa sigue en `/finanzas/facturas-proveedor`.
+- **Documentos afectados:** igual que D-040/D-041; [`PERMISSIONS_ROUTE_MATRIX.md`](../08-architecture/PERMISSIONS_ROUTE_MATRIX.md).
+
+---
+
 ### D-042 — Ciclo de vida de proyecto: cancelación no destructiva, guards y reactivación
 
 - **Fecha:** 2026-05-29

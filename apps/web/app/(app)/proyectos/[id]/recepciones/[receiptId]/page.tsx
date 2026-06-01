@@ -34,13 +34,15 @@ import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; receiptId: string }>;
+  searchParams: Promise<{ invoiceError?: string }>;
 }
 
-export default async function RecepcionDetailPage({ params }: PageProps) {
+export default async function RecepcionDetailPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id, receiptId } = await params;
+  const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -140,6 +142,12 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
         )}
       </div>
 
+      {sp.invoiceError && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {sp.invoiceError}
+        </div>
+      )}
+
       {isConfirmed && (
         <PoBillingNextStepPanel
           projectId={id}
@@ -147,6 +155,7 @@ export default async function RecepcionDetailPage({ params }: PageProps) {
           purchaseReceiptId={receiptId}
           billing={billing}
           canEditAp={canEditAp}
+          errorReturnPath={`/proyectos/${id}/recepciones/${receiptId}`}
         />
       )}
 

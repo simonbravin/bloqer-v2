@@ -7,9 +7,13 @@ import {
   computeWeightShare,
   currentOverheadPeriod,
   periodToDateRange,
+  periodToIssueDateBounds,
   resolvePeriodKeysForFilter,
   type OverheadPeriodFilter,
 } from "./overhead-period";
+
+/** Opciones alineadas con D-043 al cerrar período o mostrar vista previa de cierre. */
+export const AUTO_WEIGHT_PERIOD_CLOSE_OPTS = { excludeDraftProjects: true } as const;
 
 const ZERO = new Prisma.Decimal(0);
 const MAX_CORPORATE_GG_PERIODS = 120;
@@ -27,7 +31,7 @@ export async function getCorporateGgPoolForPeriod(
   ctx: ServiceContext,
 ): Promise<CorporateGgPoolResult> {
   assertValidOverheadPeriod(period);
-  const { dateFrom, dateTo } = periodToDateRange(period);
+  const issueDate = periodToIssueDateBounds(period);
 
   const invoices = await prisma.supplierInvoice.findMany({
     where: {
@@ -35,7 +39,7 @@ export async function getCorporateGgPoolForPeriod(
       companyId,
       projectId: null,
       status: "ISSUED",
-      issueDate: { gte: new Date(dateFrom), lte: new Date(dateTo) },
+      issueDate,
     },
     select: { totalAmount: true, amountArs: true, currency: true },
   });
@@ -59,15 +63,21 @@ export async function getCorporateGgPoolForPeriod(
   };
 }
 
+type AutoWeightProjectListOpts = { excludeDraftProjects?: boolean };
+
 async function listCompanyProjectsForAutoWeight(
   companyId: string,
   ctx: ServiceContext,
+  opts?: AutoWeightProjectListOpts,
 ): Promise<{ id: string; code: string; name: string }[]> {
+  const statuses = opts?.excludeDraftProjects
+    ? (["ACTIVE", "ON_HOLD"] as const)
+    : (["ACTIVE", "ON_HOLD", "DRAFT"] as const);
   return prisma.project.findMany({
     where: {
       tenantId: ctx.tenantId,
       companyId,
-      status: { in: ["ACTIVE", "ON_HOLD", "DRAFT"] },
+      status: { in: [...statuses] },
     },
     select: { id: true, code: true, name: true },
     orderBy: { name: "asc" },
@@ -146,10 +156,13 @@ async function projectAccruedCdForPeriod(
   return total;
 }
 
+export type BuildAutoWeightContextOpts = AutoWeightProjectListOpts;
+
 async function buildAutoWeightPeriodContext(
   companyId: string,
   period: string,
   ctx: ServiceContext,
+  opts?: BuildAutoWeightContextOpts,
 ): Promise<AutoWeightPeriodContext> {
   const company = await prisma.company.findUnique({
     where: { id: companyId },
@@ -160,7 +173,7 @@ async function buildAutoWeightPeriodContext(
 
   const [poolResult, projects] = await Promise.all([
     getCorporateGgPoolForPeriod(companyId, period, ctx),
-    listCompanyProjectsForAutoWeight(companyId, ctx),
+    listCompanyProjectsForAutoWeight(companyId, ctx, opts),
   ]);
 
   const warnings: string[] = [];
@@ -219,10 +232,11 @@ export async function getAutoWeightOverheadPreviewForPeriod(
   companyId: string,
   period: string,
   ctx: ServiceContext,
+  opts?: BuildAutoWeightContextOpts,
 ): Promise<AutoWeightPeriodPreview> {
   assertOverheadView(ctx);
   assertValidOverheadPeriod(period);
-  const context = await buildAutoWeightPeriodContext(companyId, period, ctx);
+  const context = await buildAutoWeightPeriodContext(companyId, period, ctx, opts);
 
   const rows: AutoWeightProjectRow[] = context.projects.map((p) => {
     const cd = context.cdsByProjectId.get(p.id) ?? ZERO;
@@ -279,6 +293,37 @@ export async function sumAutoWeightOverheadForProject(
   let lastWeight: string | null = null;
 
   for (const period of periods) {
+    const frozen = await prisma.overheadPeriodClose.findUnique({
+      where: {
+        tenantId_companyId_period: {
+          tenantId: ctx.tenantId,
+          companyId,
+          period,
+        },
+      },
+      select: { status: true, poolArs: true },
+    });
+
+    if (frozen?.status === "FROZEN") {
+      const snap = await prisma.overheadAutoPeriodSnapshot.findUnique({
+        where: {
+          tenantId_companyId_period_projectId: {
+            tenantId: ctx.tenantId,
+            companyId,
+            period,
+            projectId,
+          },
+        },
+        select: { allocatedAmount: true, weightPct: true },
+      });
+      if (snap) {
+        total = total.plus(snap.allocatedAmount);
+        poolSum = poolSum.plus(frozen.poolArs);
+        if (periods.length === 1) lastWeight = snap.weightPct.toFixed(2);
+      }
+      continue;
+    }
+
     const context = await buildAutoWeightPeriodContext(companyId, period, ctx);
     const { allocatedAmount, weightPct } = allocateProjectFromContext(context, projectId);
     total = total.plus(new Prisma.Decimal(allocatedAmount));

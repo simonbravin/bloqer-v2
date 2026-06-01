@@ -87,7 +87,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
             </Link>{" "}
             (borradores) o{" "}
             <Link href="/finanzas/gastos-generales" className="font-medium text-foreground underline underline-offset-4 hover:no-underline">
-              Gastos generales
+              Imputación GG
             </Link>
             . Las compras de obra se cargan desde{" "}
             <Link

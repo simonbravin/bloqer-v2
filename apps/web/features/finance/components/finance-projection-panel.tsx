@@ -34,8 +34,8 @@ export function FinanceProjectionPanel({ projection }: { projection: FinanceProj
       <CardHeader className="border-b border-border/60 pb-4">
         <CardTitle className="text-base">Proyección de liquidez (90 días)</CardTitle>
         <CardDescription>
-          Saldo de caja hoy menos egresos por C×P corporativas con vencimiento hasta{" "}
-          {formatDate(projection.dateTo)} (incluye vencidas).{" "}
+          Saldo de caja hoy menos egresos por C×P corporativas con vencimiento entre{" "}
+          {formatDate(projection.dateFrom)} y {formatDate(projection.dateTo)} (incluye vencidas).{" "}
           <Link href={projection.href} className="underline underline-offset-2">
             Ver obligaciones
           </Link>

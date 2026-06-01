@@ -1,6 +1,7 @@
 import { can, type UserRole } from "@bloqer/domain";
 import type { PermissionModule } from "@bloqer/domain";
 import { satisfiesNavRequirement, type NavRequirement } from "./nav-config";
+import { canAccessScheduledReportsNav } from "./configuracion-subnav";
 
 function canViewTenantAuditLog(roles: UserRole[]): boolean {
   return can(roles, "VIEW", "AUDIT");
@@ -62,7 +63,7 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
       },
       { label: "Cuentas por cobrar", href: "/finanzas/cuentas-por-cobrar-aging", require: { action: "VIEW", module: "AR" } },
       { label: "Cuentas por pagar", href: "/finanzas/cuentas-por-pagar-aging", require: { action: "VIEW", module: "AP" } },
-      { label: "Gastos generales", href: "/finanzas/gastos-generales", require: { action: "VIEW", module: "AP" } },
+      { label: "Imputación GG", href: "/finanzas/gastos-generales", require: { action: "VIEW", module: "AP" } },
     ],
   },
   {
@@ -94,6 +95,7 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
       { label: "Mi perfil", href: "/configuracion/perfil" },
       { label: "Equipo", href: "/configuracion/equipo" },
       { label: "Permisos", href: "/configuracion/permisos" },
+      { label: "Reportes programados", href: "/configuracion/reportes" },
       { label: "Registro", href: "/configuracion/registro", require: { action: "VIEW", module: "AUDIT" } },
     ],
   },
@@ -115,6 +117,12 @@ export function buildGlobalNavSections(
       if (def.title === "Configuración") {
         if (item.href === "/configuracion/perfil") {
           items.push({ label: item.label, href: item.href, matchExact: item.matchExact });
+          continue;
+        }
+        if (item.href === "/configuracion/reportes") {
+          if (canAccessScheduledReportsNav(roles)) {
+            items.push({ label: item.label, href: item.href, matchExact: item.matchExact });
+          }
           continue;
         }
         if (item.href === "/configuracion/registro") {

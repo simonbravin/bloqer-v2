@@ -1,5 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { toIsoDateLocal } from "@bloqer/utils";
 import type { CreateSupplierInvoiceFromPurchaseOrderInput } from "@bloqer/validators";
 import { ServiceContext, ServiceError } from "../types";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
@@ -31,14 +32,10 @@ export type PurchaseOrderBillingSummary = {
   draftInvoiceCount: number;
 };
 
-function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function defaultDueDate(): string {
   const d = new Date();
   d.setDate(d.getDate() + 30);
-  return d.toISOString().slice(0, 10);
+  return toIsoDateLocal(d);
 }
 
 async function loadPoForBilling(purchaseOrderId: string, ctx: ServiceContext) {
@@ -107,8 +104,11 @@ export async function getPurchaseOrderBillingSummary(
   let draftInvoiceCount = 0;
 
   for (const inv of invoices) {
+    if (inv.status === "DRAFT") {
+      draftInvoiceCount += 1;
+      continue;
+    }
     invoicedAmount = invoicedAmount.add(inv.totalAmount);
-    if (inv.status === "DRAFT") draftInvoiceCount += 1;
     if (inv.payable && inv.payable.status !== "CANCELLED") {
       paidAmount = paidAmount.add(inv.payable.paidAmount);
     }
@@ -308,7 +308,11 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
     );
   }
 
-  const basis = invoicedAmount.greaterThan(0) ? "remaining" : (input.basis ?? "received");
+  const basis = input.purchaseReceiptId
+    ? "received"
+    : invoicedAmount.greaterThan(0)
+      ? "remaining"
+      : (input.basis ?? "received");
   const draftLines = buildInvoiceDraftLinesFromPo(poLines, {
     basis,
     receiptQuantities,
@@ -324,7 +328,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
     {
       projectId: input.projectId,
       supplierContactId: po.supplierContactId,
-      issueDate: todayIsoDate(),
+      issueDate: toIsoDateLocal(),
       dueDate: defaultDueDate(),
       currency: po.currency,
       purchaseOrderId: input.purchaseOrderId,

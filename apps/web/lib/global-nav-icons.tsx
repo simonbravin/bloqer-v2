@@ -6,6 +6,7 @@ import {
   Briefcase,
   Building2,
   Calculator,
+  CalendarClock,
   FileSpreadsheet,
   FolderKanban,
   GitBranch,
@@ -46,6 +47,7 @@ const GLOBAL_NAV_ICON_BY_HREF: Record<string, LucideIcon> = {
   "/configuracion/perfil": User,
   "/configuracion/equipo": Users,
   "/configuracion/permisos": Shield,
+  "/configuracion/reportes": CalendarClock,
   "/configuracion/registro": ScrollText,
 };
 

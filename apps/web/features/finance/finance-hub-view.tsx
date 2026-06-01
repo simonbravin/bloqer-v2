@@ -90,7 +90,7 @@ function CompanyOperationsSection({ summary }: { summary: CompanyFinanceOperatio
           </TableScroll>
         )}
         <Button asChild size="sm" variant="outline">
-          <Link href="/finanzas/gastos-generales">Abrir asistente</Link>
+          <Link href="/finanzas/gastos-generales">Imputar a obra</Link>
         </Button>
       </CardContent>
     </Card>

@@ -41,7 +41,12 @@ interface PageProps {
     includeInternalTransfers?: string;
     scope?: string;
     projectId?: string;
+    register?: string;
   }>;
+}
+
+function wantsRegisterAp(sp: Awaited<PageProps["searchParams"]>): boolean {
+  return sp.register === "ap";
 }
 
 function defaultDateRange(): { dateFrom: string; dateTo: string } {
@@ -212,12 +217,15 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {(canEditAp || canEditTreasury) && (
-            <NewTransactionDialog
-              suppliers={suppliersForDialog}
-              treasuryAccounts={treasuryAccountsForDialog}
-              canAp={canEditAp}
-              canTreasury={canEditTreasury}
-            />
+            <Suspense fallback={null}>
+              <NewTransactionDialog
+                suppliers={suppliersForDialog}
+                treasuryAccounts={treasuryAccountsForDialog}
+                canAp={canEditAp}
+                canTreasury={canEditTreasury}
+                defaultOpen={wantsRegisterAp(sp)}
+              />
+            </Suspense>
           )}
         </div>
       </div>

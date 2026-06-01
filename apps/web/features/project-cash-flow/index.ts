@@ -4,3 +4,7 @@ export { ProjectCashFlowChart }   from "./components/project-cash-flow-chart";
 export { CollectionDetailTable }  from "./components/collection-detail-table";
 export { PaymentDetailTable }     from "./components/payment-detail-table";
 export { ProjectFinanceSnapshotPanel } from "./project-finance-snapshot-panel";
+export {
+  ProjectCashPositionProjectionPanel,
+  PROJECTION_ANCHOR,
+} from "./components/project-cash-position-projection-panel";

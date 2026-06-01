@@ -1,9 +1,12 @@
 "use server";
 
 import {
+  closeOverheadPeriod,
   createProjectOverheadAllocation,
   deleteProjectOverheadAllocation,
+  AUTO_WEIGHT_PERIOD_CLOSE_OPTS,
   getAutoWeightOverheadPreviewForPeriod,
+  reopenOverheadPeriod,
   ServiceError,
   updateCompanyOverheadAllocationMode,
   updateCompanyOverheadAllocationPct,
@@ -11,10 +14,12 @@ import {
 import {
   autoWeightPreviewQuerySchema,
   createProjectOverheadAllocationSchema,
+  overheadPeriodActionSchema,
   updateCompanyOverheadModeSchema,
   updateCompanyOverheadPctSchema,
   type AutoWeightPreviewQueryInput,
   type CreateProjectOverheadAllocationInput,
+  type OverheadPeriodActionInput,
   type UpdateCompanyOverheadModeInput,
   type UpdateCompanyOverheadPctInput,
 } from "@bloqer/validators";
@@ -110,6 +115,38 @@ export async function updateCompanyOverheadModeAction(
   }
 }
 
+export async function closeOverheadPeriodAction(
+  data: OverheadPeriodActionInput,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = overheadPeriodActionSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    await closeOverheadPeriod(parsed.data.companyId, parsed.data.period, ctx);
+    revalidatePath(PATH);
+    revalidatePath("/proyectos");
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function reopenOverheadPeriodAction(
+  data: OverheadPeriodActionInput,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = overheadPeriodActionSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    await reopenOverheadPeriod(parsed.data.companyId, parsed.data.period, ctx);
+    revalidatePath(PATH);
+    revalidatePath("/proyectos");
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
 export async function fetchAutoWeightPreviewAction(
   data: AutoWeightPreviewQueryInput,
 ): Promise<
@@ -124,6 +161,7 @@ export async function fetchAutoWeightPreviewAction(
       parsed.data.companyId,
       parsed.data.period,
       ctx,
+      AUTO_WEIGHT_PERIOD_CLOSE_OPTS,
     );
     return { ok: true, preview };
   } catch (err) {

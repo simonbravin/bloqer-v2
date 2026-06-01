@@ -38,6 +38,10 @@ function periodLabel(key: string, period: "day" | "week" | "month"): string {
     return new Date(Date.UTC(+parts[0]!, +parts[1]! - 1, 1))
       .toLocaleDateString("es-AR", { month: "long", year: "numeric" });
   }
+  const weekMatch = key.match(/^(\d{4})-W(\d{2})$/);
+  if (weekMatch) {
+    return `Sem. ${Number(weekMatch[2])} · ${weekMatch[1]}`;
+  }
   return key;
 }
 

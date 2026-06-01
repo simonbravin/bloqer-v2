@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,13 +29,23 @@ interface Props {
   treasuryAccounts: TreasuryAccountOption[];
   canAp: boolean;
   canTreasury: boolean;
+  /** Abre el diálogo al montar (p. ej. /finanzas/transacciones?register=ap). */
+  defaultOpen?: boolean;
 }
 
 const DEFAULT_LINE: InvoiceLine = { description: "", quantity: "1", unitPrice: "", taxRate: "21" };
 
-export function NewTransactionDialog({ suppliers, treasuryAccounts, canAp, canTreasury }: Props) {
+export function NewTransactionDialog({
+  suppliers,
+  treasuryAccounts,
+  canAp,
+  canTreasury,
+  defaultOpen = false,
+}: Props) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [open, setOpen] = useState(defaultOpen);
   const [kind, setKind] = useState<TransactionKind>(canAp ? "AP_EXPENSE" : "TREASURY_INFLOW");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +56,18 @@ export function NewTransactionDialog({ suppliers, treasuryAccounts, canAp, canTr
   const [payAccountId, setPayAccountId] = useState("");
 
   const [inflowAccountId, setInflowAccountId] = useState("");
+
+  useEffect(() => {
+    if (defaultOpen) setOpen(true);
+  }, [defaultOpen]);
+
+  function clearRegisterQueryParam() {
+    if (searchParams.get("register") !== "ap") return;
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("register");
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
 
   const treasuryOptions = useMemo(
     () => toSearchableOptions(treasuryAccounts.map((a) => ({ id: a.id, label: a.label }))),
@@ -108,6 +130,7 @@ export function NewTransactionDialog({ suppliers, treasuryAccounts, canAp, canTr
         }
         setOpen(false);
         resetForm();
+        clearRegisterQueryParam();
         router.refresh();
         router.push(res.href);
         return;
@@ -130,6 +153,7 @@ export function NewTransactionDialog({ suppliers, treasuryAccounts, canAp, canTr
       }
       setOpen(false);
       resetForm();
+      clearRegisterQueryParam();
       router.refresh();
       router.push(res.href);
     });
@@ -140,7 +164,10 @@ export function NewTransactionDialog({ suppliers, treasuryAccounts, canAp, canTr
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) resetForm();
+        if (!next) {
+          resetForm();
+          clearRegisterQueryParam();
+        }
       }}
     >
       <DialogTrigger asChild>

@@ -36,3 +36,10 @@ export const autoWeightPreviewQuerySchema = z.object({
 });
 
 export type AutoWeightPreviewQueryInput = z.infer<typeof autoWeightPreviewQuerySchema>;
+
+export const overheadPeriodActionSchema = z.object({
+  companyId: z.string().uuid(),
+  period: z.string().regex(/^\d{4}-\d{2}$/, "Período inválido (use YYYY-MM)"),
+});
+
+export type OverheadPeriodActionInput = z.infer<typeof overheadPeriodActionSchema>;

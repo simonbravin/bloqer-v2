@@ -116,21 +116,13 @@ export function OverheadAllocationsPanel({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-blue-200 bg-blue-50/80 dark:border-blue-900 dark:bg-blue-950/30 p-4 text-sm space-y-2">
-        <p className="font-medium text-foreground">Cómo se imputa GG a la obra (D-040)</p>
-        <p className="text-muted-foreground">
-          Los <strong>gastos generales de empresa</strong> (oficina, vehículos, servicios sin proyecto)
-          se cargan con facturas <em>sin obra</em> en el asistente de abajo. Acá elegís el método para
-          repartir ese costo corporativo entre proyectos.
-        </p>
-      </div>
-
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Método de imputación</CardTitle>
-          <CardDescription>
-            Manual: montos por obra y/o % sobre CD devengado. Automático: reparte el pool de facturas
-            corporativas del mes según el peso del costo directo devengado de cada obra (Q-013 opción 3).
+          <CardTitle className="text-lg">Método de imputación a obra</CardTitle>
+          <CardDescription className="max-w-prose">
+            {isAuto
+              ? "Automático: pool mensual en ARS repartido por peso del CD. Cerrá cada período arriba para fijar margen."
+              : "Manual: imputaciones por obra y/o % sobre CD devengado de cada proyecto (no redistribuye el pool entre obras)."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3">
@@ -175,10 +167,10 @@ export function OverheadAllocationsPanel({
       {isAuto ? (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Prorrateo automático por peso del CD</CardTitle>
+            <CardTitle className="text-lg">Vista previa del período</CardTitle>
             <CardDescription>
-              Pool = facturas corporativas emitidas en el período (ARS). Cada obra recibe pool × (CD obra
-              / CD total empresa en el mes).
+              Vista alineada con el cierre: excluye proyectos en borrador. El margen en obra usa pesos en vivo
+              hasta que cierres el período.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

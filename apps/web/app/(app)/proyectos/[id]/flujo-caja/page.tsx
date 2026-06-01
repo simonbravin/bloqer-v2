@@ -3,14 +3,19 @@ import { Suspense } from "react";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { getCurrentUser } from "@/lib/auth";
+import { toIsoDateLocal } from "@bloqer/utils";
 import {
   getProjectCashFlowReport,
   getProjectCashProjectionReport,
+  getProjectCashPositionProjection,
+  resolveProjectionAsOfDate,
   ServiceError,
 } from "@bloqer/services";
 import {
   ProjectCashFlowFilters,
   ProjectCashFlowChart,
+  ProjectCashPositionProjectionPanel,
+  PROJECTION_ANCHOR,
 } from "@/features/project-cash-flow";
 import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
@@ -30,7 +35,28 @@ interface PageProps {
     dateTo?: string;
     period?: string;
     currency?: string;
+    projectionDate?: string;
   }>;
+}
+
+function buildFlujoCajaQuery(
+  sp: {
+    dateFrom?: string;
+    dateTo?: string;
+    period?: string;
+    currency?: string;
+    projectionDate?: string;
+  },
+  extra?: { projectionDate?: string },
+): string {
+  const params = new URLSearchParams();
+  if (sp.dateFrom) params.set("dateFrom", sp.dateFrom);
+  if (sp.dateTo) params.set("dateTo", sp.dateTo);
+  if (sp.period) params.set("period", sp.period);
+  if (sp.currency) params.set("currency", sp.currency);
+  const projectionDate = extra?.projectionDate ?? sp.projectionDate;
+  if (projectionDate) params.set("projectionDate", projectionDate);
+  return params.toString();
 }
 
 const PERIOD_LABELS: Record<string, string> = {
@@ -91,17 +117,28 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
     ? { dateFrom: sp.dateFrom, dateTo: sp.dateTo, currency: sp.currency }
     : { currency: sp.currency };
 
+  const projectionActive = Boolean(sp.projectionDate);
+  const appliedProjectionDate = resolveProjectionAsOfDate(sp.projectionDate);
+
   let report;
   let projection;
+  let positionProjection;
 
   try {
-    [report, projection] = await Promise.all([
+    [report, projection, positionProjection] = await Promise.all([
       getProjectCashFlowReport(
         id,
         { dateFrom: sp.dateFrom, dateTo: sp.dateTo, period, currency: sp.currency },
         ctx,
       ),
       getProjectCashProjectionReport(id, projectionFilters, ctx),
+      projectionActive
+        ? getProjectCashPositionProjection(
+            id,
+            { asOfDate: sp.projectionDate, currency: sp.currency },
+            ctx,
+          )
+        : Promise.resolve(null),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
@@ -117,7 +154,7 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
         projectId={id}
         projectName={report.project.name}
         title="Flujo de caja"
-        subtitle="Ingresos, gastos y balance del período. Desglose por partida EDT."
+        subtitle="Cobros y pagos confirmados del proyecto, agrupados por período (día, semana o mes)."
         actions={
           <>
             <ReportExportActions
@@ -140,7 +177,14 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
         <p className="text-xs text-muted-foreground">
           Incluye movimientos confirmados; las proyecciones se calculan desde saldos abiertos de CxC/CxP.
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link
+              href={`/proyectos/${id}/flujo-caja?${buildFlujoCajaQuery(sp, { projectionDate: sp.projectionDate ?? toIsoDateLocal() })}#${PROJECTION_ANCHOR}`}
+            >
+              Flujo proyectado
+            </Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href={`/proyectos/${id}/cuentas-por-cobrar`}>Ver CxC</Link>
           </Button>
@@ -149,6 +193,13 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
           </Button>
         </div>
       </div>
+
+      <ProjectCashPositionProjectionPanel
+        projectId={id}
+        report={positionProjection}
+        active={projectionActive}
+        appliedAsOfDate={appliedProjectionDate}
+      />
 
       {report.warnings.multiCurrency && (
         <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10 px-4 py-3 text-sm text-yellow-700 dark:text-yellow-400">

@@ -4,6 +4,7 @@ import { ServiceError } from "../types";
 import {
   assertValidOverheadPeriod,
   computeWeightShare,
+  periodToIssueDateBounds,
   resolvePeriodKeysForFilter,
 } from "./overhead-period";
 
@@ -31,4 +32,10 @@ test("computeWeightShare returns percent of total", () => {
 test("resolvePeriodKeysForFilter expands inclusive range", () => {
   const keys = resolvePeriodKeysForFilter({ periodFrom: "2026-01", periodTo: "2026-03" });
   assert.deepEqual(keys, ["2026-01", "2026-02", "2026-03"]);
+});
+
+test("periodToIssueDateBounds includes last day of month end-to-end UTC", () => {
+  const { gte, lte } = periodToIssueDateBounds("2026-02");
+  assert.equal(gte.toISOString(), "2026-02-01T00:00:00.000Z");
+  assert.equal(lte.toISOString(), "2026-02-28T23:59:59.999Z");
 });

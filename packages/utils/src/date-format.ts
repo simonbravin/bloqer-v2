@@ -1,6 +1,14 @@
 /** Locale fijo para UI es-AR: fechas siempre dd/mm/yyyy. */
 const LOCALE = "es-AR";
 
+/** Fecha calendario local como YYYY-MM-DD (evita desfase UTC en issueDate/dueDate). */
+export function toIsoDateLocal(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 const DATE_PARTS: Intl.DateTimeFormatOptions = {
   day: "2-digit",
   month: "2-digit",

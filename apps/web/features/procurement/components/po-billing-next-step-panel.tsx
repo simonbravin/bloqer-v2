@@ -10,6 +10,8 @@ type Props = {
   purchaseReceiptId?: string;
   billing: PurchaseOrderBillingSummary;
   canEditAp: boolean;
+  /** Ruta a la que volver si falla la creación del borrador (sin reintentar en cada refresh). */
+  errorReturnPath: string;
 };
 
 export function PoBillingNextStepPanel({
@@ -18,13 +20,10 @@ export function PoBillingNextStepPanel({
   purchaseReceiptId,
   billing,
   canEditAp,
+  errorReturnPath,
 }: Props) {
   const pending = Number.parseFloat(billing.pendingToInvoice);
   const showAction = billing.hasReceivedQuantity && pending > 0;
-
-  const query = new URLSearchParams({ purchaseOrderId });
-  if (purchaseReceiptId) query.set("purchaseReceiptId", purchaseReceiptId);
-  const invoiceUrl = `/proyectos/${projectId}/facturas-proveedor/nueva?${query.toString()}`;
 
   return (
     <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
@@ -32,8 +31,11 @@ export function PoBillingNextStepPanel({
         <p className="font-medium">Facturación de la OC</p>
         {billing.hasReceivedQuantity ? (
           <p className="text-muted-foreground text-xs">
-            Recibido: {billing.receivedAmount} · Facturado: {billing.invoicedAmount} · Pagado:{" "}
+            Recibido: {billing.receivedAmount} · Facturado (emitido): {billing.invoicedAmount} · Pagado:{" "}
             {billing.paidAmount}
+            {billing.draftInvoiceCount > 0
+              ? ` · ${billing.draftInvoiceCount} borrador(es)`
+              : null}
             {pending > 0 ? ` · Pendiente de facturar: ${billing.pendingToInvoice}` : null}
           </p>
         ) : (
@@ -46,6 +48,11 @@ export function PoBillingNextStepPanel({
           <p className="text-xs text-amber-800 dark:text-amber-200">
             La recepción no genera deuda automáticamente. Registrá la factura del proveedor y
             emitila para crear la cuenta por pagar.
+          </p>
+        ) : billing.draftInvoiceCount > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Hay factura(s) en borrador vinculada(s) a esta OC. Emitila desde la lista de facturas
+            de proveedor.
           </p>
         ) : null}
       </div>
@@ -61,9 +68,8 @@ export function PoBillingNextStepPanel({
                 basis: "received",
               });
               if ("error" in res) {
-                const errQuery = new URLSearchParams(query);
-                errQuery.set("error", res.error);
-                redirect(`${invoiceUrl.split("?")[0]}?${errQuery.toString()}`);
+                const errQuery = new URLSearchParams({ invoiceError: res.error });
+                redirect(`${errorReturnPath}?${errQuery.toString()}`);
               }
               redirect(`/proyectos/${projectId}/facturas-proveedor/${res.id}`);
             }}

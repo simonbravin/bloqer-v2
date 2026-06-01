@@ -185,7 +185,7 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 
 ### 16E.2 Fuera de alcance
 
-- Rutas nuevas solo para subnav; **sin** “Gastos generales” como URL inventada (Phase **17B** agrega `/finanzas/gastos-generales` como **asistente** explícito; no cambia el modelo).
+- Phase **17B** refinada (2026-05): `/finanzas/gastos-generales` = **imputación GG** (manual + AUTO_WEIGHT por período); alta corporativa en `facturas-proveedor` o `transacciones?register=ap`; `/gastos-generales/nueva` redirige a alta de factura. Cierre de período AUTO: [D-043](../00-product/DECISION_LOG.md).
 
 ---
 
@@ -231,7 +231,7 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 
 | Fase | Entregable |
 |------|------------|
-| **17B** | Rutas `/finanzas/gastos-generales` + `/nueva`: asistente de pasos reutilizando alta de factura corporativa, emisión y C×P existentes. |
+| **17B** | `/finanzas/gastos-generales`: imputación a obra + panel de períodos (cierre AUTO_WEIGHT [D-043]); `/nueva` → redirect a factura corporativa; subnav **Imputación GG**. |
 | **17C** | Filtro `corporateApPayments` en reporte de movimientos + CSV/email. |
 | **17D** | `journal-entry-source-link` — `href` finanzas para factura/pago corporativo. |
 | **17E** | `company-finance-operations-summary.service` + card en hub `/finanzas`. |

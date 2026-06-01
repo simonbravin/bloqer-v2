@@ -43,8 +43,8 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
     });
     links.push({
       href: "/finanzas/gastos-generales",
-      label: "Gastos generales",
-      title: "Asistente para facturas de proveedor sin proyecto e imputación a obra",
+      label: "Imputación GG",
+      title: "Imputar gastos corporativos a obra (manual o automático por período)",
     });
   }
 

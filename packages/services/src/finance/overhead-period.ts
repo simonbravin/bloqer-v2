@@ -17,6 +17,15 @@ export function periodToDateRange(period: string): { dateFrom: string; dateTo: s
   };
 }
 
+/** Límites UTC inclusivos para filtrar `issueDate` de facturas en un período YYYY-MM. */
+export function periodToIssueDateBounds(period: string): { gte: Date; lte: Date } {
+  const { dateFrom, dateTo } = periodToDateRange(period);
+  return {
+    gte: new Date(`${dateFrom}T00:00:00.000Z`),
+    lte: new Date(`${dateTo}T23:59:59.999Z`),
+  };
+}
+
 export function assertValidOverheadPeriod(period: string): void {
   if (!/^\d{4}-\d{2}$/.test(period)) {
     throw new ServiceError("VALIDATION", "Período inválido (use YYYY-MM)");

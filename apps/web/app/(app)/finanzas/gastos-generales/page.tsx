@@ -1,33 +1,28 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import {
   currentOverheadPeriod,
+  AUTO_WEIGHT_PERIOD_CLOSE_OPTS,
   getAutoWeightOverheadPreviewForPeriod,
   getCompanies,
   getCompanyOverheadSettings,
   getTenantModuleGate,
   listActiveProjectsForOverhead,
+  listCompanySupplierInvoices,
+  listOverheadPeriodSummaries,
   listProjectOverheadAllocations,
   ServiceError,
 } from "@bloqer/services";
+import type { SupplierInvoiceListItem } from "@/features/ap";
 import { OverheadAllocationsPanel } from "@/features/finance/overhead-allocations-panel";
+import { CorporateGgRecentInvoices } from "@/features/finance/components/corporate-gg-recent-invoices";
+import { OverheadPeriodSummaryPanel } from "@/features/finance/components/overhead-period-summary-panel";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
-
-const MOVIMIENTOS_CORP =
-  "/tesoreria/reportes/movimientos?sourceType=PAYMENT&type=OUTFLOW&corporateApPayments=true";
 
 export default async function GastosGeneralesPage() {
   const current = await getCurrentUser();
@@ -46,13 +41,36 @@ export default async function GastosGeneralesPage() {
   }
 
   const canEditAp = can(current.tenantCtx.roles, "EDIT", "AP");
-  const canTreasury =
-    gate.isEnabled("TREASURY") && can(current.tenantCtx.roles, "VIEW", "TREASURY");
 
   const companies = await getCompanies(ctx);
   const companyId = ctx.companyId ?? companies[0]?.id;
 
+  let recentInvoices: SupplierInvoiceListItem[] = [];
+  if (companyId) {
+    try {
+      const invResult = await listCompanySupplierInvoices(ctx, {
+        page: 1,
+        pageSize: 10,
+        status: "ISSUED",
+      });
+      recentInvoices = invResult.data.map((inv) => ({
+        id: inv.id,
+        code: inv.code,
+        supplierName: inv.supplierName,
+        issueDate: inv.issueDate,
+        dueDate: inv.dueDate,
+        totalAmount: inv.totalAmount,
+        currency: inv.currency,
+        status: inv.status,
+      }));
+    } catch (err) {
+      if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
+    }
+  }
+
   let overheadPanel: ReactNode = null;
+  let periodSummaries: Awaited<ReturnType<typeof listOverheadPeriodSummaries>> = [];
+
   if (!companyId) {
     overheadPanel = (
       <p className="text-sm text-muted-foreground rounded-lg border bg-card p-4">
@@ -66,10 +84,21 @@ export default async function GastosGeneralesPage() {
         listProjectOverheadAllocations({ companyId }, ctx),
         listActiveProjectsForOverhead(companyId, ctx),
       ]);
+
+      if (settings.overheadAllocationMode === "AUTO_WEIGHT") {
+        periodSummaries = await listOverheadPeriodSummaries(companyId, ctx, { limit: 12 });
+      }
+
       const initialAutoPreview =
         settings.overheadAllocationMode === "AUTO_WEIGHT"
-          ? await getAutoWeightOverheadPreviewForPeriod(companyId, currentOverheadPeriod(), ctx)
+          ? await getAutoWeightOverheadPreviewForPeriod(
+              companyId,
+              currentOverheadPeriod(),
+              ctx,
+              AUTO_WEIGHT_PERIOD_CLOSE_OPTS,
+            )
           : null;
+
       overheadPanel = (
         <OverheadAllocationsPanel
           companyId={companyId}
@@ -92,59 +121,44 @@ export default async function GastosGeneralesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Gastos generales</h1>
           <p className="text-sm text-muted-foreground max-w-prose">
-            Facturas corporativas sin proyecto, imputación de GG a obra (manual, % empresa o
-            prorrateo automático por peso del CD) y flujo de pago desde tesorería.
+            Imputación de gastos corporativos a obra. Las facturas sin proyecto se cargan en Facturas y
+            gastos.
           </p>
         </div>
         <PageBackLink href="/finanzas" label="Resumen Finanzas" />
       </div>
 
-      {overheadPanel}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Asistente de facturas corporativas</CardTitle>
-          <CardDescription>
-            Cargá gastos sin proyecto, emití la cuenta por pagar y pagá desde tesorería.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed">
-            <li>
-              <span className="font-medium text-foreground">Crear borrador</span> — proveedor, líneas
-              y fechas.
-            </li>
-            <li>
-              <span className="font-medium text-foreground">Emitir factura</span> — genera la cuenta
-              por pagar corporativa.
-            </li>
-            <li>
-              <span className="font-medium text-foreground">Pagar</span> — desde cuentas por pagar
-              de empresa.
-            </li>
-          </ol>
-          <div className="flex flex-wrap gap-2">
-            {canEditAp ? (
-              <Button asChild>
-                <Link href="/finanzas/gastos-generales/nueva">Nueva factura de gasto</Link>
-              </Button>
-            ) : null}
-            <Button asChild variant="outline">
-              <Link href="/finanzas/facturas-proveedor">Ver facturas empresa</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/finanzas/cuentas-por-pagar">Pagos pendientes</Link>
-            </Button>
-          </div>
-        </CardContent>
-        {canTreasury ? (
-          <CardFooter className="border-t bg-muted/20">
-            <Button asChild variant="secondary" size="sm">
-              <Link href={MOVIMIENTOS_CORP}>Ver movimientos de tesorería (pagos corporativos)</Link>
-            </Button>
-          </CardFooter>
+      <div className="flex flex-wrap gap-2">
+        {canEditAp ? (
+          <Button asChild>
+            <Link href="/finanzas/facturas-proveedor/nueva">Nueva factura de gasto</Link>
+          </Button>
         ) : null}
-      </Card>
+        <Button asChild variant="outline">
+          <Link href="/finanzas/transacciones?register=ap">Alta rápida (emitir ya)</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/finanzas/facturas-proveedor">Ver todas las facturas</Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/finanzas/cuentas-por-pagar">Pagos pendientes</Link>
+        </Button>
+      </div>
+
+      {companyId && periodSummaries.length > 0 ? (
+        <OverheadPeriodSummaryPanel
+          companyId={companyId}
+          periods={periodSummaries}
+          canEdit={canEditAp}
+        />
+      ) : null}
+
+      <CorporateGgRecentInvoices
+        invoices={recentInvoices}
+        listHref="/finanzas/facturas-proveedor"
+      />
+
+      {overheadPanel}
     </PageShell>
   );
 }

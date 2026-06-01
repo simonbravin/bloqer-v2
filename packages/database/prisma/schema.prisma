@@ -52,6 +52,12 @@ enum OverheadAllocationMode {
   AUTO_WEIGHT
 }
 
+/// D-043: cierre mensual de imputación AUTO_WEIGHT (OPEN = preview dinámico).
+enum OverheadPeriodCloseStatus {
+  OPEN
+  FROZEN
+}
+
 enum MembershipStatus {
   ACTIVE
   INACTIVE
@@ -550,8 +556,10 @@ model Tenant {
   journalEntries        JournalEntry[]
   accountingMappingRules AccountingMappingRule[]
   tenantModuleSettings    TenantModuleSetting[]
-  projectOverheadAllocations ProjectOverheadAllocation[]
-  scheduledReports        ScheduledReport[]
+  projectOverheadAllocations   ProjectOverheadAllocation[]
+  overheadPeriodCloses         OverheadPeriodClose[]
+  overheadAutoPeriodSnapshots  OverheadAutoPeriodSnapshot[]
+  scheduledReports             ScheduledReport[]
 
   @@map("tenants")
 }
@@ -628,6 +636,8 @@ model Company {
 
   tenant         Tenant           @relation(fields: [tenantId], references: [id])
   projectOverheadAllocations ProjectOverheadAllocation[]
+  overheadPeriodCloses       OverheadPeriodClose[]
+  overheadAutoPeriodSnapshots OverheadAutoPeriodSnapshot[]
   memberships    UserMembership[]
   projects       Project[]
   budgets        Budget[]
@@ -682,6 +692,52 @@ model ProjectOverheadAllocation {
   @@unique([tenantId, projectId, period])
   @@index([tenantId, companyId])
   @@map("project_overhead_allocations")
+}
+
+/// D-043: control de cierre por período para AUTO_WEIGHT (pool + CD al momento del cierre).
+model OverheadPeriodClose {
+  id         String                   @id @default(uuid())
+  tenantId   String
+  companyId  String
+  period     String                   @db.VarChar(7)
+  status     OverheadPeriodCloseStatus @default(OPEN)
+  poolArs    Decimal                  @default(0) @db.Decimal(18, 4)
+  totalCdArs Decimal                  @default(0) @db.Decimal(18, 4)
+  frozenAt   DateTime?
+  frozenBy   String?
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+
+  tenant    Tenant                     @relation(fields: [tenantId], references: [id])
+  company   Company                    @relation(fields: [companyId], references: [id])
+  snapshots OverheadAutoPeriodSnapshot[]
+
+  @@unique([tenantId, companyId, period])
+  @@index([tenantId, companyId])
+  @@map("overhead_period_closes")
+}
+
+/// D-043: imputación AUTO congelada por proyecto y período (no mezclar con project_overhead_allocations).
+model OverheadAutoPeriodSnapshot {
+  id              String   @id @default(uuid())
+  tenantId        String
+  companyId       String
+  period          String   @db.VarChar(7)
+  projectId       String
+  periodCloseId   String
+  allocatedAmount Decimal  @db.Decimal(18, 4)
+  weightPct       Decimal  @db.Decimal(8, 4)
+  createdAt       DateTime @default(now())
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id])
+  company     Company             @relation(fields: [companyId], references: [id])
+  project     Project             @relation(fields: [projectId], references: [id])
+  periodClose OverheadPeriodClose @relation(fields: [periodCloseId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, companyId, period, projectId])
+  @@index([tenantId, companyId, period])
+  @@index([periodCloseId])
+  @@map("overhead_auto_period_snapshots")
 }
 
 // ─── RBAC ─────────────────────────────────────────────────────────────────────
@@ -928,7 +984,8 @@ model Project {
   journalEntries        JournalEntry[]
   journalEntryLines     JournalEntryLine[]
   schedule              Schedule?
-  overheadAllocations   ProjectOverheadAllocation[]
+  overheadAllocations          ProjectOverheadAllocation[]
+  overheadAutoPeriodSnapshots  OverheadAutoPeriodSnapshot[]
   auditLogs             AuditLog[]
   scheduledReports      ScheduledReport[]
 
