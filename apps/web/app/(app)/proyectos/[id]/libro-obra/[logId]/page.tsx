@@ -25,6 +25,7 @@ import {
   JobsiteLogLifecycleDialog,
 } from "@/features/jobsite-log";
 import { EntityDocumentsPanel } from "@/features/documents";
+import { ReportExportActions } from "@/features/reports";
 import {
   submitJobsiteLogAction,
   approveJobsiteLogAction,
@@ -82,8 +83,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
 
   const wasUpdated =
     log.updatedAt.getTime() - log.createdAt.getTime() > 1000 ||
-    (activityLog.updatedByName !== null &&
-      activityLog.updatedByName !== activityLog.createdByName);
+    activityLog.updatedByName !== activityLog.createdByName;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -104,10 +104,10 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
               {activityLog.createdByName ? `Creado por ${activityLog.createdByName}` : "Parte de obra"}
               {" · "}
               {formatDateTime(new Date(log.createdAt))}
-              {wasUpdated && activityLog.updatedByName ? (
+              {wasUpdated ? (
                 <>
                   {" · "}
-                  Última modificación por {activityLog.updatedByName}
+                  Última modificación por {activityLog.updatedByName ?? "—"}
                   {" · "}
                   {formatDateTime(new Date(log.updatedAt))}
                 </>
@@ -130,6 +130,11 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                 <Link href={`/proyectos/${projectId}/libro-obra/${logId}/editar`}>Editar</Link>
               </Button>
             )}
+            <ReportExportActions
+              exportPath={`/api/reports/proyectos/${projectId}/libro-obra/${logId}/export`}
+              params={{}}
+              pdfOnly
+            />
           </div>
         </div>
       </div>

@@ -60,6 +60,7 @@ export * from "./inventory/stock-balance.service";
 export * from "./subcontracts/subcontract.service";
 export * from "./subcontracts/subcontract-certification.service";
 export * from "./jobsite-log/jobsite-log.service";
+export * from "./jobsite-log/jobsite-log-export.service";
 export * from "./schedule/schedule-access";
 export * from "./schedule/schedule.service";
 export * from "./schedule/schedule-workspace.service";

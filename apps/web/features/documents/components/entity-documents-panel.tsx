@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { DocumentAttachmentView } from "@bloqer/services";
 import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge } from "./document-status-badge";
-import { DocumentForm } from "./document-form";
+import { DocumentUploadDialog } from "./document-upload-dialog";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import {
@@ -55,10 +55,9 @@ export type EntityDocumentsPanelScope =
 interface PanelPaths {
   revalidateExtra: string[];
   afterUploadPath: string;
-  cancelHref:      string;
-  emptyMessage:    string;
+  emptyMessage: string;
   defaultCategory: string;
-  uploadHint:      string | null;
+  uploadHint: string | null;
 }
 
 function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDocumentsLink): PanelPaths {
@@ -70,10 +69,9 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     return {
       revalidateExtra: [p],
       afterUploadPath: p,
-      cancelHref:      p,
-      emptyMessage:    "No hay adjuntos en esta factura de proveedor.",
+      emptyMessage: "No hay adjuntos en esta factura de proveedor.",
       defaultCategory: "INVOICE",
-      uploadHint:      "Factura, remito o comprobante",
+      uploadHint: "Factura, remito o comprobante",
     };
   }
 
@@ -85,10 +83,9 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
       return {
         revalidateExtra: [p],
         afterUploadPath: p,
-        cancelHref:      p,
-        emptyMessage:    "No hay adjuntos en este parte.",
+        emptyMessage: "No hay adjuntos en este parte.",
         defaultCategory: "JOBSITE_EVIDENCE",
-        uploadHint:      null,
+        uploadHint: "Fotos, planos o evidencia del parte de obra",
       };
     }
     case "CERTIFICATION": {
@@ -96,10 +93,9 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
       return {
         revalidateExtra: [p],
         afterUploadPath: p,
-        cancelHref:      p,
-        emptyMessage:    "No hay adjuntos en esta certificación.",
+        emptyMessage: "No hay adjuntos en esta certificación.",
         defaultCategory: "CERTIFICATE",
-        uploadHint:      "Soporte de certificación",
+        uploadHint: "Soporte de certificación",
       };
     }
     case "SUPPLIER_INVOICE": {
@@ -107,10 +103,9 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
       return {
         revalidateExtra: [p],
         afterUploadPath: p,
-        cancelHref:      p,
-        emptyMessage:    "No hay adjuntos en esta factura de proveedor.",
+        emptyMessage: "No hay adjuntos en esta factura de proveedor.",
         defaultCategory: "INVOICE",
-        uploadHint:      "Factura, remito o comprobante",
+        uploadHint: "Factura, remito o comprobante",
       };
     }
     case "PURCHASE_ORDER": {
@@ -118,10 +113,9 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
       return {
         revalidateExtra: [p],
         afterUploadPath: p,
-        cancelHref:      p,
-        emptyMessage:    "No hay adjuntos en esta orden de compra.",
+        emptyMessage: "No hay adjuntos en esta orden de compra.",
         defaultCategory: "CONTRACT",
-        uploadHint:      "OC o documentación de compra",
+        uploadHint: "OC o documentación de compra",
       };
     }
     case "PURCHASE_RECEIPT": {
@@ -129,10 +123,9 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
       return {
         revalidateExtra: [p],
         afterUploadPath: p,
-        cancelHref:      p,
-        emptyMessage:    "No hay adjuntos en esta recepción.",
+        emptyMessage: "No hay adjuntos en esta recepción.",
         defaultCategory: "RECEIPT",
-        uploadHint:      "Remito o evidencia de recepción",
+        uploadHint: "Remito o evidencia de recepción",
       };
     }
     case "SUBCONTRACT": {
@@ -140,10 +133,9 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
       return {
         revalidateExtra: [p],
         afterUploadPath: p,
-        cancelHref:      p,
-        emptyMessage:    "No hay adjuntos en este subcontrato.",
+        emptyMessage: "No hay adjuntos en este subcontrato.",
         defaultCategory: "CONTRACT",
-        uploadHint:      "Contrato o documentación del subcontrato",
+        uploadHint: "Contrato o documentación del subcontrato",
       };
     }
     case "SUBCONTRACT_CERTIFICATION": {
@@ -151,10 +143,9 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
       return {
         revalidateExtra: [p],
         afterUploadPath: p,
-        cancelHref:      p,
-        emptyMessage:    "No hay adjuntos en esta certificación de subcontrato.",
+        emptyMessage: "No hay adjuntos en esta certificación de subcontrato.",
         defaultCategory: "CERTIFICATE",
-        uploadHint:      "Certificado o respaldo de mediciones",
+        uploadHint: "Certificado o respaldo de mediciones",
       };
     }
     case "BUDGET": {
@@ -162,21 +153,20 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
       return {
         revalidateExtra: [p],
         afterUploadPath: p,
-        cancelHref:      p,
-        emptyMessage:    "No hay adjuntos en este presupuesto.",
+        emptyMessage: "No hay adjuntos en este presupuesto.",
         defaultCategory: "REPORT",
-        uploadHint:      "Informe de costos, exportaciones o respaldo del presupuesto",
+        uploadHint: "Informe de costos, exportaciones o respaldo del presupuesto",
       };
     }
   }
 }
 
 interface Props {
-  scope:             EntityDocumentsPanelScope;
-  linkedEntity:      EntityDocumentsLink;
+  scope: EntityDocumentsPanelScope;
+  linkedEntity: EntityDocumentsLink;
   storageConfigured: boolean;
-  docs:              DocumentAttachmentView[];
-  canEdit:           boolean;
+  docs: DocumentAttachmentView[];
+  canEdit: boolean;
 }
 
 export function EntityDocumentsPanel({
@@ -186,7 +176,7 @@ export function EntityDocumentsPanel({
   docs,
   canEdit,
 }: Props) {
-  const { revalidateExtra, afterUploadPath, cancelHref, emptyMessage, defaultCategory, uploadHint } =
+  const { revalidateExtra, afterUploadPath, emptyMessage, defaultCategory, uploadHint } =
     getPanelPaths(scope, linkedEntity);
 
   const isCompany = scope.kind === "company-finanzas-supplier-invoice";
@@ -194,171 +184,165 @@ export function EntityDocumentsPanel({
   const projectIdForTable = scope.kind === "project" ? scope.projectId : null;
 
   const subtitle = isCompany
-    ? "Adjuntos de la factura corporativa (sin proyecto). Podés descargar desde acá; no hay biblioteca de proyecto vinculada."
-    : "También aparecen en la biblioteca de documentos del proyecto.";
+    ? "Adjuntos de la factura corporativa."
+    : "También visibles en la biblioteca de documentos del proyecto.";
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <div>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-base font-semibold">Adjuntos</h2>
-          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
         </div>
-        {docs.length === 0 ? (
-          <ListEmptyState message={emptyMessage} />
-        ) : (
-          <TableScroll>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Archivo</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Tamaño</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {docs.map((doc) => {
-                  const canDownload =
-                    doc.storageProvider === "R2" &&
-                    (doc.status === "ACTIVE" || doc.status === "ARCHIVED");
-                  return (
-                    <TableRow key={doc.id}>
-                      <TableCell>
-                        {projectIdForTable ? (
-                          <Link
-                            href={`/proyectos/${projectIdForTable}/documentos/${doc.id}`}
-                            className="font-medium hover:underline underline-offset-2"
-                          >
-                            {doc.originalFileName}
-                          </Link>
-                        ) : (
-                          <span className="font-medium">{doc.originalFileName}</span>
-                        )}
-                        {doc.description && (
-                          <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[200px]">
-                            {doc.description}
-                          </p>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <DocumentCategoryBadge category={doc.category} />
-                      </TableCell>
-                      <TableCell>
-                        <DocumentStatusBadge status={doc.status} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs tabular-nums">
-                        {fmtSize(doc.sizeBytes)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
-                        {fmtDate(doc.createdAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex flex-wrap justify-end gap-1">
-                          {canDownload && (
-                            <Button variant="outline" size="sm" asChild>
-                              <a href={`/api/documents/${doc.id}/download`}>Descargar</a>
-                            </Button>
-                          )}
-                          {doc.canMutate && doc.status === "ACTIVE" && isCompany && (
-                            <form action={archiveCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
-                              <Button variant="ghost" size="sm" type="submit">
-                                Archivar
-                              </Button>
-                            </form>
-                          )}
-                          {doc.canMutate && doc.status === "ACTIVE" && !isCompany && projectIdForTable && (
-                            <form action={archiveDocumentAction.bind(null, doc.id, projectIdForTable, revalidateExtra)}>
-                              <Button variant="ghost" size="sm" type="submit">
-                                Archivar
-                              </Button>
-                            </form>
-                          )}
-                          {doc.canMutate && doc.status === "ARCHIVED" && isCompany && (
-                            <form action={restoreCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
-                              <Button variant="ghost" size="sm" type="submit">
-                                Restaurar
-                              </Button>
-                            </form>
-                          )}
-                          {doc.canMutate && doc.status === "ARCHIVED" && !isCompany && projectIdForTable && (
-                            <form action={restoreDocumentAction.bind(null, doc.id, projectIdForTable, revalidateExtra)}>
-                              <Button variant="ghost" size="sm" type="submit">
-                                Restaurar
-                              </Button>
-                            </form>
-                          )}
-                          {doc.canMutate && doc.status === "UPLOADING" && isCompany && (
-                            <form action={softDeleteCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
-                              <Button variant="ghost" size="sm" type="submit" className="text-destructive">
-                                Cancelar subida
-                              </Button>
-                            </form>
-                          )}
-                          {doc.canMutate && doc.status === "UPLOADING" && !isCompany && projectIdForTable && (
-                            <form
-                              action={softDeleteDocumentAction.bind(null, doc.id, projectIdForTable, {
-                                extraPathsToRevalidate: revalidateExtra,
-                                redirectToProjectDocuments: false,
-                              })}
-                            >
-                              <Button variant="ghost" size="sm" type="submit" className="text-destructive">
-                                Cancelar subida
-                              </Button>
-                            </form>
-                          )}
-                          {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && isCompany && (
-                            <form action={softDeleteCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
-                              <Button variant="ghost" size="sm" type="submit" className="text-destructive">
-                                Eliminar
-                              </Button>
-                            </form>
-                          )}
-                          {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && !isCompany && projectIdForTable && (
-                            <form
-                              action={softDeleteDocumentAction.bind(null, doc.id, projectIdForTable, {
-                                extraPathsToRevalidate: revalidateExtra,
-                                redirectToProjectDocuments: false,
-                              })}
-                            >
-                              <Button variant="ghost" size="sm" type="submit" className="text-destructive">
-                                Eliminar
-                              </Button>
-                            </form>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableScroll>
-        )}
-      </div>
-
-      {canEdit && (
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className={`font-semibold ${uploadHint ? "mb-1" : "mb-4"}`}>
-            Agregar adjunto
-          </h3>
-          {uploadHint && (
-            <p className="text-xs text-muted-foreground mb-3">{uploadHint}</p>
-          )}
-          <DocumentForm
+        {canEdit && (
+          <DocumentUploadDialog
             projectId={projectIdForForm}
             storageConfigured={storageConfigured}
             linkedEntity={linkedEntity}
             defaultCategory={defaultCategory}
             afterUploadPath={afterUploadPath}
-            cancelHref={cancelHref}
-            revalidatePaths={[afterUploadPath, ...revalidateExtra]}
+            revalidatePaths={revalidateExtra}
+            triggerLabel="Adjuntar"
+            title="Adjuntar archivo"
+            description={uploadHint ?? undefined}
             submitLabel="Subir adjunto"
             placeholderWarning="La carga real de archivos no está configurada en este entorno. Solo se guardará la metadata (modo desarrollo)."
           />
-        </div>
+        )}
+      </div>
+
+      {docs.length === 0 ? (
+        <ListEmptyState message={emptyMessage} />
+      ) : (
+        <TableScroll>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Archivo</TableHead>
+                <TableHead>Categoría</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Tamaño</TableHead>
+                <TableHead>Fecha</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {docs.map((doc) => {
+                const canDownload =
+                  doc.storageProvider === "R2" &&
+                  (doc.status === "ACTIVE" || doc.status === "ARCHIVED");
+                return (
+                  <TableRow key={doc.id}>
+                    <TableCell>
+                      {projectIdForTable ? (
+                        <Link
+                          href={`/proyectos/${projectIdForTable}/documentos/${doc.id}`}
+                          className="font-medium hover:underline underline-offset-2"
+                        >
+                          {doc.originalFileName}
+                        </Link>
+                      ) : (
+                        <span className="font-medium">{doc.originalFileName}</span>
+                      )}
+                      {doc.description && (
+                        <p className="mt-0.5 max-w-[200px] truncate text-xs text-muted-foreground">
+                          {doc.description}
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <DocumentCategoryBadge category={doc.category} />
+                    </TableCell>
+                    <TableCell>
+                      <DocumentStatusBadge status={doc.status} />
+                    </TableCell>
+                    <TableCell className="text-xs tabular-nums text-muted-foreground">
+                      {fmtSize(doc.sizeBytes)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                      {fmtDate(doc.createdAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex flex-wrap justify-end gap-1">
+                        {canDownload && (
+                          <Button variant="outline" size="sm" asChild>
+                            <a href={`/api/documents/${doc.id}/download`}>Descargar</a>
+                          </Button>
+                        )}
+                        {doc.canMutate && doc.status === "ACTIVE" && isCompany && (
+                          <form action={archiveCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
+                            <Button variant="ghost" size="sm" type="submit">
+                              Archivar
+                            </Button>
+                          </form>
+                        )}
+                        {doc.canMutate && doc.status === "ACTIVE" && !isCompany && projectIdForTable && (
+                          <form action={archiveDocumentAction.bind(null, doc.id, projectIdForTable, revalidateExtra)}>
+                            <Button variant="ghost" size="sm" type="submit">
+                              Archivar
+                            </Button>
+                          </form>
+                        )}
+                        {doc.canMutate && doc.status === "ARCHIVED" && isCompany && (
+                          <form action={restoreCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
+                            <Button variant="ghost" size="sm" type="submit">
+                              Restaurar
+                            </Button>
+                          </form>
+                        )}
+                        {doc.canMutate && doc.status === "ARCHIVED" && !isCompany && projectIdForTable && (
+                          <form action={restoreDocumentAction.bind(null, doc.id, projectIdForTable, revalidateExtra)}>
+                            <Button variant="ghost" size="sm" type="submit">
+                              Restaurar
+                            </Button>
+                          </form>
+                        )}
+                        {doc.canMutate && doc.status === "UPLOADING" && isCompany && (
+                          <form action={softDeleteCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
+                            <Button variant="ghost" size="sm" type="submit" className="text-destructive">
+                              Cancelar subida
+                            </Button>
+                          </form>
+                        )}
+                        {doc.canMutate && doc.status === "UPLOADING" && !isCompany && projectIdForTable && (
+                          <form
+                            action={softDeleteDocumentAction.bind(null, doc.id, projectIdForTable, {
+                              extraPathsToRevalidate: revalidateExtra,
+                              redirectToProjectDocuments: false,
+                            })}
+                          >
+                            <Button variant="ghost" size="sm" type="submit" className="text-destructive">
+                              Cancelar subida
+                            </Button>
+                          </form>
+                        )}
+                        {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && isCompany && (
+                          <form action={softDeleteCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
+                            <Button variant="ghost" size="sm" type="submit" className="text-destructive">
+                              Eliminar
+                            </Button>
+                          </form>
+                        )}
+                        {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && !isCompany && projectIdForTable && (
+                          <form
+                            action={softDeleteDocumentAction.bind(null, doc.id, projectIdForTable, {
+                              extraPathsToRevalidate: revalidateExtra,
+                              redirectToProjectDocuments: false,
+                            })}
+                          >
+                            <Button variant="ghost" size="sm" type="submit" className="text-destructive">
+                              Eliminar
+                            </Button>
+                          </form>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableScroll>
       )}
     </div>
   );

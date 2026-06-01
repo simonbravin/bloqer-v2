@@ -30,6 +30,7 @@ import {
   budgetWbsExportPdfColumns,
   budgetWbsExportPdfRowsFromTable,
   buildBudgetWbsExportPayload,
+  buildJobsiteLogPdfPayload,
   type CashFlowFilters,
   type CashPositionFilters,
   type CertificationReportFilters,
@@ -54,6 +55,7 @@ import type { PdfReportBranding } from "./branding/pdf-branding.types";
 import { safeReportFilename } from "./filename.service";
 import { AgingReportPdfDocument } from "./pdf/aging-pdf";
 import { CostControlReportPdfDocument } from "./pdf/cost-control-pdf";
+import { JobsiteLogPdfDocument } from "./pdf/jobsite-log-pdf";
 import { ProjectSimpleTablePdfDocument } from "./pdf/project-simple-table-pdf";
 import type { ReportPdfPayload } from "./pdf/pdf-export.types";
 import { MAX_AUDIT_LOG_PDF_ROWS } from "./pdf/pdf-export.types";
@@ -762,4 +764,18 @@ export async function exportCompanySupplierInvoicesPdf(
       }))}
     />
   ));
+}
+
+export async function exportJobsiteLogPdf(
+  logId: string,
+  projectId: string,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const payload = await buildJobsiteLogPdfPayload(logId, projectId, ctx);
+  return exportPdfDocument(
+    ctx,
+    { projectId },
+    `libro_obra_parte_${payload.meta.logDateIso}_${payload.meta.status.toLowerCase()}`,
+    (branding) => <JobsiteLogPdfDocument payload={payload} branding={branding} />,
+  );
 }

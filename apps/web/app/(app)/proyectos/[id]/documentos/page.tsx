@@ -1,13 +1,12 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
-import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { getCurrentUser } from "@/lib/auth";
+import { isStorageConfigured } from "@bloqer/config";
 import { getProjectShellInfo, listProjectDocuments, ServiceError } from "@bloqer/services";
-import { DocumentListSection, DocumentFilters } from "@/features/documents";
+import { DocumentListSection, DocumentFilters, DocumentUploadDialog } from "@/features/documents";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
@@ -87,9 +86,15 @@ export default async function DocumentosPage({ params, searchParams }: PageProps
             <Suspense fallback={null}>
               <ListViewToggle storageKey={`documentos-${id}`} />
             </Suspense>
-            <Button asChild size="sm">
-              <Link href={`/proyectos/${id}/documentos/nuevo`}>+ Agregar documento</Link>
-            </Button>
+            <DocumentUploadDialog
+              projectId={id}
+              storageConfigured={isStorageConfigured()}
+              revalidatePaths={[`/proyectos/${id}/documentos`]}
+              triggerLabel="Agregar documento"
+              title="Agregar documento"
+              submitLabel="Subir documento"
+              showPlusIcon
+            />
           </>
         }
       />
