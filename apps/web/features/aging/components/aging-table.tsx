@@ -18,7 +18,6 @@ import { AgingBucketBadge } from "./aging-bucket-badge";
 
 interface Props {
   report: AgingReport;
-  linkBase?: string;
 }
 
 function formatAmount(value: string) {

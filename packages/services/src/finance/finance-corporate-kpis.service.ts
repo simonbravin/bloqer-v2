@@ -47,7 +47,7 @@ export type FinanceProjectionSummary = {
 
 export const CORPORATE_OBLIGATIONS_HREF = "/finanzas/cuentas-por-pagar";
 export const CORPORATE_OVERDUE_HREF = "/finanzas/cuentas-por-pagar?status=OVERDUE";
-export const COMPANY_AR_AGING_HREF = "/finanzas/cuentas-por-cobrar-aging";
+export const COMPANY_AR_AGING_HREF = "/finanzas/cuentas-por-cobrar";
 export const POSICION_CAJA_HREF = "/tesoreria/reportes/posicion-caja";
 
 const ZERO = new Prisma.Decimal(0);

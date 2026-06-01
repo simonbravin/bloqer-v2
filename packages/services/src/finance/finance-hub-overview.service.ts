@@ -337,9 +337,12 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
     hasFinanceModules
     && ((arMod && arPerm) || (apMod && apPerm) || (trMod && trPerm) || (acctMod && acctPerm));
 
-  const [arReport, apReport] = await Promise.all([
+  const [arReport, apReport, apCorporateReport] = await Promise.all([
     arMod && arPerm ? safeRun(() => getReceivableAgingReport({}, ctx)) : Promise.resolve(null),
     apMod && apPerm ? safeRun(() => getPayableAgingReport({}, ctx)) : Promise.resolve(null),
+    apMod && apPerm
+      ? safeRun(() => getPayableAgingReport({ corporateOnly: true }, ctx))
+      : Promise.resolve(null),
   ]);
 
   let arCard: FinanceHubMoneyCard | undefined;
@@ -349,7 +352,7 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
       moduleEnabled: true,
       hasPermission: arPerm,
       visible:       arPerm,
-      agingHref:     "/finanzas/cuentas-por-cobrar-aging",
+      agingHref:     "/finanzas/cuentas-por-cobrar",
       ...money,
       loadFailed: arPerm ? money.loadFailed : false,
     };
@@ -357,31 +360,34 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
 
   let apCard: FinanceHubMoneyCard | undefined;
   if (apMod) {
-    const money = buildMoneyCardFromAging(apReport, Boolean(apPerm && apReport === null));
+    const money = buildMoneyCardFromAging(
+      apCorporateReport,
+      Boolean(apPerm && apCorporateReport === null),
+    );
     apCard = {
       moduleEnabled: true,
       hasPermission: apPerm,
       visible:       apPerm,
-      agingHref:     "/finanzas/cuentas-por-pagar-aging",
+      agingHref:     "/finanzas/cuentas-por-pagar",
       ...money,
       loadFailed: apPerm ? money.loadFailed : false,
     };
   }
 
   const arInsight = arMod
-    ? buildInsightBlock(arMod, arPerm, arReport, "/finanzas/cuentas-por-cobrar-aging")
+    ? buildInsightBlock(arMod, arPerm, arReport, "/finanzas/cuentas-por-cobrar")
     : undefined;
 
   const apGlobalInsight = apMod
-    ? buildInsightBlock(apMod, apPerm, apReport, "/finanzas/cuentas-por-pagar-aging")
+    ? buildInsightBlock(apMod, apPerm, apReport, "/finanzas/cuentas-por-pagar")
     : undefined;
 
   const apWithProjectInsight = apMod
-    ? buildInsightBlock(apMod, apPerm, apReport, "/finanzas/cuentas-por-pagar-aging", (it) => it.projectId != null)
+    ? buildInsightBlock(apMod, apPerm, apReport, "/finanzas/cuentas-por-pagar", (it) => it.projectId != null)
     : undefined;
 
   const apCorporateInsight = apMod
-    ? buildInsightBlock(apMod, apPerm, apReport, "/finanzas/cuentas-por-pagar-aging", (it) => it.projectId == null)
+    ? buildInsightBlock(apMod, apPerm, apReport, "/finanzas/cuentas-por-pagar", (it) => it.projectId == null)
     : undefined;
 
   let treasuryCard: FinanceHubTreasuryCard | undefined;

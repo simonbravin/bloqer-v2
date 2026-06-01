@@ -6,15 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { TransaccionesDateFilters } from "@/features/finance/components/transacciones-date-filters";
-import { PayableListSection } from "@/features/ap";
-import type { PayableListItem } from "@/features/ap";
+import { ReceivableListSection, type ReceivableListItem } from "@/features/sales-invoices";
 import { AgingSummaryCards, AgingFilters, AgingTable } from "@/features/aging";
 import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  getPayableAgingReport,
-  listCompanyPayables,
+  getReceivableAgingReport,
+  listCompanyReceivables,
   parseAgingFilters,
   ServiceError,
 } from "@bloqer/services";
@@ -40,7 +39,7 @@ interface PageProps {
   }>;
 }
 
-export default async function FinanzasCuentasPorPagarPage({ searchParams }: PageProps) {
+export default async function FinanzasCuentasPorCobrarPage({ searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
@@ -64,11 +63,8 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
   let listResult;
   try {
     [agingReport, listResult] = await Promise.all([
-      getPayableAgingReport(
-        { ...parseAgingFilters(sp), corporateOnly: true },
-        ctx,
-      ),
-      listCompanyPayables(ctx, {
+      getReceivableAgingReport(parseAgingFilters(sp), ctx),
+      listCompanyReceivables(ctx, {
         status,
         pendingOnly,
         dueDateFrom: sp.from,
@@ -82,20 +78,21 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
     throw err;
   }
 
-  const items: PayableListItem[] = listResult.data.map((p) => ({
-    id: p.id,
-    supplierName: p.supplierName,
-    dueDate: p.dueDate,
-    status: p.status,
-    originalAmount: p.originalAmount,
-    paidAmount: p.paidAmount,
-    balanceDue: p.balanceDue,
-    currency: p.currency,
-    supplierInvoiceId: p.supplierInvoiceId,
-    supplierInvoiceCode: p.supplierInvoiceCode,
+  const items: ReceivableListItem[] = listResult.data.map((r) => ({
+    id: r.id,
+    projectId: r.projectId,
+    salesInvoiceId: r.salesInvoiceId,
+    dueDate: r.dueDate,
+    status: r.status,
+    originalAmount: r.originalAmount,
+    paidAmount: r.paidAmount,
+    balanceDue: r.balanceDue,
+    currency: r.currency,
+    clientName: r.clientName,
+    projectCode: r.projectCode,
+    projectName: r.projectName,
+    salesInvoiceCode: r.salesInvoiceCode,
   }));
-
-  const exportParams = { ...sp, scope: "corporate" as const };
 
   function listHref(listStatus?: string) {
     const p = new URLSearchParams();
@@ -115,7 +112,7 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
   const statusLabel: Record<string, string> = {
     OPEN: "Abiertas",
     PARTIAL: "Parcial",
-    PAID: "Pagadas",
+    PAID: "Cobradas",
     OVERDUE: "Vencidas",
     CANCELLED: "Canceladas",
   };
@@ -124,21 +121,17 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Cuentas por pagar</h1>
-          <p className="text-xs text-muted-foreground">
-            Obligaciones empresa (sin proyecto) · Al {agingReport.asOfDate}
+          <h1 className="text-2xl font-bold tracking-tight">Cuentas por cobrar</h1>
+          <p className="text-xs text-muted-foreground max-w-prose">
+            Todas las obras de la empresa · Al {agingReport.asOfDate}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ReportExportActions
-            exportPath="/api/reports/finanzas/ap-aging.csv"
-            params={exportParams}
-            pdf
-          />
+          <ReportExportActions exportPath="/api/reports/finanzas/ar-aging.csv" params={sp} pdf />
           <ReportEmailSendDialog
-            reportType="AP_AGING"
+            reportType="AR_AGING"
             supportsPdf
-            params={exportParams}
+            params={sp}
             defaultRecipientEmail={current.session.user?.email ?? null}
           />
         </div>
@@ -152,13 +145,13 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
         <CardHeader className="pb-2">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle className="text-lg">Detalle de obligaciones</CardTitle>
+              <CardTitle className="text-lg">Detalle de cuentas por cobrar</CardTitle>
               <CardDescription className="mt-1 max-w-prose">
-                Facturas corporativas sin imputar a obra. Desde acá abrís el detalle y registrás pagos.
+                Listado paginado por obra. El detalle y la cobranza se gestionan desde el proyecto.
               </CardDescription>
             </div>
             <Suspense fallback={null}>
-              <ListViewToggle storageKey="finanzas-cuentas-por-pagar" />
+              <ListViewToggle storageKey="finanzas-cuentas-por-cobrar" />
             </Suspense>
           </div>
         </CardHeader>
@@ -166,16 +159,16 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground mr-1">Estado:</span>
             <Button asChild variant={pendingOnly ? "secondary" : "outline"} size="sm">
-              <Link href={`/finanzas/cuentas-por-pagar${listHref()}`}>Pendientes</Link>
+              <Link href={`/finanzas/cuentas-por-cobrar${listHref()}`}>Pendientes</Link>
             </Button>
             <Button asChild variant={showAllStates ? "secondary" : "outline"} size="sm">
-              <Link href={`/finanzas/cuentas-por-pagar${listHref("ALL")}`}>
+              <Link href={`/finanzas/cuentas-por-cobrar${listHref("ALL")}`}>
                 Todos los estados
               </Link>
             </Button>
             {STATUSES.map((s) => (
               <Button key={s} asChild variant={status === s ? "secondary" : "outline"} size="sm">
-                <Link href={`/finanzas/cuentas-por-pagar${listHref(s)}`}>
+                <Link href={`/finanzas/cuentas-por-cobrar${listHref(s)}`}>
                   {statusLabel[s] ?? s}
                 </Link>
               </Button>
@@ -183,15 +176,21 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
           </div>
 
           <Suspense fallback={null}>
-            <TransaccionesDateFilters preserveParams={["status", "search", "currency", "bucket", "asOfDate", "contactId", "includePaid"]} />
+            <TransaccionesDateFilters
+              preserveParams={[
+                "status",
+                "search",
+                "currency",
+                "bucket",
+                "asOfDate",
+                "contactId",
+                "includePaid",
+              ]}
+            />
           </Suspense>
 
           <Suspense fallback={<ListSectionSkeleton />}>
-            <PayableListSection
-              payables={items}
-              hrefPrefix="/finanzas/cuentas-por-pagar"
-              supplierInvoiceHrefPrefix="/finanzas/facturas-proveedor"
-            />
+            <ReceivableListSection receivables={items} showProjectColumn />
           </Suspense>
 
           <Suspense fallback={null}>

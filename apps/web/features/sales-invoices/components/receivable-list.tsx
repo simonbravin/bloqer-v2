@@ -11,4 +11,7 @@ export type ReceivableListItem = {
   balanceDue: string;
   currency: string;
   clientName: string;
+  projectCode?: string;
+  projectName?: string;
+  salesInvoiceCode?: string | null;
 };

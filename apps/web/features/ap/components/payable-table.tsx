@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { PayableListItem } from "./payable-list";
 
@@ -36,6 +37,7 @@ export function PayableTable({
             <TableHead>Vencimiento</TableHead>
             <TableHead>Factura</TableHead>
             <TableHead className="text-right">Saldo</TableHead>
+            <TableHead>Pagada</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead className="w-20" />
           </TableRow>
@@ -62,6 +64,9 @@ export function PayableTable({
                   style: "currency",
                   currency: p.currency,
                 })}
+              </TableCell>
+              <TableCell>
+                <ObligationSettledCell status={p.status} />
               </TableCell>
               <TableCell>
                 <PayableStatusBadge status={p.status} />

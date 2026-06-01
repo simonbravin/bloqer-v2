@@ -563,7 +563,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       for (const row of financeSummary!.receivablesOpenByCurrency ?? []) {
         arOpen.set(row.currency, new Prisma.Decimal(row.total));
       }
-      pushMoneyKpi(kpis, "ar_open", "Cuentas por cobrar", arOpen, "/finanzas/cuentas-por-cobrar-aging", "$ 0,00");
+      pushMoneyKpi(kpis, "ar_open", "Cuentas por cobrar", arOpen, "/finanzas/cuentas-por-cobrar", "$ 0,00");
       if ((financeSummary!.overdueReceivablesCount ?? 0) > 0) {
         kpis.push({
           key:    "ar_overdue",
@@ -578,7 +578,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
           key:    "ar_due_soon",
           label:  "Cuentas por cobrar próximas (14 días)",
           value:  String(financeSummary!.receivablesDueSoonCount),
-          href:   "/finanzas/cuentas-por-cobrar-aging",
+          href:   "/finanzas/cuentas-por-cobrar",
           tone:   "muted",
         });
       }
@@ -607,7 +607,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       for (const row of financeSummary!.payablesOpenByCurrency ?? []) {
         apOpen.set(row.currency, new Prisma.Decimal(row.total));
       }
-      pushMoneyKpi(kpis, "ap_open", "Cuentas por pagar", apOpen, "/finanzas/cuentas-por-pagar-aging", "$ 0,00");
+      pushMoneyKpi(kpis, "ap_open", "Cuentas por pagar", apOpen, "/finanzas/cuentas-por-pagar", "$ 0,00");
       if ((financeSummary!.overduePayablesCount ?? 0) > 0) {
         kpis.push({
           key:    "ap_overdue",
@@ -622,7 +622,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
           key:    "ap_due_soon",
           label:  "Cuentas por pagar próximas (14 días)",
           value:  String(financeSummary!.payablesDueSoonCount),
-          href:   "/finanzas/cuentas-por-pagar-aging",
+          href:   "/finanzas/cuentas-por-pagar",
           tone:   "muted",
         });
       }
@@ -721,14 +721,14 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
   if (arAllowed) {
     quickActions.push({
       label:       "Cuentas por cobrar",
-      href:        "/finanzas/cuentas-por-cobrar-aging",
+      href:        "/finanzas/cuentas-por-cobrar",
       description: "Saldos por cliente y vencimiento",
     });
   }
   if (apAllowed) {
     quickActions.push({
       label:       "Cuentas por pagar",
-      href:        "/finanzas/cuentas-por-pagar-aging",
+      href:        "/finanzas/cuentas-por-pagar",
       description: "Saldos por proveedor y vencimiento",
     });
   }

@@ -55,7 +55,7 @@ export default async function FinanzasPayableDetailPage({ params }: PageProps) {
   return (
     <PageShell variant="detail" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href="/finanzas/cuentas-por-pagar" label="Pagos pendientes" />
+        <PageBackLink href="/finanzas/cuentas-por-pagar" label="Cuentas por pagar" />
         <h1 className="text-2xl font-bold tracking-tight">Cuenta por pagar (empresa)</h1>
         <PayableStatusBadge status={payable.status} />
       </div>

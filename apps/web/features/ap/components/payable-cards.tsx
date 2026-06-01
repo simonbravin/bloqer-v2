@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { PayableListItem } from "./payable-list";
 
@@ -27,7 +28,12 @@ export function PayableCards({
         >
           <div className="flex items-start justify-between gap-2">
             <span className="text-xs text-muted-foreground">Vence {formatDate(p.dueDate)}</span>
-            <PayableStatusBadge status={p.status} />
+            <div className="flex flex-col items-end gap-1">
+              <PayableStatusBadge status={p.status} />
+              <span className="text-xs text-muted-foreground">
+                Pagada: <ObligationSettledCell status={p.status} />
+              </span>
+            </div>
           </div>
           <h3 className="mt-2 font-semibold leading-snug">{p.supplierName}</h3>
           {p.supplierInvoiceCode && p.supplierInvoiceId && supplierInvoiceHrefPrefix ? (

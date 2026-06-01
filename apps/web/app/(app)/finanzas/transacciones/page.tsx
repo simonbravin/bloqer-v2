@@ -205,7 +205,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
           <h1 className="text-2xl font-bold tracking-tight">Transacciones</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Ingresos y egresos de caja confirmados (obra y empresa). Para obligaciones pendientes ver{" "}
-            <Link href="/finanzas/cuentas-por-pagar-aging" className="underline underline-offset-2 text-foreground">
+            <Link href="/finanzas/cuentas-por-pagar" className="underline underline-offset-2 text-foreground">
               Cuentas por pagar
             </Link>
             ; indicadores en{" "}
@@ -281,13 +281,8 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
             {canAp && (
               <>
                 <li>
-                  <Link href="/finanzas/cuentas-por-pagar-aging" className="underline underline-offset-2 text-foreground">
-                    Cuentas por pagar (aging)
-                  </Link>
-                </li>
-                <li>
                   <Link href="/finanzas/cuentas-por-pagar" className="underline underline-offset-2 text-foreground">
-                    Pagos pendientes
+                    Cuentas por pagar
                   </Link>
                 </li>
                 <li>

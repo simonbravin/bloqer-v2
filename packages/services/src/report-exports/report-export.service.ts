@@ -65,6 +65,7 @@ export function parseAgingFilters(sp: Record<string, string | undefined>): Aging
     bucket: bucket && valid.includes(bucket) ? bucket : undefined,
     asOfDate: sp.asOfDate,
     projectId: sp.projectId,
+    corporateOnly: sp.scope === "corporate",
     contactId: sp.contactId,
     companyId: sp.companyId,
     includePaid: sp.includePaid === "true",

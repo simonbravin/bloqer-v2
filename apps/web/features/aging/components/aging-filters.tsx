@@ -23,7 +23,12 @@ const BUCKET_OPTIONS: { value: AgingBucket | ""; label: string }[] = [
   { value: "90_plus", label: "+90 días" },
 ];
 
-export function AgingFilters() {
+interface AgingFiltersProps {
+  /** Query keys kept when clearing aging filters (e.g. list status / pagination). */
+  preserveParams?: string[];
+}
+
+export function AgingFilters({ preserveParams = [] }: AgingFiltersProps) {
   const router     = useRouter();
   const pathname   = usePathname();
   const sp         = useSearchParams();
@@ -79,7 +84,15 @@ export function AgingFilters() {
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => router.push(pathname)}
+        onClick={() => {
+          const next = new URLSearchParams();
+          for (const key of preserveParams) {
+            const value = sp.get(key);
+            if (value) next.set(key, value);
+          }
+          const qs = next.toString();
+          router.push(qs ? `${pathname}?${qs}` : pathname);
+        }}
         className="self-end"
       >
         Limpiar

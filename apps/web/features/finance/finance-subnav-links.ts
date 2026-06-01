@@ -29,7 +29,7 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
 
   if (gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR")) {
     links.push({
-      href: "/finanzas/cuentas-por-cobrar-aging",
+      href: "/finanzas/cuentas-por-cobrar",
       label: "Cuentas por cobrar",
       title: "Saldos por cliente y vencimiento",
     });
@@ -37,7 +37,7 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
 
   if (gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP")) {
     links.push({
-      href: "/finanzas/cuentas-por-pagar-aging",
+      href: "/finanzas/cuentas-por-pagar",
       label: "Cuentas por pagar",
       title: "Saldos por proveedor y vencimiento",
     });

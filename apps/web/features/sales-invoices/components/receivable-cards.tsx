@@ -1,23 +1,26 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
 import { ReceivableStatusBadge } from "./receivable-status-badge";
 import type { ReceivableListItem } from "./receivable-list";
 
 function fmtMoney(value: string, currency: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value)) + " " + currency;
+  return (
+    new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+      parseFloat(value),
+    ) +
+    " " +
+    currency
+  );
 }
 
-export function ReceivableCards({
-  receivables,
-  projectId,
-}: {
+type Props = {
   receivables: ReceivableListItem[];
-  projectId: string;
-}) {
+  showProjectColumn?: boolean;
+};
+
+export function ReceivableCards({ receivables, showProjectColumn = false }: Props) {
   if (receivables.length === 0) {
     return (
       <ListEmptyState message="Sin cuentas por cobrar. Se crean automáticamente al emitir una factura." />
@@ -29,14 +32,25 @@ export function ReceivableCards({
       {receivables.map((r) => (
         <Link
           key={r.id}
-          href={`/proyectos/${projectId}/cuentas-por-cobrar/${r.id}`}
+          href={`/proyectos/${r.projectId}/cuentas-por-cobrar/${r.id}`}
           className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
             <span className="text-xs text-muted-foreground">Vence {formatDate(r.dueDate)}</span>
-            <ReceivableStatusBadge status={r.status} />
+            <div className="flex flex-col items-end gap-1">
+              <ReceivableStatusBadge status={r.status} />
+              <span className="text-xs text-muted-foreground">
+                Cobrada: <ObligationSettledCell status={r.status} />
+              </span>
+            </div>
           </div>
           <h3 className="mt-2 font-semibold leading-snug">{r.clientName}</h3>
+          {showProjectColumn && r.projectName ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {r.projectCode ? `${r.projectCode} · ` : ""}
+              {r.projectName}
+            </p>
+          ) : null}
           <div className="mt-3 flex justify-between gap-2 text-sm tabular-nums">
             <span className="text-muted-foreground">Saldo</span>
             <span className="font-medium">{fmtMoney(r.balanceDue, r.currency)}</span>

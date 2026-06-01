@@ -13,6 +13,8 @@ export type AgingBucket = "current" | "1_30" | "31_60" | "61_90" | "90_plus";
 export type AgingFilters = {
   companyId?: string;
   projectId?: string;
+  /** Finanzas empresa AP: solo obligaciones sin obra (`projectId` null). */
+  corporateOnly?: boolean;
   contactId?: string;
   currency?: string;
   asOfDate?: string;
@@ -149,8 +151,9 @@ export async function getReceivableAgingReport(
     where: {
       tenantId: ctx.tenantId,
       status:   { notIn: filters.includePaid ? ["CANCELLED"] : ["CANCELLED", "PAID"] },
-      ...(filters.companyId ? { companyId:        filters.companyId } : {}),
-      ...(filters.projectId ? { projectId:        filters.projectId } : {}),
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+      ...(filters.companyId ? { companyId: filters.companyId } : {}),
+      ...(filters.projectId ? { projectId: filters.projectId } : {}),
       ...(filters.contactId ? { clientContactId:  filters.contactId } : {}),
       ...(filters.currency  ? { currency:         filters.currency  } : {}),
     },
@@ -231,14 +234,21 @@ export async function getPayableAgingReport(
 
   const asOf = parseObligationAsOfDate(filters.asOfDate);
 
+  const projectFilter = filters.corporateOnly
+    ? { projectId: null as null }
+    : filters.projectId
+      ? { projectId: filters.projectId }
+      : {};
+
   const rows = await prisma.payable.findMany({
     where: {
       tenantId: ctx.tenantId,
       status:   { notIn: filters.includePaid ? ["CANCELLED"] : ["CANCELLED", "PAID"] },
-      ...(filters.companyId ? { companyId:          filters.companyId } : {}),
-      ...(filters.projectId ? { projectId:          filters.projectId } : {}),
-      ...(filters.contactId ? { supplierContactId:  filters.contactId } : {}),
-      ...(filters.currency  ? { currency:           filters.currency  } : {}),
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+      ...(filters.companyId ? { companyId: filters.companyId } : {}),
+      ...projectFilter,
+      ...(filters.contactId ? { supplierContactId: filters.contactId } : {}),
+      ...(filters.currency ? { currency: filters.currency } : {}),
     },
     include: {
       supplierContact: { select: { id: true, legalName: true, fantasyName: true } },

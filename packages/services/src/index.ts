@@ -34,7 +34,7 @@ export {
 export type { WbsImportProfile } from "./budget/wbs-code-rules";
 export * from "./certification/certification.service";
 export * from "./certification/certification-line.service";
-export { canViewArProjectArea, canEditArArea } from "./ar/ar-access";
+export { canViewArProjectArea, canEditArArea, canViewCompanyAr } from "./ar/ar-access";
 export * from "./ar/sales-invoice.service";
 export * from "./ar/receivable.service";
 export * from "./ar/project-ar-summary.service";

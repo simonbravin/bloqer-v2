@@ -16,3 +16,8 @@ export function canViewArProjectArea(roles: ServiceContext["roles"]): boolean {
 export function canEditArArea(roles: ServiceContext["roles"]): boolean {
   return can(roles, "EDIT", "AR");
 }
+
+/** Company-level Finanzas AR routes: VIEW AR only (not VIEW PROJECTS). */
+export function canViewCompanyAr(roles: ServiceContext["roles"]): boolean {
+  return can(roles, "VIEW", "AR");
+}

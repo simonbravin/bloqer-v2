@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
 import { ReceivableStatusBadge } from "./receivable-status-badge";
 import type { ReceivableListItem } from "./receivable-list";
 
@@ -24,13 +25,13 @@ function fmtMoney(value: string, currency: string) {
   );
 }
 
-export function ReceivableTable({
-  receivables,
-  projectId,
-}: {
+type Props = {
   receivables: ReceivableListItem[];
-  projectId: string;
-}) {
+  /** Muestra columna de obra (listado empresa). */
+  showProjectColumn?: boolean;
+};
+
+export function ReceivableTable({ receivables, showProjectColumn = false }: Props) {
   if (receivables.length === 0) {
     return (
       <ListEmptyState message="Sin cuentas por cobrar. Se crean automáticamente al emitir una factura." />
@@ -43,7 +44,10 @@ export function ReceivableTable({
         <TableHeader>
           <TableRow>
             <TableHead>Cliente</TableHead>
+            {showProjectColumn ? <TableHead>Proyecto</TableHead> : null}
             <TableHead>Vencimiento</TableHead>
+            {showProjectColumn ? <TableHead>Factura</TableHead> : null}
+            <TableHead>Cobrada</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead className="text-right">Original</TableHead>
             <TableHead className="text-right">Saldo</TableHead>
@@ -53,8 +57,37 @@ export function ReceivableTable({
         <TableBody>
           {receivables.map((r) => (
             <TableRow key={r.id}>
-              <TableCell className="text-sm">{r.clientName}</TableCell>
+              <TableCell className="text-sm font-medium">{r.clientName}</TableCell>
+              {showProjectColumn ? (
+                <TableCell className="text-sm text-muted-foreground">
+                  {r.projectCode ? (
+                    <span title={r.projectName}>
+                      {r.projectCode}
+                      {r.projectName ? ` · ${r.projectName}` : ""}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+              ) : null}
               <TableCell className="text-sm">{formatDate(r.dueDate)}</TableCell>
+              {showProjectColumn ? (
+                <TableCell className="text-sm text-muted-foreground">
+                  {r.salesInvoiceCode ? (
+                    <Link
+                      href={`/proyectos/${r.projectId}/facturas/${r.salesInvoiceId}`}
+                      className="hover:underline"
+                    >
+                      {r.salesInvoiceCode}
+                    </Link>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+              ) : null}
+              <TableCell>
+                <ObligationSettledCell status={r.status} />
+              </TableCell>
               <TableCell>
                 <ReceivableStatusBadge status={r.status} />
               </TableCell>
@@ -66,7 +99,7 @@ export function ReceivableTable({
               </TableCell>
               <TableCell>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/proyectos/${projectId}/cuentas-por-cobrar/${r.id}`}>Ver</Link>
+                  <Link href={`/proyectos/${r.projectId}/cuentas-por-cobrar/${r.id}`}>Ver</Link>
                 </Button>
               </TableCell>
             </TableRow>

@@ -1,5 +1,9 @@
 import { Prisma, prisma, Receivable, ReceivableStatus } from "@bloqer/database";
-import { canEditArArea, canViewArProjectArea } from "./ar-access";
+import { canEditArArea, canViewArProjectArea, canViewCompanyAr } from "./ar-access";
+import {
+  appendPendingReceivablesFilter,
+  appendReceivableStatusFilter,
+} from "../finance/receivable-list-filters";
 import { auditAr } from "./ar-audit";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -7,6 +11,7 @@ import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { assertCanCancelReceivableDirect } from "./receivable-cancel-guards";
+import { deriveObligationDisplayStatus, isObligationOverdue } from "../finance/obligation-date";
 
 const MAX_COLLECTIBLE_RECEIVABLES = 500;
 
@@ -102,7 +107,83 @@ export async function listCollectibleReceivablesByProject(
     .filter((r) => new Prisma.Decimal(r.balanceDue).greaterThan(0));
 }
 
+export type CompanyReceivableListFilters = {
+  status?: "OPEN" | "PARTIAL" | "PAID" | "OVERDUE" | "CANCELLED";
+  pendingOnly?: boolean;
+  clientContactId?: string;
+  dueDateFrom?: string;
+  dueDateTo?: string;
+  page?: number;
+  pageSize?: number;
+};
 
+export type CompanyReceivableListRow = ReceivableView & {
+  projectCode: string;
+  projectName: string;
+  salesInvoiceCode: string | null;
+};
+
+/** All receivables for the tenant company (every line has a project). VIEW AR only. */
+export async function listCompanyReceivables(
+  ctx: ServiceContext,
+  filters?: CompanyReceivableListFilters,
+): Promise<{ data: CompanyReceivableListRow[]; total: number }> {
+  await assertArTenantModule(ctx);
+  if (!canViewCompanyAr(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar a nivel empresa");
+  }
+
+  const { skip, take } = resolvePagination({
+    page: filters?.page,
+    pageSize: filters?.pageSize,
+  });
+
+  const where: Prisma.ReceivableWhereInput = {
+    tenantId: ctx.tenantId,
+    ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    ...(filters?.clientContactId ? { clientContactId: filters.clientContactId } : {}),
+    ...(filters?.dueDateFrom || filters?.dueDateTo
+      ? {
+          dueDate: {
+            ...(filters.dueDateFrom ? { gte: new Date(filters.dueDateFrom) } : {}),
+            ...(filters.dueDateTo ? { lte: new Date(filters.dueDateTo) } : {}),
+          },
+        }
+      : {}),
+  };
+  if (filters?.pendingOnly && !filters.status) {
+    appendPendingReceivablesFilter(where);
+  }
+  appendReceivableStatusFilter(where, filters?.status);
+
+  const [rows, total] = await Promise.all([
+    prisma.receivable.findMany({
+      where,
+      include: {
+        clientContact: { select: { legalName: true, fantasyName: true } },
+        salesInvoice: { select: { number: true } },
+        project: { select: { code: true, name: true } },
+      },
+      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+      skip,
+      take,
+    }),
+    prisma.receivable.count({ where }),
+  ]);
+
+  const data: CompanyReceivableListRow[] = rows.map((r) => {
+    const base = serializeReceivable(r);
+    const num = r.salesInvoice?.number;
+    return {
+      ...base,
+      projectCode: r.project.code,
+      projectName: r.project.name,
+      salesInvoiceCode: num != null ? `FAC-${String(num).padStart(5, "0")}` : null,
+    };
+  });
+
+  return { data, total };
+}
 
 export type ReceivablesProjectSummary = {
   totalByCurrency: { currency: string; amount: string }[];
@@ -207,10 +288,10 @@ export async function cancelReceivable(id: string, ctx: ServiceContext): Promise
   return updated;
 }
 
-import { deriveObligationDisplayStatus, isObligationOverdue } from "../finance/obligation-date";
-
 type RawReceivable = Receivable & {
   clientContact: { legalName: string; fantasyName: string | null };
+  salesInvoice?: { number: number } | null;
+  project?: { code: string; name: string };
 };
 
 function serializeReceivable(r: RawReceivable): ReceivableView {
