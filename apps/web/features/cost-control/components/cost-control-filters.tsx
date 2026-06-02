@@ -33,14 +33,17 @@ export function CostControlFilters({ budgets, currentBudgetId }: Props) {
     const bid = fd.get("budgetId") as string;
     const from = fd.get("dateFrom") as string;
     const to = fd.get("dateTo") as string;
+    const wbsSearch = (fd.get("wbsSearch") as string)?.trim() ?? "";
 
     sp.delete("budgetId");
     sp.delete("dateFrom");
     sp.delete("dateTo");
+    sp.delete("wbsSearch");
 
     if (bid && bid !== "__all__") sp.set("budgetId", bid);
     if (from) sp.set("dateFrom", from);
     if (to) sp.set("dateTo", to);
+    if (wbsSearch) sp.set("wbsSearch", wbsSearch);
 
     const q = sp.toString();
     router.push(q ? `${pathname}?${q}` : pathname);
@@ -91,6 +94,7 @@ export function CostControlFilters({ budgets, currentBudgetId }: Props) {
       <div className="min-w-56 flex-1 basis-72 space-y-1">
         <Label className="text-xs">Buscar WBS</Label>
         <Input
+          name="wbsSearch"
           className="h-8 w-full text-xs"
           placeholder="Código o nombre…"
           defaultValue={wbsSearchDefault}

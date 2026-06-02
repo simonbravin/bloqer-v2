@@ -158,7 +158,7 @@ export function SubcontractForm({
     setPending(false);
     if ("error" in res) { setError(res.error ?? null); return; }
     toast.success("Subcontrato guardado.");
-    router.push(`subcontratos/${res.id}`);
+    router.push(`/proyectos/${projectId}/subcontratos/${res.id}`);
   }
 
   return (

@@ -40,6 +40,7 @@ export default async function SubcontratosPage({ params }: PageProps) {
     subcontracts = await listSubcontractsByProject(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
@@ -51,14 +52,19 @@ export default async function SubcontratosPage({ params }: PageProps) {
         title="Subcontratos"
         subtitle={`${subcontracts.length} ${subcontracts.length === 1 ? "subcontrato" : "subcontratos"}`}
         actions={
-          <>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/proyectos/${projectId}/reportes/subcontratos`}>
+                Varianza y certificaciones
+              </Link>
+            </Button>
             <Suspense fallback={null}>
               <ListViewToggle storageKey={`subcontratos-${projectId}`} />
             </Suspense>
             <Button asChild>
               <Link href={`/proyectos/${projectId}/subcontratos/nuevo`}>+ Nuevo subcontrato</Link>
             </Button>
-          </>
+          </div>
         }
       />
 

@@ -8,6 +8,7 @@ import {
   type ProjectCostControlReport,
 } from "../cost-control/cost-control.service";
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
+import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { ServiceContext, ServiceError } from "../types";
 
 /** Capa de costo para comparar contra presupuesto ([D-021]). */
@@ -317,7 +318,6 @@ export async function getWbsSubcontractBudgetHints(
         },
       },
     },
-    orderBy: { code: "asc" },
   });
 
   const hints: WbsSubcontractBudgetHint[] = [];
@@ -348,8 +348,8 @@ export async function getWbsSubcontractBudgetHints(
 
   if (options?.excludeWithActiveContract !== false) {
     const covered = await getWbsIdsWithActiveSubcontract(projectId, ctx);
-    return hints.filter((h) => !covered.has(h.wbsNodeId));
+    return hints.filter((h) => !covered.has(h.wbsNodeId)).sort((a, b) => compareWbsCodes(a.code, b.code));
   }
 
-  return hints;
+  return hints.sort((a, b) => compareWbsCodes(a.code, b.code));
 }

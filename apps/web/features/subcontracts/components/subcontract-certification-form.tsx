@@ -68,7 +68,7 @@ export function SubcontractCertificationForm({
     if ("error" in res) { setPendingError(res.error ?? null); return; }
     toast.success(mode === "edit" ? "Certificación actualizada." : "Certificación guardada.");
     if (mode === "edit") { router.push(".."); return; }
-    if ("id" in res) router.push(`certificaciones/${res.id}`);
+    if ("id" in res) router.push(`../${res.id}`);
   }
 
   return (

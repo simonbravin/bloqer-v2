@@ -4,6 +4,7 @@ import { canViewSubcontractsArea } from "../subcontracts/subcontract-access";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
+import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { listApprovedBudgetsForProject, resolveApprovedBudgetForProject } from "./report-budget-resolve";
 import { monthKey, monthLabel } from "./report-month";
 
@@ -104,8 +105,8 @@ export async function getSubcontractVarianceReport(
   const wbsLeaves = await prisma.wbsNode.findMany({
     where: { budgetId: budget.id, type: "ITEM" },
     select: { id: true, code: true, name: true },
-    orderBy: { code: "asc" },
   });
+  wbsLeaves.sort((a, b) => compareWbsCodes(a.code, b.code));
 
   const costItems = await prisma.costItem.findMany({
     where: { budgetId: budget.id },

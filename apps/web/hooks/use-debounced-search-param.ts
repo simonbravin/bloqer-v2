@@ -23,7 +23,8 @@ export function useDebouncedSearchParam(
         if (!trimmed || trimmed.length < minLen) params.delete(param);
         else params.set(param, trimmed);
         params.delete("page");
-        router.replace(`${pathname}?${params.toString()}`);
+        const q = params.toString();
+        router.replace(q ? `${pathname}?${q}` : pathname);
       }, delayMs);
     },
     [router, pathname, searchParams, param, delayMs, options?.minLength],

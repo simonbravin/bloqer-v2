@@ -2,6 +2,7 @@ import { Prisma, prisma, Subcontract } from "@bloqer/database";
 import { canEditSubcontractsArea, canViewSubcontractsArea } from "./subcontract-access";
 import type { CreateSubcontractInput, UpdateSubcontractInput, UpdateSubcontractMetaInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
+import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
@@ -154,8 +155,8 @@ export async function getSubcontractFormWbsPickList(
       budget: { projectId, status: { in: ["APPROVED", "CLOSED"] } },
     },
     select: { id: true, code: true, name: true, costItem: { select: { unit: true } } },
-    orderBy: { code: "asc" },
   });
+  wbsNodes.sort((a, b) => compareWbsCodes(a.code, b.code));
 
   return {
     companyId: project.companyId ?? ctx.companyId ?? "",

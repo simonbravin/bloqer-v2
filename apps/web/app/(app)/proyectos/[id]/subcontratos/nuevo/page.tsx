@@ -50,6 +50,16 @@ export default async function NuevoSubcontratoPage({ params, searchParams }: Pag
         <PageBackLink href={`/proyectos/${projectId}/subcontratos`} label="Subcontratos" />
         <h1 className="text-2xl font-bold tracking-tight">Nuevo subcontrato</h1>
       </div>
+      {sp.filter === "pending" && budgetHints.length > 0 ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/20">
+          <p className="text-sm font-medium">Partidas pendientes de contrato</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {budgetHints.length}{" "}
+            {budgetHints.length === 1 ? "ítem tiene" : "ítems tienen"} subcontrato en presupuesto sin
+            contrato activo. Elegí una sugerencia en el formulario para comenzar.
+          </p>
+        </div>
+      ) : null}
       <div className="rounded-lg border bg-card p-6">
         <SubcontractForm
           projectId={projectId}
