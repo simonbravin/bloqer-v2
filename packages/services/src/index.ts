@@ -79,6 +79,7 @@ export * from "./jobsite-log/jobsite-log-export.service";
 export * from "./schedule/schedule-access";
 export * from "./schedule/schedule.service";
 export * from "./schedule/schedule-workspace.service";
+export * from "./schedule/schedule-progress-sync.service";
 export type { ScheduleItemAuditEntryDto } from "./schedule/schedule-audit";
 export type {
   ScheduleItemContextDto,

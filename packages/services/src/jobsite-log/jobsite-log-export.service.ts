@@ -204,7 +204,7 @@ export async function buildJobsiteLogPdfPayload(
       wbs: `${p.wbsNode.code} — ${p.wbsNode.name}`,
       description: p.description ?? "—",
       quantity: formatQty(p.quantityCompleted, p.wbsNode.unit),
-      pct: p.physicalPct ? `${p.physicalPct}%` : "—",
+      pct: p.physicalPct ? `${p.physicalPct}% (día)` : "—",
       notes: p.notes ?? "—",
     })),
     labor: log.labor.map((lb) => ({

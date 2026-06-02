@@ -1,12 +1,20 @@
 # Kibo UI (cronograma)
 
-Los adapters viven en [`features/schedule/adapters/schedule-view-types.ts`](../../features/schedule/adapters/schedule-view-types.ts).
+Componentes instalados vía `npx kibo-ui add` (ADR-007):
 
-Las vistas actuales en `features/schedule/components/` implementan Gantt, calendario y kanban con ese contrato. Para instalar los componentes upstream:
+- [`gantt/`](./gantt/index.tsx)
+- [`calendar/`](./calendar/index.tsx)
+- [`kanban/`](./kanban/index.tsx)
+
+Los **adapters** de dominio viven en [`features/schedule/adapters/schedule-view-types.ts`](../../features/schedule/adapters/schedule-view-types.ts). Las vistas del feature `schedule` importan Kibo + mappers; no acceden a DTOs crudos en los componentes Kibo.
+
+Para reinstalar o actualizar:
 
 ```bash
 cd apps/web
-npx kibo-ui@latest add gantt calendar kanban
+echo N | npx kibo-ui@latest add gantt
+echo N | npx kibo-ui@latest add calendar
+echo N | npx kibo-ui@latest add kanban
 ```
 
-Reemplazá el cuerpo de `schedule-gantt-view.tsx` (etc.) por los componentes generados y mantené los mappers del adapter.
+Usar `echo N` evita sobrescribir `components/ui/card.tsx` y otros primitivos shadcn ya customizados.

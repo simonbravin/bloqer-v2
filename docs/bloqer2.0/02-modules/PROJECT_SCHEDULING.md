@@ -28,7 +28,8 @@ Sin cronograma, el costo puede estar “al día” pero la obra retrasada — o 
 ## 8. Acciones disponibles
 - Crear/editar cronograma (Gantt y/o lista de hitos según [Q-003]).
 - Vincular tarea a `CostItem` / `WbsNode`.
-- Registrar avance % de tarea (manual o desde certificación).
+- Registrar avance % de tarea (manual excepcional; **automático desde libro de obra al aprobar** — [D-045] / [BR-SCH-004]).
+- Editar fechas y dependencias FS (advertencias no bloqueantes si hay conflicto).
 
 ## 9. Pantallas y vistas necesarias
 - Vista Gantt (si Fase 1 incluye).
@@ -39,6 +40,7 @@ Sin cronograma, el costo puede estar “al día” pero la obra retrasada — o 
 - **BR-SCH-001**: un proyecto tiene un único Schedule activo ([BR-SCH-001]).
 - **BR-SCH-002**: avance cronograma ≠ avance certificado; reportes los muestran lado a lado ([BR-SCH-002]).
 - **BR-SCH-003**: ítem `BLOCKED` con causa obligatoria ([BR-SCH-003]).
+- **BR-SCH-004**: sync de avance real al aprobar libro ([BR-SCH-004], [D-045]).
 
 ## 11. Validaciones
 - Fechas de tarea coherentes con dependencias (sin ciclos).

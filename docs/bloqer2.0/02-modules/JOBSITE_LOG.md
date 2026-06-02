@@ -34,7 +34,9 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § JobsiteLogEntry.
 
 ## 10. Reglas de negocio
 - **BR-JL-001**: recomendación una entrada por día; no obligatorio hard ([BR-JL-001]).
+- **BR-JL-003**: materiales con producto y depósito generan consumo de inventario al aprobar el parte ([BR-JL-003]).
 - Partes aprobados son lectura para certificación como evidencia complementaria.
+- **BR-SCH-004 / [D-045]:** al aprobar, sincroniza `ScheduleItem.progressPct` en ítems de cronograma con WBS primario enlazado (ver [`../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md)).
 
 ## 11. Validaciones
 - Fecha no futura para parte “ejecutado”.

@@ -73,6 +73,7 @@ export function ConsumptionForm({ projectId, products, warehouses, wbsOptions }:
       <div className="space-y-1.5">
         <Label>Producto</Label>
         <SearchableCombobox
+          popoverWidth="wide"
           options={productOptions}
           value={productId}
           onValueChange={setProductId}
@@ -116,6 +117,7 @@ export function ConsumptionForm({ projectId, products, warehouses, wbsOptions }:
         <div className="space-y-1.5">
           <Label>Partida WBS (opcional)</Label>
           <SearchableCombobox
+            popoverWidth="wide"
             options={wbsComboboxOptions}
             value={wbsNodeId}
             onValueChange={setWbsNodeId}

@@ -370,6 +370,12 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Regla:** pasar un `ScheduleItem` a `BLOCKED` requiere **`block_reason`** no vacío (texto). Desbloquear (`IN_PROGRESS`) registra actor y timestamp.
 - **Origen:** [`STATE_MACHINES.md`](./STATE_MACHINES.md) §27.
 
+### BR-SCH-004 — Sincronización de avance real desde libro de obra
+- **Regla:** al **aprobar** un parte de obra (`JobsiteLog` → `APPROVED`), el sistema recalcula y persiste `ScheduleItem.progressPct` para cada ítem de cronograma cuyo WBS primario aparece en las líneas de avance del parte, según [D-045].
+- **Regla:** no se sincroniza en `DRAFT`, `SUBMITTED` ni `RETURNED`; tampoco si el acumulado físico del WBS supera 100 %.
+- **Regla:** el avance **plan temporal** (curva tiempo vs fechas), el avance **por cantidad** y el **certificado** no se sobrescriben con esta operación.
+- **Origen:** [D-045]; procedimiento en [`../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md).
+
 ---
 
 ## 16. Reglas de subcontratos
@@ -433,6 +439,10 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 
 ### BR-JL-002 — Adjuntos opcionales
 - **Regla:** una entrada puede tener fotos y otros adjuntos via `Document`.
+
+### BR-JL-003 — Consumo de inventario al aprobar materiales
+- **Regla:** al pasar un `JobsiteLog` a `APPROVED`, cada línea de `JobsiteLogMaterialUsage` con `productId` y `warehouseId` genera un `StockMovement` `OUT` / `CONSUMPTION` (idempotente por línea). Requiere módulo `INVENTORY` habilitado y stock suficiente al momento de aprobar.
+- **Nota:** la validación de stock también corre al guardar/enviar; el descuento ocurre solo en aprobación.
 
 ---
 

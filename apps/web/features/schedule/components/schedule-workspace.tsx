@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ScheduleWorkspaceDto } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { ScheduleSummaryCards } from "./schedule-summary-cards";
@@ -10,9 +10,10 @@ import { ScheduleGanttView } from "./schedule-gantt-view";
 import { ScheduleKanbanView } from "./schedule-kanban-view";
 import { ScheduleCalendarView } from "./schedule-calendar-view";
 import { ScheduleImportDialog } from "./schedule-import-dialog";
-import { ScheduleItemDrawer } from "./schedule-item-drawer";
+import { ScheduleItemDialog } from "./schedule-item-dialog";
 import { ScheduleFilters } from "./schedule-filters";
 import { ScheduleCreateDialog } from "./schedule-create-dialog";
+import { ScheduleProgressLegend } from "./schedule-progress-dimensions";
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
 
 type ViewId = "gantt" | "calendar" | "kanban" | "table";
@@ -24,6 +25,11 @@ const VIEWS: { id: ViewId; label: string }[] = [
   { id: "table", label: "Tabla" },
 ];
 
+function parseView(raw: string | null): ViewId {
+  if (raw && VIEWS.some((v) => v.id === raw)) return raw as ViewId;
+  return "table";
+}
+
 export function ScheduleWorkspace({
   projectId,
   workspace,
@@ -32,23 +38,70 @@ export function ScheduleWorkspace({
   workspace: ScheduleWorkspaceDto;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [view, setView] = useState<ViewId>("table");
-  const [selected, setSelected] = useState<ScheduleWorkspaceItemDto | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const view = useMemo(() => parseView(searchParams.get("view")), [searchParams]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const delayedOnly = searchParams.get("delayedOnly") === "1";
-  const statusFilter = searchParams.get("status");
-  const items = workspace.items.filter((i) => {
-    if (delayedOnly && i.daysLate == null) return false;
-    if (statusFilter && i.status !== statusFilter) return false;
-    return true;
-  });
+  const items = workspace.items;
+  const filtersExcludeAll =
+    workspace.summary.unfilteredActiveCount > 0 && items.length === 0;
+
+  const hasActiveFilters =
+    searchParams.get("status") != null || searchParams.get("delayedOnly") === "1";
+
+  function clearFilters() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("status");
+    params.delete("delayedOnly");
+    const q = params.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  }
+
+  function setView(next: ViewId) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", next);
+    const q = params.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  }
 
   function selectItem(item: ScheduleWorkspaceItemDto) {
-    setSelected(item);
-    setDrawerOpen(true);
+    setSelectedId(item.id);
+    setDialogOpen(true);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("itemId", item.id);
+    const q = params.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   }
+
+  function closeDialog(open: boolean) {
+    setDialogOpen(open);
+    if (!open) {
+      setSelectedId(null);
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("itemId");
+      const q = params.toString();
+      router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+    }
+  }
+
+  const itemIdParam = searchParams.get("itemId");
+  useEffect(() => {
+    if (!itemIdParam) {
+      return;
+    }
+    const exists = workspace.items.some((i) => i.id === itemIdParam);
+    if (exists) {
+      setSelectedId(itemIdParam);
+      setDialogOpen(true);
+      return;
+    }
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("itemId");
+    const q = params.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  }, [itemIdParam, workspace.items, pathname, router, searchParams]);
 
   return (
     <div className="space-y-6">
@@ -57,8 +110,19 @@ export function ScheduleWorkspace({
       <ScheduleFilters
         budgets={workspace.availableBudgets}
         currentBudgetId={workspace.budgetId}
-        delayedOnly={delayedOnly}
+        delayedOnly={searchParams.get("delayedOnly") === "1"}
       />
+
+      {filtersExcludeAll && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <span>Ninguna tarea coincide con los filtros activos.</span>
+          {hasActiveFilters && (
+            <Button type="button" size="sm" variant="outline" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm text-muted-foreground">
@@ -88,13 +152,31 @@ export function ScheduleWorkspace({
         </div>
       </div>
 
-      {view === "table" && <ScheduleTableView items={items} onSelect={selectItem} />}
+      <details className="rounded-lg border bg-card px-4 py-2 text-sm">
+        <summary className="cursor-pointer font-medium text-muted-foreground py-1">
+          Leyenda de avances
+        </summary>
+        <div className="pt-2 pb-1">
+          <ScheduleProgressLegend />
+        </div>
+      </details>
+
+      {view === "table" && (
+        <ScheduleTableView
+          items={items}
+          onSelect={selectItem}
+          filtersExcludeAll={filtersExcludeAll}
+          unfilteredActiveCount={workspace.summary.unfilteredActiveCount}
+        />
+      )}
       {view === "gantt" && (
         <ScheduleGanttView
           projectId={projectId}
           workspace={workspace}
           items={items}
           onSelect={selectItem}
+          filtersExcludeAll={filtersExcludeAll}
+          unfilteredActiveCount={workspace.summary.unfilteredActiveCount}
         />
       )}
       {view === "kanban" && (
@@ -103,19 +185,26 @@ export function ScheduleWorkspace({
           workspace={workspace}
           items={items}
           onSelect={selectItem}
+          filtersExcludeAll={filtersExcludeAll}
+          unfilteredActiveCount={workspace.summary.unfilteredActiveCount}
         />
       )}
       {view === "calendar" && (
-        <ScheduleCalendarView items={items} onSelect={selectItem} />
+        <ScheduleCalendarView
+          items={items}
+          onSelect={selectItem}
+          filtersExcludeAll={filtersExcludeAll}
+          unfilteredActiveCount={workspace.summary.unfilteredActiveCount}
+        />
       )}
 
-      <ScheduleItemDrawer
+      <ScheduleItemDialog
         projectId={projectId}
         workspace={workspace}
-        item={selected}
+        itemId={selectedId}
         allItems={workspace.items}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
+        open={dialogOpen}
+        onOpenChange={closeDialog}
       />
     </div>
   );

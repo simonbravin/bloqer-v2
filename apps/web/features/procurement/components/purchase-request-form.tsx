@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  SearchableCombobox,
+  withNoneOption,
+  wbsToSearchableOptions,
+} from "@/components/ui/searchable-combobox";
 import type { WbsOption } from "./purchase-order-lines-editor";
 import { createPurchaseRequestAction } from "@/app/(app)/proyectos/[id]/solicitudes-compra/actions";
 
@@ -27,6 +25,15 @@ export function PurchaseRequestForm({ projectId, wbsOptions }: PurchaseRequestFo
   const [error, setError] = useState<string | null>(null);
   const NONE_WBS = "__none__";
   const [wbsNodeId, setWbsNodeId] = useState<string>(NONE_WBS);
+
+  const wbsComboboxOptions = useMemo(
+    () =>
+      withNoneOption(wbsToSearchableOptions(wbsOptions), {
+        label: "Sin imputación",
+        value: NONE_WBS,
+      }),
+    [wbsOptions],
+  );
 
   return (
     <form
@@ -79,19 +86,14 @@ export function PurchaseRequestForm({ projectId, wbsOptions }: PurchaseRequestFo
       {wbsOptions.length > 0 && (
         <div className="space-y-2">
           <Label>Ítem WBS (opcional)</Label>
-          <Select value={wbsNodeId} onValueChange={setWbsNodeId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Sin imputación WBS" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE_WBS}>Sin imputación</SelectItem>
-              {wbsOptions.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  {w.code} — {w.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            popoverWidth="wide"
+            options={wbsComboboxOptions}
+            value={wbsNodeId}
+            onValueChange={setWbsNodeId}
+            placeholder="Sin imputación WBS"
+            searchPlaceholder="Buscar partida…"
+          />
         </div>
       )}
 

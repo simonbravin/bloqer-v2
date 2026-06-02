@@ -3,9 +3,20 @@ import { can } from "@bloqer/domain";
 import type { CreateJobsiteLogInput, UpdateJobsiteLogInput, ReturnJobsiteLogInput } from "@bloqer/validators";
 import { listEntityAuditLogs, log } from "../audit/audit.service";
 import { createSystemNotification } from "../notifications/notification.service";
-import { assertJobsiteLogTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { getStockBalance } from "../inventory/stock-balance.service";
+import { createJobsiteLogMaterialStockMovements } from "../inventory/stock-movement.service";
+import { syncScheduleProgressFromJobsiteLog } from "../schedule/schedule-progress-sync.service";
+import {
+  assertInventoryTenantModule,
+  assertJobsiteLogTenantModule,
+} from "../tenant-modules/tenant-module-enforcement";
+import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { sortTreeOrder } from "@bloqer/utils";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const HUNDRED = new Prisma.Decimal(100);
 
 function canViewJobsiteLogArea(roles: ServiceContext["roles"]): boolean {
   return can(roles, "VIEW", "JOBSITE_LOG") || can(roles, "VIEW", "PROJECTS");
@@ -222,16 +233,100 @@ const logInclude = {
 
 // ─── Validation helpers ───────────────────────────────────────────────────────
 
-async function validateChildren(
+export type JobsiteLogListFilters = {
+  dateFrom?: string;
+  dateTo?: string;
+  wbsNodeId?: string;
+  status?: string;
+};
+
+export type WbsIncrementalProgressSnapshot = Record<string, { approvedIncrementalPct: string }>;
+
+/** Sum of incremental physicalPct from jobsite logs, grouped by WBS. */
+export async function getWbsIncrementalProgressSnapshot(
+  projectId: string,
+  ctx: ServiceContext,
+  options?: {
+    excludeLogId?: string;
+    /** Lifecycle validation: include other SUBMITTED partes in the 100% cap. */
+    includeSubmitted?: boolean;
+  },
+): Promise<WbsIncrementalProgressSnapshot> {
+  await assertJobsiteLogTenantModule(ctx);
+  const logStatuses: Array<"APPROVED" | "SUBMITTED"> = options?.includeSubmitted
+    ? ["APPROVED", "SUBMITTED"]
+    : ["APPROVED"];
+  const rows = await prisma.jobsiteLogProgress.findMany({
+    where: {
+      physicalPct: { not: null },
+      jobsiteLog: {
+        tenantId: ctx.tenantId,
+        projectId,
+        status: { in: logStatuses },
+        ...(options?.excludeLogId ? { id: { not: options.excludeLogId } } : {}),
+      },
+    },
+    select: { wbsNodeId: true, physicalPct: true },
+  });
+
+  const sums = new Map<string, Prisma.Decimal>();
+  for (const row of rows) {
+    if (!row.physicalPct) continue;
+    const prev = sums.get(row.wbsNodeId) ?? new Prisma.Decimal(0);
+    sums.set(row.wbsNodeId, prev.add(row.physicalPct));
+  }
+
+  const out: WbsIncrementalProgressSnapshot = {};
+  for (const [wbsNodeId, total] of sums) {
+    out[wbsNodeId] = { approvedIncrementalPct: total.toFixed(2) };
+  }
+  return out;
+}
+
+/** Cumulative incremental physicalPct for one WBS (approved logs only). */
+export async function getWbsCumulativePhysicalPct(
+  projectId: string,
+  wbsNodeId: string,
+  ctx: ServiceContext,
+): Promise<string | null> {
+  const snapshot = await getWbsIncrementalProgressSnapshot(projectId, ctx);
+  return snapshot[wbsNodeId]?.approvedIncrementalPct ?? null;
+}
+
+/** True if any WBS has approved incremental sum > 100 (legacy data hint). */
+export function hasLegacyPhysicalPctOverflow(snapshot: WbsIncrementalProgressSnapshot): boolean {
+  return Object.values(snapshot).some((v) => parseFloat(v.approvedIncrementalPct) > 100);
+}
+
+async function assertWbsBelongsToProject(wbsNodeId: string, projectId: string, tenantId: string) {
+  const wbs = await prisma.wbsNode.findUnique({
+    where: { id: wbsNodeId },
+    include: { budget: { select: { projectId: true, tenantId: true } } },
+  });
+  if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo WBS no encontrado: ${wbsNodeId}`);
+  if (wbs.budget.tenantId !== tenantId || wbs.budget.projectId !== projectId) {
+    throw new ServiceError("CONFLICT", "La partida WBS no pertenece a este proyecto");
+  }
+  if (wbs.type !== "ITEM") {
+    throw new ServiceError("CONFLICT", `El nodo WBS "${wbs.name}" debe ser de tipo ITEM, no GROUP`);
+  }
+}
+
+async function validateJobsiteLogBusinessRules(
   input: Pick<CreateJobsiteLogInput, "progress" | "labor" | "materials">,
   projectId: string,
   tenantId: string,
+  ctx: ServiceContext,
+  options?: {
+    excludeLogId?: string;
+    includeSubmittedInProgressCap?: boolean;
+    enforceStockOnLifecycle?: boolean;
+  },
 ) {
   for (const p of input.progress ?? []) {
-    const wbs = await prisma.wbsNode.findUnique({ where: { id: p.wbsNodeId } });
-    if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo WBS no encontrado: ${p.wbsNodeId}`);
-    if (wbs.type !== "ITEM") throw new ServiceError("CONFLICT", `El nodo WBS "${wbs.name}" debe ser de tipo ITEM, no GROUP`);
+    await assertWbsBelongsToProject(p.wbsNodeId, projectId, tenantId);
   }
+
   for (const lb of input.labor ?? []) {
     if (lb.contactId) {
       const contact = await prisma.contact.findUnique({ where: { id: lb.contactId } });
@@ -245,6 +340,7 @@ async function validateChildren(
       if (sub.projectId !== projectId) throw new ServiceError("CONFLICT", "El subcontrato no pertenece a este proyecto");
     }
   }
+
   for (const m of input.materials ?? []) {
     if (m.productId) {
       const product = await prisma.product.findUnique({ where: { id: m.productId } });
@@ -255,6 +351,149 @@ async function validateChildren(
       if (!warehouse || warehouse.tenantId !== tenantId) throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
     }
   }
+
+  const approvedSnapshot = await getWbsIncrementalProgressSnapshot(projectId, ctx, {
+    excludeLogId: options?.excludeLogId,
+    includeSubmitted: options?.includeSubmittedInProgressCap ?? true,
+  });
+
+  const draftPctByWbs = new Map<string, Prisma.Decimal>();
+  for (const p of input.progress ?? []) {
+    if (!p.physicalPct) continue;
+    const inc = new Prisma.Decimal(p.physicalPct);
+    if (inc.lessThan(0)) {
+      throw new ServiceError("CONFLICT", "El % físico del día no puede ser negativo");
+    }
+    if (inc.greaterThan(HUNDRED)) {
+      throw new ServiceError("CONFLICT", "El % físico del día no puede superar 100");
+    }
+    const prev = draftPctByWbs.get(p.wbsNodeId) ?? new Prisma.Decimal(0);
+    draftPctByWbs.set(p.wbsNodeId, prev.add(inc));
+  }
+
+  for (const [wbsNodeId, draftSum] of draftPctByWbs) {
+    const approved = new Prisma.Decimal(approvedSnapshot[wbsNodeId]?.approvedIncrementalPct ?? "0");
+    const total = approved.add(draftSum);
+    if (total.greaterThan(HUNDRED)) {
+      throw new ServiceError(
+        "CONFLICT",
+        `El avance acumulado no puede superar 100% (actual: ${approved.toFixed(2)}%, este parte: ${draftSum.toFixed(2)}%)`,
+      );
+    }
+  }
+
+  const gate = await getTenantModuleGate(ctx);
+  const inventoryChecks =
+    gate.isEnabled("INVENTORY") &&
+    (options?.enforceStockOnLifecycle || can(ctx.roles, "VIEW", "INVENTORY"));
+
+  if (inventoryChecks) {
+    const qtyByPair = new Map<string, { productId: string; warehouseId: string; qty: Prisma.Decimal }>();
+    for (const m of input.materials ?? []) {
+      if (!m.productId || !m.warehouseId) continue;
+      const key = `${m.productId}:${m.warehouseId}`;
+      const qty = new Prisma.Decimal(m.quantity);
+      const prev = qtyByPair.get(key);
+      if (prev) {
+        prev.qty = prev.qty.add(qty);
+      } else {
+        qtyByPair.set(key, { productId: m.productId, warehouseId: m.warehouseId, qty });
+      }
+    }
+
+    for (const { productId, warehouseId, qty } of qtyByPair.values()) {
+      const balance = await getStockBalance({ tenantId, warehouseId, productId });
+      if (qty.greaterThan(balance)) {
+        throw new ServiceError(
+          "CONFLICT",
+          `Stock insuficiente. Disponible: ${balance.toString()}, solicitado: ${qty.toString()}`,
+        );
+      }
+    }
+  }
+}
+
+async function validateJobsiteLogFromDb(
+  logId: string,
+  projectId: string,
+  tenantId: string,
+  ctx: ServiceContext,
+) {
+  const existing = await prisma.jobsiteLog.findUnique({
+    where: { id: logId },
+    include: {
+      progress: {
+        select: {
+          wbsNodeId: true,
+          description: true,
+          quantityCompleted: true,
+          physicalPct: true,
+          notes: true,
+          sortOrder: true,
+        },
+      },
+      materials: {
+        select: {
+          productId: true,
+          warehouseId: true,
+          description: true,
+          quantity: true,
+          notes: true,
+          sortOrder: true,
+        },
+      },
+      labor: {
+        select: {
+          contactId: true,
+          subcontractId: true,
+          crewDescription: true,
+          workersCount: true,
+          hoursWorked: true,
+          notes: true,
+          sortOrder: true,
+        },
+      },
+    },
+  });
+  if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
+
+  await validateJobsiteLogBusinessRules(
+    {
+      progress: existing.progress.map((p) => ({
+        wbsNodeId: p.wbsNodeId,
+        description: p.description,
+        quantityCompleted: p.quantityCompleted.toString(),
+        physicalPct: p.physicalPct?.toString() ?? null,
+        notes: p.notes,
+        sortOrder: p.sortOrder,
+      })),
+      labor: existing.labor.map((lb) => ({
+        contactId: lb.contactId,
+        subcontractId: lb.subcontractId,
+        crewDescription: lb.crewDescription,
+        workersCount: lb.workersCount,
+        hoursWorked: lb.hoursWorked?.toString() ?? null,
+        notes: lb.notes,
+        sortOrder: lb.sortOrder,
+      })),
+      materials: existing.materials.map((m) => ({
+        productId: m.productId,
+        warehouseId: m.warehouseId,
+        description: m.description,
+        quantity: m.quantity.toString(),
+        notes: m.notes,
+        sortOrder: m.sortOrder,
+      })),
+    },
+    projectId,
+    tenantId,
+    ctx,
+    {
+      excludeLogId: logId,
+      includeSubmittedInProgressCap: true,
+      enforceStockOnLifecycle: true,
+    },
+  );
 }
 
 async function writeChildren(
@@ -417,6 +656,7 @@ export async function getJobsiteLogActivityLog(
 
 export async function listJobsiteLogsByProject(
   projectId: string,
+  filters: JobsiteLogListFilters | undefined,
   ctx: ServiceContext,
 ): Promise<JobsiteLogView[]> {
   await assertJobsiteLogTenantModule(ctx);
@@ -427,8 +667,55 @@ export async function listJobsiteLogsByProject(
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
+  const f = filters ?? {};
+  const dateOnlyRe = /^\d{4}-\d{2}-\d{2}$/;
+  if (f.dateFrom && !dateOnlyRe.test(f.dateFrom)) {
+    throw new ServiceError("CONFLICT", "Fecha «desde» inválida");
+  }
+  if (f.dateTo && !dateOnlyRe.test(f.dateTo)) {
+    throw new ServiceError("CONFLICT", "Fecha «hasta» inválida");
+  }
+  if (f.dateFrom && f.dateTo && f.dateFrom > f.dateTo) {
+    throw new ServiceError("CONFLICT", "La fecha «desde» no puede ser posterior a «hasta»");
+  }
+
+  let wbsNodeIdFilter: string | undefined;
+  if (f.wbsNodeId && f.wbsNodeId !== "__all__") {
+    if (!UUID_RE.test(f.wbsNodeId)) {
+      wbsNodeIdFilter = undefined;
+    } else {
+      try {
+        await assertWbsBelongsToProject(f.wbsNodeId, projectId, ctx.tenantId);
+        wbsNodeIdFilter = f.wbsNodeId;
+      } catch (err) {
+        if (err instanceof ServiceError && err.code === "NOT_FOUND") {
+          wbsNodeIdFilter = undefined;
+        } else {
+          throw err;
+        }
+      }
+    }
+  }
+
   const logs = await prisma.jobsiteLog.findMany({
-    where: { projectId, tenantId: ctx.tenantId },
+    where: {
+      projectId,
+      tenantId: ctx.tenantId,
+      ...(f.status && ["DRAFT", "SUBMITTED", "APPROVED", "CANCELLED"].includes(f.status)
+        ? { status: f.status as "DRAFT" | "SUBMITTED" | "APPROVED" | "CANCELLED" }
+        : {}),
+      ...(f.dateFrom || f.dateTo
+        ? {
+            logDate: {
+              ...(f.dateFrom ? { gte: new Date(f.dateFrom) } : {}),
+              ...(f.dateTo ? { lte: new Date(f.dateTo) } : {}),
+            },
+          }
+        : {}),
+      ...(wbsNodeIdFilter
+        ? { progress: { some: { wbsNodeId: wbsNodeIdFilter } } }
+        : {}),
+    },
     include: logInclude,
     orderBy: [{ logDate: "desc" }, { createdAt: "desc" }],
   });
@@ -438,6 +725,7 @@ export async function listJobsiteLogsByProject(
 /** Pick lists for jobsite log create/edit forms (keeps Prisma out of `apps/web` pages). */
 export type JobsiteLogFormPickList = {
   companyId: string;
+  inventoryModuleEnabled: boolean;
   contactOptions: Array<{ id: string; name: string }>;
   productOptions: Array<{ id: string; name: string }>;
   warehouseOptions: Array<{ id: string; name: string }>;
@@ -459,7 +747,7 @@ export async function getJobsiteLogFormPickList(
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
-  const [contacts, products, warehouses, subcontracts] = await Promise.all([
+  const [contacts, products, warehouses, subcontracts, gate] = await Promise.all([
     prisma.contact.findMany({
       where: { tenantId: ctx.tenantId, status: "ACTIVE" },
       select: { id: true, legalName: true, fantasyName: true },
@@ -480,10 +768,15 @@ export async function getJobsiteLogFormPickList(
       select: { id: true, number: true, title: true },
       orderBy: { number: "asc" },
     }),
+    getTenantModuleGate(ctx),
   ]);
+
+  const inventoryModuleEnabled =
+    gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY");
 
   return {
     companyId: project.companyId ?? ctx.companyId ?? "",
+    inventoryModuleEnabled,
     contactOptions: contacts.map((c) => ({ id: c.id, name: c.fantasyName ?? c.legalName })),
     productOptions: products,
     warehouseOptions: warehouses,
@@ -520,7 +813,7 @@ export async function createJobsiteLog(
   }
 
   const companyId = input.companyId;
-  await validateChildren(input, input.projectId, ctx.tenantId);
+  await validateJobsiteLogBusinessRules(input, input.projectId, ctx.tenantId, ctx);
 
   const result = await prisma.$transaction(async (tx) => {
     const created = await tx.jobsiteLog.create({
@@ -585,10 +878,12 @@ export async function updateJobsiteLog(
     if (logDate > today) throw new ServiceError("CONFLICT", "La fecha del parte no puede ser futura");
   }
 
-  await validateChildren(
+  await validateJobsiteLogBusinessRules(
     { progress: input.progress, labor: input.labor, materials: input.materials },
     existing.projectId,
     ctx.tenantId,
+    ctx,
+    { excludeLogId: id },
   );
 
   const result = await prisma.$transaction(async (tx) => {
@@ -668,6 +963,8 @@ export async function submitJobsiteLog(id: string, ctx: ServiceContext): Promise
     throw new ServiceError("CONFLICT", "El parte debe tener al menos un campo descriptivo antes de enviarse");
   }
 
+  await validateJobsiteLogFromDb(id, existing.projectId, ctx.tenantId, ctx);
+
   const updated = await prisma.jobsiteLog.update({
     where: { id },
     data: { status: "SUBMITTED", returnNotes: null, updatedBy: ctx.actorUserId },
@@ -698,9 +995,55 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
   if (existing.status !== "SUBMITTED") {
     throw new ServiceError("CONFLICT", `El parte en estado "${existing.status}" no puede aprobarse. Debe estar enviado.`);
   }
-  const updated = await prisma.jobsiteLog.update({
-    where: { id }, data: { status: "APPROVED", updatedBy: ctx.actorUserId }, include: logInclude,
+
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await validateJobsiteLogFromDb(id, existing.projectId, ctx.tenantId, ctx);
+
+  const gate = await getTenantModuleGate(ctx);
+  if (gate.isEnabled("INVENTORY")) {
+    await assertInventoryTenantModule(ctx);
+  }
+
+  let stockMovementsCreated = 0;
+  const updated = await prisma.$transaction(async (tx) => {
+    if (gate.isEnabled("INVENTORY")) {
+      const logWithMaterials = await tx.jobsiteLog.findUniqueOrThrow({
+        where: { id },
+        include: { materials: true },
+      });
+      stockMovementsCreated = await createJobsiteLogMaterialStockMovements(tx, {
+        jobsiteLogId: id,
+        projectId:    existing.projectId,
+        logDate:      existing.logDate,
+        tenantId:     ctx.tenantId,
+        companyId:    existing.companyId,
+        actorUserId:  ctx.actorUserId,
+        materials:    logWithMaterials.materials,
+      });
+    }
+
+    await syncScheduleProgressFromJobsiteLog(id, existing.projectId, ctx, tx);
+
+    return tx.jobsiteLog.update({
+      where: { id },
+      data: { status: "APPROVED", updatedBy: ctx.actorUserId },
+      include: logInclude,
+    });
   });
+
+  if (stockMovementsCreated > 0) {
+    await log({
+      tenantId:    ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      companyId:   existing.companyId,
+      projectId:   existing.projectId,
+      action:      "JOBSITE_LOG_STOCK_CONSUMED",
+      entityType:  "JobsiteLog",
+      entityId:    id,
+      after:       { stockMovementsCreated },
+    });
+  }
+
   await log({
     tenantId: ctx.tenantId,
     actorUserId: ctx.actorUserId,
@@ -730,6 +1073,9 @@ export async function returnJobsiteLog(
   if (existing.status !== "SUBMITTED") {
     throw new ServiceError("CONFLICT", `Solo los partes enviados pueden devolverse para corrección. Estado actual: "${existing.status}"`);
   }
+
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+
   const updated = await prisma.jobsiteLog.update({
     where: { id },
     data: { status: "DRAFT", returnNotes: input.returnNotes, updatedBy: ctx.actorUserId },
@@ -808,9 +1154,23 @@ export async function cancelJobsiteLog(id: string, ctx: ServiceContext): Promise
 export async function listProjectWbsItemsForLog(projectId: string, ctx: ServiceContext) {
   await assertJobsiteLogTenantModule(ctx);
   if (!canViewJobsiteLogArea(ctx.roles)) throw new ServiceError("FORBIDDEN", "Sin permisos");
-  return prisma.wbsNode.findMany({
-    where: { type: "ITEM", budget: { projectId, status: { in: ["APPROVED", "CLOSED"] } } },
-    select: { id: true, code: true, name: true, costItem: { select: { unit: true } } },
-    orderBy: { code: "asc" },
+  const nodes = await prisma.wbsNode.findMany({
+    where: {
+      type: "ITEM",
+      budget: {
+        projectId,
+        tenantId: ctx.tenantId,
+        status: { in: ["APPROVED", "CLOSED"] },
+      },
+    },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      parentId: true,
+      sortOrder: true,
+      costItem: { select: { unit: true } },
+    },
   });
+  return sortTreeOrder(nodes, (a, b) => a.code.localeCompare(b.code, "es"));
 }

@@ -88,4 +88,63 @@ export function computeDaysLate(endDate: Date | null, status: ScheduleItemStatus
   return diff > 0 ? diff : null;
 }
 
+/** Elapsed calendar % between start and end (plan esperado a la fecha). */
+export function computeTimePlanProgressPct(
+  startDate: string | null,
+  endDate: string | null,
+): string | null {
+  if (!startDate || !endDate) return null;
+  const start = parseDateOnly(startDate);
+  const end = parseDateOnly(endDate);
+  const today = new Date();
+  const t0 = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  const t1 = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+  const now = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const total = t1 - t0;
+  if (total <= 0) return now >= t1 ? "100.00" : "0.00";
+  if (now <= t0) return "0.00";
+  if (now >= t1) return "100.00";
+  return new Prisma.Decimal(now - t0).div(total).mul(100).toFixed(2);
+}
+
 export const ZERO_DEC = new Prisma.Decimal(0);
+
+export type FinishStartCheckItem = {
+  id: string;
+  name: string;
+  startDate: Date | null;
+  endDate: Date | null;
+};
+
+/** Non-blocking warnings when dates break Finish-to-Start (FS) dependencies. */
+export function checkFinishStartViolations(
+  item: FinishStartCheckItem,
+  predecessors: FinishStartCheckItem[],
+  successors: FinishStartCheckItem[],
+): string[] {
+  const warnings: string[] = [];
+  const itemStart = item.startDate;
+  const itemEnd = item.endDate;
+
+  for (const pred of predecessors) {
+    if (!pred.endDate || !itemStart) continue;
+    const pEnd = pred.endDate.getTime();
+    const sStart = itemStart.getTime();
+    if (sStart < pEnd) {
+      warnings.push(
+        `Dependencia FS: el inicio de esta tarea es anterior al fin de «${pred.name}».`,
+      );
+    }
+  }
+
+  for (const succ of successors) {
+    if (!itemEnd || !succ.startDate) continue;
+    if (succ.startDate.getTime() < itemEnd.getTime()) {
+      warnings.push(
+        `Dependencia FS: «${succ.name}» inicia antes del fin de esta tarea.`,
+      );
+    }
+  }
+
+  return warnings;
+}

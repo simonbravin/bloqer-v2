@@ -35,7 +35,10 @@ export function ScheduleCreateDialog({ projectId }: { projectId: string }) {
     const fd = new FormData(e.currentTarget);
     const name = (fd.get("name") as string).trim();
     const startDate = (fd.get("startDate") as string) || null;
-    const endDate = (fd.get("endDate") as string) || null;
+    let endDate = (fd.get("endDate") as string) || null;
+    if (type === "MILESTONE" && startDate && !endDate) {
+      endDate = startDate;
+    }
     if (!name) return;
 
     startTransition(async () => {

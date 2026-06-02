@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
-import { getJobsiteLogById, getJobsiteLogActivityLog, listEntityDocuments, ServiceError } from "@bloqer/services";
+import { getJobsiteLogById, getJobsiteLogActivityLog, getWbsIncrementalProgressSnapshot, listEntityDocuments, listStockMovements, ServiceError } from "@bloqer/services";
 import {
   JobsiteLogStatusBadge,
   JobsiteLogIssueSeverityBadge,
@@ -62,11 +62,35 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
 
   let log;
   let activityLog;
+  let wbsProgressSnapshot: Awaited<ReturnType<typeof getWbsIncrementalProgressSnapshot>> = {};
+  let materialStockMovements: Awaited<ReturnType<typeof listStockMovements>> = [];
   try {
     [log, activityLog] = await Promise.all([
       getJobsiteLogById(logId, ctx),
       getJobsiteLogActivityLog(logId, ctx),
     ]);
+    wbsProgressSnapshot = await getWbsIncrementalProgressSnapshot(projectId, ctx, {
+      excludeLogId: log.status === "APPROVED" ? logId : undefined,
+    });
+
+    const consumableMaterialIds = log.materials
+      .filter((m) => m.productId && m.warehouseId)
+      .map((m) => m.id);
+    if (log.status === "APPROVED" && consumableMaterialIds.length > 0) {
+      try {
+        materialStockMovements = await listStockMovements(
+          {
+            sourceType: "CONSUMPTION",
+            sourceIds: consumableMaterialIds,
+            projectId,
+            status: "CONFIRMED",
+          },
+          ctx,
+        );
+      } catch (err) {
+        if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
+      }
+    }
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
@@ -84,6 +108,24 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
   const wasUpdated =
     log.updatedAt.getTime() - log.createdAt.getTime() > 1000 ||
     activityLog.updatedByName !== activityLog.createdByName;
+
+  const stockMovementByMaterialId = new Map(
+    materialStockMovements
+      .filter((sm): sm is (typeof materialStockMovements)[number] & { sourceId: string } => sm.sourceId != null)
+      .map((sm) => [sm.sourceId, sm]),
+  );
+
+  const progressRows = log.progress.map((p, idx) => {
+    const approved = parseFloat(wbsProgressSnapshot[p.wbsNodeId]?.approvedIncrementalPct ?? "0");
+    let logSum = 0;
+    for (let j = 0; j <= idx; j++) {
+      const row = log.progress[j]!;
+      if (row.wbsNodeId === p.wbsNodeId && row.physicalPct) {
+        logSum += parseFloat(row.physicalPct);
+      }
+    }
+    return { ...p, cumulativePct: approved + logSum };
+  });
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -184,12 +226,13 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                   <TableHead>Partida WBS</TableHead>
                   <TableHead>Descripción</TableHead>
                   <TableHead className="text-right">Cantidad</TableHead>
-                  <TableHead className="text-right">% Físico</TableHead>
+                  <TableHead className="text-right">% del día</TableHead>
+                  <TableHead className="text-right">Acumulado</TableHead>
                   <TableHead>Notas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {log.progress.map((p) => (
+                {progressRows.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-mono text-xs">
                       {p.wbsNode.code} — {p.wbsNode.name}
@@ -203,6 +246,9 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {p.physicalPct ? `${p.physicalPct}%` : "—"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-mono text-xs">
+                      {p.cumulativePct.toFixed(2).replace(/\.?0+$/, "")} / 100
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {p.notes ?? "—"}
@@ -260,11 +306,15 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                   <TableHead>Producto</TableHead>
                   <TableHead>Depósito</TableHead>
                   <TableHead className="text-right">Cantidad</TableHead>
+                  <TableHead>Consumo inventario</TableHead>
                   <TableHead>Notas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {log.materials.map((m) => (
+                {log.materials.map((m) => {
+                  const movement = stockMovementByMaterialId.get(m.id);
+                  const showConsumption = m.productId && m.warehouseId;
+                  return (
                   <TableRow key={m.id}>
                     <TableCell className="font-medium">{m.description}</TableCell>
                     <TableCell className="text-muted-foreground">{m.productName ?? "—"}</TableCell>
@@ -274,11 +324,30 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                     <TableCell className="text-right tabular-nums">
                       {parseFloat(m.quantity).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
                     </TableCell>
+                    <TableCell className="text-xs">
+                      {!showConsumption ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : log.status === "APPROVED" ? (
+                        movement ? (
+                          <Link
+                            href="/inventario/movimientos"
+                            className="text-primary hover:underline"
+                          >
+                            Registrado · {formatDateLong(new Date(movement.movementDate))}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">Sin movimiento</span>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground">Al aprobar</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {m.notes ?? "—"}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </TableScroll>

@@ -593,8 +593,8 @@ R2 endpoint: `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
 | ~~P-LOG-01~~ | ~~File/photo attachments on JobsiteLog~~ — **RESOLVED in Phase 6D** (`DocumentAttachment` + `EntityDocumentsPanel`; R2/PLACEHOLDER same as project docs) |
 | P-LOG-02 | PDF export of Jobsite Log (daily report) — deferred |
 | P-LOG-03 | Progress reporting: aggregate quantityCompleted per WBS ITEM across logs — no report UI yet |
-| P-LOG-04 | Schedule/Gantt integration — no planned activity entity yet |
-| P-LOG-05 | Automatic stock consumption on material usage — explicitly excluded; would require StockMovement CONSUMPTION on submit/approve |
+| ~~P-LOG-04~~ | ~~Schedule/Gantt integration~~ — **RESOLVED (2026-06-02):** sync avance real al aprobar libro ([D-045]/[BR-SCH-004]); vistas cronograma + calendario libro; procedimiento [`05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](./05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md); **Kibo UI** Gantt/Calendar/Kanban en `apps/web/components/kibo-ui/` (ADR-007) |
+| P-LOG-05 | Automatic stock consumption on material usage — **RESOLVED**: `StockMovement` CONSUMPTION on `approveJobsiteLog` when `INVENTORY` enabled (`createJobsiteLogMaterialStockMovements`) |
 | ~~P-DOC-01~~ | ~~Stale UPLOADING cleanup (metadata)~~ — **RESOLVED in Phase 6C** (`cleanupStaleUploadingDocuments`; no R2 object deletion) |
 | P-DOC-01B | Scheduled job / platform cron to run stale UPLOADING cleanup per tenant (and optional orphan object removal in R2) — not implemented |
 | P-DOC-02 | Antivirus/virus scanning on upload — no ClamAV or equivalent |

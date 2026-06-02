@@ -7,6 +7,7 @@ import {
   approveJobsiteLog,
   returnJobsiteLog,
   cancelJobsiteLog,
+  getSourceStockPreview,
   ServiceError,
 } from "@bloqer/services";
 import {
@@ -51,11 +52,17 @@ function revalidateJobsiteLogPaths(projectId: string, logId: string) {
   revalidatePath(`/proyectos/${projectId}/libro-obra/${logId}/editar`);
 }
 
+function revalidateProjectSchedulePaths(projectId: string) {
+  revalidatePath(`/proyectos/${projectId}/cronograma`);
+  revalidatePath(`/proyectos/${projectId}`);
+}
+
 async function lifecycleAction(
   logId: string,
   projectId: string,
   fn: (id: string, ctx: Awaited<ReturnType<typeof getCtx>>, input?: { returnNotes: string }) => Promise<{ projectId: string }>,
   input?: { returnNotes: string },
+  options?: { revalidateSchedule?: boolean },
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
@@ -63,6 +70,12 @@ async function lifecycleAction(
     revalidateJobsiteLogPaths(projectId, logId);
     if (log.projectId !== projectId) {
       revalidateJobsiteLogPaths(log.projectId, logId);
+    }
+    if (options?.revalidateSchedule) {
+      revalidateProjectSchedulePaths(projectId);
+      if (log.projectId !== projectId) {
+        revalidateProjectSchedulePaths(log.projectId);
+      }
     }
     return { ok: true };
   } catch (err) {
@@ -142,7 +155,13 @@ export async function approveJobsiteLogAction(
   logId: string,
   projectId: string,
 ): Promise<Ok | Err> {
-  return lifecycleAction(logId, projectId, async (id, ctx) => approveJobsiteLog(id, ctx));
+  return lifecycleAction(
+    logId,
+    projectId,
+    async (id, ctx) => approveJobsiteLog(id, ctx),
+    undefined,
+    { revalidateSchedule: true },
+  );
 }
 
 export async function returnJobsiteLogAction(
@@ -159,6 +178,7 @@ export async function returnJobsiteLogAction(
     projectId,
     async (id, ctx, input) => returnJobsiteLog(id, input!, ctx),
     parsed.data,
+    { revalidateSchedule: true },
   );
 }
 
@@ -167,4 +187,17 @@ export async function cancelJobsiteLogAction(
   projectId: string,
 ): Promise<Ok | Err> {
   return lifecycleAction(logId, projectId, async (id, ctx) => cancelJobsiteLog(id, ctx));
+}
+
+export async function getStockBalancePreviewAction(
+  warehouseId: string,
+  productId: string,
+): Promise<{ balance: string } | Err> {
+  const ctx = await getCtx();
+  try {
+    const balance = await getSourceStockPreview(warehouseId, productId, ctx);
+    return { balance };
+  } catch (err) {
+    return handle(err);
+  }
 }

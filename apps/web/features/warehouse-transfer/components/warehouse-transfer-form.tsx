@@ -109,6 +109,7 @@ export function WarehouseTransferForm({
         <Label htmlFor="productId">Producto</Label>
         <input type="hidden" name="productId" value={productId} />
         <SearchableCombobox
+          popoverWidth="wide"
           id="productId"
           options={productOptions}
           value={productId}

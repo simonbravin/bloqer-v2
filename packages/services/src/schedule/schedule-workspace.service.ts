@@ -9,8 +9,9 @@ import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { canEditScheduleArea, canViewScheduleArea } from "./schedule-access";
-import { computeDaysLate, formatDateOnly, ZERO_DEC } from "./schedule-helpers";
+import { computeDaysLate, formatDateOnly, ZERO_DEC, computeTimePlanProgressPct } from "./schedule-helpers";
 import { ensureScheduleForProject } from "./schedule.service";
+import { sortTreeOrder } from "@bloqer/utils";
 
 export type ScheduleWorkspaceFilters = {
   budgetId?: string;
@@ -57,6 +58,8 @@ export type ScheduleWorkspaceItemDto = {
   endDate: string | null;
   durationDays: number | null;
   progressPct: string;
+  /** Calendar-elapsed plan % (on-read, D-045). */
+  timePlanPct: string | null;
   daysLate: number | null;
   wbsLinks: ScheduleWbsLinkDto[];
   metrics: ScheduleItemMetricsDto | null;
@@ -79,6 +82,8 @@ export type ScheduleWorkspaceDto = {
   items: ScheduleWorkspaceItemDto[];
   summary: {
     totalItems: number;
+    /** Active items (non-CANCELLED) before status/delayedOnly URL filters */
+    unfilteredActiveCount: number;
     completedItems: number;
     delayedItems: number;
     scheduleProgressPct: string | null;
@@ -131,6 +136,9 @@ function aggregateMetricsFromRows(rows: CostControlRow[]): ScheduleItemMetricsDt
   if (rows.length === 0) return emptyMetrics();
 
   let m = emptyMetrics();
+  let totalOpQty = new Prisma.Decimal(0);
+  let totalBudgetQty = new Prisma.Decimal(0);
+
   for (const r of rows) {
     m.budgetTotalCost = addDecStrings(m.budgetTotalCost, r.budgetTotalCost);
     m.budgetTotalSale = addDecStrings(m.budgetTotalSale, r.budgetTotalSale);
@@ -141,18 +149,14 @@ function aggregateMetricsFromRows(rows: CostControlRow[]): ScheduleItemMetricsDt
     m.costVariance = addDecStrings(m.costVariance, r.costVariance);
     if (r.flags.overBudget) m.overBudget = true;
 
-    const qty = new Prisma.Decimal(r.budgetQty);
-    const op = new Prisma.Decimal(r.operationalProgressQty);
-    if (qty.gt(0)) {
-      const pct = op.div(qty).mul(100);
-      const prev = m.operationalProgressPct
-        ? new Prisma.Decimal(m.operationalProgressPct)
-        : null;
-      m.operationalProgressPct = prev
-        ? prev.add(pct).div(2).toFixed(2)
-        : pct.toFixed(2);
-    }
+    totalOpQty = totalOpQty.add(new Prisma.Decimal(r.operationalProgressQty));
+    totalBudgetQty = totalBudgetQty.add(new Prisma.Decimal(r.budgetQty));
   }
+
+  if (totalBudgetQty.gt(0)) {
+    m.operationalProgressPct = totalOpQty.div(totalBudgetQty).mul(100).toFixed(2);
+  }
+
   const sale = new Prisma.Decimal(m.budgetTotalSale);
   if (sale.gt(0)) {
     m.certifiedProgressPct = new Prisma.Decimal(m.certifiedApproved)
@@ -235,6 +239,13 @@ export async function getProjectScheduleWorkspace(
 
   const costRowByWbs = new Map(cc.rows.map((r) => [r.wbsNodeId, r]));
 
+  const unfilteredActiveCount = await prisma.scheduleItem.count({
+    where: {
+      scheduleId: schedule.id,
+      status: { not: "CANCELLED" },
+    },
+  });
+
   const items = await prisma.scheduleItem.findMany({
     where: {
       scheduleId: schedule.id,
@@ -314,6 +325,10 @@ export async function getProjectScheduleWorkspace(
       endDate: formatDateOnly(item.endDate),
       durationDays: item.durationDays,
       progressPct: item.progressPct.toFixed(2),
+      timePlanPct: computeTimePlanProgressPct(
+        formatDateOnly(item.startDate),
+        formatDateOnly(item.endDate),
+      ),
       daysLate,
       wbsLinks,
       metrics,
@@ -353,9 +368,10 @@ export async function getProjectScheduleWorkspace(
     budgetStatus: cc.budgetStatus,
     availableBudgets: cc.availableBudgets,
     canEdit: canEditScheduleArea(ctx.roles),
-    items: dtoItems,
+    items: sortTreeOrder(dtoItems, (a, b) => a.name.localeCompare(b.name, "es")),
     summary: {
       totalItems: activeItems.length,
+      unfilteredActiveCount,
       completedItems,
       delayedItems,
       scheduleProgressPct,

@@ -252,6 +252,7 @@ function AddLineForm({
       <div className="space-y-1.5">
         <Label>Ítem WBS *</Label>
         <SearchableCombobox
+          popoverWidth="wide"
           options={wbsOptions}
           value={wbsNodeId}
           onValueChange={setWbsNodeId}

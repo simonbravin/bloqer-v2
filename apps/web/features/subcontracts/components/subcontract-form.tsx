@@ -174,6 +174,7 @@ export function SubcontractForm({
         <div className="space-y-1">
           <Label>Subcontratista *</Label>
           <SearchableCombobox
+            popoverWidth="wide"
             options={contactsToSearchableOptions(subcontractorOptions)}
             value={subcontractorId}
             onValueChange={setSubcontractorId}
@@ -249,6 +250,7 @@ export function SubcontractForm({
                     <TableRow key={i}>
                       <TableCell className="min-w-[160px]">
                       <SearchableCombobox
+                        popoverWidth="wide"
                         className="h-8 text-xs"
                         options={wbsComboboxOptions}
                         value={line.wbsNodeId}

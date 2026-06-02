@@ -85,9 +85,9 @@ export async function updateScheduleItemDatesAction(
   const ctx = await getCtx();
   const input = updateScheduleItemDatesSchema.parse(raw);
   try {
-    await updateScheduleItemDates(scheduleItemId, input, ctx);
+    const { fsWarnings } = await updateScheduleItemDates(scheduleItemId, input, ctx);
     revalidateCronograma(projectId);
-    return { ok: true as const };
+    return { ok: true as const, fsWarnings };
   } catch (e) {
     return handle(e);
   }

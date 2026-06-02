@@ -38,6 +38,9 @@ type SearchableComboboxProps = {
   id?: string;
   /** Si true, volver a elegir la opción activa la deselecciona. */
   allowClear?: boolean;
+  /** Ancho del popover: «trigger» (default) o «wide» para catálogos largos en tablas angostas. */
+  popoverWidth?: "trigger" | "wide";
+  contentClassName?: string;
 };
 
 export function SearchableCombobox({
@@ -51,6 +54,8 @@ export function SearchableCombobox({
   className,
   id,
   allowClear = false,
+  popoverWidth = "trigger",
+  contentClassName,
 }: SearchableComboboxProps) {
   const [open, setOpen] = React.useState(false);
   const selected = options.find((o) => o.value === value);
@@ -65,6 +70,7 @@ export function SearchableCombobox({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
+          title={selected?.label}
           className={cn(
             "h-10 w-full justify-between px-3 font-normal",
             !selected && "text-muted-foreground",
@@ -75,7 +81,15 @@ export function SearchableCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+      <PopoverContent
+        className={cn(
+          popoverWidth === "wide"
+            ? "min-w-[max(var(--radix-popover-trigger-width),28rem)] max-w-[min(36rem,90vw)] p-0"
+            : "w-[var(--radix-popover-trigger-width)] p-0",
+          contentClassName,
+        )}
+        align="start"
+      >
         <Command
           filter={(itemValue, search) => {
             if (!search.trim()) return 1;
@@ -103,7 +117,9 @@ export function SearchableCombobox({
                       value === option.value ? "opacity-100" : "opacity-0",
                     )}
                   />
-                  <span className="truncate">{option.label}</span>
+                  <span className={cn(popoverWidth === "wide" ? "break-words whitespace-normal" : "truncate")}>
+                    {option.label}
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>

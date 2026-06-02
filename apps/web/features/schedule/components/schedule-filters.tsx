@@ -20,6 +20,7 @@ const STATUS_OPTIONS: (ScheduleItemStatus | "ALL")[] = [
   "IN_PROGRESS",
   "BLOCKED",
   "COMPLETED",
+  "CANCELLED",
 ];
 
 type Props = {

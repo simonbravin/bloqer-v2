@@ -22,12 +22,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   ScheduleProgressDimensions,
   ScheduleProgressLegend,
@@ -38,11 +38,13 @@ import {
   getScheduleItemContextAction,
   listScheduleItemAuditAction,
   removeScheduleDependencyAction,
+  updateScheduleItemDatesAction,
   updateScheduleItemNameAction,
   updateScheduleItemProgressAction,
   cancelScheduleItemAction,
 } from "../actions/schedule-actions";
-import { STATUS_LABELS } from "../adapters/schedule-view-types";
+import { STATUS_LABELS, primaryWbsLink } from "../adapters/schedule-view-types";
+import { ScheduleCancelDialog } from "./schedule-cancel-dialog";
 
 const CATEGORY_LABELS: Record<string, string> = {
   MATERIAL: "Materiales",
@@ -52,28 +54,32 @@ const CATEGORY_LABELS: Record<string, string> = {
   OTHER: "Otros",
 };
 
-export function ScheduleItemDrawer({
+export function ScheduleItemDialog({
   projectId,
   workspace,
-  item,
+  itemId,
   allItems,
   open,
   onOpenChange,
 }: {
   projectId: string;
   workspace: ScheduleWorkspaceDto;
-  item: ScheduleWorkspaceItemDto | null;
+  itemId: string | null;
   allItems: ScheduleWorkspaceItemDto[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
+  const item = itemId ? allItems.find((i) => i.id === itemId) ?? null : null;
   const [pending, startTransition] = useTransition();
   const [audit, setAudit] = useState<ScheduleItemAuditEntryView[]>([]);
   const [context, setContext] = useState<ScheduleItemContextDto | null>(null);
   const [predecessorPick, setPredecessorPick] = useState("");
   const [progressInput, setProgressInput] = useState("");
+  const [startDateInput, setStartDateInput] = useState("");
+  const [endDateInput, setEndDateInput] = useState("");
   const [tab, setTab] = useState<"detail" | "history" | "links">("detail");
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   const depCandidates = useMemo(() => {
     if (!item) return [];
@@ -90,6 +96,8 @@ export function ScheduleItemDrawer({
   useEffect(() => {
     if (!open || !item) return;
     setProgressInput(item.progressPct);
+    setStartDateInput(item.startDate ?? "");
+    setEndDateInput(item.endDate ?? "");
     startTransition(async () => {
       const [auditRes, ctxRes] = await Promise.all([
         listScheduleItemAuditAction(item.id),
@@ -102,30 +110,44 @@ export function ScheduleItemDrawer({
     });
   }, [open, item?.id, projectId]);
 
-  if (!item) return null;
-
-  const m = item.metrics;
-  const primaryWbs = item.wbsLinks.find((l) => l.isPrimary) ?? item.wbsLinks[0];
-  const predItems = item.predecessorDependencies
+  const m = item?.metrics;
+  const primaryWbs = item ? primaryWbsLink(item) : null;
+  const predItems = (item?.predecessorDependencies ?? [])
     .map((d) => {
       const task = allItems.find((i) => i.id === d.predecessorId);
       return task ? { ...task, dependencyId: d.dependencyId } : null;
     })
     .filter(Boolean) as (ScheduleWorkspaceItemDto & { dependencyId: string })[];
-  const succItems = item.successorIds
+  const succItems = (item?.successorIds ?? [])
     .map((id) => allItems.find((i) => i.id === id))
     .filter(Boolean) as ScheduleWorkspaceItemDto[];
   function copyPhysical() {
     const pct = m?.operationalProgressPct;
     if (!pct) {
-      toast.error("Sin avance físico en libro de obra para este WBS");
+      toast.error("Sin avance operativo (cantidad) para este WBS");
       return;
     }
     startTransition(async () => {
       const res = await copyProgressFromPhysicalAction(projectId, item!.id, Number(pct));
       if ("error" in res) toast.error(res.error);
       else {
-        toast.success("Avance del cronograma actualizado desde obra");
+        toast.success("Avance real actualizado (por cantidad operativa)");
+        router.refresh();
+      }
+    });
+  }
+
+  function copyJobsitePhysicalPct() {
+    const pct = context?.jobsitePhysicalPctCumulative;
+    if (!pct) {
+      toast.error("Sin % físico acumulado en libro de obra para este WBS");
+      return;
+    }
+    startTransition(async () => {
+      const res = await copyProgressFromPhysicalAction(projectId, item!.id, Number(pct));
+      if ("error" in res) toast.error(res.error);
+      else {
+        toast.success(`Cronograma actualizado al ${pct}% (libro de obra)`);
         router.refresh();
       }
     });
@@ -141,7 +163,7 @@ export function ScheduleItemDrawer({
       const res = await updateScheduleItemProgressAction(projectId, item!.id, { progressPct: pct });
       if ("error" in res) toast.error(res.error);
       else {
-        toast.success("Avance planificado guardado");
+        toast.success("Avance real guardado");
         router.refresh();
       }
     });
@@ -179,29 +201,53 @@ export function ScheduleItemDrawer({
     });
   }
 
-  function cancelItem() {
-    if (!confirm("¿Cancelar esta tarea en el cronograma?")) return;
+  function confirmCancelItem() {
     startTransition(async () => {
       const res = await cancelScheduleItemAction(projectId, item!.id);
       if ("error" in res) toast.error(res.error);
       else {
         toast.success("Tarea cancelada");
+        setCancelOpen(false);
         onOpenChange(false);
         router.refresh();
       }
     });
   }
 
+  function saveDates() {
+    if (!item) return;
+    startTransition(async () => {
+      const res = await updateScheduleItemDatesAction(projectId, item.id, {
+        startDate: startDateInput || null,
+        endDate: endDateInput || null,
+      });
+      if ("error" in res) toast.error(res.error);
+      else {
+        if ("fsWarnings" in res && res.fsWarnings?.length) {
+          toast.warning(res.fsWarnings.join(" "));
+        } else {
+          toast.success("Fechas actualizadas");
+        }
+        router.refresh();
+      }
+    });
+  }
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="overflow-y-auto sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle className="pr-8">{item.name}</SheetTitle>
-          <SheetDescription>
-            {STATUS_LABELS[item.status] ?? item.status}
-            {item.daysLate ? ` · Atrasado ${item.daysLate} días` : ""}
-          </SheetDescription>
-        </SheetHeader>
+    <>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{item?.name ?? "Tarea"}</DialogTitle>
+          <DialogDescription>
+            {item ? (
+              <>
+                {STATUS_LABELS[item.status] ?? item.status}
+                {item.daysLate ? ` · Atrasado ${item.daysLate} días` : ""}
+              </>
+            ) : null}
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="mt-4 flex gap-1 rounded-lg border p-1">
           {(
@@ -224,26 +270,56 @@ export function ScheduleItemDrawer({
           ))}
         </div>
 
-        {tab === "detail" && (
+        {!item ? (
+          <p className="mt-4 text-sm text-muted-foreground">Tarea no encontrada.</p>
+        ) : null}
+
+        {item && tab === "detail" && (
           <div className="space-y-6 text-sm mt-4">
             <section className="space-y-2">
-              <h3 className="font-medium">Tres avances (BR-SCH-002)</h3>
+              <h3 className="font-medium">Cuatro dimensiones de avance (BR-SCH-002 / D-045)</h3>
               <ScheduleProgressDimensions item={item} />
               <ScheduleProgressLegend />
             </section>
 
-            <section className="space-y-1">
+            <section className="space-y-2">
               <h3 className="font-medium">Planificación</h3>
-              <p>
-                {item.startDate ?? "—"} → {item.endDate ?? "—"}
-              </p>
+              {workspace.canEdit ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Inicio</Label>
+                    <Input
+                      type="date"
+                      className="h-8 text-xs"
+                      value={startDateInput}
+                      onChange={(e) => setStartDateInput(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fin</Label>
+                    <Input
+                      type="date"
+                      className="h-8 text-xs"
+                      value={endDateInput}
+                      onChange={(e) => setEndDateInput(e.target.value)}
+                    />
+                  </div>
+                  <Button size="sm" className="col-span-2" disabled={pending} onClick={saveDates}>
+                    Guardar fechas
+                  </Button>
+                </div>
+              ) : (
+                <p>
+                  {item.startDate ?? "—"} → {item.endDate ?? "—"}
+                </p>
+              )}
               {item.blockReason && (
                 <p className="text-destructive">Bloqueo: {item.blockReason}</p>
               )}
               {workspace.canEdit && (
                 <div className="flex gap-2 items-end pt-2">
                   <div className="space-y-1 flex-1">
-                    <Label className="text-xs">Avance plan %</Label>
+                    <Label className="text-xs">Avance real %</Label>
                     <Input
                       type="number"
                       min={0}
@@ -309,17 +385,32 @@ export function ScheduleItemDrawer({
                 <p className="text-muted-foreground">
                   {primaryWbs.wbsCode} — {primaryWbs.wbsName}
                 </p>
-                <Button variant="link" className="h-auto p-0" asChild>
-                  <Link href={`/proyectos/${projectId}/control-costos/${primaryWbs.wbsNodeId}`}>
-                    Ver en control de costos
-                  </Link>
-                </Button>
+                <div className="flex flex-col items-start gap-1">
+                  <Button variant="link" className="h-auto p-0" asChild>
+                    <Link href={`/proyectos/${projectId}/control-costos/${primaryWbs.wbsNodeId}`}>
+                      Ver en control de costos
+                    </Link>
+                  </Button>
+                  <Button variant="link" className="h-auto p-0" asChild>
+                    <Link
+                      href={`/proyectos/${projectId}/libro-obra?wbsNodeId=${primaryWbs.wbsNodeId}`}
+                    >
+                      Ver partes en libro de obra
+                    </Link>
+                  </Button>
+                </div>
               </section>
             )}
 
             {workspace.canEdit && m?.operationalProgressPct && (
               <Button size="sm" variant="secondary" disabled={pending} onClick={copyPhysical}>
-                Copiar avance físico al cronograma (acción explícita)
+                Copiar avance por cantidad (operativo)
+              </Button>
+            )}
+
+            {workspace.canEdit && context?.jobsitePhysicalPctCumulative && (
+              <Button size="sm" variant="secondary" disabled={pending} onClick={copyJobsitePhysicalPct}>
+                Copiar % físico acumulado ({context.jobsitePhysicalPctCumulative}%)
               </Button>
             )}
 
@@ -376,14 +467,19 @@ export function ScheduleItemDrawer({
             </section>
 
             {workspace.canEdit && item.status !== "CANCELLED" && (
-              <Button size="sm" variant="destructive" disabled={pending} onClick={cancelItem}>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={pending}
+                onClick={() => setCancelOpen(true)}
+              >
                 Cancelar tarea
               </Button>
             )}
           </div>
         )}
 
-        {tab === "history" && (
+        {item && tab === "history" && (
           <div className="mt-4">
             {audit.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sin registros de auditoría aún.</p>
@@ -403,10 +499,17 @@ export function ScheduleItemDrawer({
           </div>
         )}
 
-        {tab === "links" && (
+        {item && tab === "links" && (
           <div className="space-y-6 text-sm mt-4">
             <section>
               <h3 className="font-medium mb-2">Libro de obra (aprobados)</h3>
+              <p className="text-xs text-muted-foreground mb-2">
+                % del día por parte. Acumulado aprobado:{" "}
+                {context?.jobsitePhysicalPctCumulative != null
+                  ? `${context.jobsitePhysicalPctCumulative} / 100`
+                  : "—"}
+                . El avance operativo del cronograma también puede usar cantidades.
+              </p>
               {!context?.jobsiteEntries.length ? (
                 <p className="text-muted-foreground text-xs">Sin partes aprobados en el WBS primario.</p>
               ) : (
@@ -443,7 +546,17 @@ export function ScheduleItemDrawer({
             </section>
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
+    {item && (
+      <ScheduleCancelDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        itemName={item.name}
+        pending={pending}
+        onConfirm={confirmCancelItem}
+      />
+    )}
+    </>
   );
 }

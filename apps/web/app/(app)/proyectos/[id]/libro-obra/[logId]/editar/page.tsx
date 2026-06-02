@@ -4,11 +4,13 @@ import {
   getJobsiteLogById,
   getJobsiteLogFormPickList,
   getProjectShellInfo,
+  getWbsIncrementalProgressSnapshot,
+  hasLegacyPhysicalPctOverflow,
   listProjectWbsItemsForLog,
   ServiceError,
 } from "@bloqer/services";
 import { JobsiteLogForm } from "@/features/jobsite-log";
-import { updateJobsiteLogAction } from "../../actions";
+import { getStockBalancePreviewAction, updateJobsiteLogAction } from "../../actions";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { formatDateLong } from "@/lib/format";
@@ -41,11 +43,13 @@ export default async function EditarParteObraPage({ params }: PageProps) {
 
   let wbsRaw: Awaited<ReturnType<typeof listProjectWbsItemsForLog>>;
   let pickList: Awaited<ReturnType<typeof getJobsiteLogFormPickList>>;
+  let wbsProgressSnapshot: Awaited<ReturnType<typeof getWbsIncrementalProgressSnapshot>>;
   let project;
   try {
-    [wbsRaw, pickList, project] = await Promise.all([
+    [wbsRaw, pickList, wbsProgressSnapshot, project] = await Promise.all([
       listProjectWbsItemsForLog(projectId, ctx).catch(() => []),
       getJobsiteLogFormPickList(projectId, ctx),
+      getWbsIncrementalProgressSnapshot(projectId, ctx, { excludeLogId: logId }),
       getProjectShellInfo(projectId, ctx),
     ]);
   } catch (err) {
@@ -87,6 +91,10 @@ export default async function EditarParteObraPage({ params }: PageProps) {
           code: `SC-${String(s.number).padStart(3, "0")}`,
           title: s.title,
         }))}
+        wbsProgressSnapshot={wbsProgressSnapshot}
+        legacyPhysicalPctWarning={hasLegacyPhysicalPctOverflow(wbsProgressSnapshot)}
+        inventoryModuleEnabled={pickList.inventoryModuleEnabled}
+        stockPreviewAction={getStockBalancePreviewAction}
         action={updateAction}
         mode="edit"
         submitLabel="Guardar cambios"

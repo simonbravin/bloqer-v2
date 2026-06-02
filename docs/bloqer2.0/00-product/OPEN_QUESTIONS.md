@@ -82,6 +82,18 @@
 - **Recomendación:** opción 1 en Fase 1, opción 3 en Fase 2/3.
 - **Bloquea:** [`02-modules/JOBSITE_LOG.md`](../02-modules/JOBSITE_LOG.md).
 
+### Q-005b — Libro de obra: semántica legacy de `physicalPct`
+
+- **Categoría:** Libro de Obra
+- **Estado:** ABIERTA
+- **Impacto:** partes `APPROVED` previos a jun-2026 pueden haber cargado % acumulado en lugar de % incremental del día; la suma histórica puede superar 100 o no coincidir con cantidades.
+- **Opciones:**
+  1. Dejar datos legacy sin migrar; UI/validación aplica solo a partes nuevos.
+  2. Script de normalización one-off (fuera de producto) tras auditoría manual.
+  3. Flag por tenant «modo acumulado legacy» hasta migración completa.
+- **Recomendación:** opción 1 + advertencia en UI si suma histórica > 100.
+- **Bloquea:** reportes de avance físico por WBS basados en `physicalPct`.
+
 ### Q-006 — RFIs con SLA
 
 - **Categoría:** RFIs
@@ -414,6 +426,17 @@
   3. Worker/cola para reintentos automáticos y paquetes ZIP.
 - **Recomendación inicial:** (1) hasta demanda explícita; cualquier (2)/(3) requiere ADR.
 - **Bloquea:** ampliación de Phase 17 sin decisión.
+
+### Q-033 — Marcadores de obra ad-hoc en cronograma
+
+- **Categoría:** Cronograma / UX
+- **Estado:** ABIERTA
+- **Impacto si no se resuelve:** no hay criterio para persistir fechas de obra dibujadas en Gantt (distintas de ítems `MILESTONE`).
+- **Opciones identificadas:**
+  1. Solo ítems `MILESTONE` + línea “Hoy” (estado actual, Opción A).
+  2. Entidad `ScheduleMarker` persistida con nombre y fecha.
+- **Recomendación inicial:** (1) hasta demanda explícita del negocio.
+- **Bloquea:** ampliación de Gantt más allá de hitos de tarea.
 
 ---
 

@@ -1,119 +1,76 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
-import { Button } from "@/components/ui/button";
-import { mapItemToCalendarFeature } from "../adapters/schedule-view-types";
-import { cn } from "@/lib/utils";
-
-function monthKey(d: Date) {
-  return `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
-}
+import {
+  CalendarBody,
+  CalendarDatePagination,
+  CalendarDatePicker,
+  CalendarHeader,
+  CalendarItem,
+  CalendarMonthPicker,
+  CalendarProvider,
+  CalendarYearPicker,
+} from "@/components/kibo-ui/calendar";
+import { mapScheduleItemsToCalendarFeatures } from "../adapters/schedule-view-types";
+import { ScheduleViewEmptyMessage } from "./schedule-empty-state";
 
 export function ScheduleCalendarView({
   items,
   onSelect,
+  filtersExcludeAll = false,
+  unfilteredActiveCount = 0,
 }: {
   items: ScheduleWorkspaceItemDto[];
   onSelect: (item: ScheduleWorkspaceItemDto) => void;
+  filtersExcludeAll?: boolean;
+  unfilteredActiveCount?: number;
 }) {
-  const [cursor, setCursor] = useState(() => {
-    const n = new Date();
-    return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), 1));
-  });
+  const fallback = useMemo(() => new Date(), []);
+  const features = useMemo(
+    () => mapScheduleItemsToCalendarFeatures(items, fallback),
+    [items, fallback],
+  );
+  const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
-  const year = cursor.getUTCFullYear();
-  const month = cursor.getUTCMonth();
+  const yearSpan = useMemo(() => {
+    const years = features.flatMap((f) => [f.startAt.getFullYear(), f.endAt.getFullYear()]);
+    const now = new Date().getFullYear();
+    if (years.length === 0) return { start: now - 1, end: now + 2 };
+    return { start: Math.min(...years) - 1, end: Math.max(...years) + 1 };
+  }, [features]);
 
-  const featuresByDay = useMemo(() => {
-    const map = new Map<string, Array<{ item: ScheduleWorkspaceItemDto; color: string }>>();
-    const fallback = cursor;
-    for (const item of items) {
-      const f = mapItemToCalendarFeature(item, fallback);
-      if (!f) continue;
-      const key = f.endAt.toISOString().slice(0, 10);
-      const list = map.get(key) ?? [];
-      list.push({ item, color: f.status.color });
-      map.set(key, list);
-    }
-    return map;
-  }, [items, cursor]);
-
-  const firstDow = new Date(Date.UTC(year, month, 1)).getUTCDay();
-  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-
-  const monthLabel = cursor.toLocaleDateString("es-AR", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  if (items.length === 0) {
+    return (
+      <ScheduleViewEmptyMessage
+        filtersExcludeAll={filtersExcludeAll}
+        unfilteredActiveCount={unfilteredActiveCount}
+      />
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setCursor(new Date(Date.UTC(year, month - 1, 1)))}
-        >
-          ←
-        </Button>
-        <span className="text-sm font-medium capitalize">{monthLabel}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setCursor(new Date(Date.UTC(year, month + 1, 1)))}
-        >
-          →
-        </Button>
-      </div>
-      <div className="grid grid-cols-7 gap-px rounded-md border bg-border text-center text-xs">
-        {["Do", "Lu", "Ma", "Mi", "Ju", "Vi", "Sa"].map((d) => (
-          <div key={d} className="bg-muted/50 p-2 font-medium">
-            {d}
-          </div>
-        ))}
-        {Array.from({ length: firstDow }).map((_, i) => (
-          <div key={`pad-${i}`} className="min-h-[72px] bg-background" />
-        ))}
-        {Array.from({ length: daysInMonth }).map((_, i) => {
-          const day = i + 1;
-          const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-          const feats = featuresByDay.get(key) ?? [];
-          const isToday =
-            monthKey(new Date()) === monthKey(cursor) &&
-            day === new Date().getUTCDate() &&
-            month === new Date().getUTCMonth() &&
-            year === new Date().getUTCFullYear();
-          return (
-            <div
-              key={key}
-              className={cn(
-                "min-h-[72px] bg-background p-1 text-left align-top",
-                isToday && "ring-1 ring-primary ring-inset",
-              )}
-            >
-              <span className="text-[10px] text-muted-foreground">{day}</span>
-              <div className="mt-1 space-y-0.5">
-                {feats.slice(0, 3).map(({ item, color }) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="block w-full truncate rounded px-1 py-0.5 text-[10px] text-left text-white"
-                    style={{ backgroundColor: color }}
-                    onClick={() => onSelect(item)}
-                  >
-                    {item.name}
-                  </button>
-                ))}
-                {feats.length > 3 && (
-                  <span className="text-[10px] text-muted-foreground">+{feats.length - 3}</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <CalendarProvider locale="es-AR" startDay={1} className="rounded-md border p-4">
+      <CalendarDatePicker className="mb-4">
+        <CalendarMonthPicker />
+        <CalendarYearPicker start={yearSpan.start} end={yearSpan.end} />
+        <CalendarDatePagination />
+      </CalendarDatePicker>
+      <CalendarHeader />
+      <CalendarBody features={features}>
+        {({ feature }) => (
+          <button
+            type="button"
+            className="w-full text-left"
+            onClick={() => {
+              const item = itemById.get(feature.id);
+              if (item) onSelect(item);
+            }}
+          >
+            <CalendarItem feature={feature} />
+          </button>
+        )}
+      </CalendarBody>
+    </CalendarProvider>
   );
 }

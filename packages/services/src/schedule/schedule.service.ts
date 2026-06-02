@@ -7,6 +7,7 @@ import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenan
 import { canEditScheduleArea, canViewScheduleArea } from "./schedule-access";
 import {
   assertScheduleStatusTransition,
+  checkFinishStartViolations,
   daysBetween,
   formatDateOnly,
   parseDateOnly,
@@ -366,7 +367,7 @@ export async function updateScheduleItemDates(
   scheduleItemId: string,
   input: { startDate: string | null; endDate: string | null },
   ctx: ServiceContext,
-) {
+): Promise<{ item: Awaited<ReturnType<typeof prisma.scheduleItem.update>>; fsWarnings: string[] }> {
   if (!canEditScheduleArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
   }
@@ -398,7 +399,28 @@ export async function updateScheduleItemDates(
     before,
     scheduleItemSnapshot(updated),
   );
-  return updated;
+
+  const predDeps = await prisma.scheduleItemDependency.findMany({
+    where: { successorId: item.id, tenantId: ctx.tenantId },
+    include: { predecessor: { select: { id: true, name: true, startDate: true, endDate: true } } },
+  });
+  const succDeps = await prisma.scheduleItemDependency.findMany({
+    where: { predecessorId: item.id, tenantId: ctx.tenantId },
+    include: { successor: { select: { id: true, name: true, startDate: true, endDate: true } } },
+  });
+
+  const fsWarnings = checkFinishStartViolations(
+    {
+      id: updated.id,
+      name: updated.name,
+      startDate: updated.startDate,
+      endDate: updated.endDate,
+    },
+    predDeps.map((d) => d.predecessor),
+    succDeps.map((d) => d.successor),
+  );
+
+  return { item: updated, fsWarnings };
 }
 
 export async function updateScheduleItemProgress(
@@ -406,7 +428,7 @@ export async function updateScheduleItemProgress(
   progressPct: number,
   ctx: ServiceContext,
 ) {
-  if (!canEditScheduleArea(ctx.roles) && !can(ctx.roles, "VIEW", "SCHEDULE")) {
+  if (!canEditScheduleArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para actualizar avance");
   }
   const item = await getScheduleItemForMutation(scheduleItemId, ctx);
@@ -681,6 +703,41 @@ export async function copyScheduleProgressFromPhysical(
   ctx: ServiceContext,
 ) {
   return updateScheduleItemProgress(scheduleItemId, physicalPct, ctx);
+}
+
+/** Primary schedule item id per WBS (for deep links libro → cronograma). */
+export async function getPrimaryScheduleItemIdsByWbs(
+  projectId: string,
+  wbsNodeIds: string[],
+  ctx: ServiceContext,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (!canViewScheduleArea(ctx.roles) || wbsNodeIds.length === 0) return map;
+
+  const schedule = await prisma.schedule.findUnique({
+    where: { projectId },
+    select: { id: true, tenantId: true },
+  });
+  if (!schedule || schedule.tenantId !== ctx.tenantId) return map;
+
+  const links = await prisma.scheduleItemWbsLink.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      wbsNodeId: { in: wbsNodeIds },
+      isPrimary: true,
+      scheduleItem: { scheduleId: schedule.id },
+    },
+    orderBy: [
+      { scheduleItem: { sortOrder: "asc" } },
+      { scheduleItem: { name: "asc" } },
+    ],
+    select: { wbsNodeId: true, scheduleItemId: true },
+  });
+
+  for (const link of links) {
+    if (!map.has(link.wbsNodeId)) map.set(link.wbsNodeId, link.scheduleItemId);
+  }
+  return map;
 }
 
 /** WBS node IDs linked to any schedule item in the project (for cross-module badges). */

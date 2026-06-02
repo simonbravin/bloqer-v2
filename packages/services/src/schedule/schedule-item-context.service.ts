@@ -1,4 +1,4 @@
-import { prisma } from "@bloqer/database";
+import { Prisma, prisma } from "@bloqer/database";
 import { canViewScheduleArea } from "./schedule-access";
 import { ServiceError } from "../types";
 import type { ServiceContext } from "../types";
@@ -23,7 +23,30 @@ export type ScheduleItemCertificationEntry = {
 export type ScheduleItemContextDto = {
   jobsiteEntries: ScheduleItemJobsiteEntry[];
   certificationEntries: ScheduleItemCertificationEntry[];
+  /** Suma incremental de % físico (partes aprobados) para el WBS primario. */
+  jobsitePhysicalPctCumulative: string | null;
 };
+
+async function getWbsIncrementalPhysicalPctSum(
+  tenantId: string,
+  projectId: string,
+  wbsNodeId: string,
+): Promise<string | null> {
+  const rows = await prisma.jobsiteLogProgress.findMany({
+    where: {
+      wbsNodeId,
+      physicalPct: { not: null },
+      jobsiteLog: { tenantId, projectId, status: "APPROVED" },
+    },
+    select: { physicalPct: true },
+  });
+  if (rows.length === 0) return null;
+  let sum = new Prisma.Decimal(0);
+  for (const r of rows) {
+    if (r.physicalPct) sum = sum.add(r.physicalPct);
+  }
+  return sum.toFixed(2);
+}
 
 export async function getScheduleItemContext(
   projectId: string,
@@ -42,38 +65,40 @@ export async function getScheduleItemContext(
 
   const primaryWbsId = item.wbsLinks[0]?.wbsNodeId;
   if (!primaryWbsId) {
-    return { jobsiteEntries: [], certificationEntries: [] };
+    return { jobsiteEntries: [], certificationEntries: [], jobsitePhysicalPctCumulative: null };
   }
 
   const base = `/proyectos/${projectId}`;
 
-  const progressRows = await prisma.jobsiteLogProgress.findMany({
-    where: {
-      wbsNodeId: primaryWbsId,
-      jobsiteLog: { tenantId: ctx.tenantId, projectId, status: "APPROVED" },
-    },
-    include: {
-      jobsiteLog: { select: { id: true, logDate: true, status: true } },
-    },
-    orderBy: { jobsiteLog: { logDate: "desc" } },
-    take: 10,
-  });
-
-  const certLines = await prisma.certificationLine.findMany({
-    where: {
-      wbsNodeId: primaryWbsId,
-      certification: {
-        tenantId: ctx.tenantId,
-        projectId,
-        status: { in: ["ISSUED", "APPROVED"] },
+  const [progressRows, certLines, jobsitePhysicalPctCumulative] = await Promise.all([
+    prisma.jobsiteLogProgress.findMany({
+      where: {
+        wbsNodeId: primaryWbsId,
+        jobsiteLog: { tenantId: ctx.tenantId, projectId, status: "APPROVED" },
       },
-    },
-    include: {
-      certification: { select: { id: true, number: true, status: true } },
-    },
-    orderBy: { certification: { issueDate: "desc" } },
-    take: 10,
-  });
+      include: {
+        jobsiteLog: { select: { id: true, logDate: true, status: true } },
+      },
+      orderBy: { jobsiteLog: { logDate: "desc" } },
+      take: 10,
+    }),
+    prisma.certificationLine.findMany({
+      where: {
+        wbsNodeId: primaryWbsId,
+        certification: {
+          tenantId: ctx.tenantId,
+          projectId,
+          status: { in: ["ISSUED", "APPROVED"] },
+        },
+      },
+      include: {
+        certification: { select: { id: true, number: true, status: true } },
+      },
+      orderBy: { certification: { issueDate: "desc" } },
+      take: 10,
+    }),
+    getWbsIncrementalPhysicalPctSum(ctx.tenantId, projectId, primaryWbsId),
+  ]);
 
   return {
     jobsiteEntries: progressRows.map((p) => ({
@@ -91,5 +116,6 @@ export async function getScheduleItemContext(
       periodAmount: l.periodAmount.toFixed(2),
       href: `${base}/certificaciones/${l.certification.id}`,
     })),
+    jobsitePhysicalPctCumulative,
   };
 }

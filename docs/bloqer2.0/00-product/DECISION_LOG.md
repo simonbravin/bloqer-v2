@@ -573,6 +573,23 @@
 
 ---
 
+### D-045 — Avance real del cronograma sincronizado desde libro de obra
+
+- **Fecha:** 2026-06-02
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (plan cronograma + avances integrados)
+- **Decisión:**
+  1. `ScheduleItem.progressPct` (**avance real** en cronograma) se actualiza **automáticamente al aprobar** un `JobsiteLog`, no al enviar ni al guardar borrador.
+  2. La fuente es el WBS **primario** (`ScheduleItemWbsLink.isPrimary = true`) del ítem de cronograma.
+  3. El % proviene del acumulado aprobado de `physicalPct` incremental por parte; si no hay % físico, fallback cantidad ejecutada / `budgetQty` del ítem de costo.
+  4. Si el acumulado supera 100 %, no se sincroniza ese WBS (datos legacy / Q-005b).
+  5. Al llegar a 100 % con estado `IN_PROGRESS`, la tarea pasa a `COMPLETED` (transición documentada en §27).
+  6. El **avance certificado** y el **avance por cantidad operativa** siguen siendo dimensiones de lectura separadas ([BR-SCH-002]); el PM puede editar fechas y dependencias; el avance real manual queda como excepción operativa.
+- **Implicancias:** `syncScheduleProgressFromJobsiteLog` en `packages/services`; auditoría `SCHEDULE_PROGRESS_SYNCED_FROM_JOBSITE_LOG`.
+- **Documentos afectados:** [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) ([BR-SCH-004]), [`05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md), [`02-modules/PROJECT_SCHEDULING.md`](../02-modules/PROJECT_SCHEDULING.md), [`02-modules/JOBSITE_LOG.md`](../02-modules/JOBSITE_LOG.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

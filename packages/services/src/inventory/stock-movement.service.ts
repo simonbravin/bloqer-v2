@@ -1,4 +1,4 @@
-import { Prisma, prisma, StockMovement, StockMovementStatus } from "@bloqer/database";
+import { Prisma, prisma, StockMovement, StockMovementSourceType, StockMovementStatus } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreateStockConsumptionInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
@@ -59,6 +59,8 @@ export async function listStockMovements(
     productId?:         string;
     projectId?:         string;
     purchaseReceiptId?: string;
+    sourceType?:        StockMovementSourceType;
+    sourceIds?:         string[];
     status?:            StockMovementStatus;
   },
   ctx: ServiceContext,
@@ -67,6 +69,7 @@ export async function listStockMovements(
   if (!can(ctx.roles, "VIEW", "INVENTORY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver movimientos de stock");
   }
+  const sourceIds = filters.sourceIds?.filter(Boolean) ?? [];
   const movements = await prisma.stockMovement.findMany({
     where: {
       tenantId:          ctx.tenantId,
@@ -74,6 +77,8 @@ export async function listStockMovements(
       productId:         filters.productId ?? undefined,
       projectId:         filters.projectId ?? undefined,
       purchaseReceiptId: filters.purchaseReceiptId ?? undefined,
+      sourceType:        filters.sourceType ?? undefined,
+      ...(sourceIds.length > 0 ? { sourceId: { in: sourceIds } } : {}),
       status:            filters.status ?? undefined,
     },
     include: movementInclude,
@@ -217,4 +222,105 @@ export async function cancelReceiptStockMovements(
     where:  { purchaseReceiptId, status: "CONFIRMED" },
     data:   { status: "CANCELLED" },
   });
+}
+
+/** P-LOG-05 — consumo de inventario al aprobar un parte de obra (idempotente por línea de material). */
+export async function createJobsiteLogMaterialStockMovements(
+  tx: TxClient,
+  params: {
+    jobsiteLogId: string;
+    projectId:    string;
+    logDate:      Date;
+    tenantId:     string;
+    companyId:    string;
+    actorUserId:  string;
+    materials: Array<{
+      id:          string;
+      productId:   string | null;
+      warehouseId: string | null;
+      quantity:    Prisma.Decimal;
+      description: string;
+      notes:       string | null;
+    }>;
+  },
+): Promise<number> {
+  let created = 0;
+
+  const qtyByPair = new Map<
+    string,
+    { productId: string; warehouseId: string; qty: Prisma.Decimal }
+  >();
+  for (const m of params.materials) {
+    if (!m.productId || !m.warehouseId) continue;
+    if (m.quantity.lessThanOrEqualTo(0)) continue;
+    const key = `${m.productId}:${m.warehouseId}`;
+    const prev = qtyByPair.get(key);
+    if (prev) {
+      prev.qty = prev.qty.add(m.quantity);
+    } else {
+      qtyByPair.set(key, {
+        productId: m.productId,
+        warehouseId: m.warehouseId,
+        qty: m.quantity,
+      });
+    }
+  }
+
+  for (const { productId, warehouseId, qty } of qtyByPair.values()) {
+    const balance = await getStockBalance({
+      tenantId:    params.tenantId,
+      warehouseId,
+      productId,
+    });
+    if (qty.greaterThan(balance)) {
+      throw new ServiceError(
+        "CONFLICT",
+        `Stock insuficiente al aprobar el parte. Disponible: ${balance.toString()}, solicitado: ${qty.toString()}`,
+      );
+    }
+  }
+
+  for (const m of params.materials) {
+    if (!m.productId || !m.warehouseId) continue;
+    if (m.quantity.lessThanOrEqualTo(0)) continue;
+
+    const existing = await tx.stockMovement.findFirst({
+      where: {
+        tenantId:   params.tenantId,
+        sourceType: "CONSUMPTION",
+        sourceId:   m.id,
+        status:     "CONFIRMED",
+      },
+    });
+    if (existing) continue;
+
+    const warehouse = await tx.warehouse.findUnique({ where: { id: m.warehouseId } });
+    if (!warehouse || warehouse.status !== "ACTIVE") {
+      throw new ServiceError("CONFLICT", "El depósito del material no está activo");
+    }
+
+    const noteParts = [`Parte de obra`, m.description];
+    if (m.notes) noteParts.push(m.notes);
+
+    await tx.stockMovement.create({
+      data: {
+        tenantId:     params.tenantId,
+        companyId:    warehouse.companyId ?? params.companyId,
+        warehouseId:  m.warehouseId,
+        productId:    m.productId,
+        projectId:    params.projectId,
+        type:         "OUT",
+        sourceType:   "CONSUMPTION",
+        sourceId:     m.id,
+        movementDate: params.logDate,
+        quantity:     m.quantity,
+        status:       "CONFIRMED",
+        notes:        noteParts.join(" · "),
+        createdBy:    params.actorUserId,
+      },
+    });
+    created++;
+  }
+
+  return created;
 }

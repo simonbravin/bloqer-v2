@@ -13,6 +13,7 @@ import { assertProjectAllowsOperationalMutation } from "../project/project-opera
 import { assertCompanyMatchesProject, assertWbsLineForProject } from "./procurement-wbs";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import { assertDirectPoAllowed } from "./procurement-policy.service";
+import { sortTreeOrder } from "@bloqer/utils";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { onPurchaseOrderDraftCancelled } from "./purchase-request-to-po.service";
 
@@ -210,15 +211,18 @@ export async function listProcurementWbsOptions(
       id: true,
       code: true,
       name: true,
+      parentId: true,
+      sortOrder: true,
       budget: { select: { name: true, versionNumber: true } },
     },
-    orderBy: [{ budget: { versionNumber: "desc" } }, { code: "asc" }],
   });
 
-  return nodes.map((n) => ({
-    id:         n.id,
-    code:       n.code,
-    name:       n.name,
+  const ordered = sortTreeOrder(nodes, (a, b) => a.code.localeCompare(b.code));
+
+  return ordered.map((n) => ({
+    id: n.id,
+    code: n.code,
+    name: n.name,
     budgetName: `${n.budget.name} v${n.budget.versionNumber}`,
   }));
 }

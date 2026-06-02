@@ -3,6 +3,7 @@ import type { ScheduleWorkspaceDto } from "@bloqer/services";
 
 export function ScheduleSummaryCards({ workspace }: { workspace: ScheduleWorkspaceDto }) {
   const { summary } = workspace;
+  const filteredView = summary.totalItems !== summary.unfilteredActiveCount;
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Card>
@@ -21,7 +22,14 @@ export function ScheduleSummaryCards({ workspace }: { workspace: ScheduleWorkspa
           <CardTitle className="text-sm font-medium text-muted-foreground">Ítems activos</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-semibold tabular-nums">{summary.totalItems}</p>
+          <p className="text-2xl font-semibold tabular-nums">
+            {filteredView ? summary.totalItems : summary.unfilteredActiveCount}
+          </p>
+          {filteredView && (
+            <p className="text-xs text-muted-foreground">
+              de {summary.unfilteredActiveCount} en total (filtros activos)
+            </p>
+          )}
         </CardContent>
       </Card>
       <Card>

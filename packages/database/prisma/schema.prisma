@@ -2425,7 +2425,7 @@ model JobsiteLogLabor {
   @@map("jobsite_log_labor")
 }
 
-// Evidence only — does NOT create StockMovement OUT.
+// On APPROVED: creates StockMovement OUT (CONSUMPTION) per line with productId+warehouseId.
 // description mandatory fallback when productId is null.
 model JobsiteLogMaterialUsage {
   id           String   @id @default(uuid())

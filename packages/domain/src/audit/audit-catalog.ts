@@ -166,6 +166,7 @@ export const AUDIT_ACTION_LABELS_ES: Record<string, string> = {
   "schedule_item.wbs_unlinked": "WBS desvinculado de tarea",
   "schedule_dependency.added": "Dependencia agregada",
   "schedule_dependency.removed": "Dependencia eliminada",
+  SCHEDULE_PROGRESS_SYNCED_FROM_JOBSITE_LOG: "Avance de cronograma sincronizado desde libro de obra",
   // Jobsite log
   JOBSITE_LOG_CREATED: "Parte de obra creado",
   JOBSITE_LOG_UPDATED: "Parte de obra actualizado",
