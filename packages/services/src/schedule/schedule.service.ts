@@ -1,3 +1,4 @@
+import type { Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import type { ScheduleItemStatus, ScheduleItemType } from "@bloqer/database";
 import { can } from "@bloqer/domain";
@@ -8,9 +9,12 @@ import { canEditScheduleArea, canViewScheduleArea } from "./schedule-access";
 import {
   assertScheduleStatusTransition,
   checkFinishStartViolations,
+  computeContainerRollup,
   daysBetween,
   formatDateOnly,
+  isFormerScheduleContainer,
   parseDateOnly,
+  scheduleItemHasActiveChildren,
   wouldCreateDependencyCycle,
 } from "./schedule-helpers";
 import {
@@ -65,6 +69,119 @@ async function getScheduleItemForMutation(scheduleItemId: string, ctx: ServiceCo
   const item = await getScheduleItemOrThrow(scheduleItemId, ctx);
   await assertProjectScheduleMutation(item.schedule.projectId, ctx);
   return item;
+}
+
+async function rollupScheduleContainerDatesInTx(
+  scheduleId: string,
+  ctx: ServiceContext,
+  tx: Prisma.TransactionClient,
+) {
+  const items = await tx.scheduleItem.findMany({
+    where: { scheduleId, tenantId: ctx.tenantId },
+    select: {
+      id: true,
+      parentId: true,
+      status: true,
+      startDate: true,
+      endDate: true,
+      durationDays: true,
+      name: true,
+      progressPct: true,
+      blockReason: true,
+    },
+  });
+
+  const rollup = computeContainerRollup(items);
+
+  for (const [containerId, dates] of rollup) {
+    const current = items.find((i) => i.id === containerId);
+    if (!current) continue;
+
+    const newStart = dates?.startDate ?? null;
+    const newEnd = dates?.endDate ?? null;
+    const newDuration = dates?.durationDays ?? null;
+
+    const sameStart =
+      (current.startDate?.toISOString().slice(0, 10) ?? null) ===
+      (newStart?.toISOString().slice(0, 10) ?? null);
+    const sameEnd =
+      (current.endDate?.toISOString().slice(0, 10) ?? null) ===
+      (newEnd?.toISOString().slice(0, 10) ?? null);
+    if (sameStart && sameEnd && (current.durationDays ?? null) === newDuration) continue;
+
+    const before = scheduleItemSnapshot(current);
+    const updated = await tx.scheduleItem.update({
+      where: { id: containerId },
+      data: {
+        startDate: newStart,
+        endDate: newEnd,
+        durationDays: newDuration,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+    await auditSchedule(
+      ctx,
+      "schedule_item.dates_updated",
+      SCHEDULE_ITEM_ENTITY,
+      containerId,
+      before,
+      scheduleItemSnapshot(updated),
+      tx,
+    );
+  }
+
+  for (const item of items) {
+    if (item.status === "CANCELLED") continue;
+    if (!isFormerScheduleContainer(items, item.id)) continue;
+    if (!item.startDate && !item.endDate) continue;
+
+    const before = scheduleItemSnapshot(item);
+    const updated = await tx.scheduleItem.update({
+      where: { id: item.id },
+      data: {
+        startDate: null,
+        endDate: null,
+        durationDays: null,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+    await auditSchedule(
+      ctx,
+      "schedule_item.dates_updated",
+      SCHEDULE_ITEM_ENTITY,
+      item.id,
+      before,
+      scheduleItemSnapshot(updated),
+      tx,
+    );
+  }
+}
+
+export async function rollupScheduleContainersForProject(
+  projectId: string,
+  ctx: ServiceContext,
+) {
+  if (!canEditScheduleArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
+  }
+  await assertProjectScheduleMutation(projectId, ctx);
+  await assertProjectAccess(projectId, ctx);
+  const schedule = await ensureScheduleForProject(projectId, ctx);
+
+  await prisma.$transaction(async (tx) => {
+    await rollupScheduleContainerDatesInTx(schedule.id, ctx, tx);
+  });
+
+  await auditSchedule(
+    ctx,
+    "schedule.containers_rollup",
+    SCHEDULE_ENTITY,
+    schedule.id,
+    undefined,
+    { projectId },
+  );
+
+  return schedule;
 }
 
 export async function ensureScheduleForProject(projectId: string, ctx: ServiceContext) {
@@ -160,7 +277,7 @@ export async function importScheduleFromBudget(
     scheduleItemByWbsId.set(link.wbsNodeId, link.scheduleItemId);
   }
   const includeGroups = input.includeGroups !== false;
-  const placeholderDates = input.placeholderDates !== false;
+  const placeholderDates = input.placeholderDates === true;
 
   let placeholderStart: Date | null = null;
   let placeholderEnd: Date | null = null;
@@ -171,6 +288,18 @@ export async function importScheduleFromBudget(
 
   const itemNodes = wbsNodes.filter((n) => n.type === "ITEM");
   const groupNodes = includeGroups ? wbsNodes.filter((n) => n.type === "GROUP") : [];
+
+  const newItemNodes = itemNodes.filter((n) => !linkedWbs.has(n.id));
+  const siblingsByParent = new Map<string | null, typeof itemNodes>();
+  for (const node of newItemNodes) {
+    const key = node.parentId ?? null;
+    const list = siblingsByParent.get(key) ?? [];
+    list.push(node);
+    siblingsByParent.set(key, list);
+  }
+  for (const list of siblingsByParent.values()) {
+    list.sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code));
+  }
 
   let importedCount = 0;
 
@@ -206,9 +335,6 @@ export async function importScheduleFromBudget(
       importedCount += 1;
     }
 
-    const leafCount = Math.max(itemNodes.length, 1);
-    let leafIndex = 0;
-
     for (const node of itemNodes) {
       if (linkedWbs.has(node.id)) continue;
 
@@ -221,13 +347,17 @@ export async function importScheduleFromBudget(
       let durationDays: number | null = null;
 
       if (placeholderStart && placeholderEnd) {
+        const siblings = siblingsByParent.get(node.parentId ?? null) ?? [node];
+        const siblingIndex = Math.max(0, siblings.findIndex((s) => s.id === node.id));
+        const siblingCount = Math.max(siblings.length, 1);
         const totalMs = placeholderEnd.getTime() - placeholderStart.getTime();
-        const slice = totalMs / leafCount;
-        startDate = new Date(placeholderStart.getTime() + slice * leafIndex);
-        endDate = new Date(placeholderStart.getTime() + slice * (leafIndex + 1) - MS_PER_DAY);
+        const slice = totalMs / siblingCount;
+        startDate = new Date(placeholderStart.getTime() + slice * siblingIndex);
+        endDate = new Date(
+          placeholderStart.getTime() + slice * (siblingIndex + 1) - MS_PER_DAY,
+        );
         if (endDate < startDate) endDate = startDate;
         durationDays = daysBetween(startDate, endDate);
-        leafIndex += 1;
       }
 
       const created = await tx.scheduleItem.create({
@@ -256,6 +386,10 @@ export async function importScheduleFromBudget(
       scheduleItemByWbsId.set(node.id, created.id);
       linkedWbs.add(node.id);
       importedCount += 1;
+    }
+
+    if (importedCount > 0) {
+      await rollupScheduleContainerDatesInTx(schedule.id, ctx, tx);
     }
   });
 
@@ -312,20 +446,24 @@ export async function createScheduleItem(
   const durationDays =
     startDate && endDate ? daysBetween(startDate, endDate) : null;
 
-  const created = await prisma.scheduleItem.create({
-    data: {
-      tenantId: ctx.tenantId,
-      scheduleId: schedule.id,
-      parentId: input.parentId ?? null,
-      sortOrder: input.sortOrder ?? 0,
-      name: input.name,
-      type: input.type ?? "TASK",
-      startDate,
-      endDate,
-      durationDays,
-      createdBy: ctx.actorUserId,
-      updatedBy: ctx.actorUserId,
-    },
+  const created = await prisma.$transaction(async (tx) => {
+    const row = await tx.scheduleItem.create({
+      data: {
+        tenantId: ctx.tenantId,
+        scheduleId: schedule.id,
+        parentId: input.parentId ?? null,
+        sortOrder: input.sortOrder ?? 0,
+        name: input.name,
+        type: input.type ?? "TASK",
+        startDate,
+        endDate,
+        durationDays,
+        createdBy: ctx.actorUserId,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+    await rollupScheduleContainerDatesInTx(schedule.id, ctx, tx);
+    return row;
   });
   await auditSchedule(
     ctx,
@@ -373,6 +511,21 @@ export async function updateScheduleItemDates(
   }
   const item = await getScheduleItemForMutation(scheduleItemId, ctx);
 
+  const siblings = await prisma.scheduleItem.findMany({
+    where: {
+      scheduleId: item.scheduleId,
+      tenantId: ctx.tenantId,
+      status: { not: "CANCELLED" },
+    },
+    select: { id: true, parentId: true, status: true },
+  });
+  if (scheduleItemHasActiveChildren(siblings, item.id)) {
+    throw new ServiceError(
+      "VALIDATION",
+      "Las fechas de contenedores se calculan automáticamente desde las subtareas.",
+    );
+  }
+
   const startDate = input.startDate ? parseDateOnly(input.startDate) : null;
   const endDate = input.endDate ? parseDateOnly(input.endDate) : null;
   if (startDate && endDate && endDate < startDate) {
@@ -382,14 +535,18 @@ export async function updateScheduleItemDates(
     startDate && endDate ? daysBetween(startDate, endDate) : null;
 
   const before = scheduleItemSnapshot(item);
-  const updated = await prisma.scheduleItem.update({
-    where: { id: item.id },
-    data: {
-      startDate,
-      endDate,
-      durationDays,
-      updatedBy: ctx.actorUserId,
-    },
+  const updated = await prisma.$transaction(async (tx) => {
+    const row = await tx.scheduleItem.update({
+      where: { id: item.id },
+      data: {
+        startDate,
+        endDate,
+        durationDays,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+    await rollupScheduleContainerDatesInTx(item.scheduleId, ctx, tx);
+    return row;
   });
   await auditSchedule(
     ctx,
@@ -469,13 +626,19 @@ async function transitionScheduleItem(
   }
 
   const before = scheduleItemSnapshot(item);
-  const updated = await prisma.scheduleItem.update({
-    where: { id: item.id },
-    data: {
-      status: to,
-      blockReason: to === "BLOCKED" ? extra!.blockReason!.trim() : to === "IN_PROGRESS" ? null : item.blockReason,
-      updatedBy: ctx.actorUserId,
-    },
+  const updated = await prisma.$transaction(async (tx) => {
+    const row = await tx.scheduleItem.update({
+      where: { id: item.id },
+      data: {
+        status: to,
+        blockReason: to === "BLOCKED" ? extra!.blockReason!.trim() : to === "IN_PROGRESS" ? null : item.blockReason,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+    if (to === "CANCELLED") {
+      await rollupScheduleContainerDatesInTx(item.scheduleId, ctx, tx);
+    }
+    return row;
   });
   await auditSchedule(
     ctx,

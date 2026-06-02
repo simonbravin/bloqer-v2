@@ -17,14 +17,13 @@ import {
   endOfDay,
   endOfMonth,
   format,
-  formatDate,
-  formatDistance,
   getDate,
   getDaysInMonth,
   isSameDay,
   startOfDay,
   startOfMonth,
 } from "date-fns";
+import { es } from "date-fns/locale";
 import { atom, useAtom } from "jotai";
 import throttle from "lodash.throttle";
 import { PlusIcon, TrashIcon } from "lucide-react";
@@ -106,6 +105,7 @@ export type GanttContextProps = {
   timelineData: TimelineData;
   ref: RefObject<HTMLDivElement | null> | null;
   scrollToFeature?: (feature: GanttFeature) => void;
+  scrollToDate?: (date: Date) => void;
 };
 
 const getsDaysIn = (range: Range) => {
@@ -290,6 +290,11 @@ const calculateInnerOffset = (
   return (dayOfMonth / totalRangeDays) * columnWidth;
 };
 
+function formatDurationDaysFromRange(start: Date, end: Date): string {
+  const days = Math.max(1, differenceInDays(end, start) + 1);
+  return days === 1 ? "1 día" : `${days} días`;
+}
+
 export function useGanttLayout(): GanttContextProps {
   return useContext(GanttContext);
 }
@@ -306,6 +311,7 @@ const GanttContext = createContext<GanttContextProps>({
   timelineData: [],
   ref: null,
   scrollToFeature: undefined,
+  scrollToDate: undefined,
 });
 
 export type GanttContentHeaderProps = {
@@ -368,17 +374,18 @@ const DailyHeader: FC = () => {
             renderHeaderItem={(item: number) => (
               <div className="flex items-center justify-center gap-1">
                 <p>
-                  {format(addDays(new Date(year.year, index, 1), item), "d")}
+                  {format(addDays(new Date(year.year, index, 1), item), "d", { locale: es })}
                 </p>
                 <p className="text-muted-foreground">
                   {format(
                     addDays(new Date(year.year, index, 1), item),
-                    "EEEEE"
+                    "EEEEE",
+                    { locale: es }
                   )}
                 </p>
               </div>
             )}
-            title={format(new Date(year.year, index, 1), "MMMM yyyy")}
+            title={format(new Date(year.year, index, 1), "MMMM yyyy", { locale: es })}
           />
           <GanttColumns
             columns={month.days}
@@ -401,7 +408,7 @@ const MonthlyHeader: FC = () => {
       <GanttContentHeader
         columns={year.quarters.flatMap((quarter) => quarter.months).length}
         renderHeaderItem={(item: number) => (
-          <p>{format(new Date(year.year, item, 1), "MMM")}</p>
+          <p>{format(new Date(year.year, item, 1), "MMM", { locale: es })}</p>
         )}
         title={`${year.year}`}
       />
@@ -425,7 +432,7 @@ const QuarterlyHeader: FC = () => {
           columns={quarter.months.length}
           renderHeaderItem={(item: number) => (
             <p>
-              {format(new Date(year.year, quarterIndex * 3 + item, 1), "MMM")}
+              {format(new Date(year.year, quarterIndex * 3 + item, 1), "MMM", { locale: es })}
             </p>
           )}
           title={`Q${quarterIndex + 1} ${year.year}`}
@@ -466,21 +473,26 @@ export type GanttSidebarItemProps = {
   feature: GanttFeature;
   onSelectItem?: (id: string) => void;
   className?: string;
+  /** When set, replaces computed English formatDistance label. */
+  durationLabel?: string;
 };
 
 export const GanttSidebarItem: FC<GanttSidebarItemProps> = ({
   feature,
   onSelectItem,
   className,
+  durationLabel,
 }) => {
   const gantt = useContext(GanttContext);
   const tempEndAt =
     feature.endAt && isSameDay(feature.startAt, feature.endAt)
       ? addDays(feature.endAt, 1)
       : feature.endAt;
-  const duration = tempEndAt
-    ? formatDistance(feature.startAt, tempEndAt)
-    : `${formatDistance(feature.startAt, new Date())} so far`;
+  const duration =
+    durationLabel ??
+    (tempEndAt
+      ? formatDurationDaysFromRange(feature.startAt, tempEndAt)
+      : "En curso");
 
   const handleClick: MouseEventHandler<HTMLDivElement> = (event) => {
     if (event.target === event.currentTarget) {
@@ -746,7 +758,7 @@ export const GanttCreateMarkerTrigger: FC<GanttCreateMarkerTriggerProps> = ({
           <PlusIcon className="text-muted-foreground" size={12} />
         </button>
         <div className="whitespace-nowrap rounded-full border border-border/50 bg-background/90 px-2 py-1 text-foreground text-xs backdrop-blur-lg">
-          {formatDate(date, "MMM dd, yyyy")}
+          {format(date, "dd/MM/yyyy", { locale: es })}
         </div>
       </div>
     </div>
@@ -1140,7 +1152,7 @@ export const GanttMarker: FC<
           >
             {label}
             <span className="max-h-[0] overflow-hidden opacity-80 transition-all group-hover:max-h-[2rem]">
-              {formatDate(date, "MMM dd, yyyy")}
+              {format(date, "dd/MM/yyyy", { locale: es })}
             </span>
           </div>
         </ContextMenuTrigger>
@@ -1361,6 +1373,35 @@ export const GanttProvider: FC<GanttProviderProps> = ({
     [timelineData, zoom, range, columnWidth, sidebarWidth, onAddItem]
   );
 
+  const scrollToDate = useCallback(
+    (date: Date) => {
+      const scrollElement = scrollRef.current;
+      if (!scrollElement) {
+        return;
+      }
+
+      const timelineStartDate = new Date(timelineData[0].year, 0, 1);
+      const offset = getOffset(startOfDay(date), timelineStartDate, {
+        zoom,
+        range,
+        columnWidth,
+        sidebarWidth,
+        headerHeight,
+        rowHeight,
+        onAddItem,
+        placeholderLength: 2,
+        timelineData,
+        ref: scrollRef,
+      });
+
+      scrollElement.scrollTo({
+        left: Math.max(0, offset),
+        behavior: "smooth",
+      });
+    },
+    [timelineData, zoom, range, columnWidth, sidebarWidth, onAddItem]
+  );
+
   return (
     <GanttContext.Provider
       value={{
@@ -1375,6 +1416,7 @@ export const GanttProvider: FC<GanttProviderProps> = ({
         placeholderLength: 2,
         ref: scrollRef,
         scrollToFeature,
+        scrollToDate,
       }}
     >
       <div
@@ -1462,7 +1504,7 @@ export const GanttToday: FC<GanttTodayProps> = ({ className, label = "Hoy" }) =>
       >
         {label}
         <span className="max-h-[0] overflow-hidden opacity-80 transition-all group-hover:max-h-[2rem]">
-          {formatDate(date, "MMM dd, yyyy")}
+          {format(date, "dd/MM/yyyy", { locale: es })}
         </span>
       </div>
       <div className={cn("h-full w-px bg-card", className)} />

@@ -19,7 +19,7 @@ export const scheduleWorkspaceFiltersSchema = z.object({
 export const importScheduleFromBudgetSchema = z.object({
   budgetId: z.string().uuid(),
   includeGroups: z.boolean().optional().default(true),
-  placeholderDates: z.boolean().optional().default(true),
+  placeholderDates: z.boolean().optional().default(false),
 });
 
 export const createScheduleItemSchema = z.object({

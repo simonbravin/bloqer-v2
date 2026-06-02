@@ -15,6 +15,7 @@ import {
   moveScheduleItemToStatus,
   removeScheduleDependency,
   ServiceError,
+  rollupScheduleContainersForProject,
   updateScheduleItemDates,
   updateScheduleItemName,
   updateScheduleItemProgress,
@@ -88,6 +89,17 @@ export async function updateScheduleItemDatesAction(
     const { fsWarnings } = await updateScheduleItemDates(scheduleItemId, input, ctx);
     revalidateCronograma(projectId);
     return { ok: true as const, fsWarnings };
+  } catch (e) {
+    return handle(e);
+  }
+}
+
+export async function rollupScheduleContainersAction(projectId: string) {
+  const ctx = await getCtx();
+  try {
+    await rollupScheduleContainersForProject(projectId, ctx);
+    revalidateCronograma(projectId);
+    return { ok: true as const };
   } catch (e) {
     return handle(e);
   }

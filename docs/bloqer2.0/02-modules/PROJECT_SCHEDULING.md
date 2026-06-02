@@ -30,6 +30,7 @@ Sin cronograma, el costo puede estar “al día” pero la obra retrasada — o 
 - Vincular tarea a `CostItem` / `WbsNode`.
 - Registrar avance % de tarea (manual excepcional; **automático desde libro de obra al aprobar** — [D-045] / [BR-SCH-004]).
 - Editar fechas y dependencias FS (advertencias no bloqueantes si hay conflicto).
+- Importar WBS: estructura sin fechas por defecto; fechas de borrador opt-in; rollup de contenedores ([D-046]).
 
 ## 9. Pantallas y vistas necesarias
 - Vista Gantt (si Fase 1 incluye).

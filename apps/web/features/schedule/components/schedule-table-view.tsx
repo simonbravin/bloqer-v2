@@ -2,7 +2,13 @@
 
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
 import { Badge } from "@/components/ui/badge";
-import { STATUS_LABELS, primaryWbsLink } from "../adapters/schedule-view-types";
+import { formatDateAr } from "@/lib/gantt-date-format";
+import {
+  STATUS_LABELS,
+  primaryWbsLink,
+  scheduleItemHasActiveChildren,
+  scheduleItemTreeDepth,
+} from "../adapters/schedule-view-types";
 import { ScheduleProgressDimensions } from "./schedule-progress-dimensions";
 import { ScheduleViewEmptyMessage } from "./schedule-empty-state";
 
@@ -44,6 +50,8 @@ export function ScheduleTableView({
         <tbody>
           {items.map((item) => {
             const primary = primaryWbsLink(item);
+            const depth = scheduleItemTreeDepth(items, item.id);
+            const isLeaf = !scheduleItemHasActiveChildren(items, item.id);
             return (
               <tr
                 key={item.id}
@@ -51,7 +59,12 @@ export function ScheduleTableView({
                 onClick={() => onSelect(item)}
               >
                 <td className="p-3 max-w-[240px]">
-                  <span className="line-clamp-2">{item.name}</span>
+                  <span
+                    className="line-clamp-2 block"
+                    style={depth > 0 ? { paddingLeft: depth * 12 } : undefined}
+                  >
+                    {item.name}
+                  </span>
                   <div className="flex flex-wrap items-center gap-1 mt-0.5">
                     {item.type === "MILESTONE" && (
                       <Badge variant="outline" className="text-[10px] px-1 py-0">
@@ -64,8 +77,8 @@ export function ScheduleTableView({
                   </div>
                 </td>
                 <td className="p-3">{STATUS_LABELS[item.status] ?? item.status}</td>
-                <td className="p-3 tabular-nums whitespace-nowrap">{item.startDate ?? "—"}</td>
-                <td className="p-3 tabular-nums whitespace-nowrap">{item.endDate ?? "—"}</td>
+                <td className="p-3 tabular-nums whitespace-nowrap">{formatDateAr(item.startDate)}</td>
+                <td className="p-3 tabular-nums whitespace-nowrap">{formatDateAr(item.endDate)}</td>
                 <td className="p-3">
                   <ScheduleProgressDimensions item={item} compact />
                 </td>
@@ -77,7 +90,7 @@ export function ScheduleTableView({
                 </td>
                 <td className="p-3">
                   <div className="flex flex-wrap gap-1">
-                    {item.daysLate != null && (
+                    {isLeaf && item.daysLate != null && (
                       <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-xs text-destructive">
                         Atrasado {item.daysLate}d
                       </span>

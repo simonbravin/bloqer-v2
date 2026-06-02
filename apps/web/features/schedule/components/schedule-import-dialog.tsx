@@ -28,6 +28,7 @@ export function ScheduleImportDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [budgetId, setBudgetId] = useState(defaultBudgetId ?? budgets[0]?.id ?? "");
+  const [placeholderDates, setPlaceholderDates] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function onImport() {
@@ -39,7 +40,7 @@ export function ScheduleImportDialog({
       const res = await importScheduleFromBudgetAction(projectId, {
         budgetId,
         includeGroups: true,
-        placeholderDates: true,
+        placeholderDates,
       });
       if ("error" in res) {
         toast.error(res.error);
@@ -62,25 +63,43 @@ export function ScheduleImportDialog({
         <DialogHeader>
           <DialogTitle>Importar WBS al cronograma</DialogTitle>
           <DialogDescription>
-            Crea tareas enlazadas a ítems del presupuesto aprobado. Podés agregar hitos y tareas sin WBS después.
+            Crea tareas enlazadas a ítems del presupuesto aprobado. Por defecto importa solo la
+            estructura, sin fechas. Podés agregar hitos y tareas sin WBS después.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="import-budget">
-            Presupuesto base
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium" htmlFor="import-budget">
+              Presupuesto base
+            </label>
+            <select
+              id="import-budget"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={budgetId}
+              onChange={(e) => setBudgetId(e.target.value)}
+            >
+              {budgets.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} ({b.status})
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="flex items-start gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={placeholderDates}
+              onChange={(e) => setPlaceholderDates(e.target.checked)}
+            />
+            <span>
+              Asignar fechas estimadas de borrador
+              <span className="block text-xs text-muted-foreground font-normal mt-0.5">
+                Reparte el rango del proyecto entre tareas hermanas. No respeta dependencias FS; las
+                fechas de contenedores se calculan luego por rollup.
+              </span>
+            </span>
           </label>
-          <select
-            id="import-budget"
-            className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={budgetId}
-            onChange={(e) => setBudgetId(e.target.value)}
-          >
-            {budgets.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name} ({b.status})
-              </option>
-            ))}
-          </select>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)}>

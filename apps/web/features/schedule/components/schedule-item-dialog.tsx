@@ -43,7 +43,8 @@ import {
   updateScheduleItemProgressAction,
   cancelScheduleItemAction,
 } from "../actions/schedule-actions";
-import { STATUS_LABELS, primaryWbsLink } from "../adapters/schedule-view-types";
+import { STATUS_LABELS, primaryWbsLink, scheduleItemHasActiveChildren } from "../adapters/schedule-view-types";
+import { formatDateAr } from "@/lib/gantt-date-format";
 import { ScheduleCancelDialog } from "./schedule-cancel-dialog";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -71,6 +72,7 @@ export function ScheduleItemDialog({
 }) {
   const router = useRouter();
   const item = itemId ? allItems.find((i) => i.id === itemId) ?? null : null;
+  const isContainer = item ? scheduleItemHasActiveChildren(allItems, item.id) : false;
   const [pending, startTransition] = useTransition();
   const [audit, setAudit] = useState<ScheduleItemAuditEntryView[]>([]);
   const [context, setContext] = useState<ScheduleItemContextDto | null>(null);
@@ -284,7 +286,7 @@ export function ScheduleItemDialog({
 
             <section className="space-y-2">
               <h3 className="font-medium">Planificación</h3>
-              {workspace.canEdit ? (
+              {workspace.canEdit && !isContainer ? (
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <Label className="text-xs">Inicio</Label>
@@ -309,9 +311,16 @@ export function ScheduleItemDialog({
                   </Button>
                 </div>
               ) : (
-                <p>
-                  {item.startDate ?? "—"} → {item.endDate ?? "—"}
-                </p>
+                <div>
+                  <p>
+                    {formatDateAr(item.startDate)} → {formatDateAr(item.endDate)}
+                  </p>
+                  {isContainer && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Fechas de contenedor calculadas automáticamente desde las subtareas.
+                    </p>
+                  )}
+                </div>
               )}
               {item.blockReason && (
                 <p className="text-destructive">Bloqueo: {item.blockReason}</p>

@@ -9,7 +9,7 @@ import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { canEditScheduleArea, canViewScheduleArea } from "./schedule-access";
-import { computeDaysLate, formatDateOnly, ZERO_DEC, computeTimePlanProgressPct } from "./schedule-helpers";
+import { computeDaysLate, formatDateOnly, ZERO_DEC, computeTimePlanProgressPct, isScheduleLeafItem } from "./schedule-helpers";
 import { ensureScheduleForProject } from "./schedule.service";
 import { sortTreeOrder } from "@bloqer/utils";
 
@@ -267,7 +267,8 @@ export async function getProjectScheduleWorkspace(
   const dtoItems: ScheduleWorkspaceItemDto[] = [];
 
   for (const item of items) {
-    const daysLate = computeDaysLate(item.endDate, item.status);
+    const isLeaf = isScheduleLeafItem(items, item.id);
+    const daysLate = isLeaf ? computeDaysLate(item.endDate, item.status) : null;
     if (filters.delayedOnly && daysLate === null) continue;
 
     const wbsLinks: ScheduleWbsLinkDto[] = item.wbsLinks.map((l) => ({
@@ -342,12 +343,13 @@ export async function getProjectScheduleWorkspace(
   }
 
   const activeItems = dtoItems.filter((i) => i.status !== "CANCELLED");
+  const leafItems = activeItems.filter((i) => isScheduleLeafItem(activeItems, i.id));
   const completedItems = activeItems.filter((i) => i.status === "COMPLETED").length;
-  const delayedItems = activeItems.filter((i) => i.daysLate !== null).length;
+  const delayedItems = leafItems.filter((i) => i.daysLate !== null).length;
 
   let weighted = ZERO_DEC;
   let weightSum = ZERO_DEC;
-  for (const i of activeItems) {
+  for (const i of leafItems) {
     const dur = i.durationDays && i.durationDays > 0
       ? new Prisma.Decimal(i.durationDays)
       : new Prisma.Decimal(1);

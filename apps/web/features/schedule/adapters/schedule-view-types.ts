@@ -1,6 +1,7 @@
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
 import type { GanttFeature as KiboGanttFeature } from "@/components/kibo-ui/gantt";
 import type { Feature as KiboCalendarFeature } from "@/components/kibo-ui/calendar";
+import { formatDateAr } from "@/lib/gantt-date-format";
 
 /** Adapter shapes aligned with Kibo UI Gantt/Calendar/Kanban (ADR-007). */
 export type GanttFeature = KiboGanttFeature;
@@ -14,6 +15,8 @@ export type KanbanCard = {
   endAt?: Date | null;
   badges: string[];
 };
+
+export const CONTAINER_COLOR = "#475569";
 
 const STATUS_COLORS: Record<string, string> = {
   PLANNED: "#94a3b8",
@@ -36,6 +39,13 @@ function parseItemDate(iso: string | null, fallback: Date): Date {
   return new Date(`${iso}T12:00:00.000Z`);
 }
 
+export function scheduleItemHasActiveChildren(
+  items: ScheduleWorkspaceItemDto[],
+  itemId: string,
+): boolean {
+  return items.some((i) => i.parentId === itemId && i.status !== "CANCELLED");
+}
+
 export function scheduleItemTreeDepth(
   items: ScheduleWorkspaceItemDto[],
   itemId: string,
@@ -50,10 +60,33 @@ export function scheduleItemTreeDepth(
   return depth;
 }
 
+export function countScheduleItemsWithoutDates(items: ScheduleWorkspaceItemDto[]): {
+  containersWithoutDates: number;
+  leavesWithoutDates: number;
+} {
+  let containersWithoutDates = 0;
+  let leavesWithoutDates = 0;
+
+  for (const item of items) {
+    if (item.status === "CANCELLED") continue;
+    const hasDates = Boolean(item.startDate && item.endDate);
+    if (hasDates) continue;
+
+    if (scheduleItemHasActiveChildren(items, item.id)) {
+      containersWithoutDates += 1;
+    } else {
+      leavesWithoutDates += 1;
+    }
+  }
+
+  return { containersWithoutDates, leavesWithoutDates };
+}
+
 export function mapItemToGanttFeature(
   item: ScheduleWorkspaceItemDto,
   fallbackStart: Date,
   fallbackEnd: Date,
+  isSummary = false,
 ): GanttFeature | null {
   if (item.type === "MILESTONE") {
     const dateIso = item.endDate ?? item.startDate;
@@ -84,9 +117,9 @@ export function mapItemToGanttFeature(
     startAt,
     endAt,
     status: {
-      id: item.status,
-      name: STATUS_LABELS[item.status] ?? item.status,
-      color: STATUS_COLORS[item.status] ?? "#64748b",
+      id: isSummary ? "SUMMARY" : item.status,
+      name: isSummary ? "Contenedor" : (STATUS_LABELS[item.status] ?? item.status),
+      color: isSummary ? CONTAINER_COLOR : (STATUS_COLORS[item.status] ?? "#64748b"),
     },
     lane: item.parentId ?? undefined,
   };
@@ -125,7 +158,8 @@ export function mapScheduleItemsToGanttEntries(
 ): ScheduleGanttEntry[] {
   const entries: ScheduleGanttEntry[] = [];
   for (const item of items) {
-    const feature = mapItemToGanttFeature(item, fallbackStart, fallbackEnd);
+    const isSummary = scheduleItemHasActiveChildren(items, item.id);
+    const feature = mapItemToGanttFeature(item, fallbackStart, fallbackEnd, isSummary);
     if (feature) entries.push({ item, feature });
   }
   return entries;
@@ -146,6 +180,9 @@ export function primaryWbsLink(item: ScheduleWorkspaceItemDto) {
 
 export function mapItemToKanbanCard(item: ScheduleWorkspaceItemDto): KanbanCard {
   const badges: string[] = [];
+  if (item.startDate && item.endDate) {
+    badges.push(`${formatDateAr(item.startDate)} → ${formatDateAr(item.endDate)}`);
+  }
   if (item.daysLate) badges.push(`Atrasado ${item.daysLate}d`);
   if (item.metrics?.overBudget) badges.push("Sobre presupuesto");
   const primary = primaryWbsLink(item);

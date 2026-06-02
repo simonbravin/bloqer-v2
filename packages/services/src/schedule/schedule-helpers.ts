@@ -4,6 +4,117 @@ import { ServiceError } from "../types";
 
 const MS_PER_DAY = 86_400_000;
 
+export type RollupScheduleItemInput = {
+  id: string;
+  parentId: string | null;
+  status: ScheduleItemStatus;
+  startDate: Date | null;
+  endDate: Date | null;
+};
+
+export type ContainerRollupDates = {
+  startDate: Date;
+  endDate: Date;
+  durationDays: number;
+};
+
+/** True when the item has at least one non-CANCELLED child. */
+export function scheduleItemHasActiveChildren(
+  items: Array<{ id: string; parentId: string | null; status: ScheduleItemStatus | string }>,
+  itemId: string,
+): boolean {
+  return items.some((i) => i.parentId === itemId && i.status !== "CANCELLED");
+}
+
+/** Leaf = no active (non-CANCELLED) children. Used for KPI avance/atraso. */
+export function isScheduleLeafItem(
+  items: Array<{ id: string; parentId: string | null; status: ScheduleItemStatus | string }>,
+  itemId: string,
+): boolean {
+  return !scheduleItemHasActiveChildren(items, itemId);
+}
+
+/** Had child rows but none active — former summary task with possibly stale rollup dates. */
+export function isFormerScheduleContainer(
+  items: Array<{ id: string; parentId: string | null; status: ScheduleItemStatus | string }>,
+  itemId: string,
+): boolean {
+  if (scheduleItemHasActiveChildren(items, itemId)) return false;
+  return items.some((i) => i.parentId === itemId);
+}
+
+function collectLeafDatesUnder(
+  items: RollupScheduleItemInput[],
+  nodeId: string,
+): Array<{ startDate: Date; endDate: Date }> {
+  const node = items.find((i) => i.id === nodeId);
+  if (!node || node.status === "CANCELLED") return [];
+
+  const activeChildren = items.filter(
+    (i) => i.parentId === nodeId && i.status !== "CANCELLED",
+  );
+
+  if (activeChildren.length === 0) {
+    if (node.startDate && node.endDate) {
+      return [{ startDate: node.startDate, endDate: node.endDate }];
+    }
+    return [];
+  }
+
+  return activeChildren.flatMap((child) => collectLeafDatesUnder(items, child.id));
+}
+
+/** Bottom-up rollup: container dates = min/max of leaf descendant dates (excludes CANCELLED). */
+export function computeContainerRollup(
+  items: RollupScheduleItemInput[],
+): Map<string, ContainerRollupDates | null> {
+  const result = new Map<string, ContainerRollupDates | null>();
+  const containerIds = items
+    .filter((i) => scheduleItemHasActiveChildren(items, i.id))
+    .map((i) => i.id);
+
+  const depthOf = (id: string): number => {
+    let depth = 0;
+    let current = items.find((i) => i.id === id);
+    while (current?.parentId) {
+      depth += 1;
+      current = items.find((i) => i.id === current!.parentId);
+    }
+    return depth;
+  };
+
+  const sorted = [...containerIds].sort((a, b) => depthOf(b) - depthOf(a));
+
+  for (const containerId of sorted) {
+    const activeChildren = items.filter(
+      (i) => i.parentId === containerId && i.status !== "CANCELLED",
+    );
+    const leafDates = activeChildren.flatMap((child) =>
+      collectLeafDatesUnder(items, child.id),
+    );
+
+    if (leafDates.length === 0) {
+      result.set(containerId, null);
+      continue;
+    }
+
+    let minStart = leafDates[0]!.startDate;
+    let maxEnd = leafDates[0]!.endDate;
+    for (const { startDate, endDate } of leafDates) {
+      if (startDate < minStart) minStart = startDate;
+      if (endDate > maxEnd) maxEnd = endDate;
+    }
+
+    result.set(containerId, {
+      startDate: minStart,
+      endDate: maxEnd,
+      durationDays: daysBetween(minStart, maxEnd),
+    });
+  }
+
+  return result;
+}
+
 export function parseDateOnly(iso: string): Date {
   const d = new Date(`${iso}T12:00:00.000Z`);
   if (Number.isNaN(d.getTime())) {

@@ -590,6 +590,21 @@
 
 ---
 
+### D-046 — Import WBS sin fechas por defecto y rollup de contenedores
+
+- **Fecha:** 2026-06-02
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (plan Gantt / armar cronograma desde cero)
+- **Decisión:**
+  1. Importar WBS al cronograma crea **estructura sin fechas** por defecto (`placeholderDates` opt-in).
+  2. Si el usuario activa *fechas estimadas de borrador*, se reparte el rango del proyecto entre **hermanos** WBS (secuencial por `sortOrder`); **no** respeta auto-programación FS en v1.
+  3. Ítems contenedor (con hijos activos) tienen fechas **derivadas** (min/max de hojas descendientes no canceladas) vía rollup; no son editables manualmente.
+  4. KPI de avance y atraso del cronograma ponderan solo **hojas** (ítems sin hijos activos), no contenedores.
+- **Implicancias:** `computeContainerRollup` / `rollupScheduleContainersForProject` en services; Gantt sidebar lista toda la estructura.
+- **Documentos afectados:** [`02-modules/PROJECT_SCHEDULING.md`](../02-modules/PROJECT_SCHEDULING.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

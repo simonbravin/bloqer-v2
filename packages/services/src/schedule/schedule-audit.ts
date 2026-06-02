@@ -9,6 +9,7 @@ export const SCHEDULE_ENTITY = "Schedule";
 export const SCHEDULE_AUDIT_ACTIONS = [
   "schedule.created",
   "schedule.imported_from_budget",
+  "schedule.containers_rollup",
   "schedule_item.created",
   "schedule_item.name_updated",
   "schedule_item.dates_updated",
@@ -46,17 +47,21 @@ export async function auditSchedule(
   entityId: string,
   before?: Prisma.InputJsonValue,
   after?: Prisma.InputJsonValue,
+  tx?: Prisma.TransactionClient,
 ) {
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action,
-    entityType,
-    entityId,
-    before,
-    after,
-    ipAddress: ctx.ipAddress ?? null,
-  });
+  await log(
+    {
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action,
+      entityType,
+      entityId,
+      before,
+      after,
+      ipAddress: ctx.ipAddress ?? null,
+    },
+    tx,
+  );
 }
 
 export function scheduleItemSnapshot(item: {
@@ -101,6 +106,7 @@ const ACTION_LABELS: Record<string, string> = {
   "schedule_dependency.added": "Dependencia agregada",
   "schedule_dependency.removed": "Dependencia eliminada",
   "schedule.imported_from_budget": "Importación desde presupuesto",
+  "schedule.containers_rollup": "Fechas de contenedores recalculadas",
 };
 
 function summarizeEntry(action: string, after: unknown, before: unknown): string {
