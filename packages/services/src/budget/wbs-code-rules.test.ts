@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  compareWbsCodes,
   detectImportProfile,
   inferImportNodeType,
   isStructuralLeafByCode,
@@ -92,5 +93,19 @@ describe("reconcileImportRowTypes", () => {
     const rows = reconcileImportRowTypes([{ code: "ARQ", type: "ITEM", name: "Arq" }], "multi_discipline");
     assert.equal(rows[0]?.type, "GROUP");
     assert.equal(inferImportNodeType("ARQ", new Set(["ARQ"]), "multi_discipline"), "GROUP");
+  });
+});
+
+describe("compareWbsCodes", () => {
+  it("ordena segmentos numéricos de forma natural", () => {
+    const codes = ["10.1", "11.1", "1.8", "1.9", "2.2", "2.1"];
+    codes.sort(compareWbsCodes);
+    assert.deepEqual(codes, ["1.8", "1.9", "2.1", "2.2", "10.1", "11.1"]);
+  });
+
+  it("ordena prefijos de rubro antes de comparar números", () => {
+    const codes = ["EST.2.1", "ARQ.1.8", "ARQ.2.1"];
+    codes.sort(compareWbsCodes);
+    assert.deepEqual(codes, ["ARQ.1.8", "ARQ.2.1", "EST.2.1"]);
   });
 });

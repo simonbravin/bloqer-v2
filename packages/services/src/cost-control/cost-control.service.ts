@@ -5,6 +5,7 @@ import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenan
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
+import { compareWbsCodes } from "../budget/wbs-code-rules";
 
 export { canViewProjectCostControlReport };
 
@@ -279,8 +280,8 @@ export async function getProjectCostControl(
       } : {}),
     },
     include: { costItem: true },
-    orderBy: { code: "asc" },
   });
+  wbsNodes.sort((a, b) => compareWbsCodes(a.code, b.code));
 
   const wbsNodeIds = new Set(wbsNodes.map((n) => n.id));
 

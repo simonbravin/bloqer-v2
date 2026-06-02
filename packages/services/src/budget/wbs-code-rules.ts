@@ -179,6 +179,33 @@ export function parentCodeFrom(canonicalCode: string): string | undefined {
   return canonicalCode.slice(0, idx);
 }
 
+/** Natural sort for WBS codes (1.8 before 2.1 before 10.1). */
+export function compareWbsCodes(a: string, b: string): number {
+  const segA = a.split(".");
+  const segB = b.split(".");
+  const len = Math.max(segA.length, segB.length);
+
+  for (let i = 0; i < len; i++) {
+    const sa = segA[i];
+    const sb = segB[i];
+    if (sa === undefined) return -1;
+    if (sb === undefined) return 1;
+
+    const na = /^\d+$/.test(sa) ? Number.parseInt(sa, 10) : Number.NaN;
+    const nb = /^\d+$/.test(sb) ? Number.parseInt(sb, 10) : Number.NaN;
+
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) {
+      if (na !== nb) return na - nb;
+      continue;
+    }
+
+    const cmp = sa.localeCompare(sb, "es", { sensitivity: "base" });
+    if (cmp !== 0) return cmp;
+  }
+
+  return 0;
+}
+
 export function detectProfileFromImportRows(
   rows: ReadonlyArray<{ code: string }>,
 ): WbsImportProfile {

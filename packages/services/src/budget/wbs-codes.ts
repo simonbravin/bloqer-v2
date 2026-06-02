@@ -9,6 +9,7 @@ import {
 
 export {
   countCodeSegments,
+  compareWbsCodes,
   isMultiStyleCode,
   isDisciplineRootCode,
   WBS_MAX_CODE_SEGMENTS_SIMPLE,
