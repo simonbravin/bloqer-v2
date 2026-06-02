@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { AgingReport, AgingRow, AgingItem } from "@bloqer/services";
 import { formatCurrencyDisplay, formatDate } from "@/lib/format";
-import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { formatDecimalAr } from "@/lib/format-money";
 import {
   Table,
   TableBody,
@@ -21,10 +21,8 @@ interface Props {
 }
 
 function formatAmount(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
+  const n = Number(value);
+  return formatDecimalAr(Number.isFinite(n) ? n : 0);
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -145,14 +143,14 @@ export function AgingTable({ report }: Props) {
   }
 
   if (report.rows.length === 0) {
-    return <ListEmptyState message="No hay saldos pendientes con los filtros actuales." />;
+    return null;
   }
 
   const t = report.totals;
 
   return (
     <div className="space-y-0">
-    <TableScroll>
+      <TableScroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -191,7 +189,7 @@ export function AgingTable({ report }: Props) {
             </TableRow>
           </TableFooter>
         </Table>
-    </TableScroll>
+      </TableScroll>
 
       {Object.keys(report.byCurrency).length > 1 && (
         <div className="border-t px-4 py-3 flex flex-wrap gap-4 text-xs text-muted-foreground">

@@ -23,6 +23,8 @@ export interface KpiStatCardProps {
   /** Explanatory helper below the value. */
   helper?: string;
   variant?: "default" | "highlight";
+  /** Shorter cards for dense dashboards (e.g. aging buckets). */
+  compact?: boolean;
   className?: string;
 }
 
@@ -34,26 +36,39 @@ export function KpiStatCard({
   subtitle,
   helper,
   variant = "default",
+  compact = false,
   className,
 }: KpiStatCardProps) {
   const inner = (
     <Card
       className={cn(
-        "flex h-full min-h-[8.5rem] flex-col rounded-xl border border-border bg-card shadow-sm transition-shadow duration-200",
+        "flex h-full flex-col rounded-xl border border-border bg-card shadow-sm transition-shadow duration-200",
+        compact ? "min-h-[4.75rem]" : "min-h-[8.5rem]",
         variant === "highlight" && "border-primary/30 bg-primary/5",
         className,
       )}
     >
-      <CardHeader className="flex-none space-y-0 pb-0 pt-5">
-        <CardTitle className="min-h-[2.5rem] text-sm font-medium leading-snug text-muted-foreground line-clamp-2">
+      <CardHeader className={cn("flex-none space-y-0 pb-0", compact ? "pt-3" : "pt-5")}>
+        <CardTitle
+          className={cn(
+            "font-medium leading-snug text-muted-foreground line-clamp-2",
+            compact ? "min-h-0 text-xs" : "min-h-[2.5rem] text-sm",
+          )}
+        >
           {label}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col justify-end space-y-1 pb-5 pt-3">
+      <CardContent
+        className={cn(
+          "flex flex-1 flex-col justify-end space-y-1",
+          compact ? "pb-3 pt-1.5" : "pb-5 pt-3",
+        )}
+      >
         <p
           className={cn(
-            getKpiValueSizeClass(value),
-            "break-all font-semibold tabular-nums leading-none tracking-tight",
+            getKpiValueSizeClass(value, { compact }),
+            "w-full min-w-0 font-semibold tabular-nums leading-tight tracking-tight",
+            !compact && "break-all",
             toneValueClass[tone],
           )}
         >
