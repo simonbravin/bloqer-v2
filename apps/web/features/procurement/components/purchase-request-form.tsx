@@ -36,9 +36,10 @@ export function PurchaseRequestForm({ projectId, wbsOptions }: PurchaseRequestFo
   );
 
   return (
-    <form
-      className="space-y-4 max-w-xl"
-      action={(fd) => {
+    <div className="rounded-lg border bg-card p-6">
+      <form
+        className="space-y-5"
+        action={(fd) => {
         startTransition(async () => {
           setError(null);
           const result = await createPurchaseRequestAction(projectId, {
@@ -65,7 +66,9 @@ export function PurchaseRequestForm({ projectId, wbsOptions }: PurchaseRequestFo
         });
       }}
     >
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="description">Descripción</Label>
@@ -111,5 +114,6 @@ export function PurchaseRequestForm({ projectId, wbsOptions }: PurchaseRequestFo
         {pending ? "Guardando…" : "Crear solicitud"}
       </Button>
     </form>
+    </div>
   );
 }
