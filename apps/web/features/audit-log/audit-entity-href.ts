@@ -73,6 +73,8 @@ export function buildAuditEntityHref(
       return `/proyectos/${entityId}`;
     case "PurchaseOrder":
       return projectId ? `/proyectos/${projectId}/ordenes-compra/${entityId}` : null;
+    case "PurchaseRequest":
+      return projectId ? `/proyectos/${projectId}/solicitudes-compra/${entityId}` : null;
     case "PurchaseReceipt":
       return projectId ? `/proyectos/${projectId}/ordenes-compra` : null;
     case "Budget":

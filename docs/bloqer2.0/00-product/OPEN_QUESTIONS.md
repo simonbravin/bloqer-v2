@@ -215,14 +215,10 @@
 ### Q-017 — Umbrales de aprobación de OC
 
 - **Categoría:** Compras
-- **Estado:** ABIERTA
-- **Impacto:** define si hay flujo de 4 ojos automático.
-- **Opciones:**
-  1. Sin umbral: cualquiera con permiso APPROVE puede aprobar cualquier OC.
-  2. Umbral configurable por empresa: OCs sobre cierto monto requieren aprobación de Admin/Owner.
-  3. Workflow multinivel (Fase 2).
-- **Recomendación:** opción 2 desde Fase 1.
-- **Bloquea:** [`02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md`](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [`01-domain/APPROVAL_WORKFLOWS.md`](../01-domain/APPROVAL_WORKFLOWS.md).
+- **Estado:** CERRADA — ver [D-044](./DECISION_LOG.md#d-044--solicitud-de-compra-cotizaciones-y-flujo-de-oc)
+- **Decisión (Fase 1):** umbral configurable por empresa en `CompanyProcurementSettings.poApprovalThresholdArs`; OCs en ARS ≥ umbral requieren aprobador OWNER/ADMIN o varianza `EXTRA_APPROVAL`; workflow multinivel queda para Fase 2.
+- **Implementación:** `packages/services/src/procurement/purchase-order-workflow.service.ts`, UI `/configuracion/compras`.
+- **Documentos:** [`02-modules/PURCHASE_REQUESTS.md`](../02-modules/PURCHASE_REQUESTS.md), [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) [BR-PUR-008]–[BR-APR-005].
 
 ### Q-018 — Configuración del método de valuación de stock por depósito
 

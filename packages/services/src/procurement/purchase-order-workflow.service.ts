@@ -1,0 +1,321 @@
+import { Prisma, prisma, PurchaseOrderStatus } from "@bloqer/database";
+import { can } from "@bloqer/domain";
+import { auditProcurement } from "./procurement-audit";
+import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { ServiceContext, ServiceError } from "../types";
+import { recalcPurchaseOrderTotals } from "./purchase-order-calc.service";
+import {
+  canApprovePurchaseOrders,
+  canEditPurchaseOrders,
+} from "./procurement-access";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
+import {
+  assertHighLevelApprover,
+  assertSelfApprovalAllowed,
+  assertStandardApprover,
+} from "./procurement-policy.service";
+import { evaluateLineVariance, poRequiresHighLevelApproval } from "./purchase-variance.service";
+import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
+import { onPurchaseOrderConfirmed } from "./purchase-request-to-po.service";
+import { notifyPurchaseOrderPendingApproval } from "./procurement-notifications.service";
+import type { PurchaseOrderView } from "./purchase-order.service";
+
+async function reloadPoView(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
+  const { getPurchaseOrderById } = await import("./purchase-order.service");
+  return getPurchaseOrderById(id, ctx);
+}
+
+const poInclude = {
+  supplierContact: { select: { legalName: true, fantasyName: true } },
+  purchaseRequest: { select: { requestedByUserId: true } },
+  lines: {
+    orderBy: { sortOrder: "asc" as const },
+    include: { wbsNode: { select: { code: true, name: true } } },
+  },
+};
+
+async function loadPo(id: string, tenantId: string) {
+  const po = await prisma.purchaseOrder.findUnique({ where: { id }, include: poInclude });
+  if (!po || po.tenantId !== tenantId) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
+  return po;
+}
+
+async function applyVarianceSnapshots(
+  tx: Prisma.TransactionClient,
+  purchaseOrderId: string,
+  settings: Awaited<ReturnType<typeof getCompanyProcurementSettingsForProject>>,
+): Promise<{ requiresExtraApproval: boolean; requiresJustification: boolean }> {
+  const lines = await tx.purchaseOrderLine.findMany({
+    where: { purchaseOrderId },
+    include: { wbsNode: { select: { id: true } } },
+  });
+
+  let requiresExtraApproval = false;
+  let requiresJustification = false;
+
+  for (const line of lines) {
+    const result = evaluateLineVariance(
+      {
+        unit: line.unit,
+        unitPrice: line.unitPrice.toString(),
+        budgetUnitCost: line.budgetUnitCostSnapshot?.toString() ?? null,
+        budgetUnit: line.unit,
+        varianceJustification: line.varianceJustification,
+      },
+      settings,
+    );
+    if (result.requiresExtraApproval) requiresExtraApproval = true;
+    if (result.requiresJustification && !line.varianceJustification?.trim()) {
+      requiresJustification = true;
+    }
+    await tx.purchaseOrderLine.update({
+      where: { id: line.id },
+      data: {
+        variancePct: result.variancePct ? new Prisma.Decimal(result.variancePct) : null,
+        varianceTier: result.varianceTier,
+        varianceUnitMismatch: result.varianceUnitMismatch,
+      },
+    });
+  }
+
+  return { requiresExtraApproval, requiresJustification };
+}
+
+function resolveOriginUserId(po: {
+  originRequestedByUserId: string | null;
+  purchaseRequestId: string | null;
+  purchaseRequest: { requestedByUserId: string | null } | null;
+}): string | null {
+  return po.originRequestedByUserId ?? po.purchaseRequest?.requestedByUserId ?? null;
+}
+
+export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
+  await assertProcurementTenantModule(ctx);
+  if (!canEditPurchaseOrders(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para enviar órdenes de compra");
+  }
+
+  const existing = await loadPo(id, ctx.tenantId);
+  if (existing.status !== "DRAFT") {
+    throw new ServiceError("CONFLICT", "Solo se pueden enviar órdenes en borrador");
+  }
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+
+  const lineCount = await prisma.purchaseOrderLine.count({ where: { purchaseOrderId: id } });
+  if (lineCount === 0) throw new ServiceError("CONFLICT", "La orden debe tener al menos una línea");
+
+  const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
+
+  const submitResult = await prisma.$transaction(async (tx) => {
+    await recalcPurchaseOrderTotals(tx, id);
+    const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
+    if (po.totalAmount.lessThanOrEqualTo(0)) {
+      throw new ServiceError("CONFLICT", "El monto total debe ser mayor a cero");
+    }
+
+    const { requiresExtraApproval, requiresJustification } = await applyVarianceSnapshots(tx, id, settings);
+    if (requiresJustification) {
+      throw new ServiceError("CONFLICT", "Completá la justificación de desvío presupuestario en las líneas");
+    }
+
+    const fx = computeDocumentFxAmounts(po.currency, po.totalAmount, po.fxRate);
+    const totalArs = fx.amountArs;
+    const highLevel = poRequiresHighLevelApproval(totalArs, settings) || requiresExtraApproval;
+
+    let nextStatus: PurchaseOrderStatus = "SUBMITTED";
+    let approvedBy: string | null = null;
+    let approvedAt: Date | null = null;
+
+    if (!highLevel) {
+      assertStandardApprover(ctx.roles);
+      const originId = resolveOriginUserId(existing);
+      assertSelfApprovalAllowed(settings, originId, ctx.actorUserId, false, false);
+      nextStatus = "APPROVED";
+      approvedBy = ctx.actorUserId ?? null;
+      approvedAt = new Date();
+    }
+
+    await tx.purchaseOrder.update({
+      where: { id },
+      data: {
+        status: nextStatus,
+        fxRate: fx.fxRate,
+        totalAmountArs: totalArs,
+        approvedByUserId: approvedBy,
+        approvedAt,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+
+    await auditProcurement(
+      ctx,
+      "purchase_order.submitted",
+      "PurchaseOrder",
+      id,
+      { projectId: po.projectId, companyId: po.companyId },
+      { after: { status: nextStatus }, tx },
+    );
+    if (nextStatus === "APPROVED") {
+      await auditProcurement(
+        ctx,
+        "purchase_order.approved",
+        "PurchaseOrder",
+        id,
+        { projectId: po.projectId, companyId: po.companyId },
+        { after: { autoApproved: true }, tx },
+      );
+    }
+
+    return {
+      nextStatus,
+      requiresExtraApproval,
+      totalArs,
+      projectId: po.projectId,
+      companyId: po.companyId,
+      number: po.number,
+    };
+  });
+
+  if (submitResult.nextStatus === "SUBMITTED") {
+    const highLevel =
+      poRequiresHighLevelApproval(submitResult.totalArs, settings) ||
+      submitResult.requiresExtraApproval;
+    await notifyPurchaseOrderPendingApproval({
+      ctx,
+      purchaseOrderId: id,
+      projectId: submitResult.projectId,
+      companyId: submitResult.companyId,
+      code: `OC-${String(submitResult.number).padStart(3, "0")}`,
+      requiresHighLevel: highLevel,
+      requiresVarianceExtra: submitResult.requiresExtraApproval,
+    });
+  }
+
+  return reloadPoView(id, ctx);
+}
+
+export async function approvePurchaseOrder(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
+  await assertProcurementTenantModule(ctx);
+  if (!canApprovePurchaseOrders(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para aprobar órdenes de compra");
+  }
+
+  const existing = await prisma.purchaseOrder.findUnique({
+    where: { id },
+    include: { purchaseRequest: { select: { requestedByUserId: true } } },
+  });
+  if (!existing || existing.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
+  }
+  if (existing.status !== "SUBMITTED") {
+    throw new ServiceError("CONFLICT", "La orden no está pendiente de aprobación");
+  }
+
+  const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
+
+  await prisma.$transaction(async (tx) => {
+    const { requiresExtraApproval } = await applyVarianceSnapshots(tx, id, settings);
+    const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
+    const highLevel =
+      poRequiresHighLevelApproval(po.totalAmountArs, settings) || requiresExtraApproval;
+
+    if (highLevel) {
+      assertHighLevelApprover(ctx.roles, true, requiresExtraApproval);
+    } else {
+      assertStandardApprover(ctx.roles);
+    }
+
+    const originId = resolveOriginUserId({
+      ...existing,
+      purchaseRequest: existing.purchaseRequest,
+    });
+    assertSelfApprovalAllowed(settings, originId, ctx.actorUserId, requiresExtraApproval, highLevel);
+
+    await tx.purchaseOrder.update({
+      where: { id },
+      data: {
+        status: "APPROVED",
+        approvedByUserId: ctx.actorUserId,
+        approvedAt: new Date(),
+        updatedBy: ctx.actorUserId,
+      },
+    });
+
+    await auditProcurement(
+      ctx,
+      "purchase_order.approved",
+      "PurchaseOrder",
+      id,
+      { projectId: po.projectId, companyId: po.companyId },
+      { tx },
+    );
+  });
+
+  return reloadPoView(id, ctx);
+}
+
+export async function confirmPurchaseOrder(
+  id: string,
+  ctx: ServiceContext,
+  options?: { fxRate?: string },
+): Promise<PurchaseOrderView> {
+  await assertProcurementTenantModule(ctx);
+  if (!canEditPurchaseOrders(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para confirmar órdenes al proveedor");
+  }
+
+  const existing = await prisma.purchaseOrder.findUnique({ where: { id } });
+  if (!existing || existing.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
+  }
+  if (existing.status !== "APPROVED") {
+    throw new ServiceError("CONFLICT", "La orden debe estar aprobada antes de confirmar al proveedor");
+  }
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+
+  await prisma.$transaction(async (tx) => {
+    await recalcPurchaseOrderTotals(tx, id);
+    const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
+    const fx = computeDocumentFxAmounts(
+      po.currency,
+      po.totalAmount,
+      options?.fxRate ? new Prisma.Decimal(options.fxRate) : po.fxRate,
+    );
+
+    await tx.purchaseOrder.update({
+      where: { id },
+      data: {
+        status: "CONFIRMED",
+        fxRate: fx.fxRate,
+        totalAmountArs: fx.amountArs,
+        confirmedByUserId: ctx.actorUserId,
+        confirmedAt: new Date(),
+        updatedBy: ctx.actorUserId,
+      },
+    });
+
+    await onPurchaseOrderConfirmed(id, ctx, tx);
+
+    await auditProcurement(
+      ctx,
+      "purchase_order.confirmed",
+      "PurchaseOrder",
+      id,
+      { projectId: po.projectId, companyId: po.companyId },
+      { after: { totalAmountArs: fx.amountArs.toString() }, tx },
+    );
+  });
+
+  return reloadPoView(id, ctx);
+}
+
+/** @deprecated Use submit → approve → confirm. Kept for existing UI actions. */
+export async function issuePurchaseOrder(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
+  await submitPurchaseOrder(id, ctx);
+  const po = await prisma.purchaseOrder.findUnique({ where: { id } });
+  if (po?.status === "SUBMITTED") {
+    await approvePurchaseOrder(id, ctx);
+  }
+  return confirmPurchaseOrder(id, ctx);
+}

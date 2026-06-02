@@ -1,5 +1,6 @@
 import { Prisma, prisma, PurchaseReceipt, PurchaseReceiptStatus, PurchaseOrderStatus } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { canEditPurchaseReceipts } from "./procurement-access";
+import { PO_RECEIPT_ELIGIBLE_STATUSES } from "./procurement-constants";
 import type { CreatePurchaseReceiptInput } from "@bloqer/validators";
 import { auditProcurement } from "./procurement-audit";
 import { createReceiptStockMovement, cancelReceiptStockMovements } from "../inventory/stock-movement.service";
@@ -78,7 +79,7 @@ async function recomputePOStatus(tx: TxClient, purchaseOrderId: string): Promise
     ? PurchaseOrderStatus.RECEIVED
     : anyReceived
       ? PurchaseOrderStatus.PARTIALLY_RECEIVED
-      : PurchaseOrderStatus.ISSUED;
+      : PurchaseOrderStatus.CONFIRMED;
 
   await tx.purchaseOrder.update({ where: { id: purchaseOrderId }, data: { status: newStatus } });
 }
@@ -143,7 +144,7 @@ export async function createPurchaseReceipt(
   ctx: ServiceContext,
 ): Promise<PurchaseReceiptView> {
   await assertProcurementTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "PROCUREMENT")) {
+  if (!canEditPurchaseReceipts(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear recepciones");
   }
 
@@ -155,8 +156,8 @@ export async function createPurchaseReceipt(
   if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await assertProjectAllowsOperationalMutation(po.projectId, ctx.tenantId);
 
-  // BR-PUR-004: receipt only allowed on ISSUED / PARTIALLY_RECEIVED / RECEIVED
-  if (!["ISSUED", "PARTIALLY_RECEIVED", "RECEIVED"].includes(po.status)) {
+  // BR-PUR-004: receipt only allowed on CONFIRMED+
+  if (!PO_RECEIPT_ELIGIBLE_STATUSES.includes(po.status as (typeof PO_RECEIPT_ELIGIBLE_STATUSES)[number])) {
     throw new ServiceError(
       "CONFLICT",
       `No se puede registrar recepción en una orden con estado "${po.status}". Primero emita la orden.`,
@@ -227,7 +228,7 @@ export async function createPurchaseReceipt(
 
 export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): Promise<PurchaseReceiptView> {
   await assertProcurementTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "PROCUREMENT")) {
+  if (!canEditPurchaseReceipts(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para confirmar recepciones");
   }
 
@@ -305,7 +306,7 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
 
 export async function cancelPurchaseReceipt(id: string, ctx: ServiceContext): Promise<PurchaseReceiptView> {
   await assertProcurementTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "PROCUREMENT")) {
+  if (!canEditPurchaseReceipts(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para anular recepciones");
   }
 

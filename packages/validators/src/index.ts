@@ -6,6 +6,8 @@ export * from "./sales-invoice";
 export * from "./treasury";
 export * from "./ap";
 export * from "./procurement";
+export * from "./purchase-request";
+export * from "./company-procurement-settings";
 export * from "./inventory";
 export * from "./subcontracts";
 export * from "./jobsite-log";

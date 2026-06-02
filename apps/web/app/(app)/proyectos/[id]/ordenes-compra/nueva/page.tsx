@@ -2,7 +2,14 @@ import { redirect } from "next/navigation";
 import { PurchaseOrderForm } from "@/features/procurement";
 import type { SupplierOption, WbsOption, ProductOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
-import { listContacts, listProcurementWbsOptions, listProducts } from "@bloqer/services";
+import {
+  canEditPurchaseOrders,
+  listContacts,
+  listProcurementWbsOptions,
+  listProducts,
+  ServiceError,
+} from "@bloqer/services";
+import { notFound } from "next/navigation";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
 
@@ -13,6 +20,7 @@ interface PageProps {
 export default async function NuevaOrdenCompraPage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
+  if (!canEditPurchaseOrders(current.tenantCtx.roles)) redirect("/dashboard");
 
   const { id } = await params;
   const ctx = {
@@ -22,11 +30,18 @@ export default async function NuevaOrdenCompraPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
-  const [suppliersResult, wbsNodes, productsResult] = await Promise.all([
-    listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
-    listProcurementWbsOptions(id, ctx),
-    listProducts({ status: "ACTIVE" }, ctx),
-  ]);
+  let suppliersResult, wbsNodes, productsResult;
+  try {
+    [suppliersResult, wbsNodes, productsResult] = await Promise.all([
+      listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
+      listProcurementWbsOptions(id, ctx),
+      listProducts({ status: "ACTIVE" }, ctx),
+    ]);
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    throw err;
+  }
   const products = productsResult.data;
 
   const suppliers: SupplierOption[] = suppliersResult.data.map((c) => ({

@@ -8,7 +8,12 @@ import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { PurchaseOrderListSection } from "@/features/procurement/components/purchase-order-list-section";
 import type { PurchaseOrderListItem } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
-import { getProjectShellInfo, listPurchaseOrdersByProject, ServiceError } from "@bloqer/services";
+import {
+  canEditPurchaseOrders,
+  getProjectShellInfo,
+  listPurchaseOrdersByProject,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
@@ -41,8 +46,11 @@ export default async function OrdenesCompraPage({ params }: PageProps) {
     orders = await listPurchaseOrdersByProject(id, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
+
+  const canCreatePo = canEditPurchaseOrders(current.tenantCtx.roles);
 
   const items: PurchaseOrderListItem[] = orders.map((o) => ({
     id: o.id,
@@ -67,9 +75,14 @@ export default async function OrdenesCompraPage({ params }: PageProps) {
             <Suspense fallback={null}>
               <ListViewToggle storageKey={`ordenes-compra-${id}`} />
             </Suspense>
-            <Button asChild>
-              <Link href={`/proyectos/${id}/ordenes-compra/nueva`}>Nueva OC</Link>
+            <Button asChild variant="outline">
+              <Link href={`/proyectos/${id}/solicitudes-compra`}>Solicitudes</Link>
             </Button>
+            {canCreatePo && (
+              <Button asChild>
+                <Link href={`/proyectos/${id}/ordenes-compra/nueva`}>Nueva OC</Link>
+              </Button>
+            )}
           </>
         }
       />

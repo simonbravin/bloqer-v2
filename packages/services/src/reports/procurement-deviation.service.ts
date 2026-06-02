@@ -57,7 +57,7 @@ export type ProcurementReportEmpty = { type: "NO_APPROVED_BUDGETS" };
 
 export type ProcurementReportResult = ProcurementDeviationReport | ProcurementReportEmpty;
 
-const PO_COMMITTED_STATUSES = ["ISSUED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
+const PO_COMMITTED_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
 
 function budgetMaterialForItems(
   costItems: Array<{

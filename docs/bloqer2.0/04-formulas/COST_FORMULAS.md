@@ -16,13 +16,13 @@ Monto asociado a **compromisos firmes** aún **no necesariamente** devengados ni
 
 | Origen | Condición mínima en el modelo |
 |---|---|
-| **Purchase Order** | `APPROVED` o `CONFIRMED` (y no `CANCELLED`) |
+| **Purchase Order** | `CONFIRMED`, `PARTIALLY_RECEIVED` o `RECEIVED` (y no `CANCELLED`). Ver [D-044](../00-product/DECISION_LOG.md): el compromiso se reconoce al **confirmar al proveedor**, no en `SUBMITTED`/`APPROVED`. |
 | **Subcontract** | Estado que formaliza el compromiso contractual: **`ACTIVE`** en el ciclo actual (equivalente operativo a “aprobado/confirmado” para reporting) |
 | **Otros compromisos firmes** | Documentos/parametrización tenant que registren obligación firme aprobada (Fase 1: según catálogo explícito cuando exista) |
 
 **Excluye:**
 
-- OC en `DRAFT` / `SUBMITTED` (no firmes aún).
+- OC en `DRAFT`, `SUBMITTED` o `APPROVED` (aún no confirmada al proveedor).
 - OC / subcontratos `CANCELLED`.
 - **Internal transfers** (no son costo de proyecto).
 - Proyecciones o “forecast” **sin** documento aprobado.
@@ -126,6 +126,16 @@ Componentes imputados al ítem según la **vista activa** del toggle del reporte
 Positivo = **ahorro**; negativo = **sobrecosto**. La vista debe etiquetarse: *comprometido abierto*, *devengado*, *pagado* o *exposición esperada* según [D-021].
 
 **Precisión:** 2 decimales ARS.
+
+### 4.1 Varianza unitaria en líneas de OC ([D-044])
+
+Al enviar una OC, por cada línea con baseline APU (`budgetUnitCostSnapshot`):
+
+\[
+\text{variance\_pct} = \frac{\text{unitPrice} - \text{budgetUnitCost}}{\text{budgetUnitCost}} \times 100
+\]
+
+Tiers (umbrales en `CompanyProcurementSettings`): `NONE` &lt; soft %; `NOTE_REQUIRED` entre soft y extra %; `EXTRA_APPROVAL` ≥ extra %; casos especiales `UNIT_MISMATCH` y `NO_BUDGET_BASELINE`.
 
 ---
 

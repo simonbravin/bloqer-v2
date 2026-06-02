@@ -18,6 +18,7 @@ export const TENANT_MODULE_LABEL_ES: Record<PermissionModule, string> = {
   CERTIFICATIONS:                "Certificaciones",
   PROCUREMENT:                   "Compras",
   PURCHASE_ORDERS:               "Órdenes de compra",
+  PURCHASE_REQUESTS:             "Solicitudes de compra",
   SUBCONTRACTS:                  "Subcontratos",
   INVENTORY:                     "Inventario",
   WAREHOUSES:                    "Depósitos",

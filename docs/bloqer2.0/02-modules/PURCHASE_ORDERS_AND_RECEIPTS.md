@@ -57,7 +57,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § PurchaseOrder y Rec
 - **PROCUREMENT**, **INVENTORY**, **EXPENSES_AND_PAYMENTS** (factura).
 
 ## 16. Permisos
-PROCUREMENT crea; umbral oc superior requiere ADMIN ([Q-017]).
+PROCUREMENT crea; umbral OC superior requiere ADMIN/OWNER ([D-044], [Q-017] cerrada).
 
 ## 17. Eventos disparados / consumidos
 - `purchase_order.*`, `receipt.confirmed`, `receipt.cancelled`.

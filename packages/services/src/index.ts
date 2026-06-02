@@ -49,7 +49,20 @@ export * from "./ap/supplier-invoice.service";
 export * from "./ap/supplier-invoice-from-po.service";
 export * from "./ap/payable.service";
 export * from "./ap/payment.service";
-export { canViewProcurementProjectArea } from "./procurement/procurement-access";
+export {
+  canViewProcurementProjectArea,
+  canEditPurchaseRequests,
+  canEditPurchaseOrders,
+  canApprovePurchaseOrders,
+  canEditPurchaseReceipts,
+} from "./procurement/procurement-access";
+export * from "./procurement/company-procurement-settings.service";
+export * from "./procurement/purchase-request.service";
+export * from "./procurement/procurement-quote.service";
+export * from "./procurement/purchase-request-to-po.service";
+export * from "./procurement/purchase-order-workflow.service";
+export * from "./procurement/procurement-policy.service";
+export * from "./procurement/purchase-variance.service";
 export { canViewSubcontractsArea } from "./subcontracts/subcontract-access";
 export * from "./procurement/purchase-order.service";
 export * from "./procurement/purchase-receipt.service";

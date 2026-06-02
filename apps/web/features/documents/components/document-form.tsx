@@ -40,6 +40,8 @@ export type DocumentFormProps = {
     | { type: "SUPPLIER_INVOICE"; id: string }
     | { type: "PURCHASE_ORDER"; id: string }
     | { type: "PURCHASE_RECEIPT"; id: string }
+    | { type: "PURCHASE_REQUEST"; id: string }
+    | { type: "PROCUREMENT_QUOTE"; id: string }
     | { type: "SUBCONTRACT"; id: string }
     | { type: "SUBCONTRACT_CERTIFICATION"; id: string; subcontractId: string }
     | { type: "BUDGET"; id: string };

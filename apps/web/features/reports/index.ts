@@ -15,6 +15,7 @@ export { CertificationVsBudgetTable } from "./certification-vs-budget-table";
 export { ProcurementWbsDeviationTable } from "./procurement-wbs-deviation-table";
 export { ProcurementUnallocatedTable } from "./procurement-unallocated-table";
 export { ProcurementSupplierTable } from "./procurement-supplier-table";
+export { PurchaseOrderVarianceTable } from "./components/purchase-order-variance-table";
 export { MaterialWbsTable } from "./material-wbs-table";
 export { SubcontractWbsVarianceTable } from "./subcontract-wbs-variance-table";
 export { SubcontractContractsTable } from "./subcontract-contracts-table";

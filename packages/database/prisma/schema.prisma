@@ -298,15 +298,47 @@ enum PaymentStatus {
 
 // ─── Procurement ──────────────────────────────────────────────────────────────
 
-// BR-PUR-001: ISSUED PO commits cost (committed_amount layer).
-// BR-PUR-004: Receipt only allowed when PO is ISSUED or partially/fully received.
+// BR-PUR-001: CONFIRMED PO commits cost (committed_amount layer) — D-006.
+// BR-PUR-004: Receipt only when PO is CONFIRMED+ or partially/fully received.
 // PARTIALLY_RECEIVED / RECEIVED are computed — set only via receipt confirm/cancel.
 enum PurchaseOrderStatus {
   DRAFT
-  ISSUED
+  SUBMITTED
+  APPROVED
+  CONFIRMED
   PARTIALLY_RECEIVED
   RECEIVED
   CANCELLED
+}
+
+enum PurchaseRequestStatus {
+  DRAFT
+  SUBMITTED
+  QUOTE_SELECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum ProcurementQuoteStatus {
+  DRAFT
+  RECEIVED
+  SELECTED
+  REJECTED
+  SUPERSEDED
+}
+
+enum PurchaseRequestLineType {
+  MATERIAL
+  SERVICE
+  OTHER
+}
+
+enum PurchaseOrderVarianceTier {
+  NONE
+  NOTE_REQUIRED
+  EXTRA_APPROVAL
+  NO_BUDGET_BASELINE
+  UNIT_MISMATCH
 }
 
 // CONFIRMED receipt increments receivedQuantity on PO lines.
@@ -438,17 +470,17 @@ model User {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  accounts    Account[]
-  sessions    Session[]
-  memberships UserMembership[]
-  auditLogs   AuditLog[]
-  notificationsReceived Notification[] @relation("NotificationRecipient")
-  platformAdmin         PlatformAdmin?
-  platformAuditsPerformed PlatformAuditLog[] @relation("PlatformAuditActor")
-  invitationsSent       TenantInvitation[] @relation("TenantInvitationInvitedBy")
-  invitationsAccepted   TenantInvitation[] @relation("TenantInvitationAcceptedBy")
-  journalEntriesCreated  JournalEntry[]     @relation("JournalEntryCreatedBy")
-  journalEntriesUpdated  JournalEntry[]     @relation("JournalEntryUpdatedBy")
+  accounts                  Account[]
+  sessions                  Session[]
+  memberships               UserMembership[]
+  auditLogs                 AuditLog[]
+  notificationsReceived     Notification[]             @relation("NotificationRecipient")
+  platformAdmin             PlatformAdmin?
+  platformAuditsPerformed   PlatformAuditLog[]         @relation("PlatformAuditActor")
+  invitationsSent           TenantInvitation[]         @relation("TenantInvitationInvitedBy")
+  invitationsAccepted       TenantInvitation[]         @relation("TenantInvitationAcceptedBy")
+  journalEntriesCreated     JournalEntry[]             @relation("JournalEntryCreatedBy")
+  journalEntriesUpdated     JournalEntry[]             @relation("JournalEntryUpdatedBy")
   scheduledReportsCreated   ScheduledReport[]          @relation("ScheduledReportCreatedBy")
   scheduledReportRecipients ScheduledReportRecipient[] @relation("ScheduledReportRecipientUser")
 
@@ -502,64 +534,66 @@ model VerificationToken {
 // ─── Tenant & company ─────────────────────────────────────────────────────────
 
 model Tenant {
-  id           String       @id @default(uuid())
-  name         String
-  slug         String       @unique
-  status       TenantStatus @default(ACTIVE)
-  fiscalId     String?
-  timezone     String       @default("America/Argentina/Buenos_Aires")
-  baseCurrency String       @default("ARS")
+  id                    String             @id @default(uuid())
+  name                  String
+  slug                  String             @unique
+  status                TenantStatus       @default(ACTIVE)
+  fiscalId              String?
+  timezone              String             @default("America/Argentina/Buenos_Aires")
+  baseCurrency          String             @default("ARS")
   /// SaaS plan slug (internal); not a Stripe price id.
-  saasPlan                 String               @default("trial")
-  subscriptionStatus       SubscriptionStatus   @default(TRIAL)
-  trialEndsAt              DateTime?
-  billingCustomerId        String?              @db.VarChar(255)
-  suspendedReason          String?              @db.VarChar(512)
-  platformInternalNotes    String?
+  saasPlan              String             @default("trial")
+  subscriptionStatus    SubscriptionStatus @default(TRIAL)
+  trialEndsAt           DateTime?
+  billingCustomerId     String?            @db.VarChar(255)
+  suspendedReason       String?            @db.VarChar(512)
+  platformInternalNotes String?
   /// Internal notes for `/configuracion/permisos` (key = PermissionModule overview key). See ADR-Phase1-05.
-  permissionMatrixNotes    Json?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  permissionMatrixNotes Json?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
-  companies      Company[]
-  memberships    UserMembership[]
-  auditLogs      AuditLog[]
-  contacts       Contact[]
-  projects       Project[]
-  schedules      Schedule[]
-  budgets        Budget[]
-  certifications    Certification[]
-  salesInvoices     SalesInvoice[]
-  receivables       Receivable[]
-  treasuryAccounts  TreasuryAccount[]
-  accountMovements  AccountMovement[]
-  collections       Collection[]
-  internalTransfers InternalTransfer[]
-  supplierInvoices  SupplierInvoice[]
-  payables          Payable[]
-  payments          Payment[]
-  purchaseOrders    PurchaseOrder[]
-  purchaseReceipts  PurchaseReceipt[]
-  products          Product[]
-  warehouses        Warehouse[]
-  stockMovements    StockMovement[]
-  subcontracts      Subcontract[]
-  subcontractCertifications SubcontractCertification[]
-  jobsiteLogs           JobsiteLog[]
-  warehouseTransfers    WarehouseTransfer[]
-  documentAttachments   DocumentAttachment[]
-  notifications         Notification[]
-  emailDeliveryLogs     EmailDeliveryLog[]
-  platformAuditLogs     PlatformAuditLog[] @relation("PlatformAuditTargetTenant")
-  tenantInvitations     TenantInvitation[]
-  accountingAccounts    AccountingAccount[]
-  journalEntries        JournalEntry[]
-  accountingMappingRules AccountingMappingRule[]
-  tenantModuleSettings    TenantModuleSetting[]
-  projectOverheadAllocations   ProjectOverheadAllocation[]
-  overheadPeriodCloses         OverheadPeriodClose[]
-  overheadAutoPeriodSnapshots  OverheadAutoPeriodSnapshot[]
-  scheduledReports             ScheduledReport[]
+  companies                   Company[]
+  memberships                 UserMembership[]
+  auditLogs                   AuditLog[]
+  contacts                    Contact[]
+  projects                    Project[]
+  schedules                   Schedule[]
+  budgets                     Budget[]
+  certifications              Certification[]
+  salesInvoices               SalesInvoice[]
+  receivables                 Receivable[]
+  treasuryAccounts            TreasuryAccount[]
+  accountMovements            AccountMovement[]
+  collections                 Collection[]
+  internalTransfers           InternalTransfer[]
+  supplierInvoices            SupplierInvoice[]
+  payables                    Payable[]
+  payments                    Payment[]
+  purchaseOrders              PurchaseOrder[]
+  purchaseReceipts            PurchaseReceipt[]
+  purchaseRequests            PurchaseRequest[]
+  procurementQuotes           ProcurementQuote[]
+  products                    Product[]
+  warehouses                  Warehouse[]
+  stockMovements              StockMovement[]
+  subcontracts                Subcontract[]
+  subcontractCertifications   SubcontractCertification[]
+  jobsiteLogs                 JobsiteLog[]
+  warehouseTransfers          WarehouseTransfer[]
+  documentAttachments         DocumentAttachment[]
+  notifications               Notification[]
+  emailDeliveryLogs           EmailDeliveryLog[]
+  platformAuditLogs           PlatformAuditLog[]           @relation("PlatformAuditTargetTenant")
+  tenantInvitations           TenantInvitation[]
+  accountingAccounts          AccountingAccount[]
+  journalEntries              JournalEntry[]
+  accountingMappingRules      AccountingMappingRule[]
+  tenantModuleSettings        TenantModuleSetting[]
+  projectOverheadAllocations  ProjectOverheadAllocation[]
+  overheadPeriodCloses        OverheadPeriodClose[]
+  overheadAutoPeriodSnapshots OverheadAutoPeriodSnapshot[]
+  scheduledReports            ScheduledReport[]
 
   @@map("tenants")
 }
@@ -597,12 +631,12 @@ model PlatformAdmin {
 
 /// Cross-tenant platform actions (append-only).
 model PlatformAuditLog {
-  id               String   @id @default(uuid())
-  actorUserId      String
-  action           String   @db.VarChar(128)
-  targetTenantId   String?
-  metadata         Json?
-  createdAt        DateTime @default(now())
+  id             String   @id @default(uuid())
+  actorUserId    String
+  action         String   @db.VarChar(128)
+  targetTenantId String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
 
   actor        User    @relation("PlatformAuditActor", fields: [actorUserId], references: [id], onDelete: Cascade)
   targetTenant Tenant? @relation("PlatformAuditTargetTenant", fields: [targetTenantId], references: [id], onDelete: SetNull)
@@ -613,58 +647,60 @@ model PlatformAuditLog {
 }
 
 model Company {
-  id        String        @id @default(uuid())
-  tenantId  String
-  name      String
-  legalName String?
-  fiscalId  String?
+  id                     String                 @id @default(uuid())
+  tenantId               String
+  name                   String
+  legalName              String?
+  fiscalId               String?
   /// Street / postal address (tenant primary company; Phase 14A onboarding).
-  address     String?
-  city        String?
-  country     String  @default("AR")
-  phone       String?
-  website     String? @db.VarChar(512)
-  industry    String? @db.VarChar(128)
-  companySize String? @db.VarChar(64)
-  status    CompanyStatus @default(ACTIVE)
+  address                String?
+  city                   String?
+  country                String                 @default("AR")
+  phone                  String?
+  website                String?                @db.VarChar(512)
+  industry               String?                @db.VarChar(128)
+  companySize            String?                @db.VarChar(64)
+  status                 CompanyStatus          @default(ACTIVE)
   /// Q-013 opción 2: % sobre costo directo devengado (solo modo MANUAL).
-  overheadAllocationPct Decimal @default(0) @db.Decimal(8, 4)
+  overheadAllocationPct  Decimal                @default(0) @db.Decimal(8, 4)
   /// Q-013 opción 1+2 (MANUAL) vs opción 3 (AUTO_WEIGHT por peso de CD del período).
   overheadAllocationMode OverheadAllocationMode @default(MANUAL)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 
-  tenant         Tenant           @relation(fields: [tenantId], references: [id])
-  projectOverheadAllocations ProjectOverheadAllocation[]
-  overheadPeriodCloses       OverheadPeriodClose[]
+  tenant                      Tenant                       @relation(fields: [tenantId], references: [id])
+  projectOverheadAllocations  ProjectOverheadAllocation[]
+  overheadPeriodCloses        OverheadPeriodClose[]
   overheadAutoPeriodSnapshots OverheadAutoPeriodSnapshot[]
-  memberships    UserMembership[]
-  projects       Project[]
-  budgets        Budget[]
-  certifications    Certification[]
-  salesInvoices     SalesInvoice[]
-  receivables       Receivable[]
-  treasuryAccounts  TreasuryAccount[]
-  collections       Collection[]
-  internalTransfers InternalTransfer[]
-  supplierInvoices  SupplierInvoice[]
-  payables          Payable[]
-  payments          Payment[]
-  purchaseOrders    PurchaseOrder[]
-  purchaseReceipts  PurchaseReceipt[]
-  products          Product[]
-  warehouses        Warehouse[]
-  stockMovements    StockMovement[]
-  subcontracts      Subcontract[]
-  subcontractCertifications SubcontractCertification[]
-  jobsiteLogs           JobsiteLog[]
-  warehouseTransfers    WarehouseTransfer[]
-  tenantInvitations     TenantInvitation[]
-  accountingAccounts    AccountingAccount[]
-  journalEntries        JournalEntry[]
-  accountingMappingRules AccountingMappingRule[]
-  auditLogs             AuditLog[]
-  scheduledReports      ScheduledReport[]
+  memberships                 UserMembership[]
+  projects                    Project[]
+  budgets                     Budget[]
+  certifications              Certification[]
+  salesInvoices               SalesInvoice[]
+  receivables                 Receivable[]
+  treasuryAccounts            TreasuryAccount[]
+  collections                 Collection[]
+  internalTransfers           InternalTransfer[]
+  supplierInvoices            SupplierInvoice[]
+  payables                    Payable[]
+  payments                    Payment[]
+  purchaseOrders              PurchaseOrder[]
+  purchaseReceipts            PurchaseReceipt[]
+  purchaseRequests            PurchaseRequest[]
+  procurementSettings         CompanyProcurementSettings?
+  products                    Product[]
+  warehouses                  Warehouse[]
+  stockMovements              StockMovement[]
+  subcontracts                Subcontract[]
+  subcontractCertifications   SubcontractCertification[]
+  jobsiteLogs                 JobsiteLog[]
+  warehouseTransfers          WarehouseTransfer[]
+  tenantInvitations           TenantInvitation[]
+  accountingAccounts          AccountingAccount[]
+  journalEntries              JournalEntry[]
+  accountingMappingRules      AccountingMappingRule[]
+  auditLogs                   AuditLog[]
+  scheduledReports            ScheduledReport[]
 
   @@index([tenantId])
   @@map("companies")
@@ -696,20 +732,20 @@ model ProjectOverheadAllocation {
 
 /// D-043: control de cierre por período para AUTO_WEIGHT (pool + CD al momento del cierre).
 model OverheadPeriodClose {
-  id         String                   @id @default(uuid())
+  id         String                    @id @default(uuid())
   tenantId   String
   companyId  String
-  period     String                   @db.VarChar(7)
+  period     String                    @db.VarChar(7)
   status     OverheadPeriodCloseStatus @default(OPEN)
-  poolArs    Decimal                  @default(0) @db.Decimal(18, 4)
-  totalCdArs Decimal                  @default(0) @db.Decimal(18, 4)
+  poolArs    Decimal                   @default(0) @db.Decimal(18, 4)
+  totalCdArs Decimal                   @default(0) @db.Decimal(18, 4)
   frozenAt   DateTime?
   frozenBy   String?
-  createdAt  DateTime                 @default(now())
-  updatedAt  DateTime                 @updatedAt
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
 
-  tenant    Tenant                     @relation(fields: [tenantId], references: [id])
-  company   Company                    @relation(fields: [companyId], references: [id])
+  tenant    Tenant                       @relation(fields: [tenantId], references: [id])
+  company   Company                      @relation(fields: [companyId], references: [id])
   snapshots OverheadAutoPeriodSnapshot[]
 
   @@unique([tenantId, companyId, period])
@@ -778,10 +814,10 @@ model TenantInvitation {
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  invitedBy User     @relation("TenantInvitationInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
-  acceptedBy User?  @relation("TenantInvitationAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company    Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  invitedBy  User     @relation("TenantInvitationInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  acceptedBy User?    @relation("TenantInvitationAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, email, status])
   @@index([tenantId, status, expiresAt])
@@ -842,24 +878,25 @@ model Contact {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  tenant               Tenant                @relation(fields: [tenantId], references: [id])
-  roles                ContactRole[]
-  clientProfile        ClientProfile?
-  supplierProfile      SupplierProfile?
-  subcontractorProfile SubcontractorProfile?
-  projects             Project[]
-  salesInvoices        SalesInvoice[]
-  receivables          Receivable[]
-  collections          Collection[]
-  supplierInvoices     SupplierInvoice[]
-  payables             Payable[]
-  purchaseOrders       PurchaseOrder[]
-  purchaseReceipts     PurchaseReceipt[]
-  subcontracts         Subcontract[]         @relation("SubcontractSubcontractor")
+  tenant                    Tenant                     @relation(fields: [tenantId], references: [id])
+  roles                     ContactRole[]
+  clientProfile             ClientProfile?
+  supplierProfile           SupplierProfile?
+  subcontractorProfile      SubcontractorProfile?
+  projects                  Project[]
+  salesInvoices             SalesInvoice[]
+  receivables               Receivable[]
+  collections               Collection[]
+  supplierInvoices          SupplierInvoice[]
+  payables                  Payable[]
+  purchaseOrders            PurchaseOrder[]
+  purchaseReceipts          PurchaseReceipt[]
+  procurementQuotes         ProcurementQuote[]
+  subcontracts              Subcontract[]              @relation("SubcontractSubcontractor")
   subcontractCertifications SubcontractCertification[] @relation("SubcontractCertificationSubcontractor")
-  jobsiteLogLabors     JobsiteLogLabor[]
+  jobsiteLogLabors          JobsiteLogLabor[]
   /// Accounts-payable payments (`payments` table); distinct from `payables` / treasury naming.
-  apPayments           Payment[]
+  apPayments                Payment[]
 
   @@unique([tenantId, taxId])
   @@index([tenantId, status])
@@ -934,60 +971,61 @@ model SubcontractorProfile {
 // BR-PROJ-003: COMPLETED/CANCELLED projects are read-only.
 
 model Project {
-  id              String        @id @default(uuid())
-  tenantId        String
-  companyId       String?
-  clientContactId String
-  code            String
-  name            String
-  description     String?
-  address         String?
-  city            String?
-  province        String?
-  country         String        @default("AR")
-  type            ProjectType   @default(PRIVATE)
-  status          ProjectStatus @default(DRAFT)
+  id                       String         @id @default(uuid())
+  tenantId                 String
+  companyId                String?
+  clientContactId          String
+  code                     String
+  name                     String
+  description              String?
+  address                  String?
+  city                     String?
+  province                 String?
+  country                  String         @default("AR")
+  type                     ProjectType    @default(PRIVATE)
+  status                   ProjectStatus  @default(DRAFT)
   statusBeforeCancellation ProjectStatus?
   cancellationReason       String?
   cancelledAt              DateTime?
-  startDate       DateTime?
-  expectedEndDate DateTime?
-  actualEndDate   DateTime?
-  notes           String?
-  createdBy       String?
-  updatedBy       String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  startDate                DateTime?
+  expectedEndDate          DateTime?
+  actualEndDate            DateTime?
+  notes                    String?
+  createdBy                String?
+  updatedBy                String?
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
 
-  tenant         Tenant          @relation(fields: [tenantId], references: [id])
-  company        Company?        @relation(fields: [companyId], references: [id])
-  client         Contact         @relation(fields: [clientContactId], references: [id])
-  budgets        Budget[]
-  certifications Certification[]
-  salesInvoices  SalesInvoice[]
-  receivables    Receivable[]
-  collections    Collection[]
-  supplierInvoices SupplierInvoice[]
-  payables         Payable[]
-  payments         Payment[]
-  accountMovements AccountMovement[]
-  purchaseOrders   PurchaseOrder[]
-  purchaseReceipts PurchaseReceipt[]
-  warehouses       Warehouse[]
-  stockMovements   StockMovement[]
-  subcontracts     Subcontract[]
-  subcontractCertifications SubcontractCertification[]
-  jobsiteLogs           JobsiteLog[]
-  warehouseTransfers    WarehouseTransfer[]
-  documentAttachments   DocumentAttachment[]
-  notifications         Notification[]
-  journalEntries        JournalEntry[]
-  journalEntryLines     JournalEntryLine[]
-  schedule              Schedule?
-  overheadAllocations          ProjectOverheadAllocation[]
-  overheadAutoPeriodSnapshots  OverheadAutoPeriodSnapshot[]
-  auditLogs             AuditLog[]
-  scheduledReports      ScheduledReport[]
+  tenant                      Tenant                       @relation(fields: [tenantId], references: [id])
+  company                     Company?                     @relation(fields: [companyId], references: [id])
+  client                      Contact                      @relation(fields: [clientContactId], references: [id])
+  budgets                     Budget[]
+  certifications              Certification[]
+  salesInvoices               SalesInvoice[]
+  receivables                 Receivable[]
+  collections                 Collection[]
+  supplierInvoices            SupplierInvoice[]
+  payables                    Payable[]
+  payments                    Payment[]
+  accountMovements            AccountMovement[]
+  purchaseOrders              PurchaseOrder[]
+  purchaseReceipts            PurchaseReceipt[]
+  purchaseRequests            PurchaseRequest[]
+  warehouses                  Warehouse[]
+  stockMovements              StockMovement[]
+  subcontracts                Subcontract[]
+  subcontractCertifications   SubcontractCertification[]
+  jobsiteLogs                 JobsiteLog[]
+  warehouseTransfers          WarehouseTransfer[]
+  documentAttachments         DocumentAttachment[]
+  notifications               Notification[]
+  journalEntries              JournalEntry[]
+  journalEntryLines           JournalEntryLine[]
+  schedule                    Schedule?
+  overheadAllocations         ProjectOverheadAllocation[]
+  overheadAutoPeriodSnapshots OverheadAutoPeriodSnapshot[]
+  auditLogs                   AuditLog[]
+  scheduledReports            ScheduledReport[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -1012,9 +1050,9 @@ model Schedule {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  tenant         Tenant  @relation(fields: [tenantId], references: [id])
-  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  baselineBudget Budget? @relation(fields: [baselineBudgetId], references: [id], onDelete: SetNull)
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  baselineBudget Budget?        @relation(fields: [baselineBudgetId], references: [id], onDelete: SetNull)
   items          ScheduleItem[]
 
   @@index([tenantId, projectId])
@@ -1040,12 +1078,12 @@ model ScheduleItem {
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
-  schedule     Schedule                  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  parent       ScheduleItem?             @relation("ScheduleItemChildren", fields: [parentId], references: [id], onDelete: SetNull)
-  children     ScheduleItem[]            @relation("ScheduleItemChildren")
+  schedule     Schedule                 @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  parent       ScheduleItem?            @relation("ScheduleItemChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children     ScheduleItem[]           @relation("ScheduleItemChildren")
   wbsLinks     ScheduleItemWbsLink[]
-  predecessors ScheduleItemDependency[]  @relation("ScheduleDependencySuccessor")
-  successors   ScheduleItemDependency[]  @relation("ScheduleDependencyPredecessor")
+  predecessors ScheduleItemDependency[] @relation("ScheduleDependencySuccessor")
+  successors   ScheduleItemDependency[] @relation("ScheduleDependencyPredecessor")
 
   @@index([scheduleId, parentId, sortOrder])
   @@index([tenantId, scheduleId])
@@ -1053,12 +1091,12 @@ model ScheduleItem {
 }
 
 model ScheduleItemDependency {
-  id           String                 @id @default(uuid())
-  tenantId     String
+  id            String                 @id @default(uuid())
+  tenantId      String
   predecessorId String
-  successorId  String
-  type         ScheduleDependencyType @default(FS)
-  createdAt    DateTime               @default(now())
+  successorId   String
+  type          ScheduleDependencyType @default(FS)
+  createdAt     DateTime               @default(now())
 
   predecessor ScheduleItem @relation("ScheduleDependencyPredecessor", fields: [predecessorId], references: [id], onDelete: Cascade)
   successor   ScheduleItem @relation("ScheduleDependencySuccessor", fields: [successorId], references: [id], onDelete: Cascade)
@@ -1110,16 +1148,16 @@ model Budget {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  tenant       Tenant          @relation(fields: [tenantId], references: [id])
-  company      Company?        @relation(fields: [companyId], references: [id])
-  project      Project         @relation(fields: [projectId], references: [id])
-  parentBudget Budget?         @relation("BudgetAddenda", fields: [parentBudgetId], references: [id])
-  addenda      Budget[]        @relation("BudgetAddenda")
-  settings     BudgetSettings?
-  wbsNodes     WbsNode[]
-  costItems    CostItem[]
-  analysisLines CostAnalysisLine[]
-  certifications Certification[]
+  tenant              Tenant             @relation(fields: [tenantId], references: [id])
+  company             Company?           @relation(fields: [companyId], references: [id])
+  project             Project            @relation(fields: [projectId], references: [id])
+  parentBudget        Budget?            @relation("BudgetAddenda", fields: [parentBudgetId], references: [id])
+  addenda             Budget[]           @relation("BudgetAddenda")
+  settings            BudgetSettings?
+  wbsNodes            WbsNode[]
+  costItems           CostItem[]
+  analysisLines       CostAnalysisLine[]
+  certifications      Certification[]
   schedulesAsBaseline Schedule[]
 
   @@unique([projectId, versionNumber])
@@ -1157,16 +1195,17 @@ model WbsNode {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  budget             Budget              @relation(fields: [budgetId], references: [id])
-  parent             WbsNode?            @relation("WbsChildren", fields: [parentId], references: [id])
-  children           WbsNode[]           @relation("WbsChildren")
-  costItem           CostItem?
-  certificationLines    CertificationLine[]
-  purchaseOrderLines    PurchaseOrderLine[]
-  stockMovements        StockMovement[]
-  subcontractLines      SubcontractLine[]
-  jobsiteLogProgress    JobsiteLogProgress[]
-  scheduleItemWbsLinks  ScheduleItemWbsLink[]
+  budget               Budget                @relation(fields: [budgetId], references: [id])
+  parent               WbsNode?              @relation("WbsChildren", fields: [parentId], references: [id])
+  children             WbsNode[]             @relation("WbsChildren")
+  costItem             CostItem?
+  certificationLines   CertificationLine[]
+  purchaseOrderLines   PurchaseOrderLine[]
+  purchaseRequestLines PurchaseRequestLine[]
+  stockMovements       StockMovement[]
+  subcontractLines     SubcontractLine[]
+  jobsiteLogProgress   JobsiteLogProgress[]
+  scheduleItemWbsLinks ScheduleItemWbsLink[]
 
   @@unique([budgetId, code])
   @@index([budgetId, parentId])
@@ -1263,22 +1302,22 @@ model Certification {
 }
 
 model CertificationLine {
-  id                    String        @id @default(uuid())
+  id                    String   @id @default(uuid())
   certificationId       String
   wbsNodeId             String
   // Snapshots captured at line creation — frozen when certification is ISSUED
-  unitSalePriceSnapshot Decimal       @db.Decimal(18, 4)
-  budgetQty             Decimal       @db.Decimal(18, 4)
+  unitSalePriceSnapshot Decimal  @db.Decimal(18, 4)
+  budgetQty             Decimal  @db.Decimal(18, 4)
   // Progress — BR-CERT-003: physical and economic are independent
-  physicalPct           Decimal       @default(0) @db.Decimal(8, 4)
-  previousQty           Decimal       @default(0) @db.Decimal(18, 4)
-  currentQty            Decimal       @default(0) @db.Decimal(18, 4)
-  cumulativeQty         Decimal       @default(0) @db.Decimal(18, 4)
-  periodAmount          Decimal       @default(0) @db.Decimal(18, 4)
+  physicalPct           Decimal  @default(0) @db.Decimal(8, 4)
+  previousQty           Decimal  @default(0) @db.Decimal(18, 4)
+  currentQty            Decimal  @default(0) @db.Decimal(18, 4)
+  cumulativeQty         Decimal  @default(0) @db.Decimal(18, 4)
+  periodAmount          Decimal  @default(0) @db.Decimal(18, 4)
   notes                 String?
-  sortOrder             Int           @default(0)
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  sortOrder             Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   certification     Certification      @relation(fields: [certificationId], references: [id])
   wbsNode           WbsNode            @relation(fields: [wbsNodeId], references: [id])
@@ -1321,11 +1360,11 @@ model SalesInvoice {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
-  tenant        Tenant            @relation(fields: [tenantId], references: [id])
-  company       Company           @relation(fields: [companyId], references: [id])
-  project       Project           @relation(fields: [projectId], references: [id])
-  clientContact Contact           @relation(fields: [clientContactId], references: [id])
-  certification Certification?    @relation(fields: [certificationId], references: [id])
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  company       Company            @relation(fields: [companyId], references: [id])
+  project       Project            @relation(fields: [projectId], references: [id])
+  clientContact Contact            @relation(fields: [clientContactId], references: [id])
+  certification Certification?     @relation(fields: [certificationId], references: [id])
   lines         SalesInvoiceLine[]
   receivable    Receivable?
   collections   Collection[]
@@ -1411,11 +1450,11 @@ model AccountingAccount {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company      Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  parent       AccountingAccount?  @relation("AccountingAccountParent", fields: [parentId], references: [id], onDelete: SetNull)
-  children     AccountingAccount[] @relation("AccountingAccountParent")
-  journalLines JournalEntryLine[]
+  tenant             Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company            Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent             AccountingAccount?      @relation("AccountingAccountParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children           AccountingAccount[]     @relation("AccountingAccountParent")
+  journalLines       JournalEntryLine[]
   mappingRulesDebit  AccountingMappingRule[] @relation("AccountingMappingDebitAccount")
   mappingRulesCredit AccountingMappingRule[] @relation("AccountingMappingCreditAccount")
 
@@ -1426,22 +1465,22 @@ model AccountingAccount {
 }
 
 model JournalEntry {
-  id                String                 @id @default(uuid())
-  tenantId          String
-  companyId         String
-  projectId         String?
-  entryDate         DateTime               @db.Date
-  status            JournalEntryStatus     @default(DRAFT)
-  sourceType        JournalEntrySourceType
-  sourceId          String?                @db.VarChar(128)
-  description       String                 @db.VarChar(1024)
-  reference         String?                @db.VarChar(256)
-  createdByUserId   String
-  updatedByUserId   String
-  postedAt          DateTime?
-  cancelledAt       DateTime?
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
+  id              String                 @id @default(uuid())
+  tenantId        String
+  companyId       String
+  projectId       String?
+  entryDate       DateTime               @db.Date
+  status          JournalEntryStatus     @default(DRAFT)
+  sourceType      JournalEntrySourceType
+  sourceId        String?                @db.VarChar(128)
+  description     String                 @db.VarChar(1024)
+  reference       String?                @db.VarChar(256)
+  createdByUserId String
+  updatedByUserId String
+  postedAt        DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 
   tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -1458,19 +1497,19 @@ model JournalEntry {
 
 // Phase 11B: company-scoped GL mapping; multiple rules per eventType resolved by priority ASC.
 model AccountingMappingRule {
-  id               String                    @id @default(uuid())
-  tenantId         String
-  companyId        String
-  eventType        AccountingMappingEventType
-  name             String                    @db.VarChar(256)
-  description      String?                   @db.VarChar(1024)
-  debitAccountId   String
-  creditAccountId  String
-  isActive         Boolean                   @default(true)
-  priority         Int                       @default(100)
-  metadata         Json?
-  createdAt        DateTime                  @default(now())
-  updatedAt        DateTime                  @updatedAt
+  id              String                     @id @default(uuid())
+  tenantId        String
+  companyId       String
+  eventType       AccountingMappingEventType
+  name            String                     @db.VarChar(256)
+  description     String?                    @db.VarChar(1024)
+  debitAccountId  String
+  creditAccountId String
+  isActive        Boolean                    @default(true)
+  priority        Int                        @default(100)
+  metadata        Json?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
 
   tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -1526,13 +1565,13 @@ model TreasuryAccount {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
-  tenant             Tenant             @relation(fields: [tenantId], references: [id])
-  company            Company?           @relation(fields: [companyId], references: [id])
-  movements          AccountMovement[]
-  collections        Collection[]
-  transfersOut       InternalTransfer[] @relation("TransferSource")
-  transfersIn        InternalTransfer[] @relation("TransferDest")
-  payments           Payment[]
+  tenant       Tenant             @relation(fields: [tenantId], references: [id])
+  company      Company?           @relation(fields: [companyId], references: [id])
+  movements    AccountMovement[]
+  collections  Collection[]
+  transfersOut InternalTransfer[] @relation("TransferSource")
+  transfersIn  InternalTransfer[] @relation("TransferDest")
+  payments     Payment[]
 
   /// Tenant-wide unique **display name** (see docs/bloqer2.0/03-finance/TREASURY_MODEL.md §TreasuryAccount uniqueness).
   @@unique([tenantId, name])
@@ -1546,23 +1585,23 @@ model TreasuryAccount {
 // Phase 16B: optional project dimension for reporting / manual classification.
 // Movements from Collection/Payment keep projectId null unless explicitly set later; avoid duplicating source truth.
 model AccountMovement {
-  id           String                   @id @default(uuid())
+  id           String                    @id @default(uuid())
   tenantId     String
   companyId    String?
   accountId    String
   projectId    String?
-  movementDate DateTime                 @db.Date
+  movementDate DateTime                  @db.Date
   type         AccountMovementType
   sourceType   AccountMovementSourceType
   sourceId     String?
   currency     String
-  amount       Decimal                  @db.Decimal(18, 4)
+  amount       Decimal                   @db.Decimal(18, 4)
   description  String
-  status       AccountMovementStatus    @default(CONFIRMED)
+  status       AccountMovementStatus     @default(CONFIRMED)
   transferId   String?
   createdBy    String?
-  createdAt    DateTime                 @default(now())
-  updatedAt    DateTime                 @updatedAt
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
 
   tenant  Tenant          @relation(fields: [tenantId], references: [id])
   account TreasuryAccount @relation(fields: [accountId], references: [id])
@@ -1617,20 +1656,20 @@ model Collection {
 // BR-TRZ-004: exactly 2 AccountMovements per transfer (TRANSFER_OUT + TRANSFER_IN), linked by transferId.
 // Same currency only for Phase 3C. Source != destination. No negative balance allowed.
 model InternalTransfer {
-  id                   String                @id @default(uuid())
+  id                   String                 @id @default(uuid())
   tenantId             String
   companyId            String
   sourceAccountId      String
   destinationAccountId String
-  transferDate         DateTime              @db.Date
+  transferDate         DateTime               @db.Date
   currency             String
-  amount               Decimal               @db.Decimal(18, 4)
+  amount               Decimal                @db.Decimal(18, 4)
   description          String?
   status               InternalTransferStatus @default(CONFIRMED)
   createdBy            String?
   updatedBy            String?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   tenant             Tenant          @relation(fields: [tenantId], references: [id])
   company            Company         @relation(fields: [companyId], references: [id])
@@ -1674,20 +1713,20 @@ model SupplierInvoice {
   updatedAt         DateTime              @updatedAt
 
   // Optional link to PurchaseOrder — no 3-way match yet; validates consistency in service.
-  purchaseOrderId           String?
+  purchaseOrderId            String?
   // Optional link to SubcontractCertification — set on certification approve.
   subcontractCertificationId String? @unique
 
-  tenant                    Tenant               @relation(fields: [tenantId], references: [id])
-  company                   Company              @relation(fields: [companyId], references: [id])
-  project                   Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  supplierContact           Contact              @relation(fields: [supplierContactId], references: [id])
-  purchaseOrder             PurchaseOrder?       @relation(fields: [purchaseOrderId], references: [id])
-  subcontractCertification  SubcontractCertification? @relation(fields: [subcontractCertificationId], references: [id])
-  lines                     SupplierInvoiceLine[]
-  payable                   Payable?
+  tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
+  company                  Company                   @relation(fields: [companyId], references: [id])
+  project                  Project?                  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  supplierContact          Contact                   @relation(fields: [supplierContactId], references: [id])
+  purchaseOrder            PurchaseOrder?            @relation(fields: [purchaseOrderId], references: [id])
+  subcontractCertification SubcontractCertification? @relation(fields: [subcontractCertificationId], references: [id])
+  lines                    SupplierInvoiceLine[]
+  payable                  Payable?
   /// Partial payments against this invoice (`Payment.supplierInvoiceId`).
-  apPayments                Payment[]
+  apPayments               Payment[]
 
   @@unique([tenantId, companyId, number])
   @@index([tenantId, projectId])
@@ -1697,18 +1736,18 @@ model SupplierInvoice {
 }
 
 model SupplierInvoiceLine {
-  id          String   @id @default(uuid())
-  invoiceId   String
-  description String
-  quantity    Decimal  @db.Decimal(18, 4)
-  unitPrice   Decimal  @db.Decimal(18, 4)
-  taxRate     Decimal  @default(0) @db.Decimal(8, 4)
-  lineSubtotal Decimal @db.Decimal(18, 4)
-  lineTax     Decimal  @default(0) @db.Decimal(18, 4)
-  lineTotal   Decimal  @db.Decimal(18, 4)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  invoiceId    String
+  description  String
+  quantity     Decimal  @db.Decimal(18, 4)
+  unitPrice    Decimal  @db.Decimal(18, 4)
+  taxRate      Decimal  @default(0) @db.Decimal(8, 4)
+  lineSubtotal Decimal  @db.Decimal(18, 4)
+  lineTax      Decimal  @default(0) @db.Decimal(18, 4)
+  lineTotal    Decimal  @db.Decimal(18, 4)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   invoice SupplierInvoice @relation(fields: [invoiceId], references: [id])
 
@@ -1793,44 +1832,181 @@ model Payment {
 
 // ─── Procurement ──────────────────────────────────────────────────────────────
 // See: docs/bloqer2.0/02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md
-// BR-PUR-001: ISSUED PO contributes to committed_amount cost layer.
-// BR-PUR-004: Receipt only allowed when PO status is ISSUED | PARTIALLY_RECEIVED | RECEIVED.
+// BR-PUR-001: CONFIRMED PO contributes to committed_amount cost layer.
+// BR-PUR-004: Receipt only when PO status is CONFIRMED | PARTIALLY_RECEIVED | RECEIVED.
 // BR-SUP-001: supplierContactId must have active SUPPLIER role (enforced at service layer).
-// No inventory stock movements in this phase.
+
+model CompanyProcurementSettings {
+  id                              String   @id @default(uuid())
+  companyId                       String   @unique
+  poApprovalThresholdArs          Decimal? @db.Decimal(18, 4)
+  purchaseRequestRequiredAboveArs Decimal? @db.Decimal(18, 4)
+  minQuotesRequired               Int      @default(2)
+  maxQuotesAllowed                Int      @default(3)
+  quoteRequiredCategories         Json?
+  allowDirectPo                   Boolean  @default(true)
+  allowSelfApproval               Boolean  @default(true)
+  allowEmergencyDirectPo          Boolean  @default(false)
+  varianceSoftAlertPct            Decimal  @default(10) @db.Decimal(8, 4)
+  varianceNoteRequiredPct         Decimal  @default(25) @db.Decimal(8, 4)
+  varianceExtraApprovalPct        Decimal  @default(25) @db.Decimal(8, 4)
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@map("company_procurement_settings")
+}
+
+model PurchaseRequest {
+  id                      String                @id @default(uuid())
+  tenantId                String
+  companyId               String
+  projectId               String
+  number                  Int
+  requestedByUserId       String?
+  neededByDate            DateTime?             @db.Date
+  status                  PurchaseRequestStatus @default(DRAFT)
+  notes                   String?
+  emergencyDirectPoReason String?
+  submittedAt             DateTime?
+  createdBy               String?
+  updatedBy               String?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+
+  tenant         Tenant                @relation(fields: [tenantId], references: [id])
+  company        Company               @relation(fields: [companyId], references: [id])
+  project        Project               @relation(fields: [projectId], references: [id])
+  lines          PurchaseRequestLine[]
+  quotes         ProcurementQuote[]
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([tenantId, companyId, number])
+  @@index([tenantId, projectId])
+  @@index([tenantId, status])
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestLine {
+  id                     String                  @id @default(uuid())
+  purchaseRequestId      String
+  wbsNodeId              String?
+  productId              String?
+  lineType               PurchaseRequestLineType @default(MATERIAL)
+  description            String
+  unit                   String                  @default("")
+  quantity               Decimal                 @db.Decimal(18, 4)
+  budgetUnitCostSnapshot Decimal?                @db.Decimal(18, 4)
+  budgetQuantitySnapshot Decimal?                @db.Decimal(18, 4)
+  sortOrder              Int                     @default(0)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  purchaseRequest PurchaseRequest        @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  wbsNode         WbsNode?               @relation(fields: [wbsNodeId], references: [id])
+  product         Product?               @relation(fields: [productId], references: [id])
+  quoteLines      ProcurementQuoteLine[]
+
+  @@index([purchaseRequestId])
+  @@index([wbsNodeId])
+  @@map("purchase_request_lines")
+}
+
+model ProcurementQuote {
+  id                String                 @id @default(uuid())
+  tenantId          String
+  purchaseRequestId String
+  supplierContactId String
+  status            ProcurementQuoteStatus @default(DRAFT)
+  currency          String                 @default("ARS")
+  fxRate            Decimal                @default(1) @db.Decimal(18, 6)
+  totalAmountArs    Decimal                @default(0) @db.Decimal(18, 4)
+  subtotal          Decimal                @default(0) @db.Decimal(18, 4)
+  taxAmount         Decimal                @default(0) @db.Decimal(18, 4)
+  totalAmount       Decimal                @default(0) @db.Decimal(18, 4)
+  validUntil        DateTime?              @db.Date
+  notes             String?
+  receivedAt        DateTime?
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id])
+  purchaseRequest  PurchaseRequest        @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  supplierContact  Contact                @relation(fields: [supplierContactId], references: [id])
+  lines            ProcurementQuoteLine[]
+  selectedOnOrders PurchaseOrder[]        @relation("SelectedProcurementQuote")
+
+  @@index([tenantId, purchaseRequestId])
+  @@index([purchaseRequestId, supplierContactId])
+  @@map("procurement_quotes")
+}
+
+model ProcurementQuoteLine {
+  id                    String  @id @default(uuid())
+  procurementQuoteId    String
+  purchaseRequestLineId String
+  unitPrice             Decimal @db.Decimal(18, 4)
+  taxRate               Decimal @default(0) @db.Decimal(8, 4)
+  lineSubtotal          Decimal @db.Decimal(18, 4)
+  lineTax               Decimal @default(0) @db.Decimal(18, 4)
+  lineTotal             Decimal @db.Decimal(18, 4)
+  sortOrder             Int     @default(0)
+
+  procurementQuote    ProcurementQuote    @relation(fields: [procurementQuoteId], references: [id], onDelete: Cascade)
+  purchaseRequestLine PurchaseRequestLine @relation(fields: [purchaseRequestLineId], references: [id])
+
+  @@index([procurementQuoteId])
+  @@map("procurement_quote_lines")
+}
 
 model PurchaseOrder {
-  id                    String              @id @default(uuid())
-  tenantId              String
-  companyId             String
-  projectId             String
-  supplierContactId     String
-  number                Int
-  issueDate             DateTime            @db.Date
-  expectedDeliveryDate  DateTime?           @db.Date
-  currency              String              @default("ARS")
-  subtotal              Decimal             @default(0) @db.Decimal(18, 4)
-  taxAmount             Decimal             @default(0) @db.Decimal(18, 4)
-  totalAmount           Decimal             @default(0) @db.Decimal(18, 4)
-  status                PurchaseOrderStatus @default(DRAFT)
-  notes                 String?
-  internalNotes         String?
-  createdBy             String?
-  updatedBy             String?
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  id                         String              @id @default(uuid())
+  tenantId                   String
+  companyId                  String
+  projectId                  String
+  supplierContactId          String
+  purchaseRequestId          String?
+  selectedProcurementQuoteId String?
+  originRequestedByUserId    String?
+  number                     Int
+  issueDate                  DateTime            @db.Date
+  expectedDeliveryDate       DateTime?           @db.Date
+  currency                   String              @default("ARS")
+  fxRate                     Decimal             @default(1) @db.Decimal(18, 6)
+  totalAmountArs             Decimal             @default(0) @db.Decimal(18, 4)
+  subtotal                   Decimal             @default(0) @db.Decimal(18, 4)
+  taxAmount                  Decimal             @default(0) @db.Decimal(18, 4)
+  totalAmount                Decimal             @default(0) @db.Decimal(18, 4)
+  status                     PurchaseOrderStatus @default(DRAFT)
+  approvedByUserId           String?
+  approvedAt                 DateTime?
+  confirmedByUserId          String?
+  confirmedAt                DateTime?
+  notes                      String?
+  internalNotes              String?
+  createdBy                  String?
+  updatedBy                  String?
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @updatedAt
 
-  tenant          Tenant           @relation(fields: [tenantId], references: [id])
-  company         Company          @relation(fields: [companyId], references: [id])
-  project         Project          @relation(fields: [projectId], references: [id])
-  supplierContact Contact          @relation(fields: [supplierContactId], references: [id])
-  lines           PurchaseOrderLine[]
-  receipts        PurchaseReceipt[]
-  supplierInvoices SupplierInvoice[]
+  tenant                   Tenant              @relation(fields: [tenantId], references: [id])
+  company                  Company             @relation(fields: [companyId], references: [id])
+  project                  Project             @relation(fields: [projectId], references: [id])
+  supplierContact          Contact             @relation(fields: [supplierContactId], references: [id])
+  purchaseRequest          PurchaseRequest?    @relation(fields: [purchaseRequestId], references: [id])
+  selectedProcurementQuote ProcurementQuote?   @relation("SelectedProcurementQuote", fields: [selectedProcurementQuoteId], references: [id])
+  lines                    PurchaseOrderLine[]
+  receipts                 PurchaseReceipt[]
+  supplierInvoices         SupplierInvoice[]
 
   @@unique([tenantId, companyId, number])
   @@index([tenantId, projectId])
   @@index([tenantId, status])
   @@index([tenantId, supplierContactId])
+  @@index([purchaseRequestId])
   @@map("purchase_orders")
 }
 
@@ -1838,26 +2014,31 @@ model PurchaseOrder {
 // productId optional — only product-linked lines generate StockMovement IN on receipt confirm.
 // receivedQuantity is maintained by service when receipts are confirmed/cancelled.
 model PurchaseOrderLine {
-  id               String    @id @default(uuid())
-  purchaseOrderId  String
-  wbsNodeId        String?
-  productId        String?
-  description      String
-  unit             String    @default("")
-  quantity         Decimal   @db.Decimal(18, 4)
-  unitPrice        Decimal   @db.Decimal(18, 4)
-  taxRate          Decimal   @default(0) @db.Decimal(8, 4)
-  lineSubtotal     Decimal   @db.Decimal(18, 4)
-  lineTax          Decimal   @default(0) @db.Decimal(18, 4)
-  lineTotal        Decimal   @db.Decimal(18, 4)
-  receivedQuantity Decimal   @default(0) @db.Decimal(18, 4)
-  sortOrder        Int       @default(0)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                     String                    @id @default(uuid())
+  purchaseOrderId        String
+  wbsNodeId              String?
+  productId              String?
+  description            String
+  unit                   String                    @default("")
+  quantity               Decimal                   @db.Decimal(18, 4)
+  unitPrice              Decimal                   @db.Decimal(18, 4)
+  taxRate                Decimal                   @default(0) @db.Decimal(8, 4)
+  lineSubtotal           Decimal                   @db.Decimal(18, 4)
+  lineTax                Decimal                   @default(0) @db.Decimal(18, 4)
+  lineTotal              Decimal                   @db.Decimal(18, 4)
+  receivedQuantity       Decimal                   @default(0) @db.Decimal(18, 4)
+  budgetUnitCostSnapshot Decimal?                  @db.Decimal(18, 4)
+  variancePct            Decimal?                  @db.Decimal(18, 4)
+  varianceTier           PurchaseOrderVarianceTier @default(NONE)
+  varianceJustification  String?
+  varianceUnitMismatch   Boolean                   @default(false)
+  sortOrder              Int                       @default(0)
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
 
-  purchaseOrder PurchaseOrder       @relation(fields: [purchaseOrderId], references: [id])
-  wbsNode       WbsNode?            @relation(fields: [wbsNodeId], references: [id])
-  product       Product?            @relation(fields: [productId], references: [id])
+  purchaseOrder PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id])
+  wbsNode       WbsNode?              @relation(fields: [wbsNodeId], references: [id])
+  product       Product?              @relation(fields: [productId], references: [id])
   receiptLines  PurchaseReceiptLine[]
 
   @@index([purchaseOrderId])
@@ -1883,12 +2064,12 @@ model PurchaseReceipt {
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
-  tenant          Tenant          @relation(fields: [tenantId], references: [id])
-  company         Company         @relation(fields: [companyId], references: [id])
-  project         Project         @relation(fields: [projectId], references: [id])
-  purchaseOrder   PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id])
-  supplierContact Contact         @relation(fields: [supplierContactId], references: [id])
-  warehouse       Warehouse?      @relation(fields: [warehouseId], references: [id])
+  tenant          Tenant                @relation(fields: [tenantId], references: [id])
+  company         Company               @relation(fields: [companyId], references: [id])
+  project         Project               @relation(fields: [projectId], references: [id])
+  purchaseOrder   PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id])
+  supplierContact Contact               @relation(fields: [supplierContactId], references: [id])
+  warehouse       Warehouse?            @relation(fields: [warehouseId], references: [id])
   lines           PurchaseReceiptLine[]
   stockMovements  StockMovement[]
 
@@ -1941,13 +2122,14 @@ model Product {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  tenant            Tenant              @relation(fields: [tenantId], references: [id])
-  company           Company?            @relation(fields: [companyId], references: [id])
-  purchaseOrderLines  PurchaseOrderLine[]
-  stockMovements      StockMovement[]
-  jobsiteLogMaterials JobsiteLogMaterialUsage[]
-  warehouseTransfers  WarehouseTransfer[]
-  costAnalysisLines   CostAnalysisLine[]
+  tenant               Tenant                    @relation(fields: [tenantId], references: [id])
+  company              Company?                  @relation(fields: [companyId], references: [id])
+  purchaseOrderLines   PurchaseOrderLine[]
+  purchaseRequestLines PurchaseRequestLine[]
+  stockMovements       StockMovement[]
+  jobsiteLogMaterials  JobsiteLogMaterialUsage[]
+  warehouseTransfers   WarehouseTransfer[]
+  costAnalysisLines    CostAnalysisLine[]
 
   @@unique([tenantId, companyId, sku])
   @@index([tenantId, status])
@@ -1970,14 +2152,14 @@ model Warehouse {
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
-  tenant         Tenant          @relation(fields: [tenantId], references: [id])
-  company        Company         @relation(fields: [companyId], references: [id])
-  project        Project?        @relation(fields: [projectId], references: [id])
-  stockMovements StockMovement[]
-  receipts       PurchaseReceipt[]
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id])
+  company             Company                   @relation(fields: [companyId], references: [id])
+  project             Project?                  @relation(fields: [projectId], references: [id])
+  stockMovements      StockMovement[]
+  receipts            PurchaseReceipt[]
   jobsiteLogMaterials JobsiteLogMaterialUsage[]
-  transfersOut   WarehouseTransfer[] @relation("TransferSource")
-  transfersIn    WarehouseTransfer[] @relation("TransferDestination")
+  transfersOut        WarehouseTransfer[]       @relation("TransferSource")
+  transfersIn         WarehouseTransfer[]       @relation("TransferDestination")
 
   @@unique([tenantId, companyId, name])
   @@index([tenantId, companyId, status])
@@ -1989,38 +2171,38 @@ model Warehouse {
 // quantity is always positive — direction determined by type (IN increases, OUT decreases).
 // unitCost/totalCost nullable — captured from PO line unitPrice on PURCHASE_RECEIPT movements.
 model StockMovement {
-  id                   String                  @id @default(uuid())
-  tenantId             String
-  companyId            String
-  warehouseId          String
-  productId            String
-  projectId            String?
-  wbsNodeId            String?
-  purchaseReceiptId    String?
+  id                    String                  @id @default(uuid())
+  tenantId              String
+  companyId             String
+  warehouseId           String
+  productId             String
+  projectId             String?
+  wbsNodeId             String?
+  purchaseReceiptId     String?
   purchaseReceiptLineId String?
-  type                 StockMovementType
-  sourceType           StockMovementSourceType
-  sourceId             String?
-  movementDate         DateTime                @db.Date
-  quantity             Decimal                 @db.Decimal(18, 4)
-  unitCost             Decimal?                @db.Decimal(18, 4)
-  totalCost            Decimal?                @db.Decimal(18, 4)
-  status               StockMovementStatus     @default(CONFIRMED)
-  notes                String?
-  createdBy            String?
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
+  type                  StockMovementType
+  sourceType            StockMovementSourceType
+  sourceId              String?
+  movementDate          DateTime                @db.Date
+  quantity              Decimal                 @db.Decimal(18, 4)
+  unitCost              Decimal?                @db.Decimal(18, 4)
+  totalCost             Decimal?                @db.Decimal(18, 4)
+  status                StockMovementStatus     @default(CONFIRMED)
+  notes                 String?
+  createdBy             String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
 
-  tenant               Tenant               @relation(fields: [tenantId], references: [id])
-  company              Company              @relation(fields: [companyId], references: [id])
-  warehouse            Warehouse            @relation(fields: [warehouseId], references: [id])
-  product              Product              @relation(fields: [productId], references: [id])
-  project              Project?             @relation(fields: [projectId], references: [id])
-  wbsNode              WbsNode?             @relation(fields: [wbsNodeId], references: [id])
-  purchaseReceipt      PurchaseReceipt?     @relation(fields: [purchaseReceiptId], references: [id])
-  purchaseReceiptLine  PurchaseReceiptLine?  @relation(fields: [purchaseReceiptLineId], references: [id])
-  warehouseTransferId  String?
-  warehouseTransfer    WarehouseTransfer?    @relation(fields: [warehouseTransferId], references: [id])
+  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  company             Company              @relation(fields: [companyId], references: [id])
+  warehouse           Warehouse            @relation(fields: [warehouseId], references: [id])
+  product             Product              @relation(fields: [productId], references: [id])
+  project             Project?             @relation(fields: [projectId], references: [id])
+  wbsNode             WbsNode?             @relation(fields: [wbsNodeId], references: [id])
+  purchaseReceipt     PurchaseReceipt?     @relation(fields: [purchaseReceiptId], references: [id])
+  purchaseReceiptLine PurchaseReceiptLine? @relation(fields: [purchaseReceiptLineId], references: [id])
+  warehouseTransferId String?
+  warehouseTransfer   WarehouseTransfer?   @relation(fields: [warehouseTransferId], references: [id])
 
   @@index([tenantId, warehouseId, productId])
   @@index([tenantId, productId, status])
@@ -2056,13 +2238,13 @@ model Subcontract {
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 
-  tenant                 Tenant                     @relation(fields: [tenantId], references: [id])
-  company                Company                    @relation(fields: [companyId], references: [id])
-  project                Project                    @relation(fields: [projectId], references: [id])
-  subcontractorContact   Contact                    @relation("SubcontractSubcontractor", fields: [subcontractorContactId], references: [id])
-  lines                  SubcontractLine[]
-  certifications         SubcontractCertification[]
-  jobsiteLogLabors       JobsiteLogLabor[]
+  tenant               Tenant                     @relation(fields: [tenantId], references: [id])
+  company              Company                    @relation(fields: [companyId], references: [id])
+  project              Project                    @relation(fields: [projectId], references: [id])
+  subcontractorContact Contact                    @relation("SubcontractSubcontractor", fields: [subcontractorContactId], references: [id])
+  lines                SubcontractLine[]
+  certifications       SubcontractCertification[]
+  jobsiteLogLabors     JobsiteLogLabor[]
 
   @@unique([tenantId, companyId, number])
   @@index([tenantId, projectId])
@@ -2088,8 +2270,8 @@ model SubcontractLine {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  subcontract        Subcontract                   @relation(fields: [subcontractId], references: [id])
-  wbsNode            WbsNode?                      @relation(fields: [wbsNodeId], references: [id])
+  subcontract        Subcontract                    @relation(fields: [subcontractId], references: [id])
+  wbsNode            WbsNode?                       @relation(fields: [wbsNodeId], references: [id])
   certificationLines SubcontractCertificationLine[]
 
   @@index([subcontractId])
@@ -2118,13 +2300,13 @@ model SubcontractCertification {
   createdAt              DateTime                       @default(now())
   updatedAt              DateTime                       @updatedAt
 
-  tenant                 Tenant                         @relation(fields: [tenantId], references: [id])
-  company                Company                        @relation(fields: [companyId], references: [id])
-  project                Project                        @relation(fields: [projectId], references: [id])
-  subcontract            Subcontract                    @relation(fields: [subcontractId], references: [id])
-  subcontractorContact   Contact                        @relation("SubcontractCertificationSubcontractor", fields: [subcontractorContactId], references: [id])
-  lines                  SubcontractCertificationLine[]
-  supplierInvoice        SupplierInvoice?
+  tenant               Tenant                         @relation(fields: [tenantId], references: [id])
+  company              Company                        @relation(fields: [companyId], references: [id])
+  project              Project                        @relation(fields: [projectId], references: [id])
+  subcontract          Subcontract                    @relation(fields: [subcontractId], references: [id])
+  subcontractorContact Contact                        @relation("SubcontractCertificationSubcontractor", fields: [subcontractorContactId], references: [id])
+  lines                SubcontractCertificationLine[]
+  supplierInvoice      SupplierInvoice?
 
   @@unique([subcontractId, number])
   @@index([tenantId, projectId])
@@ -2164,29 +2346,29 @@ model SubcontractCertificationLine {
 // logDate not future (enforced at service layer).
 
 model JobsiteLog {
-  id            String           @id @default(uuid())
-  tenantId      String
-  companyId     String
-  projectId     String
-  logDate       DateTime         @db.Date
-  title         String?
-  workFront     String?
-  shift         String?
-  status        JobsiteLogStatus @default(DRAFT)
-  weather       String?
-  generalNotes  String?
-  blockers      String?
-  incidents     String?
-  safetyNotes   String?
-  returnNotes   String?
-  createdBy     String?
-  updatedBy     String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id           String           @id @default(uuid())
+  tenantId     String
+  companyId    String
+  projectId    String
+  logDate      DateTime         @db.Date
+  title        String?
+  workFront    String?
+  shift        String?
+  status       JobsiteLogStatus @default(DRAFT)
+  weather      String?
+  generalNotes String?
+  blockers     String?
+  incidents    String?
+  safetyNotes  String?
+  returnNotes  String?
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
-  tenant    Tenant               @relation(fields: [tenantId], references: [id])
-  company   Company              @relation(fields: [companyId], references: [id])
-  project   Project              @relation(fields: [projectId], references: [id])
+  tenant    Tenant                    @relation(fields: [tenantId], references: [id])
+  company   Company                   @relation(fields: [companyId], references: [id])
+  project   Project                   @relation(fields: [projectId], references: [id])
   progress  JobsiteLogProgress[]
   labor     JobsiteLogLabor[]
   materials JobsiteLogMaterialUsage[]
@@ -2200,16 +2382,16 @@ model JobsiteLog {
 // wbsNodeId must be WbsNodeType.ITEM (validated at service layer).
 // quantityCompleted is operational evidence only — does not affect Certification/CertificationLine.
 model JobsiteLogProgress {
-  id                 String   @id @default(uuid())
-  jobsiteLogId       String
-  wbsNodeId          String
-  description        String?
-  quantityCompleted  Decimal  @db.Decimal(18, 4)
-  physicalPct        Decimal? @db.Decimal(8, 4)
-  notes              String?
-  sortOrder          Int      @default(0)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                String   @id @default(uuid())
+  jobsiteLogId      String
+  wbsNodeId         String
+  description       String?
+  quantityCompleted Decimal  @db.Decimal(18, 4)
+  physicalPct       Decimal? @db.Decimal(8, 4)
+  notes             String?
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   jobsiteLog JobsiteLog @relation(fields: [jobsiteLogId], references: [id])
   wbsNode    WbsNode    @relation(fields: [wbsNodeId], references: [id])
@@ -2234,8 +2416,8 @@ model JobsiteLogLabor {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  jobsiteLog  JobsiteLog  @relation(fields: [jobsiteLogId], references: [id])
-  contact     Contact?    @relation(fields: [contactId], references: [id])
+  jobsiteLog  JobsiteLog   @relation(fields: [jobsiteLogId], references: [id])
+  contact     Contact?     @relation(fields: [contactId], references: [id])
   subcontract Subcontract? @relation(fields: [subcontractId], references: [id])
 
   @@index([jobsiteLogId])
@@ -2314,6 +2496,8 @@ enum LinkedEntityType {
   SUPPLIER_INVOICE
   PURCHASE_ORDER
   PURCHASE_RECEIPT
+  PURCHASE_REQUEST
+  PROCUREMENT_QUOTE
   SUBCONTRACT
   SUBCONTRACT_CERTIFICATION
   JOBSITE_LOG
@@ -2350,12 +2534,12 @@ model WarehouseTransfer {
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
-  tenant               Tenant    @relation(fields: [tenantId], references: [id])
-  company              Company   @relation(fields: [companyId], references: [id])
-  project              Project?  @relation(fields: [projectId], references: [id])
-  sourceWarehouse      Warehouse @relation("TransferSource", fields: [sourceWarehouseId], references: [id])
-  destinationWarehouse Warehouse @relation("TransferDestination", fields: [destinationWarehouseId], references: [id])
-  product              Product   @relation(fields: [productId], references: [id])
+  tenant               Tenant          @relation(fields: [tenantId], references: [id])
+  company              Company         @relation(fields: [companyId], references: [id])
+  project              Project?        @relation(fields: [projectId], references: [id])
+  sourceWarehouse      Warehouse       @relation("TransferSource", fields: [sourceWarehouseId], references: [id])
+  destinationWarehouse Warehouse       @relation("TransferDestination", fields: [destinationWarehouseId], references: [id])
+  product              Product         @relation(fields: [productId], references: [id])
   stockMovements       StockMovement[]
 
   @@unique([tenantId, companyId, number])
@@ -2371,7 +2555,7 @@ model WarehouseTransfer {
 // Download/access policy: presigned GET URLs only (`document.service`); `publicUrl` is unused/reserved — do not expose in API DTOs.
 
 model DocumentAttachment {
-  id               String           @id @default(uuid())
+  id               String            @id @default(uuid())
   tenantId         String
   companyId        String?
   projectId        String?
@@ -2379,19 +2563,19 @@ model DocumentAttachment {
   fileName         String
   mimeType         String
   sizeBytes        Int
-  storageProvider  StorageProvider  @default(PLACEHOLDER)
+  storageProvider  StorageProvider   @default(PLACEHOLDER)
   storageBucket    String?
   storageKey       String
   /// Unused in production flows; reserved if a CDN/public asset strategy is added later.
   publicUrl        String?
-  category         DocumentCategory @default(OTHER)
+  category         DocumentCategory  @default(OTHER)
   description      String?
-  status           DocumentStatus   @default(ACTIVE)
+  status           DocumentStatus    @default(ACTIVE)
   linkedEntityType LinkedEntityType?
   linkedEntityId   String?
   uploadedBy       String
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id])
   project Project? @relation(fields: [projectId], references: [id])
@@ -2413,6 +2597,8 @@ enum NotificationType {
   NEGATIVE_STOCK
   CERTIFICATION_APPROVED_WITHOUT_INVOICE
   STALE_DOCUMENT_UPLOAD
+  PURCHASE_REQUEST_SUBMITTED
+  PURCHASE_ORDER_PENDING_APPROVAL
 }
 
 enum NotificationSeverity {
@@ -2448,21 +2634,21 @@ enum EmailProvider {
 }
 
 model Notification {
-  id               String                @id @default(uuid())
+  id               String               @id @default(uuid())
   tenantId         String
   companyId        String?
   recipientUserId  String?
   type             NotificationType
   title            String
   body             String
-  severity         NotificationSeverity  @default(INFO)
-  status           NotificationStatus    @default(UNREAD)
+  severity         NotificationSeverity @default(INFO)
+  status           NotificationStatus   @default(UNREAD)
   linkedEntityType LinkedEntityType?
   linkedEntityId   String?
   projectId        String?
   actionUrl        String?
   metadata         Json?
-  createdAt        DateTime              @default(now())
+  createdAt        DateTime             @default(now())
   readAt           DateTime?
   archivedAt       DateTime?
 
@@ -2543,18 +2729,18 @@ enum ScheduledReportRunStatus {
 }
 
 model ScheduledReport {
-  id              String                   @id @default(uuid())
+  id              String                    @id @default(uuid())
   tenantId        String
   companyId       String?
   projectId       String?
   scope           ScheduledReportScope
-  name            String                   @db.VarChar(200)
-  status          ScheduledReportStatus    @default(ACTIVE)
+  name            String                    @db.VarChar(200)
+  status          ScheduledReportStatus     @default(ACTIVE)
   frequency       ScheduledReportFrequency
   dayOfWeek       Int?
   dayOfMonth      Int?
-  timeOfDay       String                   @db.VarChar(5)
-  timezone        String                   @db.VarChar(64)
+  timeOfDay       String                    @db.VarChar(5)
+  timezone        String                    @db.VarChar(64)
   format          ScheduledReportFormat
   params          Json?
   createdByUserId String
@@ -2562,14 +2748,14 @@ model ScheduledReport {
   lastRunStatus   ScheduledReportRunStatus?
   nextRunAt       DateTime
   runLockUntil    DateTime?
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
 
-  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company   Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  createdBy User      @relation("ScheduledReportCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  items     ScheduledReportItem[]
+  tenant     Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company    Company?                   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  project    Project?                   @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  createdBy  User                       @relation("ScheduledReportCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  items      ScheduledReportItem[]
   recipients ScheduledReportRecipient[]
 
   @@index([tenantId, status, nextRunAt])

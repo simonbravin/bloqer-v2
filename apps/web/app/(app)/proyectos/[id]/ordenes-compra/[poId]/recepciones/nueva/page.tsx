@@ -32,7 +32,7 @@ export default async function NuevaRecepcionPage({ params }: PageProps) {
     throw err;
   }
 
-  if (!["ISSUED", "PARTIALLY_RECEIVED"].includes(order.status)) {
+  if (!["CONFIRMED", "PARTIALLY_RECEIVED"].includes(order.status)) {
     redirect(`/proyectos/${id}/ordenes-compra/${poId}`);
   }
 

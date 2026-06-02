@@ -9,6 +9,7 @@ const purchaseOrderLineSchema = z.object({
   unitPrice:   z.string().regex(/^\d+(\.\d+)?$/, "Precio inválido"),
   taxRate:     z.string().regex(/^\d+(\.\d+)?$/).default("21"),
   sortOrder:   z.number().int().default(0),
+  varianceJustification: z.string().max(2000).optional().nullable(),
 });
 
 export const createPurchaseOrderSchema = z.object({

@@ -4,6 +4,9 @@ import {
   createPurchaseOrder,
   updatePurchaseOrder,
   issuePurchaseOrder,
+  submitPurchaseOrder,
+  approvePurchaseOrder,
+  confirmPurchaseOrder,
   cancelPurchaseOrder,
   createPurchaseReceipt,
   confirmPurchaseReceipt,
@@ -76,6 +79,49 @@ export async function updatePurchaseOrderAction(
   }
 }
 
+export async function submitPurchaseOrderAction(
+  poId: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    await submitPurchaseOrder(poId, ctx);
+    revalidatePO(projectId, poId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function approvePurchaseOrderAction(
+  poId: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    await approvePurchaseOrder(poId, ctx);
+    revalidatePO(projectId, poId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function confirmPurchaseOrderAction(
+  poId: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    await confirmPurchaseOrder(poId, ctx);
+    revalidatePO(projectId, poId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+/** Envía, aprueba (si aplica) y confirma en un paso — compatibilidad UI legacy. */
 export async function issuePurchaseOrderAction(
   poId: string,
   projectId: string,

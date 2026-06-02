@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getProcurementDeviationReport,
+  getPurchaseOrderVarianceReport,
   getProjectCostControl,
   getProjectShellInfo,
   ServiceError,
@@ -11,6 +12,7 @@ import {
   ProcurementSupplierTable,
   ProcurementUnallocatedTable,
   ProcurementWbsDeviationTable,
+  PurchaseOrderVarianceTable,
   ReportDateFilters,
 } from "@/features/reports";
 import { ReportExportActions } from "@/features/reports";
@@ -51,10 +53,12 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
 
   let report;
   let budgetProbe;
+  let poVariance;
   try {
-    [report, budgetProbe] = await Promise.all([
+    [report, budgetProbe, poVariance] = await Promise.all([
       getProcurementDeviationReport(projectId, filters, ctx),
       getProjectCostControl(projectId, { budgetId: sp.budgetId }, ctx),
+      getPurchaseOrderVarianceReport(projectId, ctx),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
@@ -148,6 +152,18 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
             </CardHeader>
             <CardContent>
               <ProcurementSupplierTable rows={report.bySupplier} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Desvíos en líneas de OC</CardTitle>
+              <CardDescription>
+                Líneas con varianza vs presupuesto (nota, aprobación extra o sin baseline)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PurchaseOrderVarianceTable rows={poVariance.rows} projectId={projectId} />
             </CardContent>
           </Card>
         </>

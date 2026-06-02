@@ -84,6 +84,8 @@ export const initiateUploadSchema = z
         "SUPPLIER_INVOICE",
         "PURCHASE_ORDER",
         "PURCHASE_RECEIPT",
+        "PURCHASE_REQUEST",
+        "PROCUREMENT_QUOTE",
         "SUBCONTRACT",
         "SUBCONTRACT_CERTIFICATION",
         "BUDGET",

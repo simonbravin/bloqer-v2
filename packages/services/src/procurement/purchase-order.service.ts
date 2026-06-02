@@ -1,12 +1,27 @@
-import { Prisma, prisma, PurchaseOrder, PurchaseOrderStatus } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { Prisma, prisma, PurchaseOrder } from "@bloqer/database";
 import type { CreatePurchaseOrderInput, UpdatePurchaseOrderInput } from "@bloqer/validators";
 import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { calcLine, recalcPurchaseOrderTotals } from "./purchase-order-calc.service";
-import { canViewProcurementProjectArea } from "./procurement-access";
+import {
+  canEditPurchaseOrders,
+  canViewProcurementProjectArea,
+} from "./procurement-access";
+import { PO_RECEIPT_ELIGIBLE_STATUSES } from "./procurement-constants";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertCompanyMatchesProject, assertWbsLineForProject } from "./procurement-wbs";
+import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
+import { assertDirectPoAllowed } from "./procurement-policy.service";
+import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
+import { onPurchaseOrderDraftCancelled } from "./purchase-request-to-po.service";
+
+export {
+  submitPurchaseOrder,
+  approvePurchaseOrder,
+  confirmPurchaseOrder,
+  issuePurchaseOrder,
+} from "./purchase-order-workflow.service";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -28,6 +43,9 @@ export type PurchaseOrderLineView = {
   receivedQuantity: string;
   remainingQuantity: string;
   sortOrder: number;
+  varianceTier: string;
+  variancePct: string | null;
+  varianceJustification: string | null;
 };
 
 export type PurchaseOrderView = Omit<PurchaseOrder, "subtotal" | "taxAmount" | "totalAmount"> & {
@@ -48,6 +66,9 @@ function serializeLine(
     quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; taxRate: Prisma.Decimal;
     lineSubtotal: Prisma.Decimal; lineTax: Prisma.Decimal; lineTotal: Prisma.Decimal;
     receivedQuantity: Prisma.Decimal; sortOrder: number;
+    varianceTier: string;
+    variancePct: Prisma.Decimal | null;
+    varianceJustification: string | null;
     wbsNode: { code: string; name: string } | null;
   },
 ): PurchaseOrderLineView {
@@ -70,6 +91,9 @@ function serializeLine(
     receivedQuantity:  l.receivedQuantity.toString(),
     remainingQuantity: remaining.lessThan(0) ? "0" : remaining.toString(),
     sortOrder:         l.sortOrder,
+    varianceTier:      l.varianceTier,
+    variancePct:       l.variancePct?.toString() ?? null,
+    varianceJustification: l.varianceJustification,
   };
 }
 
@@ -141,7 +165,7 @@ export async function listLinkablePurchaseOrders(
     where: {
       projectId,
       tenantId: ctx.tenantId,
-      status: { in: ["ISSUED", "PARTIALLY_RECEIVED", "RECEIVED"] },
+      status: { in: [...PO_RECEIPT_ELIGIBLE_STATUSES] },
     },
     select: { id: true, number: true, supplierContactId: true, currency: true, status: true },
     orderBy: { number: "asc" },
@@ -247,7 +271,7 @@ export async function createPurchaseOrder(
   ctx: ServiceContext,
 ): Promise<PurchaseOrderView> {
   await assertProcurementTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "PROCUREMENT")) {
+  if (!canEditPurchaseOrders(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear órdenes de compra");
   }
 
@@ -261,25 +285,25 @@ export async function createPurchaseOrder(
     throw new ServiceError("CONFLICT", "El contacto seleccionado no tiene rol de proveedor activo");
   }
 
-  // WBS node validation: only ITEM type, from APPROVED/CLOSED budgets
   for (const line of input.lines) {
     if (line.wbsNodeId) {
-      const wbsNode = await prisma.wbsNode.findUnique({
-        where: { id: line.wbsNodeId },
-        include: { budget: { select: { projectId: true, status: true } } },
-      });
-      if (!wbsNode) throw new ServiceError("NOT_FOUND", `Nodo WBS no encontrado: ${line.wbsNodeId}`);
-      if (wbsNode.type !== "ITEM") throw new ServiceError("CONFLICT", "Solo se permiten nodos WBS de tipo ITEM");
-      if (wbsNode.budget.projectId !== input.projectId) {
-        throw new ServiceError("CONFLICT", "El nodo WBS no pertenece al proyecto");
-      }
-      if (!["APPROVED", "CLOSED"].includes(wbsNode.budget.status)) {
-        throw new ServiceError("CONFLICT", "Solo se permiten nodos WBS de presupuestos APROBADOS o CERRADOS");
-      }
+      await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId);
     }
   }
 
   const companyId = await resolveCompanyId(input.projectId, ctx);
+  await assertCompanyMatchesProject(companyId, input.projectId, ctx.tenantId);
+
+  let estimatedTotal = new Prisma.Decimal(0);
+  for (const line of input.lines) {
+    const qty = new Prisma.Decimal(line.quantity);
+    const price = new Prisma.Decimal(line.unitPrice);
+    const rate = new Prisma.Decimal(line.taxRate ?? "0");
+    estimatedTotal = estimatedTotal.plus(calcLine(qty, price, rate).lineTotal);
+  }
+  const settings = await getCompanyProcurementSettingsForProject(input.projectId, ctx);
+  const fx = computeDocumentFxAmounts(input.currency ?? "ARS", estimatedTotal, null);
+  assertDirectPoAllowed(settings, fx.amountArs, ctx);
 
   const maxNum = await prisma.purchaseOrder.aggregate({
     where: { tenantId: ctx.tenantId, companyId },
@@ -300,6 +324,7 @@ export async function createPurchaseOrder(
         currency:            input.currency ?? "ARS",
         notes:               input.notes ?? null,
         internalNotes:       input.internalNotes ?? null,
+        originRequestedByUserId: ctx.actorUserId,
         createdBy:           ctx.actorUserId,
         updatedBy:           ctx.actorUserId,
       },
@@ -351,7 +376,7 @@ export async function updatePurchaseOrder(
   ctx: ServiceContext,
 ): Promise<PurchaseOrderView> {
   await assertProcurementTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "PROCUREMENT")) {
+  if (!canEditPurchaseOrders(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar órdenes de compra");
   }
 
@@ -405,8 +430,14 @@ export async function updatePurchaseOrder(
     });
 
     if (input.lines) {
+      const previousLines = await tx.purchaseOrderLine.findMany({ where: { purchaseOrderId: id } });
       await tx.purchaseOrderLine.deleteMany({ where: { purchaseOrderId: id } });
       for (const line of input.lines) {
+        const prev = previousLines.find(
+          (p) =>
+            p.wbsNodeId === (line.wbsNodeId ?? null) &&
+            p.description === line.description,
+        );
         const qty   = new Prisma.Decimal(line.quantity);
         const price = new Prisma.Decimal(line.unitPrice);
         const rate  = new Prisma.Decimal(line.taxRate ?? "0");
@@ -425,6 +456,14 @@ export async function updatePurchaseOrder(
             lineTax,
             lineTotal,
             sortOrder:       line.sortOrder ?? 0,
+            budgetUnitCostSnapshot: prev?.budgetUnitCostSnapshot ?? null,
+            varianceJustification:
+              line.varianceJustification !== undefined
+                ? line.varianceJustification
+                : prev?.varianceJustification ?? null,
+            varianceTier: prev?.varianceTier ?? "NONE",
+            variancePct: prev?.variancePct ?? null,
+            varianceUnitMismatch: prev?.varianceUnitMismatch ?? false,
           },
         });
       }
@@ -446,48 +485,9 @@ export async function updatePurchaseOrder(
   return serializePO(po);
 }
 
-export async function issuePurchaseOrder(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
-  await assertProcurementTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "PROCUREMENT")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para emitir órdenes de compra");
-  }
-
-  const existing = await prisma.purchaseOrder.findUnique({ where: { id } });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
-  assertDraft(existing);
-
-  const lineCount = await prisma.purchaseOrderLine.count({ where: { purchaseOrderId: id } });
-  if (lineCount === 0) throw new ServiceError("CONFLICT", "La orden de compra debe tener al menos una línea");
-
-  const po = await prisma.$transaction(async (tx) => {
-    await recalcPurchaseOrderTotals(tx, id);
-    const updated = await tx.purchaseOrder.update({
-      where: { id },
-      data: { status: PurchaseOrderStatus.ISSUED, updatedBy: ctx.actorUserId },
-    });
-    if (updated.totalAmount.lessThanOrEqualTo(0)) {
-      throw new ServiceError("CONFLICT", "El monto total de la orden debe ser mayor a cero");
-    }
-    const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: poInclude });
-    await auditProcurement(
-      ctx,
-      "purchase_order.issued",
-      "PurchaseOrder",
-      id,
-      { projectId: po.projectId, companyId: po.companyId },
-      { after: { number: po.number, totalAmount: po.totalAmount.toString() }, tx },
-    );
-    return po;
-  });
-
-  return serializePO(po);
-}
-
 export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
   await assertProcurementTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "PROCUREMENT")) {
+  if (!canEditPurchaseOrders(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para anular órdenes de compra");
   }
 
@@ -497,6 +497,9 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
 
   if (existing.status === "CANCELLED") {
     throw new ServiceError("CONFLICT", "La orden de compra ya está anulada");
+  }
+  if (existing.status === "PARTIALLY_RECEIVED" || existing.status === "RECEIVED") {
+    throw new ServiceError("CONFLICT", "No se puede anular una orden con recepciones registradas");
   }
 
   // Block if any CONFIRMED receipts exist
@@ -514,6 +517,8 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
   if (linkedInvoices > 0) {
     throw new ServiceError("CONFLICT", "No se puede anular: hay facturas de proveedor vinculadas activas");
   }
+
+  const wasDraft = existing.status === "DRAFT";
 
   const po = await prisma.$transaction(async (tx) => {
     const draftReceipts = await tx.purchaseReceipt.findMany({
@@ -547,9 +552,13 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
 
     const cancelled = await tx.purchaseOrder.update({
       where: { id },
-      data: { status: PurchaseOrderStatus.CANCELLED, updatedBy: ctx.actorUserId },
+      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
       include: poInclude,
     });
+
+    if (wasDraft && existing.purchaseRequestId) {
+      await onPurchaseOrderDraftCancelled(id, ctx, tx);
+    }
 
     await auditProcurement(
       ctx,

@@ -19,7 +19,7 @@ export type ProjectCancellationImpact = {
   reactivationTargetStatus: ProjectStatus | null;
 };
 
-const OPEN_PO_STATUSES = ["ISSUED", "PARTIALLY_RECEIVED"] as const;
+const OPEN_PO_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "SUBMITTED", "APPROVED"] as const;
 const OPEN_CERT_STATUSES = ["DRAFT", "ISSUED", "APPROVED"] as const;
 const OPEN_OBLIGATION_STATUSES = ["OPEN", "PARTIAL", "OVERDUE"] as const;
 
@@ -29,6 +29,7 @@ export async function countOpenOperationalDocuments(
 ): Promise<ProjectCancellationImpactBlocker[]> {
   const [
     openPurchaseOrders,
+    openPurchaseRequests,
     openCertifications,
     issuedSupplierInvoices,
     issuedSalesInvoices,
@@ -40,6 +41,9 @@ export async function countOpenOperationalDocuments(
   ] = await Promise.all([
     prisma.purchaseOrder.count({
       where: { projectId, tenantId, status: { in: [...OPEN_PO_STATUSES] } },
+    }),
+    prisma.purchaseRequest.count({
+      where: { projectId, tenantId, status: { in: ["DRAFT", "SUBMITTED", "QUOTE_SELECTED"] } },
     }),
     prisma.certification.count({
       where: { projectId, tenantId, status: { in: [...OPEN_CERT_STATUSES] } },
@@ -70,6 +74,13 @@ export async function countOpenOperationalDocuments(
   const blockers: ProjectCancellationImpactBlocker[] = [];
   if (openPurchaseOrders > 0) {
     blockers.push({ key: "purchase_orders", label: "Órdenes de compra abiertas", count: openPurchaseOrders });
+  }
+  if (openPurchaseRequests > 0) {
+    blockers.push({
+      key: "purchase_requests",
+      label: "Solicitudes de compra abiertas",
+      count: openPurchaseRequests,
+    });
   }
   if (openCertifications > 0) {
     blockers.push({ key: "certifications", label: "Certificaciones abiertas", count: openCertifications });

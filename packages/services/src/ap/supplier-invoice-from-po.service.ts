@@ -21,7 +21,7 @@ import {
   type PoLineForInvoiceDraft,
 } from "./supplier-invoice-from-po-pure";
 
-const LINKABLE_PO_STATUSES = ["ISSUED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
+const LINKABLE_PO_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
 
 export type PurchaseOrderBillingSummary = {
   receivedAmount: string;

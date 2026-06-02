@@ -40,6 +40,7 @@ export function PurchaseOrderEditForm({ projectId, order, suppliers, wbsOptions,
           quantity:    l.quantity,
           unitPrice:   l.unitPrice,
           taxRate:     l.taxRate,
+          varianceJustification: l.varianceJustification,
         }))
       : [{ wbsNodeId: null, productId: null, description: "", unit: "", quantity: "1", unitPrice: "", taxRate: "21" }],
   );
@@ -105,7 +106,13 @@ export function PurchaseOrderEditForm({ projectId, order, suppliers, wbsOptions,
 
         <hr />
 
-        <PurchaseOrderLinesEditor lines={lines} onChange={setLines} wbsOptions={wbsOptions} productOptions={productOptions} />
+        <PurchaseOrderLinesEditor
+          lines={lines}
+          onChange={setLines}
+          wbsOptions={wbsOptions}
+          productOptions={productOptions}
+          showVarianceJustification
+        />
 
         <hr />
 

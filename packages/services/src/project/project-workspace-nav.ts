@@ -75,7 +75,8 @@ export function buildProjectWorkspaceNavSections(
     finanzasProyecto.push({ label: "Flujo de caja", href: `${base}/flujo-caja` });
   }
   if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) {
-    finanzasProyecto.push({ label: "Compras", href: `${base}/ordenes-compra` });
+    finanzasProyecto.push({ label: "Solicitudes de compra", href: `${base}/solicitudes-compra` });
+    finanzasProyecto.push({ label: "Órdenes de compra", href: `${base}/ordenes-compra` });
   }
   if (gate.isEnabled("SUBCONTRACTS") && (can(roles, "VIEW", "SUBCONTRACTS") || can(roles, "VIEW", "PROJECTS"))) {
     finanzasProyecto.push({ label: "Subcontratos", href: `${base}/subcontratos` });

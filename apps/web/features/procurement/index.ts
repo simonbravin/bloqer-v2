@@ -1,4 +1,5 @@
 export { PurchaseOrderStatusBadge } from "./components/purchase-order-status-badge";
+export { PurchaseRequestStatusBadge } from "./components/purchase-request-status-badge";
 export { PurchaseReceiptStatusBadge } from "./components/purchase-receipt-status-badge";
 export { PurchaseOrderLinesEditor } from "./components/purchase-order-lines-editor";
 export type { PurchaseOrderLine, WbsOption, ProductOption } from "./components/purchase-order-lines-editor";

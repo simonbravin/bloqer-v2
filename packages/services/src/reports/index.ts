@@ -1,6 +1,7 @@
 export * from "./budget-variance.service";
 export * from "./certification-evolution.service";
 export * from "./procurement-deviation.service";
+export * from "./purchase-order-variance-report.service";
 export * from "./material-variance.service";
 export * from "./subcontract-variance.service";
 export * from "./project-income-expense.service";

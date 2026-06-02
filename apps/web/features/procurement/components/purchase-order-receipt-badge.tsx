@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 
 const MAP = {
   DRAFT:              { label: "—",           variant: "outline" as const },
+  CONFIRMED:          { label: "Pendiente",   variant: "secondary" as const },
   ISSUED:             { label: "Pendiente",   variant: "secondary" as const },
   PARTIALLY_RECEIVED: { label: "Parcial",     variant: "outline" as const },
   RECEIVED:           { label: "Recibida",    variant: "default" as const },

@@ -10,6 +10,23 @@ import { resolvePagination } from "../finance/pagination";
 import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
+import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
+import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
+
+const PO_AP_LINKABLE_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
+
+function assertPurchaseOrderLinkableForAp(status: string): void {
+  if (status === "CANCELLED") {
+    throw new ServiceError("CONFLICT", "No se puede vincular a una orden de compra anulada");
+  }
+  if (!PO_AP_LINKABLE_STATUSES.includes(status as (typeof PO_AP_LINKABLE_STATUSES)[number])) {
+    throw new ServiceError(
+      "CONFLICT",
+      "La orden debe estar confirmada al proveedor antes de vincular una factura",
+    );
+  }
+}
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -287,12 +304,7 @@ export async function createSupplierInvoice(
     const po = await prisma.purchaseOrder.findUnique({ where: { id: input.purchaseOrderId } });
     if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
     if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    if (po.status === "CANCELLED") {
-      throw new ServiceError("CONFLICT", "No se puede vincular a una orden de compra anulada");
-    }
-    if (po.status === "DRAFT") {
-      throw new ServiceError("CONFLICT", "No se puede vincular a una orden de compra en borrador");
-    }
+    assertPurchaseOrderLinkableForAp(po.status);
     if (po.projectId !== projectId) {
       throw new ServiceError("CONFLICT", "La orden de compra no pertenece al mismo proyecto");
     }
@@ -302,6 +314,23 @@ export async function createSupplierInvoice(
     if (po.currency !== (input.currency ?? "ARS")) {
       throw new ServiceError("CONFLICT", "La moneda de la factura no coincide con la de la orden de compra");
     }
+  }
+
+  let invoiceTotal = new Prisma.Decimal(0);
+  for (const line of input.lines) {
+    const qty = new Prisma.Decimal(line.quantity);
+    const price = new Prisma.Decimal(line.unitPrice);
+    const rate = new Prisma.Decimal(line.taxRate ?? "0");
+    invoiceTotal = invoiceTotal.plus(calcLine(qty, price, rate).lineTotal);
+  }
+  const estimatedFx = computeDocumentFxAmounts(
+    input.currency ?? "ARS",
+    invoiceTotal,
+    input.fxRate ? new Prisma.Decimal(input.fxRate) : null,
+  );
+  if (projectId && !input.purchaseOrderId) {
+    const settings = await getCompanyProcurementSettingsForProject(projectId, ctx);
+    assertProjectApDirectSpendAllowed(settings, estimatedFx.amountArs, ctx);
   }
 
   const companyId = await resolveCompanyIdForAp(projectId, ctx);
@@ -417,12 +446,7 @@ export async function updateSupplierInvoice(
     const po = await prisma.purchaseOrder.findUnique({ where: { id: input.purchaseOrderId } });
     if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
     if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    if (po.status === "CANCELLED") {
-      throw new ServiceError("CONFLICT", "No se puede vincular a una orden de compra anulada");
-    }
-    if (po.status === "DRAFT") {
-      throw new ServiceError("CONFLICT", "No se puede vincular a una orden de compra en borrador");
-    }
+    assertPurchaseOrderLinkableForAp(po.status);
     if (po.projectId !== existing.projectId) {
       throw new ServiceError("CONFLICT", "La orden de compra no pertenece al mismo proyecto");
     }

@@ -29,6 +29,7 @@ export type PurchaseOrderLine = {
   quantity: string;
   unitPrice: string;
   taxRate: string;
+  varianceJustification?: string | null;
 };
 
 export type WbsOption     = { id: string; code: string; name: string; budgetName: string };
@@ -53,13 +54,21 @@ interface Props {
   onChange: (lines: PurchaseOrderLine[]) => void;
   wbsOptions: WbsOption[];
   productOptions?: ProductOption[];
+  /** Muestra campo de justificación de desvío presupuestario por línea (OC en borrador). */
+  showVarianceJustification?: boolean;
 }
 
 const DEFAULT_LINE: PurchaseOrderLine = {
   wbsNodeId: null, productId: null, description: "", unit: "", quantity: "1", unitPrice: "", taxRate: "21",
 };
 
-export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productOptions = [] }: Props) {
+export function PurchaseOrderLinesEditor({
+  lines,
+  onChange,
+  wbsOptions,
+  productOptions = [],
+  showVarianceJustification = false,
+}: Props) {
   const wbsComboboxOptions = useMemo(
     () => withNoneOption(wbsToSearchableOptions(wbsOptions), { label: "Sin WBS" }),
     [wbsOptions],
@@ -111,6 +120,9 @@ export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productO
               <TableHead className="w-[8%]">Cant.</TableHead>
               <TableHead className="w-[12%]">Precio unit.</TableHead>
               <TableHead className="w-[7%]">IVA %</TableHead>
+              {showVarianceJustification && (
+                <TableHead className="w-[14%]">Justif. desvío</TableHead>
+              )}
               <TableHead className="w-[10%] text-right">Subtotal</TableHead>
               <TableHead className="w-[7%] text-right">IVA</TableHead>
               <TableHead className="w-[8%] text-right">Total</TableHead>
@@ -197,6 +209,16 @@ export function PurchaseOrderLinesEditor({ lines, onChange, wbsOptions, productO
                       className="h-8 text-sm"
                     />
                   </TableCell>
+                  {showVarianceJustification && (
+                    <TableCell className="py-1.5">
+                      <Input
+                        value={line.varianceJustification ?? ""}
+                        onChange={(e) => update(i, "varianceJustification", e.target.value)}
+                        placeholder="Si supera presupuesto…"
+                        className="h-8 text-sm"
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.subtotal)}</TableCell>
                   <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.tax)}</TableCell>
                   <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.total)}</TableCell>

@@ -247,12 +247,12 @@ stateDiagram-v2
   SUBMITTED --> DRAFT : rechazar / devolver
   APPROVED --> CONFIRMED : confirmar al proveedor
   APPROVED --> CANCELLED : cancelar
-  CONFIRMED --> RECEIVED_PARTIAL : recepcion parcial
-  CONFIRMED --> RECEIVED_FULL : recepcion completa
+  CONFIRMED --> PARTIALLY_RECEIVED : recepcion parcial
+  CONFIRMED --> RECEIVED : recepcion completa
   CONFIRMED --> CANCELLED : cancelar
-  RECEIVED_PARTIAL --> RECEIVED_FULL : recepcion completa
-  RECEIVED_PARTIAL --> CANCELLED : cancelar (con saldo)
-  RECEIVED_FULL --> [*]
+  PARTIALLY_RECEIVED --> RECEIVED : recepcion completa
+  PARTIALLY_RECEIVED --> CANCELLED : cancelar (con saldo)
+  RECEIVED --> [*]
   CANCELLED --> [*]
 ```
 
@@ -862,7 +862,9 @@ stateDiagram-v2
 | Addendum | DRAFT, IN_REVIEW, APPROVED, SIGNED, CANCELLED |
 | Certification | DRAFT, ISSUED, APPROVED, REJECTED, CANCELLED (+ `payment_status` derivado) |
 | SalesInvoice | DRAFT, ISSUED, PAID, OVERDUE, CANCELLED |
-| PurchaseOrder | DRAFT, SUBMITTED, APPROVED, CONFIRMED, RECEIVED_PARTIAL, RECEIVED_FULL, CANCELLED |
+| PurchaseOrder | DRAFT, SUBMITTED, APPROVED, CONFIRMED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED |
+| PurchaseRequest | DRAFT, SUBMITTED, QUOTE_SELECTED, COMPLETED, CANCELLED |
+| ProcurementQuote | DRAFT, RECEIVED, SELECTED, REJECTED, SUPERSEDED |
 | Receipt | DRAFT, CONFIRMED, CANCELLED |
 | StockMovement | DRAFT, CONFIRMED, CANCELLED |
 | PurchaseInvoice | DRAFT, ISSUED, APPROVED, PAID, OVERDUE, CANCELLED |

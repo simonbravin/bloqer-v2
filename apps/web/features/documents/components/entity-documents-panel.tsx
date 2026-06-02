@@ -44,6 +44,8 @@ export type EntityDocumentsLink =
   | { type: "SUPPLIER_INVOICE"; id: string }
   | { type: "PURCHASE_ORDER"; id: string }
   | { type: "PURCHASE_RECEIPT"; id: string }
+  | { type: "PURCHASE_REQUEST"; id: string }
+  | { type: "PROCUREMENT_QUOTE"; id: string }
   | { type: "SUBCONTRACT"; id: string }
   | { type: "SUBCONTRACT_CERTIFICATION"; id: string; subcontractId: string }
   | { type: "BUDGET"; id: string };
@@ -126,6 +128,26 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
         emptyMessage: "No hay adjuntos en esta recepción.",
         defaultCategory: "RECEIPT",
         uploadHint: "Remito o evidencia de recepción",
+      };
+    }
+    case "PURCHASE_REQUEST": {
+      const p = `/proyectos/${projectId}/solicitudes-compra/${linkedEntity.id}`;
+      return {
+        revalidateExtra: [p],
+        afterUploadPath: p,
+        emptyMessage: "No hay adjuntos en esta solicitud.",
+        defaultCategory: "OTHER",
+        uploadHint: "Especificación, plano o detalle del pedido",
+      };
+    }
+    case "PROCUREMENT_QUOTE": {
+      const p = `/proyectos/${projectId}/solicitudes-compra`;
+      return {
+        revalidateExtra: [p],
+        afterUploadPath: p,
+        emptyMessage: "No hay adjuntos en esta cotización.",
+        defaultCategory: "INVOICE",
+        uploadHint: "Presupuesto o cotización del proveedor",
       };
     }
     case "SUBCONTRACT": {

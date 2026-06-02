@@ -130,6 +130,8 @@ type DocumentUploadPlan = {
     | "SUPPLIER_INVOICE"
     | "PURCHASE_ORDER"
     | "PURCHASE_RECEIPT"
+    | "PURCHASE_REQUEST"
+    | "PROCUREMENT_QUOTE"
     | "SUBCONTRACT"
     | "SUBCONTRACT_CERTIFICATION"
     | "BUDGET";
@@ -159,6 +161,14 @@ async function resolveDocumentUploadPlan(
   const linkedPurchaseReceipt =
     input.linkedEntityType === "PURCHASE_RECEIPT" && input.linkedEntityId
       ? { purchaseReceiptId: input.linkedEntityId as string }
+      : null;
+  const linkedPurchaseRequest =
+    input.linkedEntityType === "PURCHASE_REQUEST" && input.linkedEntityId
+      ? { purchaseRequestId: input.linkedEntityId as string }
+      : null;
+  const linkedProcurementQuote =
+    input.linkedEntityType === "PROCUREMENT_QUOTE" && input.linkedEntityId
+      ? { procurementQuoteId: input.linkedEntityId as string }
       : null;
   const linkedSubcontract =
     input.linkedEntityType === "SUBCONTRACT" && input.linkedEntityId
@@ -288,6 +298,14 @@ async function resolveDocumentUploadPlan(
     await assertPurchaseReceiptDocumentTarget(strictProjectId!, linkedPurchaseReceipt.purchaseReceiptId, ctx);
     linkedEntityType = "PURCHASE_RECEIPT";
     linkedEntityId   = linkedPurchaseReceipt.purchaseReceiptId;
+  } else if (linkedPurchaseRequest) {
+    await assertPurchaseRequestDocumentTarget(strictProjectId!, linkedPurchaseRequest.purchaseRequestId, ctx);
+    linkedEntityType = "PURCHASE_REQUEST";
+    linkedEntityId   = linkedPurchaseRequest.purchaseRequestId;
+  } else if (linkedProcurementQuote) {
+    await assertProcurementQuoteDocumentTarget(strictProjectId!, linkedProcurementQuote.procurementQuoteId, ctx);
+    linkedEntityType = "PROCUREMENT_QUOTE";
+    linkedEntityId   = linkedProcurementQuote.procurementQuoteId;
   } else if (linkedSubcontract) {
     await assertSubcontractDocumentTarget(strictProjectId!, linkedSubcontract.subcontractId, ctx);
     linkedEntityType = "SUBCONTRACT";
@@ -574,6 +592,8 @@ export async function listEntityDocuments(
     "SUPPLIER_INVOICE",
     "PURCHASE_ORDER",
     "PURCHASE_RECEIPT",
+    "PURCHASE_REQUEST",
+    "PROCUREMENT_QUOTE",
     "SUBCONTRACT",
     "SUBCONTRACT_CERTIFICATION",
     "BUDGET",
@@ -613,6 +633,20 @@ export async function listEntityDocuments(
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la recepción");
     }
     await assertPurchaseReceiptDocumentTarget(options!.projectId!, entityId, ctx);
+  } else if (entityType === "PURCHASE_REQUEST") {
+    if (
+      !can(ctx.roles, "VIEW", "PURCHASE_REQUESTS") &&
+      !can(ctx.roles, "VIEW", "PROCUREMENT") &&
+      !can(ctx.roles, "VIEW", "PROJECTS")
+    ) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la solicitud");
+    }
+    await assertPurchaseRequestDocumentTarget(options!.projectId!, entityId, ctx);
+  } else if (entityType === "PROCUREMENT_QUOTE") {
+    if (!can(ctx.roles, "VIEW", "PROCUREMENT") && !can(ctx.roles, "VIEW", "PROJECTS")) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la cotización");
+    }
+    await assertProcurementQuoteDocumentTarget(options!.projectId!, entityId, ctx);
   } else if (entityType === "SUBCONTRACT") {
     if (!can(ctx.roles, "VIEW", "SUBCONTRACTS") && !can(ctx.roles, "VIEW", "PROJECTS")) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos del subcontrato");
@@ -850,6 +884,40 @@ async function assertPurchaseReceiptDocumentTarget(
   }
 }
 
+async function assertPurchaseRequestDocumentTarget(
+  projectId: string,
+  purchaseRequestId: string,
+  ctx: ServiceContext,
+): Promise<void> {
+  const pr = await prisma.purchaseRequest.findUnique({
+    where: { id: purchaseRequestId },
+    select: { id: true, tenantId: true, projectId: true },
+  });
+  if (!pr || pr.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Solicitud de compra no encontrada");
+  }
+  if (pr.projectId !== projectId) {
+    throw new ServiceError("FORBIDDEN", "La solicitud no pertenece a este proyecto");
+  }
+}
+
+async function assertProcurementQuoteDocumentTarget(
+  projectId: string,
+  procurementQuoteId: string,
+  ctx: ServiceContext,
+): Promise<void> {
+  const quote = await prisma.procurementQuote.findUnique({
+    where: { id: procurementQuoteId },
+    include: { purchaseRequest: { select: { projectId: true, tenantId: true } } },
+  });
+  if (!quote || quote.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Cotización no encontrada");
+  }
+  if (quote.purchaseRequest.projectId !== projectId) {
+    throw new ServiceError("FORBIDDEN", "La cotización no pertenece a este proyecto");
+  }
+}
+
 async function assertSubcontractDocumentTarget(
   projectId:    string,
   subcontractId: string,
@@ -893,9 +961,14 @@ function canViewDocumentByLink(
   if (linkedEntityType === "CERTIFICATION" && can(ctx.roles, "VIEW", "CERTIFICATIONS")) return true;
   if (linkedEntityType === "SUPPLIER_INVOICE" && can(ctx.roles, "VIEW", "AP")) return true;
   if (
-    (linkedEntityType === "PURCHASE_ORDER" || linkedEntityType === "PURCHASE_RECEIPT") &&
+    (linkedEntityType === "PURCHASE_ORDER" ||
+      linkedEntityType === "PURCHASE_RECEIPT" ||
+      linkedEntityType === "PROCUREMENT_QUOTE") &&
     can(ctx.roles, "VIEW", "PROCUREMENT")
   ) {
+    return true;
+  }
+  if (linkedEntityType === "PURCHASE_REQUEST" && can(ctx.roles, "VIEW", "PURCHASE_REQUESTS")) {
     return true;
   }
   if (
@@ -925,8 +998,11 @@ function canMutateDocumentByLink(
   if (t === "SUPPLIER_INVOICE") {
     return can(ctx.roles, "EDIT", "AP");
   }
-  if (t === "PURCHASE_ORDER" || t === "PURCHASE_RECEIPT") {
+  if (t === "PURCHASE_ORDER" || t === "PURCHASE_RECEIPT" || t === "PROCUREMENT_QUOTE") {
     return can(ctx.roles, "EDIT", "PROCUREMENT");
+  }
+  if (t === "PURCHASE_REQUEST") {
+    return can(ctx.roles, "EDIT", "PURCHASE_REQUESTS");
   }
   if (t === "SUBCONTRACT" || t === "SUBCONTRACT_CERTIFICATION") {
     return can(ctx.roles, "EDIT", "SUBCONTRACTS");
@@ -943,7 +1019,10 @@ function linkedEntityTypeToPermissionModule(linkedEntityType: string | null): Pe
   if (t === "JOBSITE_LOG") return "JOBSITE_LOG";
   if (t === "CERTIFICATION") return "CERTIFICATIONS";
   if (t === "SUPPLIER_INVOICE") return "AP";
-  if (t === "PURCHASE_ORDER" || t === "PURCHASE_RECEIPT") return "PROCUREMENT";
+  if (t === "PURCHASE_ORDER" || t === "PURCHASE_RECEIPT" || t === "PROCUREMENT_QUOTE") {
+    return "PROCUREMENT";
+  }
+  if (t === "PURCHASE_REQUEST") return "PURCHASE_REQUESTS";
   if (t === "SUBCONTRACT" || t === "SUBCONTRACT_CERTIFICATION") return "SUBCONTRACTS";
   if (t === "BUDGET") return "BUDGETS";
   return "PROJECTS";

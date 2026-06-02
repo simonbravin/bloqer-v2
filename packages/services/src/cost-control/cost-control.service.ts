@@ -38,7 +38,7 @@ export type CostControlRow = {
   certifiedIssued: string;   // Certification.status = ISSUED
   certifiedApproved: string; // Certification.status = APPROVED (primary KPI)
   // ─ Cost layers (shown separately — no double-counting) ─
-  committedCost: string;         // ISSUED POs + ACTIVE subcontracts
+  committedCost: string;         // CONFIRMED POs + ACTIVE subcontracts
   receivedCost: string;          // CONFIRMED receipts (qty × unit price via POLine)
   accruedCost: string;           // ISSUED SupplierInvoices (PO-linked proportional) + APPROVED SubcontractCertifications
   paidCost: string;              // CONFIRMED Payments traceable to WBS
@@ -321,7 +321,7 @@ export async function getProjectCostControl(
           where: {
             purchaseOrder: {
               projectId, tenantId: ctx.tenantId,
-              status: { in: ["ISSUED", "PARTIALLY_RECEIVED", "RECEIVED"] },
+              status: { in: ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] },
               ...(dateWhere(dateFrom, dateTo) ? { issueDate: dateWhere(dateFrom, dateTo) } : {}),
             },
           },

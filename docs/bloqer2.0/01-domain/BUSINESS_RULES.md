@@ -184,6 +184,26 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 ### BR-PUR-007 — Imputación obligatoria a proyecto o categoría
 - **Regla:** una OC/factura debe imputarse a un `project_id` o tener líneas con `wbs_node_id`. Si es general (sin proyecto), se imputa a una categoría de costo de la empresa.
 
+### BR-PUR-008 — Solicitud obligatoria sobre umbral
+- **Regla:** si el monto estimado en ARS de una OC directa o compra supera `CompanyProcurementSettings.purchaseRequestRequiredAboveArs`, debe existir una `PurchaseRequest` completada con cotizaciones mínimas antes de confirmar la OC, salvo compra de emergencia documentada por OWNER/ADMIN.
+- **Origen:** [D-044](../00-product/DECISION_LOG.md).
+
+### BR-PUR-009 — Tiers de varianza presupuestaria en OC
+- **Regla:** al enviar una OC, cada línea calcula `varianceTier`: `NONE` (&lt; soft %), `NOTE_REQUIRED` (soft–extra %), `EXTRA_APPROVAL` (≥ extra %), `UNIT_MISMATCH` (unidad distinta al WBS), `NO_BUDGET_BASELINE` (sin costo APU). `NOTE_REQUIRED` y superiores exigen `varianceJustification`; `EXTRA_APPROVAL` exige aprobador de alto nivel.
+- **Origen:** [D-044](../00-product/DECISION_LOG.md).
+
+### BR-PUR-010 — Cotizaciones mínimas antes de seleccionar
+- **Regla:** no se puede generar OC desde cotización hasta tener al menos `minQuotesRequired` cotizaciones en estado `RECEIVED` para la solicitud, y la cotización elegida no debe estar vencida (`validUntil`).
+- **Origen:** [D-044](../00-product/DECISION_LOG.md).
+
+### BR-APR-004 — Segregación solicitante vs aprobador OC
+- **Regla:** quien originó la solicitud (`originRequestedByUserId` o `PurchaseRequest.requestedByUserId`) no puede aprobar la OC vinculada, salvo `allowSelfApproval` y sin varianza `EXTRA_APPROVAL` ni umbral de alto monto.
+- **Origen:** [D-044](../00-product/DECISION_LOG.md).
+
+### BR-APR-005 — Factura directa a obra sobre umbral
+- **Regla:** una `SupplierInvoice` de proyecto sin `purchaseOrderId` cuyo total en ARS supere `purchaseRequestRequiredAboveArs` solo puede registrarse por roles con `APPROVE AP` u OWNER/ADMIN, salvo que exista OC confirmada o solicitud completada que respalde el gasto.
+- **Origen:** [D-044](../00-product/DECISION_LOG.md).
+
 ---
 
 ## 8. Reglas de inventario

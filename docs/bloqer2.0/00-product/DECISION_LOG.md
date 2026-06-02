@@ -557,6 +557,22 @@
 
 ---
 
+### D-044 — Solicitud de compra, cotizaciones y flujo de OC
+
+- **Fecha:** 2026-06-01
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (plan compras + auditoría)
+- **Decisión:**
+  1. Entidades `PurchaseRequest`, `ProcurementQuote` y settings `CompanyProcurementSettings` (1:1 `Company`).
+  2. OC: `DRAFT` → `SUBMITTED` → `APPROVED` → `CONFIRMED` → recepciones; migración `ISSUED` → `CONFIRMED`.
+  3. `committed_amount` solo al confirmar al proveedor ([D-006]).
+  4. Fase 1: una OC activa por solicitud; cotizaciones mínimas configurables.
+  5. Permisos: `PURCHASE_REQUESTS` (PM/capataz EDIT); compras aprueba/confirma OC.
+- **Implicancias:** services en `packages/services/src/procurement/*`, UI en `/solicitudes-compra`, gate AP [BR-APR-005].
+- **Documentos afectados:** [`02-modules/PURCHASE_REQUESTS.md`](../02-modules/PURCHASE_REQUESTS.md), [`01-domain/STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7, [`00-product/PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
