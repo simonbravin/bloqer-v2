@@ -124,8 +124,7 @@ export function ProjectCashPositionProjectionPanel({
 
             {!active ? (
               <p className="text-sm text-muted-foreground">
-                Usá &quot;Flujo proyectado&quot; o elegí una fecha y presioná Aplicar para ver los
-                indicadores.
+                Elegí una fecha y presioná Aplicar para ver los indicadores.
               </p>
             ) : !row ? (
               <p className="text-sm text-muted-foreground">
@@ -204,5 +203,3 @@ export function ProjectCashPositionProjectionPanel({
     </div>
   );
 }
-
-export { PROJECTION_ANCHOR };
