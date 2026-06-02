@@ -4,7 +4,7 @@ import { calcLine } from "./purchase-order-calc.service";
 import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { canEditPurchaseOrders, canViewProcurementProjectArea } from "./procurement-access";
+import { canEditPurchaseOrders, canViewPurchaseRequests } from "./procurement-access";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 
@@ -151,7 +151,7 @@ export async function listProcurementQuotesForRequest(
   }>
 > {
   await assertProcurementTenantModule(ctx);
-  if (!canViewProcurementProjectArea(ctx.roles)) {
+  if (!canViewPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
   const quotes = await prisma.procurementQuote.findMany({

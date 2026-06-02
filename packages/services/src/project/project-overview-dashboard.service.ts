@@ -17,7 +17,11 @@ import { getProjectProfitabilityKpi } from "../reports/project-profitability.ser
 import { computeProjectScheduleProgressPct } from "../schedule/schedule-workspace.service";
 import { canViewArProjectArea } from "../ar/ar-access";
 import { canViewApProjectArea } from "../ap/ap-access";
-import { canViewProcurementProjectArea } from "../procurement/procurement-access";
+import {
+  canEditPurchaseOrders,
+  canViewProcurementProjectArea,
+  canViewPurchaseRequests,
+} from "../procurement/procurement-access";
 import { canViewSubcontractsArea } from "../subcontracts/subcontract-access";
 import { assertJobsiteLogTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
@@ -69,6 +73,8 @@ export type ProjectOverviewBillingVsCollections = {
 
 export type ProjectOverviewActivity = {
   certificationsCount: number | null;
+  purchaseRequestsCount: number | null;
+  purchaseRequestsAwaitingQuotesCount: number | null;
   purchaseOrdersCount: number | null;
   subcontractsCount: number | null;
   documentsCount: number | null;
@@ -387,6 +393,40 @@ export async function getProjectOverviewDashboard(
     });
   }
 
+  let purchaseRequestsCount: number | null = null;
+  let purchaseRequestsAwaitingQuotesCount: number | null = null;
+  if (gate.isEnabled("PROCUREMENT") && canViewPurchaseRequests(ctx.roles)) {
+    purchaseRequestsCount = await prisma.purchaseRequest.count({
+      where: { tenantId: ctx.tenantId, projectId, status: { not: "CANCELLED" } },
+    });
+    purchaseRequestsAwaitingQuotesCount = await prisma.purchaseRequest.count({
+      where: { tenantId: ctx.tenantId, projectId, status: "SUBMITTED" },
+    });
+    if (
+      purchaseRequestsAwaitingQuotesCount > 0 &&
+      canEditPurchaseOrders(ctx.roles)
+    ) {
+      alerts.push({
+        label: "Solicitudes pendientes de cotización",
+        description: `${purchaseRequestsAwaitingQuotesCount} solicitud${purchaseRequestsAwaitingQuotesCount === 1 ? "" : "es"} enviada${purchaseRequestsAwaitingQuotesCount === 1 ? "" : "s"} sin cotización completa.`,
+        severity: "warning",
+        href: `${base}/solicitudes-compra?status=SUBMITTED`,
+      });
+    }
+  } else if (!gate.isEnabled("PROCUREMENT")) {
+    sectionsExcluded.push({
+      module: "PURCHASE_REQUESTS",
+      section: "activity_pr",
+      reason: "TENANT_MODULE_DISABLED",
+    });
+  } else {
+    sectionsExcluded.push({
+      module: "PURCHASE_REQUESTS",
+      section: "activity_pr",
+      reason: "MISSING_PERMISSION",
+    });
+  }
+
   let purchaseOrdersCount: number | null = null;
   if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(ctx.roles)) {
     purchaseOrdersCount = await prisma.purchaseOrder.count({
@@ -455,6 +495,8 @@ export async function getProjectOverviewDashboard(
 
   const activity: ProjectOverviewActivity = {
     certificationsCount,
+    purchaseRequestsCount,
+    purchaseRequestsAwaitingQuotesCount,
     purchaseOrdersCount,
     subcontractsCount,
     documentsCount,

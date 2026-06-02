@@ -51,10 +51,12 @@ export * from "./ap/payable.service";
 export * from "./ap/payment.service";
 export {
   canViewProcurementProjectArea,
+  canViewPurchaseRequests,
   canEditPurchaseRequests,
   canEditPurchaseOrders,
   canApprovePurchaseOrders,
   canEditPurchaseReceipts,
+  canManageProcurementQuotes,
 } from "./procurement/procurement-access";
 export * from "./procurement/company-procurement-settings.service";
 export * from "./procurement/purchase-request.service";

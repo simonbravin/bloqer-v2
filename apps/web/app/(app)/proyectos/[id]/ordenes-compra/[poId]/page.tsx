@@ -19,10 +19,11 @@ import type { SupplierInvoiceListItem } from "@/features/ap";
 import type { PurchaseReceiptListItem } from "@/features/procurement";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
-import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import {
+  canApprovePurchaseOrders,
   canEditPurchaseOrders,
+  canEditPurchaseReceipts,
   getPurchaseOrderBillingSummary,
   getPurchaseOrderById,
   listEntityDocuments,
@@ -70,6 +71,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
@@ -77,16 +79,16 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
 
   const poAttachments = await listEntityDocuments("PURCHASE_ORDER", poId, ctx, { projectId: id });
   const storageConfigured = isStorageConfigured();
-  const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "PROCUREMENT");
+  const canEditAttachments = canEditPurchaseOrders(current.tenantCtx.roles);
 
   const isDraft = order.status === "DRAFT";
   const isCancelled = order.status === "CANCELLED";
   const isSubmitted = order.status === "SUBMITTED";
   const isApproved = order.status === "APPROVED";
   const isReceivable = ["CONFIRMED", "PARTIALLY_RECEIVED"].includes(order.status);
-  const canApprovePo = can(current.tenantCtx.roles, "APPROVE", "PURCHASE_ORDERS")
-    || can(current.tenantCtx.roles, "APPROVE", "PROCUREMENT");
+  const canApprovePo = canApprovePurchaseOrders(current.tenantCtx.roles);
   const canEditPo = canEditPurchaseOrders(current.tenantCtx.roles);
+  const canReceive = canEditPurchaseReceipts(current.tenantCtx.roles);
   const showBilling = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status);
   const showVarianceCols = order.lines.some((l) => l.varianceTier && l.varianceTier !== "NONE");
 
@@ -292,7 +294,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
             <Button type="submit">Confirmar al proveedor</Button>
           </form>
         )}
-        {isReceivable && (
+        {isReceivable && canReceive && (
           <Button asChild>
             <Link href={`/proyectos/${id}/ordenes-compra/${poId}/recepciones/nueva`}>
               Registrar recepción

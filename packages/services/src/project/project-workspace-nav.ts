@@ -7,7 +7,10 @@ import {
   canViewProjectCostControlReport,
   canViewProjectScheduleArea,
 } from "./project-nav-guards";
-import { canViewProcurementProjectArea } from "../procurement/procurement-access";
+import {
+  canViewProcurementProjectArea,
+  canViewPurchaseRequests,
+} from "../procurement/procurement-access";
 import type { TenantModuleGate } from "../tenant-modules/tenant-module-gate";
 
 export type ProjectWorkspaceNavLink = {
@@ -74,8 +77,10 @@ export function buildProjectWorkspaceNavSections(
   if (gate.isEnabled("PROJECTS") && canViewProjectCashFlowReport(roles)) {
     finanzasProyecto.push({ label: "Flujo de caja", href: `${base}/flujo-caja` });
   }
-  if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) {
+  if (gate.isEnabled("PROCUREMENT") && canViewPurchaseRequests(roles)) {
     finanzasProyecto.push({ label: "Solicitudes de compra", href: `${base}/solicitudes-compra` });
+  }
+  if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) {
     finanzasProyecto.push({ label: "Órdenes de compra", href: `${base}/ordenes-compra` });
   }
   if (gate.isEnabled("SUBCONTRACTS") && (can(roles, "VIEW", "SUBCONTRACTS") || can(roles, "VIEW", "PROJECTS"))) {

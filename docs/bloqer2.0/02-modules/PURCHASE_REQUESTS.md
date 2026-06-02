@@ -50,5 +50,17 @@ El costo comprometido (`committed_amount`) se reconoce solo en `CONFIRMED` ([D-0
 
 ## UI
 
-- `/proyectos/[id]/solicitudes-compra`
+- `/proyectos/[id]/solicitudes-compra` — listado; filtro `?status=SUBMITTED` (pendientes de cotización)
 - `/proyectos/[id]/ordenes-compra` (workflow submit / approve / confirm)
+- Resumen del proyecto: contador de solicitudes + alerta si hay enviadas sin cotizar (rol compras)
+
+## Permisos (resumen)
+
+| Acción | Módulo / helper | Roles típicos |
+|--------|-----------------|-------------|
+| Ver solicitudes | `VIEW PURCHASE_REQUESTS` o `canViewPurchaseRequests` | PM, capataz, compras, depósito (V), finanzas (V) |
+| Crear / enviar solicitud | `EDIT PURCHASE_REQUESTS` o `canEditPurchaseRequests` | PM, capataz |
+| Cargar cotización / generar OC | `canManageProcurementQuotes` (= editar OC) | Compras, PM (OC borrador) |
+| Aprobar OC | `canApprovePurchaseOrders` | Compras, owner/admin — no el solicitante (BR-APR-004) |
+
+Matriz canónica: `PERMISSIONS_MATRIX.md` §2.1; gates en `packages/services/src/procurement/procurement-access.ts`.

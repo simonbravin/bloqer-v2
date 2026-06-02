@@ -6,6 +6,16 @@ export function canViewProcurementProjectArea(roles: ServiceContext["roles"]): b
   return can(roles, "VIEW", "PROCUREMENT") || can(roles, "VIEW", "PROJECTS");
 }
 
+/** List/detail purchase requests (VIEW PURCHASE_REQUESTS or procurement/project read). */
+export function canViewPurchaseRequests(roles: ServiceContext["roles"]): boolean {
+  return can(roles, "VIEW", "PURCHASE_REQUESTS") || canViewProcurementProjectArea(roles);
+}
+
+/** Load quotes, select supplier, create draft PO from a request. */
+export function canManageProcurementQuotes(roles: ServiceContext["roles"]): boolean {
+  return canEditPurchaseOrders(roles);
+}
+
 export function canEditPurchaseOrders(roles: ServiceContext["roles"]): boolean {
   return can(roles, "EDIT", "PURCHASE_ORDERS") || can(roles, "EDIT", "PROCUREMENT");
 }

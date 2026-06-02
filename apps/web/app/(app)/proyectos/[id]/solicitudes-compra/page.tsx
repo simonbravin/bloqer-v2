@@ -13,20 +13,31 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { PurchaseRequestStatusBadge } from "@/features/procurement/components/purchase-request-status-badge";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { getCurrentUser } from "@/lib/auth";
-import { can } from "@bloqer/domain";
 import { formatDate } from "@/lib/format";
-import { getProjectShellInfo, listPurchaseRequestsByProject, ServiceError } from "@bloqer/services";
+import {
+  canEditPurchaseRequests,
+  getProjectShellInfo,
+  listPurchaseRequestsByProject,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ status?: string }>;
 }
 
-export default async function SolicitudesCompraPage({ params }: PageProps) {
+export default async function SolicitudesCompraPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id } = await params;
+  const sp = await searchParams;
+  const statusFilter =
+    sp.status === "SUBMITTED" || sp.status === "DRAFT" || sp.status === "QUOTE_SELECTED"
+      ? sp.status
+      : undefined;
+
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -50,7 +61,20 @@ export default async function SolicitudesCompraPage({ params }: PageProps) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
-  const canCreate = can(current.tenantCtx.roles, "EDIT", "PURCHASE_REQUESTS");
+
+  const filtered = statusFilter
+    ? requests.filter((pr) => pr.status === statusFilter)
+    : requests;
+
+  const canCreate = canEditPurchaseRequests(current.tenantCtx.roles);
+  const listHref = `/proyectos/${id}/solicitudes-compra`;
+
+  const subtitle =
+    statusFilter === "SUBMITTED"
+      ? `${filtered.length} enviada${filtered.length === 1 ? "" : "s"} pendiente${filtered.length === 1 ? "" : "s"} de cotización`
+      : statusFilter
+        ? `${filtered.length} con estado filtrado`
+        : `${requests.length} ${requests.length === 1 ? "solicitud" : "solicitudes"}`;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -58,7 +82,7 @@ export default async function SolicitudesCompraPage({ params }: PageProps) {
         projectId={id}
         projectName={project.name}
         title="Solicitudes de compra"
-        subtitle={`${requests.length} ${requests.length === 1 ? "solicitud" : "solicitudes"}`}
+        subtitle={subtitle}
         actions={
           canCreate ? (
             <Button asChild>
@@ -67,6 +91,19 @@ export default async function SolicitudesCompraPage({ params }: PageProps) {
           ) : undefined
         }
       />
+
+      {statusFilter && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+          <span>
+            {statusFilter === "SUBMITTED"
+              ? "Mostrando solo solicitudes enviadas (pendientes de cotización)."
+              : `Filtro activo: ${statusFilter}.`}
+          </span>
+          <Button asChild variant="link" size="sm" className="h-auto p-0">
+            <Link href={listHref}>Ver todas</Link>
+          </Button>
+        </div>
+      )}
 
       <TableScroll>
         <Table>
@@ -80,14 +117,18 @@ export default async function SolicitudesCompraPage({ params }: PageProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {requests.length === 0 ? (
+            {filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-muted-foreground text-center py-8">
-                  No hay solicitudes de compra en este proyecto.
+                  {statusFilter === "SUBMITTED"
+                    ? "No hay solicitudes enviadas pendientes de cotización."
+                    : statusFilter
+                      ? "No hay solicitudes con este filtro."
+                      : "No hay solicitudes de compra en este proyecto."}
                 </TableCell>
               </TableRow>
             ) : (
-              requests.map((pr) => (
+              filtered.map((pr) => (
                 <TableRow key={pr.id}>
                   <TableCell className="font-medium">{pr.code}</TableCell>
                   <TableCell>

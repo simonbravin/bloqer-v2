@@ -44,8 +44,9 @@ Lectura: ✅ = permitido, ⛔ = no permitido, ⚙️ = configurable por Admin.
 | RFIs | A | A | E (su proyecto) | E | ⛔ | ⛔ | ⛔ | V | V |
 | Libro de Obra | A | A | E (su proyecto) | E | ⛔ | ⛔ | ⛔ | V | V |
 | Certificaciones | A | A | E (su proyecto) | V | ⛔ | ⛔ | ⛔ | V | V |
-| Compras | A | A | E (su proyecto) | ⛔ | A | V | ⛔ | V | V |
-| OC y Recepción | A | A | E (su proyecto) | ⛔ | A | E (recepción) | ⛔ | V | V |
+| Solicitudes de compra (`PURCHASE_REQUESTS`) | A | A | E (su proyecto) | E (capataz) | A | V | ⛔ | V | V |
+| Compras / cotizaciones (`PROCUREMENT`) | A | A | E (su proyecto) | ⛔ | A | V | ⛔ | V | V |
+| OC y Recepción (`PURCHASE_ORDERS`) | A | A | E (su proyecto) | ⛔ | A | E (recepción) | ⛔ | V | V |
 | Subcontratos | A | A | E (su proyecto) | ⛔ | E | ⛔ | ⛔ | V | V |
 | Inventario | A | A | V (su proyecto) | V | V | A | ⛔ | V | V |
 | Depósitos | A | A | V | ⛔ | V | A | ⛔ | V | V |

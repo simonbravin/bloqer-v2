@@ -3,10 +3,7 @@ import type { CreatePurchaseRequestInput, UpdatePurchaseRequestInput } from "@bl
 import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import {
-  canEditPurchaseRequests,
-  canViewProcurementProjectArea,
-} from "./procurement-access";
+import { canEditPurchaseRequests, canViewPurchaseRequests } from "./procurement-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { assertWbsLineForProject } from "./procurement-wbs";
 import { notifyPurchaseRequestSubmitted } from "./procurement-notifications.service";
@@ -91,7 +88,7 @@ export async function listPurchaseRequestsByProject(
   ctx: ServiceContext,
 ): Promise<PurchaseRequestView[]> {
   await assertProcurementTenantModule(ctx);
-  if (!canViewProcurementProjectArea(ctx.roles)) {
+  if (!canViewPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
   const rows = await prisma.purchaseRequest.findMany({
@@ -118,7 +115,7 @@ export async function listPurchaseRequestsByProject(
 
 export async function getPurchaseRequestById(id: string, ctx: ServiceContext): Promise<PurchaseRequestView> {
   await assertProcurementTenantModule(ctx);
-  if (!canViewProcurementProjectArea(ctx.roles)) {
+  if (!canViewPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
   const pr = await prisma.purchaseRequest.findUnique({
@@ -267,7 +264,7 @@ export async function getActivePurchaseOrderForRequest(
   ctx: ServiceContext,
 ): Promise<{ id: string; code: string; status: string; projectId: string } | null> {
   await assertProcurementTenantModule(ctx);
-  if (!canViewProcurementProjectArea(ctx.roles)) {
+  if (!canViewPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
   const po = await prisma.purchaseOrder.findFirst({

@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 import { PurchaseRequestForm } from "@/features/procurement/components/purchase-request-form";
 import type { WbsOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
-import { can } from "@bloqer/domain";
-import { listProcurementWbsOptions } from "@bloqer/services";
+import { canEditPurchaseRequests, listProcurementWbsOptions } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageBackLink } from "@/components/layout/page-back-link";
 
@@ -14,7 +13,7 @@ interface PageProps {
 export default async function NuevaSolicitudCompraPage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
-  if (!can(current.tenantCtx.roles, "EDIT", "PURCHASE_REQUESTS")) redirect("/dashboard");
+  if (!canEditPurchaseRequests(current.tenantCtx.roles)) redirect("/dashboard");
 
   const { id } = await params;
   const ctx = {

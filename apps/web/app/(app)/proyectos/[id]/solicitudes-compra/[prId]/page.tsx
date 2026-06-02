@@ -16,9 +16,10 @@ import {
 } from "@/features/procurement/components/procurement-quote-form";
 import type { SupplierOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
-import { can } from "@bloqer/domain";
 import { formatDate } from "@/lib/format";
 import {
+  canEditPurchaseRequests,
+  canManageProcurementQuotes,
   getActivePurchaseOrderForRequest,
   getPurchaseRequestById,
   listProcurementQuotesForRequest,
@@ -79,9 +80,8 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
-  const canEditPr = can(current.tenantCtx.roles, "EDIT", "PURCHASE_REQUESTS");
-  const canQuote = can(current.tenantCtx.roles, "EDIT", "PROCUREMENT")
-    || can(current.tenantCtx.roles, "APPROVE", "PURCHASE_ORDERS");
+  const canEditPr = canEditPurchaseRequests(current.tenantCtx.roles);
+  const canQuote = canManageProcurementQuotes(current.tenantCtx.roles);
 
   let suppliers: SupplierOption[] = [];
   if (canQuote && ["SUBMITTED", "QUOTE_SELECTED"].includes(pr.status)) {
@@ -100,8 +100,8 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
   const storageConfigured = isStorageConfigured();
   const prAttachments = await listEntityDocuments("PURCHASE_REQUEST", prId, ctx, { projectId: id });
   const canEditAttachments =
-    can(current.tenantCtx.roles, "EDIT", "PURCHASE_REQUESTS") ||
-    can(current.tenantCtx.roles, "EDIT", "PROCUREMENT");
+    canEditPurchaseRequests(current.tenantCtx.roles) ||
+    canManageProcurementQuotes(current.tenantCtx.roles);
 
   const quoteAttachments = showQuotes
     ? await Promise.all(

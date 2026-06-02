@@ -14,6 +14,13 @@ import {
   type TenantModuleGate,
 } from "../tenant-modules/tenant-module.service";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
+import {
+  canEditPurchaseOrders,
+  canEditPurchaseReceipts,
+  canEditPurchaseRequests,
+  canViewProcurementProjectArea,
+  canViewPurchaseRequests,
+} from "../procurement/procurement-access";
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024;
 
@@ -624,26 +631,22 @@ export async function listEntityDocuments(
     const { invoiceProjectId } = await assertSupplierInvoiceDocumentTarget(options?.projectId, entityId, ctx);
     if (invoiceProjectId != null) supplierInvoiceDocScope = { projectId: invoiceProjectId };
   } else if (entityType === "PURCHASE_ORDER") {
-    if (!can(ctx.roles, "VIEW", "PROCUREMENT") && !can(ctx.roles, "VIEW", "PROJECTS")) {
+    if (!canViewProcurementProjectArea(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la orden de compra");
     }
     await assertPurchaseOrderDocumentTarget(options!.projectId!, entityId, ctx);
   } else if (entityType === "PURCHASE_RECEIPT") {
-    if (!can(ctx.roles, "VIEW", "PROCUREMENT") && !can(ctx.roles, "VIEW", "PROJECTS")) {
+    if (!canViewProcurementProjectArea(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la recepción");
     }
     await assertPurchaseReceiptDocumentTarget(options!.projectId!, entityId, ctx);
   } else if (entityType === "PURCHASE_REQUEST") {
-    if (
-      !can(ctx.roles, "VIEW", "PURCHASE_REQUESTS") &&
-      !can(ctx.roles, "VIEW", "PROCUREMENT") &&
-      !can(ctx.roles, "VIEW", "PROJECTS")
-    ) {
+    if (!canViewPurchaseRequests(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la solicitud");
     }
     await assertPurchaseRequestDocumentTarget(options!.projectId!, entityId, ctx);
   } else if (entityType === "PROCUREMENT_QUOTE") {
-    if (!can(ctx.roles, "VIEW", "PROCUREMENT") && !can(ctx.roles, "VIEW", "PROJECTS")) {
+    if (!canViewPurchaseRequests(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la cotización");
     }
     await assertProcurementQuoteDocumentTarget(options!.projectId!, entityId, ctx);
@@ -961,14 +964,15 @@ function canViewDocumentByLink(
   if (linkedEntityType === "CERTIFICATION" && can(ctx.roles, "VIEW", "CERTIFICATIONS")) return true;
   if (linkedEntityType === "SUPPLIER_INVOICE" && can(ctx.roles, "VIEW", "AP")) return true;
   if (
-    (linkedEntityType === "PURCHASE_ORDER" ||
-      linkedEntityType === "PURCHASE_RECEIPT" ||
-      linkedEntityType === "PROCUREMENT_QUOTE") &&
-    can(ctx.roles, "VIEW", "PROCUREMENT")
+    (linkedEntityType === "PURCHASE_ORDER" || linkedEntityType === "PURCHASE_RECEIPT") &&
+    canViewProcurementProjectArea(ctx.roles)
   ) {
     return true;
   }
-  if (linkedEntityType === "PURCHASE_REQUEST" && can(ctx.roles, "VIEW", "PURCHASE_REQUESTS")) {
+  if (
+    (linkedEntityType === "PURCHASE_REQUEST" || linkedEntityType === "PROCUREMENT_QUOTE") &&
+    canViewPurchaseRequests(ctx.roles)
+  ) {
     return true;
   }
   if (
@@ -998,11 +1002,14 @@ function canMutateDocumentByLink(
   if (t === "SUPPLIER_INVOICE") {
     return can(ctx.roles, "EDIT", "AP");
   }
-  if (t === "PURCHASE_ORDER" || t === "PURCHASE_RECEIPT" || t === "PROCUREMENT_QUOTE") {
-    return can(ctx.roles, "EDIT", "PROCUREMENT");
+  if (t === "PURCHASE_ORDER" || t === "PROCUREMENT_QUOTE") {
+    return canEditPurchaseOrders(ctx.roles);
+  }
+  if (t === "PURCHASE_RECEIPT") {
+    return canEditPurchaseReceipts(ctx.roles);
   }
   if (t === "PURCHASE_REQUEST") {
-    return can(ctx.roles, "EDIT", "PURCHASE_REQUESTS");
+    return canEditPurchaseRequests(ctx.roles);
   }
   if (t === "SUBCONTRACT" || t === "SUBCONTRACT_CERTIFICATION") {
     return can(ctx.roles, "EDIT", "SUBCONTRACTS");
