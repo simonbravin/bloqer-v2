@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   assertScheduleStatusTransition,
   computeContainerRollup,
+  mergeDerivedContainerDatesIntoDtos,
   wouldCreateDependencyCycle,
   daysBetween,
   parseDateOnly,
@@ -138,6 +139,50 @@ describe("computeContainerRollup", () => {
     ];
     const rollup = computeContainerRollup(items);
     assert.equal(rollup.get("root"), null);
+  });
+});
+
+describe("mergeDerivedContainerDatesIntoDtos", () => {
+  it("overrides container dto dates from leaf children", () => {
+    const d = (iso: string) => parseDateOnly(iso);
+    const source = [
+      { id: "root", parentId: null, status: "PLANNED" as const, startDate: d("2026-06-01"), endDate: d("2026-09-01") },
+      { id: "a", parentId: "root", status: "PLANNED" as const, startDate: d("2026-06-01"), endDate: d("2026-07-01") },
+      { id: "b", parentId: "root", status: "PLANNED" as const, startDate: d("2026-07-01"), endDate: d("2026-10-31") },
+    ];
+    const dtos = [
+      {
+        id: "root",
+        parentId: null,
+        status: "PLANNED" as const,
+        startDate: "2026-06-01",
+        endDate: "2026-09-01",
+        durationDays: 93,
+        timePlanPct: "50.00",
+      },
+      {
+        id: "a",
+        parentId: "root",
+        status: "PLANNED" as const,
+        startDate: "2026-06-01",
+        endDate: "2026-07-01",
+        durationDays: 31,
+        timePlanPct: null,
+      },
+      {
+        id: "b",
+        parentId: "root",
+        status: "PLANNED" as const,
+        startDate: "2026-07-01",
+        endDate: "2026-10-31",
+        durationDays: 123,
+        timePlanPct: null,
+      },
+    ];
+    mergeDerivedContainerDatesIntoDtos(dtos, source);
+    assert.equal(dtos[0]!.startDate, "2026-06-01");
+    assert.equal(dtos[0]!.endDate, "2026-10-31");
+    assert.equal(dtos[0]!.durationDays, 153);
   });
 });
 

@@ -2,7 +2,6 @@
 
 import { MinusIcon, PanelLeftCloseIcon, PanelLeftIcon, PlusIcon } from "lucide-react";
 import type { Range } from "@/components/kibo-ui/gantt";
-import { useGanttLayout } from "@/components/kibo-ui/gantt";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -35,26 +34,13 @@ export function ScheduleGanttToolbar({
   canEdit?: boolean;
   className?: string;
 }) {
-  const gantt = useGanttLayout();
-
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-2 border-b bg-muted/30 px-2 py-1.5",
+        "flex flex-wrap items-center gap-2 border-b bg-muted/40 px-3 py-2",
         className,
       )}
-      style={{ gridColumn: "1 / -1" }}
     >
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="h-7 text-xs"
-        onClick={() => gantt.scrollToDate?.(new Date())}
-      >
-        Ir a hoy
-      </Button>
-
       <div className="flex items-center rounded-md border bg-background p-0.5">
         {RANGE_OPTIONS.map((opt) => (
           <Button

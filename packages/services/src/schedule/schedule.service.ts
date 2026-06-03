@@ -11,6 +11,7 @@ import {
   checkFinishStartViolations,
   computeContainerRollup,
   daysBetween,
+  datesEqualOnDay,
   formatDateOnly,
   isFormerScheduleContainer,
   parseDateOnly,
@@ -101,12 +102,8 @@ async function rollupScheduleContainerDatesInTx(
     const newEnd = dates?.endDate ?? null;
     const newDuration = dates?.durationDays ?? null;
 
-    const sameStart =
-      (current.startDate?.toISOString().slice(0, 10) ?? null) ===
-      (newStart?.toISOString().slice(0, 10) ?? null);
-    const sameEnd =
-      (current.endDate?.toISOString().slice(0, 10) ?? null) ===
-      (newEnd?.toISOString().slice(0, 10) ?? null);
+    const sameStart = datesEqualOnDay(current.startDate, newStart);
+    const sameEnd = datesEqualOnDay(current.endDate, newEnd);
     if (sameStart && sameEnd && (current.durationDays ?? null) === newDuration) continue;
 
     const before = scheduleItemSnapshot(current);

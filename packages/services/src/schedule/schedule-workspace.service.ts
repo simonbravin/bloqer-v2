@@ -9,7 +9,7 @@ import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { canEditScheduleArea, canViewScheduleArea } from "./schedule-access";
-import { computeDaysLate, formatDateOnly, ZERO_DEC, computeTimePlanProgressPct, isScheduleLeafItem } from "./schedule-helpers";
+import { computeDaysLate, formatDateOnly, ZERO_DEC, computeTimePlanProgressPct, isScheduleLeafItem, mergeDerivedContainerDatesIntoDtos } from "./schedule-helpers";
 import { ensureScheduleForProject } from "./schedule.service";
 import { sortTreeOrder } from "@bloqer/utils";
 
@@ -259,6 +259,12 @@ export async function getProjectScheduleWorkspace(
     },
   });
 
+  /** Rollup must use the full schedule tree — status/delayed filters must not shrink it. */
+  const rollupSourceItems = await prisma.scheduleItem.findMany({
+    where: { scheduleId: schedule.id },
+    select: { id: true, parentId: true, status: true, startDate: true, endDate: true },
+  });
+
   const allWbsIds = [
     ...new Set(items.flatMap((i) => i.wbsLinks.map((l) => l.wbsNodeId))),
   ];
@@ -341,6 +347,11 @@ export async function getProjectScheduleWorkspace(
       })),
     });
   }
+
+  mergeDerivedContainerDatesIntoDtos(
+    dtoItems,
+    rollupSourceItems,
+  );
 
   const activeItems = dtoItems.filter((i) => i.status !== "CANCELLED");
   const leafItems = activeItems.filter((i) => isScheduleLeafItem(activeItems, i.id));

@@ -101,8 +101,8 @@ export function computeContainerRollup(
     let minStart = leafDates[0]!.startDate;
     let maxEnd = leafDates[0]!.endDate;
     for (const { startDate, endDate } of leafDates) {
-      if (startDate < minStart) minStart = startDate;
-      if (endDate > maxEnd) maxEnd = endDate;
+      if (dateOnlyUtcMs(startDate) < dateOnlyUtcMs(minStart)) minStart = startDate;
+      if (dateOnlyUtcMs(endDate) > dateOnlyUtcMs(maxEnd)) maxEnd = endDate;
     }
 
     result.set(containerId, {
@@ -115,6 +115,64 @@ export function computeContainerRollup(
   return result;
 }
 
+export function dateOnlyUtcMs(d: Date): number {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+export function datesEqualOnDay(a: Date | null | undefined, b: Date | null | undefined): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return dateOnlyUtcMs(a) === dateOnlyUtcMs(b);
+}
+
+/** Overlay derived container dates on workspace DTOs (containers are read-time derived). */
+export function mergeDerivedContainerDatesIntoDtos<
+  T extends {
+    id: string;
+    parentId: string | null;
+    status: ScheduleItemStatus;
+    startDate: string | null;
+    endDate: string | null;
+    durationDays: number | null;
+    timePlanPct: string | null;
+  },
+>(
+  dtoItems: T[],
+  sourceItems: RollupScheduleItemInput[],
+): T[] {
+  const rollup = computeContainerRollup(sourceItems);
+  const dtoById = new Map(dtoItems.map((d) => [d.id, d]));
+
+  for (const [containerId, derived] of rollup) {
+    const dto = dtoById.get(containerId);
+    if (!dto) continue;
+    if (!derived) {
+      dto.startDate = null;
+      dto.endDate = null;
+      dto.durationDays = null;
+      dto.timePlanPct = null;
+      continue;
+    }
+    dto.startDate = formatDateOnly(derived.startDate);
+    dto.endDate = formatDateOnly(derived.endDate);
+    dto.durationDays = derived.durationDays;
+    dto.timePlanPct = computeTimePlanProgressPct(dto.startDate, dto.endDate);
+  }
+
+  for (const source of sourceItems) {
+    if (source.status === "CANCELLED") continue;
+    if (!isFormerScheduleContainer(sourceItems, source.id)) continue;
+    const dto = dtoById.get(source.id);
+    if (!dto) continue;
+    dto.startDate = null;
+    dto.endDate = null;
+    dto.durationDays = null;
+    dto.timePlanPct = null;
+  }
+
+  return dtoItems;
+}
+
 export function parseDateOnly(iso: string): Date {
   const d = new Date(`${iso}T12:00:00.000Z`);
   if (Number.isNaN(d.getTime())) {
@@ -125,7 +183,10 @@ export function parseDateOnly(iso: string): Date {
 
 export function formatDateOnly(d: Date | null | undefined): string | null {
   if (!d) return null;
-  return d.toISOString().slice(0, 10);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function daysBetween(start: Date, end: Date): number {

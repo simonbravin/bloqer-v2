@@ -9,6 +9,7 @@ import {
   GanttFeatureItem,
   GanttFeatureList,
   GanttFeatureListGroup,
+  GanttGoToTodayButton,
   GanttHeader,
   GanttProvider,
   GanttSidebar,
@@ -216,14 +217,7 @@ export function ScheduleGanttView({
           )}
         </div>
       )}
-      <GanttProvider
-        range={range}
-        zoom={zoom}
-        className={cn(
-          "h-[min(70vh,720px)] w-full border rounded-md",
-          (pending || rollupPending) && "opacity-80 pointer-events-none",
-        )}
-      >
+      <div className="overflow-hidden rounded-md border">
         <ScheduleGanttToolbar
           range={range}
           onRangeChange={setRange}
@@ -235,81 +229,91 @@ export function ScheduleGanttView({
           onRecalculateContainers={handleRecalculate}
           recalculatePending={rollupPending}
         />
-        {sidebarOpen ? (
-          <GanttSidebar>
-            {visibleItems.map((item) => (
-              <ScheduleGanttSidebarRow
-                key={item.id}
-                item={item}
-                items={visibleItems}
-                entriesByItemId={entriesByItemId}
-                onSelect={handleSelect}
-              />
-            ))}
-          </GanttSidebar>
-        ) : null}
-        <GanttTimeline>
-          <GanttHeader />
-          <GanttFeatureList>
-            <GanttFeatureListGroup>
-              {visibleItems.map((item) => {
-                const entry = entriesByItemId.get(item.id);
-                if (!entry) {
-                  return (
-                    <div
-                      key={item.id}
-                      className="relative flex w-max min-w-full py-0.5"
-                      style={{ height: "var(--gantt-row-height)" }}
-                      aria-hidden
-                    />
-                  );
-                }
+        <GanttProvider
+          range={range}
+          zoom={zoom}
+          className={cn(
+            "h-[min(65vh,680px)] w-full border-0 rounded-none",
+            (pending || rollupPending) && "opacity-80 pointer-events-none",
+          )}
+        >
+          {sidebarOpen ? (
+            <GanttSidebar>
+              {visibleItems.map((item) => (
+                <ScheduleGanttSidebarRow
+                  key={item.id}
+                  item={item}
+                  items={visibleItems}
+                  entriesByItemId={entriesByItemId}
+                  onSelect={handleSelect}
+                />
+              ))}
+            </GanttSidebar>
+          ) : null}
+          <GanttTimeline>
+            <GanttGoToTodayButton />
+            <GanttHeader />
+            <GanttFeatureList>
+              <GanttFeatureListGroup>
+                {visibleItems.map((item) => {
+                  const entry = entriesByItemId.get(item.id);
+                  if (!entry) {
+                    return (
+                      <div
+                        key={item.id}
+                        className="relative flex w-max min-w-full py-0.5"
+                        style={{ height: "var(--gantt-row-height)" }}
+                        aria-hidden
+                      />
+                    );
+                  }
 
-                const { feature } = entry;
-                const pct = Number(item.progressPct);
-                const { real, timePlan, quantity, certified } = scheduleProgressValues(item);
-                const title = `Real: ${real}% · Plan (t): ${timePlan ?? "—"}% · Cant.: ${quantity ?? "—"}% · Cert.: ${certified ?? "—"}%`;
-                const isMilestone = item.type === "MILESTONE";
-                const isSummary = scheduleItemHasActiveChildren(visibleItems, item.id);
-                const barColor = isSummary
-                  ? CONTAINER_COLOR
-                  : (STATUS_COLORS[item.status] ?? "#64748b");
-                return (
-                  <GanttFeatureItem
-                    key={feature.id}
-                    {...feature}
-                    onMove={
-                      workspace.canEdit && !isMilestone && !isSummary ? handleMove : undefined
-                    }
-                  >
-                    <div
-                      title={title}
-                      className={cn(
-                        "relative flex h-full w-full items-center overflow-hidden rounded px-1 text-[10px] text-white",
-                        isMilestone && "h-2 min-h-2 self-center rounded-sm",
-                        isSummary && "opacity-90",
-                      )}
-                      style={{ backgroundColor: barColor }}
+                  const { feature } = entry;
+                  const pct = Number(item.progressPct);
+                  const { real, timePlan, quantity, certified } = scheduleProgressValues(item);
+                  const title = `Real: ${real}% · Plan (t): ${timePlan ?? "—"}% · Cant.: ${quantity ?? "—"}% · Cert.: ${certified ?? "—"}%`;
+                  const isMilestone = item.type === "MILESTONE";
+                  const isSummary = scheduleItemHasActiveChildren(visibleItems, item.id);
+                  const barColor = isSummary
+                    ? CONTAINER_COLOR
+                    : (STATUS_COLORS[item.status] ?? "#64748b");
+                  return (
+                    <GanttFeatureItem
+                      key={feature.id}
+                      {...feature}
+                      onMove={
+                        workspace.canEdit && !isMilestone && !isSummary ? handleMove : undefined
+                      }
                     >
-                      {!isMilestone && !isSummary && (
-                        <div
-                          className="absolute inset-y-0 left-0 bg-black/25"
-                          style={{ width: `${Math.min(100, pct)}%` }}
-                        />
-                      )}
-                      <span className="relative z-10 truncate">
-                        {isMilestone ? "◆" : isSummary ? "▬" : `${pct}%`}
-                      </span>
-                    </div>
-                  </GanttFeatureItem>
-                );
-              })}
-            </GanttFeatureListGroup>
-          </GanttFeatureList>
-          <ScheduleGanttDependencyLayer items={visibleItems} entries={entries} />
-          <GanttToday />
-        </GanttTimeline>
-      </GanttProvider>
+                      <div
+                        title={title}
+                        className={cn(
+                          "relative flex h-full w-full items-center overflow-hidden rounded px-1 text-[10px] text-white",
+                          isMilestone && "h-2 min-h-2 self-center rounded-sm",
+                          isSummary && "opacity-90",
+                        )}
+                        style={{ backgroundColor: barColor }}
+                      >
+                        {!isMilestone && !isSummary && (
+                          <div
+                            className="absolute inset-y-0 left-0 bg-black/25"
+                            style={{ width: `${Math.min(100, pct)}%` }}
+                          />
+                        )}
+                        <span className="relative z-10 truncate">
+                          {isMilestone ? "◆" : isSummary ? "▬" : `${pct}%`}
+                        </span>
+                      </div>
+                    </GanttFeatureItem>
+                  );
+                })}
+              </GanttFeatureListGroup>
+            </GanttFeatureList>
+            <ScheduleGanttDependencyLayer items={visibleItems} entries={entries} />
+            <GanttToday />
+          </GanttTimeline>
+        </GanttProvider>
+      </div>
     </div>
   );
 }

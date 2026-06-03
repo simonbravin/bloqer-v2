@@ -1194,6 +1194,8 @@ export const GanttProvider: FC<GanttProviderProps> = ({
   const [timelineData, setTimelineData] = useState<TimelineData>(
     createInitialTimelineData(new Date())
   );
+  const timelineDataRef = useRef(timelineData);
+  timelineDataRef.current = timelineData;
   const [, setScrollX] = useGanttScrollX();
   const [sidebarWidth, setSidebarWidth] = useState(0);
 
@@ -1255,7 +1257,6 @@ export const GanttProvider: FC<GanttProviderProps> = ({
     };
   }, []);
 
-  // Fix the useCallback to include all dependencies
   const handleScroll = useCallback(
     throttle(() => {
       const scrollElement = scrollRef.current;
@@ -1265,16 +1266,16 @@ export const GanttProvider: FC<GanttProviderProps> = ({
 
       const { scrollLeft, scrollWidth, clientWidth } = scrollElement;
       setScrollX(scrollLeft);
+      const currentTimelineData = timelineDataRef.current;
 
       if (scrollLeft === 0) {
-        // Extend timelineData to the past
-        const firstYear = timelineData[0]?.year;
+        const firstYear = currentTimelineData[0]?.year;
 
         if (!firstYear) {
           return;
         }
 
-        const newTimelineData: TimelineData = [...timelineData];
+        const newTimelineData: TimelineData = [...currentTimelineData];
         newTimelineData.unshift({
           year: firstYear - 1,
           quarters: new Array(4).fill(null).map((_, quarterIndex) => ({
@@ -1289,18 +1290,16 @@ export const GanttProvider: FC<GanttProviderProps> = ({
 
         setTimelineData(newTimelineData);
 
-        // Scroll a bit forward so it's not at the very start
         scrollElement.scrollLeft = scrollElement.clientWidth;
         setScrollX(scrollElement.scrollLeft);
       } else if (scrollLeft + clientWidth >= scrollWidth) {
-        // Extend timelineData to the future
-        const lastYear = timelineData.at(-1)?.year;
+        const lastYear = currentTimelineData.at(-1)?.year;
 
         if (!lastYear) {
           return;
         }
 
-        const newTimelineData: TimelineData = [...timelineData];
+        const newTimelineData: TimelineData = [...currentTimelineData];
         newTimelineData.push({
           year: lastYear + 1,
           quarters: new Array(4).fill(null).map((_, quarterIndex) => ({
@@ -1315,13 +1314,12 @@ export const GanttProvider: FC<GanttProviderProps> = ({
 
         setTimelineData(newTimelineData);
 
-        // Scroll a bit back so it's not at the very end
         scrollElement.scrollLeft =
           scrollElement.scrollWidth - scrollElement.clientWidth;
         setScrollX(scrollElement.scrollLeft);
       }
     }, 100),
-    []
+    [setScrollX],
   );
 
   useEffect(() => {
@@ -1455,6 +1453,48 @@ export const GanttTimeline: FC<GanttTimelineProps> = ({
     {children}
   </div>
 );
+
+export type GanttGoToTodayButtonProps = {
+  className?: string;
+  label?: string;
+};
+
+/** Sticky shortcut — stays visible while scrolling horizontally; jumps timeline to today. */
+export const GanttGoToTodayButton: FC<GanttGoToTodayButtonProps> = ({
+  className,
+  label = "Ir a hoy",
+}) => {
+  const gantt = useContext(GanttContext);
+
+  const handleClick = useCallback(() => {
+    gantt.scrollToDate?.(new Date());
+  }, [gantt.scrollToDate]);
+
+  return (
+    <div
+      className="pointer-events-none absolute top-0 left-0 z-40 h-[var(--gantt-header-height)] w-0 overflow-visible"
+      aria-hidden={false}
+    >
+      <button
+        type="button"
+        className={cn(
+          "pointer-events-auto sticky inline-flex shrink-0 items-center justify-center border-border/50 border-b border-r bg-background/95 px-3 text-xs font-medium text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-muted",
+          className,
+        )}
+        style={{
+          left: "var(--gantt-sidebar-width)",
+          top: 0,
+          height: "var(--gantt-header-height)",
+        }}
+        onClick={handleClick}
+        aria-label={label}
+        title="Centrar la línea de tiempo en la fecha de hoy"
+      >
+        {label}
+      </button>
+    </div>
+  );
+};
 
 export type GanttTodayProps = {
   className?: string;
