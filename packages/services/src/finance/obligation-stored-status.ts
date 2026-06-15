@@ -1,4 +1,5 @@
 import { Prisma } from "@bloqer/database";
+import { hasOpenObligationBalance } from "./obligation-date";
 
 export type ActiveObligationStoredStatus = "OPEN" | "PARTIAL" | "PAID";
 
@@ -8,7 +9,7 @@ export function resolveObligationStoredStatus(
   originalAmount: Prisma.Decimal,
 ): ActiveObligationStoredStatus {
   const balance = originalAmount.minus(paidAmount);
-  if (balance.lessThanOrEqualTo(0)) return "PAID";
+  if (!hasOpenObligationBalance(balance)) return "PAID";
   if (paidAmount.greaterThan(0)) return "PARTIAL";
   return "OPEN";
 }

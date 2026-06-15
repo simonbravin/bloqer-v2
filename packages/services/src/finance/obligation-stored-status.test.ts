@@ -11,6 +11,13 @@ describe("resolveObligationStoredStatus", () => {
     );
   });
 
+  it("returns PAID when balance is sub-cent dust within tolerance", () => {
+    assert.equal(
+      resolveObligationStoredStatus(new Prisma.Decimal("34099.9978"), new Prisma.Decimal("34100")),
+      "PAID",
+    );
+  });
+
   it("returns PARTIAL when partially paid", () => {
     assert.equal(
       resolveObligationStoredStatus(new Prisma.Decimal("40"), new Prisma.Decimal("100")),

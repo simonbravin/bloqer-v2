@@ -13,6 +13,10 @@ import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { assertCanCancelReceivableDirect } from "./receivable-cancel-guards";
 import { deriveObligationDisplayStatus, hasOpenObligationBalance, isObligationOverdue, OBLIGATION_OPEN_BALANCE_EPSILON } from "../finance/obligation-date";
+import {
+  computeObligationBalanceDue,
+  normalizeObligationBalanceDue,
+} from "../finance/obligation-balance";
 
 const MAX_COLLECTIBLE_RECEIVABLES = 500;
 
@@ -308,8 +312,8 @@ async function reconcileReceivableStatusIfSettled(
   ctx: ServiceContext,
 ): Promise<Receivable> {
   if (receivable.status === "PAID" || receivable.status === "CANCELLED") return receivable;
-  const balanceDue = receivable.originalAmount.minus(receivable.paidAmount);
-  if (balanceDue.greaterThan(0)) return receivable;
+  const balanceDue = computeObligationBalanceDue(receivable.originalAmount, receivable.paidAmount);
+  if (hasOpenObligationBalance(balanceDue)) return receivable;
 
   const updated = await prisma.receivable.updateMany({
     where: {
@@ -319,15 +323,20 @@ async function reconcileReceivableStatusIfSettled(
       paidAmount: receivable.paidAmount,
       originalAmount: receivable.originalAmount,
     },
-    data: { status: "PAID", updatedBy: ctx.actorUserId },
+    data: {
+      status: "PAID",
+      paidAmount: receivable.originalAmount,
+      updatedBy: ctx.actorUserId,
+    },
   });
   if (updated.count === 0) return receivable;
-  return { ...receivable, status: "PAID" };
+  return { ...receivable, status: "PAID", paidAmount: receivable.originalAmount };
 }
 
 function serializeReceivable(r: RawReceivable): ReceivableView {
-  const balanceDue = r.originalAmount.minus(r.paidAmount);
-  const status = deriveObligationDisplayStatus(r.status, balanceDue, r.dueDate, undefined, r.paidAmount);
+  const rawBalance = computeObligationBalanceDue(r.originalAmount, r.paidAmount);
+  const balanceDue = normalizeObligationBalanceDue(rawBalance);
+  const status = deriveObligationDisplayStatus(r.status, rawBalance, r.dueDate, undefined, r.paidAmount);
   return {
     ...r,
     status,

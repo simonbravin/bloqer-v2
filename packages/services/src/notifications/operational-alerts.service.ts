@@ -2,7 +2,7 @@ import type { LinkedEntityType, NotificationSeverity, NotificationType, Prisma }
 import { prisma } from "@bloqer/database";
 import { can, type PermissionAction, type PermissionModule } from "@bloqer/domain";
 import { listNegativeStockBalancesForTenant } from "../inventory/stock-balance.service";
-import { isObligationOverdue } from "../finance/obligation-date";
+import { hasOpenObligationBalance, isObligationOverdue } from "../finance/obligation-date";
 import { ServiceContext } from "../types";
 import { createSystemNotification } from "./notification.service";
 
@@ -148,7 +148,7 @@ export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<O
 
   for (const r of rows) {
     const balanceDue = r.originalAmount.minus(r.paidAmount);
-    if (balanceDue.lessThanOrEqualTo(0)) continue;
+    if (!hasOpenObligationBalance(balanceDue)) continue;
     if (!isObligationOverdue(r.dueDate)) continue;
 
     summary.checkedCount += 1;
@@ -208,7 +208,7 @@ export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<Oper
 
   for (const p of rows) {
     const balanceDue = p.originalAmount.minus(p.paidAmount);
-    if (balanceDue.lessThanOrEqualTo(0)) continue;
+    if (!hasOpenObligationBalance(balanceDue)) continue;
     if (!isObligationOverdue(p.dueDate)) continue;
 
     summary.checkedCount += 1;

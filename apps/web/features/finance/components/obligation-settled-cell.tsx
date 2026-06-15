@@ -1,10 +1,13 @@
+/** MONEY_MODEL § Redondeo: saldo ≤ 0.01 ARS se considera saldado en UI. */
+const SETTLED_BALANCE_EPSILON = 0.01;
+
 /** Etiqueta Pagada/Cobrada derivada del estado de la obligación (es-AR). */
 export function obligationSettledLabel(
   status: string,
   balanceDue?: string | number | null,
 ): "Sí" | "Parcial" | "No" | "—" {
   if (status === "CANCELLED") return "—";
-  if (balanceDue != null && Number(balanceDue) <= 0) return "Sí";
+  if (balanceDue != null && Number(balanceDue) <= SETTLED_BALANCE_EPSILON) return "Sí";
   switch (status) {
     case "PAID":
       return "Sí";

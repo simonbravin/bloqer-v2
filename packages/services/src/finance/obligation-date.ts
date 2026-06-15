@@ -53,7 +53,7 @@ export function deriveObligationDisplayStatus(
 ): ObligationDisplayStatus {
   if (storedStatus === "CANCELLED") return "CANCELLED";
   if (storedStatus === "PAID") return "PAID";
-  if (!hasOpenObligationBalance(balanceDue, new Prisma.Decimal(0))) return "PAID";
+  if (!hasOpenObligationBalance(balanceDue)) return "PAID";
   if (isObligationOverdue(dueDate, asOf)) return "OVERDUE";
   if (paidAmount?.greaterThan(0)) return "PARTIAL";
   return "OPEN";

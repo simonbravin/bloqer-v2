@@ -2,7 +2,7 @@ import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { assertApTenantModule, assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { deriveObligationDisplayStatus, obligationDaysOverdue, parseObligationAsOfDate, startOfDayUtc } from "../finance/obligation-date";
+import { deriveObligationDisplayStatus, hasOpenObligationBalance, obligationDaysOverdue, parseObligationAsOfDate, startOfDayUtc } from "../finance/obligation-date";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -173,7 +173,7 @@ export async function getReceivableAgingReport(
   for (const r of rows) {
     // balanceDue: source of truth is originalAmount - paidAmount (maintained by AR service)
     const balanceDue = r.originalAmount.minus(r.paidAmount);
-    if (!filters.includePaid && balanceDue.lessThanOrEqualTo(ZERO)) continue;
+    if (!filters.includePaid && !hasOpenObligationBalance(balanceDue)) continue;
 
     const contactName  = r.clientContact.fantasyName ?? r.clientContact.legalName;
     const invoiceNumber = r.salesInvoice.number;
@@ -265,7 +265,7 @@ export async function getPayableAgingReport(
 
   for (const p of rows) {
     const balanceDue = p.originalAmount.minus(p.paidAmount);
-    if (!filters.includePaid && balanceDue.lessThanOrEqualTo(ZERO)) continue;
+    if (!filters.includePaid && !hasOpenObligationBalance(balanceDue)) continue;
 
     const contactName   = p.supplierContact.fantasyName ?? p.supplierContact.legalName;
     const invoiceNumber = p.supplierInvoice.number;

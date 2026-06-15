@@ -4,6 +4,7 @@ import type { CreateCollectionInput } from "@bloqer/validators";
 import { auditAr } from "../ar/ar-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
+import { effectiveObligationPaidAfterPayment } from "../finance/obligation-balance";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -204,7 +205,10 @@ export async function createCollection(
     });
 
     // Update Receivable
-    const newPaid = receivable.paidAmount.plus(amount);
+    const newPaid = effectiveObligationPaidAfterPayment(
+      receivable.originalAmount,
+      receivable.paidAmount.plus(amount),
+    );
     const newStatus = resolveObligationStoredStatus(newPaid, receivable.originalAmount);
 
     const receivableUpdate = await tx.receivable.updateMany({

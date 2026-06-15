@@ -45,6 +45,15 @@ describe("deriveObligationDisplayStatus", () => {
     );
   });
 
+  it("returns PAID for sub-cent dust balance (0.0022 ARS) even if stored OVERDUE", () => {
+    const bal = new Prisma.Decimal("0.0022");
+    const paid = new Prisma.Decimal("34099.9978");
+    assert.equal(
+      deriveObligationDisplayStatus("OVERDUE", bal, new Date("2026-05-01T00:00:00.000Z"), TODAY, paid),
+      "PAID",
+    );
+  });
+
   it("returns PAID when balance is zero and stored OPEN on past due date", () => {
     const bal = new Prisma.Decimal(0);
     const paid = new Prisma.Decimal("50");

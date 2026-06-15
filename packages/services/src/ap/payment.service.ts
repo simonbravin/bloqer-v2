@@ -4,6 +4,7 @@ import type { CreatePaymentInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
+import { effectiveObligationPaidAfterPayment } from "../finance/obligation-balance";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -295,7 +296,10 @@ export async function createPayment(
     });
 
     // Update Payable
-    const newPaid    = payable.paidAmount.plus(amount);
+    const newPaid    = effectiveObligationPaidAfterPayment(
+      payable.originalAmount,
+      payable.paidAmount.plus(amount),
+    );
     const newStatus  = resolveObligationStoredStatus(newPaid, payable.originalAmount);
 
     const payableUpdate = await tx.payable.updateMany({

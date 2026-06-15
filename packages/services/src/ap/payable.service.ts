@@ -8,6 +8,10 @@ import { resolvePagination } from "../finance/pagination";
 import { appendPayableStatusFilter, appendPendingPayablesFilter } from "../finance/payable-list-filters";
 import { deriveObligationDisplayStatus, hasOpenObligationBalance, isObligationOverdue, OBLIGATION_OPEN_BALANCE_EPSILON } from "../finance/obligation-date";
 import {
+  computeObligationBalanceDue,
+  normalizeObligationBalanceDue,
+} from "../finance/obligation-balance";
+import {
   aggregateCorporatePayableBalances,
   fetchCorporatePayableSnapshotRows,
 } from "./corporate-ap-snapshot";
@@ -345,8 +349,8 @@ async function reconcilePayableStatusIfSettled(
   ctx: ServiceContext,
 ): Promise<Payable> {
   if (payable.status === "PAID" || payable.status === "CANCELLED") return payable;
-  const balanceDue = payable.originalAmount.minus(payable.paidAmount);
-  if (balanceDue.greaterThan(0)) return payable;
+  const balanceDue = computeObligationBalanceDue(payable.originalAmount, payable.paidAmount);
+  if (hasOpenObligationBalance(balanceDue)) return payable;
 
   const updated = await prisma.payable.updateMany({
     where: {
@@ -356,10 +360,14 @@ async function reconcilePayableStatusIfSettled(
       paidAmount: payable.paidAmount,
       originalAmount: payable.originalAmount,
     },
-    data: { status: "PAID", updatedBy: ctx.actorUserId },
+    data: {
+      status: "PAID",
+      paidAmount: payable.originalAmount,
+      updatedBy: ctx.actorUserId,
+    },
   });
   if (updated.count === 0) return payable;
-  return { ...payable, status: "PAID" };
+  return { ...payable, status: "PAID", paidAmount: payable.originalAmount };
 }
 
 type RawPayable = Payable & {
@@ -367,8 +375,9 @@ type RawPayable = Payable & {
 };
 
 export function serializePayable(p: RawPayable): PayableView {
-  const balanceDue = p.originalAmount.minus(p.paidAmount);
-  const status = deriveObligationDisplayStatus(p.status, balanceDue, p.dueDate, undefined, p.paidAmount);
+  const rawBalance = computeObligationBalanceDue(p.originalAmount, p.paidAmount);
+  const balanceDue = normalizeObligationBalanceDue(rawBalance);
+  const status = deriveObligationDisplayStatus(p.status, rawBalance, p.dueDate, undefined, p.paidAmount);
   return {
     ...p,
     status,
