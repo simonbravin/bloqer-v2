@@ -3,6 +3,7 @@ import { canEditArArea, canViewArProjectArea } from "../ar/ar-access";
 import type { CreateCollectionInput } from "@bloqer/validators";
 import { auditAr } from "../ar/ar-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
+import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -204,10 +205,7 @@ export async function createCollection(
 
     // Update Receivable
     const newPaid = receivable.paidAmount.plus(amount);
-    const newBalance = receivable.originalAmount.minus(newPaid);
-    const newStatus = newBalance.isZero() ? "PAID"
-      : newPaid.greaterThan(0) ? "PARTIAL"
-      : "OPEN";
+    const newStatus = resolveObligationStoredStatus(newPaid, receivable.originalAmount);
 
     const receivableUpdate = await tx.receivable.updateMany({
       where: {
@@ -285,10 +283,7 @@ export async function cancelCollection(
     const receivable = await tx.receivable.findUnique({ where: { id: c.receivableId } });
     if (receivable && receivable.status !== "CANCELLED") {
       const newPaid = Prisma.Decimal.max(receivable.paidAmount.minus(c.amount), new Prisma.Decimal(0));
-      const newBalance = receivable.originalAmount.minus(newPaid);
-      const newStatus = newBalance.isZero() ? "PAID"
-        : newPaid.greaterThan(0) ? "PARTIAL"
-        : "OPEN";
+      const newStatus = resolveObligationStoredStatus(newPaid, receivable.originalAmount);
       const receivableReverse = await tx.receivable.updateMany({
         where: {
           id: receivable.id,

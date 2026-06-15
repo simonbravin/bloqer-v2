@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Prisma } from "@bloqer/database";
-import { appendPayableStatusFilter, mergePayableDueDate } from "./payable-list-filters";
+import { prisma } from "@bloqer/database";
+import {
+  appendPayableStatusFilter,
+  appendPendingPayablesFilter,
+  mergePayableDueDate,
+} from "./payable-list-filters";
 
 const TODAY = new Date("2026-05-29T00:00:00.000Z");
 const FUTURE = new Date("2026-06-15T00:00:00.000Z");
@@ -52,5 +57,15 @@ describe("appendPayableStatusFilter", () => {
     appendPayableStatusFilter(where, "PARTIAL", TODAY);
     assert.equal(where.status, "PARTIAL");
     assert.equal((where.dueDate as Prisma.DateTimeFilter).gte, TODAY);
+    assert.deepEqual(where.originalAmount, { gt: prisma.payable.fields.paidAmount });
+  });
+
+  it("pending filter requires open balance", () => {
+    const where: Prisma.PayableWhereInput = {};
+    appendPendingPayablesFilter(where);
+    assert.ok(Array.isArray(where.AND));
+    const pending = where.AND![0] as Prisma.PayableWhereInput;
+    assert.deepEqual(pending.status, { notIn: ["PAID", "CANCELLED"] });
+    assert.deepEqual(pending.originalAmount, { gt: prisma.payable.fields.paidAmount });
   });
 });

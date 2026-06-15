@@ -61,7 +61,8 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
     await cancelReceivableAction(receivableId, id);
   };
 
-  const canCollect = OPEN_STATUSES.has(receivable.status);
+  const canCollect =
+    Number(receivable.balanceDue) > 0 && OPEN_STATUSES.has(receivable.status);
 
   const collectionItems: CollectionListItem[] = collections.map((c) => ({
     id: c.id,

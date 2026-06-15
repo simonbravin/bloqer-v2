@@ -6,7 +6,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { appendPayableStatusFilter, appendPendingPayablesFilter } from "../finance/payable-list-filters";
-import { deriveObligationDisplayStatus, isObligationOverdue } from "../finance/obligation-date";
+import { deriveObligationDisplayStatus, hasOpenObligationBalance, isObligationOverdue, OBLIGATION_OPEN_BALANCE_EPSILON } from "../finance/obligation-date";
 import {
   aggregateCorporatePayableBalances,
   fetchCorporatePayableSnapshotRows,
@@ -44,7 +44,8 @@ export async function getPayableById(
   if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
   }
-  return serializePayable(p);
+  const reconciled = await reconcilePayableStatusIfSettled(p, ctx);
+  return serializePayable({ ...p, ...reconciled });
 }
 
 export async function getPayableBySupplierInvoiceId(
@@ -65,7 +66,8 @@ export async function getPayableBySupplierInvoiceId(
   if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
   }
-  return serializePayable(p);
+  const reconciled = await reconcilePayableStatusIfSettled(p, ctx);
+  return serializePayable({ ...p, ...reconciled });
 }
 
 export type ProjectPayableListFilters = {
@@ -103,7 +105,11 @@ export async function listPayablesByProject(
     }),
     prisma.payable.count({ where }),
   ]);
-  return { data: rows.map(serializePayable), total };
+  const reconciled = await Promise.all(rows.map((r) => reconcilePayableStatusIfSettled(r, ctx)));
+  return {
+    data: reconciled.map((p, i) => serializePayable({ ...rows[i]!, ...p })),
+    total,
+  };
 }
 
 export type PayablesProjectSummary = {
@@ -160,9 +166,9 @@ function aggregateOpenPayableBalances(
   const zero = new Prisma.Decimal(0);
 
   for (const p of rows) {
-    if (p.status === "PAID" || p.status === "CANCELLED") continue;
+    if (p.status === "CANCELLED") continue;
     const bal = p.originalAmount.minus(p.paidAmount);
-    if (bal.lessThanOrEqualTo(0)) continue;
+    if (!hasOpenObligationBalance(bal, OBLIGATION_OPEN_BALANCE_EPSILON)) continue;
     const cur = p.currency;
     total.set(cur, (total.get(cur) ?? zero).add(bal));
     if (isObligationOverdue(p.dueDate)) {
@@ -172,7 +178,7 @@ function aggregateOpenPayableBalances(
 
   const toRows = (m: Map<string, Prisma.Decimal>) =>
     [...m.entries()]
-      .filter(([, v]) => v.greaterThan(zero))
+      .filter(([, v]) => hasOpenObligationBalance(v, OBLIGATION_OPEN_BALANCE_EPSILON))
       .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
       .sort((a, b) => a.currency.localeCompare(b.currency));
 
@@ -243,9 +249,11 @@ export async function listCompanyPayables(
     prisma.payable.count({ where }),
   ]);
 
-  const data: CompanyPayableListRow[] = rows.map((r) => {
-    const { supplierInvoice, ...rest } = r;
-    const base = serializePayable(rest);
+  const reconciled = await Promise.all(rows.map((r) => reconcilePayableStatusIfSettled(r, ctx)));
+  const data: CompanyPayableListRow[] = reconciled.map((p, i) => {
+    const row = rows[i]!;
+    const { supplierInvoice, ...payableWithContact } = row;
+    const base = serializePayable({ ...payableWithContact, ...p });
     const num = supplierInvoice?.number;
     return {
       ...base,
@@ -276,7 +284,8 @@ export async function getCompanyPayableById(id: string, ctx: ServiceContext): Pr
   if (ctx.companyId && p.companyId !== ctx.companyId) {
     throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
   }
-  return serializePayable(p);
+  const reconciled = await reconcilePayableStatusIfSettled(p, ctx);
+  return serializePayable({ ...p, ...reconciled });
 }
 
 export async function cancelPayable(id: string, ctx: ServiceContext): Promise<Payable> {
@@ -331,13 +340,35 @@ export async function cancelPayable(id: string, ctx: ServiceContext): Promise<Pa
 
 // ─── Serialization ────────────────────────────────────────────────────────────
 
+async function reconcilePayableStatusIfSettled(
+  payable: Payable,
+  ctx: ServiceContext,
+): Promise<Payable> {
+  if (payable.status === "PAID" || payable.status === "CANCELLED") return payable;
+  const balanceDue = payable.originalAmount.minus(payable.paidAmount);
+  if (balanceDue.greaterThan(0)) return payable;
+
+  const updated = await prisma.payable.updateMany({
+    where: {
+      id: payable.id,
+      tenantId: ctx.tenantId,
+      status: { notIn: ["PAID", "CANCELLED"] },
+      paidAmount: payable.paidAmount,
+      originalAmount: payable.originalAmount,
+    },
+    data: { status: "PAID", updatedBy: ctx.actorUserId },
+  });
+  if (updated.count === 0) return payable;
+  return { ...payable, status: "PAID" };
+}
+
 type RawPayable = Payable & {
   supplierContact: { legalName: string; fantasyName: string | null };
 };
 
 export function serializePayable(p: RawPayable): PayableView {
   const balanceDue = p.originalAmount.minus(p.paidAmount);
-  const status = deriveObligationDisplayStatus(p.status, balanceDue, p.dueDate);
+  const status = deriveObligationDisplayStatus(p.status, balanceDue, p.dueDate, undefined, p.paidAmount);
   return {
     ...p,
     status,

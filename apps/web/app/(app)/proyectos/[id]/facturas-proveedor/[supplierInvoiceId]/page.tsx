@@ -80,8 +80,9 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
   const isIssued = invoice.status === "ISSUED";
   const isCancelled = invoice.status === "CANCELLED";
   const canPay =
-    payable &&
-    (payable.status === "OPEN" ||
+    payable
+    && Number(payable.balanceDue) > 0
+    && (payable.status === "OPEN" ||
       payable.status === "PARTIAL" ||
       payable.status === "OVERDUE");
 

@@ -1,6 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { isDueOnOrBeforeHorizon } from "../reports/report-month";
-import { isObligationOverdue } from "../finance/obligation-date";
+import { hasOpenObligationBalance, isObligationOverdue, OBLIGATION_OPEN_BALANCE_EPSILON } from "../finance/obligation-date";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import type { ServiceContext } from "../types";
@@ -72,9 +72,9 @@ export async function countCorporateDraftInvoices(ctx: ServiceContext): Promise<
 }
 
 function openBalance(row: CorporatePayableSnapshotRow): Prisma.Decimal | null {
-  if (row.status === "PAID" || row.status === "CANCELLED") return null;
+  if (row.status === "CANCELLED") return null;
   const bal = row.originalAmount.minus(row.paidAmount);
-  if (bal.lessThanOrEqualTo(0)) return null;
+  if (!hasOpenObligationBalance(bal, OBLIGATION_OPEN_BALANCE_EPSILON)) return null;
   return bal;
 }
 
@@ -96,7 +96,7 @@ export function aggregateCorporatePayableBalances(
 
   const toRows = (m: Map<string, Prisma.Decimal>) =>
     [...m.entries()]
-      .filter(([, v]) => v.greaterThan(ZERO))
+      .filter(([, v]) => hasOpenObligationBalance(v, OBLIGATION_OPEN_BALANCE_EPSILON))
       .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
       .sort((a, b) => a.currency.localeCompare(b.currency));
 

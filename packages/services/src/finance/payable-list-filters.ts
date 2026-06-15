@@ -1,4 +1,5 @@
 import type { Prisma } from "@bloqer/database";
+import { appendPayableAnd, openPayableBalanceWhere } from "./obligation-balance-filter";
 import { startOfTodayUtc } from "./pagination";
 
 export type CompanyPayableStatusFilter =
@@ -62,7 +63,10 @@ export function mergePayableDueDate(
 
 /** Excludes settled lines when listing pending corporate/project payables. */
 export function appendPendingPayablesFilter(where: Prisma.PayableWhereInput): void {
-  Object.assign(where, { status: { notIn: ["PAID", "CANCELLED"] } });
+  appendPayableAnd(where, {
+    status: { notIn: ["PAID", "CANCELLED"] },
+    ...openPayableBalanceWhere(),
+  });
 }
 
 export function appendPayableStatusFilter(
@@ -78,21 +82,17 @@ export function appendPayableStatusFilter(
           { status: "OVERDUE" },
           { status: { in: ["OPEN", "PARTIAL"] }, dueDate: { lt: today } },
         ],
+        ...openPayableBalanceWhere(),
       };
-      const existingAnd = where.AND
-        ? Array.isArray(where.AND)
-          ? where.AND
-          : [where.AND]
-        : [];
-      where.AND = [...existingAnd, overdueOr];
+      appendPayableAnd(where, overdueOr);
       break;
     }
     case "OPEN":
-      Object.assign(where, { status: "OPEN" });
+      Object.assign(where, { status: "OPEN", ...openPayableBalanceWhere() });
       mergePayableDueDate(where, { gte: today });
       break;
     case "PARTIAL":
-      Object.assign(where, { status: "PARTIAL" });
+      Object.assign(where, { status: "PARTIAL", ...openPayableBalanceWhere() });
       mergePayableDueDate(where, { gte: today });
       break;
     default:

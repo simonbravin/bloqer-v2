@@ -3,6 +3,7 @@ import { can } from "@bloqer/domain";
 import type { CreatePaymentInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
+import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -295,10 +296,7 @@ export async function createPayment(
 
     // Update Payable
     const newPaid    = payable.paidAmount.plus(amount);
-    const newBalance = payable.originalAmount.minus(newPaid);
-    const newStatus  = newBalance.isZero() ? "PAID"
-      : newPaid.greaterThan(0) ? "PARTIAL"
-      : "OPEN";
+    const newStatus  = resolveObligationStoredStatus(newPaid, payable.originalAmount);
 
     const payableUpdate = await tx.payable.updateMany({
       where: {
@@ -381,10 +379,7 @@ export async function cancelPayment(
     const payable = await tx.payable.findUnique({ where: { id: p.payableId } });
     if (payable && payable.status !== "CANCELLED") {
       const newPaid    = Prisma.Decimal.max(payable.paidAmount.minus(p.amount), new Prisma.Decimal(0));
-      const newBalance = payable.originalAmount.minus(newPaid);
-      const newStatus  = newBalance.isZero() ? "PAID"
-        : newPaid.greaterThan(0) ? "PARTIAL"
-        : "OPEN";
+      const newStatus  = resolveObligationStoredStatus(newPaid, payable.originalAmount);
       const payableReverse = await tx.payable.updateMany({
         where: {
           id: payable.id,

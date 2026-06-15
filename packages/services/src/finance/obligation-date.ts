@@ -1,4 +1,8 @@
+import { Prisma } from "@bloqer/database";
 import { startOfTodayUtc } from "./pagination";
+
+/** Minimum open balance to count in KPIs/alerts (avoids sub-cent false positives). */
+export const OBLIGATION_OPEN_BALANCE_EPSILON = new Prisma.Decimal("0.01");
 
 /** Normalizes a calendar date to UTC midnight (@db.Date semantics). */
 export function startOfDayUtc(d: Date): Date {
@@ -26,18 +30,31 @@ export function obligationDaysOverdue(dueDate: Date, asOf: Date = startOfTodayUt
 
 export type ObligationDisplayStatus = "OPEN" | "PARTIAL" | "PAID" | "OVERDUE" | "CANCELLED";
 
-/** D5 / BR-AR-002: OVERDUE derived on read when balance remains and due date passed. */
+type DecimalLike = { greaterThan(n: number | Prisma.Decimal): boolean };
+
+/** True when obligation has material open balance (BR-AR-002). */
+export function hasOpenObligationBalance(
+  balanceDue: DecimalLike,
+  epsilon: Prisma.Decimal = OBLIGATION_OPEN_BALANCE_EPSILON,
+): boolean {
+  return balanceDue.greaterThan(epsilon);
+}
+
+/**
+ * D5 / BR-AR-002: display status derived from balance + due date.
+ * Stored PAID/CANCELLED are preserved; zero balance always displays PAID.
+ */
 export function deriveObligationDisplayStatus(
   storedStatus: string,
-  balanceDue: { greaterThan(n: 0): boolean },
+  balanceDue: DecimalLike,
   dueDate: Date,
   asOf: Date = startOfTodayUtc(),
+  paidAmount?: DecimalLike,
 ): ObligationDisplayStatus {
-  if (storedStatus === "PAID" || storedStatus === "CANCELLED") {
-    return storedStatus as ObligationDisplayStatus;
-  }
-  if (balanceDue.greaterThan(0) && isObligationOverdue(dueDate, asOf)) {
-    return "OVERDUE";
-  }
-  return storedStatus as ObligationDisplayStatus;
+  if (storedStatus === "CANCELLED") return "CANCELLED";
+  if (storedStatus === "PAID") return "PAID";
+  if (!hasOpenObligationBalance(balanceDue, new Prisma.Decimal(0))) return "PAID";
+  if (isObligationOverdue(dueDate, asOf)) return "OVERDUE";
+  if (paidAmount?.greaterThan(0)) return "PARTIAL";
+  return "OPEN";
 }

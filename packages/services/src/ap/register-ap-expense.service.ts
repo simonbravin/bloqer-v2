@@ -3,6 +3,7 @@ import { can } from "@bloqer/domain";
 import type { RegisterApExpenseInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
+import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { buildFinancialHref } from "../finance/financial-trace.service";
@@ -256,8 +257,7 @@ export async function registerApExpense(
       movementId = movement.id;
 
       const newPaid = payable.paidAmount.plus(payAmount);
-      const newBalance = payable.originalAmount.minus(newPaid);
-      const newStatus = newBalance.isZero() ? "PAID" : newPaid.greaterThan(0) ? "PARTIAL" : "OPEN";
+      const newStatus = resolveObligationStoredStatus(newPaid, payable.originalAmount);
       const payableUpdate = await tx.payable.updateMany({
         where: {
           id: payable.id,

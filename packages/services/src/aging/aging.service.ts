@@ -187,7 +187,7 @@ export async function getReceivableAgingReport(
 
     if (filters.bucket && bucket !== filters.bucket) continue;
 
-    const status = deriveObligationDisplayStatus(r.status, balanceDue, dueDate, asOf);
+    const status = deriveObligationDisplayStatus(r.status, balanceDue, dueDate, asOf, r.paidAmount);
 
     const item: AgingItem = {
       id:             r.id,
@@ -279,7 +279,7 @@ export async function getPayableAgingReport(
 
     if (filters.bucket && bucket !== filters.bucket) continue;
 
-    const status = deriveObligationDisplayStatus(p.status, balanceDue, dueDate, asOf);
+    const status = deriveObligationDisplayStatus(p.status, balanceDue, dueDate, asOf, p.paidAmount);
 
     const item: AgingItem = {
       id:             p.id,

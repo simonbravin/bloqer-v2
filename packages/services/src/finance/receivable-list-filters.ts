@@ -1,4 +1,5 @@
 import type { Prisma } from "@bloqer/database";
+import { appendReceivableAnd, openReceivableBalanceWhere } from "./obligation-balance-filter";
 import { startOfTodayUtc } from "./pagination";
 
 export type CompanyReceivableStatusFilter =
@@ -60,7 +61,10 @@ export function mergeReceivableDueDate(
 }
 
 export function appendPendingReceivablesFilter(where: Prisma.ReceivableWhereInput): void {
-  Object.assign(where, { status: { notIn: ["PAID", "CANCELLED"] } });
+  appendReceivableAnd(where, {
+    status: { notIn: ["PAID", "CANCELLED"] },
+    ...openReceivableBalanceWhere(),
+  });
 }
 
 export function appendReceivableStatusFilter(
@@ -76,21 +80,17 @@ export function appendReceivableStatusFilter(
           { status: "OVERDUE" },
           { status: { in: ["OPEN", "PARTIAL"] }, dueDate: { lt: today } },
         ],
+        ...openReceivableBalanceWhere(),
       };
-      const existingAnd = where.AND
-        ? Array.isArray(where.AND)
-          ? where.AND
-          : [where.AND]
-        : [];
-      where.AND = [...existingAnd, overdueOr];
+      appendReceivableAnd(where, overdueOr);
       break;
     }
     case "OPEN":
-      Object.assign(where, { status: "OPEN" });
+      Object.assign(where, { status: "OPEN", ...openReceivableBalanceWhere() });
       mergeReceivableDueDate(where, { gte: today });
       break;
     case "PARTIAL":
-      Object.assign(where, { status: "PARTIAL" });
+      Object.assign(where, { status: "PARTIAL", ...openReceivableBalanceWhere() });
       mergeReceivableDueDate(where, { gte: today });
       break;
     default:

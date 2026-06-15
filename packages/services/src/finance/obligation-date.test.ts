@@ -29,9 +29,46 @@ describe("isObligationOverdue", () => {
 describe("deriveObligationDisplayStatus", () => {
   it("marks OPEN as OVERDUE when due date passed", () => {
     const bal = new Prisma.Decimal("100");
+    const paid = new Prisma.Decimal(0);
     assert.equal(
-      deriveObligationDisplayStatus("OPEN", bal, new Date("2026-05-01T00:00:00.000Z"), TODAY),
+      deriveObligationDisplayStatus("OPEN", bal, new Date("2026-05-01T00:00:00.000Z"), TODAY, paid),
       "OVERDUE",
+    );
+  });
+
+  it("returns PAID when balance is zero even if stored OVERDUE", () => {
+    const bal = new Prisma.Decimal(0);
+    const paid = new Prisma.Decimal("100");
+    assert.equal(
+      deriveObligationDisplayStatus("OVERDUE", bal, new Date("2026-05-01T00:00:00.000Z"), TODAY, paid),
+      "PAID",
+    );
+  });
+
+  it("returns PAID when balance is zero and stored OPEN on past due date", () => {
+    const bal = new Prisma.Decimal(0);
+    const paid = new Prisma.Decimal("50");
+    assert.equal(
+      deriveObligationDisplayStatus("OPEN", bal, new Date("2026-05-01T00:00:00.000Z"), TODAY, paid),
+      "PAID",
+    );
+  });
+
+  it("returns PARTIAL when balance remains and not overdue", () => {
+    const bal = new Prisma.Decimal("50");
+    const paid = new Prisma.Decimal("50");
+    assert.equal(
+      deriveObligationDisplayStatus("PARTIAL", bal, new Date("2026-06-15T00:00:00.000Z"), TODAY, paid),
+      "PARTIAL",
+    );
+  });
+
+  it("keeps stored PAID when balance remains (data corruption guard)", () => {
+    const bal = new Prisma.Decimal("10");
+    const paid = new Prisma.Decimal("90");
+    assert.equal(
+      deriveObligationDisplayStatus("PAID", bal, new Date("2026-05-01T00:00:00.000Z"), TODAY, paid),
+      "PAID",
     );
   });
 });

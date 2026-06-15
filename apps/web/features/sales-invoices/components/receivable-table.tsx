@@ -86,7 +86,7 @@ export function ReceivableTable({ receivables, showProjectColumn = false }: Prop
                 </TableCell>
               ) : null}
               <TableCell>
-                <ObligationSettledCell status={r.status} />
+                <ObligationSettledCell status={r.status} balanceDue={r.balanceDue} />
               </TableCell>
               <TableCell>
                 <ReceivableStatusBadge status={r.status} />

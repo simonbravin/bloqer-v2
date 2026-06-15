@@ -4,6 +4,7 @@ import {
   appendPendingReceivablesFilter,
   appendReceivableStatusFilter,
 } from "../finance/receivable-list-filters";
+import { openReceivableBalanceWhere } from "../finance/obligation-balance-filter";
 import { auditAr } from "./ar-audit";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -11,7 +12,7 @@ import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { assertCanCancelReceivableDirect } from "./receivable-cancel-guards";
-import { deriveObligationDisplayStatus, isObligationOverdue } from "../finance/obligation-date";
+import { deriveObligationDisplayStatus, hasOpenObligationBalance, isObligationOverdue, OBLIGATION_OPEN_BALANCE_EPSILON } from "../finance/obligation-date";
 
 const MAX_COLLECTIBLE_RECEIVABLES = 500;
 
@@ -37,7 +38,8 @@ export async function getReceivableById(id: string, ctx: ServiceContext): Promis
   });
   if (!r) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
   if (r.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  return serializeReceivable(r);
+  const reconciled = await reconcileReceivableStatusIfSettled(r, ctx);
+  return serializeReceivable({ ...r, ...reconciled });
 }
 
 export type ProjectReceivableListFilters = {
@@ -75,7 +77,11 @@ export async function listReceivablesByProject(
     }),
     prisma.receivable.count({ where }),
   ]);
-  return { data: rows.map(serializeReceivable), total };
+  const reconciled = await Promise.all(rows.map((r) => reconcileReceivableStatusIfSettled(r, ctx)));
+  return {
+    data: reconciled.map((p, i) => serializeReceivable({ ...rows[i]!, ...p })),
+    total,
+  };
 }
 
 /** Open/partial receivables for collection picker (capped, no pagination). */
@@ -96,6 +102,7 @@ export async function listCollectibleReceivablesByProject(
       projectId,
       tenantId: ctx.tenantId,
       status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
+      ...openReceivableBalanceWhere(),
     },
     include: { clientContact: { select: { legalName: true, fantasyName: true } } },
     orderBy: [{ dueDate: "asc" }, { id: "asc" }],
@@ -171,8 +178,10 @@ export async function listCompanyReceivables(
     prisma.receivable.count({ where }),
   ]);
 
-  const data: CompanyReceivableListRow[] = rows.map((r) => {
-    const base = serializeReceivable(r);
+  const reconciled = await Promise.all(rows.map((r) => reconcileReceivableStatusIfSettled(r, ctx)));
+  const data: CompanyReceivableListRow[] = reconciled.map((p, i) => {
+    const r = rows[i]!;
+    const base = serializeReceivable({ ...r, ...p });
     const num = r.salesInvoice?.number;
     return {
       ...base,
@@ -219,9 +228,9 @@ export async function summarizeReceivablesByProject(
   const zero = new Prisma.Decimal(0);
 
   for (const r of rows) {
-    if (r.status === "PAID" || r.status === "CANCELLED") continue;
+    if (r.status === "CANCELLED") continue;
     const bal = r.originalAmount.minus(r.paidAmount);
-    if (bal.lessThanOrEqualTo(0)) continue;
+    if (!hasOpenObligationBalance(bal, OBLIGATION_OPEN_BALANCE_EPSILON)) continue;
     const cur = r.currency;
     total.set(cur, (total.get(cur) ?? zero).add(bal));
     if (isObligationOverdue(r.dueDate)) {
@@ -231,7 +240,7 @@ export async function summarizeReceivablesByProject(
 
   const toRows = (m: Map<string, Prisma.Decimal>) =>
     [...m.entries()]
-      .filter(([, v]) => v.greaterThan(zero))
+      .filter(([, v]) => hasOpenObligationBalance(v, OBLIGATION_OPEN_BALANCE_EPSILON))
       .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
       .sort((a, b) => a.currency.localeCompare(b.currency));
 
@@ -294,9 +303,31 @@ type RawReceivable = Receivable & {
   project?: { code: string; name: string };
 };
 
+async function reconcileReceivableStatusIfSettled(
+  receivable: Receivable,
+  ctx: ServiceContext,
+): Promise<Receivable> {
+  if (receivable.status === "PAID" || receivable.status === "CANCELLED") return receivable;
+  const balanceDue = receivable.originalAmount.minus(receivable.paidAmount);
+  if (balanceDue.greaterThan(0)) return receivable;
+
+  const updated = await prisma.receivable.updateMany({
+    where: {
+      id: receivable.id,
+      tenantId: ctx.tenantId,
+      status: { notIn: ["PAID", "CANCELLED"] },
+      paidAmount: receivable.paidAmount,
+      originalAmount: receivable.originalAmount,
+    },
+    data: { status: "PAID", updatedBy: ctx.actorUserId },
+  });
+  if (updated.count === 0) return receivable;
+  return { ...receivable, status: "PAID" };
+}
+
 function serializeReceivable(r: RawReceivable): ReceivableView {
   const balanceDue = r.originalAmount.minus(r.paidAmount);
-  const status = deriveObligationDisplayStatus(r.status, balanceDue, r.dueDate);
+  const status = deriveObligationDisplayStatus(r.status, balanceDue, r.dueDate, undefined, r.paidAmount);
   return {
     ...r,
     status,

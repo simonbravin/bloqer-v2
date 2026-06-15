@@ -157,6 +157,10 @@ export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<O
 
     if (recipients.length === 0) continue;
 
+    const receivableActionUrl = r.projectId
+      ? `/proyectos/${r.projectId}/cuentas-por-cobrar/${r.id}`
+      : `/finanzas/cuentas-por-cobrar/${r.id}`;
+
     for (const uid of recipients) {
       await tryCreateAlert(
         {
@@ -170,7 +174,7 @@ export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<O
           linkedEntityType: "SALES_INVOICE",
           linkedEntityId: r.salesInvoiceId,
           projectId: r.projectId,
-          actionUrl: `/proyectos/${r.projectId}/cuentas-por-cobrar/${r.id}`,
+          actionUrl: receivableActionUrl,
           metadata: { receivableId: r.id },
         },
         summary,
@@ -213,6 +217,10 @@ export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<Oper
 
     if (recipients.length === 0) continue;
 
+    const payableActionUrl = p.projectId
+      ? `/proyectos/${p.projectId}/cuentas-por-pagar/${p.id}`
+      : `/finanzas/cuentas-por-pagar/${p.id}`;
+
     for (const uid of recipients) {
       await tryCreateAlert(
         {
@@ -226,7 +234,7 @@ export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<Oper
           linkedEntityType: "SUPPLIER_INVOICE",
           linkedEntityId: p.supplierInvoiceId,
           projectId: p.projectId,
-          actionUrl: `/proyectos/${p.projectId}/cuentas-por-pagar/${p.id}`,
+          actionUrl: payableActionUrl,
           metadata: { payableId: p.id },
         },
         summary,

@@ -3,6 +3,7 @@ import { can } from "@bloqer/domain";
 import type { RegisterArSaleInput } from "@bloqer/validators";
 import { auditAr } from "./ar-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
+import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { buildFinancialHref } from "../finance/financial-trace.service";
@@ -281,8 +282,7 @@ export async function registerArSale(
           movementId = movement.id;
 
           const newPaid = receivable.paidAmount.plus(collectAmount);
-          const newBalance = receivable.originalAmount.minus(newPaid);
-          const newStatus = newBalance.isZero() ? "PAID" : newPaid.greaterThan(0) ? "PARTIAL" : "OPEN";
+          const newStatus = resolveObligationStoredStatus(newPaid, receivable.originalAmount);
           const receivableUpdate = await tx.receivable.updateMany({
             where: {
               id: receivable.id,

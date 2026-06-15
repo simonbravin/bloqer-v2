@@ -40,7 +40,7 @@ export function ReceivableCards({ receivables, showProjectColumn = false }: Prop
             <div className="flex flex-col items-end gap-1">
               <ReceivableStatusBadge status={r.status} />
               <span className="text-xs text-muted-foreground">
-                Cobrada: <ObligationSettledCell status={r.status} />
+                Cobrada: <ObligationSettledCell status={r.status} balanceDue={r.balanceDue} />
               </span>
             </div>
           </div>

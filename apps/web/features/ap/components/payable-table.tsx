@@ -66,7 +66,7 @@ export function PayableTable({
                 })}
               </TableCell>
               <TableCell>
-                <ObligationSettledCell status={p.status} />
+                <ObligationSettledCell status={p.status} balanceDue={p.balanceDue} />
               </TableCell>
               <TableCell>
                 <PayableStatusBadge status={p.status} />
