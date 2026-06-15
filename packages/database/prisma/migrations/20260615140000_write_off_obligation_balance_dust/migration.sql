@@ -3,20 +3,20 @@
 
 UPDATE "payables"
 SET
-  "paid_amount" = "original_amount",
+  "paidAmount" = "originalAmount",
   "status" = 'PAID',
-  "updated_at" = NOW()
+  "updatedAt" = NOW()
 WHERE
   "status" NOT IN ('PAID', 'CANCELLED')
-  AND ("original_amount" - "paid_amount") > 0
-  AND ("original_amount" - "paid_amount") <= 0.01;
+  AND ("originalAmount" - "paidAmount") > 0
+  AND ("originalAmount" - "paidAmount") <= 0.01;
 
 UPDATE "receivables"
 SET
-  "paid_amount" = "original_amount",
+  "paidAmount" = "originalAmount",
   "status" = 'PAID',
-  "updated_at" = NOW()
+  "updatedAt" = NOW()
 WHERE
   "status" NOT IN ('PAID', 'CANCELLED')
-  AND ("original_amount" - "paid_amount") > 0
-  AND ("original_amount" - "paid_amount") <= 0.01;
+  AND ("originalAmount" - "paidAmount") > 0
+  AND ("originalAmount" - "paidAmount") <= 0.01;
