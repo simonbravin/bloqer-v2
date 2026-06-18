@@ -5,7 +5,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { getContactById, ServiceError } from "@bloqer/services";
 import { archiveContactAction, reactivateContactAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -42,11 +41,10 @@ export default async function ContactoDetailPage({ params }: PageProps) {
   }
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="detail" className="space-y-6" breadcrumbLabel={contact.fantasyName ?? contact.legalName}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/directorio" label="Volver" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{contact.legalName}</h1>
             {contact.fantasyName && (

@@ -19,7 +19,6 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { formatMoneyAmount } from "@/lib/format-money";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   addWbsNodeAction,
@@ -96,9 +95,8 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
 
   return (
     <BudgetWbsViewProvider budgetId={budgetId}>
-      <PageShell variant="default" className="space-y-6">
+      <PageShell variant="default" className="space-y-6" breadcrumbLabel={budget.name}>
         <div className="space-y-4">
-          <PageBackLink href={`/proyectos/${projectId}/presupuestos`} label="Presupuestos" />
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">

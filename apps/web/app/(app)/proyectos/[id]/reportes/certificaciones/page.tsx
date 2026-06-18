@@ -39,9 +39,8 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
     roles: current.tenantCtx.roles,
   };
 
-  let project;
   try {
-    project = await getProjectShellInfo(projectId, ctx);
+    await getProjectShellInfo(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
@@ -68,8 +67,6 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
-        projectId={projectId}
-        projectName={project.name}
         title="Certificaciones — evolución y estado"
         subtitle={
           report.type === "REPORT"

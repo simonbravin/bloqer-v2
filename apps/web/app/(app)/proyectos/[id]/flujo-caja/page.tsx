@@ -129,8 +129,6 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
-        projectId={id}
-        projectName={report.project.name}
         title="Flujo de caja"
         subtitle="Cobros y pagos confirmados del proyecto, agrupados por período (día, semana o mes)."
         actions={
@@ -143,7 +141,6 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
             <ReportEmailSendDialog
               reportType="PROJECT_CASH_FLOW"
               supportsPdf={false}
-              projectId={id}
               params={sp}
               defaultRecipientEmail={current.session.user?.email ?? null}
             />

@@ -16,7 +16,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { getSalesInvoiceById, ServiceError } from "@bloqer/services";
 import { issueSalesInvoiceAction, cancelSalesInvoiceAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -67,10 +66,9 @@ export default async function FacturaDetailPage({ params }: PageProps) {
   };
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={invoice.code}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href={`/proyectos/${id}/facturas`} label="Volver" />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>

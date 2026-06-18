@@ -5,8 +5,8 @@ import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { getCompanies, getJournalEntryById, listAccountingAccounts } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import { formatDate } from "@/lib/format";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function EditarAsientoPage({
   params,
@@ -41,9 +41,8 @@ export default async function EditarAsientoPage({
   const q = cf.companyId ? `?empresa=${encodeURIComponent(cf.companyId)}` : "";
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="detail" className="space-y-6" breadcrumbLabel={entry.reference ?? formatDate(entry.entryDate)}>
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/contabilidad/asientos/${journalEntryId}${q}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Editar asiento</h1>
       </div>
       <JournalEntryForm

@@ -6,7 +6,6 @@ import { StockMovementReportTable, StockReportFilters } from "@/features/invento
 import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   searchParams: Promise<{
@@ -53,7 +52,6 @@ export default async function MovimientosInventarioPage({ searchParams }: PagePr
     <PageShell variant="wide" className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/inventario/reportes" label="Reportes" />
           <h1 className="text-2xl font-bold tracking-tight">Movimientos de inventario</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">

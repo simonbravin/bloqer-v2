@@ -6,7 +6,6 @@ import { updateProjectAction } from "../../actions";
 import type { ProjectFormInput } from "@bloqer/validators";
 import { toDateInput } from "@/lib/date-input";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { PageListHeader } from "@/components/ui/page-list-header";
 
 interface PageProps {
@@ -57,8 +56,7 @@ export default async function EditarProyectoPage({ params }: PageProps) {
   };
 
   return (
-    <PageShell variant="default" className="space-y-6">
-      <PageBackLink href={`/proyectos/${id}`} label={project.name} />
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={project.name}>
       <PageListHeader title="Editar proyecto" subtitle="Datos generales de la obra" />
 
       <div className="rounded-xl border bg-card p-6 shadow-sm">

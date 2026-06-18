@@ -4,7 +4,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCertificationById, ServiceError } from "@bloqer/services";
 import { updateCertificationAction } from "../../actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string; certId: string }>;
@@ -35,9 +34,8 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
   const toDateInput = (d: Date | string) => new Date(d).toISOString().split("T")[0];
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={cert.code}>
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${projectId}/certificaciones/${certId}`} label="Volver" />
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold tracking-tight">Editar encabezado</h1>

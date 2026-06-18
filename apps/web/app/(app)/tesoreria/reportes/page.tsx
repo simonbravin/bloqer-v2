@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function ReportesTesoreriaPage() {
   const current = await getCurrentUser();
@@ -16,7 +15,6 @@ export default async function ReportesTesoreriaPage() {
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href="/tesoreria" label="Tesorería" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Reportes de tesorería</h1>
           <p className="text-sm text-muted-foreground mt-1">

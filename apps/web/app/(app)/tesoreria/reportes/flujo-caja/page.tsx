@@ -6,7 +6,6 @@ import { CashFlowTable, CashFlowChart, CashFlowFilters } from "@/features/treasu
 import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   searchParams: Promise<{
@@ -48,7 +47,6 @@ export default async function FlujoCajaPage({ searchParams }: PageProps) {
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/tesoreria/reportes" label="Reportes" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Flujo de caja</h1>
             <p className="text-sm text-muted-foreground mt-0.5">

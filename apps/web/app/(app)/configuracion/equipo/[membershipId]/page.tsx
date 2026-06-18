@@ -11,7 +11,6 @@ import {
 } from "@bloqer/services";
 import { Label } from "@/components/ui/label";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   updateTenantMemberRolesAction,
   updateTenantMemberStatusAction,
@@ -46,9 +45,8 @@ export default async function ConfiguracionEquipoDetallePage({ params }: PagePro
   const canEdit = canEditTeamMembership(current.tenantCtx.roles);
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="form" className="space-y-6" breadcrumbLabel={member.name ?? member.email}>
       <div className="flex flex-wrap gap-2">
-        <PageBackLink href="/configuracion/equipo" label="Equipo" />
       </div>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Miembro</h1>

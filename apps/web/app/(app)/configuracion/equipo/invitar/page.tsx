@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createTenantInvitationAction } from "../invitation-actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -32,7 +31,6 @@ export default async function ConfiguracionEquipoInvitarPage({ searchParams }: P
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex flex-wrap gap-2">
-        <PageBackLink href="/configuracion/equipo" label="Equipo" />
       </div>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Invitar usuario</h1>

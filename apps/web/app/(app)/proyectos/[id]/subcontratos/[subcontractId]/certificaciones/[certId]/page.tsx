@@ -23,7 +23,6 @@ import {
 } from "@bloqer/services";
 import { SubcontractCertificationStatusBadge } from "@/features/subcontracts";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   issueSubcontractCertificationAction,
   approveSubcontractCertificationAction,
@@ -73,13 +72,14 @@ export default async function CertificacionPage({ params }: PageProps) {
   const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "SUBCONTRACTS");
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell
+      variant="default"
+      className="space-y-6"
+      breadcrumbLabel={cert.code}
+      breadcrumbSegmentLabels={{ [subcontractId]: cert.subcontractCode }}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink
-            href={`/proyectos/${projectId}/subcontratos/${subcontractId}`}
-            label={cert.subcontractCode}
-          />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{cert.code}</h1>
             <div className="flex items-center gap-2 mt-1">

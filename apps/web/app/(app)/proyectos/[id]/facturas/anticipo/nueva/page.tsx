@@ -10,7 +10,6 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { ProjectFinanceLayersGuide } from "@/features/finance/components/project-finance-layers-guide";
 
 interface PageProps {
@@ -69,7 +68,6 @@ export default async function NuevaAnticipoPage({ params }: PageProps) {
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${projectId}/finanzas`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Registrar anticipo de cliente</h1>
       </div>
 

@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/table";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { DetailField, DetailFieldGrid } from "@/components/ui/detail-field-grid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
@@ -128,9 +127,8 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
   });
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={log.title ?? formatDateLong(log.logDate)}>
       <div className="space-y-4">
-        <PageBackLink href={`/proyectos/${projectId}/libro-obra`} label="Libro de obra" />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">

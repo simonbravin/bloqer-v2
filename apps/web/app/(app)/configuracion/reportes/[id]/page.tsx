@@ -64,7 +64,7 @@ export default async function EditarReporteProgramadoPage({ params, searchParams
   const emailsFilterHref = `/notificaciones/emails?emailType=REPORT_SCHEDULED&scheduledReportId=${id}`;
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={detail.name}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{detail.name}</h1>

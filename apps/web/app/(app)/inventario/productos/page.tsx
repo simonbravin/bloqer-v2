@@ -7,7 +7,6 @@ import { Pagination } from "@/components/ui/pagination";
 import { getCurrentUser } from "@/lib/auth";
 import { listProducts } from "@bloqer/services";
 import { ProductListSection } from "@/features/inventory/components/product-list-section";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageListHeader } from "@/components/ui/page-list-header";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
@@ -35,7 +34,6 @@ export default async function ProductosPage({
 
   return (
     <PageShell variant="default" className="space-y-6">
-      <PageBackLink href="/inventario" label="Inventario" />
       <PageListHeader
         title="Productos"
         subtitle={`${total} ${total === 1 ? "producto" : "productos"}`}

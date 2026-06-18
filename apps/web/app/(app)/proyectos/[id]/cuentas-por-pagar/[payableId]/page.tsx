@@ -6,7 +6,6 @@ import { PayableStatusBadge, PaymentTable } from "@/features/ap";
 import type { PaymentListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   getPayableById,
   getPurchaseOrderCodeForApLink,
@@ -65,9 +64,8 @@ export default async function PayableDetailPage({ params }: PageProps) {
     && (payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE");
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={payable.supplierName}>
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/cuentas-por-pagar`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Cuenta por pagar</h1>
         <PayableStatusBadge status={payable.status} />
       </div>

@@ -37,9 +37,8 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
     roles: current.tenantCtx.roles,
   };
 
-  let project;
   try {
-    project = await getProjectShellInfo(projectId, ctx);
+    await getProjectShellInfo(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
@@ -74,8 +73,6 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
-        projectId={projectId}
-        projectName={project.name}
         title="Control de costos"
         subtitle={subtitle}
         actions={
@@ -95,7 +92,6 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
                 reportType="PROJECT_COST_CONTROL"
                 supportsPdf
                 params={sp}
-                projectId={projectId}
                 defaultRecipientEmail={current.session.user?.email ?? null}
               />
             </div>

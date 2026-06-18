@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { CollectionForm } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { getReceivableById, listTreasuryAccounts, ServiceError } from "@bloqer/services";
 
 interface PageProps {
@@ -43,9 +42,12 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
   const isBlocked = receivable.status === "PAID" || receivable.status === "CANCELLED";
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell
+      variant="default"
+      className="space-y-6"
+      breadcrumbSegmentLabels={{ [receivableId]: receivable.clientName }}
+    >
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/cuentas-por-cobrar/${receivableId}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Registrar cobro</h1>
       </div>
 

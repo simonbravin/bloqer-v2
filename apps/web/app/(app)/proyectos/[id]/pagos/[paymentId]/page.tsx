@@ -8,7 +8,6 @@ import { getPaymentById, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { cancelPaymentAction } from "@/app/(app)/proyectos/[id]/cuentas-por-pagar/actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -43,9 +42,8 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
   const returnPath = `/proyectos/${id}/pagos/${paymentId}`;
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={formatDate(payment.paymentDate)}>
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/pagos`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Pago</h1>
         <Badge variant={isConfirmed ? "default" : "destructive"}>
           {isConfirmed ? "Confirmado" : "Cancelado"}

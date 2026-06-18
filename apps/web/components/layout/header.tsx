@@ -5,6 +5,7 @@ import type { Session } from "next-auth";
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { clearActiveTenantCookieAction } from "@/lib/auth-session-actions";
+import { AppShellBreadcrumb } from "@/components/layout/shell-breadcrumb";
 import { ShellHeaderLeading } from "@/components/layout/sidebar-shell-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -48,11 +49,7 @@ export function Header({
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/90 px-4 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/75 sm:px-6">
       <ShellHeaderLeading>
-        {tenantName ? (
-          <p className="truncate text-sm font-semibold tracking-tight text-foreground" title={tenantName}>
-            {tenantName}
-          </p>
-        ) : null}
+        {tenantName ? <AppShellBreadcrumb tenantName={tenantName} /> : null}
       </ShellHeaderLeading>
       <div className="flex items-center gap-1 sm:gap-2">
         <Button variant="ghost" size="icon" className="relative h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground" asChild title="Notificaciones">

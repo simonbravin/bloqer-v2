@@ -30,7 +30,6 @@ import { ProcurementQuoteStatusBadge } from "@/features/procurement/components/p
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { isStorageConfigured } from "@bloqer/config";
@@ -114,9 +113,8 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
     : [];
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={pr.code}>
       <div className="flex items-center gap-4 flex-wrap">
-        <PageBackLink href={`/proyectos/${id}/solicitudes-compra`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">{pr.code}</h1>
         <PurchaseRequestStatusBadge status={pr.status} />
       </div>

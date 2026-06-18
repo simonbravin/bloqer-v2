@@ -5,7 +5,6 @@ import { getProductById, listStockMovements, ServiceError } from "@bloqer/servic
 import { ProductStatusBadge, StockMovementList } from "@/features/inventory";
 import { deactivateProductAction, reactivateProductAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 import { DataTableSection } from "@/components/ui/data-table-section";
 
@@ -37,10 +36,9 @@ export default async function ProductoPage({ params }: PageProps) {
   }
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="detail" className="space-y-6" breadcrumbLabel={`[${product.sku}] ${product.name}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/inventario/productos" label="Productos" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
               [{product.sku}] {product.name}

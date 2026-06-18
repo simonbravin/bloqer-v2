@@ -11,14 +11,9 @@ import {
 import { tenantGateFromSnapshot } from "@/features/projects/tenant-gate-from-snapshot";
 import { ProjectStatusBadge } from "@/features/projects/components/project-status-badge";
 import type { PermissionModule, UserRole } from "@bloqer/domain";
-import type { ProjectShellInfo } from "@bloqer/services";
+import { useProjectShell } from "@/lib/project-shell-context";
 import { ProjectNavIcon } from "@/lib/project-nav-icons";
 import { isNavLinkActive } from "@/lib/nav-link-active";
-
-type ShellState =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "ok"; shell: ProjectShellInfo };
 
 interface ProjectWorkspaceSidebarProps {
   projectId: string;
@@ -32,6 +27,7 @@ export function ProjectWorkspaceSidebar({
   moduleGateSnapshot,
 }: ProjectWorkspaceSidebarProps) {
   const pathname = usePathname();
+  const { state: shellState } = useProjectShell();
   const gate = useMemo(() => tenantGateFromSnapshot(moduleGateSnapshot), [moduleGateSnapshot]);
   const sections = useMemo(
     () => buildProjectWorkspaceNavSections(projectId, gate, roles),
@@ -56,32 +52,8 @@ export function ProjectWorkspaceSidebar({
     });
   }, [pathname, projectId, sections]);
 
-  const [shellState, setShellState] = useState<ShellState>({ status: "loading" });
-
-  useEffect(() => {
-    let cancelled = false;
-    setShellState({ status: "loading" });
-    void (async () => {
-      try {
-        const res = await fetch(`/api/projects/${projectId}/shell`, { credentials: "same-origin" });
-        const data = (await res.json()) as ProjectShellInfo | { error?: string };
-        if (cancelled) return;
-        if (!res.ok) {
-          setShellState({
-            status: "error",
-            message: typeof data === "object" && data && "error" in data ? String(data.error) : "Error al cargar",
-          });
-          return;
-        }
-        setShellState({ status: "ok", shell: data as ProjectShellInfo });
-      } catch {
-        if (!cancelled) setShellState({ status: "error", message: "Error de red" });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
+  const shellForProject =
+    shellState.status !== "idle" && shellState.projectId === projectId ? shellState : null;
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col bg-sidebar text-sidebar-foreground">
@@ -95,31 +67,25 @@ export function ProjectWorkspaceSidebar({
       </div>
 
       <div className="mx-2 mb-3 mt-3 rounded-xl border border-border/80 bg-card px-3 py-3 text-card-foreground shadow-sm">
-        <Link
-          href="/proyectos"
-          className="mb-2 inline-flex rounded-md text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-        >
-          ← Volver a proyectos
-        </Link>
-        {shellState.status === "loading" && (
+        {(!shellForProject || shellForProject.status === "loading") && (
           <div className="space-y-2 animate-pulse">
             <div className="h-5 w-[85%] rounded bg-muted" />
             <div className="h-4 w-[45%] rounded bg-muted" />
             <div className="h-5 w-16 rounded bg-muted" />
           </div>
         )}
-        {shellState.status === "error" && (
-          <p className="text-xs text-destructive">{shellState.message}</p>
+        {shellForProject?.status === "error" && (
+          <p className="text-xs text-destructive">{shellForProject.message}</p>
         )}
-        {shellState.status === "ok" && (
+        {shellForProject?.status === "ok" && (
           <>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="min-w-0 flex-1 truncate text-base font-semibold leading-tight tracking-tight">
-                {shellState.shell.name}
+                {shellForProject.shell.name}
               </h2>
-              <ProjectStatusBadge status={shellState.shell.status} />
+              <ProjectStatusBadge status={shellForProject.shell.status} />
             </div>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{shellState.shell.code}</p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{shellForProject.shell.code}</p>
           </>
         )}
       </div>

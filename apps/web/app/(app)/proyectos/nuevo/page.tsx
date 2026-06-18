@@ -5,7 +5,6 @@ import { listContacts } from "@bloqer/services";
 import { createProjectAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageListHeader } from "@/components/ui/page-list-header";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function NuevoProyectoPage() {
   const current = await getCurrentUser();
@@ -25,7 +24,6 @@ export default async function NuevoProyectoPage() {
 
   return (
     <PageShell variant="default" className="space-y-6">
-      <PageBackLink href="/proyectos" label="Proyectos" />
       <PageListHeader title="Nuevo proyecto" subtitle="Alta de obra" />
 
       <div className="rounded-xl border bg-card p-6 shadow-sm">

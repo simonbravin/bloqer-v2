@@ -7,7 +7,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { listInternalTransfers, ServiceError } from "@bloqer/services";
 import { InternalTransferListSection } from "@/features/treasury/components/internal-transfer-list-section";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 import { parsePage } from "@/lib/parse-page";
 
@@ -48,7 +47,6 @@ export default async function TransferenciasPage({
     <PageShell variant="default" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/tesoreria" label="Volver" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Transferencias internas</h1>
             <p className="mt-1 text-sm text-muted-foreground">

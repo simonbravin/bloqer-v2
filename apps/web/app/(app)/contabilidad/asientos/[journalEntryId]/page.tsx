@@ -26,7 +26,6 @@ import {
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
 import { formatDate } from "@/lib/format";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { PageShell } from "@/components/layout/page-shell";
 import { DetailField, DetailFieldGrid } from "@/components/ui/detail-field-grid";
 
@@ -66,10 +65,9 @@ export default async function AsientoDetallePage({
   const canEdit = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={entry.reference ?? formatDate(entry.entryDate)}>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <PageBackLink href={`/contabilidad/asientos${q}`} label="Asientos" />
           <h1 className="text-2xl font-bold tracking-tight">Asiento</h1>
           <JournalEntryStatusBadge status={entry.status} />
         </div>

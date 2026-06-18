@@ -3,6 +3,7 @@
 import { signOut } from "next-auth/react";
 import type { Session } from "next-auth";
 import Link from "next/link";
+import { PlatformShellBreadcrumb } from "@/components/layout/shell-breadcrumb";
 import { ShellHeaderLeading } from "@/components/layout/sidebar-shell-context";
 import { clearActiveTenantCookieAction } from "@/lib/auth-session-actions";
 import { Button } from "@/components/ui/button";
@@ -33,9 +34,7 @@ export function PlatformHeader({ user }: { user: Session["user"] }) {
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/90 px-4 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/75 sm:px-6">
       <ShellHeaderLeading>
-        <p className="truncate text-sm font-semibold tracking-tight text-foreground">
-          Consola de plataforma
-        </p>
+        <PlatformShellBreadcrumb />
       </ShellHeaderLeading>
       <div className="flex items-center gap-1 sm:gap-2">
         <Button variant="ghost" size="sm" asChild className="hidden text-muted-foreground sm:inline-flex">

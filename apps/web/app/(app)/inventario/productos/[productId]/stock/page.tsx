@@ -3,7 +3,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { getProductStockDetail, ServiceError } from "@bloqer/services";
 import { StockBalanceTable, StockMovementReportTable } from "@/features/inventory-reports";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ productId: string }>;
@@ -42,7 +41,6 @@ export default async function ProductoStockPage({ params, searchParams }: PagePr
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/inventario/productos/${productId}`} label={product.name} />
         <h1 className="text-2xl font-bold tracking-tight">Stock — {product.name}</h1>
       </div>
 

@@ -5,7 +5,6 @@ import { CashPositionTable } from "@/features/treasury-reports";
 import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   searchParams: Promise<{ companyId?: string; currency?: string }>;
@@ -35,7 +34,6 @@ export default async function PosicionCajaPage({ searchParams }: PageProps) {
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/tesoreria/reportes" label="Reportes" />
           <h1 className="text-2xl font-bold tracking-tight">Posición de caja</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">

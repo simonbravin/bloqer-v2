@@ -32,9 +32,8 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
     roles: current.tenantCtx.roles,
   };
 
-  let project;
   try {
-    project = await getProjectShellInfo(id, ctx);
+    await getProjectShellInfo(id, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
@@ -66,8 +65,6 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
-        projectId={id}
-        projectName={project.name}
         title="Facturas proveedor"
         subtitle={`${invoicesTotal} ${invoicesTotal === 1 ? "factura" : "facturas"}`}
         actions={

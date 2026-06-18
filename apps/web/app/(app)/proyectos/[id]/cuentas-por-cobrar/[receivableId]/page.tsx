@@ -9,7 +9,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { getReceivableById, listCollectionsByReceivable, ServiceError } from "@bloqer/services";
 import { cancelReceivableAction } from "../../facturas/actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -76,10 +75,9 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
   }));
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={receivable.clientName}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href={`/proyectos/${id}/cuentas-por-cobrar`} label="Volver" />
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Cuenta por cobrar</h1>
             <ReceivableStatusBadge status={receivable.status} />

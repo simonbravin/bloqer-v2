@@ -7,7 +7,6 @@ import { getAccountingMappingRuleById } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 export default async function ReglaContableDetallePage({
@@ -37,10 +36,9 @@ export default async function ReglaContableDetallePage({
   const canEdit = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="detail" className="space-y-6" breadcrumbLabel={rule.name}>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <PageBackLink href={`/contabilidad/reglas${q}`} label="Volver" />
           <h1 className="text-2xl font-bold tracking-tight">{rule.name}</h1>
           <AccountingEventTypeBadge eventType={rule.eventType} />
         </div>

@@ -4,7 +4,6 @@ import type { WbsOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
 import { canEditPurchaseRequests, listProcurementWbsOptions } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -34,7 +33,6 @@ export default async function NuevaSolicitudCompraPage({ params }: PageProps) {
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/solicitudes-compra`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva solicitud de compra</h1>
       </div>
       <PurchaseRequestForm projectId={id} wbsOptions={wbsOptions} />

@@ -7,7 +7,6 @@ import { listAccountingMappingRules } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 export default async function ContabilidadReglasPage({
@@ -31,7 +30,6 @@ export default async function ContabilidadReglasPage({
     <PageShell variant="default" className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/contabilidad" label="Volver" />
           <h1 className="text-2xl font-bold tracking-tight">Reglas contables</h1>
         </div>
         {can(current.tenantCtx.roles, "EDIT", "ACCOUNTING") && (

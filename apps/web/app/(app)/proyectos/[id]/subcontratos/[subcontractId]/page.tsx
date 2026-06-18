@@ -16,7 +16,6 @@ import {
   SubcontractCertificationStatusBadge,
 } from "@/features/subcontracts";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { DataTableSection } from "@/components/ui/data-table-section";
@@ -76,10 +75,9 @@ export default async function SubcontratoPage({ params }: PageProps) {
     parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2 });
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={subcontract.code}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href={`/proyectos/${projectId}/subcontratos`} label="Subcontratos" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
               {subcontract.code} — {subcontract.title}

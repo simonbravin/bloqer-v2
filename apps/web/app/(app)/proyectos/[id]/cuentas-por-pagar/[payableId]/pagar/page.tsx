@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { PaymentForm } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { getPayableById, listTreasuryAccounts, ServiceError } from "@bloqer/services";
 
 interface PageProps {
@@ -46,9 +45,12 @@ export default async function PagarPage({ params }: PageProps) {
   const isBlocked = payable.status === "PAID" || payable.status === "CANCELLED";
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell
+      variant="default"
+      className="space-y-6"
+      breadcrumbSegmentLabels={{ [payableId]: payable.supplierName }}
+    >
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/cuentas-por-pagar/${payableId}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Registrar pago</h1>
       </div>
 

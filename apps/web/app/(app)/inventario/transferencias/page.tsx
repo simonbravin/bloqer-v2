@@ -15,7 +15,6 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { listWarehouseTransfers } from "@bloqer/services";
 import { WarehouseTransferStatusBadge } from "@/features/warehouse-transfer";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { PageShell } from "@/components/layout/page-shell";
 
 export default async function TransferenciasPage() {
@@ -39,7 +38,6 @@ export default async function TransferenciasPage() {
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/inventario" label="Inventario" />
           <h1 className="text-2xl font-bold tracking-tight">Transferencias de depósito</h1>
         </div>
         <Button asChild size="sm">

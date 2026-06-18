@@ -6,7 +6,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { listWarehouses } from "@bloqer/services";
 import { WarehouseListSection } from "@/features/inventory/components/warehouse-list-section";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 export default async function DepositosPage() {
@@ -26,7 +25,6 @@ export default async function DepositosPage() {
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/inventario" label="Volver" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Depósitos</h1>
             <p className="text-sm text-muted-foreground">

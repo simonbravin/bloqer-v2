@@ -1,4 +1,9 @@
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import {
+  ShellBreadcrumbLabel,
+  ShellBreadcrumbSegmentLabels,
+} from "@/components/layout/shell-breadcrumb-label";
 
 export type PageShellVariant = "default" | "wide" | "form" | "detail" | "narrow";
 
@@ -17,11 +22,25 @@ const variantClass: Record<PageShellVariant, string> = {
 export function PageShell({
   variant = "default",
   className,
+  breadcrumbLabel,
+  breadcrumbSegmentLabels,
   children,
 }: {
   variant?: PageShellVariant;
   className?: string;
-  children: React.ReactNode;
+  /** Overrides the last breadcrumb segment on detail routes (entity code, name, etc.). */
+  breadcrumbLabel?: string;
+  /** Labels keyed by URL segment id (UUID) for nested entity trails. */
+  breadcrumbSegmentLabels?: Record<string, string>;
+  children: ReactNode;
 }) {
-  return <div className={cn(variantClass[variant], className)}>{children}</div>;
+  return (
+    <div className={cn(variantClass[variant], className)}>
+      {breadcrumbLabel ? <ShellBreadcrumbLabel label={breadcrumbLabel} /> : null}
+      {breadcrumbSegmentLabels ? (
+        <ShellBreadcrumbSegmentLabels labels={breadcrumbSegmentLabels} />
+      ) : null}
+      {children}
+    </div>
+  );
 }

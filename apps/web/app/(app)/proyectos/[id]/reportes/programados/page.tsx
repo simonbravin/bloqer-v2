@@ -39,9 +39,8 @@ export default async function ProjectReportesProgramadosPage({ params }: Props) 
   if (!ctx) redirect("/login");
   if (!canManageScheduledReports(ctx)) notFound();
 
-  let project;
   try {
-    project = await getProjectShellInfo(projectId, ctx);
+    await getProjectShellInfo(projectId, ctx);
   } catch (e) {
     if (e instanceof ServiceError && e.code === "NOT_FOUND") notFound();
     if (e instanceof ServiceError && e.code === "FORBIDDEN") redirect("/dashboard");
@@ -53,8 +52,6 @@ export default async function ProjectReportesProgramadosPage({ params }: Props) 
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
-        projectId={projectId}
-        projectName={project.name}
         title="Envíos programados"
         subtitle="Reportes por email automáticos para esta obra. Ver detalle e historial de ejecuciones en cada envío."
         actions={

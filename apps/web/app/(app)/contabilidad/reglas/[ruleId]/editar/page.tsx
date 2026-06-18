@@ -6,7 +6,6 @@ import { getAccountingMappingRuleById, listAccountingAccounts } from "@bloqer/se
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function EditarReglaContablePage({
   params,
@@ -37,9 +36,8 @@ export default async function EditarReglaContablePage({
   const q = cf.companyId ? `?empresa=${encodeURIComponent(cf.companyId)}` : "";
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="form" className="space-y-6" breadcrumbLabel={rule.name}>
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/contabilidad/reglas/${ruleId}${q}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Editar regla</h1>
       </div>
       <AccountingMappingRuleForm

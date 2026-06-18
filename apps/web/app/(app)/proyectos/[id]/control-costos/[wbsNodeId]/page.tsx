@@ -3,7 +3,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { getWbsItemCostDetail, ServiceError } from "@bloqer/services";
 import { WbsItemDrilldown } from "@/features/cost-control";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string; wbsNodeId: string }>;
@@ -37,9 +36,8 @@ export default async function WbsItemDetailPage({ params, searchParams }: PagePr
   const backUrl = `/proyectos/${projectId}/control-costos${sp.budgetId ? `?budgetId=${sp.budgetId}` : ""}`;
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={detail.wbsCode}>
       <div className="flex items-center gap-4">
-        <PageBackLink href={backUrl} label="Control de costos" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight font-mono">{detail.wbsCode}</h1>
           <p className="text-sm text-muted-foreground">{detail.wbsName}</p>

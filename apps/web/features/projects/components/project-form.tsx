@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { contactsToSearchableOptions, SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { createProjectSchema, type CreateProjectInput, type ProjectFormInput } from "@bloqer/validators";
+import { invalidateProjectShellCache } from "@/lib/project-shell-context";
 
 interface ClientOption {
   id: string;
@@ -68,7 +69,13 @@ export function ProjectForm({
         setServerError(result.error);
       } else {
         const id = "id" in result ? result.id : null;
-        router.push(successRedirect ?? (id ? `/proyectos/${id}` : "/proyectos"));
+        const redirectPath = successRedirect ?? (id ? `/proyectos/${id}` : "/proyectos");
+        const updatedProjectId =
+          id ?? redirectPath.match(/^\/proyectos\/([^/]+)/)?.[1] ?? null;
+        if ("ok" in result && updatedProjectId) {
+          invalidateProjectShellCache(updatedProjectId);
+        }
+        router.push(redirectPath);
       }
     });
   });

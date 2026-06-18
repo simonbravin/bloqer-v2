@@ -58,9 +58,8 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
     roles: current.tenantCtx.roles,
   };
 
-  let project;
   try {
-    project = await getProjectShellInfo(id, ctx);
+    await getProjectShellInfo(id, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
@@ -129,8 +128,6 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
-        projectId={id}
-        projectName={project.name}
         title="Cuentas por cobrar"
         subtitle={`Aging + ${receivablesTotal} ${receivablesTotal === 1 ? "cuenta" : "cuentas"} del proyecto`}
         actions={

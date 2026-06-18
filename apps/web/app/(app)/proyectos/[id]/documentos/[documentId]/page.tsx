@@ -4,7 +4,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { getDocumentById, ServiceError } from "@bloqer/services";
 import { DocumentCategoryBadge, DocumentStatusBadge } from "@/features/documents";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { archiveDocumentAction, restoreDocumentAction, softDeleteDocumentAction } from "../actions";
 import { Button } from "@/components/ui/button";
 
@@ -59,10 +58,9 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
   };
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={doc.originalFileName}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href={`/proyectos/${id}/documentos`} label="Documentos" />
           <h1 className="text-xl font-bold tracking-tight truncate max-w-md">
             {doc.originalFileName}
           </h1>

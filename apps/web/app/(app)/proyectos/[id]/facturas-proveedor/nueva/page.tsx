@@ -4,7 +4,6 @@ import type { SupplierOption, POOption } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { listContacts, listLinkablePurchaseOrders, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -50,7 +49,6 @@ export default async function NuevaFacturaProveedorPage({ params, searchParams }
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/facturas-proveedor`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva factura de proveedor</h1>
       </div>
 

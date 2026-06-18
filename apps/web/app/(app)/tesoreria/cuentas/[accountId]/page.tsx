@@ -4,7 +4,6 @@ import type { AccountMovementListItem } from "@/features/treasury";
 import { getCurrentUser } from "@/lib/auth";
 import { getTreasuryAccountById, listAccountMovements, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { deactivateTreasuryAccountAction, reactivateTreasuryAccountAction } from "../../actions";
 import { Button } from "@/components/ui/button";
 import { DataTableSection } from "@/components/ui/data-table-section";
@@ -74,10 +73,9 @@ export default async function AccountDetailPage({ params }: PageProps) {
   }));
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={account.name}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/tesoreria/cuentas" label="Volver" />
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">{account.name}</h1>
             <TreasuryAccountStatusBadge status={account.status} />

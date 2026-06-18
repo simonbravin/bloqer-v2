@@ -4,7 +4,6 @@ import { listProducts, listWarehouses, listProcurementWbsOptions } from "@bloqer
 import { ConsumptionForm } from "@/features/inventory";
 import type { ProductOption, WarehouseOption, WbsOption } from "@/features/inventory";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -50,7 +49,6 @@ export default async function NuevoConsumoPage({ params }: PageProps) {
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/inventario`} label="Inventario del proyecto" />
         <h1 className="text-2xl font-bold tracking-tight">Registrar consumo</h1>
       </div>
 

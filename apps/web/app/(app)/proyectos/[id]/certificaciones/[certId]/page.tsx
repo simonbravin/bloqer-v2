@@ -18,7 +18,6 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   issueCertificationAction,
   approveCertificationAction,
@@ -87,10 +86,9 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
   const allItems = flattenItemNodes(wbsTree);
 
   return (
-    <PageShell variant="default" className="space-y-4">
+    <PageShell variant="default" className="space-y-4" breadcrumbLabel={cert.code}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href={`/proyectos/${projectId}/certificaciones`} label="Certificaciones" />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold tracking-tight">{cert.code}</h1>

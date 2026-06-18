@@ -5,7 +5,6 @@ import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { getCompanies } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function NuevaCuentaContablePage() {
   const current = await getCurrentUser();
@@ -18,7 +17,6 @@ export default async function NuevaCuentaContablePage() {
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href="/contabilidad/cuentas" label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva cuenta contable</h1>
       </div>
       <AccountingAccountForm

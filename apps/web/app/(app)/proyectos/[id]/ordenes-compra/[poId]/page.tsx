@@ -33,7 +33,6 @@ import {
 } from "@bloqer/services";
 import { Badge } from "@/components/ui/badge";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   submitPurchaseOrderAction,
   approvePurchaseOrderAction,
@@ -115,9 +114,8 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   }));
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={order.code}>
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/ordenes-compra`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">{order.code}</h1>
         <PurchaseOrderStatusBadge status={order.status} />
       </div>

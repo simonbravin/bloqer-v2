@@ -2,6 +2,8 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { BreadcrumbOverrideProvider } from "@/lib/breadcrumb-override-context";
+import { ProjectShellProvider } from "@/lib/project-shell-context";
 import {
   SHELL_SIDEBAR_ID,
   SHELL_SIDEBAR_WIDTH_CLASS,
@@ -38,17 +40,21 @@ export function ShellLayout({ sidebar, header, children }: ShellLayoutProps) {
 
   return (
     <SidebarShellProvider motionReady={motionReady}>
-      <div className="flex h-dvh overflow-hidden bg-background">
-        <SidebarRail>
-          <ShellSidebarPanel>{sidebar}</ShellSidebarPanel>
-        </SidebarRail>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-workspace">
-          {header}
-          <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-4 sm:p-6 lg:p-8">
-            {children}
-          </main>
-        </div>
-      </div>
+      <BreadcrumbOverrideProvider>
+        <ProjectShellProvider>
+          <div className="flex h-dvh overflow-hidden bg-background">
+            <SidebarRail>
+              <ShellSidebarPanel>{sidebar}</ShellSidebarPanel>
+            </SidebarRail>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-workspace">
+              {header}
+              <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-4 sm:p-6 lg:p-8">
+                {children}
+              </main>
+            </div>
+          </div>
+        </ProjectShellProvider>
+      </BreadcrumbOverrideProvider>
     </SidebarShellProvider>
   );
 }

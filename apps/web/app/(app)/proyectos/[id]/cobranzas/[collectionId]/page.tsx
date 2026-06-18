@@ -8,7 +8,6 @@ import { can } from "@bloqer/domain";
 import { cancelCollectionAction } from "../actions";
 import { formatDate } from "@/lib/format";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -58,10 +57,9 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
   const returnPath = `/proyectos/${id}/cobranzas/${collectionId}`;
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={formatDate(collection.collectionDate)}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href={`/proyectos/${id}/cobranzas`} label="Volver" />
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Cobranza</h1>
             <CollectionStatusBadge status={collection.status} />

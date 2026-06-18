@@ -9,7 +9,6 @@ import {
 import { SubcontractForm } from "@/features/subcontracts";
 import { updateSubcontractAction } from "../../actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string; subcontractId: string }>;
@@ -56,12 +55,8 @@ export default async function EditarSubcontratoPage({ params }: PageProps) {
   const companyId = subcontract.companyId ?? current.tenantCtx.companyId ?? "";
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={subcontract.code}>
       <div className="flex items-center gap-4">
-        <PageBackLink
-          href={`/proyectos/${projectId}/subcontratos/${subcontractId}`}
-          label="Subcontrato"
-        />
         <h1 className="text-2xl font-bold tracking-tight">Editar subcontrato</h1>
       </div>
       <div className="rounded-lg border bg-card p-6">

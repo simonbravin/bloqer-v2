@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function ReportesInventarioPage() {
   const current = await getCurrentUser();
@@ -11,7 +10,6 @@ export default async function ReportesInventarioPage() {
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href="/inventario" label="Inventario" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Reportes de inventario</h1>
           <p className="text-sm text-muted-foreground mt-1">Stock y movimientos en tiempo real.</p>

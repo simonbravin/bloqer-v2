@@ -3,7 +3,6 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   getJobsiteLogById,
   getJobsiteLogFormPickList,
-  getProjectShellInfo,
   getWbsIncrementalProgressSnapshot,
   hasLegacyPhysicalPctOverflow,
   listProjectWbsItemsForLog,
@@ -44,13 +43,11 @@ export default async function EditarParteObraPage({ params }: PageProps) {
   let wbsRaw: Awaited<ReturnType<typeof listProjectWbsItemsForLog>>;
   let pickList: Awaited<ReturnType<typeof getJobsiteLogFormPickList>>;
   let wbsProgressSnapshot: Awaited<ReturnType<typeof getWbsIncrementalProgressSnapshot>>;
-  let project;
   try {
-    [wbsRaw, pickList, wbsProgressSnapshot, project] = await Promise.all([
+    [wbsRaw, pickList, wbsProgressSnapshot] = await Promise.all([
       listProjectWbsItemsForLog(projectId, ctx).catch(() => []),
       getJobsiteLogFormPickList(projectId, ctx),
       getWbsIncrementalProgressSnapshot(projectId, ctx, { excludeLogId: logId }),
-      getProjectShellInfo(projectId, ctx),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
@@ -66,10 +63,8 @@ export default async function EditarParteObraPage({ params }: PageProps) {
   };
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={log.title ?? formatDateLong(log.logDate)}>
       <ProjectPageHeader
-        projectId={projectId}
-        projectName={project.name}
         title="Editar parte de obra"
         subtitle={formatDateLong(log.logDate)}
       />

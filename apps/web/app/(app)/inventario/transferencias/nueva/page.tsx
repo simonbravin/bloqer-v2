@@ -4,7 +4,6 @@ import { listWarehouses, listProducts, getSourceStockPreview } from "@bloqer/ser
 import { WarehouseTransferForm } from "@/features/warehouse-transfer";
 import { createWarehouseTransferAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   searchParams: Promise<{ sourceWarehouseId?: string; productId?: string }>;
@@ -40,7 +39,6 @@ export default async function NuevaTransferenciaPage({ searchParams }: PageProps
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href="/inventario/transferencias" label="Transferencias" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva transferencia de depósito</h1>
       </div>
 

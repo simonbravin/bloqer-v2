@@ -44,9 +44,8 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
     roles: current.tenantCtx.roles,
   };
 
-  let project;
   try {
-    project = await getProjectShellInfo(projectId, ctx);
+    await getProjectShellInfo(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${projectId}`);
@@ -85,8 +84,6 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
-        projectId={projectId}
-        projectName={project.name}
         title="Caja — real y proyección"
         subtitle="R-005 flujo de caja confirmado · R-006 cobros/pagos esperados por vencimiento"
         actions={

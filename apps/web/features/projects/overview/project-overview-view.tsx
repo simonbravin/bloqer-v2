@@ -11,8 +11,6 @@ import { ProjectOverviewCharts } from "./project-overview-charts";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { DetailField, DetailFieldGrid } from "@/components/ui/detail-field-grid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageBackLink } from "@/components/layout/page-back-link";
-
 const TYPE_LABELS = { PUBLIC: "Público", PRIVATE: "Privado" } as const;
 
 function locDate(d: Date | null | undefined) {
@@ -39,7 +37,6 @@ export function ProjectOverviewView({
 
   return (
     <div className="space-y-8">
-      <PageBackLink href="/proyectos" label="Proyectos" />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">

@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@bloqer/auth";
 import { getPlatformTenantInvitationById, ServiceError } from "@bloqer/services";
@@ -51,10 +50,7 @@ export default async function PlatformTenantInvitationDetailPage({ params }: Pag
   const flashEmailNote = c.get(PLATFORM_INVITE_EMAIL_FLASH_COOKIE)?.value ?? null;
 
   return (
-    <PageShell variant="default" className="space-y-6">
-      <Button variant="ghost" size="sm" asChild>
-        <Link href={`/platform/tenants/${tenantId}/invitations`}>← Invitaciones</Link>
-      </Button>
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={inv.email}>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Invitación</h1>
         <p className="text-sm text-muted-foreground">{inv.email}</p>

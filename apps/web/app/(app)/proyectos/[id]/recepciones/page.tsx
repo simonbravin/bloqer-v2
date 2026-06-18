@@ -26,9 +26,8 @@ export default async function RecepcionesPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
-  let project;
   try {
-    project = await getProjectShellInfo(id, ctx);
+    await getProjectShellInfo(id, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
@@ -54,8 +53,6 @@ export default async function RecepcionesPage({ params }: PageProps) {
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
-        projectId={id}
-        projectName={project.name}
         title="Recepciones"
         subtitle={`${items.length} ${items.length === 1 ? "recepción" : "recepciones"}`}
         actions={

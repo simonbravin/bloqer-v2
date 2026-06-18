@@ -51,8 +51,6 @@ export default async function NuevoParteObraPage({ params }: PageProps) {
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
-        projectId={projectId}
-        projectName={project.name}
         title="Nuevo parte de obra"
         subtitle="Registro diario de avance, recursos e incidencias"
       />

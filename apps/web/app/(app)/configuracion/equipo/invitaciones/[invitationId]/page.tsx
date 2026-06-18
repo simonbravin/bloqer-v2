@@ -15,7 +15,6 @@ import {
 } from "@bloqer/services";
 import { cancelTenantInvitationAction } from "../../invitation-actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -61,9 +60,8 @@ export default async function ConfiguracionEquipoInvitacionDetallePage({ params 
   const canEdit = canEditTeamMembership(current.tenantCtx.roles);
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="form" className="space-y-6" breadcrumbLabel={inv.email}>
       <div className="flex flex-wrap gap-2">
-        <PageBackLink href="/configuracion/equipo" label="Equipo" />
       </div>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Invitación</h1>

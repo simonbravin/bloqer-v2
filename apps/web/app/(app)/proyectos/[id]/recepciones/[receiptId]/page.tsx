@@ -25,7 +25,6 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   confirmPurchaseReceiptAction,
   cancelPurchaseReceiptAction,
@@ -77,9 +76,8 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
   const isConfirmed = receipt.status === "CONFIRMED";
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={receipt.purchaseOrderCode}>
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/recepciones`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">
           Recepción — {receipt.purchaseOrderCode}
         </h1>

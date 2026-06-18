@@ -21,7 +21,6 @@ import { OverheadAllocationsPanel } from "@/features/finance/overhead-allocation
 import { CorporateGgRecentInvoices } from "@/features/finance/components/corporate-gg-recent-invoices";
 import { OverheadPeriodSummaryPanel } from "@/features/finance/components/overhead-period-summary-panel";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 export default async function GastosGeneralesPage() {
@@ -125,7 +124,6 @@ export default async function GastosGeneralesPage() {
             gastos.
           </p>
         </div>
-        <PageBackLink href="/finanzas" label="Resumen Finanzas" />
       </div>
 
       <div className="flex flex-wrap gap-2">

@@ -5,7 +5,6 @@ import type { CertSummary, ClientOption } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
 import { getCertificationById, listContacts, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -41,10 +40,6 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
       return (
         <PageShell variant="default" className="space-y-4">
           <div className="flex items-center gap-4">
-            <PageBackLink
-              href={`/proyectos/${projectId}/certificaciones/${certificationId}`}
-              label="Volver"
-            />
             <h1 className="text-2xl font-bold tracking-tight">Generar factura</h1>
           </div>
           <p className="rounded border bg-card p-4 text-sm text-muted-foreground">
@@ -67,10 +62,6 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
     return (
       <PageShell variant="default" className="space-y-6">
         <div className="flex items-center gap-4">
-          <PageBackLink
-            href={`/proyectos/${projectId}/certificaciones/${certificationId}`}
-            label="Volver"
-          />
           <h1 className="text-2xl font-bold tracking-tight">Generar factura desde certificación</h1>
         </div>
         <CertificationInvoiceForm projectId={projectId} cert={certSummary} />
@@ -89,7 +80,6 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${projectId}/facturas`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva factura</h1>
       </div>
       <ManualInvoiceForm projectId={projectId} clients={clients} />

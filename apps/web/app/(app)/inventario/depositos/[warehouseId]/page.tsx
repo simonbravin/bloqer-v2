@@ -5,7 +5,6 @@ import { getWarehouseById, listStockMovements, ServiceError } from "@bloqer/serv
 import { WarehouseStatusBadge, StockMovementList } from "@/features/inventory";
 import { deactivateWarehouseAction, reactivateWarehouseAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 import { DataTableSection } from "@/components/ui/data-table-section";
 
@@ -44,10 +43,9 @@ export default async function DepositoPage({ params }: PageProps) {
   }
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="detail" className="space-y-6" breadcrumbLabel={warehouse.name}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/inventario/depositos" label="Depósitos" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{warehouse.name}</h1>
             <div className="flex items-center gap-2 mt-1">

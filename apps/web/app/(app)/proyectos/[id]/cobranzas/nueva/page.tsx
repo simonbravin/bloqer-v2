@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { CollectionForm } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   listCollectibleReceivablesByProject,
   listTreasuryAccounts,
@@ -58,7 +57,6 @@ export default async function NuevaCobranzaPage({ params, searchParams }: PagePr
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/cobranzas`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva cobranza</h1>
       </div>
 

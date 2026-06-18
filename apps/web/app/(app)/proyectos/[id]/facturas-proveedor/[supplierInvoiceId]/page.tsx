@@ -25,7 +25,6 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   issueSupplierInvoiceAction,
   cancelSupplierInvoiceAction,
@@ -87,9 +86,8 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
       payable.status === "OVERDUE");
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={invoice.code}>
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/facturas-proveedor`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
         <SupplierInvoiceStatusBadge status={invoice.status} />
       </div>

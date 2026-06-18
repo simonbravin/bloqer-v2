@@ -8,7 +8,6 @@ import { getCompanyPaymentById, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { cancelCompanyPaymentAction } from "@/app/(app)/finanzas/cuentas-por-pagar/actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -44,9 +43,8 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
   const returnPath = `/finanzas/pagos-proveedor/${paymentId}`;
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="form" className="space-y-6" breadcrumbLabel={formatDate(payment.paymentDate)}>
       <div className="flex items-center gap-4">
-        <PageBackLink href="/finanzas/pagos-proveedor" label="Pagos a proveedor" />
         <h1 className="text-2xl font-bold tracking-tight">Pago (empresa)</h1>
         <Badge variant={isConfirmed ? "default" : "destructive"}>
           {isConfirmed ? "Confirmado" : "Cancelado"}

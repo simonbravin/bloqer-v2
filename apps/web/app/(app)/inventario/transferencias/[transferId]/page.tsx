@@ -15,7 +15,6 @@ import { getWarehouseTransferById, ServiceError } from "@bloqer/services";
 import { WarehouseTransferStatusBadge } from "@/features/warehouse-transfer";
 import { cancelWarehouseTransferAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -66,10 +65,9 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
   };
 
   return (
-    <PageShell variant="detail" className="space-y-6">
+    <PageShell variant="detail" className="space-y-6" breadcrumbLabel={`TR-${String(transfer.number).padStart(3, "0")}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/inventario/transferencias" label="Transferencias" />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight font-mono">

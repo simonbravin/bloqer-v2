@@ -8,7 +8,6 @@ import {
 import { SubcontractCertificationForm } from "@/features/subcontracts";
 import { updateSubcontractCertificationAction } from "../../../../actions";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string; subcontractId: string; certId: string }>;
@@ -56,12 +55,13 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
   };
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell
+      variant="default"
+      className="space-y-6"
+      breadcrumbLabel={cert.code}
+      breadcrumbSegmentLabels={{ [subcontractId]: cert.subcontractCode }}
+    >
       <div className="flex items-center gap-4">
-        <PageBackLink
-          href={`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${certId}`}
-          label="Certificación"
-        />
         <h1 className="text-2xl font-bold tracking-tight">Editar certificación</h1>
       </div>
       <div className="rounded-lg border bg-card p-6">

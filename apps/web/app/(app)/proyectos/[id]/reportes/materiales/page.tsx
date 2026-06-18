@@ -36,9 +36,8 @@ export default async function ReporteMaterialesPage({ params, searchParams }: Pa
     roles: current.tenantCtx.roles,
   };
 
-  let project;
   try {
-    project = await getProjectShellInfo(projectId, ctx);
+    await getProjectShellInfo(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
@@ -69,8 +68,6 @@ export default async function ReporteMaterialesPage({ params, searchParams }: Pa
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
-        projectId={projectId}
-        projectName={project.name}
         title="Materiales — consumo vs presupuesto"
         subtitle="R-MAT-01 consumo de stock · R-MAT-02 APU sin producto"
         actions={

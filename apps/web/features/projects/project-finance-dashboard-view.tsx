@@ -74,8 +74,6 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
   return (
     <div className="space-y-6">
       <ProjectPageHeader
-        projectId={projectId}
-        projectName={project.name}
         title="Tablero de finanzas"
         subtitle={
           <span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

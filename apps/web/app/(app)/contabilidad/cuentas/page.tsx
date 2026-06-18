@@ -9,7 +9,6 @@ import { listAccountingAccounts } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { Button } from "@/components/ui/button";
 
 export default async function ContabilidadCuentasPage({
@@ -33,7 +32,6 @@ export default async function ContabilidadCuentasPage({
     <PageShell variant="default" className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <PageBackLink href="/contabilidad" label="Volver" />
           <h1 className="text-2xl font-bold tracking-tight">Plan de cuentas</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">

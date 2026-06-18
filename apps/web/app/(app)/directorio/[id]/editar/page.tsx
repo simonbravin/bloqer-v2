@@ -5,7 +5,6 @@ import { getContactById, ServiceError } from "@bloqer/services";
 import { updateContactAction } from "../../actions";
 import type { CreateContactInput } from "@bloqer/validators";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -37,9 +36,8 @@ export default async function EditarContactoPage({ params }: PageProps) {
   };
 
   return (
-    <PageShell variant="form" className="space-y-6">
+    <PageShell variant="form" className="space-y-6" breadcrumbLabel={contact.fantasyName ?? contact.legalName}>
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/directorio/${id}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Editar contacto</h1>
       </div>
 

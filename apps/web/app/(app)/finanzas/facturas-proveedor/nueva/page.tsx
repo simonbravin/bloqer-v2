@@ -4,7 +4,6 @@ import type { SupplierOption } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { listContacts, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 export default async function FinanzasNuevaFacturaProveedorPage() {
   const current = await getCurrentUser();
@@ -36,7 +35,6 @@ export default async function FinanzasNuevaFacturaProveedorPage() {
   return (
     <PageShell className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href="/finanzas/facturas-proveedor" label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva factura (empresa)</h1>
       </div>
       <p className="text-sm text-muted-foreground -mt-2">

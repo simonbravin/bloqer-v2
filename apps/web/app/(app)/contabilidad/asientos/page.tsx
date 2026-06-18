@@ -10,7 +10,6 @@ import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { listJournalEntries } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageListHeader } from "@/components/ui/page-list-header";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
@@ -41,7 +40,6 @@ export default async function AsientosPage({
 
   return (
     <PageShell variant="default" className="space-y-6">
-      <PageBackLink href="/contabilidad" label="Contabilidad" />
       <PageListHeader
         title="Asientos"
         subtitle={`${total} ${total === 1 ? "asiento" : "asientos"}`}

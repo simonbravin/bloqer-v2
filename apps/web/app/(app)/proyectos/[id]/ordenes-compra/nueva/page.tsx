@@ -11,7 +11,6 @@ import {
 } from "@bloqer/services";
 import { notFound } from "next/navigation";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -66,7 +65,6 @@ export default async function NuevaOrdenCompraPage({ params }: PageProps) {
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/ordenes-compra`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Nueva orden de compra</h1>
       </div>
 

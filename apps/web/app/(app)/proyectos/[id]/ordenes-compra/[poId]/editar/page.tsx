@@ -3,7 +3,6 @@ import { PurchaseOrderEditForm } from "@/features/procurement";
 import type { SupplierOption, WbsOption, ProductOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
-import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   getPurchaseOrderById,
   listProcurementWbsOptions,
@@ -67,9 +66,8 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
   }));
 
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={order.code}>
       <div className="flex items-center gap-4">
-        <PageBackLink href={`/proyectos/${id}/ordenes-compra/${poId}`} label="Volver" />
         <h1 className="text-2xl font-bold tracking-tight">Editar {order.code}</h1>
       </div>
 
