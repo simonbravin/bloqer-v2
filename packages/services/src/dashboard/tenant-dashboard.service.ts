@@ -667,11 +667,13 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       financeSummary!.cashMulticurrency = byCur.size > 1;
       if (byCur.size === 1) {
         const [only] = [...byCur.entries()];
+        const balance = only![1];
         kpis.push({
           key:    "treasury_balance",
           label:  "Saldo tesorería (cuentas activas)",
-          value:  fmtDecimalEs(only![1].toString(), only![0].length === 3 ? only![0] : undefined),
+          value:  fmtDecimalEs(balance.toString(), only![0].length === 3 ? only![0] : undefined),
           href:   "/tesoreria",
+          tone:   balance.greaterThan(ZERO) ? "success" : balance.lessThan(ZERO) ? "danger" : "muted",
         });
       } else {
         kpis.push({

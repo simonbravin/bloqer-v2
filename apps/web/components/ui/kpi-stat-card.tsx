@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getKpiValueSizeClass } from "@/lib/kpi-value-size";
+import { kpiIconAccentClass, resolveKpiStatIcon, type KpiStatTone } from "@/lib/kpi-stat-icon";
 import { cn } from "@/lib/utils";
 
-export type KpiStatTone = "default" | "success" | "warning" | "danger" | "muted";
+export type { KpiStatTone };
 
 const toneValueClass: Record<KpiStatTone, string> = {
   default: "text-card-foreground",
@@ -18,6 +19,8 @@ export interface KpiStatCardProps {
   value: string;
   href?: string;
   tone?: KpiStatTone;
+  /** Stable KPI key for icon mapping (e.g. `ar_open`, `schedule_progress`). */
+  iconKey?: string;
   /** Secondary metric line (e.g. currency code). */
   subtitle?: string;
   /** Explanatory helper below the value. */
@@ -33,12 +36,16 @@ export function KpiStatCard({
   value,
   href,
   tone = "default",
+  iconKey,
   subtitle,
   helper,
   variant = "default",
   compact = false,
   className,
 }: KpiStatCardProps) {
+  const { Icon, accent } = resolveKpiStatIcon({ iconKey, label, tone });
+  const accentClass = kpiIconAccentClass[accent];
+
   const inner = (
     <Card
       className={cn(
@@ -49,14 +56,26 @@ export function KpiStatCard({
       )}
     >
       <CardHeader className={cn("flex-none space-y-0 pb-0", compact ? "pt-3" : "pt-5")}>
-        <CardTitle
-          className={cn(
-            "font-medium leading-snug text-muted-foreground line-clamp-2",
-            compact ? "min-h-0 text-xs" : "min-h-[2.5rem] text-sm",
-          )}
-        >
-          {label}
-        </CardTitle>
+        <div className="flex items-start justify-between gap-3">
+          <CardTitle
+            className={cn(
+              "min-w-0 flex-1 font-medium leading-snug text-muted-foreground line-clamp-2",
+              compact ? "min-h-0 text-xs" : "min-h-[2.5rem] text-sm",
+            )}
+          >
+            {label}
+          </CardTitle>
+          <div
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-lg",
+              compact ? "h-8 w-8" : "h-9 w-9",
+              accentClass.container,
+            )}
+            aria-hidden
+          >
+            <Icon className={cn(compact ? "h-4 w-4" : "h-[18px] w-[18px]", accentClass.icon)} />
+          </div>
+        </div>
       </CardHeader>
       <CardContent
         className={cn(

@@ -15,21 +15,25 @@ export function CostControlSummaryCards({ totals }: Props) {
   return (
     <KpiStatGrid title={null} columns={4}>
       <KpiStatCard
+        iconKey="cost_budget"
         label="Presupuesto costo"
         value={fmt(totals.budgetTotalCost)}
         subtitle={`Venta: ${fmt(totals.budgetTotalSale)}`}
       />
       <KpiStatCard
+        iconKey="cost_exposure"
         label="Exposición esperada"
         value={fmt(totals.expectedCostExposure)}
         subtitle={`Certificado: ${fmt(totals.certifiedApproved)}`}
       />
       <KpiStatCard
+        iconKey="cost_certified"
         label="Certificado aprobado"
         value={fmt(totals.certifiedApproved)}
         subtitle={`Emitido: ${fmt(totals.certifiedIssued)}`}
       />
       <KpiStatCard
+        iconKey="cost_variance"
         label="Variación de costo"
         value={fmt(totals.costVariance)}
         subtitle={`Margen proyectado: ${fmt(totals.projectedMargin)}`}

@@ -3,6 +3,24 @@ import type { DashboardKpi } from "./tenant-dashboard.service";
 
 const ZERO = new Prisma.Decimal(0);
 
+function moneyKpiTone(key: string, amount: Prisma.Decimal): DashboardKpi["tone"] {
+  if (amount.lessThan(ZERO)) return "danger";
+  if (amount.isZero()) return "muted";
+  if (key.includes("overdue") || key.includes("vencid")) return "warning";
+  if (
+    key.includes("expense") ||
+    key.includes("gasto") ||
+    key.endsWith("_out") ||
+    key === "treasury_monthly_expenses"
+  ) {
+    return "default";
+  }
+  if (key === "treasury_balance" || key === "tr_cash" || key.includes("cash_net")) {
+    return "success";
+  }
+  return "default";
+}
+
 export function fmtDecimalEs(value: string, currencyCode?: string): string {
   const n = Number(value);
   if (Number.isNaN(n)) return value;
@@ -40,6 +58,7 @@ export function pushMoneyKpi(
       label,
       value: fmtDecimalEs(amount.toString(), currency),
       href,
+      tone: moneyKpiTone(key, amount),
     });
     return;
   }
@@ -83,7 +102,7 @@ export function pushSignedNetMoneyKpi(
       label,
       value: fmtDecimalEs(amount.toString(), currency),
       href,
-      tone: amount.lessThan(ZERO) ? "warning" : "default",
+      tone: amount.lessThan(ZERO) ? "danger" : amount.greaterThan(ZERO) ? "success" : "muted",
     });
     return;
   }

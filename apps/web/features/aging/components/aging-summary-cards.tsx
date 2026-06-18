@@ -34,6 +34,8 @@ type AgingCard = {
   label: string;
   value: string;
   borderClass: string;
+  iconKey: string;
+  tone?: "default" | "success" | "warning" | "danger" | "muted";
 };
 
 function AgingCardRow({ cards, columns }: { cards: AgingCard[]; columns: 3 | 4 }) {
@@ -44,12 +46,14 @@ function AgingCardRow({ cards, columns }: { cards: AgingCard[]; columns: 3 | 4 }
         columns === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4",
       )}
     >
-      {cards.map(({ label, value, borderClass }) => (
+      {cards.map(({ label, value, borderClass, iconKey, tone }) => (
         <KpiStatCard
           key={label}
           compact
+          iconKey={iconKey}
           label={label}
           value={value}
+          tone={tone}
           className={cn("border-2", borderClass)}
         />
       ))}
@@ -59,18 +63,60 @@ function AgingCardRow({ cards, columns }: { cards: AgingCard[]; columns: 3 | 4 }
 
 export function AgingSummaryCards({ report, currency }: Props) {
   const totals = resolveTotals(report, currency);
+  const overdueAmount = Number(totals.totalOverdue);
 
   const primaryRow: AgingCard[] = [
-    { label: "Al día", value: fmt(totals.current), borderClass: "border-emerald-500/40" },
-    { label: "Total vencido", value: fmt(totals.totalOverdue), borderClass: "border-muted" },
-    { label: "Saldo total", value: fmt(totals.totalBalance), borderClass: "border-muted" },
+    {
+      label: "Al día",
+      value: fmt(totals.current),
+      borderClass: "border-emerald-500/40",
+      iconKey: "aging_current",
+      tone: "success",
+    },
+    {
+      label: "Total vencido",
+      value: fmt(totals.totalOverdue),
+      borderClass: "border-destructive/40",
+      iconKey: "aging_overdue",
+      tone: overdueAmount > 0 ? "danger" : "muted",
+    },
+    {
+      label: "Saldo total",
+      value: fmt(totals.totalBalance),
+      borderClass: "border-muted",
+      iconKey: "aging_balance",
+    },
   ];
 
   const bucketRow: AgingCard[] = [
-    { label: "1–30 días", value: fmt(totals.bucket1_30), borderClass: "border-amber-500/40" },
-    { label: "31–60 días", value: fmt(totals.bucket31_60), borderClass: "border-orange-500/40" },
-    { label: "61–90 días", value: fmt(totals.bucket61_90), borderClass: "border-destructive/40" },
-    { label: "+90 días", value: fmt(totals.bucket90Plus), borderClass: "border-destructive/60" },
+    {
+      label: "1–30 días",
+      value: fmt(totals.bucket1_30),
+      borderClass: "border-amber-500/40",
+      iconKey: "aging_bucket",
+      tone: Number(totals.bucket1_30) > 0 ? "warning" : "muted",
+    },
+    {
+      label: "31–60 días",
+      value: fmt(totals.bucket31_60),
+      borderClass: "border-orange-500/40",
+      iconKey: "aging_bucket",
+      tone: Number(totals.bucket31_60) > 0 ? "warning" : "muted",
+    },
+    {
+      label: "61–90 días",
+      value: fmt(totals.bucket61_90),
+      borderClass: "border-destructive/40",
+      iconKey: "aging_bucket",
+      tone: Number(totals.bucket61_90) > 0 ? "danger" : "muted",
+    },
+    {
+      label: "+90 días",
+      value: fmt(totals.bucket90Plus),
+      borderClass: "border-destructive/60",
+      iconKey: "aging_overdue",
+      tone: Number(totals.bucket90Plus) > 0 ? "danger" : "muted",
+    },
   ];
 
   return (

@@ -14,8 +14,18 @@ export function DashboardAccountingCard({ summary }: { summary: DashboardAccount
       </CardHeader>
       <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <KpiStatGrid title={null} columns={2} className="flex-1">
-          <KpiStatCard label="Borrador" value={String(summary.journalDraftCount)} />
-          <KpiStatCard label="Contabilizados" value={String(summary.journalPostedCount)} />
+          <KpiStatCard
+            iconKey="tr_draft_invoices"
+            label="Borrador"
+            value={String(summary.journalDraftCount)}
+            tone={summary.journalDraftCount > 0 ? "warning" : "muted"}
+          />
+          <KpiStatCard
+            iconKey="accounting"
+            label="Contabilizados"
+            value={String(summary.journalPostedCount)}
+            tone={summary.journalPostedCount > 0 ? "success" : "muted"}
+          />
         </KpiStatGrid>
         <Button asChild variant="outline" size="sm" className="shrink-0">
           <Link href="/contabilidad">Abrir contabilidad</Link>

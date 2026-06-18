@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { Prisma } from "@bloqer/database";
-import { pushSignedNetMoneyKpi } from "../dashboard/kpi-helpers";
+import { pushMoneyKpi, pushSignedNetMoneyKpi } from "../dashboard/kpi-helpers";
 import { resolveEffectiveInceptionDate } from "./project-attributed-cash.service";
 import { buildTreasuryAttributionKpis } from "../treasury/treasury-attribution.service";
 import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
@@ -28,14 +28,40 @@ describe("resolveEffectiveInceptionDate", () => {
   });
 });
 
+describe("pushMoneyKpi", () => {
+  it("does not mark monthly expenses as success when positive", () => {
+    const kpis: DashboardKpi[] = [];
+    const map = new Map<string, Prisma.Decimal>();
+    map.set("ARS", new Prisma.Decimal("88550"));
+    pushMoneyKpi(
+      kpis,
+      "treasury_monthly_expenses",
+      "Gastos del mes",
+      map,
+      "/tesoreria/reportes/flujo-caja",
+      "$ 0,00",
+    );
+    assert.equal(kpis.length, 1);
+    assert.equal(kpis[0]?.tone, "default");
+  });
+
+  it("marks treasury balance as success when positive", () => {
+    const kpis: DashboardKpi[] = [];
+    const map = new Map<string, Prisma.Decimal>();
+    map.set("ARS", new Prisma.Decimal("124911450"));
+    pushMoneyKpi(kpis, "treasury_balance", "Saldo tesorería", map, "/tesoreria");
+    assert.equal(kpis[0]?.tone, "success");
+  });
+});
+
 describe("pushSignedNetMoneyKpi", () => {
-  it("shows negative net balances with warning tone", () => {
+  it("shows negative net balances with danger tone", () => {
     const kpis: DashboardKpi[] = [];
     const map = new Map<string, Prisma.Decimal>();
     map.set("ARS", new Prisma.Decimal("-350"));
     pushSignedNetMoneyKpi(kpis, "pf_cash_net", "Caja imputada", map, "/test", "Sin movimientos");
     assert.equal(kpis.length, 1);
-    assert.equal(kpis[0]?.tone, "warning");
+    assert.equal(kpis[0]?.tone, "danger");
     assert.ok(kpis[0]?.value.includes("350"));
   });
 });
