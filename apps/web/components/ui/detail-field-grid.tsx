@@ -1,5 +1,12 @@
 import type { ReactNode } from "react";
+import {
+  resolveDetailFieldIcon,
+  type DetailFieldIconAccent,
+  type DetailFieldIconKey,
+} from "@/lib/detail-field-icon";
 import { cn } from "@/lib/utils";
+
+export type { DetailFieldIconKey, DetailFieldIconAccent };
 
 export function DetailFieldGrid({
   children,
@@ -26,19 +33,46 @@ export function DetailFieldGrid({
 
 export function DetailField({
   label,
+  iconKey,
+  iconAccent,
   children,
   className,
   fullWidth,
 }: {
   label: string;
+  /** Optional semantic icon (client, address, dates, etc.). */
+  iconKey?: DetailFieldIconKey;
+  /** Override icon accent (e.g. muted when value is empty). */
+  iconAccent?: DetailFieldIconAccent;
   children: ReactNode;
   className?: string;
   fullWidth?: boolean;
 }) {
+  const iconMeta = iconKey ? resolveDetailFieldIcon(iconKey, iconAccent) : null;
+  const IconComponent = iconMeta?.Icon;
+  const labelId = iconKey ? `detail-field-${iconKey}-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined;
+
   return (
-    <div className={cn(fullWidth && "sm:col-span-2 lg:col-span-full", className)}>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 font-medium">{children}</dd>
+    <div
+      role="group"
+      aria-labelledby={labelId}
+      className={cn(fullWidth && "sm:col-span-2 lg:col-span-full", className)}
+    >
+      <dt className="flex items-center gap-2 text-muted-foreground">
+        {IconComponent && iconMeta ? (
+          <span
+            className={cn(
+              "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+              iconMeta.accentClass.container,
+            )}
+            aria-hidden
+          >
+            <IconComponent className={cn("h-3.5 w-3.5", iconMeta.accentClass.icon)} />
+          </span>
+        ) : null}
+        <span id={labelId}>{label}</span>
+      </dt>
+      <dd className={cn("mt-1 font-medium break-words", iconMeta && "pl-9")}>{children}</dd>
     </div>
   );
 }

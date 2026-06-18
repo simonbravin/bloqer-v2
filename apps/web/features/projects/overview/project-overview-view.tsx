@@ -20,6 +20,10 @@ function locDate(d: Date | null | undefined) {
   return formatDate(d);
 }
 
+function projectAddress(project: ProjectWithClient): string {
+  return [project.address, project.city, project.province].filter(Boolean).join(", ");
+}
+
 export function ProjectOverviewView({
   dashboard,
   projectId,
@@ -54,7 +58,11 @@ export function ProjectOverviewView({
           </CardHeader>
           <CardContent>
             <DetailFieldGrid>
-              <DetailField label="Cliente">
+              <DetailField
+                iconKey="client"
+                label="Cliente"
+                iconAccent={fullProject.client ? undefined : "muted"}
+              >
                 {fullProject.client ? (
                   <Link
                     href={`/directorio/${fullProject.client.id}`}
@@ -66,15 +74,41 @@ export function ProjectOverviewView({
                   "—"
                 )}
               </DetailField>
-              <DetailField label="Tipo">{TYPE_LABELS[fullProject.type]}</DetailField>
-              <DetailField label="Inicio">{locDate(fullProject.startDate)}</DetailField>
-              <DetailField label="Fin estimado">{locDate(fullProject.expectedEndDate)}</DetailField>
-              {fullProject.actualEndDate ? (
-                <DetailField label="Fin real">{locDate(fullProject.actualEndDate)}</DetailField>
-              ) : null}
-              <DetailField label="Dirección" fullWidth>
-                {[fullProject.address, fullProject.city, fullProject.province].filter(Boolean).join(", ") || "—"}
+              <DetailField iconKey="type" label="Tipo">
+                {TYPE_LABELS[fullProject.type]}
               </DetailField>
+              <DetailField
+                iconKey="start_date"
+                label="Inicio"
+                iconAccent={fullProject.startDate ? undefined : "muted"}
+              >
+                {locDate(fullProject.startDate)}
+              </DetailField>
+              <DetailField
+                iconKey="expected_end"
+                label="Fin estimado"
+                iconAccent={fullProject.expectedEndDate ? undefined : "muted"}
+              >
+                {locDate(fullProject.expectedEndDate)}
+              </DetailField>
+              {fullProject.actualEndDate ? (
+                <DetailField iconKey="actual_end" label="Fin real">
+                  {locDate(fullProject.actualEndDate)}
+                </DetailField>
+              ) : null}
+              <DetailField
+                iconKey="address"
+                label="Dirección"
+                fullWidth
+                iconAccent={projectAddress(fullProject) ? undefined : "muted"}
+              >
+                {projectAddress(fullProject) || "—"}
+              </DetailField>
+              {fullProject.description ? (
+                <DetailField iconKey="description" label="Descripción" fullWidth>
+                  {fullProject.description}
+                </DetailField>
+              ) : null}
             </DetailFieldGrid>
           </CardContent>
         </Card>
