@@ -161,7 +161,7 @@ export function BudgetMarginConfigSection({
           {serverError && <p className="text-sm text-destructive">{serverError}</p>}
         </div>
 
-        <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+        <div className="space-y-3 rounded-lg border shell-surface-inset p-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Desglose de cálculo
           </h3>

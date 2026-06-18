@@ -28,14 +28,17 @@
     --sidebar: 210 40% 98.5%;
     --sidebar-foreground: 222.2 84% 4.9%;
     --sidebar-border: 214.3 31.8% 90%;
+    /* Main content canvas — light gray so cards/tables pop against the panel */
+    --workspace: 210 16% 96%;
+    --workspace-foreground: 222.2 84% 4.9%;
   }
 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 217.2 32.6% 11%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 217.2 32.6% 11%;
     --popover-foreground: 210 40% 98%;
     --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
@@ -53,6 +56,21 @@
     --sidebar: 222.2 47% 6%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-border: 217.2 32.6% 14%;
+    --workspace: 222 47% 8%;
+    --workspace-foreground: 210 40% 98%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  html,
+  body {
+    height: 100%;
   }
 }
 
@@ -77,18 +95,9 @@
   .shell-page-narrow {
     @apply mx-auto w-full max-w-lg space-y-4;
   }
-}
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-
-  html,
-  body {
-    height: 100%;
+  /** Inset panel on workspace canvas — use instead of bg-muted/20 on gray workspace. */
+  .shell-surface-inset {
+    @apply bg-card;
   }
 }

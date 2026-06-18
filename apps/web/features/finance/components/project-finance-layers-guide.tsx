@@ -35,7 +35,7 @@ export function ProjectFinanceLayersGuide({ compact = false }: { compact?: boole
   }
 
   return (
-    <div className="rounded-xl border border-border/80 bg-muted/20 px-4 py-3 space-y-3">
+    <div className="rounded-xl border border-border/80 shell-surface-inset px-4 py-3 space-y-3">
       <p className="text-sm font-medium text-foreground">Tres capas financieras del proyecto</p>
       <ul className="grid gap-3 sm:grid-cols-3 text-sm">
         {LAYERS.map((layer) => (

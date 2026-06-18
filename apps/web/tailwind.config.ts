@@ -56,6 +56,10 @@ const config: Config = {
   				DEFAULT: 'hsl(var(--sidebar))',
   				foreground: 'hsl(var(--sidebar-foreground))',
   				border: 'hsl(var(--sidebar-border))'
+  			},
+  			workspace: {
+  				DEFAULT: 'hsl(var(--workspace))',
+  				foreground: 'hsl(var(--workspace-foreground))'
   			}
   		},
   		borderRadius: {
@@ -64,7 +68,8 @@ const config: Config = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		ringOffsetColor: {
-  			sidebar: 'hsl(var(--sidebar))'
+  			sidebar: 'hsl(var(--sidebar))',
+  			workspace: 'hsl(var(--workspace))'
   		},
   		keyframes: {
   			'accordion-down': {

@@ -42,9 +42,9 @@ export function ShellLayout({ sidebar, header, children }: ShellLayoutProps) {
         <SidebarRail>
           <ShellSidebarPanel>{sidebar}</ShellSidebarPanel>
         </SidebarRail>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-workspace">
           {header}
-          <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain bg-muted/20 p-4 sm:p-6 lg:p-8 dark:bg-muted/10">
+          <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-4 sm:p-6 lg:p-8">
             {children}
           </main>
         </div>

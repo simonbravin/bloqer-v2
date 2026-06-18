@@ -467,7 +467,7 @@ export function CostItemApuDialog({
               )}
 
               {editable && (
-                <div className="rounded-lg border border-dashed bg-muted/20 p-4 space-y-3">
+                <div className="rounded-lg border border-dashed shell-surface-inset p-4 space-y-3">
                   <p className="text-sm font-medium">Agregar {CATEGORY_LABELS[activeTab]}</p>
                   <div className="grid gap-3 sm:grid-cols-[1fr_6rem_5rem_6rem_auto] sm:items-end">
                     <div className="space-y-1">

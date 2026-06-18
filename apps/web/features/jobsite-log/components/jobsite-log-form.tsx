@@ -350,7 +350,7 @@ export function JobsiteLogForm({
         ) : (
           <div className="space-y-3">
             {progress.map((row, i) => (
-              <div key={i} className="rounded-md border p-4 space-y-3 bg-muted/20">
+              <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                 <div className="space-y-1">
                   <Label className="text-xs">Partida WBS</Label>
                   <SearchableCombobox
@@ -409,7 +409,7 @@ export function JobsiteLogForm({
         ) : (
           <div className="space-y-3">
             {labor.map((row, i) => (
-              <div key={i} className="rounded-md border p-4 space-y-3 bg-muted/20">
+              <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Contacto</Label>
@@ -497,7 +497,7 @@ export function JobsiteLogForm({
                 && parseNum(row.quantity) > parseNum(stockByKey[stockKey]!);
 
               return (
-                <div key={i} className="rounded-md border p-4 space-y-3 bg-muted/20">
+                <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label className="text-xs">Producto</Label>
@@ -565,7 +565,7 @@ export function JobsiteLogForm({
         ) : (
           <div className="space-y-3">
             {issues.map((row, i) => (
-              <div key={i} className="rounded-md border p-4 space-y-3 bg-muted/20 grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset grid grid-cols-2 sm:grid-cols-5 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Tipo</Label>
                   <Select value={row.type} onValueChange={(v) => updateIssue(i, "type", v)}>

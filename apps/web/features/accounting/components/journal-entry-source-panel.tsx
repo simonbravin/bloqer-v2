@@ -4,7 +4,7 @@ import type { JournalEntrySourceLink } from "@bloqer/services";
 
 export function JournalEntrySourcePanel({ link }: { link: JournalEntrySourceLink }) {
   return (
-    <div className="rounded-lg border bg-muted/20 p-6 text-sm space-y-3">
+    <div className="rounded-lg border shell-surface-inset p-6 text-sm space-y-3">
       <h2 className="font-semibold text-base">Documento origen</h2>
       <div className="space-y-1">
         <p className="font-medium">{link.kindLabel}</p>

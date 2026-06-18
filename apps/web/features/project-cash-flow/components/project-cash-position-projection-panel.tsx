@@ -99,7 +99,7 @@ export function ProjectCashPositionProjectionPanel({
               </p>
             </div>
 
-            <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+            <div className="rounded-lg border shell-surface-inset p-4 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Filtros
               </p>

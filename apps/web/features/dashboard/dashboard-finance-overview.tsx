@@ -47,7 +47,7 @@ export function DashboardFinanceOverview({ finance }: { finance: DashboardFinanc
       <CardContent className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-2">
           {hasAr ? (
-            <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+            <div className="space-y-3 rounded-lg border shell-surface-inset p-4">
               <p className="text-sm font-medium">Cuentas por cobrar</p>
               {arRows.length > 0 ? (
                 <DashboardMoneyBars title="Abierto por moneda" rows={arRows} />
@@ -68,7 +68,7 @@ export function DashboardFinanceOverview({ finance }: { finance: DashboardFinanc
           ) : null}
 
           {hasAp ? (
-            <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+            <div className="space-y-3 rounded-lg border shell-surface-inset p-4">
               <p className="text-sm font-medium">Cuentas por pagar</p>
               {apRows.length > 0 ? (
                 <DashboardMoneyBars title="Abierto por moneda" rows={apRows} />
@@ -90,7 +90,7 @@ export function DashboardFinanceOverview({ finance }: { finance: DashboardFinanc
         </div>
 
         {hasTr ? (
-          <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+          <div className="space-y-3 rounded-lg border shell-surface-inset p-4">
             <p className="text-sm font-medium">Caja / bancos</p>
             {finance.cashMulticurrency ? <p className="text-xs text-muted-foreground">Varias monedas</p> : null}
             <DashboardMoneyBars title="Saldo por cuenta (moneda)" rows={cashRows} />

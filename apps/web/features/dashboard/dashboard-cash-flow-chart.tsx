@@ -69,7 +69,7 @@ export function DashboardCashFlowChart({ chart }: { chart: DashboardCashFlowChar
         {primary && primary.buckets.length > 0 ? (
           <CashFlowChart data={primary} variant="trend" />
         ) : (
-          <p className="rounded-lg border border-dashed bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
+          <p className="rounded-lg border border-dashed shell-surface-inset px-4 py-10 text-center text-sm text-muted-foreground">
             No hay movimientos en el período seleccionado.
           </p>
         )}

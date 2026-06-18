@@ -90,7 +90,7 @@ export function DocumentUploadZone({
           "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors",
           dragOver ? "border-primary bg-primary/5" : "border-muted-foreground/30 hover:border-muted-foreground/50",
           disabled && "pointer-events-none opacity-50",
-          selectedFile && !dragOver && "border-primary/40 bg-muted/20",
+          selectedFile && !dragOver && "border-primary/40 shell-surface-inset",
         )}
       >
         <Upload className="h-8 w-8 text-muted-foreground" aria-hidden />

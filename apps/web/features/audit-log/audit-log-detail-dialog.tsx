@@ -141,7 +141,7 @@ export function AuditLogDetailDialog({
                   ))}
                 </ul>
               ) : (
-                <p className="rounded-lg border border-dashed bg-muted/20 px-3 py-4 text-center text-sm text-muted-foreground">
+                <p className="rounded-lg border border-dashed shell-surface-inset px-3 py-4 text-center text-sm text-muted-foreground">
                   No hay campos detallados para comparar en este evento.
                 </p>
               )}
