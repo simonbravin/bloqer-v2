@@ -56,7 +56,7 @@ export function DetailField({
     <div
       role="group"
       aria-labelledby={labelId}
-      className={cn(fullWidth && "sm:col-span-2 lg:col-span-full", className)}
+      className={cn(fullWidth && "col-span-full", className)}
     >
       <dt className="flex items-center gap-2 text-muted-foreground">
         {IconComponent && iconMeta ? (

@@ -54,7 +54,7 @@ export function ProjectOverviewView({
             <CardTitle className="text-base">Datos del proyecto</CardTitle>
           </CardHeader>
           <CardContent>
-            <DetailFieldGrid>
+            <DetailFieldGrid columns={3}>
               <DetailField
                 iconKey="client"
                 label="Cliente"
@@ -96,7 +96,6 @@ export function ProjectOverviewView({
               <DetailField
                 iconKey="address"
                 label="Dirección"
-                fullWidth
                 iconAccent={projectAddress(fullProject) ? undefined : "muted"}
               >
                 {projectAddress(fullProject) || "—"}
