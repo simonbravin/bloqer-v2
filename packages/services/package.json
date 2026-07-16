@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./budget-import-pure": "./src/budget/budget-import-pure.ts",
     "./wbs-metrics": "./src/budget/wbs-metrics.ts",
+    "./dashboard-format": "./src/dashboard/dashboard-format.ts",
     "./tenant-module-gate": "./src/tenant-modules/tenant-module-gate.ts",
     "./project-workspace-nav": "./src/project/project-workspace-nav.ts"
   },

@@ -1,4 +1,4 @@
-import { formatDashboardMoney } from "@bloqer/services";
+import { formatDashboardMoney } from "@bloqer/services/dashboard-format";
 
 export function DashboardMoneyBars({
   title,

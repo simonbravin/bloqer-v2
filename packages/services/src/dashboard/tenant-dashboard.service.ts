@@ -11,6 +11,8 @@ import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 
+export { formatDashboardMoney } from "./dashboard-format";
+
 const ZERO = new Prisma.Decimal(0);
 const RECENT_TREASURY_MOVEMENTS = 6;
 
@@ -875,9 +877,4 @@ function dedupeQuickActions(actions: DashboardQuickAction[]): DashboardQuickActi
     out.push(a);
   }
   return out;
-}
-
-export function formatDashboardMoney(value: string, currency?: string | null): string {
-  if (currency && currency.length === 3) return fmtDecimalEs(value, currency);
-  return fmtDecimalEs(value);
 }

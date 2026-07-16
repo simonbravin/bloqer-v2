@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { DashboardFinanceSummary } from "@bloqer/services";
-import { formatDashboardMoney } from "@bloqer/services";
+import { formatDashboardMoney } from "@bloqer/services/dashboard-format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/format";
