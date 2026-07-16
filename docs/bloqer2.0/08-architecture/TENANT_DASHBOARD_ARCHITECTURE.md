@@ -18,7 +18,7 @@ La ruta **`/dashboard`** es el tablero **por tenant** al entrar a Bloqer: KPIs r
 |----------------|-------------|
 | `subscription` | `saasPlan`, `subscriptionStatus`, `trialEndsAt`, `trialDaysRemaining`, `trialWarning` (avisos de fin de prueba). |
 | `projectStatusSlices` | Distribución de cantidad de proyectos por `status` (`groupBy`), solo si `PROJECTS` + `VIEW PROJECTS`. |
-| `financeSummary` | Totales C×C/C×P por moneda vía aging (`receivablesOpenByCurrency` / `payablesOpenByCurrency`); conteos vencidas y próximas 14 días; caja por moneda (`getTreasurySummaryByCompany`). **No** se inventan totales multimoneda fusionados. |
+| `financeSummary` | Totales C×C/C×P por moneda vía aging (para KPIs); conteos vencidas/próximas; caja por moneda; **`recentMovements`** (últimos movimientos CONFIRMED de tesorería). **No** se inventan totales multimoneda fusionados. |
 | `accountingSummary` | Conteos baratos de `JournalEntry` en `DRAFT` / `POSTED` si `companyId` + módulo `ACCOUNTING` + `VIEW ACCOUNTING`. |
 | `inventorySummary` | Incluye `activeWarehousesCount` además de productos activos y stock negativo. |
 | `warnings` | Incluye avisos de trial además de otros módulos si aplica. |
@@ -32,8 +32,8 @@ La ruta **`/dashboard`** es el tablero **por tenant** al entrar a Bloqer: KPIs r
 | `dashboard-alerts-card.tsx` | Lista de `warnings` (p. ej. trial). |
 | `dashboard-kpi-grid.tsx` / `dashboard-kpi-card.tsx` | Grilla responsive de KPIs del servicio. |
 | `dashboard-status-distribution.tsx` | Barras proporcionales por estado de proyecto (`projectStatusSlices`). |
-| `dashboard-finance-overview.tsx` | C×C / C×P / caja por moneda con barras ligeras (`dashboard-money-bars.tsx`), vencidas/próximas, enlaces a aging. |
-| `project-progress-card.tsx` (exportado como `DashboardProjectsOverview`) | Proyectos recientes, totales de venta por moneda, enlace a listado. |
+| `dashboard-finance-overview.tsx` | Últimos movimientos de tesorería (`recentMovements`) + enlaces a finanzas/tesorería. Totales CxC/CxP/caja siguen en KPIs. |
+| `project-progress-card.tsx` (exportado como `DashboardProjectsOverview`) | Lista quieta de proyectos recientes (nombre + presupuesto) + enlace al listado. |
 | `inventory-summary-card.tsx` | Resumen inventario + depósitos. |
 | `dashboard-accounting-card.tsx` | Borradores vs contabilizados. |
 | `dashboard-onboarding-checklist.tsx` | Checklist de onboarding cuando `operationalOnboarding` y hay pasos. |
@@ -48,9 +48,10 @@ La ruta **`/dashboard`** es el tablero **por tenant** al entrar a Bloqer: KPIs r
 | Proyectos activos/borrador/pausa, lista (5), venta presupuestada por moneda | `PROJECTS`; presupuesto requiere `BUDGETS` | `VIEW PROJECTS`; totales/lista: `VIEW BUDGETS` | `prisma.project` + `prisma.budget` |
 | Distribución estados proyecto | `PROJECTS` | `VIEW PROJECTS` | `prisma.project.groupBy` |
 | Avance promedio de obra | — | — | **No calculado** (`averageProgressPct: null`); UI: “Sin avance cargado”. |
-| Pista control de costos | `PROJECTS` + `BUDGETS` | `VIEW` ambos | Sin agregado global; enlace a proyectos. |
-| CxC / CxP abierto por moneda, vencidas, próximas 14 días | `AR` / `AP` | `VIEW AR` / `VIEW AP` | `getReceivableAgingReport` / `getPayableAgingReport` |
-| Caja / bancos por moneda | `TREASURY` | `VIEW TREASURY` | `getTreasurySummaryByCompany` |
+| Pista control de costos | — | — | Removida del dashboard (Phase declutter); control de costos vive por proyecto. |
+| CxC / CxP abierto por moneda, vencidas, próximas 14 días | `AR` / `AP` | `VIEW AR` / `VIEW AP` | `getReceivableAgingReport` / `getPayableAgingReport` → **KPIs** |
+| Caja / bancos por moneda | `TREASURY` | `VIEW TREASURY` | `getTreasurySummaryByCompany` → **KPI** |
+| Últimos movimientos de tesorería (bloque detalle) | `TREASURY` | `VIEW TREASURY` | `AccountMovement` CONFIRMED (últimos 6), href a reporte por cuenta |
 | Productos, depósitos, stock negativo | `INVENTORY` | `VIEW INVENTORY` | `listProducts`, `listNegativeStockBalancesForTenant`, `warehouse.count` |
 | Asientos borrador / contabilizados | `ACCOUNTING` | `VIEW ACCOUNTING` | `prisma.journalEntry.count` (con `companyId`) |
 | Notificaciones sin leer | — | — | `getUnreadNotificationCount` |

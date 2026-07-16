@@ -7,10 +7,12 @@ import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { canEditTeamMembership, canReadTenantConfigArea } from "../tenant-settings/tenant-settings-guards";
 import { getTreasurySummaryByCompany } from "../treasury/balance.service";
 import { getCashFlowReport, type CashFlowReport } from "../treasury-reports/treasury-reports.service";
+import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 
 const ZERO = new Prisma.Decimal(0);
+const RECENT_TREASURY_MOVEMENTS = 6;
 
 export type DashboardKpiTone = "default" | "success" | "warning" | "danger" | "muted";
 
@@ -79,6 +81,19 @@ export type DashboardFinanceSummary = {
   payablesDueSoonCount?: number;
   cashByCurrency?: Record<string, string>;
   cashMulticurrency?: boolean;
+  /** Últimos movimientos de tesorería (CONFIRMED); solo con módulo TREASURY. */
+  recentMovements?: DashboardTreasuryMovementRow[];
+};
+
+export type DashboardTreasuryMovementRow = {
+  id: string;
+  movementDate: string;
+  description: string;
+  amount: string;
+  currency: string;
+  type: string;
+  accountName: string;
+  href: string;
 };
 
 /** @deprecated Kept for `InventorySummaryCard`; no longer returned from `getTenantDashboard`. */
@@ -118,8 +133,6 @@ export type TenantDashboardView = {
   generatedAt: string;
   kpis: DashboardKpi[];
   projectSummary?: DashboardProjectSummary;
-  /** Presupuestado vs real: solo enlace informativo (sin agregado global Phase 14B). */
-  showCostControlHint?: boolean;
   financeSummary?: DashboardFinanceSummary;
   accountingSummary?: DashboardAccountingSummary;
   unreadNotifications: number;
@@ -364,7 +377,6 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
 
   // ─── Projects ─────────────────────────────────────────────────────────────
   let projectSummary: DashboardProjectSummary | undefined;
-  let showCostControlHint = false;
 
   if (gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS")) {
     const canViewBudgets = gate.isEnabled("BUDGETS") && can(ctx.roles, "VIEW", "BUDGETS");
@@ -503,12 +515,6 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
         description: "Alta de obra con cliente",
       });
     }
-
-    showCostControlHint =
-      gate.isEnabled("PROJECTS") &&
-      gate.isEnabled("BUDGETS") &&
-      can(ctx.roles, "VIEW", "PROJECTS") &&
-      can(ctx.roles, "VIEW", "BUDGETS");
   }
 
   // ─── Certifications ───────────────────────────────────────────────────────
@@ -685,6 +691,40 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
         });
       }
     }
+
+    const recent = await safeRun("Recent treasury movements", () =>
+      prisma.accountMovement.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          status: "CONFIRMED",
+          // Align with getTreasurySummaryByCompany: scope by account company, not movement.companyId
+          // (some rows may have null companyId while the account is scoped).
+          ...(ctx.companyId ? { account: { companyId: ctx.companyId } } : {}),
+        },
+        orderBy: [{ movementDate: "desc" }, { createdAt: "desc" }],
+        take: RECENT_TREASURY_MOVEMENTS,
+        select: {
+          id: true,
+          movementDate: true,
+          description: true,
+          amount: true,
+          currency: true,
+          type: true,
+          accountId: true,
+          account: { select: { name: true } },
+        },
+      }),
+    );
+    financeSummary!.recentMovements = (recent ?? []).map((m) => ({
+      id: m.id,
+      movementDate: isoDate(m.movementDate) ?? m.movementDate.toISOString().slice(0, 10),
+      description: m.description,
+      amount: m.amount.toString(),
+      currency: m.currency,
+      type: m.type,
+      accountName: m.account.name,
+      href: buildFinancialHref("AccountMovement", m.id, { accountId: m.accountId }),
+    }));
   }
 
   if (gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY")) {
@@ -791,7 +831,6 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
     generatedAt,
     kpis,
     projectSummary,
-    showCostControlHint,
     financeSummary:
       financeSummary && financeSummaryHasData(financeSummary) ? financeSummary : undefined,
     accountingSummary,
@@ -813,6 +852,7 @@ function canReadTenantConfig(
 }
 
 function financeSummaryHasData(f: DashboardFinanceSummary): boolean {
+  if (f.recentMovements !== undefined) return true;
   if (f.receivablesOpenByCurrency && f.receivablesOpenByCurrency.length > 0) return true;
   if (f.payablesOpenByCurrency && f.payablesOpenByCurrency.length > 0) return true;
   if (f.receivablesTotal != null && f.receivablesTotal !== "") return true;

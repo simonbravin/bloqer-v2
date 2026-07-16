@@ -67,7 +67,7 @@ export default async function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {dash.projectSummary ? (
-          <DashboardProjectsOverview summary={dash.projectSummary} showCostControlHint={dash.showCostControlHint} />
+          <DashboardProjectsOverview summary={dash.projectSummary} />
         ) : null}
 
         {dash.financeSummary ? <DashboardFinanceOverview finance={dash.financeSummary} /> : null}
