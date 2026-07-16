@@ -31,11 +31,21 @@ export function BudgetTable({
   projectId: string;
 }) {
   if (budgets.length === 0) {
-    return <ListEmptyState message="No hay presupuestos. Cree la primera versión." />;
+    return (
+      <ListEmptyState
+        title="Sin presupuestos"
+        description="Creá el primer presupuesto del proyecto. Un presupuesto adicional puede usarse como adenda operativa (sin vínculo automático)."
+        action={
+          <Button asChild size="sm">
+            <Link href={`/proyectos/${projectId}/presupuestos/nuevo`}>Nuevo presupuesto</Link>
+          </Button>
+        }
+      />
+    );
   }
 
   return (
-    <TableScroll>
+    <TableScroll stickyFirstColumn>
       <Table>
         <TableHeader>
           <TableRow>

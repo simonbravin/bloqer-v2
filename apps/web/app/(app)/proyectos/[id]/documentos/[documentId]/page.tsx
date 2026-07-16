@@ -1,8 +1,8 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getDocumentById, ServiceError } from "@bloqer/services";
-import { DocumentCategoryBadge, DocumentStatusBadge } from "@/features/documents";
+import { DocumentCategoryBadge, DocumentStatusBadge, DocumentStorageBadge } from "@/features/documents";
 import { PageShell } from "@/components/layout/page-shell";
 import { archiveDocumentAction, restoreDocumentAction, softDeleteDocumentAction } from "../actions";
 import { Button } from "@/components/ui/button";
@@ -60,15 +60,21 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={doc.originalFileName}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-xl font-bold tracking-tight truncate max-w-md">
             {doc.originalFileName}
           </h1>
+          <DocumentStorageBadge storageProvider={doc.storageProvider} />
         </div>
         <div className="flex gap-2">
           {canDownload && (
             <Button variant="outline" size="sm" asChild>
               <a href={`/api/documents/${documentId}/download`}>Descargar</a>
+            </Button>
+          )}
+          {doc.storageProvider === "PLACEHOLDER" && doc.status !== "DELETED" && (
+            <Button variant="outline" size="sm" disabled title="No hay archivo binario almacenado">
+              Descargar no disponible
             </Button>
           )}
           {doc.canMutate && doc.status === "ACTIVE" && (
@@ -109,10 +115,18 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      {doc.storageProvider === "PLACEHOLDER" && doc.status === "ACTIVE" && (
-        <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10 px-4 py-3 text-sm text-yellow-700 dark:text-yellow-400">
-          Solo se guardó la metadata de este documento. El almacenamiento real no estaba configurado
-          al momento de la subida.
+      {doc.storageProvider === "PLACEHOLDER" &&
+        (doc.status === "ACTIVE" || doc.status === "ARCHIVED") && (
+        <div
+          role="note"
+          className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300 space-y-1"
+        >
+          <p className="font-medium">Archivo no almacenado</p>
+          <p>
+            Solo se guardó la metadata de este documento. No hay un archivo descargable en el
+            almacenamiento. Esto ocurre cuando el almacenamiento de archivos no estaba configurado
+            al momento de la subida.
+          </p>
         </div>
       )}
 
@@ -147,7 +161,10 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
           </div>
           <div>
             <dt className="text-muted-foreground">Almacenamiento</dt>
-            <dd className="text-muted-foreground">{doc.storageProvider}</dd>
+            <dd className="flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground">{doc.storageProvider}</span>
+              <DocumentStorageBadge storageProvider={doc.storageProvider} />
+            </dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Subido por</dt>

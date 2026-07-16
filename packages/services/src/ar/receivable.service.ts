@@ -46,6 +46,24 @@ export async function getReceivableById(id: string, ctx: ServiceContext): Promis
   return serializeReceivable({ ...r, ...reconciled });
 }
 
+export async function getReceivableBySalesInvoiceId(
+  salesInvoiceId: string,
+  ctx: ServiceContext,
+): Promise<ReceivableView | null> {
+  await assertArTenantModule(ctx);
+  if (!canViewArProjectArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
+  }
+  const r = await prisma.receivable.findUnique({
+    where: { salesInvoiceId },
+    include: { clientContact: { select: { legalName: true, fantasyName: true } } },
+  });
+  if (!r) return null;
+  if (r.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  const reconciled = await reconcileReceivableStatusIfSettled(r, ctx);
+  return serializeReceivable({ ...r, ...reconciled });
+}
+
 export type ProjectReceivableListFilters = {
   page?: number;
   pageSize?: number;

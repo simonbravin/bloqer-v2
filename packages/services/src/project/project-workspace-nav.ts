@@ -62,8 +62,13 @@ export function buildProjectWorkspaceNavSections(
   if (gate.isEnabled("CERTIFICATIONS") && can(roles, "VIEW", "CERTIFICATIONS")) {
     operacion.push({ label: "Certificaciones", href: `${base}/certificaciones` });
   }
+  // Recepciones: operación/compras (no finanzas). Misma visibilidad que OC.
+  if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) {
+    operacion.push({ label: "Recepciones", href: `${base}/recepciones` });
+  }
   if (gate.isEnabled("INVENTORY") && can(roles, "VIEW", "INVENTORY")) {
     operacion.push({ label: "Inventario", href: `${base}/inventario` });
+    operacion.push({ label: "Consumos", href: `${base}/consumos` });
   }
   if (gate.isEnabled("PROJECTS") && can(roles, "VIEW", "PROJECTS")) {
     operacion.push({ label: "Documentos", href: `${base}/documentos` });

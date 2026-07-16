@@ -4,6 +4,7 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { DocumentAttachmentView } from "@bloqer/services";
 import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge } from "./document-status-badge";
+import { DocumentStorageBadge } from "./document-storage-badge";
 
 function fmtSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -37,6 +38,7 @@ export function DocumentCards({
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <DocumentCategoryBadge category={doc.category} />
             <DocumentStatusBadge status={doc.status} />
+            <DocumentStorageBadge storageProvider={doc.storageProvider} />
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
             {fmtSize(doc.sizeBytes)} · {formatDate(doc.createdAt)}

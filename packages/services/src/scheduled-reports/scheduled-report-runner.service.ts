@@ -11,6 +11,7 @@ import {
   deliverScheduledReportBundle,
   type ScheduledReportDeliveryKind,
 } from "./scheduled-report-delivery.service";
+import { deriveScheduledReportRunStatus } from "./scheduled-report-run-status";
 
 const RUN_LOCK_MS = 10 * 60 * 1000;
 const DUE_BATCH_PER_TENANT = 25;
@@ -252,13 +253,20 @@ async function runOneScheduledReport(
   let recipientsDuplicate = 0;
 
   if (attachments.length === 0) {
-    await finalizeScheduledReportRun(row, runWindow, now, "FAILED", {
-      recipientsSent,
-      recipientsSkipped,
-      recipientsFailed,
-      recipientsDuplicate,
-      attachmentErrors,
-    }, options.advanceNextRunAt !== false);
+    await finalizeScheduledReportRun(
+      row,
+      runWindow,
+      now,
+      "FAILED",
+      {
+        recipientsSent,
+        recipientsSkipped,
+        recipientsFailed,
+        recipientsDuplicate,
+        attachmentErrors,
+      },
+      options.advanceNextRunAt !== false,
+    );
     return {
       scheduleId: row.id,
       ok: false,
@@ -319,16 +327,13 @@ async function runOneScheduledReport(
     }
   }
 
-  let runStatus: ScheduledReportRunStatus;
-  if (recipientsFailed > 0 && recipientsSent === 0) {
-    runStatus = "FAILED";
-  } else if (attachmentErrors.length > 0 || recipientsFailed > 0) {
-    runStatus = "PARTIAL";
-  } else if (recipientsSkipped > 0 && recipientsSent === 0 && recipientsDuplicate === 0) {
-    runStatus = "SKIPPED";
-  } else {
-    runStatus = "SUCCESS";
-  }
+  const runStatus = deriveScheduledReportRunStatus({
+    recipientsSent,
+    recipientsSkipped,
+    recipientsFailed,
+    recipientsDuplicate,
+    attachmentErrorCount: attachmentErrors.length,
+  });
 
   await finalizeScheduledReportRun(
     row,

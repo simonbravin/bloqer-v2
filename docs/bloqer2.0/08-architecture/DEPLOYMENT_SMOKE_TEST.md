@@ -4,6 +4,8 @@ Run after first production (or staging) deploy, **before** announcing availabili
 
 **Prereqs:** migrations applied (`prisma migrate deploy`), env vars set per [`ENVIRONMENT_VARIABLES.md`](./ENVIRONMENT_VARIABLES.md), at least one user can sign in.
 
+**Related:** for role-based training / UAT after UI freeze, use [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) (J-02). This file stays focused on post-deploy technical checks.
+
 | # | Check | Pass criteria |
 |---|--------|----------------|
 | 1 | App boots | Home/login loads without 500; no crash loop. |

@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { DocumentAttachmentView } from "@bloqer/services";
 import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge } from "./document-status-badge";
+import { DocumentStorageBadge } from "./document-storage-badge";
 import { DocumentUploadDialog } from "./document-upload-dialog";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
@@ -228,10 +229,20 @@ export function EntityDocumentsPanel({
             title="Adjuntar archivo"
             description={uploadHint ?? undefined}
             submitLabel="Subir adjunto"
-            placeholderWarning="La carga real de archivos no está configurada en este entorno. Solo se guardará la metadata (modo desarrollo)."
+            placeholderWarning="El almacenamiento de archivos no está configurado en este entorno. Solo se guardará la metadata; no habrá un archivo descargable."
           />
         )}
       </div>
+
+      {!storageConfigured ? (
+        <div
+          role="note"
+          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/10 dark:text-amber-300"
+        >
+          Almacenamiento no configurado: las nuevas subidas quedarán como{" "}
+          <strong>Archivo no almacenado</strong> (solo metadata).
+        </div>
+      ) : null}
 
       {docs.length === 0 ? (
         <ListEmptyState message={emptyMessage} />
@@ -276,7 +287,10 @@ export function EntityDocumentsPanel({
                       <DocumentCategoryBadge category={doc.category} />
                     </TableCell>
                     <TableCell>
-                      <DocumentStatusBadge status={doc.status} />
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <DocumentStatusBadge status={doc.status} />
+                        <DocumentStorageBadge storageProvider={doc.storageProvider} />
+                      </div>
                     </TableCell>
                     <TableCell className="text-xs tabular-nums text-muted-foreground">
                       {fmtSize(doc.sizeBytes)}
@@ -289,6 +303,17 @@ export function EntityDocumentsPanel({
                         {canDownload && (
                           <Button variant="outline" size="sm" asChild>
                             <a href={`/api/documents/${doc.id}/download`}>Descargar</a>
+                          </Button>
+                        )}
+                        {doc.storageProvider === "PLACEHOLDER" &&
+                          (doc.status === "ACTIVE" || doc.status === "ARCHIVED") && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled
+                            title="No hay archivo binario almacenado"
+                          >
+                            Sin archivo
                           </Button>
                         )}
                         {doc.canMutate && doc.status === "ACTIVE" && isCompany && (

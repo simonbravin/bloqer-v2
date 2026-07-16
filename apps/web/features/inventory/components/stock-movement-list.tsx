@@ -1,7 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { StockMovementView } from "@bloqer/services";
-import { StockMovementAccountingButton } from "@/features/accounting";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import {
   Table,
@@ -12,7 +12,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { StockMovementAccountingButton } from "@/features/accounting";
 import { formatDate } from "@/lib/format";
+import { StockMovementTypeBadge } from "./stock-movement-type-badge";
 
 function formatAmount(value: string) {
   return new Intl.NumberFormat("es-AR", {
@@ -20,7 +22,6 @@ function formatAmount(value: string) {
     maximumFractionDigits: 2,
   }).format(parseFloat(value));
 }
-import { StockMovementTypeBadge } from "./stock-movement-type-badge";
 
 function consumptionCostOk(m: StockMovementView): boolean {
   const tc = m.totalCost ? parseFloat(m.totalCost) : NaN;
@@ -33,16 +34,28 @@ interface Props {
   movements: StockMovementView[];
   accountingReturnPath?: string;
   canEditAccounting?: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  emptyAction?: ReactNode;
 }
 
-export function StockMovementList({ movements, accountingReturnPath, canEditAccounting }: Props) {
+export function StockMovementList({
+  movements,
+  accountingReturnPath,
+  canEditAccounting,
+  emptyTitle = "Sin movimientos de stock",
+  emptyDescription = "Los movimientos aparecen al confirmar recepciones, consumos o transferencias.",
+  emptyAction,
+}: Props) {
   const showGl = Boolean(accountingReturnPath && canEditAccounting);
   if (movements.length === 0) {
-    return <ListEmptyState message="Sin movimientos de stock." />;
+    return (
+      <ListEmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
+    );
   }
 
   return (
-    <TableScroll>
+    <TableScroll stickyFirstColumn>
       <Table>
         <TableHeader>
           <TableRow>
@@ -70,7 +83,9 @@ export function StockMovementList({ movements, accountingReturnPath, canEditAcco
                 {m.unitCost ? `$${formatAmount(m.unitCost)}` : "—"}
               </TableCell>
               <TableCell>
-                <span className={m.status === "CANCELLED" ? "text-muted-foreground line-through" : ""}>
+                <span
+                  className={m.status === "CANCELLED" ? "text-muted-foreground line-through" : ""}
+                >
                   {m.status === "CONFIRMED" ? "Confirmado" : "Anulado"}
                 </span>
               </TableCell>

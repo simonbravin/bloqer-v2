@@ -17,12 +17,11 @@ La ruta **`/dashboard`** es el tablero **por tenant** al entrar a Bloqer: KPIs r
 | Campo / bloque | Descripción |
 |----------------|-------------|
 | `subscription` | `saasPlan`, `subscriptionStatus`, `trialEndsAt`, `trialDaysRemaining`, `trialWarning` (avisos de fin de prueba). |
-| `projectStatusSlices` | Distribución de cantidad de proyectos por `status` (`groupBy`), solo si `PROJECTS` + `VIEW PROJECTS`. |
 | `financeSummary` | Totales C×C/C×P por moneda vía aging (para KPIs); conteos vencidas/próximas; caja por moneda; **`recentMovements`** (últimos movimientos CONFIRMED de tesorería). **No** se inventan totales multimoneda fusionados. |
 | `accountingSummary` | Conteos baratos de `JournalEntry` en `DRAFT` / `POSTED` si `companyId` + módulo `ACCOUNTING` + `VIEW ACCOUNTING`. |
-| `inventorySummary` | Incluye `activeWarehousesCount` además de productos activos y stock negativo. |
 | `warnings` | Incluye avisos de trial además de otros módulos si aplica. |
-| `onboardingSteps` | Pasos guiados según permisos (p. ej. configurar tesorería solo con `EDIT TREASURY`). |
+| `cashFlowChart` | Flujo de caja por rango, solo con módulo y permiso de Tesorería. |
+| `quickActions` | Accesos calculados por permisos y módulos habilitados. |
 
 ## UI (`apps/web/features/dashboard/`)
 
@@ -31,12 +30,11 @@ La ruta **`/dashboard`** es el tablero **por tenant** al entrar a Bloqer: KPIs r
 | `dashboard-header.tsx` | Nombre tenant, plan / estado / trial, callout de trial, **nav** de accesos rápidos (`dashboardHeaderQuickNav(quickActions)` — solo `href` que ya vinieron autorizados en `quickActions`), botones notificaciones / alertas operativas. |
 | `dashboard-alerts-card.tsx` | Lista de `warnings` (p. ej. trial). |
 | `dashboard-kpi-grid.tsx` / `dashboard-kpi-card.tsx` | Grilla responsive de KPIs del servicio. |
-| `dashboard-status-distribution.tsx` | Barras proporcionales por estado de proyecto (`projectStatusSlices`). |
 | `dashboard-finance-overview.tsx` | Últimos movimientos de tesorería (`recentMovements`) + enlaces a finanzas/tesorería. Totales CxC/CxP/caja siguen en KPIs. |
 | `project-progress-card.tsx` (exportado como `DashboardProjectsOverview`) | Lista quieta de proyectos recientes (nombre + presupuesto) + enlace al listado. |
-| `inventory-summary-card.tsx` | Resumen inventario + depósitos. |
 | `dashboard-accounting-card.tsx` | Borradores vs contabilizados. |
-| `dashboard-onboarding-checklist.tsx` | Checklist de onboarding cuando `operationalOnboarding` y hay pasos. |
+| `dashboard-cash-flow-chart.tsx` | Flujo de caja por rango autorizado. |
+| `dashboard-money-bars.tsx` | Comparaciones monetarias sin fusionar monedas. |
 | `quick-actions-card.tsx` (exportado como `DashboardQuickActions`) | Botones de acciones rápidas del servicio. |
 
 **Visuales:** barras con tokens Tailwind (`bg-primary`, `bg-muted`, etc.), sin paleta hardcodeada fuera de tokens; no se usa Recharts en esta pantalla.
@@ -46,13 +44,11 @@ La ruta **`/dashboard`** es el tablero **por tenant** al entrar a Bloqer: KPIs r
 | Área | Módulo tenant | Permiso típico | Origen de datos |
 |------|---------------|----------------|-----------------|
 | Proyectos activos/borrador/pausa, lista (5), venta presupuestada por moneda | `PROJECTS`; presupuesto requiere `BUDGETS` | `VIEW PROJECTS`; totales/lista: `VIEW BUDGETS` | `prisma.project` + `prisma.budget` |
-| Distribución estados proyecto | `PROJECTS` | `VIEW PROJECTS` | `prisma.project.groupBy` |
 | Avance promedio de obra | — | — | **No calculado** (`averageProgressPct: null`); UI: “Sin avance cargado”. |
 | Pista control de costos | — | — | Removida del dashboard (Phase declutter); control de costos vive por proyecto. |
 | CxC / CxP abierto por moneda, vencidas, próximas 14 días | `AR` / `AP` | `VIEW AR` / `VIEW AP` | `getReceivableAgingReport` / `getPayableAgingReport` → **KPIs** |
 | Caja / bancos por moneda | `TREASURY` | `VIEW TREASURY` | `getTreasurySummaryByCompany` → **KPI** |
 | Últimos movimientos de tesorería (bloque detalle) | `TREASURY` | `VIEW TREASURY` | `AccountMovement` CONFIRMED (últimos 6), href a reporte por cuenta |
-| Productos, depósitos, stock negativo | `INVENTORY` | `VIEW INVENTORY` | `listProducts`, `listNegativeStockBalancesForTenant`, `warehouse.count` |
 | Asientos borrador / contabilizados | `ACCOUNTING` | `VIEW ACCOUNTING` | `prisma.journalEntry.count` (con `companyId`) |
 | Notificaciones sin leer | — | — | `getUnreadNotificationCount` |
 | Enlace alertas operativas | — | Solo quien puede correr alertas manuales | `canRunOperationalAlerts` |

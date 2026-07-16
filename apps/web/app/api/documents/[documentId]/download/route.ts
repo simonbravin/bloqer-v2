@@ -27,7 +27,11 @@ export async function GET(_req: NextRequest, { params }: RouteParams): Promise<N
   } catch (err) {
     if (err instanceof ServiceError) {
       const status = err.code === "FORBIDDEN" ? 403 : err.code === "NOT_FOUND" ? 404 : 409;
-      return NextResponse.json({ error: err.message }, { status });
+      // Prefer plain text so a browser navigation shows a readable message (not raw JSON).
+      return new NextResponse(err.message, {
+        status,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
     }
     throw err;
   }

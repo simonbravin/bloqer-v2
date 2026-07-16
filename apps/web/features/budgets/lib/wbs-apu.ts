@@ -15,6 +15,3 @@ export function nodeHasApuData(node: WbsViewNode): boolean {
   if ((parseFloat(ci.totalCostDirect) || 0) > 0) return true;
   return false;
 }
-
-/** @deprecated Usar isWbsStructuralLeaf */
-export const isLeafApuNode = isWbsStructuralLeaf;

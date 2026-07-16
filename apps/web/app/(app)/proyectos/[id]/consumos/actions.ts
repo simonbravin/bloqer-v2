@@ -10,9 +10,9 @@ async function getCtx() {
   if (!current?.tenantCtx) throw new Error("No autenticado");
   return {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 }
 
@@ -22,7 +22,8 @@ export async function createStockConsumptionAction(
 ) {
   try {
     const ctx = await getCtx();
-    const movement = await createStockConsumption(input, ctx);
+    const movement = await createStockConsumption({ ...input, projectId }, ctx);
+    revalidatePath(`/proyectos/${projectId}/consumos`);
     revalidatePath(`/proyectos/${projectId}/inventario`);
     revalidatePath("/inventario/movimientos");
     return { id: movement.id };

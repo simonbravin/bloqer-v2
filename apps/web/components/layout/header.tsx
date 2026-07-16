@@ -52,18 +52,35 @@ export function Header({
         {tenantName ? <AppShellBreadcrumb tenantName={tenantName} /> : null}
       </ShellHeaderLeading>
       <div className="flex items-center gap-1 sm:gap-2">
-        <Button variant="ghost" size="icon" className="relative h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground" asChild title="Notificaciones">
-          <Link href="/notificaciones">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+          asChild
+          title={
+            notificationUnreadCount > 0
+              ? `Notificaciones (${notificationUnreadCount} sin leer)`
+              : "Notificaciones"
+          }
+        >
+          <Link
+            href="/notificaciones"
+            aria-label={
+              notificationUnreadCount > 0
+                ? `Notificaciones, ${notificationUnreadCount} sin leer`
+                : "Notificaciones"
+            }
+          >
             <Bell className="h-4 w-4" aria-hidden />
             {notificationUnreadCount > 0 ? (
               <Badge
                 variant="destructive"
                 className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center px-1 text-[10px] font-semibold leading-none tabular-nums"
+                aria-hidden
               >
                 {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
               </Badge>
             ) : null}
-            <span className="sr-only">Notificaciones</span>
           </Link>
         </Button>
         <ThemeToggle />

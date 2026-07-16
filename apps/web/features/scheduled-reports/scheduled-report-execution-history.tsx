@@ -15,20 +15,25 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatDateTime } from "@/lib/format";
 import {
+  EMAIL_DELIVERY_STATUS_HINT,
   EMAIL_DELIVERY_STATUS_LABEL,
   deliveryStatusBadgeVariant,
 } from "./scheduled-report-labels";
 
 function deliveryDetail(row: ScheduledReportEmailDeliveryRow): string {
-  return row.skippedReason ?? row.errorMessage ?? "—";
+  if (row.skippedReason) return row.skippedReason;
+  if (row.errorMessage) return row.errorMessage;
+  return EMAIL_DELIVERY_STATUS_HINT[row.status] ?? "—";
 }
 
 function runSummary(run: ScheduledReportExecutionRun): string {
   const parts: string[] = [];
   if (run.sentCount) parts.push(`${run.sentCount} enviado${run.sentCount === 1 ? "" : "s"}`);
   if (run.failedCount) parts.push(`${run.failedCount} fallido${run.failedCount === 1 ? "" : "s"}`);
-  if (run.skippedCount) parts.push(`${run.skippedCount} omitido${run.skippedCount === 1 ? "" : "s"}`);
-  if (run.pendingCount) parts.push(`${run.pendingCount} pendiente${run.pendingCount === 1 ? "" : "s"}`);
+  if (run.skippedCount)
+    parts.push(`${run.skippedCount} omitido${run.skippedCount === 1 ? "" : "s"}`);
+  if (run.pendingCount)
+    parts.push(`${run.pendingCount} pendiente${run.pendingCount === 1 ? "" : "s"}`);
   return parts.length > 0 ? parts.join(" · ") : "Sin entregas registradas";
 }
 
@@ -45,16 +50,24 @@ export function ScheduledReportExecutionHistory({ runs, deliveries }: Props) {
       <CardHeader>
         <CardTitle className="text-base">Historial de ejecuciones</CardTitle>
         <CardDescription>
-          Cada corrida del cron puede generar varios registros (uno por destinatario). Agrupado por ventana de
-          ejecución.
+          Cada corrida del cron puede generar varios registros (uno por destinatario). Agrupado por
+          ventana de ejecución; los registros históricos sin identificador de corrida se muestran
+          por separado para no mezclar envíos distintos.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {!hasHistory ? (
-          <p className="text-sm text-muted-foreground">
-            Todavía no hay intentos de envío registrados. Cuando el cron ejecute este envío, aparecerán aquí y en
-            Notificaciones → Historial de emails.
-          </p>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              Todavía no hay intentos de envío registrados. Cuando el cron ejecute este envío,
+              aparecerán aquí.
+            </p>
+            <p>
+              Si la última corrida figura como <strong>Omitido</strong>, suele ser porque Resend no
+              está configurado o no hay destinatarios válidos — no es lo mismo que{" "}
+              <strong>Fallido</strong>.
+            </p>
+          </div>
         ) : (
           <>
             <div className="space-y-3">
@@ -71,7 +84,10 @@ export function ScheduledReportExecutionHistory({ runs, deliveries }: Props) {
                         <span className="text-muted-foreground text-xs">{runSummary(run)}</span>
                       </div>
                       {run.runWindow ? (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate" title={run.runWindow}>
+                        <p
+                          className="text-xs text-muted-foreground mt-0.5 truncate"
+                          title={run.runWindow}
+                        >
                           Ventana: {run.runWindow}
                         </p>
                       ) : null}
@@ -92,7 +108,10 @@ export function ScheduledReportExecutionHistory({ runs, deliveries }: Props) {
                                 {d.recipientEmail}
                               </TableCell>
                               <TableCell>
-                                <Badge variant={deliveryStatusBadgeVariant(d.status)}>
+                                <Badge
+                                  variant={deliveryStatusBadgeVariant(d.status)}
+                                  title={EMAIL_DELIVERY_STATUS_HINT[d.status]}
+                                >
                                   {EMAIL_DELIVERY_STATUS_LABEL[d.status]}
                                 </Badge>
                               </TableCell>
@@ -127,9 +146,14 @@ export function ScheduledReportExecutionHistory({ runs, deliveries }: Props) {
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                           {formatDateTime(d.createdAt)}
                         </TableCell>
-                        <TableCell className="text-sm max-w-[180px] truncate">{d.recipientEmail}</TableCell>
+                        <TableCell className="text-sm max-w-[180px] truncate">
+                          {d.recipientEmail}
+                        </TableCell>
                         <TableCell>
-                          <Badge variant={deliveryStatusBadgeVariant(d.status)}>
+                          <Badge
+                            variant={deliveryStatusBadgeVariant(d.status)}
+                            title={EMAIL_DELIVERY_STATUS_HINT[d.status]}
+                          >
                             {EMAIL_DELIVERY_STATUS_LABEL[d.status]}
                           </Badge>
                         </TableCell>

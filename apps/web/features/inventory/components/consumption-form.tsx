@@ -61,7 +61,7 @@ export function ConsumptionForm({ projectId, products, warehouses, wbsOptions }:
       if ("error" in res) {
         setError(res.error ?? null);
       } else {
-        router.push(`/proyectos/${projectId}/inventario`);
+        router.push(`/proyectos/${projectId}/consumos`);
       }
     });
   }

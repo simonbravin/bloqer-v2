@@ -9,6 +9,7 @@ import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { assertTreasuryAccountCurrencyMatches } from "../treasury/treasury-currency-guards";
 import { ServiceContext, ServiceError } from "../types";
 import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
@@ -243,13 +244,7 @@ export async function createPayment(
     if (account.status !== "ACTIVE") {
       throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
     }
-    // Currency guard — no FX in Phase 4A
-    if (account.currency !== payable.currency) {
-      throw new ServiceError(
-        "CONFLICT",
-        `Moneda de cuenta (${account.currency}) no coincide con la del saldo (${payable.currency}). FX no disponible.`,
-      );
-    }
+    assertTreasuryAccountCurrencyMatches(account.currency, payable.currency);
 
     const companyId = ctx.companyId ?? account.companyId ?? payable.companyId;
     const fx = computeDocumentFxAmounts(payable.currency, amount);

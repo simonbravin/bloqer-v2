@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { formatCurrencyDisplay } from "@/lib/format";
@@ -8,9 +9,11 @@ import {
   getTenantSettings,
 } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/page-shell";
 import { TenantDisplaySettingsForm } from "@/features/tenant-config/tenant-display-settings-form";
 import { updateTenantDisplaySettingsAction } from "./configuracion-actions";
+import { ShoppingCart } from "lucide-react";
 
 function countryLabel(code: string): string {
   const labels: Record<string, string> = {
@@ -106,6 +109,25 @@ export default async function ConfiguracionHomePage() {
             <p className="text-muted-foreground">Estado operativo</p>
             <p>{tenant.status}</p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-start gap-3 space-y-0">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <ShoppingCart className="h-4 w-4" aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <CardTitle className="text-base">Política de compras</CardTitle>
+            <CardDescription>
+              Mínimo de cotizaciones, umbrales de aprobación y reglas de órdenes de compra por empresa.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/configuracion/compras">Abrir configuración de compras</Link>
+          </Button>
         </CardContent>
       </Card>
 

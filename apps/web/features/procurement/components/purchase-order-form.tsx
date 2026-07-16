@@ -67,13 +67,14 @@ export function PurchaseOrderForm({ projectId, suppliers, wbsOptions, productOpt
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2 space-y-1">
-            <Label>Proveedor</Label>
+            <Label htmlFor="po-supplier">Proveedor</Label>
             {suppliers.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No hay proveedores activos. Cree un contacto con rol Proveedor primero.
               </p>
             ) : (
               <SearchableCombobox
+                id="po-supplier"
                 options={toSearchableOptions(suppliers)}
                 value={supplierContactId}
                 onValueChange={setSupplierContactId}

@@ -73,6 +73,8 @@ export default async function DocumentosPage({ params, searchParams }: PageProps
     throw err;
   }
 
+  const storageConfigured = isStorageConfigured();
+
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
@@ -85,7 +87,7 @@ export default async function DocumentosPage({ params, searchParams }: PageProps
             </Suspense>
             <DocumentUploadDialog
               projectId={id}
-              storageConfigured={isStorageConfigured()}
+              storageConfigured={storageConfigured}
               revalidatePaths={[`/proyectos/${id}/documentos`]}
               triggerLabel="Agregar documento"
               title="Agregar documento"
@@ -95,6 +97,20 @@ export default async function DocumentosPage({ params, searchParams }: PageProps
           </>
         }
       />
+
+      {!storageConfigured ? (
+        <div
+          role="note"
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/10 dark:text-amber-300"
+        >
+          <p className="font-medium">Almacenamiento de archivos no configurado</p>
+          <p className="mt-1">
+            Las nuevas subidas solo guardarán metadata y aparecerán como{" "}
+            <strong>Archivo no almacenado</strong>. No habrá descarga disponible hasta configurar el
+            almacenamiento en el entorno.
+          </p>
+        </div>
+      ) : null}
 
       <div className="rounded-lg border bg-card p-4">
         <Suspense>

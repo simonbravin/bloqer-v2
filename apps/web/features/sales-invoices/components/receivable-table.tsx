@@ -29,17 +29,34 @@ type Props = {
   receivables: ReceivableListItem[];
   /** Muestra columna de obra (listado empresa). */
   showProjectColumn?: boolean;
+  invoicesHref?: string;
+  invoicesActionLabel?: string;
 };
 
-export function ReceivableTable({ receivables, showProjectColumn = false }: Props) {
+export function ReceivableTable({
+  receivables,
+  showProjectColumn = false,
+  invoicesHref,
+  invoicesActionLabel = "Ir a facturas",
+}: Props) {
   if (receivables.length === 0) {
     return (
-      <ListEmptyState message="Sin cuentas por cobrar. Se crean automáticamente al emitir una factura." />
+      <ListEmptyState
+        title="Sin cuentas por cobrar"
+        description="Se crean automáticamente al emitir una factura de venta."
+        action={
+          invoicesHref ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={invoicesHref}>{invoicesActionLabel}</Link>
+            </Button>
+          ) : undefined
+        }
+      />
     );
   }
 
   return (
-    <TableScroll>
+    <TableScroll stickyFirstColumn>
       <Table>
         <TableHeader>
           <TableRow>

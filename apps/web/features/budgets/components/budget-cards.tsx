@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { BudgetStatusBadge } from "./budget-status-badge";
 import type { BudgetListItem } from "./budget-list";
@@ -18,7 +19,17 @@ export function BudgetCards({
   projectId: string;
 }) {
   if (budgets.length === 0) {
-    return <ListEmptyState message="No hay presupuestos. Cree la primera versión." />;
+    return (
+      <ListEmptyState
+        title="Sin presupuestos"
+        description="Creá el primer presupuesto del proyecto. Un presupuesto adicional puede usarse como adenda operativa (sin vínculo automático)."
+        action={
+          <Button asChild size="sm">
+            <Link href={`/proyectos/${projectId}/presupuestos/nuevo`}>Nuevo presupuesto</Link>
+          </Button>
+        }
+      />
+    );
   }
 
   return (

@@ -33,6 +33,7 @@ Elegir **una** de estas dos convenciones (documentar la elegida en el proyecto V
 10. **Resend:** `RESEND_API_KEY` + `RESEND_FROM_EMAIL`; hasta entonces correo transaccional no-op.
 11. **Cron Vercel:** `CRON_SECRET` (≥16 caracteres) alineado con el header que envía los jobs hacia `/api/cron/operational-alerts` y `/api/cron/scheduled-reports` (ver `apps/web/vercel.json`).
 12. **Smoke test:** checklist [`DEPLOYMENT_SMOKE_TEST.md`](./DEPLOYMENT_SMOKE_TEST.md).
+13. **Capacitación / UAT por rol (post-estabilización UI):** [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md).
 
 **Explícito:** `db:push` es solo para iteración local aislada; **producción y staging compartidos = `migrate deploy`**. Variables de integraciones opcionales se agregan **una vez** creado el recurso (Neon, R2, Resend, etc.).
 
@@ -83,6 +84,7 @@ Elegir **una** de estas dos convenciones (documentar la elegida en el proyecto V
 ## Referencias
 
 - [`ENVIRONMENT_VARIABLES.md`](./ENVIRONMENT_VARIABLES.md) — requisitos y opcionales (Phase 10D).  
-- [`DEPLOYMENT_SMOKE_TEST.md`](./DEPLOYMENT_SMOKE_TEST.md) — validación post-deploy.  
+- [`DEPLOYMENT_SMOKE_TEST.md`](./DEPLOYMENT_SMOKE_TEST.md) — validación post-deploy.
+- [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) — UAT / capacitación por rol.
 - Documentación de despliegue Vercel (cuando exista el proyecto enlazado).  
 - [`PHASE_5_HARDENING.md`](./PHASE_5_HARDENING.md)

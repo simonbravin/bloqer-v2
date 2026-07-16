@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
+import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
 import { PayableStatusBadge } from "./payable-status-badge";
@@ -15,7 +16,19 @@ export function PayableCards({
   supplierInvoiceHrefPrefix?: string;
 }) {
   if (payables.length === 0) {
-    return <ListEmptyState message="No hay cuentas por pagar registradas." />;
+    return (
+      <ListEmptyState
+        title="Sin cuentas por pagar"
+        description="Se generan al emitir una factura de proveedor."
+        action={
+          supplierInvoiceHrefPrefix ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={supplierInvoiceHrefPrefix}>Ver facturas proveedor</Link>
+            </Button>
+          ) : undefined
+        }
+      />
+    );
   }
 
   return (

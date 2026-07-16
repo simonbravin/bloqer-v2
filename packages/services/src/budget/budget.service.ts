@@ -1,4 +1,4 @@
-import { prisma } from "@bloqer/database";
+import { prisma, Prisma } from "@bloqer/database";
 import type { Budget, BudgetSettings } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreateBudgetInput, UpdateBudgetInput } from "@bloqer/validators";
@@ -282,8 +282,7 @@ export async function approveBudget(
     throw new ServiceError("CONFLICT", "Solo se puede aprobar un presupuesto en revisión");
   }
 
-  // BR-BUD-001: enforce one APPROVED per project at service layer
-  // TODO: add DB-level protection (partial unique index not supported in Prisma)
+  // BR-BUD-001: one APPROVED per project (service check + partial unique index in DB).
   const existing = await prisma.budget.findFirst({
     where: { projectId: budget.projectId, status: "APPROVED", id: { not: id } },
   });
@@ -294,10 +293,21 @@ export async function approveBudget(
     );
   }
 
-  const updated = await prisma.budget.update({
-    where: { id },
-    data: { status: "APPROVED", updatedBy: ctx.actorUserId },
-  });
+  let updated: Budget;
+  try {
+    updated = await prisma.budget.update({
+      where: { id },
+      data: { status: "APPROVED", updatedBy: ctx.actorUserId },
+    });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      throw new ServiceError(
+        "CONFLICT",
+        "Ya existe un presupuesto aprobado para este proyecto. Ciérrelo antes de aprobar otro.",
+      );
+    }
+    throw e;
+  }
 
   const comment = input?.comment?.trim() || null;
   await log({

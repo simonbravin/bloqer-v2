@@ -24,7 +24,6 @@ export * from "./budget/wbs-metrics";
 export * from "./budget/budget-wbs-export.service";
 export * from "./budget/wbs-spreadsheet-parser";
 export {
-  WBS_MAX_CODE_SEGMENTS,
   WBS_MAX_CODE_SEGMENTS_SIMPLE,
   WBS_MAX_CODE_SEGMENTS_MULTI,
   countCodeSegments,

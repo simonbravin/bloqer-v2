@@ -8,15 +8,31 @@ import { ReceivableTable } from "./receivable-table";
 export function ReceivableListSection({
   receivables,
   showProjectColumn = false,
+  invoicesHref,
+  invoicesActionLabel,
 }: {
   receivables: ReceivableListItem[];
   showProjectColumn?: boolean;
+  invoicesHref?: string;
+  invoicesActionLabel?: string;
 }) {
   const view = useSearchParams().get("view") === "cards" ? "cards" : "table";
   if (view === "cards") {
-    return <ReceivableCards receivables={receivables} showProjectColumn={showProjectColumn} />;
+    return (
+      <ReceivableCards
+        receivables={receivables}
+        showProjectColumn={showProjectColumn}
+        invoicesHref={invoicesHref}
+        invoicesActionLabel={invoicesActionLabel}
+      />
+    );
   }
   return (
-    <ReceivableTable receivables={receivables} showProjectColumn={showProjectColumn} />
+    <ReceivableTable
+      receivables={receivables}
+      showProjectColumn={showProjectColumn}
+      invoicesHref={invoicesHref}
+      invoicesActionLabel={invoicesActionLabel}
+    />
   );
 }

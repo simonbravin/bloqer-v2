@@ -2,9 +2,13 @@ import { prisma } from "@bloqer/database";
 import { OVERVIEW_MODULES, type PermissionModule } from "@bloqer/domain";
 import { ServiceError } from "../types";
 import type { ServiceContext } from "../types";
-import type { TenantModuleGate } from "./tenant-module-gate";
+import {
+  createTenantModuleGate,
+  type TenantModuleGate,
+} from "./tenant-module-gate";
 
 export type { TenantModuleGate } from "./tenant-module-gate";
+export { resolveTenantModuleEnabled, createTenantModuleGate } from "./tenant-module-gate";
 
 export async function getTenantModuleGate(ctx: ServiceContext): Promise<TenantModuleGate> {
   const rows = await prisma.tenantModuleSetting.findMany({
@@ -12,13 +16,7 @@ export async function getTenantModuleGate(ctx: ServiceContext): Promise<TenantMo
     select: { moduleKey: true, isEnabled: true },
   });
   const byKey = new Map(rows.map((r) => [r.moduleKey, r.isEnabled]));
-  return {
-    isEnabled(module: PermissionModule) {
-      const v = byKey.get(module);
-      if (v === undefined) return true;
-      return v;
-    },
-  };
+  return createTenantModuleGate(byKey);
 }
 
 /** Modules that are enabled for this tenant (respecting default-on when no row). */

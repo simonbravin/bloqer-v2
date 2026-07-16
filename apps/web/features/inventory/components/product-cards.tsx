@@ -1,11 +1,22 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { ProductView } from "@bloqer/services";
 import { ProductStatusBadge } from "./product-status-badge";
 
 export function ProductCards({ products }: { products: ProductView[] }) {
   if (products.length === 0) {
-    return <ListEmptyState message="No hay productos registrados." />;
+    return (
+      <ListEmptyState
+        title="Sin productos"
+        description="Registrá el catálogo para controlar stock y consumos."
+        action={
+          <Button asChild size="sm">
+            <Link href="/inventario/productos/nuevo">Nuevo producto</Link>
+          </Button>
+        }
+      />
+    );
   }
 
   return (

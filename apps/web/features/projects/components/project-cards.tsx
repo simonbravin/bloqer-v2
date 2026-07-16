@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { ProjectType } from "@bloqer/database";
 import type { ProjectWithClient } from "@bloqer/services";
@@ -15,7 +16,17 @@ interface ProjectCardsProps {
 
 export function ProjectCards({ projects }: ProjectCardsProps) {
   if (projects.length === 0) {
-    return <ListEmptyState message="No se encontraron proyectos con los filtros aplicados." />;
+    return (
+      <ListEmptyState
+        title="Sin proyectos"
+        description="No hay proyectos con los filtros aplicados, o todavía no creaste ninguno."
+        action={
+          <Button asChild size="sm">
+            <Link href="/proyectos/nuevo">Crear proyecto</Link>
+          </Button>
+        }
+      />
+    );
   }
 
   return (

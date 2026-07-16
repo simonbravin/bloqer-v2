@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { canRunOperationalAlerts } from "@bloqer/services";
+import { canRunOperationalAlerts, getOperationalAlertsLastActivity } from "@bloqer/services";
 import { OperationalAlertsPanel } from "./operational-alerts-panel";
+import { OperationalAlertsActivityCard } from "./operational-alerts-activity-card";
 import { PageShell } from "@/components/layout/page-shell";
 
 export default async function OperationalAlertsPage() {
@@ -17,6 +18,8 @@ export default async function OperationalAlertsPage() {
   };
 
   if (!canRunOperationalAlerts(ctx)) notFound();
+
+  const activity = await getOperationalAlertsLastActivity(ctx);
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -38,6 +41,7 @@ export default async function OperationalAlertsPage() {
         </p>
       </div>
 
+      <OperationalAlertsActivityCard activity={activity} />
       <OperationalAlertsPanel />
     </PageShell>
   );

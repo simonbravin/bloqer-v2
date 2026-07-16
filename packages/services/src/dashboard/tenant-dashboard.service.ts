@@ -51,13 +51,6 @@ export type DashboardProjectSummary = {
   projects: DashboardProjectRow[];
 };
 
-/** @deprecated Kept for optional widgets; no longer returned from `getTenantDashboard`. */
-export type DashboardProjectStatusSlice = {
-  status: string;
-  count: number;
-  label: string;
-};
-
 export type TenantSubscriptionInfo = {
   saasPlan: string;
   subscriptionStatus: string;
@@ -96,13 +89,6 @@ export type DashboardTreasuryMovementRow = {
   type: string;
   accountName: string;
   href: string;
-};
-
-/** @deprecated Kept for `InventorySummaryCard`; no longer returned from `getTenantDashboard`. */
-export type DashboardInventorySummary = {
-  activeProductsCount: number;
-  negativeStockCount: number;
-  activeWarehousesCount: number;
 };
 
 export type DashboardAccountingSummary = {

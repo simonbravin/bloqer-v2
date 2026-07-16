@@ -34,7 +34,7 @@ export default async function NuevoPresupuestoPage({ params }: PageProps) {
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Nuevo presupuesto"
-        subtitle="Alta de una nueva versión de presupuesto"
+        subtitle="Alta de un presupuesto nuevo. Si es una adenda, crealo aparte: no hay vínculo automático con el anterior."
       />
       <div className="rounded-xl border bg-card p-6 shadow-sm">
         <BudgetForm

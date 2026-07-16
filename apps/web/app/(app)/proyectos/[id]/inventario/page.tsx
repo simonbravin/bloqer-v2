@@ -47,9 +47,14 @@ export default async function ProyectoInventarioPage({ params }: PageProps) {
         title="Inventario del proyecto"
         subtitle={`${movements.length} ${movements.length === 1 ? "movimiento" : "movimientos"}`}
         actions={
-          <Button asChild>
-            <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar consumo</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link href={`/proyectos/${id}/consumos`}>Ver consumos</Link>
+            </Button>
+            <Button asChild>
+              <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar consumo</Link>
+            </Button>
+          </div>
         }
       />
 

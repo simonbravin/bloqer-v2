@@ -175,8 +175,12 @@ export function CompanyProcurementSettingsForm({
                 disabled={!canEdit || pending}
                 className="rounded border"
               />
-              Permitir auto-aprobación si no hay conflicto de interés
+              Permitir auto-aprobación solo bajo umbral y sin desvío extra
             </label>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Si la OC supera el umbral de administración o requiere aprobación extra por desvío,
+              quien originó la compra no puede aprobarla aunque esta opción esté activa.
+            </p>
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"

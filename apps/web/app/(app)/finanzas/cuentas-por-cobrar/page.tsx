@@ -190,7 +190,12 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
           </Suspense>
 
           <Suspense fallback={<ListSectionSkeleton />}>
-            <ReceivableListSection receivables={items} showProjectColumn />
+            <ReceivableListSection
+              receivables={items}
+              showProjectColumn
+              invoicesHref="/proyectos"
+              invoicesActionLabel="Ir a proyectos"
+            />
           </Suspense>
 
           <Suspense fallback={null}>

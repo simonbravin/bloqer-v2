@@ -456,7 +456,7 @@ R2 endpoint: `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
 
 ### Phase 7A — Roles, permissions, module visibility
 
-- **Sidebar:** `apps/web/lib/nav-config.ts` + `filterMainNav(roles)`; `AppLayout` pasa `tenantCtx.roles` a `Sidebar`. Items filtrados por `can()` (`VIEW` sobre módulos reales). Enlaces rotos removidos históricamente (`/compras`, `/reportes`). **`/configuracion`** (Phase 10B) aparece con `VIEW TENANT_SETTINGS` **o** `VIEW USERS_PERMISSIONS`.
+- **Sidebar:** `apps/web/lib/global-workspace-nav.ts` + `satisfiesNavRequirement` (`nav-config.ts`); `AppLayout` pasa `tenantCtx.roles` y el gate de módulos a `Sidebar`. Items filtrados por `can()` (`VIEW` sobre módulos reales). Enlaces rotos removidos históricamente (`/compras`, `/reportes`). **`/configuracion`** (Phase 10B) aparece con `VIEW TENANT_SETTINGS` **o** `VIEW USERS_PERMISSIONS`.
 - **Jobsite log:** lectura `VIEW JOBSITE_LOG | VIEW PROJECTS`; contribución (crear/editar/enviar/cancelar) `EDIT JOBSITE_LOG | EDIT PROJECTS`; aprobar/devolver solo `EDIT PROJECTS` (supervisor).
 - **Procurement reads:** `procurement-access.ts` — `VIEW PROCUREMENT | VIEW PROJECTS` en PO/receipt reads + `listLinkablePurchaseOrders` / `listProcurementWbsOptions` (cerraban brecha sin gate).
 - **AP project reads:** `ap-access.ts` — `VIEW AP | VIEW PROJECTS` en factura proveedor, payable, payment (lecturas); aging global AP sigue `VIEW AP` solo.

@@ -49,8 +49,7 @@ export default async function FinanzasPayableDetailPage({ params }: PageProps) {
   }));
 
   const canPay =
-    Number(payable.balanceDue) > 0
-    && (payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE");
+    payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE";
 
   return (
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={payable.supplierName}>

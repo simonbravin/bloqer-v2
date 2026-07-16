@@ -6,6 +6,10 @@ import { log } from "../audit/audit.service";
 import { createSystemNotification } from "../notifications/notification.service";
 import { ServiceContext, ServiceError } from "../types";
 import { _computePreviousQty, _recalcCertificationTotals } from "./certification-calc.service";
+import {
+  assertCertificationLineWithinBudget,
+  assertCertificationStatusEditable,
+} from "./certification-guards";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 // ─── View types (Decimal fields serialized to string) ─────────────────────────
@@ -37,12 +41,7 @@ export type CertificationWithLines = Omit<Certification, "totalAmount"> & {
 // ─── Guard ────────────────────────────────────────────────────────────────────
 
 export function assertCertificationEditable(cert: Certification): void {
-  if (cert.status !== "DRAFT") {
-    throw new ServiceError(
-      "CONFLICT",
-      `La certificación en estado "${cert.status}" no puede editarse. Anule y cree una nueva.`,
-    );
-  }
+  assertCertificationStatusEditable(cert.status);
 }
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
@@ -257,17 +256,13 @@ export async function issueCertification(id: string, ctx: ServiceContext): Promi
       });
 
       if (cumulative.greaterThan(line.budgetQty)) {
-        if (cert.project.type === "PUBLIC") {
-          throw new ServiceError(
-            "CONFLICT",
-            `Ítem "${line.wbsNode.code}" supera el techo del presupuesto en obra pública. Requiere adenda. (BR-CERT-002)`,
-          );
-        } else if (!cert.notes?.trim()) {
-          throw new ServiceError(
-            "CONFLICT",
-            `Ítem "${line.wbsNode.code}" supera el techo. Agregue una nota explicativa en la certificación. (BR-CERT-002b)`,
-          );
-        }
+        assertCertificationLineWithinBudget({
+          projectType: cert.project.type,
+          itemCode: line.wbsNode.code,
+          cumulative,
+          budgetQty: line.budgetQty,
+          certificationNotes: cert.notes,
+        });
       }
     }
 

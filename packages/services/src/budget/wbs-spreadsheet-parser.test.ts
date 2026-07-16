@@ -1,18 +1,24 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeItemCode, parseNumberedSpreadsheetRows } from "./wbs-spreadsheet-parser";
+import { parseNumberedSpreadsheetRows } from "./wbs-spreadsheet-parser";
+import { parseCellA } from "./wbs-code-rules";
 
-describe("normalizeItemCode", () => {
+function numberedCanonical(raw: unknown): string | null {
+  const parsed = parseCellA(raw, null);
+  return parsed.kind === "numbered" ? parsed.canonical : null;
+}
+
+describe("parseCellA numbered canonical", () => {
   it("canonicalizes prefixed cells", () => {
-    assert.equal(normalizeItemCode("ARQ 1.1.1"), "ARQ.1.1.1");
+    assert.equal(numberedCanonical("ARQ 1.1.1"), "ARQ.1.1.1");
   });
 
   it("accepts plain numeric codes", () => {
-    assert.equal(normalizeItemCode("2.1"), "2.1");
+    assert.equal(numberedCanonical("2.1"), "2.1");
   });
 
   it("rejects invalid codes", () => {
-    assert.equal(normalizeItemCode("TOTAL"), null);
+    assert.equal(numberedCanonical("TOTAL"), null);
   });
 });
 
@@ -103,8 +109,8 @@ describe("parseNumberedSpreadsheetRows — simple (un solo rubro)", () => {
   });
 
   it("accepts numeric Excel cell for code", () => {
-    assert.equal(normalizeItemCode(1), "1");
-    assert.equal(normalizeItemCode(2.1), "2.1");
+    assert.equal(numberedCanonical(1), "1");
+    assert.equal(numberedCanonical(2.1), "2.1");
   });
 });
 

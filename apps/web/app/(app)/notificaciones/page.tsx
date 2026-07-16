@@ -16,6 +16,7 @@ import {
 } from "./actions";
 import { formatDateTime } from "@/lib/format";
 import { PageShell } from "@/components/layout/page-shell";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
 
 interface PageProps {
   searchParams: Promise<{ filtro?: string }>;
@@ -120,7 +121,16 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
       </div>
 
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No hay notificaciones en esta vista.</p>
+        <ListEmptyState
+          title="Sin notificaciones"
+          description={
+            filtro === "unread"
+              ? "No tenés notificaciones sin leer."
+              : filtro === "archived"
+                ? "No hay notificaciones archivadas."
+                : "Cuando haya alertas o avisos del sistema aparecerán acá. También podés abrirlos desde la campana del encabezado."
+          }
+        />
       ) : (
         <ul className="space-y-3">
           {items.map((n) => {

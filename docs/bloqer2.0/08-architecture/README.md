@@ -69,7 +69,10 @@ Traducir la **fuente de verdad funcional** (producto, dominio, finanzas, fórmul
 48. [`PHASE_4_REPORTING.md`](./PHASE_4_REPORTING.md) — Compras, inventario, reportes, dashboards.  
 49. [`PHASE_5_HARDENING.md`](./PHASE_5_HARDENING.md) — Tests, perf, observabilidad.  
 50. [`DEPLOYMENT_PLAN.md`](./DEPLOYMENT_PLAN.md) — Entornos y despliegue.  
-51. [`RISK_REGISTER.md`](./RISK_REGISTER.md) — Riesgos de implementación.
+51. [`DEPLOYMENT_SMOKE_TEST.md`](./DEPLOYMENT_SMOKE_TEST.md) — Smoke técnico post-deploy.
+52. [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) — Smoke / UAT por rol (J-02, capacitación).
+53. [`PROJECT_FINANCE_QA_UAT_BY_ROLE.md`](./PROJECT_FINANCE_QA_UAT_BY_ROLE.md) — UAT finanzas de proyecto.
+54. [`RISK_REGISTER.md`](./RISK_REGISTER.md) — Riesgos de implementación.
 
 ## Relación con la documentación funcional
 

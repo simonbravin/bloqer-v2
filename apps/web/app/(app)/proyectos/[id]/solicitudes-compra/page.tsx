@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { PurchaseRequestStatusBadge } from "@/features/procurement/components/purchase-request-status-badge";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { getCurrentUser } from "@/lib/auth";
@@ -116,12 +117,35 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground text-center py-8">
-                  {statusFilter === "SUBMITTED"
-                    ? "No hay solicitudes enviadas pendientes de cotización."
-                    : statusFilter
-                      ? "No hay solicitudes con este filtro."
-                      : "No hay solicitudes de compra en este proyecto."}
+                <TableCell colSpan={5} className="p-0">
+                  <ListEmptyState
+                    className="rounded-none border-0"
+                    title={
+                      statusFilter === "SUBMITTED"
+                        ? "Sin solicitudes pendientes de cotización"
+                        : statusFilter
+                          ? "Sin resultados para este filtro"
+                          : "Sin solicitudes de compra"
+                    }
+                    description={
+                      statusFilter
+                        ? "Probá quitar el filtro o crear una nueva solicitud."
+                        : "Pedí materiales u otros ítems antes de generar una orden de compra."
+                    }
+                    action={
+                      canCreate && !statusFilter ? (
+                        <Button asChild size="sm">
+                          <Link href={`/proyectos/${id}/solicitudes-compra/nueva`}>
+                            Nueva solicitud
+                          </Link>
+                        </Button>
+                      ) : statusFilter ? (
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={listHref}>Ver todas</Link>
+                        </Button>
+                      ) : undefined
+                    }
+                  />
                 </TableCell>
               </TableRow>
             ) : (

@@ -12,8 +12,16 @@ import {
 } from "../tenant-modules/tenant-module-enforcement";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
+import {
+  assertJobsiteLogApprovable,
+  hasLegacyPhysicalPctOverflow,
+  type JobsiteLogProgressSnapshot,
+} from "./jobsite-log-guards";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { sortTreeOrder } from "@bloqer/utils";
+
+export type WbsIncrementalProgressSnapshot = JobsiteLogProgressSnapshot;
+export { hasLegacyPhysicalPctOverflow };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HUNDRED = new Prisma.Decimal(100);
@@ -240,8 +248,6 @@ export type JobsiteLogListFilters = {
   status?: string;
 };
 
-export type WbsIncrementalProgressSnapshot = Record<string, { approvedIncrementalPct: string }>;
-
 /** Sum of incremental physicalPct from jobsite logs, grouped by WBS. */
 export async function getWbsIncrementalProgressSnapshot(
   projectId: string,
@@ -293,10 +299,6 @@ export async function getWbsCumulativePhysicalPct(
   return snapshot[wbsNodeId]?.approvedIncrementalPct ?? null;
 }
 
-/** True if any WBS has approved incremental sum > 100 (legacy data hint). */
-export function hasLegacyPhysicalPctOverflow(snapshot: WbsIncrementalProgressSnapshot): boolean {
-  return Object.values(snapshot).some((v) => parseFloat(v.approvedIncrementalPct) > 100);
-}
 
 async function assertWbsBelongsToProject(wbsNodeId: string, projectId: string, tenantId: string) {
   const wbs = await prisma.wbsNode.findUnique({
@@ -992,9 +994,7 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
   const existing = await prisma.jobsiteLog.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (existing.status !== "SUBMITTED") {
-    throw new ServiceError("CONFLICT", `El parte en estado "${existing.status}" no puede aprobarse. Debe estar enviado.`);
-  }
+  assertJobsiteLogApprovable(existing.status);
 
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
   await validateJobsiteLogFromDb(id, existing.projectId, ctx.tenantId, ctx);

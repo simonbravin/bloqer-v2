@@ -25,11 +25,23 @@ export function PayableTable({
   supplierInvoiceHrefPrefix?: string;
 }) {
   if (payables.length === 0) {
-    return <ListEmptyState message="No hay cuentas por pagar registradas." />;
+    return (
+      <ListEmptyState
+        title="Sin cuentas por pagar"
+        description="Se generan al emitir una factura de proveedor."
+        action={
+          supplierInvoiceHrefPrefix ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={supplierInvoiceHrefPrefix}>Ver facturas proveedor</Link>
+            </Button>
+          ) : undefined
+        }
+      />
+    );
   }
 
   return (
-    <TableScroll>
+    <TableScroll stickyFirstColumn>
       <Table>
         <TableHeader>
           <TableRow>

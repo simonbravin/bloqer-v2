@@ -3,16 +3,14 @@ import { notFound, redirect } from "next/navigation";
 import { formatDateTime } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import {
-  canManageScheduledReports,
-  listScheduledReports,
-} from "@bloqer/services";
+import { canManageScheduledReports, listScheduledReports } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageListHeader } from "@/components/ui/page-list-header";
 import {
   SCHEDULED_REPORT_FREQUENCY_LABEL,
+  SCHEDULED_REPORT_RUN_STATUS_HINT,
   SCHEDULED_REPORT_RUN_STATUS_LABEL,
   SCHEDULED_REPORT_STATUS_LABEL,
   runStatusBadgeVariant,
@@ -49,7 +47,7 @@ export default async function ConfiguracionReportesPage({ searchParams }: Props)
     <PageShell variant="default" className="space-y-6">
       <PageListHeader
         title="Reportes programados"
-        subtitle="Envíos automáticos por email según la programación configurada. El cron horario genera adjuntos y registra cada intento."
+        subtitle="Envíos automáticos por email según la programación configurada. El cron diario genera adjuntos y registra cada intento."
         actions={
           <Button asChild>
             <Link href="/configuracion/reportes/nuevo">Nuevo envío</Link>
@@ -62,7 +60,23 @@ export default async function ConfiguracionReportesPage({ searchParams }: Props)
       ) : null}
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Todavía no hay envíos programados.</p>
+        <div className="space-y-3 rounded-lg border bg-card px-6 py-8 text-center text-sm text-muted-foreground">
+          <p>Todavía no hay envíos programados.</p>
+          <p>
+            Creá un envío para que el cron diario genere adjuntos y registre cada intento. El
+            historial de mails está en{" "}
+            <Link
+              href="/notificaciones/emails?emailType=REPORT_SCHEDULED"
+              className="text-foreground underline underline-offset-2"
+            >
+              Notificaciones → Emails
+            </Link>
+            .
+          </p>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/configuracion/reportes/nuevo">Crear primer envío</Link>
+          </Button>
+        </div>
       ) : (
         <TableScroll>
           <Table>
@@ -94,12 +108,18 @@ export default async function ConfiguracionReportesPage({ searchParams }: Props)
                       <span className="block">
                         {formatDateTime(r.lastRunAt)}
                         {r.lastRunStatus ? (
-                          <Badge
-                            variant={runStatusBadgeVariant(r.lastRunStatus)}
-                            className="mt-1"
-                          >
-                            {SCHEDULED_REPORT_RUN_STATUS_LABEL[r.lastRunStatus]}
-                          </Badge>
+                          <>
+                            <Badge
+                              variant={runStatusBadgeVariant(r.lastRunStatus)}
+                              className="mt-1"
+                              title={SCHEDULED_REPORT_RUN_STATUS_HINT[r.lastRunStatus]}
+                            >
+                              {SCHEDULED_REPORT_RUN_STATUS_LABEL[r.lastRunStatus]}
+                            </Badge>
+                            <span className="mt-1 block max-w-xs text-xs text-muted-foreground">
+                              {SCHEDULED_REPORT_RUN_STATUS_HINT[r.lastRunStatus]}
+                            </span>
+                          </>
                         ) : null}
                       </span>
                     ) : (

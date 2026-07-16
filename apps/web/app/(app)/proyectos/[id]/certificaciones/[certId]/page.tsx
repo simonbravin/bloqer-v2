@@ -119,12 +119,40 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
           {cert.status === "APPROVED" && !existingInvoice && (
             <Button variant="outline" size="sm" asChild>
               <Link href={`/proyectos/${projectId}/facturas/nueva?certificationId=${certId}`}>
-                Generar factura
+                Emitir factura
               </Link>
             </Button>
           )}
         </div>
       </div>
+
+      {cert.status === "APPROVED" && !existingInvoice && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950 dark:border-blue-900 dark:bg-blue-950/20 dark:text-blue-100">
+          <p className="font-medium">Certificación aprobada pendiente de facturación</p>
+          <p className="mt-1 text-xs">
+            La aprobación no emite una factura automáticamente. Usá “Emitir factura” para crear la
+            factura vinculada y habilitar la cuenta por cobrar.
+          </p>
+        </div>
+      )}
+
+      {cert.status === "APPROVED" && existingInvoice && (
+        <div className="rounded-lg border bg-card px-4 py-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-medium">Factura vinculada</p>
+              <p className="text-xs text-muted-foreground">
+                Esta certificación ya tiene una factura activa: {existingInvoice.code}.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/proyectos/${projectId}/facturas/${existingInvoice.id}`}>
+                Ver factura
+              </Link>
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-4 items-start">
         <div className="flex-1 min-w-0">

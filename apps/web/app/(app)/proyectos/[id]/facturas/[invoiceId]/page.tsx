@@ -13,7 +13,7 @@ import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SalesInvoiceStatusBadge } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
-import { getSalesInvoiceById, ServiceError } from "@bloqer/services";
+import { getReceivableBySalesInvoiceId, getSalesInvoiceById, ServiceError } from "@bloqer/services";
 import { issueSalesInvoiceAction, cancelSalesInvoiceAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
@@ -49,12 +49,15 @@ export default async function FacturaDetailPage({ params }: PageProps) {
   };
 
   let invoice;
+  let receivable = null;
   try {
     invoice = await getSalesInvoiceById(invoiceId, ctx);
+    receivable = await getReceivableBySalesInvoiceId(invoiceId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
   }
+  if (invoice.projectId !== id || (receivable && receivable.projectId !== id)) notFound();
 
   const doIssue = async () => {
     "use server";
@@ -64,6 +67,11 @@ export default async function FacturaDetailPage({ params }: PageProps) {
     "use server";
     await cancelSalesInvoiceAction(invoiceId, id);
   };
+  const canCollect =
+    receivable &&
+    (receivable.status === "OPEN" ||
+      receivable.status === "PARTIAL" ||
+      receivable.status === "OVERDUE");
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={invoice.code}>
@@ -98,6 +106,35 @@ export default async function FacturaDetailPage({ params }: PageProps) {
           )}
         </div>
       </div>
+
+      {receivable ? (
+        <div className="rounded-lg border bg-card px-4 py-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-medium">Cuenta por cobrar vinculada</p>
+              <p className="text-xs text-muted-foreground">
+                Saldo pendiente: {fmtMoney(receivable.balanceDue, receivable.currency)}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/proyectos/${id}/cuentas-por-cobrar/${receivable.id}`}>Ver C×C</Link>
+              </Button>
+              {canCollect ? (
+                <Button size="sm" asChild>
+                  <Link href={`/proyectos/${id}/cuentas-por-cobrar/${receivable.id}/cobrar`}>
+                    Registrar cobranza
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : invoice.status === "DRAFT" ? (
+        <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+          Al emitir la factura se crea la cuenta por cobrar vinculada.
+        </div>
+      ) : null}
 
       <div className="rounded-lg border bg-card">
         <div className="border-b px-6 py-4">

@@ -96,6 +96,11 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
   }));
 
   const exportParams = { ...sp, scope: "corporate" as const };
+  const listExportParams: Record<string, string | undefined> = {
+    status: showAllStates ? "ALL" : status,
+    from: sp.from,
+    to: sp.to,
+  };
 
   function listHref(listStatus?: string) {
     const p = new URLSearchParams();
@@ -130,10 +135,20 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/finanzas/pagos-proveedor">Pagos a proveedores</Link>
+          </Button>
           <ReportExportActions
             exportPath="/api/reports/finanzas/ap-aging.csv"
             params={exportParams}
             pdf
+            label="Exportar aging"
+          />
+          <ReportExportActions
+            exportPath="/api/reports/finanzas/cxp-corporativo.csv"
+            params={listExportParams}
+            pdf
+            label="Exportar listado"
           />
           <ReportEmailSendDialog
             reportType="AP_AGING"

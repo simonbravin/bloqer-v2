@@ -30,7 +30,15 @@ export type PlatformTenantModuleRow = {
   moduleKey: PermissionModule;
   label: string;
   isEnabled: boolean;
+  /** True when a `TenantModuleSetting` row exists; false means default-on (no row yet). */
+  hasExplicitRow: boolean;
   internalNotes: string | null;
+};
+
+export type PlatformTenantModuleCoverage = {
+  totalModules: number;
+  explicitRows: number;
+  missingRows: number;
 };
 
 export async function listPlatformTenantModuleRows(
@@ -57,9 +65,22 @@ export async function listPlatformTenantModuleRows(
       moduleKey,
       label,
       isEnabled: r ? r.isEnabled : true,
+      hasExplicitRow: Boolean(r),
       internalNotes: r?.internalNotes ?? null,
     };
   });
+}
+
+/** Coverage of explicit `TenantModuleSetting` rows vs catalog size (default-on gaps). */
+export function summarizePlatformTenantModuleCoverage(
+  rows: readonly PlatformTenantModuleRow[],
+): PlatformTenantModuleCoverage {
+  const explicitRows = rows.filter((r) => r.hasExplicitRow).length;
+  return {
+    totalModules: rows.length,
+    explicitRows,
+    missingRows: rows.length - explicitRows,
+  };
 }
 
 /**

@@ -196,7 +196,7 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
       </Card>
 
       <Suspense fallback={<ListSectionSkeleton />}>
-        <ReceivableListSection receivables={items} />
+        <ReceivableListSection receivables={items} invoicesHref={`/proyectos/${id}/facturas`} />
       </Suspense>
 
       <Suspense fallback={null}>

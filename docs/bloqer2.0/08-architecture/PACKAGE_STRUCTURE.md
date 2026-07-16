@@ -51,6 +51,7 @@
 | Aspecto | Contenido |
 |---|---|
 | **Objetivo** | Componentes reutilizables, tokens, composición shadcn. |
+| **Estado actual** | **Stub Phase 0** (H-D7: mantener). Ver `packages/ui/README.md`. UI real vive en `apps/web`. |
 | **Responsabilidades** | Presentación; props tipadas; sin fetch a datos financieros autoritativos. |
 | **Dependencias permitidas** | React, Tailwind, Radix/shadcn. |
 | **Prohibido** | Prisma; `services` (salvo patrones muy controlados de “hook + server” que igual deleguen). |

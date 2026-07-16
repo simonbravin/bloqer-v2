@@ -296,12 +296,3 @@ export function budgetWbsExportPdfRowsFromTable(
     return record;
   });
 }
-
-/** @deprecated Prefer budgetWbsExportPdfRowsFromTable with buildBudgetWbsExportTable rows. */
-export function budgetWbsExportPdfRows(
-  tree: WbsViewNode[],
-  view: BudgetWbsExportView,
-): Record<string, string>[] {
-  const { rows } = buildBudgetWbsExportTable(tree, view);
-  return budgetWbsExportPdfRowsFromTable(view, rows);
-}

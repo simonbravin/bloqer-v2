@@ -9,6 +9,7 @@ import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { assertTreasuryAccountCurrencyMatches } from "./treasury-currency-guards";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
@@ -153,12 +154,7 @@ export async function createCollection(
     if (account.status !== "ACTIVE") {
       throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
     }
-    if (account.currency !== receivable.currency) {
-      throw new ServiceError(
-        "CONFLICT",
-        `Moneda de cuenta (${account.currency}) no coincide con la del saldo (${receivable.currency}). FX no disponible en Phase 3C.`,
-      );
-    }
+    assertTreasuryAccountCurrencyMatches(account.currency, receivable.currency);
 
     const companyId = ctx.companyId ?? account.companyId ?? receivable.companyId;
     const fx = computeDocumentFxAmounts(receivable.currency, amount);

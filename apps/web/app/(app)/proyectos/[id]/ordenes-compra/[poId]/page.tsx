@@ -315,7 +315,14 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
         )}
       </div>
 
-      <DataTableSection title="Recepciones">
+      <DataTableSection
+        title="Recepciones"
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/proyectos/${id}/recepciones`}>Ver todas las recepciones</Link>
+          </Button>
+        }
+      >
         <PurchaseReceiptTable receipts={receiptItems} projectId={id} />
       </DataTableSection>
 

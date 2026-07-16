@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
+import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
 import { ReceivableStatusBadge } from "./receivable-status-badge";
@@ -18,12 +19,29 @@ function fmtMoney(value: string, currency: string) {
 type Props = {
   receivables: ReceivableListItem[];
   showProjectColumn?: boolean;
+  invoicesHref?: string;
+  invoicesActionLabel?: string;
 };
 
-export function ReceivableCards({ receivables, showProjectColumn = false }: Props) {
+export function ReceivableCards({
+  receivables,
+  showProjectColumn = false,
+  invoicesHref,
+  invoicesActionLabel = "Ir a facturas",
+}: Props) {
   if (receivables.length === 0) {
     return (
-      <ListEmptyState message="Sin cuentas por cobrar. Se crean automáticamente al emitir una factura." />
+      <ListEmptyState
+        title="Sin cuentas por cobrar"
+        description="Se crean automáticamente al emitir una factura de venta."
+        action={
+          invoicesHref ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={invoicesHref}>{invoicesActionLabel}</Link>
+            </Button>
+          ) : undefined
+        }
+      />
     );
   }
 

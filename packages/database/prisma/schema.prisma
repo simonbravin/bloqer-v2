@@ -1125,11 +1125,15 @@ model ScheduleItemWbsLink {
 
 // ─── Budgets / WBS / APU ──────────────────────────────────────────────────────
 // See: docs/bloqer2.0/02-modules/BUDGETS.md, WBS_AND_COST_ITEMS.md
-// BR-BUD-001: one APPROVED version per project — enforced at service layer.
+// BR-BUD-001: one APPROVED version per project — service guard + partial unique DB index.
 // BR-BUD-002/006/008: status-based edit locks enforced at service layer.
 // BR-WBS-001: only ITEM nodes receive certifications (future).
 // BR-WBS-002: code unique within budget.
 
+/// Budget / presupuesto versionado por proyecto.
+/// BR-BUD-001: DB enforces at most one `APPROVED` per `projectId` via partial unique index
+/// `budgets_one_approved_per_project_key` (migration 20260716120000). Not a Prisma @@unique
+/// (that would incorrectly block multiple DRAFT/CLOSED). No extra table.
 model Budget {
   id             String       @id @default(uuid())
   tenantId       String

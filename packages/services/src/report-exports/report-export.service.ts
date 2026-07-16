@@ -120,14 +120,15 @@ export function parseCompanyPayableExportFilters(
 export function parseCompanySupplierInvoiceExportFilters(
   sp: Record<string, string | undefined>,
 ): CompanySupplierInvoiceListFilters {
+  const showAll = sp.status === "ALL";
   const status =
-    sp.status && (INVOICE_EXPORT_STATUSES as readonly string[]).includes(sp.status)
+    sp.status && !showAll && (INVOICE_EXPORT_STATUSES as readonly string[]).includes(sp.status)
       ? (sp.status as (typeof INVOICE_EXPORT_STATUSES)[number])
       : undefined;
-  let issueDateFrom = sp.from ?? sp.issueDateFrom;
-  let issueDateTo = sp.to ?? sp.issueDateTo;
+  const issueDateFrom = sp.from ?? sp.issueDateFrom;
+  const issueDateTo = sp.to ?? sp.issueDateTo;
   return {
-    status: status ?? "ISSUED",
+    status: showAll ? undefined : (status ?? "ISSUED"),
     ...(issueDateFrom ? { issueDateFrom } : {}),
     ...(issueDateTo ? { issueDateTo } : {}),
   };

@@ -43,7 +43,17 @@ export function ProjectTable({ projects }: ProjectTableProps) {
   const { sorted, sortKey, sortDir, toggleSort } = useClientTableSort(projects, accessors, "name");
 
   if (projects.length === 0) {
-    return <ListEmptyState message="No se encontraron proyectos con los filtros aplicados." />;
+    return (
+      <ListEmptyState
+        title="Sin proyectos"
+        description="No hay proyectos con los filtros aplicados, o todavía no creaste ninguno."
+        action={
+          <Button asChild size="sm">
+            <Link href="/proyectos/nuevo">Crear proyecto</Link>
+          </Button>
+        }
+      />
+    );
   }
 
   return (

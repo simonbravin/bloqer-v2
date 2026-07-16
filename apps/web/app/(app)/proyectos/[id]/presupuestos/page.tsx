@@ -51,7 +51,7 @@ export default async function PresupuestosPage({ params }: PageProps) {
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Presupuestos"
-        subtitle={`${serialized.length} ${serialized.length === 1 ? "versión" : "versiones"}`}
+        subtitle={`${serialized.length} ${serialized.length === 1 ? "presupuesto" : "presupuestos"}`}
         actions={
           <>
             <Suspense fallback={null}>
@@ -63,6 +63,12 @@ export default async function PresupuestosPage({ params }: PageProps) {
           </>
         }
       />
+
+      <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+        Podés crear más de un presupuesto por proyecto (p. ej. como adenda operativa). En esta
+        versión no hay vínculo automático padre–hijo ni estado <span className="font-mono">SUPERSEDED</span>.
+        Solo puede haber un presupuesto <span className="font-mono">APPROVED</span> a la vez.
+      </div>
 
       <Suspense fallback={<ListSectionSkeleton />}>
         <BudgetListSection budgets={serialized} projectId={id} />

@@ -51,12 +51,12 @@ export function CertificationForm({ projectId, budgets, defaultBudgetId, onSubmi
     <form onSubmit={handleSubmit} className="space-y-5">
       {budgets.length > 1 && (
         <div className="space-y-1.5">
-          <Label>Presupuesto *</Label>
+          <Label htmlFor="cert-budget">Presupuesto *</Label>
           <Select
             value={form.watch("budgetId")}
             onValueChange={(v) => form.setValue("budgetId", v)}
           >
-            <SelectTrigger>
+            <SelectTrigger id="cert-budget">
               <SelectValue placeholder="Seleccionar presupuesto..." />
             </SelectTrigger>
             <SelectContent>
@@ -75,15 +75,15 @@ export function CertificationForm({ projectId, budgets, defaultBudgetId, onSubmi
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label>Inicio del período *</Label>
-          <Input type="date" {...form.register("periodStart")} />
+          <Label htmlFor="cert-period-start">Inicio del período *</Label>
+          <Input id="cert-period-start" type="date" {...form.register("periodStart")} />
           {form.formState.errors.periodStart && (
             <p className="text-xs text-destructive">{form.formState.errors.periodStart.message}</p>
           )}
         </div>
         <div className="space-y-1.5">
-          <Label>Fin del período *</Label>
-          <Input type="date" {...form.register("periodEnd")} />
+          <Label htmlFor="cert-period-end">Fin del período *</Label>
+          <Input id="cert-period-end" type="date" {...form.register("periodEnd")} />
           {form.formState.errors.periodEnd && (
             <p className="text-xs text-destructive">{form.formState.errors.periodEnd.message}</p>
           )}
@@ -91,8 +91,9 @@ export function CertificationForm({ projectId, budgets, defaultBudgetId, onSubmi
       </div>
 
       <div className="space-y-1.5">
-        <Label>Notas para el cliente</Label>
+        <Label htmlFor="cert-notes">Notas para el cliente</Label>
         <Textarea
+          id="cert-notes"
           rows={3}
           placeholder="Observaciones o aclaraciones para el cliente..."
           {...form.register("notes")}
@@ -100,8 +101,9 @@ export function CertificationForm({ projectId, budgets, defaultBudgetId, onSubmi
       </div>
 
       <div className="space-y-1.5">
-        <Label>Notas internas</Label>
+        <Label htmlFor="cert-internal-notes">Notas internas</Label>
         <Textarea
+          id="cert-internal-notes"
           rows={2}
           placeholder="Notas internas (no visibles al cliente)..."
           {...form.register("internalNotes")}

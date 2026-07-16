@@ -3,7 +3,6 @@ import { describe, it } from "node:test";
 import type { WbsViewNode } from "./wbs.service";
 import {
   buildBudgetWbsExportTable,
-  budgetWbsExportPdfRows,
   budgetWbsExportPdfRowsFromTable,
   parseBudgetWbsExportFilters,
 } from "./budget-wbs-export.service";
@@ -141,14 +140,15 @@ describe("buildBudgetWbsExportTable", () => {
   });
 });
 
-describe("budgetWbsExportPdfRows", () => {
+describe("budgetWbsExportPdfRowsFromTable", () => {
   it("maps breakdown row keys for PDF", () => {
     const tree = [leafNode("1", "Item", {})];
-    const rows = budgetWbsExportPdfRows(tree, "breakdown");
-    assert.equal(rows.length, 2);
-    assert.ok("material" in rows[0]!);
-    assert.ok("sale" in rows[0]!);
-    assert.equal(rows[1]!.name, "TOTAL GENERAL");
+    const { rows } = buildBudgetWbsExportTable(tree, "breakdown");
+    const pdfRows = budgetWbsExportPdfRowsFromTable("breakdown", rows);
+    assert.equal(pdfRows.length, 2);
+    assert.ok("material" in pdfRows[0]!);
+    assert.ok("sale" in pdfRows[0]!);
+    assert.equal(pdfRows[1]!.name, "TOTAL GENERAL");
   });
 
   it("pdf rows from table include TOTAL GENERAL", () => {

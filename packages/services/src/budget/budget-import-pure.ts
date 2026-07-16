@@ -10,7 +10,7 @@ import {
 } from "./wbs-code-rules";
 
 export { IMPORT_TEMPLATE_COLUMNS };
-export { parseNumberedSpreadsheetRows, normalizeItemCode } from "./wbs-spreadsheet-parser";
+export { parseNumberedSpreadsheetRows } from "./wbs-spreadsheet-parser";
 export type {
   SpreadsheetParseError,
   SpreadsheetParseResult,

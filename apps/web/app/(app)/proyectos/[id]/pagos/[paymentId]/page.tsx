@@ -88,6 +88,11 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
               Ver cuenta por pagar →
             </Link>
           </Button>
+          <Button asChild variant="outline">
+            <Link href={`/proyectos/${id}/facturas-proveedor/${payment.supplierInvoiceId}`}>
+              Ver factura proveedor →
+            </Link>
+          </Button>
         </div>
       </div>
 

@@ -5,8 +5,6 @@ export { BudgetCompositionChart } from "./budget-composition-chart";
 export { ReportDateFilters } from "./report-date-filters";
 export {
   ReportExportActions,
-  ReportCsvExportLink,
-  ReportPdfExportLink,
 } from "./report-export-actions";
 export { CertificationEvolutionChart } from "./certification-evolution-chart";
 export { CertificationProgressChart } from "./certification-progress-chart";

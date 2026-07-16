@@ -55,7 +55,9 @@ function ItemRows({ items }: { items: AgingItem[] }) {
               {items.map((item) => (
                 <TableRow key={item.id} className="hover:bg-muted/20">
                   <TableCell className="font-mono">#{item.invoiceNumber}</TableCell>
-                  <TableCell className="max-w-[160px] truncate">{item.projectName || "—"}</TableCell>
+                  <TableCell className="max-w-[160px] truncate">
+                    {item.projectName || "—"}
+                  </TableCell>
                   <TableCell>{formatDate(item.issueDate)}</TableCell>
                   <TableCell>
                     <span>{formatDate(item.dueDate)}</span>
@@ -63,7 +65,9 @@ function ItemRows({ items }: { items: AgingItem[] }) {
                       <span className="ml-1 text-red-500">({item.daysOverdue}d)</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatAmount(item.originalAmount)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatAmount(item.originalAmount)}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
                     {formatAmount(item.paidAmount)}
                   </TableCell>
@@ -98,10 +102,20 @@ function GroupRow({
   const hasItems = row.items.length > 0;
   return (
     <>
-      <TableRow className="cursor-pointer select-none" onClick={onToggle}>
+      <TableRow>
         <TableCell className="font-medium">
-          <span className="mr-2 text-muted-foreground">{expanded ? "▾" : "▸"}</span>
-          {row.contactName}
+          <button
+            type="button"
+            onClick={onToggle}
+            disabled={!hasItems}
+            aria-expanded={hasItems ? expanded : undefined}
+            className="flex w-full items-center text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+          >
+            <span className="mr-2 text-muted-foreground" aria-hidden>
+              {hasItems ? (expanded ? "▾" : "▸") : "•"}
+            </span>
+            {row.contactName}
+          </button>
         </TableCell>
         <TableCell className="text-xs text-muted-foreground">
           {formatCurrencyDisplay(row.currency)}
@@ -150,15 +164,21 @@ export function AgingTable({ report }: Props) {
 
   return (
     <div className="space-y-0">
-      <TableScroll>
+      <TableScroll stickyFirstColumn>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Cliente / Proveedor</TableHead>
               <TableHead>Moneda</TableHead>
-              <TableHead className="text-right text-emerald-600 dark:text-emerald-400">Al día</TableHead>
-              <TableHead className="text-right text-yellow-700 dark:text-yellow-400">1–30d</TableHead>
-              <TableHead className="text-right text-orange-700 dark:text-orange-400">31–60d</TableHead>
+              <TableHead className="text-right text-emerald-600 dark:text-emerald-400">
+                Al día
+              </TableHead>
+              <TableHead className="text-right text-yellow-700 dark:text-yellow-400">
+                1–30d
+              </TableHead>
+              <TableHead className="text-right text-orange-700 dark:text-orange-400">
+                31–60d
+              </TableHead>
               <TableHead className="text-right text-red-600 dark:text-red-400">61–90d</TableHead>
               <TableHead className="text-right text-red-700 dark:text-red-300">+90d</TableHead>
               <TableHead className="text-right">Total</TableHead>
@@ -181,11 +201,21 @@ export function AgingTable({ report }: Props) {
             <TableRow>
               <TableCell colSpan={2}>Total general</TableCell>
               <TableCell className="text-right tabular-nums">{formatAmount(t.current)}</TableCell>
-              <TableCell className="text-right tabular-nums">{formatAmount(t.bucket1_30)}</TableCell>
-              <TableCell className="text-right tabular-nums">{formatAmount(t.bucket31_60)}</TableCell>
-              <TableCell className="text-right tabular-nums">{formatAmount(t.bucket61_90)}</TableCell>
-              <TableCell className="text-right tabular-nums">{formatAmount(t.bucket90Plus)}</TableCell>
-              <TableCell className="text-right tabular-nums">{formatAmount(t.totalBalance)}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatAmount(t.bucket1_30)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatAmount(t.bucket31_60)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatAmount(t.bucket61_90)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatAmount(t.bucket90Plus)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatAmount(t.totalBalance)}
+              </TableCell>
             </TableRow>
           </TableFooter>
         </Table>

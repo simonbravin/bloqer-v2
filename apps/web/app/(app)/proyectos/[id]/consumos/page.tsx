@@ -1,0 +1,89 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
+import { Button } from "@/components/ui/button";
+import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
+import { PageShell } from "@/components/layout/page-shell";
+import { ProjectPageHeader } from "@/components/layout/project-page-header";
+import { getCurrentUser } from "@/lib/auth";
+import { StockMovementList } from "@/features/inventory";
+import { can } from "@bloqer/domain";
+import { getProjectShellInfo, listStockMovements, ServiceError } from "@bloqer/services";
+
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function ProyectoConsumosPage({ params }: PageProps) {
+  const current = await getCurrentUser();
+  if (!current?.tenantCtx) redirect("/login");
+
+  const { id } = await params;
+  const ctx = {
+    actorUserId: current.session.user.id!,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
+  };
+
+  try {
+    await getProjectShellInfo(id, ctx);
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
+
+  let movements;
+  try {
+    movements = await listStockMovements(
+      { projectId: id, sourceType: "CONSUMPTION", status: "CONFIRMED" },
+      ctx,
+    );
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
+  const canCreateConsumption = can(current.tenantCtx.roles, "EDIT", "INVENTORY");
+
+  return (
+    <PageShell variant="default" className="space-y-6">
+      <ProjectPageHeader
+        title="Consumos del proyecto"
+        subtitle={`${movements.length} ${movements.length === 1 ? "consumo confirmado" : "consumos confirmados"}`}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link href={`/proyectos/${id}/inventario`}>Ver inventario</Link>
+            </Button>
+            {canCreateConsumption ? (
+              <Button asChild>
+                <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar consumo</Link>
+              </Button>
+            ) : null}
+          </div>
+        }
+      />
+
+      <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+        Este listado usa los movimientos de stock existentes con origen consumo. No crea una tabla
+        separada: el historial queda reconciliado con inventario, WBS y control de costos.
+      </div>
+
+      <Suspense fallback={<ListSectionSkeleton />}>
+        <StockMovementList
+          movements={movements}
+          emptyTitle="Sin consumos registrados"
+          emptyDescription="Los consumos aparecen acá después de descontar materiales del stock del proyecto."
+          emptyAction={
+            canCreateConsumption ? (
+              <Button asChild size="sm">
+                <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar primer consumo</Link>
+              </Button>
+            ) : undefined
+          }
+        />
+      </Suspense>
+    </PageShell>
+  );
+}

@@ -6,6 +6,7 @@ import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { SupplierInvoiceListSection } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
+import { ReportExportActions } from "@/features/reports";
 import { getCurrentUser } from "@/lib/auth";
 import { listCompanySupplierInvoices, ServiceError } from "@bloqer/services";
 import { Pagination } from "@/components/ui/pagination";
@@ -103,6 +104,12 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
           <Suspense fallback={null}>
             <ListViewToggle storageKey="finanzas-facturas-proveedor" />
           </Suspense>
+          <ReportExportActions
+            exportPath="/api/reports/finanzas/facturas-proveedor-corporativo.csv"
+            params={{ status: status ?? "ALL", from: sp.from, to: sp.to }}
+            pdf
+            label="Exportar"
+          />
           <Button asChild>
             <Link href="/finanzas/facturas-proveedor/nueva">Nueva factura</Link>
           </Button>

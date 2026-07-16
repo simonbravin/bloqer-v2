@@ -27,7 +27,7 @@ type Props = {
 
 export function CostControlTable({ rows, totals, projectId }: Props) {
   return (
-    <TableScroll>
+    <TableScroll stickyFirstColumn>
         <Table className="text-xs">
           <TableHeader className="sticky top-0 z-10 bg-muted/50">
             <TableRow>

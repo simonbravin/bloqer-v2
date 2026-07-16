@@ -438,6 +438,18 @@
 - **Recomendación inicial:** (1) hasta demanda explícita del negocio.
 - **Bloquea:** ampliación de Gantt más allá de hitos de tarea.
 
+### Q-051 — Semántica de umbrales de varianza de compra
+
+- **Categoría:** Compras / aprobaciones
+- **Estado:** ABIERTA
+- **Impacto si no se resuelve:** `varianceNoteRequiredPct` se configura y muestra en UI, pero BR-PUR-009 define `NOTE_REQUIRED` desde `varianceSoftAlertPct`; hoy el umbral de nota no altera `evaluateLineVariance`.
+- **Opciones identificadas:**
+  1. Mantener BR-PUR-009 y retirar `varianceNoteRequiredPct` de configuración.
+  2. Introducir un tier/alerta no bloqueante entre `varianceSoftAlertPct` y `varianceNoteRequiredPct`.
+  3. Usar `varianceNoteRequiredPct` como inicio de `NOTE_REQUIRED` y redefinir qué efecto tiene el umbral soft.
+- **Recomendación inicial:** (2), pero requiere actualizar reglas, tipos, UI y tests en una decisión coordinada.
+- **Bloquea:** cualquier cambio de semántica en `evaluateLineVariance`; no bloquea los Lotes 1–7.
+
 ---
 
 ## Cómo se resuelve una pregunta

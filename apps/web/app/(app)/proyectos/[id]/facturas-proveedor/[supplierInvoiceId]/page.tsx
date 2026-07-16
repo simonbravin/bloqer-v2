@@ -80,7 +80,6 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
   const isCancelled = invoice.status === "CANCELLED";
   const canPay =
     payable
-    && Number(payable.balanceDue) > 0
     && (payable.status === "OPEN" ||
       payable.status === "PARTIAL" ||
       payable.status === "OVERDUE");
@@ -92,16 +91,35 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
         <SupplierInvoiceStatusBadge status={invoice.status} />
       </div>
 
-      {invoice.purchaseOrderId && poCode ? (
-        <p className="text-sm text-muted-foreground">
-          Orden de compra:{" "}
-          <Link
-            href={`/proyectos/${id}/ordenes-compra/${invoice.purchaseOrderId}`}
-            className="text-primary hover:underline font-medium"
-          >
-            {poCode}
-          </Link>
-        </p>
+      {(invoice.purchaseOrderId || invoice.subcontractCertificationId || (isIssued && payable)) ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Relacionados</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {invoice.purchaseOrderId && poCode ? (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/proyectos/${id}/ordenes-compra/${invoice.purchaseOrderId}`}>
+                  Ver OC {poCode}
+                </Link>
+              </Button>
+            ) : null}
+            {invoice.subcontractCertificationId && invoice.subcontractId ? (
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  href={`/proyectos/${id}/subcontratos/${invoice.subcontractId}/certificaciones/${invoice.subcontractCertificationId}`}
+                >
+                  Ver {invoice.subcontractCertificationCode ?? "certificación SC"}
+                </Link>
+              </Button>
+            ) : null}
+            {isIssued && payable ? (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/proyectos/${id}/cuentas-por-pagar/${payable.id}`}>Ver C×P</Link>
+              </Button>
+            ) : null}
+          </CardContent>
+        </Card>
       ) : null}
 
       {warnings.length > 0 && (

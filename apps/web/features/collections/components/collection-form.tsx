@@ -78,9 +78,9 @@ export function CollectionForm({
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2 space-y-1">
-            <Label>Cuenta de tesorería ({receivableCurrency})</Label>
+            <Label htmlFor="collection-account">Cuenta de tesorería ({receivableCurrency})</Label>
             <Select onValueChange={setAccountId} value={accountId}>
-              <SelectTrigger>
+              <SelectTrigger id="collection-account">
                 <SelectValue placeholder="Seleccionar cuenta…" />
               </SelectTrigger>
               <SelectContent>

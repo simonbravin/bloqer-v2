@@ -1,4 +1,4 @@
-import { Prisma, prisma, SubcontractCertification } from "@bloqer/database";
+import { Prisma, prisma, SubcontractCertification, SupplierInvoiceStatus } from "@bloqer/database";
 import { canEditSubcontractsArea, canViewSubcontractsArea } from "./subcontract-access";
 import type { CreateSubcontractCertificationInput, UpdateSubcontractCertificationInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
@@ -29,6 +29,8 @@ export type SubcontractCertificationView = Omit<SubcontractCertification, never>
   subcontractCode:   string;
   subcontractorName: string;
   supplierInvoiceId: string | null;
+  supplierInvoiceCode: string | null;
+  supplierInvoiceStatus: SupplierInvoiceStatus | null;
   lines:             SubcontractCertificationLineView[];
 };
 
@@ -37,7 +39,7 @@ export type SubcontractCertificationView = Omit<SubcontractCertification, never>
 type CertWithRelations = SubcontractCertification & {
   subcontract: { number: number };
   subcontractorContact: { legalName: string; fantasyName: string | null };
-  supplierInvoice: { id: string } | null;
+  supplierInvoice: { id: string; number: number; status: SupplierInvoiceStatus } | null;
   lines: Array<{
     id: string; subcontractCertificationId: string; subcontractLineId: string;
     previousQty: Prisma.Decimal; currentQty: Prisma.Decimal;
@@ -57,6 +59,8 @@ function serializeCert(c: CertWithRelations): SubcontractCertificationView {
     subcontractorName: c.subcontractorContact.fantasyName ?? c.subcontractorContact.legalName,
     totalAmount:       totalAmount.toString(),
     supplierInvoiceId: c.supplierInvoice?.id ?? null,
+    supplierInvoiceCode: c.supplierInvoice ? `FP-${String(c.supplierInvoice.number).padStart(5, "0")}` : null,
+    supplierInvoiceStatus: c.supplierInvoice?.status ?? null,
     lines: c.lines.map((l) => ({
       id:                         l.id,
       subcontractCertificationId: l.subcontractCertificationId,
@@ -81,7 +85,7 @@ function serializeCert(c: CertWithRelations): SubcontractCertificationView {
 const certInclude = {
   subcontract:          { select: { number: true } },
   subcontractorContact: { select: { legalName: true, fantasyName: true } },
-  supplierInvoice:      { select: { id: true } },
+  supplierInvoice:      { select: { id: true, number: true, status: true } },
   lines: {
     include: { subcontractLine: { select: { description: true, unit: true, quantity: true } } },
     orderBy: { sortOrder: "asc" as const },

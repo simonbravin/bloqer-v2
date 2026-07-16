@@ -35,13 +35,6 @@ export type SpreadsheetParseResult = {
 
 const SKIP_NAME_PATTERNS = /^(total|presupuesto|subtotal|importe|%)/i;
 
-/** @deprecated Use parseCellA from wbs-code-rules */
-export function normalizeItemCode(raw: unknown): string | null {
-  const parsed = parseCellA(raw, null);
-  if (parsed.kind === "numbered") return parsed.canonical;
-  return null;
-}
-
 function cellString(raw: unknown): string {
   if (raw == null) return "";
   return String(raw).trim();

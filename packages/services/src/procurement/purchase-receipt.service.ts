@@ -1,8 +1,8 @@
 import { Prisma, prisma, PurchaseReceipt, PurchaseReceiptStatus, PurchaseOrderStatus } from "@bloqer/database";
 import { canEditPurchaseReceipts } from "./procurement-access";
-import { PO_RECEIPT_ELIGIBLE_STATUSES } from "./procurement-constants";
 import type { CreatePurchaseReceiptInput } from "@bloqer/validators";
 import { auditProcurement } from "./procurement-audit";
+import { assertPoEligibleForReceipt, assertReceiptQtyWithinRemaining } from "./purchase-receipt-guards";
 import { createReceiptStockMovement, cancelReceiptStockMovements } from "../inventory/stock-movement.service";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -157,12 +157,7 @@ export async function createPurchaseReceipt(
   await assertProjectAllowsOperationalMutation(po.projectId, ctx.tenantId);
 
   // BR-PUR-004: receipt only allowed on CONFIRMED+
-  if (!PO_RECEIPT_ELIGIBLE_STATUSES.includes(po.status as (typeof PO_RECEIPT_ELIGIBLE_STATUSES)[number])) {
-    throw new ServiceError(
-      "CONFLICT",
-      `No se puede registrar recepción en una orden con estado "${po.status}". Primero emita la orden.`,
-    );
-  }
+  assertPoEligibleForReceipt(po.status);
 
   // Validate each line exists on PO and quantity > 0 and doesn't exceed remaining
   for (const inputLine of input.lines) {
@@ -171,16 +166,8 @@ export async function createPurchaseReceipt(
       throw new ServiceError("NOT_FOUND", `Línea de OC no encontrada: ${inputLine.purchaseOrderLineId}`);
     }
     const qtyReceived = new Prisma.Decimal(inputLine.quantityReceived);
-    if (qtyReceived.lessThanOrEqualTo(0)) {
-      throw new ServiceError("CONFLICT", `La cantidad recibida debe ser mayor a cero: ${poLine.description}`);
-    }
     const remaining = poLine.quantity.minus(poLine.receivedQuantity);
-    if (qtyReceived.greaterThan(remaining)) {
-      throw new ServiceError(
-        "CONFLICT",
-        `La cantidad recibida (${qtyReceived}) excede la cantidad pendiente (${remaining}) para: ${poLine.description}`,
-      );
-    }
+    assertReceiptQtyWithinRemaining(qtyReceived, remaining, poLine.description);
   }
 
   const receipt = await prisma.$transaction(async (tx) => {

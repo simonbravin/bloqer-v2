@@ -156,6 +156,8 @@ export async function listSupplierInvoicesByPurchaseOrder(
     totalAmount: inv.totalAmount.toString(),
     code: `FP-${String(inv.number).padStart(5, "0")}`,
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
+    subcontractCertificationCode: null,
+    subcontractId: null,
   }));
 }
 

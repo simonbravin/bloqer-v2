@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -14,11 +15,21 @@ import { ProductStatusBadge } from "./product-status-badge";
 
 export function ProductTable({ products }: { products: ProductView[] }) {
   if (products.length === 0) {
-    return <ListEmptyState message="No hay productos registrados." />;
+    return (
+      <ListEmptyState
+        title="Sin productos"
+        description="Registrá el catálogo para controlar stock y consumos."
+        action={
+          <Button asChild size="sm">
+            <Link href="/inventario/productos/nuevo">Nuevo producto</Link>
+          </Button>
+        }
+      />
+    );
   }
 
   return (
-    <TableScroll>
+    <TableScroll stickyFirstColumn>
       <Table>
         <TableHeader>
           <TableRow>

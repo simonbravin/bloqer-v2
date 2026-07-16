@@ -159,9 +159,9 @@ export function DocumentForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {!storageConfigured && (
-        <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-700 dark:bg-yellow-900/10 dark:text-yellow-400">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/10 dark:text-amber-300">
           {placeholderWarning ??
-            "El almacenamiento real no está configurado en este entorno. Solo se guardará la metadata del documento (modo desarrollo)."}
+            "El almacenamiento de archivos no está configurado en este entorno. Solo se guardará la metadata; no habrá un archivo descargable."}
         </div>
       )}
 

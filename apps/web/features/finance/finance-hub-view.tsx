@@ -89,9 +89,14 @@ function CompanyOperationsSection({ summary }: { summary: CompanyFinanceOperatio
             </Table>
           </TableScroll>
         )}
-        <Button asChild size="sm" variant="outline">
-          <Link href="/finanzas/gastos-generales">Imputar a obra</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/finanzas/pagos-proveedor">Ver todos los pagos</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/finanzas/gastos-generales">Imputar a obra</Link>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -133,6 +138,20 @@ export function FinanceHubView({ overview }: { overview: FinanceHubOverview }) {
               {a.message}
             </div>
           ))}
+        </div>
+      ) : null}
+
+      {overview.apCard?.visible ? (
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/finanzas/cuentas-por-pagar">Cuentas por pagar</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/finanzas/pagos-proveedor">Pagos a proveedores</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/finanzas/facturas-proveedor">Facturas y gastos</Link>
+          </Button>
         </div>
       ) : null}
 

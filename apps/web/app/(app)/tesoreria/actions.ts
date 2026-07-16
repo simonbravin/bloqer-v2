@@ -121,11 +121,3 @@ export async function cancelInternalTransferAction(
     return handle(err);
   }
 }
-
-/** Form-friendly wrapper (void return for client components). */
-export async function cancelInternalTransferFormAction(
-  id: string,
-  _formData: FormData,
-): Promise<void> {
-  await cancelInternalTransferAction(id);
-}

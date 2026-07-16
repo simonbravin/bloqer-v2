@@ -50,6 +50,8 @@ export type SupplierInvoiceView = Omit<SupplierInvoice, "subtotal" | "taxAmount"
   code: string;
   lines: SupplierInvoiceLineView[];
   supplierName: string;
+  subcontractCertificationCode: string | null;
+  subcontractId: string | null;
 };
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
@@ -80,6 +82,12 @@ export async function getSupplierInvoiceById(
     include: {
       lines: { orderBy: { sortOrder: "asc" } },
       supplierContact: { select: { legalName: true, fantasyName: true } },
+      subcontractCertification: {
+        select: {
+          number: true,
+          subcontractId: true,
+        },
+      },
     },
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
@@ -226,6 +234,12 @@ export async function getCompanySupplierInvoiceById(
     include: {
       lines: { orderBy: { sortOrder: "asc" } },
       supplierContact: { select: { legalName: true, fantasyName: true } },
+      subcontractCertification: {
+        select: {
+          number: true,
+          subcontractId: true,
+        },
+      },
     },
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
@@ -734,6 +748,7 @@ type RawInvoice = SupplierInvoice & {
     sortOrder: number;
   }>;
   supplierContact: { legalName: string; fantasyName: string | null };
+  subcontractCertification?: { number: number; subcontractId: string } | null;
 };
 
 type RawInvoiceListRow = SupplierInvoice & {
@@ -748,6 +763,8 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoice
     totalAmount: inv.totalAmount.toString(),
     code:        `FP-${String(inv.number).padStart(5, "0")}`,
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
+    subcontractCertificationCode: null,
+    subcontractId: null,
   };
 }
 
@@ -759,6 +776,10 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
     totalAmount: inv.totalAmount.toString(),
     code:        `FP-${String(inv.number).padStart(5, "0")}`,
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
+    subcontractCertificationCode: inv.subcontractCertification
+      ? `CERT-SC-${String(inv.subcontractCertification.number).padStart(3, "0")}`
+      : null,
+    subcontractId: inv.subcontractCertification?.subcontractId ?? null,
     lines: inv.lines.map((l) => ({
       id:          l.id,
       invoiceId:   l.invoiceId,

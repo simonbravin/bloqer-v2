@@ -46,9 +46,17 @@ export default async function TransferenciasPage() {
       </div>
 
       {transfers.length === 0 ? (
-        <ListEmptyState message="No hay transferencias registradas." />
+        <ListEmptyState
+          title="Sin transferencias"
+          description="Mové stock entre depósitos cuando haga falta reponer obra o centralizar materiales."
+          action={
+            <Button asChild size="sm">
+              <Link href="/inventario/transferencias/nueva">Nueva transferencia</Link>
+            </Button>
+          }
+        />
       ) : (
-        <TableScroll>
+        <TableScroll stickyFirstColumn>
           <Table>
             <TableHeader>
               <TableRow>

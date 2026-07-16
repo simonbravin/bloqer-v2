@@ -58,6 +58,31 @@ export const OVERVIEW_MODULES: readonly PermissionModule[] = [
   "CONSOLIDATED_NET_PROFITABILITY",
 ] as const;
 
+/**
+ * Permission modules that exist in RBAC / tenant toggles but have **no operable product UI**
+ * in this version. Shown as “No disponibles” in `/configuracion/permisos`; still seedable
+ * in `TenantModuleSetting` for future phases. Do **not** add BILLING / TENANT_TRANSFER here
+ * without a separate product decision (platform-scoped).
+ */
+export const MODULES_UNAVAILABLE_IN_THIS_VERSION: readonly PermissionModule[] = [
+  "CONTRACTS",
+  "CHANGE_ORDERS",
+  "RFIS",
+  "BANK_RECONCILIATION",
+  "TAXES",
+] as const;
+
+const UNAVAILABLE_MODULE_SET = new Set<string>(MODULES_UNAVAILABLE_IN_THIS_VERSION);
+
+export function isPermissionModuleUnavailableInThisVersion(module: PermissionModule): boolean {
+  return UNAVAILABLE_MODULE_SET.has(module);
+}
+
+/** Overview columns that are operable (or at least present) in the current product UI. */
+export function getOperableOverviewModules(): readonly PermissionModule[] {
+  return OVERVIEW_MODULES.filter((m) => !isPermissionModuleUnavailableInThisVersion(m));
+}
+
 /** Subset of `PermissionModule` used in the read-only matrix UI — keep in sync with `OVERVIEW_MODULES`. */
 export type OverviewPermissionModule = (typeof OVERVIEW_MODULES)[number];
 
@@ -135,13 +160,14 @@ export type PermissionModuleGroupSection = {
   modules: readonly OverviewPermissionModule[];
 };
 
-/** Column order for matrix UI: grouped sections, each module in same relative order as `OVERVIEW_MODULES`. */
+/** Column order for matrix UI: grouped sections, each module in same relative order as operable overview modules. */
 export function getPermissionModuleGroupSections(): readonly PermissionModuleGroupSection[] {
+  const operable = getOperableOverviewModules();
   const buckets = new Map<PermissionModuleGroupId, OverviewPermissionModule[]>();
   for (const id of PERMISSION_MODULE_GROUP_ORDER) {
     buckets.set(id, []);
   }
-  for (const m of OVERVIEW_MODULES) {
+  for (const m of operable) {
     const g = PERMISSION_MODULE_GROUP[m];
     buckets.get(g)!.push(m);
   }
@@ -149,6 +175,25 @@ export function getPermissionModuleGroupSections(): readonly PermissionModuleGro
     id,
     labelEs: PERMISSION_MODULE_GROUP_LABEL_ES[id],
     modules: buckets.get(id)!,
+  })).filter((section) => section.modules.length > 0);
+}
+
+/** Labels for the “no disponible en esta versión” notice on the permissions page. */
+export function getUnavailablePermissionModulesForUi(): readonly {
+  moduleKey: PermissionModule;
+  labelEs: string;
+}[] {
+  // Labels inlined to avoid circular import with supported-modules.ts
+  const labels: Partial<Record<PermissionModule, string>> = {
+    CONTRACTS: "Contratos / Adendas",
+    CHANGE_ORDERS: "Change orders",
+    RFIS: "RFIs",
+    BANK_RECONCILIATION: "Conciliación bancaria",
+    TAXES: "Impuestos / Retenciones",
+  };
+  return MODULES_UNAVAILABLE_IN_THIS_VERSION.map((moduleKey) => ({
+    moduleKey,
+    labelEs: labels[moduleKey] ?? moduleKey,
   }));
 }
 
@@ -168,15 +213,16 @@ export type PermissionMatrixGrid = {
 };
 
 export function buildPermissionMatrixGrid(): PermissionMatrixGrid {
+  const modules = getOperableOverviewModules();
   const grid = {} as Record<UserRole, Record<PermissionModule, PermissionAction | null>>;
   for (const role of OVERVIEW_ROLES) {
     const row = {} as Record<PermissionModule, PermissionAction | null>;
-    for (const m of OVERVIEW_MODULES) {
+    for (const m of modules) {
       row[m] = effectivePermissionCeiling(role, m);
     }
     grid[role] = row;
   }
-  return { roles: OVERVIEW_ROLES, modules: OVERVIEW_MODULES, grid };
+  return { roles: OVERVIEW_ROLES, modules, grid };
 }
 
 /** Same members as `OVERVIEW_MODULES`, typed for `z.enum` in `@bloqer/validators`. */

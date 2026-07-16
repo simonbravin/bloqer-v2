@@ -13,6 +13,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import type { DocumentAttachmentView } from "@bloqer/services";
 import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge }   from "./document-status-badge";
+import { DocumentStorageBadge }  from "./document-storage-badge";
 
 function fmtDate(iso: string) {
   return formatDate(iso);
@@ -64,7 +65,10 @@ export function DocumentList({ docs, projectId }: Props) {
                 <DocumentCategoryBadge category={doc.category} />
               </TableCell>
               <TableCell>
-                <DocumentStatusBadge status={doc.status} />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <DocumentStatusBadge status={doc.status} />
+                  <DocumentStorageBadge storageProvider={doc.storageProvider} />
+                </div>
               </TableCell>
               <TableCell className="text-xs tabular-nums text-muted-foreground">{fmtSize(doc.sizeBytes)}</TableCell>
               <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{fmtDate(doc.createdAt)}</TableCell>

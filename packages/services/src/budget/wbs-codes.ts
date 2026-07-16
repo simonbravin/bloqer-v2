@@ -1,11 +1,5 @@
 import type { WbsNodeType } from "@bloqer/database";
-import {
-  countCodeSegments,
-  isDisciplineRootCode,
-  isMultiStyleCode,
-  WBS_MAX_CODE_SEGMENTS_MULTI,
-  WBS_MAX_CODE_SEGMENTS_SIMPLE,
-} from "./wbs-code-rules";
+import { isDisciplineRootCode, isMultiStyleCode } from "./wbs-code-rules";
 
 export {
   countCodeSegments,
@@ -15,9 +9,6 @@ export {
   WBS_MAX_CODE_SEGMENTS_SIMPLE,
   WBS_MAX_CODE_SEGMENTS_MULTI,
 } from "./wbs-code-rules";
-
-/** @deprecated Use WBS_MAX_CODE_SEGMENTS_SIMPLE */
-export const WBS_MAX_CODE_SEGMENTS = WBS_MAX_CODE_SEGMENTS_SIMPLE;
 
 type WbsNodeRow = { id: string; parentId: string | null; code: string; type: WbsNodeType; sortOrder: number };
 
@@ -39,12 +30,6 @@ export function nextChildCode(parentCode: string, siblings: WbsNodeRow[]): strin
   }
   return `${parentCode}.${childCount + 1}`;
 }
-
-/** @deprecated Use nextChildCode */
-export const nextChildItemCode = nextChildCode;
-
-/** @deprecated Use nextChildCode */
-export const nextChildGroupCode = nextChildCode;
 
 export function nextSortOrder(siblings: WbsNodeRow[]): number {
   if (siblings.length === 0) return 0;

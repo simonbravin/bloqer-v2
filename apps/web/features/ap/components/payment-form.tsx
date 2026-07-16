@@ -101,9 +101,9 @@ export function PaymentForm({
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2 space-y-1">
-            <Label>Cuenta de tesorería ({payableCurrency})</Label>
+            <Label htmlFor="payment-account">Cuenta de tesorería ({payableCurrency})</Label>
             <Select onValueChange={setAccountId} value={accountId}>
-              <SelectTrigger>
+              <SelectTrigger id="payment-account">
                 <SelectValue placeholder="Seleccionar cuenta…" />
               </SelectTrigger>
               <SelectContent>

@@ -21,6 +21,7 @@ import {
   listEntityDocuments,
   ServiceError,
 } from "@bloqer/services";
+import { SupplierInvoiceStatusBadge } from "@/features/ap";
 import { SubcontractCertificationStatusBadge } from "@/features/subcontracts";
 import { PageShell } from "@/components/layout/page-shell";
 import {
@@ -167,15 +168,43 @@ export default async function CertificacionPage({ params }: PageProps) {
         </div>
       </div>
 
-      {cert.supplierInvoiceId && (
-        <div className="rounded-lg border bg-card p-4 flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">Factura de proveedor vinculada</p>
-          <Link
-            href={`/proyectos/${projectId}/facturas-proveedor/${cert.supplierInvoiceId}`}
-            className="text-sm text-primary hover:underline"
-          >
-            Ver factura →
-          </Link>
+      {cert.status === "APPROVED" && cert.supplierInvoiceId && (
+        <div className="rounded-lg border bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium">Factura proveedor generada</p>
+                {cert.supplierInvoiceStatus && (
+                  <SupplierInvoiceStatusBadge status={cert.supplierInvoiceStatus} />
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {cert.supplierInvoiceStatus === "DRAFT"
+                  ? `Al aprobar la certificación se creó ${cert.supplierInvoiceCode ?? "la factura"} en borrador. Revisala y emitila para que impacte en Cuentas por pagar.`
+                  : cert.supplierInvoiceStatus === "ISSUED"
+                    ? `${cert.supplierInvoiceCode ?? "La factura"} ya fue emitida e impacta en Cuentas por pagar.`
+                    : `${cert.supplierInvoiceCode ?? "La factura"} fue anulada. Revisá su detalle antes de continuar.`}
+              </p>
+            </div>
+            <Button
+              asChild
+              size="sm"
+              variant={cert.supplierInvoiceStatus === "CANCELLED" ? "outline" : "default"}
+            >
+              <Link href={`/proyectos/${projectId}/facturas-proveedor/${cert.supplierInvoiceId}`}>
+                {cert.supplierInvoiceStatus === "DRAFT"
+                  ? "Revisar y emitir factura"
+                  : "Ver factura"}
+              </Link>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {cert.status === "APPROVED" && !cert.supplierInvoiceId && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
+          Certificación aprobada sin factura proveedor vinculada. Revisá el log de aprobación o
+          contactá a administración antes de crear documentos manuales.
         </div>
       )}
 

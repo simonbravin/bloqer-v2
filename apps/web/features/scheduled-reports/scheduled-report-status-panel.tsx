@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { formatDateTime } from "@/lib/format";
 import {
   SCHEDULED_REPORT_FREQUENCY_LABEL,
+  SCHEDULED_REPORT_RUN_STATUS_HINT,
   SCHEDULED_REPORT_RUN_STATUS_LABEL,
   SCHEDULED_REPORT_STATUS_LABEL,
   runStatusBadgeVariant,
@@ -42,9 +43,18 @@ export function ScheduledReportStatusPanel({ detail, emailsFilterHref }: Props) 
             {detail.lastRunAt ? formatDateTime(detail.lastRunAt) : "Sin ejecuciones aún"}
           </p>
           {detail.lastRunStatus ? (
-            <Badge variant={runStatusBadgeVariant(detail.lastRunStatus)} className="mt-1">
-              {SCHEDULED_REPORT_RUN_STATUS_LABEL[detail.lastRunStatus]}
-            </Badge>
+            <>
+              <Badge
+                variant={runStatusBadgeVariant(detail.lastRunStatus)}
+                className="mt-1"
+                title={SCHEDULED_REPORT_RUN_STATUS_HINT[detail.lastRunStatus]}
+              >
+                {SCHEDULED_REPORT_RUN_STATUS_LABEL[detail.lastRunStatus]}
+              </Badge>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {SCHEDULED_REPORT_RUN_STATUS_HINT[detail.lastRunStatus]}
+              </p>
+            </>
           ) : null}
         </div>
         <div>

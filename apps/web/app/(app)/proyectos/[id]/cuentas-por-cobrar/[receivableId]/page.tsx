@@ -54,14 +54,14 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
   }
+  if (receivable.projectId !== id) notFound();
 
   const doCancel = async () => {
     "use server";
     await cancelReceivableAction(receivableId, id);
   };
 
-  const canCollect =
-    Number(receivable.balanceDue) > 0 && OPEN_STATUSES.has(receivable.status);
+  const canCollect = OPEN_STATUSES.has(receivable.status);
 
   const collectionItems: CollectionListItem[] = collections.map((c) => ({
     id: c.id,

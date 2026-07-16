@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -21,11 +22,21 @@ const TYPE_LABELS: Record<string, string> = {
 
 export function WarehouseTable({ warehouses }: { warehouses: WarehouseView[] }) {
   if (warehouses.length === 0) {
-    return <ListEmptyState message="No hay depósitos registrados." />;
+    return (
+      <ListEmptyState
+        title="Sin depósitos"
+        description="Creá un depósito para registrar ingresos, egresos y transferencias."
+        action={
+          <Button asChild size="sm">
+            <Link href="/inventario/depositos/nuevo">Nuevo depósito</Link>
+          </Button>
+        }
+      />
+    );
   }
 
   return (
-    <TableScroll>
+    <TableScroll stickyFirstColumn>
       <Table>
         <TableHeader>
           <TableRow>

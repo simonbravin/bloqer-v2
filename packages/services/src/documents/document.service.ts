@@ -455,7 +455,12 @@ export async function getDocumentDownloadUrl(
   }
   if (doc.status === "DELETED") throw new ServiceError("FORBIDDEN", "El documento ha sido eliminado");
   if (doc.status === "UPLOADING") throw new ServiceError("CONFLICT", "El documento todavía se está subiendo");
-  if (doc.storageProvider !== "R2") throw new ServiceError("CONFLICT", "Este documento no tiene archivo real adjunto");
+  if (doc.storageProvider !== "R2") {
+    throw new ServiceError(
+      "CONFLICT",
+      "No hay archivo almacenado para descargar. Solo se guardó la metadata del documento (el almacenamiento de archivos no estaba configurado).",
+    );
+  }
 
   return getPresignedGetUrl(doc.storageKey, 300);
 }

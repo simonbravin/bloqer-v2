@@ -22,16 +22,13 @@ import {
   markEmailDeliverySent,
   markEmailDeliverySkipped,
 } from "../email-delivery/email-delivery-log.service";
-import { canRunOperationalAlerts } from "./operational-alerts-runner.service";
 import { ServiceContext, ServiceError } from "../types";
+import { canRunOperationalAlerts } from "./operational-alerts-runner.service";
+import { OPERATIONAL_NOTIFICATION_TYPES } from "./operational-alerts.service";
 
-const OPERATIONAL_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new Set([
-  "RECEIVABLE_OVERDUE",
-  "PAYABLE_OVERDUE",
-  "NEGATIVE_STOCK",
-  "CERTIFICATION_APPROVED_WITHOUT_INVOICE",
-  "STALE_DOCUMENT_UPLOAD",
-]);
+const OPERATIONAL_NOTIFICATION_TYPE_SET: ReadonlySet<NotificationType> = new Set(
+  OPERATIONAL_NOTIFICATION_TYPES,
+);
 
 const SKIP_LOG_PLACEHOLDER_EMAIL = "skipped@internal.bloqer";
 
@@ -205,7 +202,7 @@ export async function sendNotificationEmail(
       ? `${base}${n.actionUrl}`
       : null;
 
-  const isOperational = OPERATIONAL_NOTIFICATION_TYPES.has(n.type);
+  const isOperational = OPERATIONAL_NOTIFICATION_TYPE_SET.has(n.type);
 
   const { html, text } = isOperational
     ? {
@@ -267,7 +264,7 @@ export async function sendOperationalAlertEmail(
   if (!n) {
     throw new ServiceError("NOT_FOUND", "Notificación no encontrada");
   }
-  if (!OPERATIONAL_NOTIFICATION_TYPES.has(n.type)) {
+  if (!OPERATIONAL_NOTIFICATION_TYPE_SET.has(n.type)) {
     throw new ServiceError("VALIDATION", "Esta notificación no es una alerta operativa");
   }
   return sendNotificationEmail(notificationId, ctx, { emailType: "OPERATIONAL_ALERT" });

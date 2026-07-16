@@ -17,7 +17,12 @@ import { canRunOperationalAlerts, listEmailDeliveryLogs } from "@bloqer/services
 import type { EmailDeliveryStatus, EmailDeliveryType } from "@bloqer/database";
 import { formatDateTime } from "@/lib/format";
 import { PageShell } from "@/components/layout/page-shell";
-import { EMAIL_DELIVERY_STATUS_LABEL } from "@/features/scheduled-reports/scheduled-report-labels";
+import { Badge } from "@/components/ui/badge";
+import {
+  EMAIL_DELIVERY_STATUS_HINT,
+  EMAIL_DELIVERY_STATUS_LABEL,
+  deliveryStatusBadgeVariant,
+} from "@/features/scheduled-reports/scheduled-report-labels";
 
 const STATUSES: EmailDeliveryStatus[] = ["PENDING", "SENT", "SKIPPED", "FAILED"];
 const EMAIL_TYPE_LABEL: Record<EmailDeliveryType, string> = {
@@ -33,7 +38,10 @@ const EMAIL_TYPES: EmailDeliveryType[] = [
   "REPORT_SCHEDULED",
 ];
 
-function parseEnumParam<T extends string>(value: string | undefined, allowed: readonly T[]): T | undefined {
+function parseEnumParam<T extends string>(
+  value: string | undefined,
+  allowed: readonly T[],
+): T | undefined {
   if (!value) return undefined;
   return (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
 }
@@ -59,9 +67,9 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
 
   const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 
   if (!canRunOperationalAlerts(ctx)) {
@@ -107,9 +115,22 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight">Historial de emails enviados</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Registro de intentos de envío (reportes manuales, programados, notificaciones y alertas). Solo OWNER o
-          ADMIN.
+          Registro de intentos de envío (reportes manuales, programados, notificaciones y alertas).
+          Solo OWNER o ADMIN.
         </p>
+        <ul className="mt-3 max-w-2xl space-y-1 text-xs text-muted-foreground">
+          <li>
+            <strong className="text-foreground">Enviado</strong> — {EMAIL_DELIVERY_STATUS_HINT.SENT}
+          </li>
+          <li>
+            <strong className="text-foreground">Omitido</strong> —{" "}
+            {EMAIL_DELIVERY_STATUS_HINT.SKIPPED}
+          </li>
+          <li>
+            <strong className="text-foreground">Fallido</strong> —{" "}
+            {EMAIL_DELIVERY_STATUS_HINT.FAILED}
+          </li>
+        </ul>
         {scheduledReportId ? (
           <p className="mt-2 text-sm">
             Filtro: envío programado{" "}
@@ -120,14 +141,21 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
               ver configuración
             </Link>
             {" · "}
-            <Link href="/notificaciones/emails" className="text-primary underline-offset-4 hover:underline">
+            <Link
+              href="/notificaciones/emails"
+              className="text-primary underline-offset-4 hover:underline"
+            >
               quitar filtro
             </Link>
           </p>
         ) : null}
       </div>
 
-      <form className="rounded-lg border bg-card p-4 space-y-3" method="get" action="/notificaciones/emails">
+      <form
+        className="rounded-lg border bg-card p-4 space-y-3"
+        method="get"
+        action="/notificaciones/emails"
+      >
         {scheduledReportId ? (
           <input type="hidden" name="scheduledReportId" value={scheduledReportId} />
         ) : null}
@@ -153,7 +181,9 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
             <select
               id="f-type"
               name="emailType"
-              defaultValue={sp.emailType ?? ""}
+              defaultValue={scheduledReportId ? "REPORT_SCHEDULED" : (sp.emailType ?? "")}
+              disabled={Boolean(scheduledReportId)}
+              aria-describedby={scheduledReportId ? "f-type-help" : undefined}
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
             >
               <option value="">Todos</option>
@@ -163,10 +193,20 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
                 </option>
               ))}
             </select>
+            {scheduledReportId ? (
+              <p id="f-type-help" className="text-xs text-muted-foreground">
+                Solo emails de este envío programado.
+              </p>
+            ) : null}
           </div>
           <div className="grid gap-1">
             <Label htmlFor="f-to">Destinatario (contiene)</Label>
-            <Input id="f-to" name="recipientEmail" defaultValue={sp.recipientEmail ?? ""} placeholder="email@…" />
+            <Input
+              id="f-to"
+              name="recipientEmail"
+              defaultValue={sp.recipientEmail ?? ""}
+              placeholder="email@…"
+            />
           </div>
           <div className="grid gap-1">
             <Label htmlFor="f-df">Desde</Label>
@@ -203,8 +243,16 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
-                  No hay registros para los filtros.
+                <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                  No hay registros para los filtros. Si esperabas envíos de reportes programados,
+                  revisá{" "}
+                  <Link
+                    href="/configuracion/reportes"
+                    className="text-foreground underline underline-offset-2"
+                  >
+                    Configuración → Reportes
+                  </Link>{" "}
+                  (estado de la última corrida) o quitá filtros.
                 </TableCell>
               </TableRow>
             ) : (
@@ -213,27 +261,35 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
                   <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                     {fmtWhen(row.createdAt)}
                   </TableCell>
-                  <TableCell className="max-w-[140px] truncate text-sm">{row.recipientEmail}</TableCell>
+                  <TableCell className="max-w-[140px] truncate text-sm">
+                    {row.recipientEmail}
+                  </TableCell>
                   <TableCell className="text-xs">{EMAIL_TYPE_LABEL[row.emailType]}</TableCell>
                   <TableCell className="text-xs">
-                    <span
-                      className={
-                        row.status === "SENT"
-                          ? "text-green-600 dark:text-green-500"
-                          : row.status === "FAILED"
-                            ? "text-destructive"
-                            : "text-muted-foreground"
-                      }
+                    <Badge
+                      variant={deliveryStatusBadgeVariant(row.status)}
+                      title={EMAIL_DELIVERY_STATUS_HINT[row.status]}
                     >
                       {EMAIL_DELIVERY_STATUS_LABEL[row.status]}
-                    </span>
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-xs">{row.provider}</TableCell>
                   <TableCell className="max-w-[200px] truncate text-sm" title={row.subject}>
                     {row.subject}
                   </TableCell>
-                  <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
-                    {row.skippedReason ?? row.errorMessage ?? row.providerMessageId ?? "—"}
+                  <TableCell
+                    className="max-w-[220px] truncate text-xs text-muted-foreground"
+                    title={
+                      row.skippedReason ??
+                      row.errorMessage ??
+                      row.providerMessageId ??
+                      EMAIL_DELIVERY_STATUS_HINT[row.status]
+                    }
+                  >
+                    {row.skippedReason ??
+                      row.errorMessage ??
+                      row.providerMessageId ??
+                      EMAIL_DELIVERY_STATUS_HINT[row.status]}
                   </TableCell>
                 </TableRow>
               ))
@@ -244,7 +300,10 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
 
       <p className="text-xs text-muted-foreground">
         Mostrando hasta 80 filas. Filtros activos:{" "}
-        <Link href={`/notificaciones/emails${querySuffix}`} className="underline-offset-2 hover:underline">
+        <Link
+          href={`/notificaciones/emails${querySuffix}`}
+          className="underline-offset-2 hover:underline"
+        >
           compartir URL
         </Link>
       </p>

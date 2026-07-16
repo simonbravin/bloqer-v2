@@ -1,13 +1,26 @@
-import type { LinkedEntityType, NotificationSeverity, NotificationType, Prisma } from "@bloqer/database";
+import type { EmailDeliveryStatus, LinkedEntityType, NotificationSeverity, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import { can, type PermissionAction, type PermissionModule } from "@bloqer/domain";
 import { listNegativeStockBalancesForTenant } from "../inventory/stock-balance.service";
 import { hasOpenObligationBalance, isObligationOverdue } from "../finance/obligation-date";
-import { ServiceContext } from "../types";
+import { ServiceContext, ServiceError } from "../types";
 import { createSystemNotification } from "./notification.service";
 
 /** Rolling window to avoid duplicate operational alerts for the same entity + recipient. */
 const DEDUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** In-app notification types produced by operational alert jobs (Phase 8B). */
+export const OPERATIONAL_NOTIFICATION_TYPES = [
+  "RECEIVABLE_OVERDUE",
+  "PAYABLE_OVERDUE",
+  "NEGATIVE_STOCK",
+  "CERTIFICATION_APPROVED_WITHOUT_INVOICE",
+  "STALE_DOCUMENT_UPLOAD",
+] as const satisfies readonly NotificationType[];
+
+export type OperationalNotificationType = (typeof OPERATIONAL_NOTIFICATION_TYPES)[number];
+
+const ACTIVITY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type OperationalAlertRunSummary = {
   checkedCount: number;
@@ -394,4 +407,75 @@ export async function runStaleUploadingDocumentsAlert(ctx: ServiceContext): Prom
   }
 
   return summary;
+}
+
+export type OperationalAlertsLastActivity = {
+  /** ISO timestamp of the newest operational alert notification in the tenant, if any. */
+  lastNotificationAt: string | null;
+  /** Count of operational alert notifications created in the last 7 days. */
+  notificationsLast7Days: number;
+  byType: Array<{
+    type: OperationalNotificationType;
+    count: number;
+    lastAt: string;
+  }>;
+  lastEmailAt: string | null;
+  lastEmailStatus: EmailDeliveryStatus | null;
+};
+
+/**
+ * Lightweight “last activity” for ops — aggregates existing Notification + EmailDeliveryLog rows.
+ * No new tables or job history; OWNER/ADMIN only.
+ */
+export async function getOperationalAlertsLastActivity(
+  ctx: ServiceContext,
+): Promise<OperationalAlertsLastActivity> {
+  if (!ctx.roles.some((r) => r === "OWNER" || r === "ADMIN")) {
+    throw new ServiceError("FORBIDDEN", "Solo OWNER o ADMIN pueden ver actividad de alertas");
+  }
+
+  const types = [...OPERATIONAL_NOTIFICATION_TYPES];
+  const since = new Date(Date.now() - ACTIVITY_WINDOW_MS);
+
+  const [latest, grouped, lastEmail] = await Promise.all([
+    prisma.notification.findFirst({
+      where: { tenantId: ctx.tenantId, type: { in: types } },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    }),
+    prisma.notification.groupBy({
+      by: ["type"],
+      where: {
+        tenantId: ctx.tenantId,
+        type: { in: types },
+        createdAt: { gte: since },
+      },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    }),
+    prisma.emailDeliveryLog.findFirst({
+      where: { tenantId: ctx.tenantId, emailType: "OPERATIONAL_ALERT" },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, status: true },
+    }),
+  ]);
+
+  const byType = grouped
+    .filter((g): g is typeof g & { type: OperationalNotificationType } =>
+      (OPERATIONAL_NOTIFICATION_TYPES as readonly string[]).includes(g.type),
+    )
+    .map((g) => ({
+      type: g.type,
+      count: g._count._all,
+      lastAt: (g._max.createdAt ?? since).toISOString(),
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    lastNotificationAt: latest?.createdAt.toISOString() ?? null,
+    notificationsLast7Days: byType.reduce((n, r) => n + r.count, 0),
+    byType,
+    lastEmailAt: lastEmail?.createdAt.toISOString() ?? null,
+    lastEmailStatus: lastEmail?.status ?? null,
+  };
 }

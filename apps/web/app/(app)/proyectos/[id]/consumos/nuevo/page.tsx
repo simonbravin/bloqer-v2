@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { listProducts, listWarehouses, listProcurementWbsOptions } from "@bloqer/services";
+import { listInventoryConsumptionWbsOptions, listProducts, listWarehouses } from "@bloqer/services";
 import { ConsumptionForm } from "@/features/inventory";
 import type { ProductOption, WarehouseOption, WbsOption } from "@/features/inventory";
 import { PageShell } from "@/components/layout/page-shell";
+import { can } from "@bloqer/domain";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -14,6 +15,9 @@ export default async function NuevoConsumoPage({ params }: PageProps) {
   if (!current?.tenantCtx) redirect("/login");
 
   const { id } = await params;
+  if (!can(current.tenantCtx.roles, "EDIT", "INVENTORY")) {
+    redirect(`/proyectos/${id}/consumos`);
+  }
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -24,7 +28,7 @@ export default async function NuevoConsumoPage({ params }: PageProps) {
   const [productsResult, warehouses, wbsNodes] = await Promise.all([
     listProducts({ status: "ACTIVE" }, ctx),
     listWarehouses({ status: "ACTIVE" }, ctx),
-    listProcurementWbsOptions(id, ctx),
+    listInventoryConsumptionWbsOptions(id, ctx),
   ]);
   const products = productsResult.data;
 
