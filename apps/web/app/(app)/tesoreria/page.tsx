@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { TreasurySummaryCards } from "@/features/treasury";
+import { TreasuryHubView } from "@/features/treasury";
 import { getCurrentUser } from "@/lib/auth";
-import { getTreasurySummaryByCompany } from "@bloqer/services";
+import { getTreasuryHubOverview, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -22,27 +22,36 @@ export default async function TesoreriaPage() {
     roles:       current.tenantCtx.roles,
   };
 
-  const summaries = await getTreasurySummaryByCompany(ctx);
+  let overview;
+  try {
+    overview = await getTreasuryHubOverview(ctx);
+  } catch (err) {
+    if (err instanceof ServiceError && (err.code === "FORBIDDEN" || err.code === "NOT_FOUND")) {
+      redirect("/dashboard");
+    }
+    throw err;
+  }
+
+  const canCreateAccount = can(current.tenantCtx.roles, "EDIT", "TREASURY");
 
   return (
     <PageShell variant="default" className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Tesorería</h1>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/tesoreria/cuentas">Cuentas</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/tesoreria/transferencias">Transferencias</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/tesoreria/reportes">Reportes</Link>
+          </Button>
+        </div>
       </div>
 
-      <TreasurySummaryCards summaries={summaries} />
-
-      <div className="flex flex-wrap gap-3">
-        <Button asChild>
-          <Link href="/tesoreria/cuentas">Ver cuentas</Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <Link href="/tesoreria/transferencias">Transferencias</Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <Link href="/tesoreria/reportes">Reportes</Link>
-        </Button>
-      </div>
+      <TreasuryHubView overview={overview} canCreateAccount={canCreateAccount} />
     </PageShell>
   );
 }

@@ -5,6 +5,7 @@ export { TreasuryAccountCards } from "./components/treasury-account-cards";
 export { TreasuryAccountListSection } from "./components/treasury-account-list-section";
 export { AccountMovementList } from "./components/account-movement-list";
 export { TreasurySummaryCards } from "./components/treasury-summary-cards";
+export { TreasuryHubView } from "./components/treasury-hub-view";
 export { TreasuryAccountForm } from "./components/treasury-account-form";
 export { InternalTransferForm } from "./components/internal-transfer-form";
 export type { TreasuryAccountListItem } from "./components/treasury-account-list";

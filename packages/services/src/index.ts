@@ -44,6 +44,12 @@ export * from "./treasury/collection.service";
 export * from "./treasury/internal-transfer.service";
 export { getTreasurySummaryByCompany } from "./treasury/balance.service";
 export type { AccountBalanceSummary } from "./treasury/balance.service";
+export {
+  getTreasuryHubOverview,
+  type TreasuryHubOverview,
+  type TreasuryHubMovementRow,
+  type TreasuryMoneyByCurrency,
+} from "./treasury/treasury-hub.service";
 export { canViewApProjectArea, canViewCompanyAp } from "./ap/ap-access";
 export * from "./ap/supplier-invoice.service";
 export * from "./ap/supplier-invoice-from-po.service";

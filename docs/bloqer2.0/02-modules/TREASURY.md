@@ -30,6 +30,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § AccountMovement.
 - Transferencias internas con doble fecha ([D-023]).
 
 ## 9. Pantallas y vistas necesarias
+- **Resumen (`/tesoreria`):** posición de caja (saldo por moneda), ingresos/egresos del mes (sin transferencias internas), lista de cuentas con saldo, últimos movimientos confirmados; empty state si no hay cuentas.
 - Extracto por cuenta (filtros fecha contable/valor).
 - Ledger global filtrable.
 - Posición consolidada multi-moneda.
