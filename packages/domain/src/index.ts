@@ -30,3 +30,16 @@ export {
   resolveAuditActionLabel,
   type AuditUiModule,
 } from "./audit/audit-catalog";
+export {
+  APU_DECIMAL_PLACES,
+  canUseTotalPartidaMode,
+  convertApuEntryMode,
+  lineUnitTotal,
+  previewApuEntry,
+  roundApuDecimal,
+  toEntryApuLine,
+  toStoredApuLine,
+  type ApuEntryMode,
+  type ApuEntryInput,
+  type ApuLineAmounts,
+} from "./budget/apu-entry";

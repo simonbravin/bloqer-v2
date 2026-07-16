@@ -204,8 +204,8 @@ export function CostItemPanel({
                 <TableHead>Cat.</TableHead>
                 <TableHead>Descripción</TableHead>
                 <TableHead>Un.</TableHead>
-                <TableHead className="text-right">Coef.</TableHead>
-                <TableHead className="text-right">C.Unit.</TableHead>
+                <TableHead className="text-right">Cant.</TableHead>
+                <TableHead className="text-right">Precio</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 {editable && <TableHead />}
               </TableRow>
@@ -269,6 +269,8 @@ export function CostItemPanel({
               mode="create"
               costItemId={costItem.id}
               nextSortOrder={costItem.analysisLines.length}
+              itemQuantity={parseFloat(costItem.quantity) || 0}
+              itemUnit={costItem.unit}
               onSubmit={onAddLine}
               onDone={() => setDialogState({ type: "closed" })}
             />
@@ -277,6 +279,8 @@ export function CostItemPanel({
             <CostAnalysisLineForm
               mode="edit"
               defaults={dialogState.line}
+              itemQuantity={parseFloat(costItem.quantity) || 0}
+              itemUnit={costItem.unit}
               onSubmit={(data) => onUpdateLine(dialogState.type === "edit" ? dialogState.line.id : "", data)}
               onDone={() => setDialogState({ type: "closed" })}
             />

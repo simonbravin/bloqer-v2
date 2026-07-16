@@ -56,7 +56,9 @@ Los ítems siguen el estado del Budget padre; no tienen máquina propia salvo l�
 ## 11. Validaciones
 - Cantidades > 0 para ítems activos.
 - Unidad obligatoria.
-- Análisis de costo: suma componentes = costo total ítem (tolerancia).
+- Análisis de costo: suma de líneas **unitarias** × cantidad del ítem = costo total ítem (tolerancia).
+
+> Ver [D-047](../00-product/DECISION_LOG.md#d-047--apu-persistencia-unitaria-entrada-opcional-por-total-de-partida): las `CostAnalysisLine` se persisten por unidad del ítem; la UI puede convertir entrada “total partida” a unitario al guardar.
 
 ## 12. Fórmulas relacionadas
 - [`../04-formulas/BUDGET_FORMULAS.md`](../04-formulas/BUDGET_FORMULAS.md), [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md), [`SALE_PRICE_FORMULAS.md`](../04-formulas/SALE_PRICE_FORMULAS.md).

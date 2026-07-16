@@ -28,6 +28,7 @@ import { CATEGORY_LABELS, VISIBLE_COST_CATEGORIES, type VisibleCostCategory } fr
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { UnitSelect } from "./unit-select";
 import { CostAnalysisLineForm } from "./cost-analysis-line-form";
+import { ApuEntryModeToggle } from "./apu-entry-mode-toggle";
 import type { WbsViewNode, CostAnalysisLineView, CostItemView } from "@bloqer/services";
 import type {
   CreateCostAnalysisLineInput,
@@ -35,6 +36,14 @@ import type {
   UpdateCostItemInput,
 } from "@bloqer/validators";
 import type { CostCategory } from "@bloqer/database";
+import {
+  canUseTotalPartidaMode,
+  convertApuEntryMode,
+  previewApuEntry,
+  roundApuDecimal,
+  toStoredApuLine,
+  type ApuEntryMode,
+} from "@bloqer/domain";
 
 type LocalLine = CostAnalysisLineView & {
   _isNew?: boolean;
@@ -116,6 +125,7 @@ export function CostItemApuDialog({
   const [newUnit, setNewUnit] = useState("un");
   const [newCoef, setNewCoef] = useState("1");
   const [newUnitCost, setNewUnitCost] = useState("0");
+  const [entryMode, setEntryMode] = useState<ApuEntryMode>("unit");
 
   const resetFromCostItem = useCallback((ci: CostItemView) => {
     setUnit(ci.unit);
@@ -130,6 +140,7 @@ export function CostItemApuDialog({
     setNewUnit("un");
     setNewCoef("1");
     setNewUnitCost("0");
+    setEntryMode("unit");
     setEditLine(null);
     setActiveTab("MATERIAL");
   }, []);
@@ -160,7 +171,6 @@ export function CostItemApuDialog({
   }, [lines]);
 
   const unitCostDirect = useMemo(() => {
-    if (!unitByCategory) return 0;
     return (
       unitByCategory.MATERIAL +
       unitByCategory.LABOR +
@@ -171,6 +181,16 @@ export function CostItemApuDialog({
 
   const qtyN = parseFloat(quantity) || 0;
   const totalProjectCost = unitCostDirect * qtyN;
+  const entryPreview = useMemo(
+    () =>
+      previewApuEntry({
+        mode: entryMode,
+        coefficient: parseFloat(newCoef) || 0,
+        unitCost: parseFloat(newUnitCost) || 0,
+        itemQuantity: qtyN,
+      }),
+    [entryMode, newCoef, newUnitCost, qtyN],
+  );
 
   const visibleLines = lines.filter((l) => !l._deleted && l.category === activeTab);
   const legacyOtherLines = lines.filter((l) => !l._deleted && l.category === "OTHER");
@@ -187,9 +207,20 @@ export function CostItemApuDialog({
       toast.error("Ingresá una descripción");
       return;
     }
-    const coef = parseFloat(newCoef) || 0;
-    const uc = parseFloat(newUnitCost) || 0;
-    const totalCost = String(coef * uc);
+    const itemQty = parseFloat(quantity) || 0;
+    if (entryMode === "total" && !canUseTotalPartidaMode(itemQty)) {
+      toast.error("Definí la cantidad del ítem para cargar por total de partida");
+      return;
+    }
+    const coefInput = parseFloat(newCoef) || 0;
+    const ucInput = parseFloat(newUnitCost) || 0;
+    const stored = toStoredApuLine({
+      mode: entryMode,
+      coefficient: coefInput,
+      unitCost: ucInput,
+      itemQuantity: itemQty,
+    });
+    const totalCost = String(roundApuDecimal(stored.coefficient * stored.unitCost));
     const tempId = `temp_${crypto.randomUUID()}`;
     setLines((prev) => [
       ...prev,
@@ -198,8 +229,8 @@ export function CostItemApuDialog({
         category: activeTab,
         description: newDesc.trim(),
         unit: newUnit,
-        coefficient: String(coef),
-        unitCost: String(uc),
+        coefficient: String(stored.coefficient),
+        unitCost: String(stored.unitCost),
         totalCost,
         sortOrder: prev.filter((l) => !l._deleted).length,
         supplierContactId: null,
@@ -210,6 +241,28 @@ export function CostItemApuDialog({
     setNewDesc("");
     setNewCoef("1");
     setNewUnitCost("0");
+  }
+
+  function handleEntryModeChange(next: ApuEntryMode) {
+    const itemQty = parseFloat(quantity) || 0;
+    if (next === "total" && !canUseTotalPartidaMode(itemQty)) {
+      toast.error("Definí la cantidad del ítem para cargar por total de partida");
+      return;
+    }
+    if (next !== entryMode) {
+      const converted = convertApuEntryMode(
+        entryMode,
+        next,
+        {
+          coefficient: parseFloat(newCoef) || 0,
+          unitCost: parseFloat(newUnitCost) || 0,
+        },
+        itemQty,
+      );
+      setNewCoef(String(converted.coefficient));
+      setNewUnitCost(String(converted.unitCost));
+    }
+    setEntryMode(next);
   }
 
   function markDelete(lineId: string) {
@@ -329,7 +382,7 @@ export function CostItemApuDialog({
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               {VISIBLE_COST_CATEGORIES.map((cat) => (
                 <div key={cat} className="rounded-lg border bg-card p-3 text-center">
-                  <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[cat]}</p>
+                  <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[cat]} / und.</p>
                   <p className="font-mono text-sm font-semibold tabular-nums">
                     {fmtMoney(String(unitByCategory[cat]), currency)}
                   </p>
@@ -424,8 +477,8 @@ export function CostItemApuDialog({
                     <TableRow>
                       <TableHead>Descripción</TableHead>
                       <TableHead>Un.</TableHead>
-                      <TableHead className="text-right">Coef.</TableHead>
-                      <TableHead className="text-right">C. unit.</TableHead>
+                      <TableHead className="text-right">Cant.</TableHead>
+                      <TableHead className="text-right">Precio</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       {editable && <TableHead />}
                     </TableRow>
@@ -468,7 +521,14 @@ export function CostItemApuDialog({
 
               {editable && (
                 <div className="rounded-lg border border-dashed shell-surface-inset p-4 space-y-3">
-                  <p className="text-sm font-medium">Agregar {CATEGORY_LABELS[activeTab]}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium">Agregar {CATEGORY_LABELS[activeTab]}</p>
+                    <ApuEntryModeToggle
+                      value={entryMode}
+                      onChange={handleEntryModeChange}
+                      totalDisabled={!canUseTotalPartidaMode(parseFloat(quantity) || 0)}
+                    />
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-[1fr_6rem_5rem_6rem_auto] sm:items-end">
                     <div className="space-y-1">
                       <Label className="text-xs">Descripción</Label>
@@ -479,7 +539,7 @@ export function CostItemApuDialog({
                       <UnitSelect value={newUnit} onChange={setNewUnit} className="h-9" />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Cantidad</Label>
+                      <Label className="text-xs">Cant.</Label>
                       <Input value={newCoef} onChange={(e) => setNewCoef(e.target.value)} className="font-mono" />
                     </div>
                     <div className="space-y-1">
@@ -490,6 +550,11 @@ export function CostItemApuDialog({
                       <Plus className="h-3 w-3 mr-1" /> Agregar
                     </Button>
                   </div>
+                  <p className="font-mono text-[11px] text-muted-foreground">
+                    {entryMode === "unit"
+                      ? `En partida: ${fmtNum(String(entryPreview.partidaTotal))}`
+                      : `Por ${budgetUnitLabel(unit) || "und."}: ${fmtNum(String(entryPreview.unitTotal))}`}
+                  </p>
                 </div>
               )}
 
@@ -527,6 +592,9 @@ export function CostItemApuDialog({
             <CostAnalysisLineForm
               mode="edit"
               defaults={editLine}
+              itemQuantity={parseFloat(quantity) || 0}
+              itemUnit={unit}
+              toastOnSuccess={false}
               onSubmit={async (data) => {
                 const coef = parseFloat(String(data.coefficient ?? editLine.coefficient)) || 0;
                 const uc = parseFloat(String(data.unitCost ?? editLine.unitCost)) || 0;

@@ -16,13 +16,26 @@ import {
   type CreateCostAnalysisLineInput, type UpdateCostAnalysisLineInput,
 } from "@bloqer/validators";
 import type { CostCategory } from "@bloqer/database";
+import {
+  canUseTotalPartidaMode,
+  convertApuEntryMode,
+  previewApuEntry,
+  toStoredApuLine,
+  type ApuEntryMode,
+} from "@bloqer/domain";
 import { CATEGORY_LABELS, VISIBLE_COST_CATEGORIES } from "@/lib/budget-categories";
+import { budgetUnitLabel } from "@/lib/budget-units";
 import { UnitSelect } from "./unit-select";
+import { ApuEntryModeToggle } from "./apu-entry-mode-toggle";
 
 type CreateMode = {
   mode: "create";
   costItemId: string;
   nextSortOrder: number;
+  itemQuantity: number;
+  itemUnit?: string;
+  /** When false, skip success toast (caller persists later). Default true. */
+  toastOnSuccess?: boolean;
   onSubmit: (data: CreateCostAnalysisLineInput) => Promise<{ id: string } | { error: string }>;
 };
 
@@ -36,6 +49,9 @@ type EditMode = {
     unitCost: string;
     notes: string | null;
   };
+  itemQuantity: number;
+  itemUnit?: string;
+  toastOnSuccess?: boolean;
   onSubmit: (data: UpdateCostAnalysisLineInput) => Promise<{ ok: true } | { error: string }>;
 };
 
@@ -60,8 +76,10 @@ type Shared = {
 };
 
 function CreateLineForm({
-  costItemId, nextSortOrder, onSubmit, isPending, startTransition, serverError, setServerError, onDone,
+  costItemId, nextSortOrder, itemQuantity, itemUnit, toastOnSuccess = true, onSubmit,
+  isPending, startTransition, serverError, setServerError, onDone,
 }: CreateMode & Shared) {
+  const [entryMode, setEntryMode] = useState<ApuEntryMode>("unit");
   const form = useForm<CreateCostAnalysisLineInput>({
     resolver: zodResolver(createCostAnalysisLineSchema),
     defaultValues: {
@@ -73,57 +91,155 @@ function CreateLineForm({
     },
   });
 
+  const handleEntryModeChange = (next: ApuEntryMode) => {
+    if (next === "total" && !canUseTotalPartidaMode(itemQuantity)) {
+      toast.error("Definí la cantidad del ítem para cargar por total de partida");
+      return;
+    }
+    if (next !== entryMode) {
+      const converted = convertApuEntryMode(
+        entryMode,
+        next,
+        {
+          coefficient: form.getValues("coefficient") ?? 0,
+          unitCost: form.getValues("unitCost") ?? 0,
+        },
+        itemQuantity,
+      );
+      form.setValue("coefficient", converted.coefficient);
+      form.setValue("unitCost", converted.unitCost);
+    }
+    setEntryMode(next);
+  };
+
   const handleSubmit = form.handleSubmit((data) => {
     setServerError(null);
+    if (entryMode === "total" && !canUseTotalPartidaMode(itemQuantity)) {
+      toast.error("Definí la cantidad del ítem para cargar por total de partida");
+      return;
+    }
+    const stored = toStoredApuLine({
+      mode: entryMode,
+      coefficient: data.coefficient,
+      unitCost: data.unitCost,
+      itemQuantity,
+    });
     startTransition(async () => {
-      const result = await onSubmit(data);
+      const result = await onSubmit({ ...data, ...stored });
       if ("error" in result) {
         setServerError(result.error);
         toast.error(result.error);
       } else {
-        toast.success("Línea APU agregada");
+        if (toastOnSuccess) toast.success("Línea APU agregada");
         onDone();
       }
     });
   });
 
-  return <LineFormFields form={form} onDone={onDone} isPending={isPending} serverError={serverError} onSubmit={handleSubmit} submitLabel="Agregar línea" />;
+  return (
+    <LineFormFields
+      form={form}
+      onDone={onDone}
+      isPending={isPending}
+      serverError={serverError}
+      onSubmit={handleSubmit}
+      submitLabel="Agregar línea"
+      entryMode={entryMode}
+      onEntryModeChange={handleEntryModeChange}
+      itemQuantity={itemQuantity}
+      itemUnit={itemUnit}
+    />
+  );
 }
 
 function EditLineForm({
-  defaults, onSubmit, isPending, startTransition, serverError, setServerError, onDone,
+  defaults, itemQuantity, itemUnit, toastOnSuccess = true, onSubmit,
+  isPending, startTransition, serverError, setServerError, onDone,
 }: EditMode & Shared) {
+  const [entryMode, setEntryMode] = useState<ApuEntryMode>("unit");
   const form = useForm<UpdateCostAnalysisLineInput>({
     resolver: zodResolver(updateCostAnalysisLineSchema),
     defaultValues: {
       category: defaults.category as CostCategory,
       description: defaults.description,
       unit: defaults.unit,
-      coefficient: parseFloat(defaults.coefficient),
-      unitCost: parseFloat(defaults.unitCost),
+      coefficient: parseFloat(defaults.coefficient) || 0,
+      unitCost: parseFloat(defaults.unitCost) || 0,
       notes: defaults.notes ?? "",
     },
   });
 
+  const handleEntryModeChange = (next: ApuEntryMode) => {
+    if (next === "total" && !canUseTotalPartidaMode(itemQuantity)) {
+      toast.error("Definí la cantidad del ítem para cargar por total de partida");
+      return;
+    }
+    if (next !== entryMode) {
+      const converted = convertApuEntryMode(
+        entryMode,
+        next,
+        {
+          coefficient: form.getValues("coefficient") ?? 0,
+          unitCost: form.getValues("unitCost") ?? 0,
+        },
+        itemQuantity,
+      );
+      form.setValue("coefficient", converted.coefficient);
+      form.setValue("unitCost", converted.unitCost);
+    }
+    setEntryMode(next);
+  };
+
   const handleSubmit = form.handleSubmit((data) => {
     setServerError(null);
+    if (entryMode === "total" && !canUseTotalPartidaMode(itemQuantity)) {
+      toast.error("Definí la cantidad del ítem para cargar por total de partida");
+      return;
+    }
+    const stored = toStoredApuLine({
+      mode: entryMode,
+      coefficient: data.coefficient ?? 0,
+      unitCost: data.unitCost ?? 0,
+      itemQuantity,
+    });
     startTransition(async () => {
-      const result = await onSubmit(data);
+      const result = await onSubmit({ ...data, ...stored });
       if ("error" in result) {
         setServerError(result.error);
         toast.error(result.error);
       } else {
-        toast.success("Línea APU actualizada");
+        if (toastOnSuccess) toast.success("Línea APU actualizada");
         onDone();
       }
     });
   });
 
-  return <LineFormFields form={form} onDone={onDone} isPending={isPending} serverError={serverError} onSubmit={handleSubmit} submitLabel="Guardar" />;
+  return (
+    <LineFormFields
+      form={form}
+      onDone={onDone}
+      isPending={isPending}
+      serverError={serverError}
+      onSubmit={handleSubmit}
+      submitLabel="Guardar"
+      entryMode={entryMode}
+      onEntryModeChange={handleEntryModeChange}
+      itemQuantity={itemQuantity}
+      itemUnit={itemUnit}
+    />
+  );
+}
+
+function formatPreview(n: number) {
+  return new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(n);
 }
 
 function LineFormFields({
   form, onDone, isPending, serverError, onSubmit, submitLabel,
+  entryMode, onEntryModeChange, itemQuantity, itemUnit,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   form: any;
@@ -132,11 +248,31 @@ function LineFormFields({
   serverError: string | null;
   onSubmit: (e: React.FormEvent) => void;
   submitLabel: string;
+  entryMode: ApuEntryMode;
+  onEntryModeChange: (mode: ApuEntryMode) => void;
+  itemQuantity: number;
+  itemUnit?: string;
 }) {
   const category = form.watch("category");
+  const coef = Number(form.watch("coefficient")) || 0;
+  const unitCost = Number(form.watch("unitCost")) || 0;
+  const preview = previewApuEntry({
+    mode: entryMode,
+    coefficient: coef,
+    unitCost,
+    itemQuantity,
+  });
+  const unitLabel = itemUnit ? budgetUnitLabel(itemUnit) : "und.";
+  const entryProduct = coef * unitCost;
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <ApuEntryModeToggle
+        value={entryMode}
+        onChange={onEntryModeChange}
+        totalDisabled={!canUseTotalPartidaMode(itemQuantity)}
+      />
+
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label>Categoría *</Label>
@@ -176,7 +312,7 @@ function LineFormFields({
 
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1.5">
-          <Label>Coeficiente</Label>
+          <Label>Cant.</Label>
           <Input
             type="number"
             step="0.0001"
@@ -185,7 +321,7 @@ function LineFormFields({
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Costo unitario</Label>
+          <Label>Precio</Label>
           <Input
             type="number"
             step="0.01"
@@ -196,15 +332,18 @@ function LineFormFields({
         <div className="space-y-1.5">
           <Label>Total</Label>
           <Input
-            value={(
-              (parseFloat(form.watch("coefficient") ?? "0") || 0) *
-              (parseFloat(form.watch("unitCost") ?? "0") || 0)
-            ).toFixed(4)}
+            value={formatPreview(entryProduct)}
             readOnly
             className="bg-muted/50 font-mono text-sm"
           />
         </div>
       </div>
+
+      <p className="font-mono text-[11px] text-muted-foreground">
+        {entryMode === "unit"
+          ? `En partida: ${formatPreview(preview.partidaTotal)}`
+          : `Por ${unitLabel}: ${formatPreview(preview.unitTotal)}`}
+      </p>
 
       <div className="space-y-1.5">
         <Label>Notas</Label>

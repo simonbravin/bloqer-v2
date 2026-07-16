@@ -605,6 +605,22 @@
 
 ---
 
+### D-047 — APU: persistencia unitaria; entrada opcional por total de partida
+
+- **Fecha:** 2026-07-16
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Al cargar APU, materiales/MO suelen venir como totales de obra (p. ej. global $1.250.000) o consumos absolutos (500 bolsas), mientras el ítem tiene cantidad contractual (900 m²). Si se cargan esos valores como si fueran por unidad, el sistema multiplica otra vez por la cantidad del ítem y distorsiona el costo.
+- **Decisión:**
+  1. Las líneas APU (`CostAnalysisLine`) se **persisten siempre unitarias** (por 1 unidad del `CostItem`): `unitCostDirect = Σ (coefficient × unitCost)`; `totalCostDirect = unitCostDirect × CostItem.quantity`.
+  2. La UI ofrece dos **modos de entrada** (no dos modelos de datos): **Por unidad** (default) y **Total partida**.
+  3. En **Total partida**, al confirmar se prorratea el importe de obra de forma **money-safe** frente a `Decimal(18,4)`: `coefficient_stored = 1`, `unitCost_stored = (coefficient_input × unitCost_input) / CostItem.quantity`. Reverse al editar en ese modo: `coefficient_input = 1`, `unitCost_input = unitCost_stored × quantity`.
+  4. Si `CostItem.quantity ≤ 0`, el modo Total partida no aplica.
+- **Implicancias:** sin cambio de schema; conversión en UI/helper de dominio antes de create/update. Reportes y baseline siguen leyendo unitario × qty. No usar `coefficient / quantity` para globales (p. ej. 1/900) porque el redondeo a 4 decimales distorsiona el dinero.
+- **Documentos afectados:** [`04-formulas/BUDGET_FORMULAS.md`](../04-formulas/BUDGET_FORMULAS.md), [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

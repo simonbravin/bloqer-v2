@@ -14,12 +14,33 @@ Donde \(PU_{venta}\) puede provenir de costo total + utilidad + impuestos (ver [
 \text{SaleBudget} = \sum_{items} \text{PrecioTotal}_{item}
 \]
 
-## Total presupuesto costo (directo en ítem)
+## Costo directo del ítem (APU unitario)
+
+Las líneas de análisis (`CostAnalysisLine`) se expresan **por 1 unidad** del ítem ([D-047](../00-product/DECISION_LOG.md#d-047--apu-persistencia-unitaria-entrada-opcional-por-total-de-partida)):
+
 \[
-\text{CostBudget}_{item} = \sum_{lines \in CostAnalysis} cost_{line}
+cost_{line} = coefficient \times unitCost
 \]
 
+\[
+CD_{unit} = \sum_{lines \in CostAnalysis} cost_{line}
+\]
+
+\[
+\text{CostBudget}_{item} = CD_{unit} \times Qty
+\]
+
+La UI puede cargar una línea en modo **Total partida**; al persistir se convierte a unitario money-safe (`coefficient = 1`, `unitCost = importe_partida / Qty`) ([D-047]).
+
 ### Ejemplo numérico
+
+| Concepto | Valor |
+|---|---|
+| Cantidad ítem | 900 m² |
+| Línea MAT (entrada total $1.250.000) | coef 1 × ARS 1.388,8889 / m² |
+| Línea LAB (unitaria) | 1 × ARS 2.800 / m² |
+| \(CD_{unit}\) | ≈ ARS 4.188,8889 / m² |
+| **CostBudget ítem** | ≈ **ARS 3.770.000** |
 
 | Concepto | Valor |
 |---|---|
