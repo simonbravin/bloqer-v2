@@ -4,11 +4,16 @@ import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
-import { SupplierInvoiceListSection } from "@/features/ap";
-import type { SupplierInvoiceListItem } from "@/features/ap";
+import {
+  NewCompanySupplierInvoiceDialog,
+  SupplierInvoiceListSection,
+  type SupplierInvoiceListItem,
+  type SupplierOption,
+} from "@/features/ap";
 import { ReportExportActions } from "@/features/reports";
 import { getCurrentUser } from "@/lib/auth";
-import { listCompanySupplierInvoices, ServiceError } from "@bloqer/services";
+import { can } from "@bloqer/domain";
+import { listCompanySupplierInvoices, listContacts, ServiceError } from "@bloqer/services";
 import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -16,7 +21,7 @@ const PAGE_SIZE = 20;
 const STATUSES = ["DRAFT", "ISSUED", "CANCELLED"] as const;
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; from?: string; to?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; from?: string; to?: string; page?: string; create?: string }>;
 }
 
 export default async function FinanzasFacturasProveedorPage({ searchParams }: PageProps) {
@@ -36,8 +41,10 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     companyId: current.tenantCtx.companyId,
     roles: current.tenantCtx.roles,
   };
+  const canCreateInvoice = can(ctx.roles, "EDIT", "AP");
 
   let result;
+  let suppliersResult = null;
   try {
     result = await listCompanySupplierInvoices(ctx, {
       status,
@@ -51,6 +58,17 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     throw err;
   }
 
+  if (canCreateInvoice) {
+    try {
+      suppliersResult = await listContacts(
+        { role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 },
+        ctx,
+      );
+    } catch {
+      // VIEW DIRECTORY may be missing; keep invoice list, create dialog without suppliers
+    }
+  }
+
   const items: SupplierInvoiceListItem[] = result.data.map((inv) => ({
     id: inv.id,
     code: inv.code,
@@ -60,6 +78,10 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     totalAmount: inv.totalAmount,
     currency: inv.currency,
     status: inv.status,
+  }));
+  const suppliers: SupplierOption[] = (suppliersResult?.data ?? []).map((contact) => ({
+    id: contact.id,
+    label: contact.fantasyName ?? contact.legalName,
   }));
 
   function q(next: Record<string, string | undefined>) {
@@ -110,9 +132,11 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
             pdf
             label="Exportar"
           />
-          <Button asChild>
-            <Link href="/finanzas/facturas-proveedor/nueva">Nueva factura</Link>
-          </Button>
+          {canCreateInvoice ? (
+            <Suspense fallback={null}>
+              <NewCompanySupplierInvoiceDialog suppliers={suppliers} defaultOpen={sp.create === "1"} />
+            </Suspense>
+          ) : null}
         </div>
       </div>
 
@@ -141,9 +165,6 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
             </Link>
             .
           </p>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/finanzas/facturas-proveedor/nueva">Crear primera factura</Link>
-          </Button>
         </div>
       ) : (
         <Suspense fallback={<ListSectionSkeleton />}>

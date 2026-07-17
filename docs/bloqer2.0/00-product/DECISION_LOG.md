@@ -621,6 +621,36 @@
 
 ---
 
+### D-048 — Finanzas: facturas documentales separadas del ledger; pagos sin listado independiente
+
+- **Fecha:** 2026-07-17
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Decisión:**
+  1. **Facturas y gastos** conserva una vista propia porque representa documentos y obligaciones antes del movimiento de caja; el alta corporativa se abre en un diálogo desde el listado.
+  2. **Transacciones** conserva una vista propia como ledger consolidado de movimientos confirmados.
+  3. No existe un listado independiente **Pagos a proveedores**: los pagos se consultan en Transacciones mediante filtros de origen/tipo.
+  4. El detalle de un `Payment` permanece como vista contextual para trazabilidad, anulación y contabilidad, accesible desde CxP, auditoría o el movimiento relacionado.
+- **Implicancias:** se retiran `/finanzas/pagos-proveedor` (listado) y `/finanzas/facturas-proveedor/nueva`; se mantienen `/finanzas/pagos-proveedor/[paymentId]` y el flujo de pago desde Cuentas por pagar.
+- **Documentos afectados:** [`02-modules/EXPENSES_AND_PAYMENTS.md`](../02-modules/EXPENSES_AND_PAYMENTS.md), [`08-architecture/PERMISSIONS_ROUTE_MATRIX.md`](../08-architecture/PERMISSIONS_ROUTE_MATRIX.md), [`08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](../08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md).
+
+---
+
+### D-049 — Ingreso corporativo enriquecido (contraparte + comprobante externo); AR formal diferido
+
+- **Fecha:** 2026-07-17
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** el alta `TREASURY_INFLOW` solo pedía cuenta/fecha/monto/descripción; no alcanzaba para registrar cobros de facturación oficial hecha por fuera. [D-037](./DECISION_LOG.md) mantiene ingresos sin obra fuera de la cadena AR.
+- **Decisión:**
+  1. Fase 1 (ahora): `AccountMovement` de ingreso corporativo (`sourceType = MANUAL_ADJUSTMENT`) admite opcionales `counterpartyContactId` (Contact del directorio, típicamente CLIENT) y `externalInvoiceRef` (N° de comprobante oficial emitido fuera de Bloqer, p. ej. ARCA).
+  2. No crea `SalesInvoice` / `Receivable` / `Collection` corporativos; sigue la opción **(2)** de Q-030 / [D-037](./DECISION_LOG.md).
+  3. Fase 2 (planificada, requiere decisión explícita): AR corporativo con `projectId` nullable + UI bajo `/finanzas`, con extensión futura a emisión legal ARCA; `externalInvoiceRef` actúa de puente para lo cargado manualmente.
+- **Implicancias:** UI “Ingreso / cobro” en Transacciones; ledger y export muestran contraparte y comprobante; sin enum nuevo de `sourceType`.
+- **Documentos afectados:** [`03-finance/ACCOUNT_MOVEMENTS.md`](../03-finance/ACCOUNT_MOVEMENTS.md), [`02-modules/SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md`](../08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

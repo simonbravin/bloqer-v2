@@ -145,7 +145,7 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 
 ### 16C.1 Alcance
 
-- **Rutas:** `GET /finanzas/facturas-proveedor`, `/nueva`, `/[invoiceId]`; `GET /finanzas/cuentas-por-pagar`, `/[payableId]`, `/[payableId]/pagar`; `GET /finanzas/pagos-proveedor/[paymentId]`.
+- **Rutas:** `GET /finanzas/facturas-proveedor`, `/[invoiceId]` (alta en diálogo); `GET /finanzas/cuentas-por-pagar`, `/[payableId]`, `/[payableId]/pagar`; `GET /finanzas/pagos-proveedor/[paymentId]` solo como detalle contextual. Los pagos se listan en `/finanzas/transacciones` con filtros ([D-048](../00-product/DECISION_LOG.md)).
 - **Representación de “gastos generales”:** mismas entidades **SupplierInvoice → Payable → Payment** con `projectId` null (sin tabla `Expense`).
 - **Aislamiento:** servicios `listCompanySupplierInvoices`, `getCompanySupplierInvoiceById`, `listCompanyPayables`, `getCompanyPayableById`, `getCompanyPaymentById` exigen **`VIEW AP`** (`canViewCompanyAp`) y filas con **`projectId === null`** (más `ctx.companyId` cuando aplica). Las rutas proyecto siguen con `projectScopeId` / `list*ByProject`.
 - **Hub:** `getFinanceHubOverview` agrega enlaces de reporte a facturas/C×P empresa y “gastos generales”. **Phase 16D** amplía el mismo servicio a tablero multimoneda + split AP obra/corporativo (aging) + accesos rápidos + bloque contabilidad (solo enlace).
@@ -185,7 +185,7 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 
 ### 16E.2 Fuera de alcance
 
-- Phase **17B** refinada (2026-05): `/finanzas/gastos-generales` = **imputación GG** (manual + AUTO_WEIGHT por período); alta corporativa en `/finanzas/facturas-proveedor/nueva` o `transacciones?register=ap`. Cierre de período AUTO: [D-043](../00-product/DECISION_LOG.md).
+- Phase **17B** refinada (2026-05): `/finanzas/gastos-generales` = **imputación GG** (manual + AUTO_WEIGHT por período); alta corporativa en el diálogo de `/finanzas/facturas-proveedor` o `transacciones?register=ap`. Cierre de período AUTO: [D-043](../00-product/DECISION_LOG.md).
 
 ---
 

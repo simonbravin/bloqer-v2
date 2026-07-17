@@ -21,6 +21,9 @@ interface Props {
   companyFinanzas?: boolean;
   suppliers: SupplierOption[];
   poOptions?: POOption[];
+  variant?: "card" | "plain";
+  onCancel?: () => void;
+  onSuccess?: () => void;
 }
 
 const DEFAULT_LINE: InvoiceLine = { description: "", quantity: "1", unitPrice: "", taxRate: "21" };
@@ -30,6 +33,9 @@ export function SupplierInvoiceForm({
   companyFinanzas = false,
   suppliers,
   poOptions = [],
+  variant = "card",
+  onCancel,
+  onSuccess,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -72,6 +78,7 @@ export function SupplierInvoiceForm({
         if ("error" in res) {
           setError(res.error);
         } else {
+          onSuccess?.();
           router.push(`/finanzas/facturas-proveedor/${res.id}`);
         }
         return;
@@ -94,13 +101,14 @@ export function SupplierInvoiceForm({
       if ("error" in res) {
         setError(res.error);
       } else {
+        onSuccess?.();
         router.push(`/proyectos/${projectId}/facturas-proveedor/${res.id}`);
       }
     });
   }
 
   return (
-    <div className="rounded-lg border bg-card p-6">
+    <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
           <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
@@ -162,7 +170,9 @@ export function SupplierInvoiceForm({
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>
+          <Button type="button" variant="outline" onClick={onCancel ?? (() => router.back())}>
+            Cancelar
+          </Button>
           <Button type="submit" disabled={isPending || suppliers.length === 0}>
             {isPending ? "Guardando…" : "Crear factura"}
           </Button>

@@ -26,7 +26,6 @@ const REVALIDATE_PATHS = [
   "/finanzas/transacciones",
   "/finanzas/facturas-proveedor",
   "/finanzas/cuentas-por-pagar",
-  "/finanzas/pagos-proveedor",
   "/tesoreria/reportes/movimientos",
 ];
 

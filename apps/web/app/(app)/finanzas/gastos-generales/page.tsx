@@ -129,7 +129,7 @@ export default async function GastosGeneralesPage() {
       <div className="flex flex-wrap gap-2">
         {canEditAp ? (
           <Button asChild>
-            <Link href="/finanzas/facturas-proveedor/nueva">Nueva factura de gasto</Link>
+            <Link href="/finanzas/facturas-proveedor?create=1">Nueva factura de gasto</Link>
           </Button>
         ) : null}
         <Button asChild variant="outline">

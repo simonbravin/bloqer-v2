@@ -1,8 +1,9 @@
 # Changelog UI — Lotes 1–6 (para autores de guía / DOCX)
 
-> **Uso:** alimentar la próxima regeneración de `guides/Guía_Operativa_Bloqer_v2*.docx` **sin** ejecutar `build_guide.js` en este lote.  
+> **Uso:** checklist de alineación UI al regenerar `guides/Guía_Operativa_Bloqer_v2*.docx`.  
 > **Fuente viva de operación:** [`../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md).  
-> **Smoke por rol:** [`../08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](../08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md).
+> **Smoke por rol:** [`../08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](../08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md).  
+> **Estado DOCX:** regenerado julio 2026 desde la MD revisada (placeholders `📷 Captura sugerida` listos para pantallazos).
 
 ---
 
@@ -47,13 +48,17 @@
 
 ---
 
-## Explicitamente NO regenerar aún
+## DOCX regenerado (julio 2026)
 
-- `guides/build_guide.js`
-- Nuevos `.docx` en el repo
+- `guides/build_guide.js` **reescrito** como parser Markdown → `docx`: lee la fuente viva `../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md` y renderiza portada, TOC, headings, tablas, listas, callouts y placeholders de captura (no hardcodea el contenido).
+- Entregables regenerados en `guides/`:
+  - `Guía_Operativa_Bloqer_v2_PROFESIONAL.docx` (entregable principal, **v2.1 — julio 2026**).
+  - `Guía_Operativa_Bloqer_v2.docx` (copia idéntica; reemplaza la versión de junio).
+- **25 bloques `📷 Captura sugerida`** renderizados como cajas placeholder (borde punteado, «[ Insertar captura aquí ]») listas para pegar pantallazos reales de los Lotes 1–7.
+- Regenerar: `cd docs/bloqer2.0/guides && node build_guide.js` (dependencia local `docx`).
 
-Cuando negocio pida entregable imprimible: regenerar DOCX **después** de alinear `GUIA_OPERATIVA_BLOQER_V2_REVISADA.md` con esta tabla y pasar el smoke J-02.
+> Si cambian rutas de la app, decisiones en `DECISION_LOG.md` o la MD revisada: actualizar la MD y **volver a correr** `build_guide.js`.
 
 ---
 
-*Lote 7 — preparación docs.*
+*Lote 7 — preparación docs · DOCX regenerado desde la MD revisada.*

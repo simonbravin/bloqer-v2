@@ -14,18 +14,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
+import { SearchableCombobox, SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/components/ui/searchable-combobox";
 import { InvoiceLinesEditor } from "@/features/ap/components/invoice-lines-editor";
 import type { InvoiceLine } from "@/features/ap/components/invoice-lines-editor";
 import { registerTransactionAction } from "@/app/(app)/finanzas/transacciones/actions";
 
 export type SupplierOption = { id: string; label: string };
+export type ClientOption = { id: string; label: string };
 export type TreasuryAccountOption = { id: string; label: string; currency: string };
 
 type TransactionKind = "AP_EXPENSE" | "TREASURY_INFLOW";
 
 interface Props {
   suppliers: SupplierOption[];
+  clients?: ClientOption[];
   treasuryAccounts: TreasuryAccountOption[];
   canAp: boolean;
   canTreasury: boolean;
@@ -37,6 +39,7 @@ const DEFAULT_LINE: InvoiceLine = { description: "", quantity: "1", unitPrice: "
 
 export function NewTransactionDialog({
   suppliers,
+  clients = [],
   treasuryAccounts,
   canAp,
   canTreasury,
@@ -56,6 +59,7 @@ export function NewTransactionDialog({
   const [payAccountId, setPayAccountId] = useState("");
 
   const [inflowAccountId, setInflowAccountId] = useState("");
+  const [counterpartyContactId, setCounterpartyContactId] = useState<string | null>(null);
 
   useEffect(() => {
     if (defaultOpen) setOpen(true);
@@ -74,6 +78,14 @@ export function NewTransactionDialog({
     [treasuryAccounts],
   );
 
+  const clientOptions = useMemo(
+    () =>
+      withNoneOption(toSearchableOptions(clients), {
+        label: "Sin cliente / contraparte",
+      }),
+    [clients],
+  );
+
   if (!canAp && !canTreasury) return null;
 
   function resetForm() {
@@ -83,6 +95,7 @@ export function NewTransactionDialog({
     setPayNow(false);
     setPayAccountId("");
     setInflowAccountId("");
+    setCounterpartyContactId(null);
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -146,6 +159,8 @@ export function NewTransactionDialog({
         movementDate: fd.get("movementDate") as string,
         amount: fd.get("amount") as string,
         description: fd.get("description") as string,
+        counterpartyContactId,
+        externalInvoiceRef: ((fd.get("externalInvoiceRef") as string) || "").trim() || null,
       });
       if ("error" in res) {
         setError(res.error);
@@ -177,7 +192,8 @@ export function NewTransactionDialog({
         <DialogHeader>
           <DialogTitle>Registrar transacción</DialogTitle>
           <DialogDescription>
-            Alta rápida de gasto corporativo (factura de proveedor) o ingreso manual de caja, sin imputar a obra.
+            Alta rápida de gasto corporativo o ingreso / cobro sin obra. El ingreso registra plata
+            en caja; la facturación oficial puede hacerse por fuera (p. ej. ARCA) y referenciarse acá.
           </DialogDescription>
         </DialogHeader>
 
@@ -199,7 +215,7 @@ export function NewTransactionDialog({
               variant={kind === "TREASURY_INFLOW" ? "secondary" : "outline"}
               onClick={() => setKind("TREASURY_INFLOW")}
             >
-              Ingreso de caja
+              Ingreso / cobro
             </Button>
           )}
         </div>
@@ -272,6 +288,11 @@ export function NewTransactionDialog({
 
           {kind === "TREASURY_INFLOW" && (
             <>
+              <p className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                Registrá un ingreso a caja. Podés indicar el cliente del directorio y el N° del
+                comprobante oficial emitido por fuera. No crea factura ni cuenta por cobrar en
+                Bloqer.
+              </p>
               <div className="space-y-1">
                 <Label>Cuenta</Label>
                 <SearchableCombobox
@@ -280,6 +301,19 @@ export function NewTransactionDialog({
                   onValueChange={setInflowAccountId}
                   placeholder="Seleccionar cuenta..."
                   searchPlaceholder="Buscar cuenta..."
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Cliente / contraparte (opcional)</Label>
+                <SearchableCombobox
+                  options={clientOptions}
+                  value={counterpartyContactId ?? SEARCHABLE_NONE}
+                  onValueChange={(v) =>
+                    setCounterpartyContactId(v === SEARCHABLE_NONE ? null : v)
+                  }
+                  placeholder="Sin cliente / contraparte"
+                  searchPlaceholder="Buscar cliente..."
+                  emptyText="Ningún cliente coincide."
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -291,6 +325,15 @@ export function NewTransactionDialog({
                   <Label htmlFor="amount">Monto</Label>
                   <Input id="amount" name="amount" inputMode="decimal" required />
                 </div>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="externalInvoiceRef">N° de comprobante externo (opcional)</Label>
+                <Input
+                  id="externalInvoiceRef"
+                  name="externalInvoiceRef"
+                  placeholder="Ej. FC A 0001-00001234"
+                  maxLength={120}
+                />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="description">Descripción</Label>

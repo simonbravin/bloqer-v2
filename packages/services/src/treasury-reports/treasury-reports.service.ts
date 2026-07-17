@@ -44,6 +44,17 @@ const SOURCE_LABELS: Record<string, string> = {
   PAYMENT:           "Pago",
 };
 
+function movementSourceLabel(
+  sourceType: string,
+  counterpartyName: string | null,
+  externalInvoiceRef: string | null,
+): string {
+  if (sourceType === "MANUAL_ADJUSTMENT" && (counterpartyName || externalInvoiceRef)) {
+    return "Ingreso / cobro";
+  }
+  return SOURCE_LABELS[sourceType] ?? sourceType;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type CashPositionAccount = {
@@ -90,6 +101,8 @@ export type MovementReportRow = {
   isInternalTransfer: boolean;
   projectId:          string | null;
   projectName:        string | null;
+  counterpartyName:   string | null;
+  externalInvoiceRef: string | null;
   runningBalance?:    string;
 };
 
@@ -236,7 +249,10 @@ type RawMovementRow = {
   description: string;
   transferId: string | null;
   projectId: string | null;
+  counterpartyContactId: string | null;
+  externalInvoiceRef: string | null;
   account: { name: string };
+  counterparty: { fantasyName: string | null; legalName: string } | null;
 };
 
 async function resolveMovementProjectIds(
@@ -428,7 +444,10 @@ export async function getAccountMovementReport(
   const [rawRows, total] = await Promise.all([
     prisma.accountMovement.findMany({
       where,
-      include: { account: { select: { name: true } } },
+      include: {
+        account: { select: { name: true } },
+        counterparty: { select: { fantasyName: true, legalName: true } },
+      },
       orderBy: [...orderBy],
       ...(paginated ? { skip, take } : {}),
     }),
@@ -459,6 +478,9 @@ export async function getAccountMovementReport(
       runningBalance = runningBalance.plus(signed);
     }
     const resolvedProjectId = projectIdByMovement.get(m.id) ?? null;
+    const counterpartyName = m.counterparty
+      ? (m.counterparty.fantasyName ?? m.counterparty.legalName)
+      : null;
     return {
       id: m.id,
       accountId: m.accountId,
@@ -466,7 +488,11 @@ export async function getAccountMovementReport(
       movementDate: m.movementDate.toISOString().slice(0, 10),
       type: m.type as string,
       sourceType: m.sourceType as string,
-      sourceLabel: SOURCE_LABELS[m.sourceType as string] ?? m.sourceType,
+      sourceLabel: movementSourceLabel(
+        m.sourceType as string,
+        counterpartyName,
+        m.externalInvoiceRef,
+      ),
       amount: m.amount.toString(),
       signedAmount: signed.toString(),
       currency: m.currency,
@@ -475,6 +501,8 @@ export async function getAccountMovementReport(
       isInternalTransfer: m.transferId !== null,
       projectId: resolvedProjectId,
       projectName: resolvedProjectId ? (projectNames.get(resolvedProjectId) ?? null) : null,
+      counterpartyName,
+      externalInvoiceRef: m.externalInvoiceRef,
       ...(runningBalance !== undefined ? { runningBalance: runningBalance.toString() } : {}),
     };
   });

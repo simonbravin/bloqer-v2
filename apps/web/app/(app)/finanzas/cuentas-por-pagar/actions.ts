@@ -30,7 +30,6 @@ function handle(err: unknown): { error: string } {
 }
 
 const FIN_AP = "/finanzas/cuentas-por-pagar";
-const FIN_PAY = "/finanzas/pagos-proveedor";
 
 export async function createCompanyPaymentAction(
   data: CreatePaymentInput,
@@ -42,7 +41,6 @@ export async function createCompanyPaymentAction(
     const payment = await createPayment(parsed.data, ctx);
     revalidatePath(FIN_AP);
     revalidatePath(`${FIN_AP}/${data.payableId}`);
-    revalidatePath(FIN_PAY);
     revalidatePath("/finanzas/transacciones");
     return { id: payment.id };
   } catch (err) {
@@ -57,8 +55,7 @@ export async function cancelCompanyPaymentAction(
   try {
     await cancelPayment(paymentId, ctx);
     revalidatePath(FIN_AP);
-    revalidatePath(FIN_PAY);
-    revalidatePath(`${FIN_PAY}/${paymentId}`);
+    revalidatePath(`/finanzas/pagos-proveedor/${paymentId}`);
     revalidatePath("/finanzas/transacciones");
     return { ok: true };
   } catch (err) {

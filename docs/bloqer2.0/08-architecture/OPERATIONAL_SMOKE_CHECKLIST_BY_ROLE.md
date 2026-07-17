@@ -111,10 +111,10 @@ Usar un usuario con rol de proyecto `PROJECT_MANAGER` (y sin roles globales que 
 
 | # | Ruta | Acción | Criterio de éxito |
 |---|------|--------|-------------------|
-| F1 | `/finanzas` | Abrir hub | Enlace a **Pagos a proveedores** / CxP |
+| F1 | `/finanzas` | Abrir hub | Indicadores y accesos sin botones redundantes bajo el título |
 | F2 | `/finanzas/cuentas-por-pagar` | Ver aging + listado | Export **aging** y **listado** CSV/PDF |
-| F3 | `/finanzas/facturas-proveedor` | Exportar | Botón Exportar CSV/PDF |
-| F4 | `/finanzas/pagos-proveedor` | Abrir desde CxP o hub | Listado carga; detalle de un pago |
+| F3 | `/finanzas/facturas-proveedor` | Nueva factura + exportar | Alta abre en diálogo; Exportar CSV/PDF |
+| F4 | `/finanzas/transacciones?sourceType=PAYMENT&type=OUTFLOW` | Consultar pagos | Lista movimientos de pago; detalle contextual accesible |
 | F5 | `/finanzas/cuentas-por-cobrar` | Aging + empty state | Empty accionable si no hay datos |
 | F6 | `/tesoreria` | Subnav | Cuentas / Transferencias / Reportes |
 | F7 | Cobranza o pago | Moneda cuenta ≠ documento | Error `CONFLICT` claro (sin FX) |
@@ -195,7 +195,7 @@ Validar al menos una vez por tenant de capacitación (pueden repartirse entre ro
 |----------|---------------|----------|
 | **PR → OC → recepción** | Solicitud → OC confirmada → recepción | Stock / cantidades recibidas |
 | **Certificación → factura → CxC** | Cert `APPROVED` → emitir factura → ver CxC | Cross-links |
-| **Factura proveedor → CxP → pago** | ISSUED → payable → pago | Tesorería OUTFLOW; link a `/finanzas/pagos-proveedor` |
+| **Factura proveedor → CxP → pago** | ISSUED → payable → pago | Tesorería OUTFLOW; movimiento visible en Transacciones y detalle contextual del pago |
 | **Documentos PLACEHOLDER** | Subir con R2 off (si aplica) | Badge PLACEHOLDER; descarga con mensaje claro |
 | **Reportes programados** | OWNER/ADMIN: ejecutar envío | Historial; Omitido si Resend off |
 | **Empty states / tablas** | Abrir listados densos | CTA en vacíos; scroll horizontal usable |

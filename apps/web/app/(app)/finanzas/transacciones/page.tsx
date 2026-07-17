@@ -131,33 +131,49 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
   const canEditTreasury = treasuryModuleOn && can(ctx.roles, "EDIT", "TREASURY");
 
   let suppliersForDialog: { id: string; label: string }[] = [];
+  let clientsForDialog: { id: string; label: string }[] = [];
   let treasuryAccountsForDialog: { id: string; label: string; currency: string }[] = [];
   let projectOptions: { id: string; name: string }[] = [];
 
-  if (canEditAp || canEditTreasury) {
+  if (canEditAp) {
     try {
-      if (canEditAp) {
-        const suppliersResult = await listContacts(
-          { role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 },
-          ctx,
-        );
-        suppliersForDialog = suppliersResult.data.map((c) => ({
-          id: c.id,
-          label: c.fantasyName ?? c.legalName,
-        }));
-      }
-      if (canEditTreasury) {
-        const accountsResult = await listTreasuryAccounts(ctx, { page: 1, pageSize: 200 });
-        treasuryAccountsForDialog = accountsResult.data
-          .filter(
-            (a) =>
-              a.status === "ACTIVE" &&
-              (!ctx.companyId || a.companyId === ctx.companyId),
-          )
-          .map((a) => ({ id: a.id, label: a.name, currency: a.currency }));
-      }
+      const suppliersResult = await listContacts(
+        { role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 },
+        ctx,
+      );
+      suppliersForDialog = suppliersResult.data.map((c) => ({
+        id: c.id,
+        label: c.fantasyName ?? c.legalName,
+      }));
     } catch {
-      // omit dialog data on failure
+      // VIEW DIRECTORY may be missing; keep AP dialog usable without supplier list
+    }
+  }
+
+  if (canEditTreasury) {
+    try {
+      const accountsResult = await listTreasuryAccounts(ctx, { page: 1, pageSize: 200 });
+      treasuryAccountsForDialog = accountsResult.data
+        .filter(
+          (a) =>
+            a.status === "ACTIVE" &&
+            (!ctx.companyId || a.companyId === ctx.companyId),
+        )
+        .map((a) => ({ id: a.id, label: a.name, currency: a.currency }));
+    } catch {
+      // omit accounts on failure
+    }
+    try {
+      const clientsResult = await listContacts(
+        { role: "CLIENT", status: "ACTIVE", page: 1, pageSize: 200 },
+        ctx,
+      );
+      clientsForDialog = clientsResult.data.map((c) => ({
+        id: c.id,
+        label: c.fantasyName ?? c.legalName,
+      }));
+    } catch {
+      // VIEW DIRECTORY may be missing; inflow still works without counterparty
     }
   }
 
@@ -220,6 +236,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
             <Suspense fallback={null}>
               <NewTransactionDialog
                 suppliers={suppliersForDialog}
+                clients={clientsForDialog}
                 treasuryAccounts={treasuryAccountsForDialog}
                 canAp={canEditAp}
                 canTreasury={canEditTreasury}

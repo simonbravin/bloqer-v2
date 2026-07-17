@@ -68,6 +68,7 @@ export function MovementLedgerTable({
               <TableHead>Cuenta</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Origen</TableHead>
+              <TableHead>Contraparte</TableHead>
               <TableHead>Descripción</TableHead>
               {showProjectColumn && <TableHead>Proyecto</TableHead>}
               <TableHead>Moneda</TableHead>
@@ -89,6 +90,24 @@ export function MovementLedgerTable({
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">{m.sourceLabel}</TableCell>
+                  <TableCell className="max-w-[160px] truncate text-muted-foreground text-xs">
+                    {m.counterpartyName ? (
+                      <span title={m.externalInvoiceRef ?? undefined}>
+                        {m.counterpartyName}
+                        {m.externalInvoiceRef ? (
+                          <span className="block truncate text-[11px] opacity-80">
+                            {m.externalInvoiceRef}
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : m.externalInvoiceRef ? (
+                      <span className="truncate" title={m.externalInvoiceRef}>
+                        {m.externalInvoiceRef}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
                   <TableCell className="max-w-[200px] truncate text-muted-foreground">
                     {m.description}
                   </TableCell>

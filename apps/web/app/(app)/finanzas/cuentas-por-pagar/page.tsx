@@ -135,9 +135,6 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/finanzas/pagos-proveedor">Pagos a proveedores</Link>
-          </Button>
           <ReportExportActions
             exportPath="/api/reports/finanzas/ap-aging.csv"
             params={exportParams}

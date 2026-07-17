@@ -91,7 +91,9 @@ function CompanyOperationsSection({ summary }: { summary: CompanyFinanceOperatio
         )}
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline">
-            <Link href="/finanzas/pagos-proveedor">Ver todos los pagos</Link>
+            <Link href="/finanzas/transacciones?sourceType=PAYMENT&type=OUTFLOW">
+              Ver pagos en transacciones
+            </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
             <Link href="/finanzas/gastos-generales">Imputar a obra</Link>
@@ -138,20 +140,6 @@ export function FinanceHubView({ overview }: { overview: FinanceHubOverview }) {
               {a.message}
             </div>
           ))}
-        </div>
-      ) : null}
-
-      {overview.apCard?.visible ? (
-        <div className="flex flex-wrap gap-2">
-          <Button asChild size="sm" variant="outline">
-            <Link href="/finanzas/cuentas-por-pagar">Cuentas por pagar</Link>
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/finanzas/pagos-proveedor">Pagos a proveedores</Link>
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/finanzas/facturas-proveedor">Facturas y gastos</Link>
-          </Button>
         </div>
       ) : null}
 

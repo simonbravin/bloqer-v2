@@ -31,8 +31,13 @@ Ver PurchaseInvoice, Payable en [`STATE_MACHINES.md`](../01-domain/STATE_MACHINE
 - Anular con reversión.
 
 ## 9. Pantallas y vistas necesarias
-- Bandeja facturas a pagar ordenadas por vencimiento.
+- **Facturas y gastos:** listado documental; alta corporativa en diálogo desde la misma pantalla.
+- **Cuentas por pagar:** bandeja de obligaciones ordenadas por vencimiento.
+- **Transacciones:** consulta consolidada de pagos confirmados mediante filtros; no hay listado independiente de pagos.
+- Detalle contextual de `Payment` para trazabilidad, anulación y contabilidad.
 - Wizard de pago con retenciones manuales.
+
+> Ver [D-048](../00-product/DECISION_LOG.md).
 
 ## 10. Reglas de negocio
 - **BR-PAY-001**: pago no excede saldo Payable ([BR-TRZ-005]).

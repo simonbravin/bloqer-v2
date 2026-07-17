@@ -5,6 +5,7 @@
 > **Base de evidencia:** rutas implementadas en `apps/web`, servicios en `packages/services`, enums en `packages/database/prisma/schema.prisma` y la spec funcional de `docs/bloqer2.0/`.
 > **Regla de prevalencia:** cuando el texto de una pantalla o de la documentación difiere del comportamiento del código, esta guía describe **lo que hace el sistema hoy**.
 > **Relación con otros documentos:** para la visión ejecutiva ver [`PANORAMA_GENERAL_BLOQER_V2.md`](./PANORAMA_GENERAL_BLOQER_V2.md); para el estado técnico y clasificación A–G ver [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md). Esta guía **no reemplaza** ni sobrescribe [`guides/GUIA_OPERATIVA_PROYECTO.md`](./guides/GUIA_OPERATIVA_PROYECTO.md), que se conserva como fuente original.
+> **Capturas:** los bloques `📷 Captura sugerida` indican dónde insertar pantallazos reales en el DOCX / PDF. No inventar UI: fotografiar el producto actual (Lotes 1–7).
 
 ---
 
@@ -59,6 +60,12 @@ flowchart TB
 - El **menú lateral de empresa** agrupa: **General · Finanzas · Tesorería · Contabilidad · Configuración**.
 - Al entrar a una obra, el menú lateral se reemplaza por el **menú del proyecto**.
 
+> **📷 Captura sugerida — Login Google**  
+> Ruta: `/login` · Mostrar botón de Google y marca Bloqer · Tip: desktop, sin datos sensibles.
+
+> **📷 Captura sugerida — Dashboard / menú empresa**  
+> Ruta: `/dashboard` · Mostrar sidebar (General · Finanzas · Tesorería · Contabilidad · Configuración) + campana de notificaciones en el header · Tip: recortar solo shell + KPI principales.
+
 ### 1.2 Menú de empresa (rutas reales)
 
 | Sección | Ítems (etiqueta → ruta) |
@@ -76,10 +83,16 @@ flowchart TB
 - **Ruta:** `/configuracion`.
 - Datos de la empresa, preferencias de visualización y políticas (incluida la política de compras en `/configuracion/compras`, accesible desde la subnavegación de configuración).
 
+> **📷 Captura sugerida — Configuración + acceso Compras**  
+> Ruta: `/configuracion` · Mostrar card/enlace a política de compras · Tip: incluir subnav de configuración si está visible.
+
 ### 1.4 Módulos habilitados
 
 - Cada empresa puede tener módulos **activos o inactivos**. La habilitación se administra desde la **consola de plataforma** (`/platform/tenants/[id]/modules`), no desde la empresa.
 - **Comportamiento por defecto:** si nunca se creó una configuración de módulo para la empresa, **el módulo se considera habilitado** (default-on). Tenerlo en cuenta al asumir que algo está "apagado".
+
+> **📷 Captura sugerida — Plataforma · módulos del tenant**  
+> Ruta: `/platform/tenants/[id]/modules` · Mostrar columnas Explícita/Default-on y cobertura · Tip: solo para material interno del proveedor SaaS (no entregar al cliente final).
 
 ---
 
@@ -108,6 +121,9 @@ flowchart TB
 - En la matriz, algunos módulos aparecen como **no disponibles en esta versión** (p. ej. contratos, órdenes de cambio, RFIs, conciliación bancaria, impuestos): no hay pantallas operativas.
 - La autorización se aplica **también en el backend** (servicios), no solo en la interfaz.
 
+> **📷 Captura sugerida — Matriz de permisos (solo lectura)**  
+> Ruta: `/configuracion/permisos` · Mostrar banner “solo lectura” + aviso de módulos no disponibles · Tip: no recortar el banner.
+
 ### 2.4 Reglas especiales
 
 - Cierre de período y transferencia de empresa (tenant) están restringidos a `OWNER`/`ADMIN`.
@@ -122,6 +138,9 @@ flowchart TB
 - **Error a evitar:** dar de alta el mismo contacto dos veces cuando cumple varios roles. Usar siempre un contacto con múltiples roles.
 - Se debe crear el **cliente** antes de crear el proyecto que lo referencia.
 
+> **📷 Captura sugerida — Directorio / contacto con roles**  
+> Ruta: `/directorio` o detalle de contacto · Mostrar roles CLIENT / SUPPLIER / SUBCONTRACTOR en un mismo contacto · Tip: datos demo, sin CUIT reales de clientes.
+
 ---
 
 ## 4. Tesorería (nivel empresa)
@@ -132,6 +151,9 @@ Configurar tesorería **antes** de operar cobranzas y pagos.
 - **Movimientos:** se generan **automáticamente** al cobrar (ingreso) y pagar (egreso); se pueden **anular** con traza (nunca se borran).
 - **Transferencias internas** (`/tesoreria/transferencias`): mueven fondos entre cuentas propias como **dos movimientos atómicos** (salida + entrada).
 - **Reportes** (`/tesoreria/reportes`): posición de caja, movimientos y flujo de caja.
+
+> **📷 Captura sugerida — Tesorería con subnav**  
+> Ruta: `/tesoreria` · Mostrar `ModuleSubnav` (Resumen · Cuentas · Transferencias · Reportes) · Tip: incluir al menos una cuenta con saldo.
 
 > **Terminología correcta:** los tipos de movimiento en el sistema son `INFLOW` (ingreso), `OUTFLOW` (egreso), `TRANSFER_IN`, `TRANSFER_OUT` y `ADJUSTMENT`. (La guía original mencionaba `INCOME`/`OUTCOME`; esos términos **no existen** en el código.)
 
@@ -164,6 +186,12 @@ stateDiagram-v2
 
 - La **cancelación es no destructiva** (conserva datos y traza).
 - **Menú del proyecto:** Resumen · Planificación · Operación · Finanzas del proyecto · Administración.
+
+> **📷 Captura sugerida — Alta de proyecto**  
+> Ruta: `/proyectos/nuevo` · Mostrar campos código, nombre, cliente, tipo PUBLIC/PRIVATE · Tip: no enviar sin completar cliente.
+
+> **📷 Captura sugerida — Menú del proyecto (Operación)**  
+> Ruta: cualquier `/proyectos/[id]/…` · Expandir sección Operación con **Recepciones** y **Consumos** visibles · Tip: captura clave post Lotes 1–3.
 
 ### 5.3 Menú del proyecto (rutas reales)
 
@@ -212,6 +240,9 @@ stateDiagram-v2
 
 > **Hito clave:** con `APPROVED` o `CLOSED` se habilitan las certificaciones al cliente y el baseline de control de costos.
 
+> **📷 Captura sugerida — Presupuesto aprobado / WBS**  
+> Ruta: `/proyectos/[id]/presupuestos/[budgetId]` · Mostrar estado APPROVED + árbol WBS con un ítem hoja · Tip: copy de adenda operativa (sin “versión” formal).
+
 ### 6.3 Adendas — limitación actual
 
 - Un cambio contractual se maneja hoy como **adenda operativa / presupuesto nuevo** del proyecto (copy de producto: **sin** “versión” formal automática).
@@ -230,6 +261,9 @@ stateDiagram-v2
 - **Estados de ítem (enum `ScheduleItemStatus`):** `PLANNED`, `IN_PROGRESS`, `BLOCKED`, `COMPLETED`, `CANCELLED` (el Kanban se organiza por estos estados).
 - **Dependencias:** solo **Finish‑to‑Start (FS)**. Las violaciones generan **advertencias**, no bloqueos.
 - **Vínculo WBS ↔ cronograma:** cada tarea puede enlazar nodos WBS (uno primario), lo que habilita KPIs y el sync de avance real.
+
+> **📷 Captura sugerida — Cronograma Gantt**  
+> Ruta: `/proyectos/[id]/cronograma?view=gantt` · Mostrar tareas + hitos · Tip: una obra con 5–8 ítems alcanza.
 
 ### 7.1 Cuatro dimensiones de avance (no confundir)
 
@@ -261,6 +295,9 @@ flowchart LR
 2. Adjuntar fotos y observaciones.
 3. **Enviar** → `SUBMITTED`; el PM **aprueba** → `APPROVED`.
 
+> **📷 Captura sugerida — Parte de obra (detalle)**  
+> Ruta: `/proyectos/[id]/libro-obra/[logId]` · Mostrar avance por WBS + adjuntos · Tip: estado SUBMITTED o APPROVED.
+
 ### 8.2 Efectos al aprobar
 
 - El parte queda **inmutable** (salvo anulación con motivo).
@@ -268,6 +305,9 @@ flowchart LR
 - Los materiales con producto + depósito pueden generar **consumo de inventario** (salida de stock).
 
 > **Nota de navegación:** el listado de consumos está en `/proyectos/[id]/consumos` (menú Operación → **Consumos**). El alta es `/consumos/nuevo`.
+
+> **📷 Captura sugerida — Listado de consumos**  
+> Ruta: `/proyectos/[id]/consumos` · Mostrar empty state con CTA o filas de consumo · Tip: no confundir con Inventario genérico.
 
 ---
 
@@ -302,11 +342,17 @@ flowchart LR
 - **Imputación:** cada línea se asigna a un nodo **WBS** (idealmente ítem hoja).
 - **Control de desvíos de precio** contra el presupuesto por tramos.
 
+> **📷 Captura sugerida — OC confirmada con links**  
+> Ruta: `/proyectos/[id]/ordenes-compra/[poId]` · Mostrar estado CONFIRMED + enlace a recepción / factura · Tip: copy de auto-aprobación si aparece en el flujo.
+
 ### 9.3 Recepciones
 
 - **Menú:** Operación → **Recepciones** (`/proyectos/[id]/recepciones`).
 - **Alta:** desde la OC → **Nueva recepción** (`/ordenes-compra/[poId]/recepciones/nueva`) o desde el listado de recepciones.
 - Al confirmar, actualiza cantidades recibidas y puede generar **entrada de stock** si hay depósito/producto.
+
+> **📷 Captura sugerida — Listado Recepciones**  
+> Ruta: `/proyectos/[id]/recepciones` · Mostrar listado (no solo URL oculta) · Tip: captura clave Lote 1 D-01.
 
 ---
 
@@ -317,6 +363,9 @@ flowchart LR
 1. Alta del contrato con un **subcontratista** del directorio; imputable a WBS categoría **SUB**.
 2. **Certificaciones de subcontrato** (enum `SubcontractCertificationStatus`): `DRAFT → ISSUED → APPROVED` (o `REJECTED` / `CANCELLED`).
 3. Al **aprobar** la certificación se genera (o se ofrece CTA hacia) una **factura de proveedor en borrador** (y con ello una cuenta por pagar), habilitando el pago.
+
+> **📷 Captura sugerida — Cert. subcontrato con factura**  
+> Ruta: `/proyectos/[id]/subcontratos/[subId]/certificaciones/[certId]` · Mostrar badge de estado de factura + CTA “Revisar y emitir” o “Ver factura” · Tip: Lote 3 B-03.
 
 > **Corrección respecto de la guía original:** el estado intermedio es **`ISSUED`** (emitida), no `SUBMITTED`. Además, la certificación de subcontrato aprobada genera una **factura de proveedor (SupplierInvoice) en DRAFT**, que al emitirse crea la cuenta por pagar.
 
@@ -355,6 +404,9 @@ stateDiagram-v2
 - **No hay estado `INVOICED`** en la certificación: el estado de cobro se **deriva** de las cobranzas asociadas (por diseño).
 - La emisión de la factura es un **paso manual**; la certificación aprobada **no crea la factura automáticamente**.
 
+> **📷 Captura sugerida — Certificación cliente APPROVED**  
+> Ruta: `/proyectos/[id]/certificaciones/[certId]` · Mostrar CTA **Emitir factura** o panel de factura vinculada · Tip: Lote 3 B-02.
+
 ---
 
 ## 12. Facturar, cobrar y pagar (nivel proyecto y empresa)
@@ -373,6 +425,9 @@ flowchart LR
 - **Cobranzas** (`/proyectos/[id]/cobranzas`): ingresan dinero a una cuenta de tesorería (movimiento `INFLOW`) y reducen el saldo pendiente.
 - **Venta rápida / anticipo** (`/proyectos/[id]/facturas/anticipo/nueva`): crea factura + cuenta por cobrar (+ cobro opcional) en un paso.
 
+> **📷 Captura sugerida — Factura emitida → CxC / cobranza**  
+> Ruta: `/proyectos/[id]/facturas/[invoiceId]` · Mostrar panel CxC vinculada + CTA Registrar cobranza · Tip: Lote 3 D-03.
+
 ### 12.2 Facturas de proveedor y pagos (AP)
 
 ```mermaid
@@ -384,13 +439,19 @@ flowchart LR
 - **Facturas de proveedor** (`/proyectos/[id]/facturas-proveedor` y consolidado `/finanzas/facturas-proveedor`).
 - **Cuentas por pagar** (`/proyectos/[id]/cuentas-por-pagar` y `/finanzas/cuentas-por-pagar`), con aging.
 - **Pagos** (`/proyectos/[id]/pagos`, o desde CxP): egresan dinero (movimiento `OUTFLOW`) y actualizan el estado del payable a `PARTIAL`/`PAID`.
-- **Gasto corporativo rápido:** desde `/finanzas/facturas-proveedor` se puede registrar factura + pago sin proyecto.
+- **Gasto corporativo:** desde `/finanzas/facturas-proveedor`, **Nueva factura** abre un diálogo para registrar el documento sin proyecto. El alta rápida con pago opcional vive en `/finanzas/transacciones`.
 
 > **Notas de navegación y límites:**
-> - El listado consolidado de pagos a proveedor está en `/finanzas/pagos-proveedor` (accesible desde el hub de Finanzas y desde Cuentas por pagar; no tiene ítem propio en la subnav de Finanzas).
+> - Los pagos a proveedor se consultan en `/finanzas/transacciones` filtrando origen `PAYMENT` y egreso. No existe un listado independiente; el detalle del pago sigue disponible desde CxP y trazabilidad.
 > - **Retenciones** en pagos son **manuales** (no hay módulo dedicado ni acumulados de retención).
 > - Igual que en tesorería, cobros y pagos operan en **una sola moneda**.
 > - Desde CxP y Facturas y gastos se pueden **exportar CSV/PDF** del listado corporativo.
+
+> **📷 Captura sugerida — CxP corporativo con export**  
+> Ruta: `/finanzas/cuentas-por-pagar` · Mostrar aging o listado + botones Exportar · Tip: Lote 5 F-01/G-01.
+
+> **📷 Captura sugerida — Transacciones / pagos proveedor**  
+> Ruta: `/finanzas/transacciones?sourceType=PAYMENT&type=OUTFLOW` · Mostrar filtros y movimientos de pago.
 
 ---
 
@@ -401,6 +462,9 @@ flowchart LR
 - **Ruta:** `/proyectos/[id]/control-costos` (drill-down en `/control-costos/[wbsNodeId]`).
 - Compara **presupuesto baseline vs. real** por ítem WBS, en capas: **comprometido**, **devengado**, **pagado**, **consumido**, más **certificado acumulado**.
 - **Exposición esperada** = devengado + comprometido abierto (**no** suma OC + factura duplicados; diseño anti doble conteo).
+
+> **📷 Captura sugerida — Control de costos**  
+> Ruta: `/proyectos/[id]/control-costos` · Mostrar tabla con columnas comprometido/devengado/pagado · Tip: primera columna sticky si aplica.
 
 ### 13.2 Rentabilidad y reportes
 
@@ -417,6 +481,9 @@ flowchart LR
 - **Gastos generales / overhead** (`/finanzas/gastos-generales`): se **imputan a las obras** de forma **manual** o por **prorrateo automático** según el peso del costo directo, con **cierre de período**. *(Es un módulo complejo; conviene validar los cálculos en producción.)*
 - **Inventario corporativo** (`/inventario`): productos (`/inventario/productos`), depósitos (`/inventario/depositos`), movimientos (`/inventario/movimientos`, ledger append‑only; el saldo se calcula sumando movimientos) y transferencias (`/inventario/transferencias`).
 
+> **📷 Captura sugerida — Inventario con subnav**  
+> Ruta: `/inventario` · Mostrar ModuleSubnav Productos / Depósitos / Movimientos / Transferencias · Tip: Lote 4 D-05.
+
 > **Limitación:** no hay **valuación de inventario FIFO/promedio** configurable; el costo se toma de la compra.
 
 ---
@@ -432,6 +499,9 @@ flowchart LR
 > - Un asiento **`POSTED` no puede anularse** desde la interfaz (no hay reversa); corregir un asiento posteado no es posible por UI.
 > - **No hay un cierre de período contable general** (solo existe congelamiento de período para gastos generales).
 > - En la práctica, la contabilidad funciona hoy como un **libro paralelo mayormente manual**.
+
+> **📷 Captura sugerida — Contabilidad con subnav**  
+> Ruta: `/contabilidad` · Mostrar ModuleSubnav Resumen / Cuentas / Asientos / Reglas · Tip: dejar claro que es sugerencias + posteo manual.
 
 ---
 
@@ -493,6 +563,12 @@ flowchart LR
 - [ ] Reportes programados y alertas operativas revisados (OWNER/ADMIN)
 - [ ] Comprender que la **contabilidad es manual** hoy
 
+> **📷 Captura sugerida — Alertas · Última actividad**  
+> Ruta: `/notificaciones/alertas` · Mostrar card Última actividad · Tip: Lote 5 G-03; solo OWNER/ADMIN.
+
+> **📷 Captura sugerida — Reportes programados (Omitido ≠ Fallido)**  
+> Ruta: `/configuracion/reportes` · Mostrar badge de última corrida con hint visible · Tip: Lote 5 G-02.
+
 ### Project Manager / Jefe de obra
 
 - [ ] Proyecto en `ACTIVE`
@@ -521,7 +597,7 @@ flowchart LR
 
 - [ ] Facturas de venta emitidas desde certificaciones
 - [ ] Cobranzas aplicadas a las cuentas por cobrar
-- [ ] Cuentas por pagar revisadas y pagos registrados (`/finanzas/pagos-proveedor`)
+- [ ] Cuentas por pagar revisadas y pagos consultados en Transacciones (`sourceType=PAYMENT`)
 - [ ] Exports CSV/PDF de CxP / facturas corporativas cuando haga falta
 - [ ] Movimientos de caja conciliados manualmente (no hay conciliación bancaria automática)
 - [ ] Reportes de flujo de caja y aging revisados
@@ -551,7 +627,7 @@ flowchart LR
 | **Ajustes de stock/caja (`ADJUSTMENT`)** | Enum reservado; sin UI. |
 | **Permisos** | La matriz es de solo lectura; los roles son fijos. |
 | **Segundo factor (2FA)** | No disponible; el acceso es solo con Google. |
-| **DOCX de guía** | El Word profesional puede estar desfasado respecto de esta guía MD; ver [`guides/CHANGELOG_UI_LOTES_1_6.md`](./guides/CHANGELOG_UI_LOTES_1_6.md) antes de regenerar. |
+| **DOCX de guía** | Regenerar desde esta MD + [`guides/CHANGELOG_UI_LOTES_1_6.md`](./guides/CHANGELOG_UI_LOTES_1_6.md). Los bloques `📷 Captura sugerida` marcan huecos para pantallazos reales. |
 
 > Estas limitaciones **no impiden** el uso productivo del sistema, pero deben conocerse para no asumir capacidades que hoy son manuales o inexistentes.
 
@@ -570,4 +646,4 @@ flowchart LR
 
 ---
 
-*Documento vivo. Actualizado en Lote 7 (preparación docs / capacitación). Actualizar cuando cambien rutas, servicios o el Prisma schema.*
+*Documento vivo. Actualizado post Lotes 1–7 (UI/UX + placeholders de capturas). Actualizar cuando cambien rutas, servicios o el Prisma schema.*

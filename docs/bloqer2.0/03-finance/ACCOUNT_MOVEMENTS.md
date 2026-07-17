@@ -15,7 +15,8 @@
 | `date_accounting` | Imputación contable |
 | `date_value` | Acreditación bancaria |
 | `status` | `DRAFT` \| `CONFIRMED` \| `RECONCILED` \| `CANCELLED` |
-| `counterparty_id` | Contact opcional |
+| `counterparty_id` / `counterpartyContactId` | Contact opcional (ingresos corporativos manuales — [D-049](../00-product/DECISION_LOG.md); no sustituye Collection/Payment) |
+| `externalInvoiceRef` | Referencia opcional al comprobante oficial emitido fuera de Bloqer (p. ej. ARCA) |
 | `project_id` | Opcional |
 | `category_id` | Categoría movimiento |
 | `source_doc_type`, `source_doc_id` | Origen polimórfico |

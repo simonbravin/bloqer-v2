@@ -19,8 +19,9 @@
 
 - **Phase 1:** política operativa documentada en [D-037](../00-product/DECISION_LOG.md), [`SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md) §17, [ADR-Phase1-07](./ARCHITECTURE_DECISION_RECORDS.md). No migración AR.
 - Política documentada: cuándo usar `TREASURY_INFLOW` / asiento manual vs obligar documento operativo.
-- `journal-entry-source-link` y reportes: enlaces seguros según rol.
-- Sin tocar `SalesInvoice` hasta nueva decisión.
+- **[D-049] (2026-07-17):** ingreso corporativo enriquecido — `AccountMovement.counterpartyContactId` + `externalInvoiceRef` opcionales; UI Transacciones “Ingreso / cobro”. Sigue siendo opción (2): sin `SalesInvoice`/`Receivable` corporativos.
+- `journal-entry-source-link` y reportes: enlaces seguros según rol; ledger/CSV/PDF muestran contraparte y comprobante externo.
+- Sin tocar `SalesInvoice` hasta nueva decisión (Fase 2 / opciones 1 o 3 + ARCA).
 
 ## Opción 3 — Nuevo documento de ingreso
 

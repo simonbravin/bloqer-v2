@@ -28,6 +28,12 @@ export async function registerCorporateTreasuryInflow(
     throw new ServiceError("VALIDATION", "El monto debe ser mayor a 0");
   }
 
+  const counterpartyContactId = input.counterpartyContactId || null;
+  const externalInvoiceRef = input.externalInvoiceRef?.trim() || null;
+  const description = input.description.trim();
+  if (!description) {
+    throw new ServiceError("VALIDATION", "La descripción es requerida");
+  }
   const movementId = randomUUID();
 
   await prisma.$transaction(async (tx) => {
@@ -44,6 +50,29 @@ export async function registerCorporateTreasuryInflow(
       );
     }
 
+    if (counterpartyContactId) {
+      const contact = await tx.contact.findUnique({
+        where: { id: counterpartyContactId },
+        select: { id: true, tenantId: true, status: true },
+      });
+      if (!contact || contact.tenantId !== ctx.tenantId) {
+        throw new ServiceError("NOT_FOUND", "Contacto de contraparte no encontrado");
+      }
+      if (contact.status !== "ACTIVE") {
+        throw new ServiceError("CONFLICT", "El contacto de contraparte no está activo");
+      }
+
+      const clientRole = await tx.contactRole.findUnique({
+        where: { contactId_role: { contactId: counterpartyContactId, role: "CLIENT" } },
+      });
+      if (!clientRole || clientRole.tenantId !== ctx.tenantId || clientRole.status !== "ACTIVE") {
+        throw new ServiceError(
+          "CONFLICT",
+          "El contacto seleccionado no tiene rol de cliente activo",
+        );
+      }
+    }
+
     await tx.accountMovement.create({
       data: {
         id: movementId,
@@ -56,7 +85,9 @@ export async function registerCorporateTreasuryInflow(
         sourceId: movementId,
         currency: account.currency,
         amount,
-        description: input.description,
+        description,
+        counterpartyContactId,
+        externalInvoiceRef,
         status: "CONFIRMED",
         createdBy: ctx.actorUserId,
       },
@@ -68,7 +99,16 @@ export async function registerCorporateTreasuryInflow(
       "AccountMovement",
       movementId,
       { companyId: ctx.companyId },
-      { after: { type: "INFLOW", sourceType: "MANUAL_ADJUSTMENT", amount: input.amount }, tx },
+      {
+        after: {
+          type: "INFLOW",
+          sourceType: "MANUAL_ADJUSTMENT",
+          amount: input.amount,
+          counterpartyContactId,
+          externalInvoiceRef,
+        },
+        tx,
+      },
     );
   });
 

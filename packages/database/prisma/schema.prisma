@@ -897,6 +897,8 @@ model Contact {
   jobsiteLogLabors          JobsiteLogLabor[]
   /// Accounts-payable payments (`payments` table); distinct from `payables` / treasury naming.
   apPayments                Payment[]
+  /// Optional counterparty on manual treasury movements (corporate inflows / future outflows).
+  accountMovementsAsCounterparty AccountMovement[] @relation("AccountMovementCounterparty")
 
   @@unique([tenantId, taxId])
   @@index([tenantId, status])
@@ -1589,32 +1591,38 @@ model TreasuryAccount {
 // Phase 16B: optional project dimension for reporting / manual classification.
 // Movements from Collection/Payment keep projectId null unless explicitly set later; avoid duplicating source truth.
 model AccountMovement {
-  id           String                    @id @default(uuid())
-  tenantId     String
-  companyId    String?
-  accountId    String
-  projectId    String?
-  movementDate DateTime                  @db.Date
-  type         AccountMovementType
-  sourceType   AccountMovementSourceType
-  sourceId     String?
-  currency     String
-  amount       Decimal                   @db.Decimal(18, 4)
-  description  String
-  status       AccountMovementStatus     @default(CONFIRMED)
-  transferId   String?
-  createdBy    String?
-  createdAt    DateTime                  @default(now())
-  updatedAt    DateTime                  @updatedAt
+  id                     String                    @id @default(uuid())
+  tenantId               String
+  companyId              String?
+  accountId              String
+  projectId              String?
+  /// Optional directory contact for manual corporate inflows (D-049); not used for COLLECTION/PAYMENT.
+  counterpartyContactId  String?
+  /// External official invoice / voucher reference (e.g. ARCA FC A 0001-00001234) when issued outside Bloqer.
+  externalInvoiceRef     String?
+  movementDate           DateTime                  @db.Date
+  type                   AccountMovementType
+  sourceType             AccountMovementSourceType
+  sourceId               String?
+  currency               String
+  amount                 Decimal                   @db.Decimal(18, 4)
+  description            String
+  status                 AccountMovementStatus     @default(CONFIRMED)
+  transferId             String?
+  createdBy              String?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
 
-  tenant  Tenant          @relation(fields: [tenantId], references: [id])
-  account TreasuryAccount @relation(fields: [accountId], references: [id])
-  project Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  account      TreasuryAccount @relation(fields: [accountId], references: [id])
+  project      Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  counterparty Contact?        @relation("AccountMovementCounterparty", fields: [counterpartyContactId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, accountId, movementDate])
   @@index([tenantId, sourceType, sourceId])
   @@index([transferId])
   @@index([tenantId, projectId])
+  @@index([tenantId, counterpartyContactId])
   @@map("account_movements")
 }
 

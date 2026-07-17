@@ -59,10 +59,11 @@ Ver máquinas SalesInvoice y Receivable.
 ## 16. Permisos
 SALES emite; FINANCE cobra y anula.
 
-## 17. Ingresos corporativos sin proyecto ([D-037], Phase 1)
+## 17. Ingresos corporativos sin proyecto ([D-037], [D-049])
 
-- Mientras `SalesInvoice` / `Receivable` / `Collection` exijan **`projectId`** en schema, los **ingresos de estructura** (sin obra en DB) se reflejan vía **`JournalEntry`** (+ líneas, `projectId` null donde corresponda) y **tesorería** (`AccountMovement` / ingresos no ligados a `Receivable` de obra), con política interna del tenant. **No** se usa `SalesInvoice` “ficticia” para este fin.
-- Si el negocio exige **C×C formal sin obra**, reabrir [Q-030](../00-product/OPEN_QUESTIONS.md) con opción **(1)** o **(3)** y migración/ADR.
+- Mientras `SalesInvoice` / `Receivable` / `Collection` exijan **`projectId`** en schema, los **ingresos de estructura** (sin obra en DB) se reflejan vía **`JournalEntry`** (+ líneas, `projectId` null donde corresponda) y **tesorería** (`AccountMovement` con `sourceType = MANUAL_ADJUSTMENT` / kind UI `TREASURY_INFLOW`), con política interna del tenant. **No** se usa `SalesInvoice` “ficticia” para este fin.
+- [D-049](../00-product/DECISION_LOG.md): el ingreso corporativo admite opcionalmente **cliente/contraparte** del directorio (`counterpartyContactId`) y **N° de comprobante externo** (`externalInvoiceRef`) para registrar facturación oficial hecha por fuera. No crea CxC.
+- Si el negocio exige **C×C formal sin obra** o emisión legal desde Bloqer (ARCA), reabrir [Q-030](../00-product/OPEN_QUESTIONS.md) con opción **(1)** o **(3)** y migración/ADR (Fase 2 planificada en D-049).
 
 ## 18. Eventos disparados / consumidos
 - `sales_invoice.*`, `collection.confirmed`, `receivable.*`.

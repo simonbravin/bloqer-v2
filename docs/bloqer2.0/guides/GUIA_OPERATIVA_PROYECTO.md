@@ -412,7 +412,7 @@ Reporte: `/proyectos/[id]/reportes/subcontratos`.
 
 1. Factura proveedor (`/facturas-proveedor`) crea **Payable**.
 2. Finanzas aprueba para pago según política.
-3. **Pago** (`/pagos` o finanzas global `/finanzas/pagos-proveedor`):
+3. **Pago** (`/pagos` en la obra o consulta global en `/finanzas/transacciones` con origen `PAYMENT`):
    - Seleccionar payable(s)
    - Cuenta origen, retenciones manuales si corresponde
 4. Confirmar → movimiento **OUTCOME** + payable `PAID` / `PARTIAL`.

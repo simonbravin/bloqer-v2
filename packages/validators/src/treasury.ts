@@ -40,10 +40,20 @@ export const createInternalTransferSchema = z.object({
 
 
 export const createCorporateTreasuryInflowSchema = z.object({
-  accountId:     z.string().uuid(),
-  movementDate:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  amount:        z.string().regex(/^\d+(\.\d+)?$/, "Monto invalido"),
-  description:   z.string().min(1, "Descripcion requerida"),
+  accountId:              z.string().uuid(),
+  movementDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  amount:                 z.string().regex(/^\d+(\.\d+)?$/, "Monto invalido"),
+  description:            z.string().trim().min(1, "Descripcion requerida"),
+  /** Optional directory contact with CLIENT role for corporate inflows — D-049. */
+  counterpartyContactId:  z.string().uuid().optional().nullable(),
+  /** Official voucher issued outside Bloqer (e.g. ARCA FC A 0001-00001234). */
+  externalInvoiceRef:     z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .nullable()
+    .transform((v) => (v && v.length > 0 ? v : null)),
 });
 
 export const registerTransactionSchema = z.discriminatedUnion("kind", [

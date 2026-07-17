@@ -553,6 +553,7 @@ export async function exportTreasuryMovementsPdf(
         { key: "date", label: "Fecha", flex: 0.85 },
         { key: "account", label: "Cuenta", flex: 1 },
         { key: "type", label: "Tipo", flex: 0.7 },
+        { key: "counterparty", label: "Contraparte", flex: 1 },
         { key: "amount", label: "Importe", flex: 0.85 },
         { key: "currency", label: "Mon.", flex: 0.45 },
         { key: "desc", label: "Descripción", flex: 1.2 },
@@ -561,6 +562,11 @@ export async function exportTreasuryMovementsPdf(
         date: r.movementDate,
         account: r.accountName,
         type: r.type,
+        counterparty: r.counterpartyName
+          ? r.externalInvoiceRef
+            ? `${r.counterpartyName} (${r.externalInvoiceRef})`
+            : r.counterpartyName
+          : (r.externalInvoiceRef ?? ""),
         amount: r.signedAmount,
         currency: r.currency,
         desc: r.description,
