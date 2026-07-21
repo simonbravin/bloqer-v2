@@ -35,7 +35,7 @@ Ver [`MVP_TECHNICAL_SCOPE.md`](./MVP_TECHNICAL_SCOPE.md): define **qué debe est
 Orden sugerido **antes** de invertir fuerte en UX de cronograma/WBS ([Q-003](../00-product/OPEN_QUESTIONS.md), [Q-004](../00-product/OPEN_QUESTIONS.md)):
 
 1. **Q-001 variante 0B** (misma persona, dos `Company` activas): solo si negocio lo exige — ADR + migración + selector de contexto; hasta entonces [D-036](../00-product/DECISION_LOG.md).
-2. **Q-030 ampliaciones (1) AR nullable o (3) nuevo documento:** si Owner reabre la pregunta — ver [`Q030_CORPORATE_INCOME_CHECKLIST.md`](./Q030_CORPORATE_INCOME_CHECKLIST.md); Phase 1 cerrada con [D-037](../00-product/DECISION_LOG.md).
+2. **Q-030 opción (1) AR nullable:** **cerrada** con [D-051](../00-product/DECISION_LOG.md) / ADR-015 (opción 3 descartada). Phase 1 opción (2) GL+tesorería sigue válida para ingresos sin CxC — [`Q030_CORPORATE_INCOME_CHECKLIST.md`](./Q030_CORPORATE_INCOME_CHECKLIST.md).
 3. **Q-007** conciliación bancaria / extractos (tesorería “ERP completo”) — ver [`PENDING_ARCHITECTURE_ITEMS.md`](./PENDING_ARCHITECTURE_ITEMS.md) P-TRZ-05 / P-ERD-06.
 4. **Phase 4** ([`PHASE_4_REPORTING.md`](./PHASE_4_REPORTING.md)): compras, inventario, reportes operativos.
 5. **Phase 5** endurecimiento: tests de invariantes financieros, observabilidad, performance.

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { assertCorporatePayableScope } from "./register-transaction-corporate-scope";
+import { assertCorporatePayableScope, assertCorporateReceivableScope } from "./register-transaction-corporate-scope";
 import { ServiceError } from "../types";
 
 const baseCtx = {
@@ -37,6 +37,28 @@ describe("assertCorporatePayableScope", () => {
         { projectId: null, companyId: "c2" },
         { ...baseCtx, companyId: null },
       ),
+    );
+  });
+});
+
+describe("assertCorporateReceivableScope (D-051)", () => {
+  it("allows corporate receivable for matching company", () => {
+    assert.doesNotThrow(() =>
+      assertCorporateReceivableScope({ projectId: null, companyId: "c1" }, baseCtx),
+    );
+  });
+
+  it("rejects project-scoped receivable", () => {
+    assert.throws(
+      () => assertCorporateReceivableScope({ projectId: "p1", companyId: "c1" }, baseCtx),
+      (err: unknown) => err instanceof ServiceError && err.code === "FORBIDDEN",
+    );
+  });
+
+  it("rejects receivable from another company when ctx has companyId", () => {
+    assert.throws(
+      () => assertCorporateReceivableScope({ projectId: null, companyId: "c2" }, baseCtx),
+      (err: unknown) => err instanceof ServiceError && err.code === "FORBIDDEN",
     );
   });
 });

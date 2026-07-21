@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { createCollectionAction } from "@/app/(app)/proyectos/[id]/cobranzas/actions";
+import { createCompanyCollectionAction } from "@/app/(app)/finanzas/cuentas-por-cobrar/actions";
 
 interface AccountOption {
   id: string;
@@ -18,7 +19,9 @@ interface AccountOption {
 }
 
 interface Props {
-  projectId: string;
+  /** Required when `companyFinanzas` is false */
+  projectId?: string;
+  companyFinanzas?: boolean;
   receivableId: string;
   receivableBalance: string;
   receivableCurrency: string;
@@ -27,6 +30,7 @@ interface Props {
 
 export function CollectionForm({
   projectId,
+  companyFinanzas = false,
   receivableId,
   receivableBalance,
   receivableCurrency,
@@ -42,17 +46,26 @@ export function CollectionForm({
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!accountId) { setError("Seleccione una cuenta de tesorería"); return; }
+    if (!companyFinanzas && !projectId) {
+      setError("Falta el proyecto");
+      return;
+    }
     const fd = new FormData(e.currentTarget);
+    const payload = {
+      receivableId,
+      accountId,
+      collectionDate: fd.get("collectionDate") as string,
+      amount:         fd.get("amount") as string,
+      notes:          (fd.get("notes") as string) || null,
+    };
     startTransition(async () => {
-      const res = await createCollectionAction(projectId, {
-        receivableId,
-        accountId,
-        collectionDate: fd.get("collectionDate") as string,
-        amount:         fd.get("amount") as string,
-        notes:          (fd.get("notes") as string) || null,
-      });
+      const res = companyFinanzas
+        ? await createCompanyCollectionAction(payload)
+        : await createCollectionAction(projectId!, payload);
       if ("error" in res) {
         setError(res.error);
+      } else if (companyFinanzas) {
+        router.push(`/finanzas/cuentas-por-cobrar/${receivableId}`);
       } else {
         router.push(`/proyectos/${projectId}/cuentas-por-cobrar/${receivableId}`);
       }

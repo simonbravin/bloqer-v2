@@ -109,11 +109,16 @@ export async function createCollection(
 
   const receivablePreview = await prisma.receivable.findUnique({
     where: { id: input.receivableId },
-    select: { tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!receivablePreview) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
   if (receivablePreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(receivablePreview.projectId, ctx.tenantId);
+  if (ctx.companyId && receivablePreview.companyId !== ctx.companyId) {
+    throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
+  }
+  if (receivablePreview.projectId) {
+    await assertProjectAllowsOperationalMutation(receivablePreview.projectId, ctx.tenantId);
+  }
 
   const result = await prisma.$transaction(async (tx) => {
     // Load receivable inside txn for consistency
@@ -185,7 +190,7 @@ export async function createCollection(
     await tx.accountMovement.create({
       data: {
         tenantId:    ctx.tenantId,
-        companyId:   account.companyId,
+        companyId:   account.companyId ?? companyId,
         projectId:   receivable.projectId,
         accountId:   input.accountId,
         movementDate: new Date(input.collectionDate),

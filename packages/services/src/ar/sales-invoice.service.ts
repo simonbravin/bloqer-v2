@@ -148,16 +148,35 @@ export async function countOpenSalesInvoicesByProject(
   });
 }
 
-async function resolveCompanyId(projectId: string, ctx: ServiceContext): Promise<string> {
+async function resolveCompanyId(projectId: string | null | undefined, ctx: ServiceContext): Promise<string> {
   if (ctx.companyId) return ctx.companyId;
-  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { companyId: true } });
-  if (project?.companyId) return project.companyId;
+  if (projectId) {
+    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { companyId: true } });
+    if (project?.companyId) return project.companyId;
+  }
   const company = await prisma.company.findFirst({
     where: { tenantId: ctx.tenantId, status: "ACTIVE" },
     orderBy: { createdAt: "asc" },
   });
   if (!company) throw new ServiceError("CONFLICT", "No hay empresa activa para emitir la factura");
   return company.id;
+}
+
+/** Public alias for corporate AR (D-051) — mirrors resolveCompanyIdForAp. */
+export async function resolveCompanyIdForAr(
+  projectId: string | null | undefined,
+  ctx: ServiceContext,
+): Promise<string> {
+  return resolveCompanyId(projectId, ctx);
+}
+
+async function assertProjectGuardIfPresent(
+  projectId: string | null | undefined,
+  tenantId: string,
+): Promise<void> {
+  if (projectId) {
+    await assertProjectAllowsOperationalMutation(projectId, tenantId);
+  }
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -171,7 +190,13 @@ export async function createSalesInvoice(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas");
   }
 
-  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+  if (!input.projectId) {
+    throw new ServiceError(
+      "VALIDATION",
+      "Para facturas corporativas usá el flujo Registrar transacción (Ingreso / factura).",
+    );
+  }
+  await assertProjectGuardIfPresent(input.projectId, ctx.tenantId);
 
   const companyId = await resolveCompanyId(input.projectId, ctx);
 
@@ -195,6 +220,7 @@ export async function createSalesInvoice(
         currency: input.currency ?? "ARS",
         notes: input.notes ?? null,
         internalNotes: input.internalNotes ?? null,
+        externalInvoiceRef: input.externalInvoiceRef ?? null,
         createdBy: ctx.actorUserId,
         updatedBy: ctx.actorUserId,
       },
@@ -361,7 +387,7 @@ export async function updateSalesInvoice(
   const inv = await prisma.salesInvoice.findUnique({ where: { id } });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(inv.projectId, ctx.tenantId);
+  await assertProjectGuardIfPresent(inv.projectId, ctx.tenantId);
   assertInvoiceEditable(inv);
 
   const updated = await prisma.$transaction(async (tx) => {
@@ -418,7 +444,7 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(invPreview.projectId, ctx.tenantId);
+  await assertProjectGuardIfPresent(invPreview.projectId, ctx.tenantId);
 
   const result = await prisma.$transaction(async (tx) => {
     const inv = await tx.salesInvoice.findUnique({

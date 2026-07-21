@@ -1342,33 +1342,36 @@ model CertificationLine {
 // BR-NUM-001: number is sequential per company (Q-002 scope TBD — see PENDING_ARCHITECTURE_ITEMS.md).
 // BR-AR-004: cancelling invoice cascades to cancel linked Receivable (service layer).
 
+// BR-AR-003 / D-051: projectId nullable — corporate AR (no obra) mirrors SupplierInvoice.
 model SalesInvoice {
-  id              String             @id @default(uuid())
-  tenantId        String
-  companyId       String
-  projectId       String
-  clientContactId String
-  certificationId String?
-  number          Int
-  issueDate       DateTime           @db.Date
-  dueDate         DateTime           @db.Date
-  currency        String             @default("ARS")
-  fxRate          Decimal            @default(1) @db.Decimal(18, 6)
-  amountArs       Decimal            @default(0) @db.Decimal(18, 4)
-  subtotal        Decimal            @default(0) @db.Decimal(18, 4)
-  taxAmount       Decimal            @default(0) @db.Decimal(18, 4)
-  totalAmount     Decimal            @default(0) @db.Decimal(18, 4)
-  status          SalesInvoiceStatus @default(DRAFT)
-  notes           String?
-  internalNotes   String?
-  createdBy       String?
-  updatedBy       String?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  id                 String             @id @default(uuid())
+  tenantId           String
+  companyId          String
+  projectId          String?
+  clientContactId    String
+  certificationId    String?
+  number             Int
+  issueDate          DateTime           @db.Date
+  dueDate            DateTime           @db.Date
+  currency           String             @default("ARS")
+  fxRate             Decimal            @default(1) @db.Decimal(18, 6)
+  amountArs          Decimal            @default(0) @db.Decimal(18, 4)
+  subtotal           Decimal            @default(0) @db.Decimal(18, 4)
+  taxAmount          Decimal            @default(0) @db.Decimal(18, 4)
+  totalAmount        Decimal            @default(0) @db.Decimal(18, 4)
+  status             SalesInvoiceStatus @default(DRAFT)
+  /// External official voucher ref when issued outside Bloqer (e.g. ARCA) — D-051 corporate AR bridge.
+  externalInvoiceRef String?
+  notes              String?
+  internalNotes      String?
+  createdBy          String?
+  updatedBy          String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   tenant        Tenant             @relation(fields: [tenantId], references: [id])
   company       Company            @relation(fields: [companyId], references: [id])
-  project       Project            @relation(fields: [projectId], references: [id])
+  project       Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
   clientContact Contact            @relation(fields: [clientContactId], references: [id])
   certification Certification?     @relation(fields: [certificationId], references: [id])
   lines         SalesInvoiceLine[]
@@ -1407,13 +1410,12 @@ model SalesInvoiceLine {
 
 // BR-AR-001: Receivable created from issued SalesInvoice (1:1).
 // BR-AR-002: status derived from paidAmount — maintained by service layer.
-// BR-AR-003: product concepts may allow debt without a project; **schema requires projectId** today (all issuing flows tie to a project). Relaxing to nullable would need migration + rules review.
-// PARTIAL/PAID/OVERDUE reserved for Collections phase.
+// BR-AR-003 / D-051: projectId nullable — corporate AR without obra (mirrors Payable).
 model Receivable {
   id              String           @id @default(uuid())
   tenantId        String
   companyId       String
-  projectId       String
+  projectId       String?
   clientContactId String
   salesInvoiceId  String           @unique
   issueDate       DateTime         @db.Date
@@ -1430,7 +1432,7 @@ model Receivable {
 
   tenant        Tenant       @relation(fields: [tenantId], references: [id])
   company       Company      @relation(fields: [companyId], references: [id])
-  project       Project      @relation(fields: [projectId], references: [id])
+  project       Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
   clientContact Contact      @relation(fields: [clientContactId], references: [id])
   salesInvoice  SalesInvoice @relation(fields: [salesInvoiceId], references: [id])
   collections   Collection[]
@@ -1630,11 +1632,12 @@ model AccountMovement {
 // On confirm: creates AccountMovement INFLOW + updates Receivable.paidAmount + recalculates status.
 // On cancel: reverses all effects atomically.
 // Currency must match Receivable.currency and TreasuryAccount.currency (no FX in Phase 3C).
+// BR-AR-003 / D-051: projectId nullable — corporate collections without obra (mirrors Payment).
 model Collection {
   id              String           @id @default(uuid())
   tenantId        String
   companyId       String
-  projectId       String
+  projectId       String?
   clientContactId String
   receivableId    String
   salesInvoiceId  String
@@ -1653,7 +1656,7 @@ model Collection {
 
   tenant        Tenant          @relation(fields: [tenantId], references: [id])
   company       Company         @relation(fields: [companyId], references: [id])
-  project       Project         @relation(fields: [projectId], references: [id])
+  project       Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   clientContact Contact         @relation(fields: [clientContactId], references: [id])
   receivable    Receivable      @relation(fields: [receivableId], references: [id])
   salesInvoice  SalesInvoice    @relation(fields: [salesInvoiceId], references: [id])

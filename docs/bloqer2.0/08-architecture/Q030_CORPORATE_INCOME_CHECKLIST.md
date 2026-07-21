@@ -1,6 +1,7 @@
 # Checklist técnica — Ingresos corporativos sin proyecto (Q-030)
 
-> **Phase 1 (2026-05-14):** producto lockeó **opción (2)** — [D-037](../00-product/DECISION_LOG.md), [ADR-Phase1-07](./ARCHITECTURE_DECISION_RECORDS.md). Este checklist sigue siendo la guía para **ampliaciones** (opciones 1 y 3). No implementar (1)/(3) hasta nueva decisión explícita.
+> **Phase 1 (2026-05-14):** opción **(2)** — [D-037](../00-product/DECISION_LOG.md), [ADR-Phase1-07](./ARCHITECTURE_DECISION_RECORDS.md).  
+> **D-051 (2026-07-21):** opción **(1)** implementada — AR con `projectId` nullable. Opción **(3)** descartada.
 
 ## Invariantes (cualquier opción)
 
@@ -8,21 +9,23 @@
 - Mutaciones y totales en `packages/services`; **no** Prisma desde `apps/web`.
 - Gates `can()` + módulos tenant alineados a [`PERMISSIONS_ROUTE_MATRIX.md`](./PERMISSIONS_ROUTE_MATRIX.md).
 
-## Opción 1 — `projectId` nullable en cadena AR
+## Opción 1 — `projectId` nullable en cadena AR — **IMPLEMENTADA (D-051)**
 
-- Migración Prisma + reglas BR-AR-003 actualizadas en docs.
-- Validators (`sales-invoice`, `receivable`, `collection`) + servicios AR + rutas `/finanzas/...` espejo de permisos AP corporativo.
-- Aging AR global: ítems con `projectId` null etiquetados (similar `AGING_AP_COMPANY_PROJECT_LABEL`).
-- Tests: numeración por `companyId`, no mezcla tenant, cobro en cuenta compatible con moneda.
+- [x] Migración Prisma + reglas BR-AR-003 actualizadas en docs.
+- [x] Validators (`sales-invoice`, `registerArIncome`) + servicios AR + rutas `/finanzas/cuentas-por-cobrar/[id]`.
+- [x] Aging AR global: ítems con `projectId` null etiquetados (`AGING_AR_COMPANY_PROJECT_LABEL` = "Empresa").
+- [x] Flujo UI Registrar transacción → Factura / cuenta por cobrar (`AR_INCOME`).
+- [x] `TREASURY_INFLOW` permanece para ingresos sin CxC.
+- [x] Tests: schema `AR_INCOME`, permisos company AR, labels aging, `buildFinancialHref` corporativo, `assertCorporateReceivableScope`.
+- [x] Guards: contacto tenant/`ACTIVE` en `registerArIncome`; mutaciones company vía `assertCompanyReceivableMutable` (no operar CxC de obra desde Finanzas).
+- [x] Guía operativa: flujo Factura/CxC vs Solo caja documentado ([`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md) §12.1 / §14).
+- [ ] ARCA / emisión legal (fuera de alcance).
 
-## Opción 2 — Solo GL + tesorería
+## Opción 2 — Solo GL + tesorería — **Phase 1 (sigue disponible)**
 
-- **Phase 1:** política operativa documentada en [D-037](../00-product/DECISION_LOG.md), [`SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md) §17, [ADR-Phase1-07](./ARCHITECTURE_DECISION_RECORDS.md). No migración AR.
-- Política documentada: cuándo usar `TREASURY_INFLOW` / asiento manual vs obligar documento operativo.
-- **[D-049] (2026-07-17):** ingreso corporativo enriquecido — `AccountMovement.counterpartyContactId` + `externalInvoiceRef` opcionales; UI Transacciones “Ingreso / cobro”. Sigue siendo opción (2): sin `SalesInvoice`/`Receivable` corporativos.
-- `journal-entry-source-link` y reportes: enlaces seguros según rol; ledger/CSV/PDF muestran contraparte y comprobante externo.
-- Sin tocar `SalesInvoice` hasta nueva decisión (Fase 2 / opciones 1 o 3 + ARCA).
+- Política operativa: cuándo usar `TREASURY_INFLOW` vs factura corporativa.
+- [D-049](../00-product/DECISION_LOG.md): `counterpartyContactId` + `externalInvoiceRef` en movimientos manuales.
 
-## Opción 3 — Nuevo documento de ingreso
+## Opción 3 — Nuevo documento de ingreso — **DESCARTADA**
 
-- `STATE_MACHINES.md` + `CORE_ENTITIES.md` + validators + servicios dedicados; evitar solapamiento semántico con `SalesInvoice` obra.
+- Se reutiliza `SalesInvoice` corporativo (espejo de `SupplierInvoice` AP) en lugar de un documento paralelo.

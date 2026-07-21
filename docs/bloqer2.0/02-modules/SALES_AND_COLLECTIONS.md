@@ -59,17 +59,17 @@ Ver máquinas SalesInvoice y Receivable.
 ## 16. Permisos
 SALES emite; FINANCE cobra y anula.
 
-## 17. Ingresos corporativos sin proyecto ([D-037], [D-049])
+## 17. Ingresos corporativos sin proyecto ([D-037], [D-049], [D-051])
 
-- Mientras `SalesInvoice` / `Receivable` / `Collection` exijan **`projectId`** en schema, los **ingresos de estructura** (sin obra en DB) se reflejan vía **`JournalEntry`** (+ líneas, `projectId` null donde corresponda) y **tesorería** (`AccountMovement` con `sourceType = MANUAL_ADJUSTMENT` / kind UI `TREASURY_INFLOW`), con política interna del tenant. **No** se usa `SalesInvoice` “ficticia” para este fin.
-- [D-049](../00-product/DECISION_LOG.md): el ingreso corporativo admite opcionalmente **cliente/contraparte** del directorio (`counterpartyContactId`) y **N° de comprobante externo** (`externalInvoiceRef`) para registrar facturación oficial hecha por fuera. No crea CxC.
-- Si el negocio exige **C×C formal sin obra** o emisión legal desde Bloqer (ARCA), reabrir [Q-030](../00-product/OPEN_QUESTIONS.md) con opción **(1)** o **(3)** y migración/ADR (Fase 2 planificada en D-049).
+- **Con CxC (D-051):** `SalesInvoice` / `Receivable` / `Collection` admiten **`projectId` null**. Flujo en `/finanzas/transacciones` → “Ingreso / cobro” → **Factura / cuenta por cobrar** (`AR_INCOME`): líneas, vencimiento, N° comprobante externo opcional, cobro opcional. Listado y cobranza en `/finanzas/cuentas-por-cobrar`.
+- **Sin CxC ([D-037], [D-049]):** ingresos de estructura que solo mueven caja → **`TREASURY_INFLOW`** (`AccountMovement` `MANUAL_ADJUSTMENT`) con `counterpartyContactId` / `externalInvoiceRef` opcionales. No crea factura ni CxC.
+- Emisión legal ARCA desde Bloqer: **fuera de alcance** (puente = `externalInvoiceRef`).
 
 ## 18. Eventos disparados / consumidos
 - `sales_invoice.*`, `collection.confirmed`, `receivable.*`.
 
 ## 19. Fase de implementación
-**Fase 1**.
+**Fase 1** (+ AR corporativo D-051).
 
 ## 20. Preguntas abiertas
-- Facturación electrónica AFIP (Fase 3).
+- Facturación electrónica AFIP / ARCA (Fase 3).

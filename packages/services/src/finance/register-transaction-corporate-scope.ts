@@ -6,6 +6,11 @@ export type CorporatePayableScopeRow = {
   companyId: string;
 };
 
+export type CorporateReceivableScopeRow = {
+  projectId: string | null;
+  companyId: string;
+};
+
 export function assertCorporatePayableScope(
   payable: CorporatePayableScopeRow,
   ctx: ServiceContext,
@@ -20,6 +25,25 @@ export function assertCorporatePayableScope(
     throw new ServiceError(
       "FORBIDDEN",
       "La obligación no pertenece a la empresa activa.",
+    );
+  }
+}
+
+/** Company Finanzas AR mutations must target corporate receivables only (D-051). */
+export function assertCorporateReceivableScope(
+  receivable: CorporateReceivableScopeRow,
+  ctx: ServiceContext,
+): void {
+  if (receivable.projectId !== null) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      "Esta cuenta está asignada a un proyecto; usá el espacio de trabajo del proyecto",
+    );
+  }
+  if (ctx.companyId && receivable.companyId !== ctx.companyId) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      "La cuenta no pertenece a la empresa activa",
     );
   }
 }

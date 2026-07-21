@@ -2,6 +2,7 @@
 import type { RegisterTransactionInput } from "@bloqer/validators";
 import { registerApExpense } from "../ap/register-ap-expense.service";
 import { createPayment } from "../ap/payment.service";
+import { registerArIncome } from "../ar/register-ar-income.service";
 import { registerCorporateTreasuryInflow } from "../treasury/register-corporate-treasury-inflow.service";
 import { ServiceContext, ServiceError } from "../types";
 import { buildFinancialHref } from "./financial-trace.service";
@@ -20,6 +21,10 @@ export async function registerTransaction(
     case "TREASURY_INFLOW": {
       const { kind: _k, ...payload } = input;
       return registerCorporateTreasuryInflow(payload, ctx);
+    }
+    case "AR_INCOME": {
+      const { kind: _k, ...payload } = input;
+      return registerArIncome(payload, ctx);
     }
     case "PAYMENT": {
       const { kind: _k, ...paymentInput } = input;

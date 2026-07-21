@@ -362,16 +362,14 @@
 ### Q-030 — Ingresos corporativos sin proyecto (AR vs GL vs nuevo documento)
 
 - **Categoría:** Finanzas / AR / Contabilidad
-- **Estado:** RESUELTA → [D-037](./DECISION_LOG.md) **(Phase 1: opción 2 GL + tesorería)**; reabrir solo si Owner elige implementar opción **(1)** o **(3)**.
-- **Impacto si no se resuelve:** no hay cadena operativa estándar para “facturación de servicios de estructura” o ingresos no imputados a obra sin forzar un proyecto real; los usuarios pueden improvisar contabilidad manual o datos fuera del modelo.
-- **Contexto:** `SalesInvoice` / `Receivable` / `Collection` llevan `projectId` **obligatorio** en schema (ver BR-AR-003 en comentarios Prisma). Los **egresos** corporativos ya cubren vía AP con `projectId` null ([`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](../08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) Phase 17A). Este ítem es **solo ingresos**.
-- **Opciones identificadas:**
-  1. Migración: `projectId` nullable en cadena AR + reglas de numeración, permisos y UI globales bajo `/finanzas`.
-  2. Sin AR: registrar solo **`JournalEntry`** + **`TREASURY_INFLOW`** / cobro manual de tesorería según política documentada.
-  3. Nuevo documento de ingreso corporativo (distinto de `Expense` y distinto de `SalesInvoice` obra) con propia máquina de estados.
-- **Matiz arquitectura (2026-05-13):** elegir (1)/(2)/(3) **no** obliga a “segundo libro” operativo: el libro contable único sigue siendo `JournalEntry` con trazabilidad por `sourceType`/`sourceId` ([D-035](./DECISION_LOG.md)). El riesgo es de **alcance de producto** (qué queda en AR vs solo GL/tesorería), no de duplicar montos en dos ledgers paralelos no documentados.
-- **Recomendación / cierre Phase 1 (2026-05-14):** opción **(2)** lockeada — [D-037](./DECISION_LOG.md). Opciones **(1)** y **(3)** quedan para decisión futura explícita si el negocio exige C×C formal sin obra u otro documento.
-- **Bloquea:** _(Phase 1 cerrado con D-037)_ “factura de venta empresa” vía **AR sin proyecto** sigue **fuera** hasta nueva decisión; ver [D-035](./DECISION_LOG.md), [D-037](./DECISION_LOG.md). Checklist técnica para ampliaciones futuras: [`Q030_CORPORATE_INCOME_CHECKLIST.md`](../08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md).
+- **Estado:** RESUELTA → [D-037](./DECISION_LOG.md) (Phase 1: opción 2) + [D-051](./DECISION_LOG.md) **(opción 1: AR nullable implementada)**.
+- **Impacto si no se resuelve:** _(histórico)_ no había cadena operativa para facturación sin obra.
+- **Contexto:** egresos corporativos ya tenían AP con `projectId` null; AR quedó asimétrico hasta D-051.
+- **Cierre:**
+  - Phase 1 ([D-037](./DECISION_LOG.md)): GL + `TREASURY_INFLOW` sin CxC.
+  - [D-049](./DECISION_LOG.md): enriqueció el inflow con contraparte + comprobante externo.
+  - [D-051](./DECISION_LOG.md): `projectId` nullable en `SalesInvoice` / `Receivable` / `Collection`; flujo `AR_INCOME` en Registrar transacción. Opción **(3)** (documento nuevo) descartada a favor del espejo de AP.
+- **Bloquea:** _(cerrado)_ ARCA / emisión legal electrónica sigue diferida.
 
 ### Q-032 — Asignación de personas/equipo en ítems de cronograma
 

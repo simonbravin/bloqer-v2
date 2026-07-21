@@ -79,7 +79,7 @@
 - Política exacta de **borrado de `Tenant`** vs archivo legal (cuarentena vs cascade) — hoy el schema asume cascade amplio bajo `Tenant`; validar con compliance antes de exponer “eliminar tenant” en producto.
 - **`PROJECT_VIEWER`** y permisos finos de certificación ya están en matriz; el modelo de “solo mis proyectos asignados” sigue pendiente a nivel de datos (ver `PERMISSIONS_ROUTE_MATRIX.md` — futuro).
 - **Q-001 variante 0B** (misma persona, dos `Company` activas en un tenant): pendiente de ADR + migración; Phase 1 en [D-036](../00-product/DECISION_LOG.md).
-- **Q-030 opciones (1) AR nullable y (3) nuevo documento:** fuera del corte Phase 1; ver [D-037](../00-product/DECISION_LOG.md) y checklist [Q030_CORPORATE_INCOME_CHECKLIST.md](./Q030_CORPORATE_INCOME_CHECKLIST.md).
+- **Q-030 opción (1) AR nullable:** implementada ([D-051](../00-product/DECISION_LOG.md)); opción (3) descartada. Ingresos sin CxC siguen por GL + `TREASURY_INFLOW` ([D-037](../00-product/DECISION_LOG.md)). Ver [Q030_CORPORATE_INCOME_CHECKLIST.md](./Q030_CORPORATE_INCOME_CHECKLIST.md).
 
 ---
 

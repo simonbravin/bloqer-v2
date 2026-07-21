@@ -37,6 +37,7 @@ export function ManualInvoiceForm({ projectId, clients }: Props) {
         dueDate:    fd.get("dueDate")    as string,
         currency:   "ARS",
         notes:      (fd.get("notes") as string) || null,
+        externalInvoiceRef: null,
         lines: [{
           description: fd.get("description") as string,
           quantity:    fd.get("quantity")    as string,

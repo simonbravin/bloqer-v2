@@ -26,6 +26,9 @@ export type AgingFilters = {
 /** Display label in aging rows when AP line has no project (es-AR product copy). */
 export const AGING_AP_COMPANY_PROJECT_LABEL = "Empresa (general)";
 
+/** Display label in aging rows when AR line has no project (D-051). */
+export const AGING_AR_COMPANY_PROJECT_LABEL = "Empresa";
+
 export type AgingItem = {
   id: string;
   invoiceId: string;
@@ -177,7 +180,7 @@ export async function getReceivableAgingReport(
 
     const contactName  = r.clientContact.fantasyName ?? r.clientContact.legalName;
     const invoiceNumber = r.salesInvoice.number;
-    const projectName  = r.project.name;
+    const projectName  = r.project?.name ?? AGING_AR_COMPANY_PROJECT_LABEL;
 
     if (filters.search && !matchesSearch(filters.search, contactName, invoiceNumber, projectName)) continue;
 

@@ -313,8 +313,8 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - No se setea a mano salvo `CANCELLED`.
 
 ### BR-AR-003 — Project_id opcional
-- **Regla:** Receivable y Payable pueden no tener proyecto (deuda/crédito general de la empresa).
-- **Origen:** [D-009].
+- **Regla:** Receivable y Payable pueden no tener proyecto (deuda/crédito general de la empresa). En schema, `SalesInvoice` / `Receivable` / `Collection` y la cadena AP tienen `projectId` nullable ([D-051] AR, Phase 16B AP).
+- **Origen:** [D-009], [D-051].
 
 ### BR-AR-004 — Facturas anuladas anulan AR/AP
 - **Regla:** anular una `SalesInvoice` o `PurchaseInvoice` anula automáticamente su `Receivable` o `Payable` (cascada controlada).

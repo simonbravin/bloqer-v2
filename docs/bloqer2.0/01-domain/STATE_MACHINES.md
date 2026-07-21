@@ -414,6 +414,7 @@ stateDiagram-v2
 - `PAID` cuando `paid_amount = total_amount`.
 - `OVERDUE` cuando vencida y saldo > 0.
 - `CANCELLED` requiere motivo.
+- Puede existir **sin proyecto** (`projectId` null) — AR corporativo ([D-051], [BR-AR-003]).
 
 ---
 

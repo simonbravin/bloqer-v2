@@ -1,7 +1,8 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import type { RegisterArSaleInput } from "@bloqer/validators";
+import type { RegisterArIncomeInput } from "@bloqer/validators";
 import { auditAr } from "./ar-audit";
+import { canEditCompanyAr } from "./ar-access";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
 import { effectiveObligationPaidAfterPayment } from "../finance/obligation-balance";
@@ -11,9 +12,8 @@ import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/register-transaction.types";
 import { assertArTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { canEditArArea } from "./ar-access";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { resolveCompanyIdForAr } from "./sales-invoice.service";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
@@ -26,30 +26,28 @@ function salesInvoiceCode(number: number): string {
   return `FAC-${String(number).padStart(5, "0")}`;
 }
 
-type ArSaleOutcome = {
+type ArIncomeOutcome = {
   invoiceId: string;
   receivableId: string;
   number: number;
-  projectId: string;
   companyId: string;
   collectionId?: string;
   movementId?: string;
   collectAccountId?: string;
 };
 
-function buildArSaleTraceChain(outcome: ArSaleOutcome): FinancialTraceLink[] {
-  const { projectId } = outcome;
+function buildArIncomeTraceChain(outcome: ArIncomeOutcome): FinancialTraceLink[] {
   const chain: FinancialTraceLink[] = [
     {
       entityType: "SalesInvoice",
       entityId: outcome.invoiceId,
       code: salesInvoiceCode(outcome.number),
-      href: buildFinancialHref("SalesInvoice", outcome.invoiceId, { projectId }),
+      href: buildFinancialHref("SalesInvoice", outcome.invoiceId),
     },
     {
       entityType: "Receivable",
       entityId: outcome.receivableId,
-      href: buildFinancialHref("Receivable", outcome.receivableId, { projectId }),
+      href: buildFinancialHref("Receivable", outcome.receivableId),
     },
   ];
   if (outcome.collectionId && outcome.movementId && outcome.collectAccountId) {
@@ -57,7 +55,7 @@ function buildArSaleTraceChain(outcome: ArSaleOutcome): FinancialTraceLink[] {
       {
         entityType: "Collection",
         entityId: outcome.collectionId,
-        href: buildFinancialHref("Collection", outcome.collectionId, { projectId }),
+        href: buildFinancialHref("Collection", outcome.collectionId),
       },
       {
         entityType: "AccountMovement",
@@ -71,34 +69,34 @@ function buildArSaleTraceChain(outcome: ArSaleOutcome): FinancialTraceLink[] {
   return chain;
 }
 
-async function resolveCompanyId(projectId: string, ctx: ServiceContext): Promise<string> {
-  if (ctx.companyId) return ctx.companyId;
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { companyId: true },
-  });
-  if (project?.companyId) return project.companyId;
-  const company = await prisma.company.findFirst({
-    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
-    orderBy: { createdAt: "asc" },
-  });
-  if (!company) throw new ServiceError("CONFLICT", "No hay empresa activa para emitir la factura");
-  return company.id;
-}
-
-export async function registerArSale(
-  input: RegisterArSaleInput,
+/**
+ * Corporate AR composite flow (D-051 / Q-030 option 1).
+ * Mirrors `registerApExpense`: SalesInvoice(projectId=null) → Receivable → optional Collection.
+ */
+export async function registerArIncome(
+  input: RegisterArIncomeInput,
   ctx: ServiceContext,
 ): Promise<RegisterTransactionResult> {
   await assertArTenantModule(ctx);
-  if (!canEditArArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para registrar ventas");
+  if (!canEditCompanyAr(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para registrar ingresos / facturas de venta");
   }
   if (input.collectNow) {
     await assertTreasuryTenantModule(ctx);
     if (!can(ctx.roles, "EDIT", "TREASURY")) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para registrar movimientos de tesorería");
     }
+  }
+
+  if (!ctx.companyId) {
+    throw new ServiceError(
+      "VALIDATION",
+      "Selecciona una empresa activa para registrar una factura de venta corporativa",
+    );
+  }
+
+  if (input.dueDate < input.issueDate) {
+    throw new ServiceError("VALIDATION", "La fecha de vencimiento no puede ser anterior a la de emisión");
   }
 
   const contact = await prisma.contact.findUnique({
@@ -119,26 +117,9 @@ export async function registerArSale(
     throw new ServiceError("CONFLICT", "El contacto seleccionado no tiene rol de cliente activo");
   }
 
-  if (input.certificationId) {
-    throw new ServiceError(
-      "CONFLICT",
-      "Para facturar una certificación usá el flujo de factura desde certificación.",
-    );
-  }
+  const companyId = await resolveCompanyIdForAr(null, ctx);
 
-  if (!input.projectId) {
-    throw new ServiceError(
-      "VALIDATION",
-      "La venta de obra requiere un proyecto. Para facturas corporativas usá Registrar transacción (Ingreso / factura).",
-    );
-  }
-  const projectId = input.projectId;
-
-  await assertProjectAllowsOperationalMutation(projectId, ctx.tenantId);
-
-  const companyId = await resolveCompanyId(projectId, ctx);
-
-  let outcome!: ArSaleOutcome;
+  let outcome!: ArIncomeOutcome;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       outcome = await prisma.$transaction(async (tx) => {
@@ -152,7 +133,7 @@ export async function registerArSale(
           data: {
             tenantId: ctx.tenantId,
             companyId,
-            projectId,
+            projectId: null,
             clientContactId: input.clientContactId,
             certificationId: null,
             number,
@@ -182,7 +163,7 @@ export async function registerArSale(
               lineSubtotal,
               lineTax,
               lineTotal,
-              certificationLineId: line.certificationLineId ?? null,
+              certificationLineId: null,
               sortOrder: line.sortOrder ?? 0,
             },
           });
@@ -209,13 +190,15 @@ export async function registerArSale(
           data: {
             tenantId: refreshed.tenantId,
             companyId: refreshed.companyId,
-            projectId: refreshed.projectId,
+            projectId: null,
             clientContactId: refreshed.clientContactId,
             salesInvoiceId: refreshed.id,
             issueDate: refreshed.issueDate,
             dueDate: refreshed.dueDate,
             currency: refreshed.currency,
             originalAmount: refreshed.totalAmount,
+            paidAmount: new Prisma.Decimal(0),
+            status: "OPEN",
             createdBy: ctx.actorUserId,
             updatedBy: ctx.actorUserId,
           },
@@ -264,7 +247,7 @@ export async function registerArSale(
             data: {
               tenantId: ctx.tenantId,
               companyId: ctx.companyId ?? account.companyId ?? receivable.companyId,
-              projectId: receivable.projectId,
+              projectId: null,
               clientContactId: receivable.clientContactId,
               receivableId: receivable.id,
               salesInvoiceId: receivable.salesInvoiceId,
@@ -287,7 +270,7 @@ export async function registerArSale(
             data: {
               tenantId: ctx.tenantId,
               companyId: account.companyId ?? ctx.companyId ?? receivable.companyId,
-              projectId: receivable.projectId,
+              projectId: null,
               accountId: input.collectNow.accountId,
               movementDate: new Date(input.collectNow.collectionDate),
               type: "INFLOW",
@@ -295,7 +278,7 @@ export async function registerArSale(
               sourceId: collection.id,
               currency: receivable.currency,
               amount: collectAmount,
-              description: `Cobranza factura ${receivable.salesInvoiceId}`,
+              description: `Cobranza factura ${salesInvoiceCode(number)}`,
               status: "CONFIRMED",
               createdBy: ctx.actorUserId,
             },
@@ -323,11 +306,11 @@ export async function registerArSale(
 
         await auditAr(
           ctx,
-          "sales_invoice.registered_sale",
+          "sales_invoice.registered_income",
           "SalesInvoice",
           refreshed.id,
-          { projectId, companyId },
-          { after: { number, issued: true, collected: Boolean(input.collectNow) }, tx },
+          { companyId, projectId: null },
+          { after: { number, issued: true, collected: Boolean(input.collectNow), corporate: true }, tx },
         );
 
         if (collectionId) {
@@ -339,7 +322,7 @@ export async function registerArSale(
             "collection.confirmed",
             "Collection",
             collectionId,
-            { projectId, companyId },
+            { companyId, projectId: null },
             {
               after: {
                 number,
@@ -355,7 +338,6 @@ export async function registerArSale(
           invoiceId: refreshed.id,
           receivableId: receivable.id,
           number,
-          projectId,
           companyId,
           collectionId,
           movementId,
@@ -372,28 +354,14 @@ export async function registerArSale(
     throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
   }
 
-  const traceChain = buildArSaleTraceChain(outcome);
+  const traceChain = buildArIncomeTraceChain(outcome);
 
-  if (outcome.collectionId) {
-    const href = buildFinancialHref("Collection", outcome.collectionId, {
-      projectId: outcome.projectId,
-    });
-    return {
-      kind: "AR_SALE",
-      primaryEntityId: outcome.collectionId,
-      primaryEntityType: "Collection",
-      href,
-      traceChain,
-    };
-  }
-
-  const href = buildFinancialHref("SalesInvoice", outcome.invoiceId, {
-    projectId: outcome.projectId,
-  });
+  // Always land on the receivable detail (corporate collection detail page does not exist).
+  const href = buildFinancialHref("Receivable", outcome.receivableId);
   return {
-    kind: "AR_SALE",
-    primaryEntityId: outcome.invoiceId,
-    primaryEntityType: "SalesInvoice",
+    kind: "AR_INCOME",
+    primaryEntityId: outcome.collectionId ?? outcome.receivableId,
+    primaryEntityType: outcome.collectionId ? "Collection" : "Receivable",
     href,
     traceChain,
   };

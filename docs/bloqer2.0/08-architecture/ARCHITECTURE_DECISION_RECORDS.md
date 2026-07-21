@@ -37,7 +37,8 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 | ADR-008 | Modelo físico: `tenant` + `company` 1:N (legal entity = `company`) con `project.company_id` opcional hasta multi-empresa activa | PROPUESTO |
 | ADR-009 | UUID PK en todas las entidades ERP; numeración humana en columnas separadas | PROPUESTO |
 | ADR-Phase1-06 | Membresía única `(userId, tenantId)` Phase 1 | ACEPTADO |
-| ADR-Phase1-07 | Ingresos corporativos sin obra: GL + tesorería Phase 1 | ACEPTADO |
+| ADR-Phase1-07 | Ingresos corporativos sin obra: GL + tesorería Phase 1 | ACEPTADO (parcial; ver ADR-015) |
+| ADR-015 | AR corporativo `projectId` nullable (Q-030 opción 1 / D-051) | ACEPTADO |
 | ADR-010 | Reporting read-layer: agregación on-read sin tablas duplicadas de montos | ACEPTADO |
 | ADR-011 | `fx_rate` + `amount_ars` en comprobantes financieros (D-008) | ACEPTADO |
 | ADR-012 | Transacciones UX: modelo documental + guards de integridad | ACEPTADO |
@@ -191,10 +192,21 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 ## ADR-Phase1-07 — Ingresos corporativos sin obra: Phase 1 sin relajar AR
 
 - **Fecha:** 2026-05-14
-- **Estado:** ACEPTADO
+- **Estado:** REEMPLAZADO parcialmente por ADR-015 (opción 1 / D-051); Phase 1 opción 2 sigue válida para ingresos sin CxC
 - **Contexto:** [Q-030](../00-product/OPEN_QUESTIONS.md) listaba migración AR nullable, solo GL/tesorería, o nuevo documento.
 - **Decisión:** Phase 1 implementa la **opción documental y operativa (2)**: reflejo contable y banco vía **`JournalEntry`** + tesorería según política; **sin** migración `projectId` nullable en `SalesInvoice`/`Receivable`/`Collection` hasta decisión explícita de producto ([D-037](../00-product/DECISION_LOG.md)).
-- **Consecuencias:** checklist [Q030_CORPORATE_INCOME_CHECKLIST.md](./Q030_CORPORATE_INCOME_CHECKLIST.md) §Opción 1/3 quedan para fases posteriores; §Opción 2 es la referencia de implementación no-code del corte.
+- **Consecuencias:** checklist [Q030_CORPORATE_INCOME_CHECKLIST.md](./Q030_CORPORATE_INCOME_CHECKLIST.md) §Opción 1/3 quedaban para fases posteriores; §Opción 2 es la referencia de implementación no-code del corte.
+
+---
+
+## ADR-015 — AR corporativo con `projectId` nullable (Q-030 opción 1 / D-051)
+
+- **Fecha:** 2026-07-21
+- **Estado:** ACEPTADO
+- **Contexto:** asimetría con AP corporativo; necesidad de CxC sin obra (capacitaciones, materiales, servicios de estructura). [D-049] difería la Fase 2.
+- **Decisión:** relajar `projectId` a nullable en `SalesInvoice`, `Receivable` y `Collection`; servicio `registerArIncome` espejo de `registerApExpense`; UI en Registrar transacción + detalle/cobranza bajo `/finanzas/cuentas-por-cobrar`. Mantener `TREASURY_INFLOW` para ingresos sin obligación. Descartar documento nuevo (opción 3).
+- **Consecuencias:** aging/listados empresa muestran label “Empresa”; numeración compartida por company; puente `externalInvoiceRef` hacia ARCA futuro sin emitir legalmente aún.
+- **Referencias funcionales:** [D-051](../00-product/DECISION_LOG.md), [Q-030](../00-product/OPEN_QUESTIONS.md), [ACCOUNTS_RECEIVABLE.md](../03-finance/ACCOUNTS_RECEIVABLE.md).
 
 ---
 

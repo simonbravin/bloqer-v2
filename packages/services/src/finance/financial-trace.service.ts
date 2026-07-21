@@ -43,6 +43,12 @@ export function buildFinancialHref(
       return `/finanzas/cuentas-por-pagar/${entityId}`;
     case "Payment":
       return `/finanzas/pagos-proveedor/${entityId}`;
+    case "SalesInvoice":
+      return `/finanzas/cuentas-por-cobrar`;
+    case "Receivable":
+      return `/finanzas/cuentas-por-cobrar/${entityId}`;
+    case "Collection":
+      return `/finanzas/cuentas-por-cobrar`;
     case "AccountMovement": {
       const accountId = options?.accountId;
       return accountId

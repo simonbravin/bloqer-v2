@@ -18,7 +18,8 @@ export type RegisterTransactionKind =
   | "AP_EXPENSE"
   | "TREASURY_INFLOW"
   | "PAYMENT"
-  | "AR_SALE";
+  | "AR_SALE"
+  | "AR_INCOME";
 
 export type RegisterTransactionResult = {
   kind: RegisterTransactionKind;

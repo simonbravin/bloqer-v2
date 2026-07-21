@@ -317,7 +317,7 @@
 
 ### Receivable
 - **Propósito:** Cuenta por Cobrar.
-- **Atributos clave:** client_id, project_id (opcional), source_doc_type, source_doc_id, total_amount, paid_amount, balance, due_date, currency, status.
+- **Atributos clave:** client_id, project_id (opcional — null = corporativa [D-051]), source_doc_type, source_doc_id, total_amount, paid_amount, balance, due_date, currency, status.
 - **Estados:** `OPEN | PARTIAL | PAID | OVERDUE | CANCELLED`.
 
 ### Payable

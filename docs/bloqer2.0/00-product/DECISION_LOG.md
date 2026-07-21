@@ -671,6 +671,23 @@
 
 ---
 
+### D-051 — AR corporativo: `projectId` nullable en cadena SalesInvoice / Receivable / Collection (Q-030 opción 1)
+
+- **Fecha:** 2026-07-21
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** el tab “Ingreso / cobro” ([D-049]) solo movía tesorería sin vencimiento ni CxC. Casos reales (capacitaciones, venta de materiales, servicios de estructura) requieren factura + cuenta por cobrar a nivel empresa, simétrico al AP corporativo ([D-009], Phase 16B).
+- **Decisión:**
+  1. Cierra la **Fase 2** de [D-049](./DECISION_LOG.md) y la opción **(1)** de [Q-030](./OPEN_QUESTIONS.md): `projectId` **nullable** en `SalesInvoice`, `Receivable` y `Collection`.
+  2. Flujo corporativo vía Registrar transacción → `AR_INCOME` (`registerArIncome`): factura con líneas + impuestos manuales + vencimiento → CxC; cobro opcional (`collectNow`).
+  3. Se mantiene `TREASURY_INFLOW` para ingresos a caja **sin** CxC (aportes, préstamos, reintegros).
+  4. `externalInvoiceRef` en `SalesInvoice` como puente a facturación oficial externa / ARCA futuro.
+  5. Emisión legal ARCA **fuera de alcance** de esta decisión.
+- **Implicancias:** aging y listado `/finanzas/cuentas-por-cobrar` incluyen filas “Empresa”; numeración de facturas sigue por `(tenantId, companyId)`; reportes por obra excluyen `projectId` null.
+- **Documentos afectados:** [`03-finance/ACCOUNTS_RECEIVABLE.md`](../03-finance/ACCOUNTS_RECEIVABLE.md), [`02-modules/SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md), [`01-domain/STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md), [`01-domain/CORE_ENTITIES.md`](../01-domain/CORE_ENTITIES.md), [`08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md`](../08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md), [`08-architecture/ARCHITECTURE_DECISION_RECORDS.md`](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md), [`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

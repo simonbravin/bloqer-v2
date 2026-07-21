@@ -411,11 +411,17 @@ Reporte: `/proyectos/[id]/reportes/subcontratos`.
 
 ### 10.2 Cuentas por cobrar (ingresos)
 
-**Ruta:** `/proyectos/[id]/cuentas-por-cobrar`
+**Ruta (obra):** `/proyectos/[id]/cuentas-por-cobrar`
 
 1. Factura emitida (`/facturas`) crea **Receivable**.
 2. **Cobranza** (`/cobranzas`): cuenta destino, montos, FX manual si aplica.
-3. Confirmar → movimiento **INCOME** en tesorería + saldo AR.
+3. Confirmar → movimiento **INFLOW** en tesorería + saldo AR.
+
+**Ruta (empresa, sin obra — D-051):** `/finanzas/cuentas-por-cobrar`
+
+1. Registrar **Factura / cuenta por cobrar** desde `/finanzas/transacciones` (tab Ingreso / cobro).
+2. Cobrar desde el detalle `/finanzas/cuentas-por-cobrar/[id]/cobrar`.
+3. Para dinero a caja **sin** CxC, usar modo **Solo caja** en el mismo diálogo (`TREASURY_INFLOW`).
 
 ### 10.3 Cuentas por pagar (egresos)
 
@@ -426,13 +432,16 @@ Reporte: `/proyectos/[id]/reportes/subcontratos`.
 3. **Pago** (`/pagos` en la obra o consulta global en `/finanzas/transacciones` con origen `PAYMENT`):
    - Seleccionar payable(s)
    - Cuenta origen, retenciones manuales si corresponde
-4. Confirmar → movimiento **OUTCOME** + payable `PAID` / `PARTIAL`.
+4. Confirmar → movimiento **OUTFLOW** + payable `PAID` / `PARTIAL`.
 
 ### 10.4 Finanzas corporativas (fuera del proyecto)
 
 | Área | Ruta |
 |------|------|
 | Finanzas hub | `/finanzas` |
+| Transacciones (AP / AR / caja) | `/finanzas/transacciones` |
+| Cuentas por cobrar (obra + Empresa) | `/finanzas/cuentas-por-cobrar` |
+| Cuentas por pagar | `/finanzas/cuentas-por-pagar` |
 | Tesorería | `/tesoreria` |
 | Posición de caja | `/tesoreria/reportes/posicion-caja` |
 | Flujo de caja global | `/tesoreria/reportes/flujo-caja` |

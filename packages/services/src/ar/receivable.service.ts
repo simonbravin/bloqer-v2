@@ -152,7 +152,10 @@ export type CompanyReceivableListRow = ReceivableView & {
   salesInvoiceCode: string | null;
 };
 
-/** All receivables for the tenant company (every line has a project). VIEW AR only. */
+/** Company-level AR label when projectId is null (D-051). */
+export const COMPANY_AR_PROJECT_LABEL = "Empresa";
+
+/** All receivables for the tenant company (project and corporate). VIEW AR only. */
 export async function listCompanyReceivables(
   ctx: ServiceContext,
   filters?: CompanyReceivableListFilters,
@@ -207,13 +210,70 @@ export async function listCompanyReceivables(
     const num = r.salesInvoice?.number;
     return {
       ...base,
-      projectCode: r.project.code,
-      projectName: r.project.name,
+      projectCode: r.project?.code ?? "—",
+      projectName: r.project?.name ?? COMPANY_AR_PROJECT_LABEL,
       salesInvoiceCode: num != null ? `FAC-${String(num).padStart(5, "0")}` : null,
     };
   });
 
   return { data, total };
+}
+
+/**
+ * Corporate receivable: `projectId === null`. VIEW AR only (D-051).
+ */
+export async function getCompanyReceivableById(id: string, ctx: ServiceContext): Promise<ReceivableView> {
+  await assertArTenantModule(ctx);
+  if (!canViewCompanyAr(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar a nivel empresa");
+  }
+  const r = await prisma.receivable.findUnique({
+    where: { id },
+    include: { clientContact: { select: { legalName: true, fantasyName: true } } },
+  });
+  if (!r) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
+  if (r.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (r.projectId !== null) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      "Esta cuenta está asignada a un proyecto; usá el espacio de trabajo del proyecto",
+    );
+  }
+  if (ctx.companyId && r.companyId !== ctx.companyId) {
+    throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
+  }
+  const reconciled = await reconcileReceivableStatusIfSettled(r, ctx);
+  return serializeReceivable({ ...r, ...reconciled });
+}
+
+/**
+ * Guard for company Finanzas mutations (cobrar / cancelar) — D-051.
+ * Ensures the receivable is corporate and belongs to the active company.
+ */
+export async function assertCompanyReceivableMutable(
+  id: string,
+  ctx: ServiceContext,
+): Promise<void> {
+  await assertArTenantModule(ctx);
+  if (!canEditArArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para modificar cuentas por cobrar");
+  }
+  const r = await prisma.receivable.findUnique({
+    where: { id },
+    select: { tenantId: true, projectId: true, companyId: true },
+  });
+  if (!r || r.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
+  }
+  if (r.projectId !== null) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      "Esta cuenta está asignada a un proyecto; usá el espacio de trabajo del proyecto",
+    );
+  }
+  if (ctx.companyId && r.companyId !== ctx.companyId) {
+    throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
+  }
 }
 
 export type ReceivablesProjectSummary = {
@@ -322,7 +382,7 @@ export async function cancelReceivable(id: string, ctx: ServiceContext): Promise
 type RawReceivable = Receivable & {
   clientContact: { legalName: string; fantasyName: string | null };
   salesInvoice?: { number: number } | null;
-  project?: { code: string; name: string };
+  project?: { code: string; name: string } | null;
 };
 
 async function reconcileReceivableStatusIfSettled(

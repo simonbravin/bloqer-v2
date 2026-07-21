@@ -444,13 +444,25 @@ flowchart LR
   AR --> COL["Cobranza"] --> TES["Tesorería: movimiento INFLOW"]
 ```
 
-- **Facturas de venta** (`/proyectos/[id]/facturas`, estados `DRAFT/ISSUED/CANCELLED`): una vez emitidas son inmutables; solo se pueden **anular**.
-- **Cuentas por cobrar** (`/proyectos/[id]/cuentas-por-cobrar` y consolidado `/finanzas/cuentas-por-cobrar`), con aging.
-- **Cobranzas** (`/proyectos/[id]/cobranzas`): ingresan dinero a una cuenta de tesorería (movimiento `INFLOW`) y reducen el saldo pendiente.
+- **Facturas de venta de obra** (`/proyectos/[id]/facturas`, estados `DRAFT/ISSUED/CANCELLED`): una vez emitidas son inmutables; solo se pueden **anular**.
+- **Cuentas por cobrar de obra** (`/proyectos/[id]/cuentas-por-cobrar`): listado y cobranza ligada al proyecto.
+- **Cobranzas de obra** (`/proyectos/[id]/cobranzas`): ingresan dinero a una cuenta de tesorería (movimiento `INFLOW`) y reducen el saldo pendiente.
 - **Venta rápida / anticipo** (`/proyectos/[id]/facturas/anticipo/nueva`): crea factura + cuenta por cobrar (+ cobro opcional) en un paso.
+
+#### Ingreso / factura corporativa (sin obra) — D-051
+
+Casos como capacitaciones, venta de materiales o servicios de estructura **sin proyecto** se registran a nivel empresa (espejo del gasto corporativo AP):
+
+1. Ir a **Finanzas → Transacciones** (`/finanzas/transacciones`) → **Registrar transacción** → tab **Ingreso / cobro**.
+2. Elegir modo **Factura / cuenta por cobrar** (crea `SalesInvoice` + `Receivable` con `projectId` null). Completar cliente, fechas, líneas, impuestos y vencimiento; N° de comprobante externo opcional; cobro inmediato opcional.
+3. Si solo necesitás mover caja **sin** CxC (aportes, préstamos, reintegros), usar el modo **Solo caja** (`TREASURY_INFLOW`).
+4. Gestionar el saldo y cobrar en **Cuentas por cobrar** (`/finanzas/cuentas-por-cobrar` → detalle `/finanzas/cuentas-por-cobrar/[id]` → **Cobrar**). En aging, las filas sin obra se etiquetan **Empresa**.
 
 > **📷 Captura sugerida — Factura emitida → CxC / cobranza**  
 > Ruta: `/proyectos/[id]/facturas/[invoiceId]` · Mostrar panel CxC vinculada + CTA Registrar cobranza · Tip: Lote 3 D-03.
+
+> **📷 Captura sugerida — Ingreso corporativo con CxC**  
+> Ruta: `/finanzas/transacciones` · Abrir Registrar transacción → Ingreso / cobro → Factura / cuenta por cobrar · Tip: D-051.
 
 ### 12.2 Facturas de proveedor y pagos (AP)
 
@@ -501,7 +513,8 @@ flowchart LR
 ## 14. Finanzas corporativas, gastos generales e inventario (nivel empresa)
 
 - **Finanzas corporativas** (`/finanzas`): tablero con KPIs, proyección y actividad consolidada.
-- **Transacciones** (`/finanzas/transacciones`): incluye el **ingreso corporativo de tesorería** (movimiento no ligado a obra).
+- **Transacciones** (`/finanzas/transacciones`): alta rápida de **gasto corporativo (AP)**, **factura/CxC corporativa (AR, D-051)** y **ingreso solo caja** (`TREASURY_INFLOW`, sin obligación).
+- **Cuentas por cobrar empresa** (`/finanzas/cuentas-por-cobrar`): consolida obra + filas **Empresa**; detalle y cobranza corporativa en `/finanzas/cuentas-por-cobrar/[id]`.
 - **Gastos generales / overhead** (`/finanzas/gastos-generales`): se **imputan a las obras** de forma **manual** o por **prorrateo automático** según el peso del costo directo, con **cierre de período**. *(Es un módulo complejo; conviene validar los cálculos en producción.)*
 - **Inventario corporativo** (`/inventario`): productos (`/inventario/productos`), depósitos (`/inventario/depositos`), movimientos (`/inventario/movimientos`, ledger append‑only; el saldo se calcula sumando movimientos) y transferencias (`/inventario/transferencias`).
 
@@ -624,7 +637,10 @@ flowchart LR
 ### Administración / Finanzas / Tesorería
 
 - [ ] Facturas de venta emitidas desde certificaciones
-- [ ] Cobranzas aplicadas a las cuentas por cobrar
+- [ ] Cobranzas de obra aplicadas a las cuentas por cobrar del proyecto
+- [ ] Ingresos corporativos con CxC registrados desde Transacciones (modo Factura / cuenta por cobrar) cuando corresponde
+- [ ] Ingresos solo caja (sin CxC) registrados solo cuando no hay obligación de cobro
+- [ ] CxC empresa revisadas en `/finanzas/cuentas-por-cobrar` (filas **Empresa**)
 - [ ] Cuentas por pagar revisadas y pagos consultados en Transacciones (`sourceType=PAYMENT`)
 - [ ] Exports CSV/PDF de CxP / facturas corporativas cuando haga falta
 - [ ] Movimientos de caja conciliados manualmente (no hay conciliación bancaria automática)

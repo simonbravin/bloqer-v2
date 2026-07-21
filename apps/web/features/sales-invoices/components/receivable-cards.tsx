@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
 import { ReceivableStatusBadge } from "./receivable-status-badge";
-import type { ReceivableListItem } from "./receivable-list";
+import { receivableDetailHref, type ReceivableListItem } from "./receivable-list";
 
 function fmtMoney(value: string, currency: string) {
   return (
@@ -50,7 +50,7 @@ export function ReceivableCards({
       {receivables.map((r) => (
         <Link
           key={r.id}
-          href={`/proyectos/${r.projectId}/cuentas-por-cobrar/${r.id}`}
+          href={receivableDetailHref(r)}
           className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
@@ -65,7 +65,7 @@ export function ReceivableCards({
           <h3 className="mt-2 font-semibold leading-snug">{r.clientName}</h3>
           {showProjectColumn && r.projectName ? (
             <p className="mt-1 text-xs text-muted-foreground">
-              {r.projectCode ? `${r.projectCode} · ` : ""}
+              {r.projectCode && r.projectCode !== "—" ? `${r.projectCode} · ` : ""}
               {r.projectName}
             </p>
           ) : null}

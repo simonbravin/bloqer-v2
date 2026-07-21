@@ -204,7 +204,7 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 | Contabilidad | `JournalEntry` / líneas | Origen `SUPPLIER_INVOICE` / `PAYMENT`; sin auto-post (Phase 11C). |
 | Adjuntos | `DocumentAttachment` | Corporativo permitido para `SUPPLIER_INVOICE` sin proyecto. |
 
-**Hueco explícito — ingreso empresa sin proyecto:** cadena **AR** (`SalesInvoice` / `Receivable` / `Collection`) sigue con **`projectId` obligatorio** en schema (BR-AR-003). No se resuelve con “Expense”; opciones futuras: AR nullable + migración, documento de ingreso distinto, o solo GL + `TREASURY_INFLOW` — **Q-030**.
+**Ingreso empresa sin proyecto:** resuelto con [D-051](../00-product/DECISION_LOG.md) / ADR-015 — cadena AR con `projectId` **nullable** + `registerArIncome` (`AR_INCOME`). `TREASURY_INFLOW` sigue para ingresos a caja **sin** CxC ([D-037]/[D-049]).
 
 **Egreso tesorería sin factura / sin AP:** `MANUAL_ADJUSTMENT` existe en enumeración; **no** hay flujo UI/servicio general de alta libre equivalente a extracto bancario sin `Payment` en esta fase.
 

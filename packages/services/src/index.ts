@@ -33,7 +33,7 @@ export {
 export type { WbsImportProfile } from "./budget/wbs-code-rules";
 export * from "./certification/certification.service";
 export * from "./certification/certification-line.service";
-export { canViewArProjectArea, canEditArArea, canViewCompanyAr } from "./ar/ar-access";
+export { canViewArProjectArea, canEditArArea, canViewCompanyAr, canEditCompanyAr } from "./ar/ar-access";
 export * from "./ar/sales-invoice.service";
 export * from "./ar/receivable.service";
 export * from "./ar/project-ar-summary.service";
@@ -110,10 +110,19 @@ export * from "./finance/register-transaction.types";
 export { buildFinancialHref } from "./finance/financial-trace.service";
 export type { FinancialHrefOptions } from "./finance/financial-trace.service";
 export * from "./finance/register-transaction.service";
+export {
+  assertCorporatePayableScope,
+  assertCorporateReceivableScope,
+} from "./finance/register-transaction-corporate-scope";
+export type {
+  CorporatePayableScopeRow,
+  CorporateReceivableScopeRow,
+} from "./finance/register-transaction-corporate-scope";
 export * from "./ap/register-ap-expense.service";
 export * from "./treasury/register-corporate-treasury-inflow.service";
 export * from "./ar/register-ar-sale.service";
 export * from "./ar/register-ar-advance.service";
+export * from "./ar/register-ar-income.service";
 export * from "./ap/register-supplier-advance.service";
 export * from "./finance/payable-list-filters";
 export * from "./project-finance/project-finance-dashboard.service";

@@ -21,3 +21,8 @@ export function canEditArArea(roles: ServiceContext["roles"]): boolean {
 export function canViewCompanyAr(roles: ServiceContext["roles"]): boolean {
   return can(roles, "VIEW", "AR");
 }
+
+/** Company-level Finanzas AR mutations (corporate SalesInvoice / Receivable) — D-051. */
+export function canEditCompanyAr(roles: ServiceContext["roles"]): boolean {
+  return can(roles, "EDIT", "AR");
+}

@@ -1,4 +1,5 @@
 import { createPaymentSchema, registerApExpenseSchema } from "./ap";
+import { registerArIncomeSchema } from "./sales-invoice";
 import { z } from "zod";
 
 export const createTreasuryAccountSchema = z.object({
@@ -60,6 +61,7 @@ export const registerTransactionSchema = z.discriminatedUnion("kind", [
   registerApExpenseSchema.extend({ kind: z.literal("AP_EXPENSE") }),
   createCorporateTreasuryInflowSchema.extend({ kind: z.literal("TREASURY_INFLOW") }),
   createPaymentSchema.extend({ kind: z.literal("PAYMENT") }),
+  registerArIncomeSchema.extend({ kind: z.literal("AR_INCOME") }),
 ]);
 
 export type CreateTreasuryAccountInput   = z.infer<typeof createTreasuryAccountSchema>;

@@ -114,8 +114,10 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
   const canTreasury = treasuryModuleOn && can(ctx.roles, "VIEW", "TREASURY");
   const canAp = gate.isEnabled("AP") && canViewCompanyAp(ctx.roles);
   const canViewProjects = gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS");
+  const canEditAr = gate.isEnabled("AR") && can(ctx.roles, "EDIT", "AR");
+  const canViewAr = gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR");
 
-  if (!canTreasury && !canAp) redirect("/dashboard");
+  if (!canTreasury && !canAp && !canViewAr) redirect("/dashboard");
 
   if (sp.tab || sp.view || sp.status || sp.from || sp.to) {
     const canonical = new URLSearchParams();
@@ -150,6 +152,21 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
     }
   }
 
+  if (canEditTreasury || canEditAr) {
+    try {
+      const clientsResult = await listContacts(
+        { role: "CLIENT", status: "ACTIVE", page: 1, pageSize: 200 },
+        ctx,
+      );
+      clientsForDialog = clientsResult.data.map((c) => ({
+        id: c.id,
+        label: c.fantasyName ?? c.legalName,
+      }));
+    } catch {
+      // VIEW DIRECTORY may be missing
+    }
+  }
+
   if (canEditTreasury) {
     try {
       const accountsResult = await listTreasuryAccounts(ctx, { page: 1, pageSize: 200 });
@@ -162,18 +179,6 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
         .map((a) => ({ id: a.id, label: a.name, currency: a.currency }));
     } catch {
       // omit accounts on failure
-    }
-    try {
-      const clientsResult = await listContacts(
-        { role: "CLIENT", status: "ACTIVE", page: 1, pageSize: 200 },
-        ctx,
-      );
-      clientsForDialog = clientsResult.data.map((c) => ({
-        id: c.id,
-        label: c.fantasyName ?? c.legalName,
-      }));
-    } catch {
-      // VIEW DIRECTORY may be missing; inflow still works without counterparty
     }
   }
 
@@ -224,6 +229,10 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
             <Link href="/finanzas/cuentas-por-pagar" className="underline underline-offset-2 text-foreground">
               Cuentas por pagar
             </Link>
+            {" "}o{" "}
+            <Link href="/finanzas/cuentas-por-cobrar" className="underline underline-offset-2 text-foreground">
+              Cuentas por cobrar
+            </Link>
             ; indicadores en{" "}
             <Link href="/finanzas" className="underline underline-offset-2 text-foreground">
               Resumen
@@ -232,7 +241,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {(canEditAp || canEditTreasury) && (
+          {(canEditAp || canEditTreasury || canEditAr) && (
             <Suspense fallback={null}>
               <NewTransactionDialog
                 suppliers={suppliersForDialog}
@@ -240,6 +249,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
                 treasuryAccounts={treasuryAccountsForDialog}
                 canAp={canEditAp}
                 canTreasury={canEditTreasury}
+                canAr={canEditAr}
                 defaultOpen={wantsRegisterAp(sp)}
               />
             </Suspense>

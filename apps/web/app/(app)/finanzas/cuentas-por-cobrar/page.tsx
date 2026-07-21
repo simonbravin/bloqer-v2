@@ -123,7 +123,7 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cuentas por cobrar</h1>
           <p className="text-xs text-muted-foreground max-w-prose">
-            Todas las obras de la empresa · Al {agingReport.asOfDate}
+            Obras y facturas corporativas de la empresa · Al {agingReport.asOfDate}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -147,7 +147,8 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
             <div>
               <CardTitle className="text-lg">Detalle de cuentas por cobrar</CardTitle>
               <CardDescription className="mt-1 max-w-prose">
-                Listado paginado por obra. El detalle y la cobranza se gestionan desde el proyecto.
+                Listado paginado (obra y empresa). Las filas sin proyecto se etiquetan como
+                &quot;Empresa&quot; y se cobran desde este espacio.
               </CardDescription>
             </div>
             <Suspense fallback={null}>

@@ -74,6 +74,7 @@ export async function registerArAdvance(
       currency,
       notes: input.notes ?? "Anticipo de cliente — imputado a obra",
       internalNotes: "Registrado vía flujo de anticipo",
+      externalInvoiceRef: null,
       lines: [
         {
           description: ADVANCE_LINE_DESCRIPTION,
