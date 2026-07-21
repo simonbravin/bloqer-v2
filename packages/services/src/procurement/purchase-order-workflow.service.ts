@@ -501,13 +501,3 @@ export async function confirmPurchaseOrder(
 
   return reloadPoView(id, ctx);
 }
-
-/** @deprecated Use submit → approve → confirm. Kept for existing UI actions. */
-export async function issuePurchaseOrder(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
-  await submitPurchaseOrder(id, ctx);
-  const po = await prisma.purchaseOrder.findUnique({ where: { id } });
-  if (po?.status === "SUBMITTED") {
-    await approvePurchaseOrder(id, ctx);
-  }
-  return confirmPurchaseOrder(id, ctx);
-}

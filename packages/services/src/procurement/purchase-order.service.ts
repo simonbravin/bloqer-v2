@@ -27,7 +27,6 @@ export {
   approvePurchaseOrder,
   returnPurchaseOrder,
   confirmPurchaseOrder,
-  issuePurchaseOrder,
 } from "./purchase-order-workflow.service";
 
 // ─── View types ───────────────────────────────────────────────────────────────

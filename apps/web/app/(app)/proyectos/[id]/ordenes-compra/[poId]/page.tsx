@@ -38,7 +38,6 @@ import {
   approvePurchaseOrderAction,
   returnPurchaseOrderAction,
   confirmPurchaseOrderAction,
-  issuePurchaseOrderAction,
   cancelPurchaseOrderAction,
 } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 import { Button } from "@/components/ui/button";
@@ -258,18 +257,6 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
               }}
             >
               <Button type="submit">Enviar a aprobación</Button>
-            </form>
-            <form
-              action={async () => {
-                "use server";
-                const res = await issuePurchaseOrderAction(poId, id);
-                if ("error" in res) redirectWithActionError(poPath, res.error);
-                redirect(poPath);
-              }}
-            >
-              <Button type="submit" variant="secondary">
-                Emitir y confirmar (rápido)
-              </Button>
             </form>
           </>
         )}

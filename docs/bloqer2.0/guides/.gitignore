@@ -1,0 +1,5 @@
+# Local guide tooling — not part of the product monorepo
+node_modules/
+package-lock.json
+*.docx
+~$*

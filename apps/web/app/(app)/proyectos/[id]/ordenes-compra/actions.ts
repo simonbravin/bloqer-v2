@@ -3,7 +3,6 @@
 import {
   createPurchaseOrder,
   updatePurchaseOrder,
-  issuePurchaseOrder,
   submitPurchaseOrder,
   approvePurchaseOrder,
   returnPurchaseOrder,
@@ -133,21 +132,6 @@ export async function confirmPurchaseOrderAction(
   const ctx = await getCtx();
   try {
     await confirmPurchaseOrder(poId, ctx);
-    revalidatePO(projectId, poId);
-    return { ok: true };
-  } catch (err) {
-    return handle(err);
-  }
-}
-
-/** Envía, aprueba (si aplica) y confirma en un paso — compatibilidad UI legacy. */
-export async function issuePurchaseOrderAction(
-  poId: string,
-  projectId: string,
-): Promise<{ ok: true } | { error: string }> {
-  const ctx = await getCtx();
-  try {
-    await issuePurchaseOrder(poId, ctx);
     revalidatePO(projectId, poId);
     return { ok: true };
   } catch (err) {
