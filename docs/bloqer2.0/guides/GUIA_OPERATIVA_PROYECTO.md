@@ -268,6 +268,8 @@ Al agregar una línea podés elegir **Por unidad** o **Total partida**: si tené
 
 ## 6. Módulo: Compras (solicitud → OC → recepción → factura)
 
+> **WBS obligatorio (D-050):** toda línea de solicitud u OC imputa a un ítem WBS. Gastos generales/indirectos → **partida de indirectos**. Al elegir la partida se ve el **costo referencial** y el **saldo de partida** (presupuestado − comprometido) como alerta, sin bloquear.
+
 ### 6.1 Solicitudes de compra
 
 **Ruta:** `/proyectos/[id]/solicitudes-compra`
@@ -275,10 +277,12 @@ Al agregar una línea podés elegir **Por unidad** o **Total partida**: si tené
 | Paso | Actor | Estado |
 |------|-------|--------|
 | Crear borrador | PM / capataz | `DRAFT` |
-| Enviar | PM | `SUBMITTED` → snapshot costo presupuestario por WBS |
-| Cotizaciones | Compras | ≥ N cotizaciones según política tenant |
+| Enviar | PM | `SUBMITTED` → snapshot costo y cantidad presupuestaria por WBS |
+| Cotizaciones | Compras | ≥ N cotizaciones según política tenant; cada una con **precio + plazo (lead time)** |
 | Seleccionar cotización | Compras | `QUOTE_SELECTED` → genera OC borrador |
 | Completar | — | `COMPLETED` |
+
+Notificaciones (in-app + email) al enviar; **recordatorio SLA** si la solicitud queda sin cotizar.
 
 ### 6.2 Órdenes de compra
 
@@ -286,20 +290,27 @@ Al agregar una línea podés elegir **Por unidad** o **Total partida**: si tené
 
 ```
 DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED
+         (SUBMITTED → DRAFT: devolución con motivo)
 ```
 
 | Hito | Impacto |
 |------|---------|
-| **APPROVED** | Aprobación interna (segregación: quien solicita no aprueba) |
+| **SUBMITTED → APPROVED / devolución** | Control de flujo; sin impacto económico |
+| **APPROVED** | Aprobación interna (segregación: quien solicita no aprueba, salvo autoaprobación habilitada y bajo umbral) |
 | **CONFIRMED** | Compromiso al proveedor → **`committed_amount`** en control de costos |
 | Recepción | Stock + avance físico de compra |
 | Factura proveedor | **`accrued_amount`** (devengado) + AP |
 
-**Imputación:** cada línea a **WBS** del presupuesto vigente (idealmente ítem hoja).
+- **Imputación:** cada línea a un **WBS** ítem hoja del presupuesto vigente (obligatorio).
+- **Devolución para cambios:** el aprobador puede devolver una OC `SUBMITTED` a `DRAFT` con **motivo**; se registra quién y por qué.
+- **Desvío de precio:** alerta suave, **justificación** requerida sobre umbral y **aprobación de administración** para desvíos altos.
+- Flujo formal **Enviar → Aprobar → Confirmar** (se retiró el atajo “emitir y confirmar rápido”).
+- Notificaciones (in-app + email): pendiente de aprobación, aprobada, devuelta, confirmada; **recordatorio SLA** para OC demoradas.
 
-### 6.3 Factura directa (sin OC)
+### 6.3 OC directa / Factura directa (sin solicitud)
 
-Permitida según política y umbral ([BR-PUR-008]). Impacta al **registrar factura**, no antes.
+- **OC directa:** permitida si la política de la empresa la habilita. Sobre el umbral configurado exige **motivo de emergencia** y solo la autoriza administración (`OWNER`/`ADMIN`).
+- **Factura directa (sin OC):** permitida según política y umbral ([BR-PUR-008]). Impacta al **registrar factura**, no antes.
 
 ### 6.4 Recepciones
 

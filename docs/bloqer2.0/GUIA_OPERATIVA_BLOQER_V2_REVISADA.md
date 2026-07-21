@@ -315,35 +315,59 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  PR["Solicitud de compra"] --> Q["Cotizaciones"]
+  PR["Solicitud de compra"] --> Q["Cotizaciones (precio + plazo)"]
   Q --> SEL["Selección de proveedor"]
   SEL --> PO["Orden de compra"]
+  DIR["OC directa (sin solicitud)"] --> PO
   PO --> REC["Recepción → Inventario (entrada)"]
   PO --> SI["Factura de proveedor → Cuenta por pagar"]
 ```
 
+> **Regla base (D-050): toda línea de compra —de solicitud o de orden— imputa obligatoriamente a un ítem WBS del presupuesto.** Los gastos generales/indirectos no quedan sin WBS: se imputan a la **partida de indirectos** correspondiente. Al elegir la partida se muestra el **costo referencial de materiales** y el **saldo de la partida** (presupuestado − comprometido) como ayuda; el saldo es una **alerta**, no un bloqueo.
+
 ### 9.1 Solicitudes de compra
 
 - **Ruta:** `/proyectos/[id]/solicitudes-compra`.
-- Flujo: crear `DRAFT` → **Enviar** (`SUBMITTED`, toma snapshot del costo presupuestario por WBS) → **Cotizaciones** (mínimo configurable por empresa) → **Seleccionar** → genera **OC en borrador**.
+- Flujo: crear `DRAFT` → **Enviar** (`SUBMITTED`, toma snapshot del costo presupuestario y de la cantidad por WBS) → **Cotizaciones** → **Seleccionar** → genera **OC en borrador**.
+- **Cotizaciones comparables:** cada cotización registra **precio** y **plazo de entrega (lead time, en días)**, además de la validez y la referencia de presupuesto, para comparar por precio **y** plazo. El mínimo de cotizaciones es configurable por empresa.
+- **Notificaciones:** al enviar una solicitud se avisa a compras/aprobadores (in‑app + email). Si una solicitud queda demorada sin cotizar, se emite un **recordatorio por SLA**.
 
 ### 9.2 Órdenes de compra
 
 - **Ruta:** `/proyectos/[id]/ordenes-compra`.
 - Ciclo (enum `PurchaseOrderStatus`): `DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED` (o `CANCELLED`).
+- **Devolución para cambios:** un aprobador puede **devolver** una OC en `SUBMITTED` de vuelta a `DRAFT` indicando un **motivo**; el solicitante corrige y reenvía. Queda registrado quién y por qué.
+
+**Flujo formal (un paso por acción):**
+
+```mermaid
+stateDiagram-v2
+  [*] --> DRAFT
+  DRAFT --> SUBMITTED: Enviar a aprobación
+  SUBMITTED --> APPROVED: Aprobar
+  SUBMITTED --> DRAFT: Devolver (con motivo)
+  APPROVED --> CONFIRMED: Confirmar al proveedor
+  CONFIRMED --> PARTIALLY_RECEIVED
+  CONFIRMED --> RECEIVED
+  DRAFT --> CANCELLED
+```
+
+> El atajo “Emitir y confirmar (rápido)” fue **retirado**: la OC recorre siempre **Enviar → Aprobar → Confirmar** para preservar la segregación de funciones.
 
 | Hito | Impacto económico |
 |------|-------------------|
-| **APPROVED** | Aprobación interna (segregación: quien solicita no aprueba) |
+| **APPROVED** | Aprobación interna (segregación: quien solicita no aprueba, salvo autoaprobación habilitada por empresa y bajo umbral) |
 | **CONFIRMED** | **Comprometido** en el control de costos |
 | Recepción | Ingreso de stock + cantidades recibidas |
 | Factura del proveedor | **Devengado** + cuenta por pagar |
 
-- **Imputación:** cada línea se asigna a un nodo **WBS** (idealmente ítem hoja).
-- **Control de desvíos de precio** contra el presupuesto por tramos.
+- **Imputación:** cada línea se asigna a un nodo **WBS** ítem hoja (obligatorio).
+- **Control de desvíos de precio** contra el costo referencial del presupuesto por tramos: alerta suave, **nota/justificación** requerida a partir de un umbral y **aprobación de administración** para desvíos altos. La justificación de desvío se guarda en la línea.
+- **OC directa (sin solicitud):** permitida solo si la política de la empresa lo habilita. Por encima del umbral configurado exige **motivo de emergencia** y solo la puede autorizar administración (`OWNER`/`ADMIN`).
+- **Notificaciones (in‑app + email):** OC pendiente de aprobación, aprobada, devuelta y confirmada; más **recordatorio por SLA** cuando una OC lleva demasiado tiempo pendiente de aprobación.
 
 > **📷 Captura sugerida — OC confirmada con links**  
-> Ruta: `/proyectos/[id]/ordenes-compra/[poId]` · Mostrar estado CONFIRMED + enlace a recepción / factura · Tip: copy de auto-aprobación si aparece en el flujo.
+> Ruta: `/proyectos/[id]/ordenes-compra/[poId]` · Mostrar estado CONFIRMED + enlace a recepción / factura · Tip: incluir botones Enviar/Aprobar/Devolver según estado.
 
 ### 9.3 Recepciones
 
@@ -510,6 +534,7 @@ flowchart LR
 | Acción | Efecto económico | Efecto en tesorería | Efecto contable |
 |--------|------------------|---------------------|-----------------|
 | Aprobar presupuesto | Habilita baseline y certificaciones | — | — |
+| Enviar/Aprobar/Devolver OC | Sin impacto económico (control de flujo y aprobación) | — | — |
 | Confirmar OC | **Comprometido** | — | — |
 | Recepción de OC | Ingreso de stock | — | — |
 | Emitir factura de proveedor | **Devengado** + cuenta por pagar | — | Sugerencia (manual) |
@@ -538,7 +563,8 @@ flowchart LR
 | Error | Consecuencia | Orden correcto |
 |-------|--------------|----------------|
 | Certificar sin presupuesto aprobado | Bloqueo o datos inválidos | Aprobar el presupuesto primero |
-| Confirmar OC sin imputar WBS | Control de costos sin trazabilidad | Cada línea con nodo WBS |
+| Crear línea de compra sin WBS | El sistema lo rechaza (WBS obligatorio) | Imputar cada línea a un ítem WBS; gastos generales → partida de indirectos |
+| Aprobar tu propia OC cuando no corresponde | Sin segregación de funciones | Que apruebe otro; la autoaprobación depende de la política y del umbral |
 | Confundir avance de Gantt con certificado | Reportes incoherentes | Real = libro de obra; Certificado = certificaciones |
 | Sumar OC + factura como costo total | Doble conteo | Usar **exposición esperada** |
 | Editar fechas de un contenedor del cronograma | Se pisa con el rollup | Editar solo hojas |
@@ -588,8 +614,10 @@ flowchart LR
 
 ### Compras
 
-- [ ] Solicitudes cotizadas (mínimo según política)
-- [ ] OC aprobada y **confirmada** al proveedor
+- [ ] Todas las líneas con **WBS** (indirectos → partida de gastos generales)
+- [ ] Solicitudes cotizadas (mínimo según política), comparando **precio y plazo**
+- [ ] Desvíos de precio con **justificación** cuando corresponde
+- [ ] OC enviada → aprobada (o **devuelta con motivo**) → **confirmada** al proveedor
 - [ ] Recepciones registradas (menú Operación o desde la OC)
 - [ ] Facturas de proveedor vinculadas a la OC
 
