@@ -140,7 +140,28 @@ export async function sendNotificationEmail(
   ctx: ServiceContext,
   options?: { emailType?: EmailDeliveryType },
 ): Promise<SendNotificationEmailResult> {
-  const emailType: EmailDeliveryType = options?.emailType ?? "NOTIFICATION";
+  return dispatchNotificationEmail(notificationId, ctx, {
+    emailType: options?.emailType,
+    systemDispatch: false,
+  });
+}
+
+/**
+ * Internal system fan-out (procurement events). Not for UI/actions — skips self-only AuthZ.
+ */
+export async function sendNotificationEmailAsSystem(
+  notificationId: string,
+  ctx: ServiceContext,
+): Promise<SendNotificationEmailResult> {
+  return dispatchNotificationEmail(notificationId, ctx, { systemDispatch: true });
+}
+
+async function dispatchNotificationEmail(
+  notificationId: string,
+  ctx: ServiceContext,
+  options: { emailType?: EmailDeliveryType; systemDispatch?: boolean },
+): Promise<SendNotificationEmailResult> {
+  const emailType: EmailDeliveryType = options.emailType ?? "NOTIFICATION";
   const n = await loadNotification(notificationId, ctx.tenantId);
   if (!n) {
     throw new ServiceError("NOT_FOUND", "Notificación no encontrada");
@@ -149,7 +170,7 @@ export async function sendNotificationEmail(
     throw new ServiceError("VALIDATION", "Notificación sin destinatario");
   }
 
-  if (!canDispatchNotificationEmail(ctx, n.recipientUserId)) {
+  if (!options.systemDispatch && !canDispatchNotificationEmail(ctx, n.recipientUserId)) {
     throw new ServiceError("FORBIDDEN", "No podés enviar esta notificación por email");
   }
 

@@ -32,7 +32,16 @@ export type PurchaseOrderLine = {
   varianceJustification?: string | null;
 };
 
-export type WbsOption     = { id: string; code: string; name: string; budgetName: string };
+export type WbsOption = {
+  id: string;
+  code: string;
+  name: string;
+  budgetName: string;
+  budgetUnitCost?: string | null;
+  budgetUnit?: string | null;
+  availableSaldo?: string | null;
+  wouldExceedBudget?: boolean;
+};
 export type ProductOption = { id: string; sku: string; name: string; unit: string };
 
 function safeNum(v: string) {
@@ -41,11 +50,11 @@ function safeNum(v: string) {
 }
 
 function linePreview(l: PurchaseOrderLine) {
-  const qty      = safeNum(l.quantity);
-  const price    = safeNum(l.unitPrice);
-  const rate     = safeNum(l.taxRate);
+  const qty = safeNum(l.quantity);
+  const price = safeNum(l.unitPrice);
+  const rate = safeNum(l.taxRate);
   const subtotal = qty * price;
-  const tax      = subtotal * (rate / 100);
+  const tax = subtotal * (rate / 100);
   return { subtotal, tax, total: subtotal + tax };
 }
 
@@ -54,12 +63,17 @@ interface Props {
   onChange: (lines: PurchaseOrderLine[]) => void;
   wbsOptions: WbsOption[];
   productOptions?: ProductOption[];
-  /** Muestra campo de justificación de desvío presupuestario por línea (OC en borrador). */
   showVarianceJustification?: boolean;
 }
 
 const DEFAULT_LINE: PurchaseOrderLine = {
-  wbsNodeId: null, productId: null, description: "", unit: "", quantity: "1", unitPrice: "", taxRate: "21",
+  wbsNodeId: null,
+  productId: null,
+  description: "",
+  unit: "",
+  quantity: "1",
+  unitPrice: "",
+  taxRate: "21",
 };
 
 export function PurchaseOrderLinesEditor({
@@ -70,7 +84,7 @@ export function PurchaseOrderLinesEditor({
   showVarianceJustification = false,
 }: Props) {
   const wbsComboboxOptions = useMemo(
-    () => withNoneOption(wbsToSearchableOptions(wbsOptions), { label: "Sin WBS" }),
+    () => wbsToSearchableOptions(wbsOptions),
     [wbsOptions],
   );
   const productComboboxOptions = useMemo(
@@ -79,7 +93,7 @@ export function PurchaseOrderLinesEditor({
   );
 
   function update(i: number, field: keyof PurchaseOrderLine, value: string | null) {
-    const next = lines.map((l, idx) => idx === i ? { ...l, [field]: value } : l);
+    const next = lines.map((l, idx) => (idx === i ? { ...l, [field]: value } : l));
     onChange(next);
   }
 
@@ -108,23 +122,26 @@ export function PurchaseOrderLinesEditor({
           + Agregar línea
         </Button>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Cada línea debe imputar a un ítem WBS. Para gastos generales usá la partida de
+        indirectos del presupuesto.
+      </p>
 
       <TableScroll>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[15%]">WBS (ITEM)</TableHead>
-              {productOptions.length > 0 && <TableHead className="w-[15%]">Producto</TableHead>}
-              <TableHead className="w-[20%]">Descripción</TableHead>
+              <TableHead className="w-[18%]">WBS (obligatorio)</TableHead>
+              {productOptions.length > 0 && <TableHead className="w-[14%]">Producto</TableHead>}
+              <TableHead className="w-[18%]">Descripción</TableHead>
               <TableHead className="w-[6%]">Unidad</TableHead>
               <TableHead className="w-[8%]">Cant.</TableHead>
-              <TableHead className="w-[12%]">Precio unit.</TableHead>
+              <TableHead className="w-[10%]">Precio unit.</TableHead>
+              <TableHead className="w-[8%]">Ref. presup.</TableHead>
               <TableHead className="w-[7%]">IVA %</TableHead>
               {showVarianceJustification && (
-                <TableHead className="w-[14%]">Justif. desvío</TableHead>
+                <TableHead className="w-[12%]">Justif. desvío</TableHead>
               )}
-              <TableHead className="w-[10%] text-right">Subtotal</TableHead>
-              <TableHead className="w-[7%] text-right">IVA</TableHead>
               <TableHead className="w-[8%] text-right">Total</TableHead>
               <TableHead className="w-8" />
             </TableRow>
@@ -132,20 +149,29 @@ export function PurchaseOrderLinesEditor({
           <TableBody>
             {lines.map((line, i) => {
               const p = linePreview(line);
+              const wbs = wbsOptions.find((w) => w.id === line.wbsNodeId);
               return (
                 <TableRow key={i} className="align-top">
                   <TableCell className="py-1.5">
-                      <SearchableCombobox
-                        popoverWidth="wide"
-                        className="h-8 text-xs"
-                        options={wbsComboboxOptions}
-                      value={line.wbsNodeId ?? SEARCHABLE_NONE}
-                      onValueChange={(v) =>
-                        update(i, "wbsNodeId", v === SEARCHABLE_NONE ? null : v)
-                      }
-                      placeholder="Sin WBS"
+                    <SearchableCombobox
+                      popoverWidth="wide"
+                      className="h-8 text-xs"
+                      options={wbsComboboxOptions}
+                      value={line.wbsNodeId ?? ""}
+                      onValueChange={(v) => update(i, "wbsNodeId", v || null)}
+                      placeholder="Elegir WBS…"
                       searchPlaceholder="Buscar partida…"
                     />
+                    {wbs?.availableSaldo != null && (
+                      <p
+                        className={`mt-1 text-[10px] ${
+                          wbs.wouldExceedBudget ? "text-destructive" : "text-muted-foreground"
+                        }`}
+                      >
+                        Saldo part.: {formatDecimalAr(Number(wbs.availableSaldo))}
+                        {wbs.wouldExceedBudget ? " (alerta)" : ""}
+                      </p>
+                    )}
                   </TableCell>
                   {productOptions.length > 0 && (
                     <TableCell className="py-1.5">
@@ -155,7 +181,7 @@ export function PurchaseOrderLinesEditor({
                         options={productComboboxOptions}
                         value={line.productId ?? SEARCHABLE_NONE}
                         onValueChange={(v) => {
-                          const selected = productOptions.find((p) => p.id === v);
+                          const selected = productOptions.find((pr) => pr.id === v);
                           const next = {
                             ...lines[i],
                             productId: v === SEARCHABLE_NONE ? null : v,
@@ -203,6 +229,11 @@ export function PurchaseOrderLinesEditor({
                       className="h-8 text-sm"
                     />
                   </TableCell>
+                  <TableCell className="py-1.5 text-xs tabular-nums text-muted-foreground">
+                    {wbs?.budgetUnitCost != null
+                      ? `${formatDecimalAr(Number(wbs.budgetUnitCost))}${wbs.budgetUnit ? ` / ${wbs.budgetUnit}` : ""}`
+                      : "—"}
+                  </TableCell>
                   <TableCell className="py-1.5">
                     <Input
                       value={line.taxRate}
@@ -221,9 +252,9 @@ export function PurchaseOrderLinesEditor({
                       />
                     </TableCell>
                   )}
-                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.subtotal)}</TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.tax)}</TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.total)}</TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">
+                    {formatDecimalAr(p.total)}
+                  </TableCell>
                   <TableCell className="align-top pt-2">
                     {lines.length > 1 && (
                       <button
@@ -245,21 +276,10 @@ export function PurchaseOrderLinesEditor({
 
       <div className="flex justify-end gap-8 text-sm border-t pt-3">
         <div className="text-right">
-          <p className="text-xs text-muted-foreground">Subtotal</p>
-          <p className="tabular-nums font-medium">{formatDecimalAr(totals.subtotal)}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">IVA</p>
-          <p className="tabular-nums font-medium">{formatDecimalAr(totals.tax)}</p>
-        </div>
-        <div className="text-right">
           <p className="text-xs text-muted-foreground font-semibold">Total (vista previa)</p>
           <p className="tabular-nums font-semibold">{formatDecimalAr(totals.total)}</p>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        * Los totales son una vista previa. El servidor recalcula al guardar.
-      </p>
     </div>
   );
 }

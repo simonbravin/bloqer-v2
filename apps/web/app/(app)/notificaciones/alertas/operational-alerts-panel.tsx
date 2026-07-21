@@ -13,6 +13,7 @@ const SINGLE_ALERTS: ReadonlyArray<{ type: OperationalAlertType; label: string }
   { type: "negativeStock", label: "Stock negativo" },
   { type: "approvedCertificationsWithoutInvoice", label: "Certificaciones aprobadas sin factura" },
   { type: "staleUploadingDocuments", label: "Uploads pendientes" },
+  { type: "procurementSlaReminders", label: "Compras demoradas (SLA)" },
 ];
 
 function ResultPanel({ state }: { state: OperationalAlertsActionState }) {

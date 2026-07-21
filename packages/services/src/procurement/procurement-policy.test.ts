@@ -25,6 +25,7 @@ const baseSettings: CompanyProcurementSettingsView = {
   varianceSoftAlertPct: "10",
   varianceNoteRequiredPct: "25",
   varianceExtraApprovalPct: "25",
+  approvalSlaHours: 72,
 };
 
 function ctx(roles: ServiceContext["roles"]): ServiceContext {

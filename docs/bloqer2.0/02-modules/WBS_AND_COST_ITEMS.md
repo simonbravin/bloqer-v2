@@ -7,7 +7,7 @@ Estructurar el presupuesto en **jerarquía WBS** y **ítems hoja** con cantidad,
 - **PM**, **ADMIN**, **OWNER**, **PROCUREMENT** (consulta).
 
 ## 3. Problema que resuelve
-Sin WBS no hay línea base para certificar ni para imputar compras por ítem.
+Sin WBS no hay línea base para certificar ni para imputar compras por ítem. Las **compras de proyecto** exigen WBS en cada línea ([BR-PUR-007], [D-050]); los gastos generales / indirectos de obra se modelan como **partida(s) WBS presupuestables**, no como líneas sin imputación.
 
 ## 4. Datos que consume (inputs)
 - **Budget** cuyo `status` **permite** editar estructura económica (`DRAFT`, o `RETURNED_FOR_CHANGES`; **no** `APPROVED` ni `CLOSED` en lo económico) ([BR-BUD-006], [BR-BUD-002]).

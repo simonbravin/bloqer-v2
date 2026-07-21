@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const purchaseRequestLineSchema = z.object({
-  wbsNodeId: z.string().uuid().optional().nullable(),
+  wbsNodeId: z.string().uuid({ message: "Cada línea debe imputar a un ítem WBS" }),
   productId: z.string().uuid().optional().nullable(),
   lineType: z.enum(["MATERIAL", "SERVICE", "OTHER"]).default("MATERIAL"),
   description: z.string().min(1, "Descripción requerida"),
@@ -36,6 +36,7 @@ export const createProcurementQuoteSchema = z.object({
   currency: z.string().length(3).default("ARS"),
   fxRate: z.string().regex(/^\d+(\.\d+)?$/).optional(),
   validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  leadTimeDays: z.coerce.number().int().min(0).max(3650).optional().nullable(),
   notes: z.string().optional().nullable(),
   lines: z.array(quoteLineSchema).min(1),
 });

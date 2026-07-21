@@ -15,6 +15,7 @@ export type CompanyProcurementSettingsView = {
   varianceSoftAlertPct: string;
   varianceNoteRequiredPct: string;
   varianceExtraApprovalPct: string;
+  approvalSlaHours: number;
 };
 
 const DEFAULTS = {
@@ -26,6 +27,7 @@ const DEFAULTS = {
   varianceSoftAlertPct: new Prisma.Decimal(10),
   varianceNoteRequiredPct: new Prisma.Decimal(25),
   varianceExtraApprovalPct: new Prisma.Decimal(25),
+  approvalSlaHours: 72,
 };
 
 function serialize(row: {
@@ -41,6 +43,7 @@ function serialize(row: {
   varianceSoftAlertPct: Prisma.Decimal;
   varianceNoteRequiredPct: Prisma.Decimal;
   varianceExtraApprovalPct: Prisma.Decimal;
+  approvalSlaHours: number;
 }): CompanyProcurementSettingsView {
   const cats = row.quoteRequiredCategories;
   return {
@@ -56,6 +59,7 @@ function serialize(row: {
     varianceSoftAlertPct: row.varianceSoftAlertPct.toString(),
     varianceNoteRequiredPct: row.varianceNoteRequiredPct.toString(),
     varianceExtraApprovalPct: row.varianceExtraApprovalPct.toString(),
+    approvalSlaHours: row.approvalSlaHours ?? 72,
   };
 }
 
@@ -83,6 +87,7 @@ export async function getCompanyProcurementSettings(
       varianceSoftAlertPct: DEFAULTS.varianceSoftAlertPct.toString(),
       varianceNoteRequiredPct: DEFAULTS.varianceNoteRequiredPct.toString(),
       varianceExtraApprovalPct: DEFAULTS.varianceExtraApprovalPct.toString(),
+      approvalSlaHours: DEFAULTS.approvalSlaHours,
     };
   }
   return serialize(row);
@@ -116,6 +121,7 @@ export async function upsertCompanyProcurementSettings(
     varianceSoftAlertPct: string;
     varianceNoteRequiredPct: string;
     varianceExtraApprovalPct: string;
+    approvalSlaHours: number;
   }>,
   ctx: ServiceContext,
 ): Promise<CompanyProcurementSettingsView> {
@@ -160,6 +166,7 @@ export async function upsertCompanyProcurementSettings(
     varianceExtraApprovalPct: input.varianceExtraApprovalPct
       ? new Prisma.Decimal(input.varianceExtraApprovalPct)
       : DEFAULTS.varianceExtraApprovalPct,
+    approvalSlaHours: input.approvalSlaHours ?? DEFAULTS.approvalSlaHours,
   };
 
   const row = await prisma.companyProcurementSettings.upsert({

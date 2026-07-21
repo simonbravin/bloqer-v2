@@ -86,12 +86,24 @@ La **facturación** no emite transición de `Certification.status` ([BR-CERT-007
 
 | Evento | Cuándo |
 |---|---|
-| `purchase_order.submitted` | DRAFT → SUBMITTED |
+| `purchase_order.submitted` | DRAFT → SUBMITTED (o auto-APPROVED en el mismo acto) |
 | `purchase_order.approved` | SUBMITTED → APPROVED |
-| `purchase_order.confirmed` | APPROVED → CONFIRMED |
-| `purchase_order.received_partial` | CONFIRMED → RECEIVED_PARTIAL |
-| `purchase_order.received_full` | * → RECEIVED_FULL |
+| `purchase_order.returned_for_changes` | SUBMITTED → DRAFT (rechazo / devolución con motivo, [BR-PUR-016], [D-050]) |
+| `purchase_order.confirmed` | APPROVED → CONFIRMED (compromiso de costo) |
+| `purchase_order.received_partial` | CONFIRMED → PARTIALLY_RECEIVED |
+| `purchase_order.received_full` | * → RECEIVED |
+| `purchase_order.closed_partial` | cierre de saldo no recibido ([BR-PUR-013]) |
 | `purchase_order.cancelled` | * → CANCELLED |
+
+### 2.6b PurchaseRequest / ProcurementQuote
+
+| Evento | Cuándo |
+|---|---|
+| `purchase_request.created` | alta borrador |
+| `purchase_request.submitted` | DRAFT → SUBMITTED (snapshot presupuesto) |
+| `purchase_request.cancelled` | → CANCELLED |
+| `procurement_quote.received` | cotización cargada |
+| `procurement_quote.selected` | cotización elegida; genera OC DRAFT |
 
 ### 2.7 Receipt
 
@@ -317,12 +329,16 @@ flowchart LR
 | `budget.approved` | habilita emisión de certificaciones; estructura económica bloqueada salvo proceso formal ([BR-BUD-006]). |
 | `budget.closed` | base contractual; bloqueo total de cómputo vendido sin adenda ([BR-BUD-002]). |
 
-### 3.8 Aprobaciones
+### 3.8 Aprobaciones y compras
 
 | Evento | Reacción |
 |---|---|
-| `purchase_order.submitted` | si supera umbral configurado, notifica a OWNER/ADMIN para aprobar (Q-017). |
-| `purchase_order.approved` | habilita confirmación al proveedor. |
+| `purchase_request.submitted` | notifica a Compras / aprobadores OC (in-app + email, [BR-PUR-015], [D-050]). |
+| `purchase_order.submitted` | si requiere alto nivel (umbral o `EXTRA_APPROVAL`), notifica a OWNER/ADMIN; si auto-aprueba, emite también `purchase_order.approved`. |
+| `purchase_order.approved` | habilita confirmación al proveedor; notifica al solicitante. |
+| `purchase_order.returned_for_changes` | notifica al creador/solicitante con el motivo; documento vuelve a editable. |
+| `purchase_order.confirmed` | imputa **comprometido**; completa SC vinculada si aplica; notifica al solicitante. |
+| Job `procurement_approval_sla_reminder` | recordatorio por antigüedad de SC sin cotizar / OC en `SUBMITTED`; escalamiento OWNER/ADMIN ([D-050]). |
 
 ### 3.9 Vencimientos (jobs programados)
 
@@ -349,6 +365,11 @@ Cada evento puede generar una **Notification** para roles específicos. Tabla re
 | `certification.approved_by_client` | OWNER, ADMIN, FINANCE, PM |
 | `certification.rejected_by_client` | OWNER, ADMIN, FINANCE, PM |
 | `certification.over_budget_warning` | OWNER, ADMIN, PM |
+| `purchase_request.submitted` | PROCUREMENT, APPROVE PURCHASE_ORDERS (fallback OWNER/ADMIN) |
+| `purchase_order.submitted` (pendiente aprobación) | aprobadores estándar o OWNER/ADMIN si alto nivel |
+| `purchase_order.approved` | solicitante / creador |
+| `purchase_order.returned_for_changes` | solicitante / creador |
+| `purchase_order.confirmed` | solicitante / creador; WAREHOUSE si hay bienes a recibir |
 | `purchase_order.submitted` (sobre umbral) | OWNER, ADMIN |
 | `receivable.overdue_detected` | OWNER, ADMIN, FINANCE |
 | `payable.overdue` | OWNER, ADMIN, FINANCE, PROCUREMENT |

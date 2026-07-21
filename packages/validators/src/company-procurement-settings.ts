@@ -17,6 +17,7 @@ export const upsertCompanyProcurementSettingsSchema = z
     allowDirectPo: z.coerce.boolean().optional(),
     allowSelfApproval: z.coerce.boolean().optional(),
     allowEmergencyDirectPo: z.coerce.boolean().optional(),
+    approvalSlaHours: z.coerce.number().int().min(1).max(720).optional(),
     varianceSoftAlertPct: pct.optional(),
     varianceNoteRequiredPct: pct.optional(),
     varianceExtraApprovalPct: pct.optional(),

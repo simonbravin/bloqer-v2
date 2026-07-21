@@ -6,6 +6,7 @@ import {
   issuePurchaseOrder,
   submitPurchaseOrder,
   approvePurchaseOrder,
+  returnPurchaseOrder,
   confirmPurchaseOrder,
   cancelPurchaseOrder,
   createPurchaseReceipt,
@@ -17,6 +18,7 @@ import {
   createPurchaseOrderSchema,
   updatePurchaseOrderSchema,
   createPurchaseReceiptSchema,
+  returnPurchaseOrderSchema,
   type CreatePurchaseOrderInput,
   type UpdatePurchaseOrderInput,
   type CreatePurchaseReceiptInput,
@@ -100,6 +102,23 @@ export async function approvePurchaseOrderAction(
   const ctx = await getCtx();
   try {
     await approvePurchaseOrder(poId, ctx);
+    revalidatePO(projectId, poId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function returnPurchaseOrderAction(
+  poId: string,
+  projectId: string,
+  reason: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = returnPurchaseOrderSchema.safeParse({ reason });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    await returnPurchaseOrder(poId, parsed.data.reason, ctx);
     revalidatePO(projectId, poId);
     return { ok: true };
   } catch (err) {

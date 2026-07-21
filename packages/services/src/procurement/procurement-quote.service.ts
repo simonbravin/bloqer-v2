@@ -74,6 +74,7 @@ export async function createProcurementQuote(
         status: "RECEIVED",
         currency: input.currency ?? "ARS",
         validUntil: input.validUntil ? new Date(input.validUntil) : null,
+        leadTimeDays: input.leadTimeDays ?? null,
         notes: input.notes ?? null,
         receivedAt: new Date(),
         createdBy: ctx.actorUserId,
@@ -148,6 +149,7 @@ export async function listProcurementQuotesForRequest(
     totalAmountArs: string;
     currency: string;
     validUntil: string | null;
+    leadTimeDays: number | null;
   }>
 > {
   await assertProcurementTenantModule(ctx);
@@ -169,5 +171,71 @@ export async function listProcurementQuotesForRequest(
     totalAmountArs: q.totalAmountArs.toString(),
     currency: q.currency,
     validUntil: q.validUntil?.toISOString().slice(0, 10) ?? null,
+    leadTimeDays: q.leadTimeDays,
+  }));
+}
+
+export async function listProcurementQuotesDetailedForRequest(
+  purchaseRequestId: string,
+  ctx: ServiceContext,
+): Promise<
+  Array<{
+    id: string;
+    supplierName: string;
+    status: string;
+    totalAmount: string;
+    totalAmountArs: string;
+    currency: string;
+    validUntil: string | null;
+    leadTimeDays: number | null;
+    lines: Array<{
+      description: string;
+      unit: string;
+      quantity: string;
+      unitPrice: string;
+      budgetUnitCostSnapshot: string | null;
+    }>;
+  }>
+> {
+  await assertProcurementTenantModule(ctx);
+  if (!canViewPurchaseRequests(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos");
+  }
+  const quotes = await prisma.procurementQuote.findMany({
+    where: { purchaseRequestId, tenantId: ctx.tenantId },
+    include: {
+      supplierContact: { select: { legalName: true, fantasyName: true } },
+      lines: {
+        include: {
+          purchaseRequestLine: {
+            select: {
+              description: true,
+              budgetUnitCostSnapshot: true,
+              quantity: true,
+              unit: true,
+            },
+          },
+        },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  return quotes.map((q) => ({
+    id: q.id,
+    supplierName: q.supplierContact.fantasyName ?? q.supplierContact.legalName,
+    status: q.status,
+    totalAmount: q.totalAmount.toString(),
+    totalAmountArs: q.totalAmountArs.toString(),
+    currency: q.currency,
+    validUntil: q.validUntil?.toISOString().slice(0, 10) ?? null,
+    leadTimeDays: q.leadTimeDays,
+    lines: q.lines.map((l) => ({
+      description: l.purchaseRequestLine.description,
+      unit: l.purchaseRequestLine.unit,
+      quantity: l.purchaseRequestLine.quantity.toString(),
+      unitPrice: l.unitPrice.toString(),
+      budgetUnitCostSnapshot: l.purchaseRequestLine.budgetUnitCostSnapshot?.toString() ?? null,
+    })),
   }));
 }

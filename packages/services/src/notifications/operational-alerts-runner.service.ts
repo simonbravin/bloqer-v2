@@ -8,6 +8,7 @@ import {
   runStaleUploadingDocumentsAlert,
   type OperationalAlertRunSummary,
 } from "./operational-alerts.service";
+import { runProcurementSlaReminders } from "../procurement/procurement-notifications.service";
 
 export const OPERATIONAL_ALERT_TYPES = [
   "overdueReceivables",
@@ -15,6 +16,7 @@ export const OPERATIONAL_ALERT_TYPES = [
   "negativeStock",
   "approvedCertificationsWithoutInvoice",
   "staleUploadingDocuments",
+  "procurementSlaReminders",
 ] as const;
 
 export type OperationalAlertType = (typeof OPERATIONAL_ALERT_TYPES)[number];
@@ -73,6 +75,10 @@ async function dispatchOperationalAlert(
       return runApprovedCertificationsWithoutInvoiceAlert(ctx);
     case "staleUploadingDocuments":
       return runStaleUploadingDocumentsAlert(ctx);
+    case "procurementSlaReminders": {
+      const s = await runProcurementSlaReminders(ctx);
+      return { checkedCount: s.checkedCount, createdCount: s.createdCount, skippedCount: s.skippedCount, errors: [] };
+    }
   }
 }
 

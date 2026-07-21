@@ -37,14 +37,11 @@
 ### Q-002 — Numeración de comprobantes
 
 - **Categoría:** Operativo / legal
-- **Estado:** ABIERTA
-- **Impacto:** afecta OCs, certificados, facturas, recibos.
-- **Opciones:**
-  1. Numeración por **empresa** (correlativa única por tipo de comprobante).
-  2. Numeración por **proyecto**.
-  3. Numeración configurable por tipo (ej. facturas por empresa, OCs por proyecto).
-- **Recomendación:** opción 3, con default a empresa.
-- **Bloquea:** [`02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md`](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [`02-modules/CERTIFICATIONS.md`](../02-modules/CERTIFICATIONS.md), [`02-modules/SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md).
+- **Estado:** CERRADA (parcial) — ver [D-050](./DECISION_LOG.md#d-050--procedimientos-de-oc-wbs-obligatorio-cotizaciones-comparables-notificaciones-y-rechazo)
+- **Impacto:** afecta OCs, solicitudes de compra, recepciones; otros comprobantes siguen la misma línea por defecto.
+- **Decisión Fase 1:** numeración **por empresa** (correlativa por tipo de documento dentro de `company_id` + `tenant_id`) para `PurchaseRequest`, `PurchaseOrder` y recepciones de compra. Alineado a la implementación vigente (`SC-NNN`, `OC-NNN`).
+- **Diferido:** numeración configurable por tipo (opción 3 original) si un tenant lo requiere; no bloquea compras.
+- **Documentos:** [`02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md`](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [`02-modules/PURCHASE_REQUESTS.md`](../02-modules/PURCHASE_REQUESTS.md).
 
 ### Q-003 — Cronograma: Gantt, hitos o ambos
 
@@ -133,14 +130,11 @@
 ### Q-009 — Notificaciones: email desde día 1
 
 - **Categoría:** Notificaciones
-- **Estado:** ABIERTA
-- **Impacto:** define infraestructura de email en Fase 1.
-- **Opciones:**
-  1. Solo in-app en Fase 1, email en Fase 2.
-  2. In-app + email transaccional desde Fase 1 (vencimientos, aprobaciones).
-  3. In-app + email + opciones avanzadas (digest diario, etc.) desde Fase 1.
-- **Recomendación:** opción 2.
-- **Bloquea:** [`02-modules/NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md).
+- **Estado:** CERRADA (parcial para compras) — ver [D-050](./DECISION_LOG.md#d-050--procedimientos-de-oc-wbs-obligatorio-cotizaciones-comparables-notificaciones-y-rechazo); resto del producto sigue alineado a la recomendación.
+- **Impacto:** define infraestructura de email.
+- **Decisión para procurement:** **in-app + email automático** en cambios de estado de SC/OC + **recordatorio por antigüedad/SLA** con escalamiento a OWNER/ADMIN ([BR-PUR-015]). Opción 2 ampliada; no solo email.
+- **Resto del producto:** se mantiene la recomendación opción 2 (in-app + email transaccional); digest avanzado diferido.
+- **Documentos:** [`02-modules/NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md), [`08-architecture/NOTIFICATIONS_ARCHITECTURE.md`](../08-architecture/NOTIFICATIONS_ARCHITECTURE.md), [`01-domain/APPROVAL_WORKFLOWS.md`](../01-domain/APPROVAL_WORKFLOWS.md).
 
 ### Q-010 — Query Builder: visual o por filtros
 
@@ -449,6 +443,13 @@
   3. Usar `varianceNoteRequiredPct` como inicio de `NOTE_REQUIRED` y redefinir qué efecto tiene el umbral soft.
 - **Recomendación inicial:** (2), pero requiere actualizar reglas, tipos, UI y tests en una decisión coordinada.
 - **Bloquea:** cualquier cambio de semántica en `evaluateLineVariance`; no bloquea los Lotes 1–7.
+
+### Q-052 — WBS obligatorio en líneas de SC / OC de proyecto
+
+- **Categoría:** Compras / control de costos
+- **Estado:** CERRADA — ver [D-050](./DECISION_LOG.md#d-050--procedimientos-de-oc-wbs-obligatorio-cotizaciones-comparables-notificaciones-y-rechazo)
+- **Decisión:** toda línea de `PurchaseRequest` y `PurchaseOrder` de proyecto **debe** imputar a un WBS `ITEM` del presupuesto aprobado/cerrado. Los gastos generales / indirectos de obra se modelan como **partida(s) WBS presupuestables**, nunca como línea sin `wbs_node_id`. Overhead de empresa sin obra queda fuera de este flujo ([D-035], [D-040]).
+- **Documentos:** [`02-modules/PURCHASE_REQUESTS.md`](../02-modules/PURCHASE_REQUESTS.md), [`02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md`](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [BR-PUR-007].
 
 ---
 

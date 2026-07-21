@@ -47,31 +47,47 @@ flowchart LR
 
 ---
 
-### 2.2 Aprobación de OC con umbral
+### 2.2 Aprobación de OC (umbral, desvío, rechazo y confirmación)
+
+> Ver [D-044](../00-product/DECISION_LOG.md), [D-050](../00-product/DECISION_LOG.md#d-050--procedimientos-de-oc-wbs-obligatorio-cotizaciones-comparables-notificaciones-y-rechazo), [Q-017](../00-product/OPEN_QUESTIONS.md) (cerrada).
 
 ```mermaid
 flowchart LR
   Draft([DRAFT]) --> Submit[Enviar]
-  Submit --> Check{Total > umbral?}
-  Check -- "No" --> AppDirect[PROCUREMENT aprueba]
-  Check -- "Si" --> AppHigh[OWNER/ADMIN aprueba]
-  AppDirect --> Approved([APPROVED])
+  Submit --> Check{"Monto >= umbral o desvio EXTRA_APPROVAL?"}
+  Check -- "No" --> AppStd[PROCUREMENT / ADMIN / OWNER]
+  Check -- "Si" --> AppHigh[OWNER / ADMIN]
+  AppStd --> Approved([APPROVED])
   AppHigh --> Approved
+  Submit --> Pending([SUBMITTED])
+  Pending --> AppHigh
+  Pending --> AppStd
+  Pending --> Reject[Rechazar / devolver con motivo]
+  Reject --> Draft
   Approved --> Confirm[Confirmar al proveedor]
   Confirm --> Confirmed([CONFIRMED])
 ```
 
 **Reglas:**
-- Umbral monto se configura por empresa (parámetro tenant). Si no se configura, no hay 4 ojos.
-- En obra pública, los umbrales típicamente son más estrictos. Configurable.
-- Una vez `APPROVED`, la confirmación al proveedor (`CONFIRMED`) registra compromiso.
+- Umbral monto: `CompanyProcurementSettings.poApprovalThresholdArs`. Si es null, no hay 4 ojos por monto; igual puede exigir alto nivel por varianza `EXTRA_APPROVAL` ([BR-PUR-009]).
+- Al **enviar**, si no requiere alto nivel y el actor es aprobador estándar (y pasa segregación), la OC puede pasar directo a `APPROVED` (auto-aprobación en el mismo acto).
+- **Aprobar ≠ ejecutar:** `APPROVED` solo habilita confirmar al proveedor. El **compromiso de costo** ocurre en `CONFIRMED` ([D-006], [BR-PUR-001]).
+- **Rechazo / devolución ([BR-PUR-016]):** desde `SUBMITTED`, el aprobador puede devolver a `DRAFT` con **motivo obligatorio** (auditado). El creador corrige y reenvía. No se “des-aprueba” un `APPROVED`/`CONFIRMED`.
+- **Segregación ([BR-APR-004]):** quien originó la SC/OC no aprueba, salvo `allowSelfApproval` y sin alto monto ni `EXTRA_APPROVAL`.
+- Toda línea de OC de proyecto lleva WBS ([BR-PUR-007], [D-050]).
 
 **Quién:**
 - Crea / submit: PROCUREMENT, PM, ADMIN.
-- Aprueba (sin umbral): PROCUREMENT, ADMIN, OWNER.
-- Aprueba (con umbral superado): solo ADMIN o OWNER.
+- Aprueba (sin umbral ni desvío alto): PROCUREMENT, ADMIN, OWNER.
+- Aprueba (umbral superado o `EXTRA_APPROVAL`): solo ADMIN o OWNER.
+- Rechaza / devuelve: mismos roles que pueden aprobar en ese contexto.
+- Confirma al proveedor: PROCUREMENT, ADMIN, OWNER.
 
-**Pendiente:** [Q-017] confirma si el umbral existe en Fase 1 o queda Fase 2.
+**Notificaciones ([BR-PUR-015], [D-050]):**
+- SC enviada → Compras (+ fallback OWNER/ADMIN).
+- OC queda `SUBMITTED` → aprobadores correspondientes (alto nivel → OWNER/ADMIN).
+- OC aprobada / rechazada-devuelta / confirmada → **solicitante** (y creador si distinto).
+- Canal: **in-app + email**; recordatorio por antigüedad/SLA con escalamiento a OWNER/ADMIN.
 
 ---
 
@@ -234,8 +250,9 @@ flowchart LR
 
 ### 4.3 Notificación
 
-- Cuando algo se envía a aprobación, se notifica a los aprobadores potenciales.
-- Cuando se aprueba, se notifica al creador.
+- Cuando algo se envía a aprobación, se notifica a los aprobadores potenciales (**in-app + email** en compras, [D-050]).
+- Cuando se aprueba, rechaza/devuelve o confirma, se notifica al **creador / solicitante**.
+- En procurement, documentos estancados generan **recordatorio por antigüedad** con escalamiento a OWNER/ADMIN ([BR-PUR-015]).
 
 ### 4.4 Tiempo de aprobación
 
@@ -258,8 +275,9 @@ flowchart LR
 |---|---|---|---|
 | Budget | aprobar borrador | OWNER, ADMIN | (PM si Admin habilita) |
 | Budget | cerrar aprobado | OWNER, ADMIN | — |
-| PurchaseOrder | aprobar | PROCUREMENT, ADMIN, OWNER | si supera umbral → solo ADMIN/OWNER |
-| PurchaseOrder | confirmar al proveedor | PROCUREMENT, ADMIN, OWNER | — |
+| PurchaseOrder | aprobar | PROCUREMENT, ADMIN, OWNER | si supera umbral o `EXTRA_APPROVAL` → solo ADMIN/OWNER; segregación [BR-APR-004] |
+| PurchaseOrder | rechazar / devolver a DRAFT | mismos que aprobar en ese contexto | motivo obligatorio [BR-PUR-016] |
+| PurchaseOrder | confirmar al proveedor | PROCUREMENT, ADMIN, OWNER | compromiso de costo [D-006] |
 | Receipt | confirmar | PROCUREMENT, WAREHOUSE, ADMIN, OWNER | — |
 | PurchaseInvoice | aprobar para pago | FINANCE, ADMIN, OWNER | — |
 | Payment | confirmar | FINANCE, ADMIN, OWNER | — |

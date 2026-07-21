@@ -36,6 +36,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import {
   submitPurchaseOrderAction,
   approvePurchaseOrderAction,
+  returnPurchaseOrderAction,
   confirmPurchaseOrderAction,
   issuePurchaseOrderAction,
   cancelPurchaseOrderAction,
@@ -157,6 +158,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                 <TableHead className="text-right">Recibido</TableHead>
                 <TableHead className="text-right">Pendiente</TableHead>
                 <TableHead className="text-right">Precio unit.</TableHead>
+                <TableHead className="text-right">Ref. presup.</TableHead>
                 {showVarianceCols && <TableHead>Desvío</TableHead>}
                 <TableHead className="text-right">Total</TableHead>
               </TableRow>
@@ -175,6 +177,9 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                     {line.remainingQuantity}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{line.unitPrice}</TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {line.budgetUnitCostSnapshot ?? "—"}
+                  </TableCell>
                   {showVarianceCols && (
                     <TableCell className="text-xs">
                       {line.varianceTier !== "NONE" ? (
@@ -269,16 +274,45 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           </>
         )}
         {isSubmitted && canApprovePo && (
-          <form
-            action={async () => {
-              "use server";
-              const res = await approvePurchaseOrderAction(poId, id);
-              if ("error" in res) redirectWithActionError(poPath, res.error);
-              redirect(poPath);
-            }}
-          >
-            <Button type="submit">Aprobar</Button>
-          </form>
+          <>
+            <form
+              action={async () => {
+                "use server";
+                const res = await approvePurchaseOrderAction(poId, id);
+                if ("error" in res) redirectWithActionError(poPath, res.error);
+                redirect(poPath);
+              }}
+            >
+              <Button type="submit">Aprobar</Button>
+            </form>
+            <form
+              action={async (fd) => {
+                "use server";
+                const reason = String(fd.get("returnReason") ?? "");
+                const res = await returnPurchaseOrderAction(poId, id, reason);
+                if ("error" in res) redirectWithActionError(poPath, res.error);
+                redirect(poPath);
+              }}
+              className="flex flex-wrap items-end gap-2"
+            >
+              <div className="space-y-1">
+                <label htmlFor="returnReason" className="text-xs text-muted-foreground">
+                  Motivo de devolución
+                </label>
+                <input
+                  id="returnReason"
+                  name="returnReason"
+                  required
+                  minLength={3}
+                  className="flex h-9 w-64 rounded-md border border-input bg-transparent px-3 text-sm"
+                  placeholder="Indicar motivo…"
+                />
+              </div>
+              <Button type="submit" variant="outline">
+                Devolver a borrador
+              </Button>
+            </form>
+          </>
         )}
         {isApproved && canEditPo && (
           <form

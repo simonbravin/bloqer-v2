@@ -1862,6 +1862,8 @@ model CompanyProcurementSettings {
   varianceSoftAlertPct            Decimal  @default(10) @db.Decimal(8, 4)
   varianceNoteRequiredPct         Decimal  @default(25) @db.Decimal(8, 4)
   varianceExtraApprovalPct        Decimal  @default(25) @db.Decimal(8, 4)
+  /// Hours before SLA reminder for SUBMITTED POs / SUBMITTED PRs without quotes (D-050).
+  approvalSlaHours                Int      @default(72)
   createdAt                       DateTime @default(now())
   updatedAt                       DateTime @updatedAt
 
@@ -1938,6 +1940,8 @@ model ProcurementQuote {
   taxAmount         Decimal                @default(0) @db.Decimal(18, 4)
   totalAmount       Decimal                @default(0) @db.Decimal(18, 4)
   validUntil        DateTime?              @db.Date
+  /// Calendar days until delivery from quote date (D-050 comparable lead time).
+  leadTimeDays      Int?
   notes             String?
   receivedAt        DateTime?
   createdBy         String?
@@ -1997,6 +2001,12 @@ model PurchaseOrder {
   approvedAt                 DateTime?
   confirmedByUserId          String?
   confirmedAt                DateTime?
+  /// Emergency direct PO over threshold (OWNER/ADMIN + allowEmergencyDirectPo). D-050.
+  emergencyReason            String?
+  /// Reason when SUBMITTED is returned to DRAFT (BR-PUR-016).
+  returnReason               String?
+  returnedAt                 DateTime?
+  returnedByUserId           String?
   notes                      String?
   internalNotes              String?
   createdBy                  String?
@@ -2611,6 +2621,10 @@ enum NotificationType {
   STALE_DOCUMENT_UPLOAD
   PURCHASE_REQUEST_SUBMITTED
   PURCHASE_ORDER_PENDING_APPROVAL
+  PURCHASE_ORDER_APPROVED
+  PURCHASE_ORDER_RETURNED
+  PURCHASE_ORDER_CONFIRMED
+  PROCUREMENT_SLA_REMINDER
 }
 
 enum NotificationSeverity {

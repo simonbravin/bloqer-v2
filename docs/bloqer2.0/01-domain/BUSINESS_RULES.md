@@ -181,20 +181,45 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 ### BR-PUR-006 — Sobrerrecepción bloqueada con tolerancia configurable
 - **Regla:** la suma de cantidades recibidas no puede exceder la cantidad de la OC en más de un % configurable por empresa (default 0%, máximo configurable 5%).
 
-### BR-PUR-007 — Imputación obligatoria a proyecto o categoría
-- **Regla:** una OC/factura debe imputarse a un `project_id` o tener líneas con `wbs_node_id`. Si es general (sin proyecto), se imputa a una categoría de costo de la empresa.
+### BR-PUR-007 — Imputación WBS obligatoria en compras de proyecto
+- **Regla:** toda línea de `PurchaseRequest` y `PurchaseOrder` con `project_id` **debe** tener `wbs_node_id` apuntando a un nodo WBS `ITEM` de un presupuesto `APPROVED` o `CLOSED` del mismo proyecto. Los gastos generales / indirectos de obra se imputan a **partida(s) WBS** presupuestables del proyecto, no a líneas sin WBS. Compras sin proyecto (overhead de empresa) siguen la vía corporativa ([D-035], [D-040]), no este flujo.
+- **Origen:** [D-050](../00-product/DECISION_LOG.md).
 
 ### BR-PUR-008 — Solicitud obligatoria sobre umbral
-- **Regla:** si el monto estimado en ARS de una OC directa o compra supera `CompanyProcurementSettings.purchaseRequestRequiredAboveArs`, debe existir una `PurchaseRequest` completada con cotizaciones mínimas antes de confirmar la OC, salvo compra de emergencia documentada por OWNER/ADMIN.
-- **Origen:** [D-044](../00-product/DECISION_LOG.md).
+- **Regla:** si el monto estimado en ARS de una OC directa o compra supera `CompanyProcurementSettings.purchaseRequestRequiredAboveArs`, debe existir una `PurchaseRequest` completada con cotizaciones mínimas antes de confirmar la OC, salvo compra de emergencia documentada por OWNER/ADMIN con `emergencyReason` obligatorio y política `allowEmergencyDirectPo` habilitada.
+- **Origen:** [D-044](../00-product/DECISION_LOG.md), [D-050](../00-product/DECISION_LOG.md).
 
 ### BR-PUR-009 — Tiers de varianza presupuestaria en OC
-- **Regla:** al enviar una OC, cada línea calcula `varianceTier`: `NONE` (&lt; soft %), `NOTE_REQUIRED` (soft–extra %), `EXTRA_APPROVAL` (≥ extra %), `UNIT_MISMATCH` (unidad distinta al WBS), `NO_BUDGET_BASELINE` (sin costo APU). `NOTE_REQUIRED` y superiores exigen `varianceJustification`; `EXTRA_APPROVAL` exige aprobador de alto nivel.
-- **Origen:** [D-044](../00-product/DECISION_LOG.md).
+- **Regla:** al enviar una OC, cada línea calcula `varianceTier`: `NONE` (&lt; soft %), `NOTE_REQUIRED` (soft–extra %), `EXTRA_APPROVAL` (≥ extra %), `UNIT_MISMATCH` (unidad distinta al WBS), `NO_BUDGET_BASELINE` (sin costo APU). `NOTE_REQUIRED` y superiores exigen `varianceJustification`; `EXTRA_APPROVAL` exige aprobador de alto nivel. **OC directa y OC desde solicitud** usan el mismo cálculo; la OC directa debe capturar `budgetUnitCostSnapshot` al crear/enviar si el WBS tiene baseline.
+- **Origen:** [D-044](../00-product/DECISION_LOG.md), [D-050](../00-product/DECISION_LOG.md).
 
 ### BR-PUR-010 — Cotizaciones mínimas antes de seleccionar
-- **Regla:** no se puede generar OC desde cotización hasta tener al menos `minQuotesRequired` cotizaciones en estado `RECEIVED` para la solicitud, y la cotización elegida no debe estar vencida (`validUntil`).
-- **Origen:** [D-044](../00-product/DECISION_LOG.md).
+- **Regla:** no se puede generar OC desde cotización hasta tener al menos `minQuotesRequired` cotizaciones en estado `RECEIVED` para la solicitud, y la cotización elegida no debe estar vencida (`validUntil`). Cada cotización debe incluir **precio por línea** y **plazo de entrega** comparable ([D-050]).
+- **Origen:** [D-044](../00-product/DECISION_LOG.md), [D-050](../00-product/DECISION_LOG.md).
+
+### BR-PUR-011 — Costo referencial y saldo de partida visibles
+- **Regla:** al cargar o enviar SC/OC, la UI y el service exponen el **costo unitario referencial** de la partida (snapshot / APU) y el **saldo disponible** (presupuestado − comprometido abierto − real, ver [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md)). Si al confirmar la OC el compromiso de la línea haría superar el presupuestado de la partida, el sistema **alerta**; el bloqueo duro es configurable por empresa (default: alerta + justificación, sin bloqueo automático en Fase 1).
+- **Origen:** [D-050](../00-product/DECISION_LOG.md).
+
+### BR-PUR-012 — Matching tres vías y tolerancia en factura
+- **Regla:** la factura de proveedor vinculada a OC se valida contra cantidades/precios de OC y, cuando existe, contra cantidades **recibidas**. Desvíos dentro de la tolerancia de empresa se permiten con registro; fuera de tolerancia requieren justificación y, si supera umbral de varianza, aprobación FINANCE/OWNER/ADMIN según política AP.
+- **Origen:** [D-020], [D-050](../00-product/DECISION_LOG.md).
+
+### BR-PUR-013 — Cierre parcial de OC
+- **Regla:** una OC en `PARTIALLY_RECEIVED` (o `CONFIRMED` con saldo pendiente que no se recibirá) puede **cerrarse** dejando el saldo sin recibir: el `committed_amount` abierto se reduce al monto efectivamente comprometido/recibido según política de reporting; no se anula si ya hay recepciones confirmadas o facturas activas (usar cierre, no `CANCELLED`).
+- **Origen:** [D-050](../00-product/DECISION_LOG.md).
+
+### BR-PUR-014 — Periodo cerrado en compras
+- **Regla:** confirmar OC, confirmar recepción o emitir/aprobar factura de compra que afecte un periodo **CLOSED** está bloqueado ([BR-TRZ-003] / [BR-PER-001]), salvo reapertura del periodo con motivo. Crear borradores en periodo que aún no cierra está permitido.
+- **Origen:** [D-014], [D-050](../00-product/DECISION_LOG.md).
+
+### BR-PUR-015 — Notificaciones de procurement
+- **Regla:** cambios de estado de SC/OC disparan notificación **in-app** y **email** a destinatarios según rol (compras, aprobadores, solicitante). Documentos pendientes de aprobación o SC sin cotizar generan **recordatorio por antigüedad** (SLA configurable; default sugerido 48–72 h) con escalamiento a OWNER/ADMIN. El fallo de email no debe abortar la mutación de negocio (best-effort).
+- **Origen:** [D-050](../00-product/DECISION_LOG.md).
+
+### BR-PUR-016 — Rechazo / devolución de OC
+- **Regla:** desde `SUBMITTED`, un aprobador autorizado puede devolver la OC a `DRAFT` con **motivo obligatorio** (auditado). El origen/creador edita y reenvía. No existe “des-aprobar” un `APPROVED`/`CONFIRMED`: se anula o se cierra según [BR-PUR-013] y reglas de anulación.
+- **Origen:** [D-050](../00-product/DECISION_LOG.md).
 
 ### BR-APR-004 — Segregación solicitante vs aprobador OC
 - **Regla:** quien originó la solicitud (`originRequestedByUserId` o `PurchaseRequest.requestedByUserId`) no puede aprobar la OC vinculada, salvo `allowSelfApproval` y sin varianza `EXTRA_APPROVAL` ni umbral de alto monto.
@@ -320,11 +345,11 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Origen:** [D-012].
 
 ### BR-APR-002 — Umbral de aprobación de OC (configurable)
-- **Regla:** si Admin configura un umbral, las OCs sobre ese monto requieren aprobación de OWNER/ADMIN aunque el creador tenga APPROVE.
-- **Pendiente:** [Q-017].
+- **Regla:** si Admin configura `poApprovalThresholdArs`, las OCs con total ARS ≥ umbral requieren aprobación de OWNER/ADMIN. El desvío `EXTRA_APPROVAL` también exige alto nivel ([BR-PUR-009]). Ver [Q-017] (cerrada), [D-044], [D-050].
+- **Origen:** [D-012], [D-044], [D-050].
 
 ### BR-APR-003 — Self-approval permitido por defecto
-- **Regla:** quien tiene `APPROVE` puede aprobar su propia creación, salvo configuración explícita de "4 ojos".
+- **Regla:** quien tiene `APPROVE` puede aprobar su propia creación, salvo configuración explícita de "4 ojos". En OC, la segregación con el **solicitante de origen** prevalece vía [BR-APR-004] y `allowSelfApproval`.
 
 ---
 

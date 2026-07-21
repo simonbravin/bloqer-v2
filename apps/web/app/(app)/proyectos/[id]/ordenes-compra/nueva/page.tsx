@@ -7,6 +7,7 @@ import {
   listContacts,
   listProcurementWbsOptions,
   listProducts,
+  getCompanyProcurementSettingsForProject,
   ServiceError,
 } from "@bloqer/services";
 import { notFound } from "next/navigation";
@@ -53,6 +54,10 @@ export default async function NuevaOrdenCompraPage({ params }: PageProps) {
     code: n.code,
     name: n.name,
     budgetName: n.budgetName,
+    budgetUnitCost: n.budgetUnitCost,
+    budgetUnit: n.budgetUnit,
+    availableSaldo: n.availableSaldo,
+    wouldExceedBudget: n.wouldExceedBudget,
   }));
 
   const productOptions: ProductOption[] = products.map((p) => ({
@@ -61,6 +66,14 @@ export default async function NuevaOrdenCompraPage({ params }: PageProps) {
     name: p.name,
     unit: p.unit,
   }));
+
+  let allowEmergency = false;
+  try {
+    const settings = await getCompanyProcurementSettingsForProject(id, ctx);
+    allowEmergency = settings.allowEmergencyDirectPo;
+  } catch {
+    allowEmergency = false;
+  }
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -73,6 +86,7 @@ export default async function NuevaOrdenCompraPage({ params }: PageProps) {
         suppliers={suppliers}
         wbsOptions={wbsOptions}
         productOptions={productOptions}
+        allowEmergencyDirectPo={allowEmergency}
       />
     </PageShell>
   );

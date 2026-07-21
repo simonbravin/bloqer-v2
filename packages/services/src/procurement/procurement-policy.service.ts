@@ -67,13 +67,36 @@ export function assertSelfApprovalAllowed(
   requiresExtraVarianceApproval: boolean,
   requiresHighLevelAmountApproval: boolean,
 ): void {
-  if (!actorUserId || !originRequestedByUserId || originRequestedByUserId !== actorUserId) {
-    return;
-  }
-  if (settings.allowSelfApproval && !requiresExtraVarianceApproval && !requiresHighLevelAmountApproval) {
+  if (
+    isSelfApprovalAllowed(
+      settings,
+      originRequestedByUserId,
+      actorUserId,
+      requiresExtraVarianceApproval,
+      requiresHighLevelAmountApproval,
+    )
+  ) {
     return;
   }
   throw new ServiceError("FORBIDDEN", "No podés aprobar una orden que originaste vos mismo");
+}
+
+/** Non-throwing check used when deciding auto-approve vs leave SUBMITTED. */
+export function isSelfApprovalAllowed(
+  settings: CompanyProcurementSettingsView,
+  originRequestedByUserId: string | null | undefined,
+  actorUserId: string | undefined,
+  requiresExtraVarianceApproval: boolean,
+  requiresHighLevelAmountApproval: boolean,
+): boolean {
+  if (!actorUserId || !originRequestedByUserId || originRequestedByUserId !== actorUserId) {
+    return true;
+  }
+  return (
+    settings.allowSelfApproval &&
+    !requiresExtraVarianceApproval &&
+    !requiresHighLevelAmountApproval
+  );
 }
 
 export function assertHighLevelApprover(
@@ -86,7 +109,11 @@ export function assertHighLevelApprover(
   throw new ServiceError("FORBIDDEN", "Esta orden requiere aprobación de administración");
 }
 
+export function isStandardApprover(roles: ServiceContext["roles"]): boolean {
+  return roles.some((r) => r === "OWNER" || r === "ADMIN" || r === "PROCUREMENT");
+}
+
 export function assertStandardApprover(roles: ServiceContext["roles"]): void {
-  if (roles.some((r) => r === "OWNER" || r === "ADMIN" || r === "PROCUREMENT")) return;
+  if (isStandardApprover(roles)) return;
   throw new ServiceError("FORBIDDEN", "Sin permisos para aprobar esta orden de compra");
 }

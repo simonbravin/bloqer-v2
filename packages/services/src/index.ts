@@ -70,6 +70,8 @@ export * from "./procurement/purchase-request-to-po.service";
 export * from "./procurement/purchase-order-workflow.service";
 export * from "./procurement/procurement-policy.service";
 export * from "./procurement/purchase-variance.service";
+export * from "./procurement/procurement-budget-baseline";
+export { runProcurementSlaReminders } from "./procurement/procurement-notifications.service";
 export { canViewSubcontractsArea } from "./subcontracts/subcontract-access";
 export * from "./procurement/purchase-order.service";
 export * from "./procurement/purchase-receipt.service";

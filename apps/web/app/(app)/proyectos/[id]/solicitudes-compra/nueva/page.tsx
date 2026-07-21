@@ -28,6 +28,10 @@ export default async function NuevaSolicitudCompraPage({ params }: PageProps) {
     code: n.code,
     name: n.name,
     budgetName: n.budgetName,
+    budgetUnitCost: n.budgetUnitCost,
+    budgetUnit: n.budgetUnit,
+    availableSaldo: n.availableSaldo,
+    wouldExceedBudget: n.wouldExceedBudget,
   }));
 
   return (

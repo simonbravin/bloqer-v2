@@ -6,6 +6,10 @@ import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseRequests, canViewPurchaseRequests } from "./procurement-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { assertWbsLineForProject } from "./procurement-wbs";
+import {
+  assertWbsRequiredOnLines,
+  budgetBaselineForWbs,
+} from "./procurement-budget-baseline";
 import { notifyPurchaseRequestSubmitted } from "./procurement-notifications.service";
 
 export type PurchaseRequestLineView = {
@@ -48,25 +52,6 @@ async function nextDocumentNumber(
     _max: { number: true },
   });
   return (max._max.number ?? 0) + 1;
-}
-
-async function budgetUnitCostForWbs(wbsNodeId: string): Promise<Prisma.Decimal | null> {
-  const item = await prisma.costItem.findFirst({
-    where: { wbsNodeId },
-    select: {
-      quantity: true,
-      analysisLines: {
-        where: { category: "MATERIAL" },
-        select: { unitCost: true, coefficient: true },
-      },
-    },
-  });
-  if (!item || item.analysisLines.length === 0) return null;
-  const unitMat = item.analysisLines.reduce(
-    (s, l) => s.plus(new Prisma.Decimal(l.unitCost).times(l.coefficient)),
-    new Prisma.Decimal(0),
-  );
-  return unitMat;
 }
 
 function serialize(pr: PurchaseRequest & { lines: PurchaseRequestLineView[] }): PurchaseRequestView {
@@ -149,10 +134,9 @@ export async function createPurchaseRequest(
   await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
   const companyId = await resolveCompanyId(input.projectId, ctx);
 
+  assertWbsRequiredOnLines(input.lines);
   for (const line of input.lines) {
-    if (line.wbsNodeId) {
-      await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId);
-    }
+    await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId);
   }
 
   const pr = await prisma.$transaction(async (tx) => {
@@ -170,7 +154,7 @@ export async function createPurchaseRequest(
         updatedBy: ctx.actorUserId,
         lines: {
           create: input.lines.map((line, i) => ({
-            wbsNodeId: line.wbsNodeId ?? null,
+            wbsNodeId: line.wbsNodeId,
             productId: line.productId ?? null,
             lineType: line.lineType,
             description: line.description,
@@ -211,21 +195,18 @@ export async function submitPurchaseRequest(id: string, ctx: ServiceContext): Pr
 
   await prisma.$transaction(async (tx) => {
     for (const line of existing.lines) {
-      let snapshot: Prisma.Decimal | null = null;
-      let qtySnapshot: Prisma.Decimal | null = null;
-      if (line.wbsNodeId) {
-        snapshot = await budgetUnitCostForWbs(line.wbsNodeId);
-        const item = await tx.costItem.findFirst({
-          where: { wbsNodeId: line.wbsNodeId },
-          select: { quantity: true },
-        });
-        qtySnapshot = item?.quantity ?? null;
+      if (!line.wbsNodeId) {
+        throw new ServiceError(
+          "CONFLICT",
+          "Todas las líneas deben tener WBS antes de enviar la solicitud",
+        );
       }
+      const baseline = await budgetBaselineForWbs(line.wbsNodeId, tx);
       await tx.purchaseRequestLine.update({
         where: { id: line.id },
         data: {
-          budgetUnitCostSnapshot: snapshot,
-          budgetQuantitySnapshot: qtySnapshot,
+          budgetUnitCostSnapshot: baseline.unitCost,
+          budgetQuantitySnapshot: baseline.quantity,
         },
       });
     }

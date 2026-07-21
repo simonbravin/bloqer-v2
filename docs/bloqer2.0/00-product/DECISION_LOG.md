@@ -651,6 +651,26 @@
 
 ---
 
+### D-050 — Procedimientos de OC: WBS obligatorio, cotizaciones comparables, notificaciones y rechazo
+
+- **Fecha:** 2026-07-21
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (revisión de procedimientos de compra)
+- **Contexto:** alinear el ciclo solicitud → cotización → OC → aprobación → confirmación → recepción/factura con trazabilidad presupuestaria y sin atrasos por falta de alerta. Extiende [D-044](./DECISION_LOG.md#d-044--solicitud-de-compra-cotizaciones-y-flujo-de-oc) y [D-006](./DECISION_LOG.md#d-006--compras-impacto-al-confirmar-oc-o-al-cargarse-si-no-hay-oc).
+- **Decisión:**
+  1. **WBS obligatorio** en toda línea de `PurchaseRequest` y `PurchaseOrder` de proyecto: cada línea imputa a un nodo WBS `ITEM` de un presupuesto `APPROVED`/`CLOSED` del mismo proyecto. No hay compra de obra “sin partida”.
+  2. **Gastos generales / indirectos de obra** se modelan como **partida(s) WBS presupuestable(s)** (nodo `ITEM` del árbol), no como línea sin `wbs_node_id`. El overhead de empresa (sin obra) sigue fuera de este flujo ([D-035], [D-040]).
+  3. **Costo referencial visible** al elegir partida: mostrar costo unitario presupuestario (baseline APU / snapshot) y **saldo disponible** de la partida (presupuestado − comprometido − real, según fórmulas de costo) antes de enviar/confirmar.
+  4. **Cotizaciones comparables por precio y plazo:** `ProcurementQuote` incluye **plazo de entrega (`leadTimeDays` o equivalente)** además de `validUntil`; la UI de comparación muestra desglose por línea, referencia de presupuesto y plazo.
+  5. **OC directa** captura el mismo `budgetUnitCostSnapshot` (y aplica [BR-PUR-009]) que la vía por solicitud; no se permite baseline vacío solo por venir de OC directa si hay WBS con APU.
+  6. **Notificaciones:** in-app (existente) + **email automático** en cambios de estado relevantes (SC enviada; OC pendiente de aprobación; OC aprobada / rechazada-devuelta / confirmada → solicitante y actores según rol) + **recordatorio por antigüedad/SLA** con escalamiento a OWNER/ADMIN. Solo email sin in-app/SLA no alcanza.
+  7. **Rechazo / devolución de OC:** desde `SUBMITTED`, el aprobador puede **devolver a `DRAFT`** con **motivo obligatorio** (evento auditado); el creador corrige y vuelve a enviar. No se “desaprueba” un `APPROVED` ya confirmado: se anula el documento según reglas vigentes.
+  8. **Numeración ([Q-002](./OPEN_QUESTIONS.md#q-002--numeración-de-comprobantes)):** en Fase 1, `PurchaseRequest`, `PurchaseOrder` y recepciones de compra se numeran **por empresa** (correlativo por tipo dentro de `company_id` + `tenant_id`). Configurable por tipo queda diferido.
+- **Implicancias:** reglas [BR-PUR-007] (redefinida), [BR-PUR-011]–[BR-PUR-016]; máquina de OC ya contempla `SUBMITTED` → `DRAFT` por rechazo; implementación de UI/email/SLA y campos de cotización quedan como trabajo posterior a esta alineación documental.
+- **Documentos afectados:** [`02-modules/PROCUREMENT.md`](../02-modules/PROCUREMENT.md), [`02-modules/PURCHASE_REQUESTS.md`](../02-modules/PURCHASE_REQUESTS.md), [`02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md`](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [`01-domain/APPROVAL_WORKFLOWS.md`](../01-domain/APPROVAL_WORKFLOWS.md), [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md), [`01-domain/STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md), [`01-domain/EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md), [`05-workflows/REGISTER_PURCHASE.md`](../05-workflows/REGISTER_PURCHASE.md), [`00-product/OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) (Q-002).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

@@ -47,6 +47,10 @@ export function PurchaseOrderEditForm({ projectId, order, suppliers, wbsOptions,
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (lines.some((l) => !l.wbsNodeId)) {
+      setError("Cada línea debe tener un ítem WBS");
+      return;
+    }
     if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {
       setError("Completar descripción, cantidad y precio en todas las líneas");
       return;
@@ -58,7 +62,11 @@ export function PurchaseOrderEditForm({ projectId, order, suppliers, wbsOptions,
         issueDate:            fd.get("issueDate") as string,
         expectedDeliveryDate: (fd.get("expectedDeliveryDate") as string) || null,
         notes:                (fd.get("notes") as string) || null,
-        lines:                lines.map((l, i) => ({ ...l, sortOrder: i })),
+        lines:                lines.map((l, i) => ({
+          ...l,
+          wbsNodeId: l.wbsNodeId!,
+          sortOrder: i,
+        })),
       });
       if ("error" in res) {
         setError(res.error);

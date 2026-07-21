@@ -110,6 +110,7 @@ Leer en este orden:
 | [`JOBSITE_LOG.md`](./02-modules/JOBSITE_LOG.md) | Libro de obra |
 | [`CERTIFICATIONS.md`](./02-modules/CERTIFICATIONS.md) | Certificaciones de avance |
 | [`PROCUREMENT.md`](./02-modules/PROCUREMENT.md) | Compras (visión general) |
+| [`PURCHASE_REQUESTS.md`](./02-modules/PURCHASE_REQUESTS.md) | Solicitudes de compra y cotizaciones |
 | [`PURCHASE_ORDERS_AND_RECEIPTS.md`](./02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md) | OC y recepciones |
 | [`SUBCONTRACTS.md`](./02-modules/SUBCONTRACTS.md) | Subcontratos |
 | [`INVENTORY.md`](./02-modules/INVENTORY.md) | Inventario |

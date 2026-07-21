@@ -238,29 +238,73 @@ stateDiagram-v2
 
 ## 7. PurchaseOrder (Orden de compra)
 
+> Ver [D-044](../00-product/DECISION_LOG.md#d-044--solicitud-de-compra-cotizaciones-y-flujo-de-oc), [D-050](../00-product/DECISION_LOG.md#d-050--procedimientos-de-oc-wbs-obligatorio-cotizaciones-comparables-notificaciones-y-rechazo).
+
 ```mermaid
 stateDiagram-v2
   [*] --> DRAFT
   DRAFT --> SUBMITTED : enviar a aprobacion
   DRAFT --> CANCELLED : cancelar
   SUBMITTED --> APPROVED : aprobar
-  SUBMITTED --> DRAFT : rechazar / devolver
+  SUBMITTED --> DRAFT : rechazar / devolver con motivo
   APPROVED --> CONFIRMED : confirmar al proveedor
   APPROVED --> CANCELLED : cancelar
   CONFIRMED --> PARTIALLY_RECEIVED : recepcion parcial
   CONFIRMED --> RECEIVED : recepcion completa
-  CONFIRMED --> CANCELLED : cancelar
+  CONFIRMED --> CANCELLED : cancelar (sin recepciones/facturas)
   PARTIALLY_RECEIVED --> RECEIVED : recepcion completa
-  PARTIALLY_RECEIVED --> CANCELLED : cancelar (con saldo)
+  PARTIALLY_RECEIVED --> CANCELLED : no permitido si hay recepcion confirmada; usar cierre parcial
   RECEIVED --> [*]
+  CANCELLED --> [*]
+```
+
+### Tabla — transiciones (PurchaseOrder)
+
+| Desde | Hacia | Acción | Quién |
+|---|---|---|---|
+| `DRAFT` | `SUBMITTED` | Enviar (o auto-`APPROVED` si no requiere alto nivel) | PROCUREMENT / PM / ADMIN con EDIT |
+| `SUBMITTED` | `APPROVED` | Aprobar | Estándar: PROCUREMENT/ADMIN/OWNER; alto monto o `EXTRA_APPROVAL`: solo OWNER/ADMIN |
+| `SUBMITTED` | `DRAFT` | Rechazar / devolver con motivo ([BR-PUR-016]) | Mismos roles que pueden aprobar |
+| `APPROVED` | `CONFIRMED` | Confirmar al proveedor → compromiso ([BR-PUR-001]) | PROCUREMENT / ADMIN / OWNER |
+| `CONFIRMED`+ | `PARTIALLY_RECEIVED` / `RECEIVED` | Por recepciones | WAREHOUSE / PROCUREMENT |
+| `*` (sin recepciones/facturas activas) | `CANCELLED` | Anular | Según permisos EDIT |
+| `PARTIALLY_RECEIVED` | (cierre) | Cierre parcial de saldo ([BR-PUR-013]) | PROCUREMENT / ADMIN / OWNER |
+
+### Reglas
+
+- Toda línea tiene `wbs_node_id` obligatorio en compras de proyecto ([BR-PUR-007], [D-050]).
+- `APPROVED` **no** compromete costo; solo habilita confirmar al proveedor.
+- `CONFIRMED` impacta costo comprometido en proyecto ([BR-PUR-001], [D-006]).
+- Recepciones avanzan el estado; factura y pago son documentos separados ([D-020]).
+- Cancelación con recepción confirmada o factura activa: bloqueada; usar cierre parcial ([BR-PUR-013]).
+- Periodo cerrado bloquea confirmar OC / recepción / factura con impacto ([BR-PUR-014]).
+
+---
+
+## 7b. PurchaseRequest (Solicitud de compra)
+
+> Ver [`02-modules/PURCHASE_REQUESTS.md`](../02-modules/PURCHASE_REQUESTS.md), [D-044], [D-050].
+
+```mermaid
+stateDiagram-v2
+  [*] --> DRAFT
+  DRAFT --> SUBMITTED : enviar
+  DRAFT --> CANCELLED : anular
+  SUBMITTED --> QUOTE_SELECTED : seleccionar cotizacion (genera OC DRAFT)
+  SUBMITTED --> CANCELLED : anular
+  QUOTE_SELECTED --> COMPLETED : OC confirmada
+  QUOTE_SELECTED --> SUBMITTED : anular OC borrador vinculada
+  QUOTE_SELECTED --> CANCELLED : anular (sin OC activa no-DRAFT)
+  COMPLETED --> [*]
   CANCELLED --> [*]
 ```
 
 ### Reglas
 
-- `CONFIRMED` impacta costo en proyecto ([BR-PUR-001]).
-- Recepciones avanzan el estado.
-- Cancelación con recepción parcial requiere proceso especial.
+- Al enviar (`SUBMITTED`): snapshot de costo unitario presupuestario por línea WBS.
+- Cotizaciones mínimas antes de seleccionar ([BR-PUR-010]); cada cotización incluye plazo de entrega ([D-050]).
+- Una OC activa (no `CANCELLED`) por solicitud en Fase 1.
+- WBS obligatorio en cada línea ([BR-PUR-007]).
 
 ---
 

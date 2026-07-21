@@ -56,6 +56,10 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
     code: n.code,
     name: n.name,
     budgetName: n.budgetName,
+    budgetUnitCost: n.budgetUnitCost,
+    budgetUnit: n.budgetUnit,
+    availableSaldo: n.availableSaldo,
+    wouldExceedBudget: n.wouldExceedBudget,
   }));
 
   const productOptions: ProductOption[] = products.map((p) => ({

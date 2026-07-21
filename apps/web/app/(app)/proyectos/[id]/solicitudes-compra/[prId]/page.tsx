@@ -155,6 +155,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
                 <TableHead>Descripción</TableHead>
                 <TableHead className="text-right">Cant.</TableHead>
                 <TableHead className="text-right">Unidad</TableHead>
+                <TableHead className="text-right">Ref. presup.</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -163,6 +164,9 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
                   <TableCell>{line.description}</TableCell>
                   <TableCell className="text-right tabular-nums">{line.quantity}</TableCell>
                   <TableCell className="text-right">{line.unit}</TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {line.budgetUnitCostSnapshot ?? "—"}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -209,13 +213,15 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
                   <TableHead>Proveedor</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Plazo (días)</TableHead>
+                  <TableHead>Vigencia</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {quotes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
                       Sin cotizaciones cargadas.
                     </TableCell>
                   </TableRow>
@@ -228,6 +234,12 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {q.totalAmount} {q.currency}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {q.leadTimeDays ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {q.validUntil ?? "—"}
                       </TableCell>
                       <TableCell className="text-right">
                         {q.status === "RECEIVED" && canQuote && (

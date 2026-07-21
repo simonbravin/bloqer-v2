@@ -16,7 +16,7 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 
 ## 5. Datos que produce (outputs)
 - **Notification** in-app (obligatorio Fase 1).
-- Email transaccional opcional ([Q-009]).
+- **Email transaccional** para procurement (SC/OC y recordatorios SLA) según [D-050] / [BR-PUR-015]; puente Resend ya existe en arquitectura (envío automático pendiente de cablear). Resto del producto: ver [Q-009](../00-product/OPEN_QUESTIONS.md) (cerrada parcial).
 
 ## 6. Entidades principales
 - **Notification**, preferencias usuario (Fase 2).
@@ -36,6 +36,7 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 ## 10. Reglas de negocio
 - Notificaciones respetan tenant y rol destinatario.
 - No enviar duplicados exactos mismo día (dedupe opcional).
+- **Compras ([D-050], [BR-PUR-015]):** in-app + email en cambios de estado de SC/OC; recordatorio por antigüedad con escalamiento a OWNER/ADMIN. Fallo de email = best-effort (no aborta la mutación).
 
 ## 11. Validaciones
 - Payload JSON schema-valid por tipo de evento.

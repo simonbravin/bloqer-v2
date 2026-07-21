@@ -1,5 +1,4 @@
 import { Prisma, prisma, PurchaseOrderStatus } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -14,11 +13,19 @@ import {
   assertHighLevelApprover,
   assertSelfApprovalAllowed,
   assertStandardApprover,
+  isSelfApprovalAllowed,
+  isStandardApprover,
 } from "./procurement-policy.service";
 import { evaluateLineVariance, poRequiresHighLevelApproval } from "./purchase-variance.service";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { onPurchaseOrderConfirmed } from "./purchase-request-to-po.service";
-import { notifyPurchaseOrderPendingApproval } from "./procurement-notifications.service";
+import {
+  notifyPurchaseOrderApproved,
+  notifyPurchaseOrderConfirmed,
+  notifyPurchaseOrderPendingApproval,
+  notifyPurchaseOrderReturned,
+} from "./procurement-notifications.service";
+import { budgetBaselineForWbs, getWbsBudgetReference } from "./procurement-budget-baseline";
 import type { PurchaseOrderView } from "./purchase-order.service";
 
 async function reloadPoView(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
@@ -44,23 +51,53 @@ async function loadPo(id: string, tenantId: string) {
 async function applyVarianceSnapshots(
   tx: Prisma.TransactionClient,
   purchaseOrderId: string,
+  tenantId: string,
   settings: Awaited<ReturnType<typeof getCompanyProcurementSettingsForProject>>,
-): Promise<{ requiresExtraApproval: boolean; requiresJustification: boolean }> {
+): Promise<{
+  requiresExtraApproval: boolean;
+  requiresJustification: boolean;
+  saldoWarnings: string[];
+}> {
   const lines = await tx.purchaseOrderLine.findMany({
     where: { purchaseOrderId },
-    include: { wbsNode: { select: { id: true } } },
+    include: { wbsNode: { select: { id: true, code: true } } },
   });
 
   let requiresExtraApproval = false;
   let requiresJustification = false;
+  const saldoWarnings: string[] = [];
+
+  const pendingByWbs = new Map<string, Prisma.Decimal>();
+  for (const line of lines) {
+    if (!line.wbsNodeId) continue;
+    const prev = pendingByWbs.get(line.wbsNodeId) ?? new Prisma.Decimal(0);
+    pendingByWbs.set(line.wbsNodeId, prev.plus(line.lineTotal));
+  }
 
   for (const line of lines) {
+    if (!line.wbsNodeId) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Todas las líneas deben tener WBS antes de enviar la orden",
+      );
+    }
+
+    const baseline = await budgetBaselineForWbs(line.wbsNodeId, tx);
+    let budgetUnitCost = line.budgetUnitCostSnapshot;
+    if (!budgetUnitCost && baseline.unitCost) {
+      budgetUnitCost = baseline.unitCost;
+      await tx.purchaseOrderLine.update({
+        where: { id: line.id },
+        data: { budgetUnitCostSnapshot: budgetUnitCost },
+      });
+    }
+
     const result = evaluateLineVariance(
       {
         unit: line.unit,
         unitPrice: line.unitPrice.toString(),
-        budgetUnitCost: line.budgetUnitCostSnapshot?.toString() ?? null,
-        budgetUnit: line.unit,
+        budgetUnitCost: budgetUnitCost?.toString() ?? null,
+        budgetUnit: baseline.unit,
         varianceJustification: line.varianceJustification,
       },
       settings,
@@ -79,7 +116,20 @@ async function applyVarianceSnapshots(
     });
   }
 
-  return { requiresExtraApproval, requiresJustification };
+  for (const [wbsNodeId, pendingTotal] of pendingByWbs) {
+    const ref = await getWbsBudgetReference(wbsNodeId, tenantId, {
+      excludePurchaseOrderId: purchaseOrderId,
+      pendingLineTotal: pendingTotal.toString(),
+      db: tx,
+    });
+    if (ref.wouldExceedBudget) {
+      saldoWarnings.push(
+        `${ref.code}: el compromiso proyectado supera el presupuestado de materiales`,
+      );
+    }
+  }
+
+  return { requiresExtraApproval, requiresJustification, saldoWarnings };
 }
 
 function resolveOriginUserId(po: {
@@ -114,7 +164,8 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
       throw new ServiceError("CONFLICT", "El monto total debe ser mayor a cero");
     }
 
-    const { requiresExtraApproval, requiresJustification } = await applyVarianceSnapshots(tx, id, settings);
+    const { requiresExtraApproval, requiresJustification, saldoWarnings } =
+      await applyVarianceSnapshots(tx, id, ctx.tenantId, settings);
     if (requiresJustification) {
       throw new ServiceError("CONFLICT", "Completá la justificación de desvío presupuestario en las líneas");
     }
@@ -127,13 +178,16 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
     let approvedBy: string | null = null;
     let approvedAt: Date | null = null;
 
-    if (!highLevel) {
-      assertStandardApprover(ctx.roles);
+    // Auto-approve only when actor may approve; otherwise leave SUBMITTED (do not throw).
+    if (!highLevel && isStandardApprover(ctx.roles)) {
       const originId = resolveOriginUserId(existing);
-      assertSelfApprovalAllowed(settings, originId, ctx.actorUserId, false, false);
-      nextStatus = "APPROVED";
-      approvedBy = ctx.actorUserId ?? null;
-      approvedAt = new Date();
+      if (
+        isSelfApprovalAllowed(settings, originId, ctx.actorUserId, false, false)
+      ) {
+        nextStatus = "APPROVED";
+        approvedBy = ctx.actorUserId ?? null;
+        approvedAt = new Date();
+      }
     }
 
     await tx.purchaseOrder.update({
@@ -144,6 +198,9 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
         totalAmountArs: totalArs,
         approvedByUserId: approvedBy,
         approvedAt,
+        returnReason: null,
+        returnedAt: null,
+        returnedByUserId: null,
         updatedBy: ctx.actorUserId,
       },
     });
@@ -154,7 +211,13 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
       "PurchaseOrder",
       id,
       { projectId: po.projectId, companyId: po.companyId },
-      { after: { status: nextStatus }, tx },
+      {
+        after: {
+          status: nextStatus,
+          ...(saldoWarnings.length > 0 ? { saldoWarnings } : {}),
+        },
+        tx,
+      },
     );
     if (nextStatus === "APPROVED") {
       await auditProcurement(
@@ -174,6 +237,8 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
       projectId: po.projectId,
       companyId: po.companyId,
       number: po.number,
+      originRequestedByUserId: resolveOriginUserId(existing),
+      createdBy: po.createdBy,
     };
   });
 
@@ -189,6 +254,18 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
       code: `OC-${String(submitResult.number).padStart(3, "0")}`,
       requiresHighLevel: highLevel,
       requiresVarianceExtra: submitResult.requiresExtraApproval,
+    });
+  } else if (submitResult.nextStatus === "APPROVED") {
+    await notifyPurchaseOrderApproved({
+      ctx,
+      purchaseOrderId: id,
+      projectId: submitResult.projectId,
+      companyId: submitResult.companyId,
+      code: `OC-${String(submitResult.number).padStart(3, "0")}`,
+      recipientUserIds: [
+        submitResult.originRequestedByUserId,
+        submitResult.createdBy,
+      ].filter(Boolean) as string[],
     });
   }
 
@@ -215,7 +292,12 @@ export async function approvePurchaseOrder(id: string, ctx: ServiceContext): Pro
   const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
 
   await prisma.$transaction(async (tx) => {
-    const { requiresExtraApproval } = await applyVarianceSnapshots(tx, id, settings);
+    const { requiresExtraApproval } = await applyVarianceSnapshots(
+      tx,
+      id,
+      ctx.tenantId,
+      settings,
+    );
     const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
     const highLevel =
       poRequiresHighLevelApproval(po.totalAmountArs, settings) || requiresExtraApproval;
@@ -250,6 +332,100 @@ export async function approvePurchaseOrder(id: string, ctx: ServiceContext): Pro
       { projectId: po.projectId, companyId: po.companyId },
       { tx },
     );
+  });
+
+  const originId = resolveOriginUserId({
+    ...existing,
+    purchaseRequest: existing.purchaseRequest,
+  });
+  await notifyPurchaseOrderApproved({
+    ctx,
+    purchaseOrderId: id,
+    projectId: existing.projectId,
+    companyId: existing.companyId,
+    code: `OC-${String(existing.number).padStart(3, "0")}`,
+    recipientUserIds: [originId, existing.createdBy].filter(Boolean) as string[],
+  });
+
+  return reloadPoView(id, ctx);
+}
+
+export async function returnPurchaseOrder(
+  id: string,
+  reason: string,
+  ctx: ServiceContext,
+): Promise<PurchaseOrderView> {
+  await assertProcurementTenantModule(ctx);
+  if (!canApprovePurchaseOrders(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para devolver órdenes de compra");
+  }
+
+  const trimmed = reason.trim();
+  if (trimmed.length < 3) {
+    throw new ServiceError("VALIDATION", "Indicá el motivo de la devolución");
+  }
+
+  const existing = await prisma.purchaseOrder.findUnique({
+    where: { id },
+    include: {
+      purchaseRequest: { select: { requestedByUserId: true } },
+      lines: { select: { varianceTier: true } },
+    },
+  });
+  if (!existing || existing.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
+  }
+  if (existing.status !== "SUBMITTED") {
+    throw new ServiceError("CONFLICT", "Solo se pueden devolver órdenes pendientes de aprobación");
+  }
+
+  const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
+  // Use snapshots from submit — do not re-run variance writes on return.
+  const requiresExtraApproval = existing.lines.some((l) => l.varianceTier === "EXTRA_APPROVAL");
+  const highLevel =
+    poRequiresHighLevelApproval(existing.totalAmountArs, settings) || requiresExtraApproval;
+  if (highLevel) {
+    assertHighLevelApprover(ctx.roles, true, requiresExtraApproval);
+  } else {
+    assertStandardApprover(ctx.roles);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.purchaseOrder.update({
+      where: { id },
+      data: {
+        status: "DRAFT",
+        returnReason: trimmed,
+        returnedAt: new Date(),
+        returnedByUserId: ctx.actorUserId,
+        approvedByUserId: null,
+        approvedAt: null,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+
+    await auditProcurement(
+      ctx,
+      "purchase_order.returned_for_changes",
+      "PurchaseOrder",
+      id,
+      { projectId: existing.projectId, companyId: existing.companyId },
+      { after: { returnReason: trimmed }, tx },
+    );
+  });
+
+  const originId = resolveOriginUserId({
+    ...existing,
+    purchaseRequest: existing.purchaseRequest,
+  });
+  await notifyPurchaseOrderReturned({
+    ctx,
+    purchaseOrderId: id,
+    projectId: existing.projectId,
+    companyId: existing.companyId,
+    code: `OC-${String(existing.number).padStart(3, "0")}`,
+    reason: trimmed,
+    recipientUserIds: [originId, existing.createdBy].filter(Boolean) as string[],
   });
 
   return reloadPoView(id, ctx);
@@ -306,6 +482,22 @@ export async function confirmPurchaseOrder(
       { after: { totalAmountArs: fx.amountArs.toString() }, tx },
     );
   });
+
+  const withOrigin = await prisma.purchaseOrder.findUnique({
+    where: { id },
+    include: { purchaseRequest: { select: { requestedByUserId: true } } },
+  });
+  if (withOrigin) {
+    const originId = resolveOriginUserId(withOrigin);
+    await notifyPurchaseOrderConfirmed({
+      ctx,
+      purchaseOrderId: id,
+      projectId: withOrigin.projectId,
+      companyId: withOrigin.companyId,
+      code: `OC-${String(withOrigin.number).padStart(3, "0")}`,
+      recipientUserIds: [originId, withOrigin.createdBy].filter(Boolean) as string[],
+    });
+  }
 
   return reloadPoView(id, ctx);
 }

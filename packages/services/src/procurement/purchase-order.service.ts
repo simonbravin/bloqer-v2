@@ -16,10 +16,16 @@ import { assertDirectPoAllowed } from "./procurement-policy.service";
 import { sortTreeOrder } from "@bloqer/utils";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { onPurchaseOrderDraftCancelled } from "./purchase-request-to-po.service";
+import {
+  assertWbsRequiredOnLines,
+  budgetUnitCostForWbs,
+  getWbsBudgetReference,
+} from "./procurement-budget-baseline";
 
 export {
   submitPurchaseOrder,
   approvePurchaseOrder,
+  returnPurchaseOrder,
   confirmPurchaseOrder,
   issuePurchaseOrder,
 } from "./purchase-order-workflow.service";
@@ -44,6 +50,7 @@ export type PurchaseOrderLineView = {
   receivedQuantity: string;
   remainingQuantity: string;
   sortOrder: number;
+  budgetUnitCostSnapshot: string | null;
   varianceTier: string;
   variancePct: string | null;
   varianceJustification: string | null;
@@ -67,6 +74,7 @@ function serializeLine(
     quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; taxRate: Prisma.Decimal;
     lineSubtotal: Prisma.Decimal; lineTax: Prisma.Decimal; lineTotal: Prisma.Decimal;
     receivedQuantity: Prisma.Decimal; sortOrder: number;
+    budgetUnitCostSnapshot: Prisma.Decimal | null;
     varianceTier: string;
     variancePct: Prisma.Decimal | null;
     varianceJustification: string | null;
@@ -92,6 +100,7 @@ function serializeLine(
     receivedQuantity:  l.receivedQuantity.toString(),
     remainingQuantity: remaining.lessThan(0) ? "0" : remaining.toString(),
     sortOrder:         l.sortOrder,
+    budgetUnitCostSnapshot: l.budgetUnitCostSnapshot?.toString() ?? null,
     varianceTier:      l.varianceTier,
     variancePct:       l.variancePct?.toString() ?? null,
     varianceJustification: l.varianceJustification,
@@ -188,6 +197,10 @@ export type ProcurementWbsOption = {
   code: string;
   name: string;
   budgetName: string;
+  budgetUnitCost: string | null;
+  budgetUnit: string | null;
+  availableSaldo: string | null;
+  wouldExceedBudget: boolean;
 };
 
 export async function listProcurementWbsOptions(
@@ -219,12 +232,21 @@ export async function listProcurementWbsOptions(
 
   const ordered = sortTreeOrder(nodes, (a, b) => a.code.localeCompare(b.code));
 
-  return ordered.map((n) => ({
-    id: n.id,
-    code: n.code,
-    name: n.name,
-    budgetName: `${n.budget.name} v${n.budget.versionNumber}`,
-  }));
+  const result: ProcurementWbsOption[] = [];
+  for (const n of ordered) {
+    const ref = await getWbsBudgetReference(n.id, ctx.tenantId);
+    result.push({
+      id: n.id,
+      code: n.code,
+      name: n.name,
+      budgetName: `${n.budget.name} v${n.budget.versionNumber}`,
+      budgetUnitCost: ref.budgetUnitCost,
+      budgetUnit: ref.budgetUnit,
+      availableSaldo: ref.availableSaldo,
+      wouldExceedBudget: ref.wouldExceedBudget,
+    });
+  }
+  return result;
 }
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
@@ -289,10 +311,9 @@ export async function createPurchaseOrder(
     throw new ServiceError("CONFLICT", "El contacto seleccionado no tiene rol de proveedor activo");
   }
 
+  assertWbsRequiredOnLines(input.lines);
   for (const line of input.lines) {
-    if (line.wbsNodeId) {
-      await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId);
-    }
+    await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId);
   }
 
   const companyId = await resolveCompanyId(input.projectId, ctx);
@@ -307,59 +328,70 @@ export async function createPurchaseOrder(
   }
   const settings = await getCompanyProcurementSettingsForProject(input.projectId, ctx);
   const fx = computeDocumentFxAmounts(input.currency ?? "ARS", estimatedTotal, null);
-  assertDirectPoAllowed(settings, fx.amountArs, ctx);
-
-  const maxNum = await prisma.purchaseOrder.aggregate({
-    where: { tenantId: ctx.tenantId, companyId },
-    _max: { number: true },
+  assertDirectPoAllowed(settings, fx.amountArs, ctx, {
+    emergencyReason: input.emergencyReason,
   });
-  const number = (maxNum._max.number ?? 0) + 1;
 
   const po = await prisma.$transaction(async (tx) => {
+    const maxNum = await tx.purchaseOrder.aggregate({
+      where: { tenantId: ctx.tenantId, companyId },
+      _max: { number: true },
+    });
+    const number = (maxNum._max.number ?? 0) + 1;
+
     const created = await tx.purchaseOrder.create({
       data: {
-        tenantId:            ctx.tenantId,
+        tenantId: ctx.tenantId,
         companyId,
-        projectId:           input.projectId,
-        supplierContactId:   input.supplierContactId,
+        projectId: input.projectId,
+        supplierContactId: input.supplierContactId,
         number,
-        issueDate:           new Date(input.issueDate),
-        expectedDeliveryDate: input.expectedDeliveryDate ? new Date(input.expectedDeliveryDate) : null,
-        currency:            input.currency ?? "ARS",
-        notes:               input.notes ?? null,
-        internalNotes:       input.internalNotes ?? null,
+        issueDate: new Date(input.issueDate),
+        expectedDeliveryDate: input.expectedDeliveryDate
+          ? new Date(input.expectedDeliveryDate)
+          : null,
+        currency: input.currency ?? "ARS",
+        notes: input.notes ?? null,
+        internalNotes: input.internalNotes ?? null,
+        emergencyReason: input.emergencyReason?.trim() || null,
         originRequestedByUserId: ctx.actorUserId,
-        createdBy:           ctx.actorUserId,
-        updatedBy:           ctx.actorUserId,
+        createdBy: ctx.actorUserId,
+        updatedBy: ctx.actorUserId,
       },
     });
 
     for (const line of input.lines) {
-      const qty   = new Prisma.Decimal(line.quantity);
+      const qty = new Prisma.Decimal(line.quantity);
       const price = new Prisma.Decimal(line.unitPrice);
-      const rate  = new Prisma.Decimal(line.taxRate ?? "0");
+      const rate = new Prisma.Decimal(line.taxRate ?? "0");
       const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, rate);
+      const budgetSnapshot = await budgetUnitCostForWbs(line.wbsNodeId, tx);
       await tx.purchaseOrderLine.create({
         data: {
           purchaseOrderId: created.id,
-          wbsNodeId:       line.wbsNodeId ?? null,
-          productId:       line.productId ?? null,
-          description:     line.description,
-          unit:            line.unit ?? "",
-          quantity:        qty,
-          unitPrice:       price,
-          taxRate:         rate,
+          wbsNodeId: line.wbsNodeId,
+          productId: line.productId ?? null,
+          description: line.description,
+          unit: line.unit ?? "",
+          quantity: qty,
+          unitPrice: price,
+          taxRate: rate,
           lineSubtotal,
           lineTax,
           lineTotal,
-          sortOrder:       line.sortOrder ?? 0,
+          budgetUnitCostSnapshot: budgetSnapshot,
+          varianceJustification: line.varianceJustification?.trim() || null,
+          sortOrder: line.sortOrder ?? 0,
         },
       });
     }
 
     await recalcPurchaseOrderTotals(tx, created.id);
 
-    const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id: created.id }, include: poInclude });
+    const po = await tx.purchaseOrder.findUniqueOrThrow({
+      where: { id: created.id },
+      include: poInclude,
+    });
     await auditProcurement(
       ctx,
       "purchase_order.created",
@@ -400,21 +432,9 @@ export async function updatePurchaseOrder(
   }
 
   if (input.lines) {
+    assertWbsRequiredOnLines(input.lines);
     for (const line of input.lines) {
-      if (line.wbsNodeId) {
-        const wbsNode = await prisma.wbsNode.findUnique({
-          where: { id: line.wbsNodeId },
-          include: { budget: { select: { projectId: true, status: true } } },
-        });
-        if (!wbsNode) throw new ServiceError("NOT_FOUND", `Nodo WBS no encontrado: ${line.wbsNodeId}`);
-        if (wbsNode.type !== "ITEM") throw new ServiceError("CONFLICT", "Solo se permiten nodos WBS de tipo ITEM");
-        if (wbsNode.budget.projectId !== existing.projectId) {
-          throw new ServiceError("CONFLICT", "El nodo WBS no pertenece al proyecto");
-        }
-        if (!["APPROVED", "CLOSED"].includes(wbsNode.budget.status)) {
-          throw new ServiceError("CONFLICT", "Solo se permiten nodos WBS de presupuestos APROBADOS o CERRADOS");
-        }
-      }
+      await assertWbsLineForProject(line.wbsNodeId, existing.projectId, ctx.tenantId);
     }
   }
 
@@ -439,17 +459,21 @@ export async function updatePurchaseOrder(
       for (const line of input.lines) {
         const prev = previousLines.find(
           (p) =>
-            p.wbsNodeId === (line.wbsNodeId ?? null) &&
+            p.wbsNodeId === line.wbsNodeId &&
             p.description === line.description,
         );
         const qty   = new Prisma.Decimal(line.quantity);
         const price = new Prisma.Decimal(line.unitPrice);
         const rate  = new Prisma.Decimal(line.taxRate ?? "0");
         const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, rate);
+        const budgetSnapshot =
+          prev?.wbsNodeId === line.wbsNodeId && prev.budgetUnitCostSnapshot
+            ? prev.budgetUnitCostSnapshot
+            : await budgetUnitCostForWbs(line.wbsNodeId, tx);
         await tx.purchaseOrderLine.create({
           data: {
             purchaseOrderId: id,
-            wbsNodeId:       line.wbsNodeId ?? null,
+            wbsNodeId:       line.wbsNodeId,
             productId:       line.productId ?? null,
             description:     line.description,
             unit:            line.unit ?? "",
@@ -460,10 +484,10 @@ export async function updatePurchaseOrder(
             lineTax,
             lineTotal,
             sortOrder:       line.sortOrder ?? 0,
-            budgetUnitCostSnapshot: prev?.budgetUnitCostSnapshot ?? null,
+            budgetUnitCostSnapshot: budgetSnapshot,
             varianceJustification:
               line.varianceJustification !== undefined
-                ? line.varianceJustification
+                ? line.varianceJustification?.trim() || null
                 : prev?.varianceJustification ?? null,
             varianceTier: prev?.varianceTier ?? "NONE",
             variancePct: prev?.variancePct ?? null,

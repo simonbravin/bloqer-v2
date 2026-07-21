@@ -11,6 +11,7 @@ export const PROCUREMENT_AUDIT_ACTIONS = [
   "purchase_order.approved",
   "purchase_order.confirmed",
   "purchase_order.returned_to_draft",
+  "purchase_order.returned_for_changes",
   "purchase_order.cancelled",
   "purchase_request.created",
   "purchase_request.submitted",
