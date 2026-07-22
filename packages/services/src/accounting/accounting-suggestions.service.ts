@@ -3,6 +3,7 @@ import type { JournalEntrySourceType, AccountingMappingEventType } from "@bloqer
 import { can } from "@bloqer/domain";
 import type { CreateJournalEntryInput, GenerateJournalSuggestionInput } from "@bloqer/validators";
 import { ServiceContext, ServiceError } from "../types";
+import { isCrossCompany } from "../company-scope";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { findActiveMappingRule } from "./accounting-mapping.service";
 import {
@@ -32,7 +33,7 @@ async function assertEdit(ctx: ServiceContext): Promise<void> {
 }
 
 function assertCompanyScope(ctx: ServiceContext, entityCompanyId: string) {
-  if (ctx.companyId && ctx.companyId !== entityCompanyId) {
+  if (isCrossCompany(entityCompanyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "El documento pertenece a otra empresa");
   }
 }

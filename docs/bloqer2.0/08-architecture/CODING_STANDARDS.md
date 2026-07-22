@@ -56,6 +56,15 @@
 - Sin reglas de “puede aprobar o no”; solo datos + scopes.  
 - Queries listados: siempre `tenant_id` first en WHERE.
 
+## Company scoping (tenant vs empresa)
+
+- Estándar completo: [`TENANT_COMPANY_SCOPING.md`](./TENANT_COMPANY_SCOPING.md). **Leer antes** de escribir cualquier filtro por `companyId`.
+- Aislamiento entre tenants: **siempre** `tenantId` en el WHERE (nunca depender de `companyId`).
+- `companyId = null` = **compartido/corporativo**, visible para cualquier empresa del tenant.
+- Entidades con `companyId` **nullable** (p. ej. `Project`, `TreasuryAccount`, `AccountMovement`, `DocumentAttachment`): usar `companyScopeFilter(ctx)` / `companyScopeRelationFilter(rel, ctx)` en lecturas e `isCrossCompany(entity.companyId, ctx)` en guards (`@bloqer/services`). **Nunca** `ctx.companyId ? { companyId } : {}` (oculta las compartidas).
+- Tesorería es **tenant-wide**: no filtrar por `ctx.companyId` (usar `getTreasurySummaryByTenant`).
+- Entidades con `companyId` **NOT NULL** (AR/AP/contabilidad/compras): `ctx.companyId ? { companyId } : {}` es correcto; verificar la nulabilidad en `schema.prisma` antes de decidir.
+
 ## Eventos
 
 - Nombres alineados a [`../01-domain/EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md) (`entity.action` en pasado, inglés).

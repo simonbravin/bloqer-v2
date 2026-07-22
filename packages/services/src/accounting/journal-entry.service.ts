@@ -9,6 +9,7 @@ import type {
   UpdateJournalEntryInput,
 } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
+import { isCrossCompany } from "../company-scope";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { resolveAccountingCompanyId } from "./accounting-company-context";
@@ -155,7 +156,7 @@ export async function findNonCancelledJournalEntryIdBySource(
   params: { companyId: string; sourceType: JournalEntrySourceType; sourceId: string },
 ): Promise<string | null> {
   await assertAccountingTenantModule(ctx);
-  if (ctx.companyId && ctx.companyId !== params.companyId) {
+  if (isCrossCompany(params.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "El asiento pertenece a otra empresa");
   }
   const row = await prisma.journalEntry.findFirst({
@@ -382,7 +383,7 @@ export async function updateJournalEntry(
   const existing = await prisma.journalEntry.findFirst({ where: { id, tenantId: ctx.tenantId } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Asiento no encontrado");
   await resolveAccountingCompanyId(ctx, existing.companyId);
-  if (ctx.companyId && existing.companyId !== ctx.companyId) {
+  if (isCrossCompany(existing.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "Asiento fuera del alcance de empresa");
   }
   if (existing.status !== "DRAFT") {
@@ -456,7 +457,7 @@ export async function postJournalEntry(id: string, ctx: ServiceContext): Promise
   });
   if (!existing) throw new ServiceError("NOT_FOUND", "Asiento no encontrado");
   await resolveAccountingCompanyId(ctx, existing.companyId);
-  if (ctx.companyId && existing.companyId !== ctx.companyId) {
+  if (isCrossCompany(existing.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "Asiento fuera del alcance de empresa");
   }
   if (existing.status !== "DRAFT") {
@@ -500,7 +501,7 @@ export async function cancelJournalEntry(id: string, ctx: ServiceContext): Promi
   const existing = await prisma.journalEntry.findFirst({ where: { id, tenantId: ctx.tenantId } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Asiento no encontrado");
   await resolveAccountingCompanyId(ctx, existing.companyId);
-  if (ctx.companyId && existing.companyId !== ctx.companyId) {
+  if (isCrossCompany(existing.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "Asiento fuera del alcance de empresa");
   }
   if (existing.status !== "DRAFT") {

@@ -9,7 +9,7 @@ import {
   type AgingReport,
 } from "../aging/aging.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
-import { getTreasurySummaryByCompany } from "../treasury/balance.service";
+import { getTreasurySummaryByTenant } from "../treasury/balance.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import type { CompanyFinanceOperationsSummary } from "./company-finance-operations-summary.service";
@@ -397,7 +397,7 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
     let multicurrency = false;
     let loadFailed = false;
     if (trPerm) {
-      const tr = await safeRun(() => getTreasurySummaryByCompany(ctx));
+      const tr = await safeRun(() => getTreasurySummaryByTenant(ctx));
       if (tr === null) {
         loadFailed = true;
       } else if (tr && tr.length > 0) {

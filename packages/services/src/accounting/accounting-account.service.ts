@@ -6,6 +6,7 @@ import type {
 } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { resolveAccountingCompanyId } from "./accounting-company-context";
 
@@ -119,7 +120,7 @@ export async function updateAccountingAccount(
   const existing = await prisma.accountingAccount.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Cuenta contable no encontrada");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Acceso denegado");
-  if (ctx.companyId && existing.companyId !== ctx.companyId) {
+  if (isCrossCompany(existing.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "Cuenta fuera del alcance de empresa");
   }
   await resolveAccountingCompanyId(ctx, existing.companyId);

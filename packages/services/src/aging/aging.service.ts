@@ -154,6 +154,7 @@ export async function getReceivableAgingReport(
     where: {
       tenantId: ctx.tenantId,
       status:   { notIn: filters.includePaid ? ["CANCELLED"] : ["CANCELLED", "PAID"] },
+      // Receivable.companyId es NOT NULL → scope directo; filtro explícito (URL) tiene prioridad.
       ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
       ...(filters.companyId ? { companyId: filters.companyId } : {}),
       ...(filters.projectId ? { projectId: filters.projectId } : {}),
@@ -247,6 +248,7 @@ export async function getPayableAgingReport(
     where: {
       tenantId: ctx.tenantId,
       status:   { notIn: filters.includePaid ? ["CANCELLED"] : ["CANCELLED", "PAID"] },
+      // Payable.companyId es NOT NULL → scope directo; filtro explícito (URL) tiene prioridad.
       ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
       ...(filters.companyId ? { companyId: filters.companyId } : {}),
       ...projectFilter,

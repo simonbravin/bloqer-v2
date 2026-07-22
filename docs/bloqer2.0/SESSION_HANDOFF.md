@@ -264,7 +264,7 @@ Ver matrices: `PERMISSIONS_ROUTE_MATRIX.md`, `SECURITY_ARCHITECTURE.md`.
 
 | File | Key responsibilities |
 |---|---|
-| `treasury/balance.service.ts` | `getAccountBalance` (openingBalance + Σ confirmed movements × sign); `getTreasurySummaryByCompany` |
+| `treasury/balance.service.ts` | `getAccountBalance` (openingBalance + Σ confirmed movements × sign); `getTreasurySummaryByTenant` (tenant-wide) |
 | `treasury/treasury-account.service.ts` | create/list/get/update/deactivate/reactivate; opening-balance INFLOW movement on create |
 | `treasury/account-movement.service.ts` | list/get/cancel (blocks cancel of TRANSFER movements; use cancelTransfer instead) |
 | `treasury/collection.service.ts` | create/cancel/list/get; enforces BR-TRZ-006 (no overpayment), currency match, updates Receivable transactionally |

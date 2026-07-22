@@ -1,6 +1,7 @@
 import type { RegisterArAdvanceInput } from "@bloqer/validators";
 import { prisma } from "@bloqer/database";
 import type { RegisterTransactionResult } from "../finance/register-transaction.types";
+import { isCrossCompany } from "../company-scope";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { registerArSale } from "./register-ar-sale.service";
@@ -41,7 +42,7 @@ export async function registerArAdvance(
   if (project.clientContactId !== input.clientContactId) {
     throw new ServiceError("VALIDATION", "El cliente seleccionado no corresponde al proyecto");
   }
-  if (ctx.companyId && project.companyId && project.companyId !== ctx.companyId) {
+  if (isCrossCompany(project.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "El proyecto no pertenece a la empresa activa");
   }
 
@@ -54,7 +55,7 @@ export async function registerArAdvance(
   if (account.status !== "ACTIVE") {
     throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
   }
-  if (ctx.companyId && account.companyId && account.companyId !== ctx.companyId) {
+  if (isCrossCompany(account.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La cuenta de tesorería no pertenece a la empresa activa");
   }
   if (account.currency !== currency) {

@@ -5,7 +5,7 @@ import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enfo
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import {
-  getTreasurySummaryByCompany,
+  getTreasurySummaryByTenant,
   type AccountBalanceSummary,
 } from "./balance.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
@@ -84,6 +84,10 @@ function sumByCurrency(
  * Hub `/tesoreria`: posición de caja, flujo del mes y actividad reciente.
  * No incluye CxC/CxP (eso es Finanzas). Transferencias internas no cuentan
  * en ingresos/egresos del mes (no cambian caja consolidada).
+ *
+ * Alcance tenant (todas las empresas): coincide con `listTreasuryAccounts` y las
+ * pestañas Cuentas / Transferencias / Reportes de `/tesoreria`, para que el Resumen
+ * muestre las mismas cuentas y movimientos que el resto del módulo.
  */
 export async function getTreasuryHubOverview(ctx: ServiceContext): Promise<TreasuryHubOverview> {
   await assertTreasuryTenantModule(ctx);
@@ -91,7 +95,7 @@ export async function getTreasuryHubOverview(ctx: ServiceContext): Promise<Treas
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver tesorería");
   }
 
-  const accounts = await getTreasurySummaryByCompany(ctx);
+  const accounts = await getTreasurySummaryByTenant(ctx);
   const balanceByCurrency = sumByCurrency(
     accounts.map((a) => ({
       currency: a.currency,
@@ -100,9 +104,6 @@ export async function getTreasuryHubOverview(ctx: ServiceContext): Promise<Treas
   );
 
   const { start, end } = monthBoundsForTenant();
-  const companyFilter = ctx.companyId
-    ? { account: { companyId: ctx.companyId } }
-    : {};
 
   const [monthlyRows, recentRows] = await Promise.all([
     prisma.accountMovement.findMany({
@@ -111,7 +112,6 @@ export async function getTreasuryHubOverview(ctx: ServiceContext): Promise<Treas
         status: "CONFIRMED",
         type: { in: ["INFLOW", "OUTFLOW"] },
         movementDate: { gte: start, lte: end },
-        ...companyFilter,
       },
       select: { type: true, currency: true, amount: true },
     }),
@@ -119,7 +119,6 @@ export async function getTreasuryHubOverview(ctx: ServiceContext): Promise<Treas
       where: {
         tenantId: ctx.tenantId,
         status: "CONFIRMED",
-        ...companyFilter,
       },
       orderBy: [{ movementDate: "desc" }, { createdAt: "desc" }],
       take: RECENT_MOVEMENTS,

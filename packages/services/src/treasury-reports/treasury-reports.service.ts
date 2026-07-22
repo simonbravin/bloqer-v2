@@ -376,7 +376,8 @@ export async function getAccountMovementReport(
     dateTo = dateTo ?? defaults.dateTo;
   }
 
-  const companyId = filters.companyId ?? ctx.companyId ?? undefined;
+  // Tesorería es tenant-wide: sólo acota un filtro de empresa explícito (URL), no ctx.companyId.
+  const companyId = filters.companyId ?? undefined;
 
   let corporatePaymentIds: string[] | undefined;
   if (filters.corporateApPaymentsOnly) {

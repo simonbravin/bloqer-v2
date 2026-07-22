@@ -8,6 +8,7 @@ import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/register-transaction.types";
 import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 import { toMoneyDecimal } from "../finance/money-decimal";
@@ -107,7 +108,7 @@ export async function registerApExpense(
     });
     if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
     if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    if (ctx.companyId && project.companyId && project.companyId !== ctx.companyId) {
+    if (isCrossCompany(project.companyId, ctx)) {
       throw new ServiceError("FORBIDDEN", "El proyecto no pertenece a la empresa activa");
     }
   }

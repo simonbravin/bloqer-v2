@@ -29,6 +29,7 @@ export async function fetchCompanyReceivableSnapshotRows(
     where: {
       tenantId: ctx.tenantId,
       status: { notIn: ["PAID", "CANCELLED"] },
+      // Receivable.companyId es NOT NULL → scope directo por empresa (no hay filas compartidas).
       ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     },
     select: {

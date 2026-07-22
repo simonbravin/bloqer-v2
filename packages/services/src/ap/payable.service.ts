@@ -2,6 +2,7 @@ import { prisma, Payable, Prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { auditAp } from "./ap-audit";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
@@ -224,6 +225,7 @@ export async function listCompanyPayables(
   const where: Prisma.PayableWhereInput = {
     tenantId: ctx.tenantId,
     projectId: null,
+    // Payable.companyId es NOT NULL → scope directo por empresa.
     ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     ...(filters?.supplierContactId ? { supplierContactId: filters.supplierContactId } : {}),
     ...(filters?.dueDateFrom || filters?.dueDateTo
@@ -286,7 +288,7 @@ export async function getCompanyPayableById(id: string, ctx: ServiceContext): Pr
   if (p.projectId !== null) {
     throw new ServiceError("FORBIDDEN", "Esta cuenta está asignada a un proyecto; usá el espacio de trabajo del proyecto");
   }
-  if (ctx.companyId && p.companyId !== ctx.companyId) {
+  if (isCrossCompany(p.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
   }
   const reconciled = await reconcilePayableStatusIfSettled(p, ctx);

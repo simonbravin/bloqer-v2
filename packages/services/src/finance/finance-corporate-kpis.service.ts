@@ -19,7 +19,7 @@ import { fmtDecimalEs, pushMoneyKpi } from "../dashboard/kpi-helpers";
 import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
 import { getCompanyCashProjectionReport } from "../reports/company-cash-projection.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
-import { getTreasurySummaryByCompany } from "../treasury/balance.service";
+import { getTreasurySummaryByTenant } from "../treasury/balance.service";
 import type { ServiceContext } from "../types";
 
 export type FinanceCorporateAlert = {
@@ -68,7 +68,7 @@ export function moneyMapFromRows(rows: { currency: string; amount: string }[]): 
 }
 
 export function treasuryBalanceMap(
-  accounts: Awaited<ReturnType<typeof getTreasurySummaryByCompany>>,
+  accounts: Awaited<ReturnType<typeof getTreasurySummaryByTenant>>,
 ): Map<string, Prisma.Decimal> {
   const m = new Map<string, Prisma.Decimal>();
   for (const acc of accounts) {
@@ -103,7 +103,7 @@ export async function buildFinanceCorporateKpis(
 
   if (access.canTreasury) {
     try {
-      const accounts = await getTreasurySummaryByCompany(ctx);
+      const accounts = await getTreasurySummaryByTenant(ctx);
       const byCur = treasuryBalanceMap(accounts);
       for (const c of byCur.keys()) currenciesSeen.add(c);
       pushMoneyKpi(kpis, "tr_cash", "Posición de caja", byCur, POSICION_CAJA_HREF);

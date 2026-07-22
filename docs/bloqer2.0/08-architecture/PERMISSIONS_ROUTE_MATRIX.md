@@ -32,13 +32,13 @@ Phase **12B:** si no existe fila en `tenant_module_settings` para un `moduleKey`
 | URL / functional area | Primary `PermissionModule` (RBAC) | Tenant module enforced in services |
 |-----------------------|-----------------------------------|-------------------------------------|
 | `/contabilidad/**`, cuentas/asientos/reglas, `journal-entry*`, `accounting-account`, `accounting-mapping`, `accounting-suggestions`, `journal-entry-source-link` | `ACCOUNTING` | `ACCOUNTING` |
-| `/tesoreria/**`, `treasury-account`, `account-movement`, `internal-transfer`, `balance.getTreasurySummaryByCompany` | `TREASURY` | `TREASURY` |
+| `/tesoreria/**`, `treasury-account`, `account-movement`, `internal-transfer`, `balance.getTreasurySummaryByTenant` | `TREASURY` | `TREASURY` |
 | Reportes tesorería (`treasury-reports`) | `TREASURY` | `TREASURY` |
 | Facturas venta, CxC, cobranzas (`sales-invoice`, `receivable`, `collection.service`) | `AR` | `AR` |
 | Facturas proveedor, CxP, pagos (`supplier-invoice`, `payable`, `payment`) | `AP` | `AP` |
 | Aging CxC / CxP (`aging.service`) | `AR` / `AP` | `AR` / `AP` |
 | **`getTenantDashboard`** (`tenant-dashboard.service.ts`) | Por sección: `VIEW PROJECTS`, `VIEW BUDGETS`, `VIEW AR`/`AP`/`TREASURY`/`INVENTORY`, etc. | **Composite:** una llamada `getTenantModuleGate`; cada subconsulta respeta el mismo módulo + RBAC que el servicio subyacente (Prisma solo en capa servicios). |
-| **`getFinanceHubOverview`** (`finance-hub-overview.service.ts`) | `VIEW AR` / `VIEW AP` / `VIEW TREASURY` / `VIEW ACCOUNTING` + módulos tenant correspondientes | **Composite:** `getTenantModuleGate` + aging AR/AP y `getTreasurySummaryByCompany`; bloque contabilidad solo enlace (sin agregados GL); `FORBIDDEN` → datos omitidos. |
+| **`getFinanceHubOverview`** (`finance-hub-overview.service.ts`) | `VIEW AR` / `VIEW AP` / `VIEW TREASURY` / `VIEW ACCOUNTING` + módulos tenant correspondientes | **Composite:** `getTenantModuleGate` + aging AR/AP y `getTreasurySummaryByTenant`; bloque contabilidad solo enlace (sin agregados GL); `FORBIDDEN` → datos omitidos. |
 | `/inventario/**`, productos, depósitos, movimientos, transferencias, `inventory-reports` | `INVENTORY` | `INVENTORY` |
 | Solicitudes de compra (`purchase-request`, `procurement-quote`) | `PURCHASE_REQUESTS` / `PURCHASE_ORDERS` | `PROCUREMENT` |
 | Órdenes de compra y recepciones (`purchase-order`, `purchase-receipt`) | `PROCUREMENT` / `PURCHASE_ORDERS` | `PROCUREMENT` |

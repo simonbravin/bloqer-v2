@@ -7,6 +7,7 @@ import type {
 } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { resolveAccountingCompanyId } from "./accounting-company-context";
 
@@ -168,7 +169,7 @@ export async function updateAccountingMappingRule(
   await assertEdit(ctx);
   const existing = await prisma.accountingMappingRule.findFirst({ where: { id, tenantId: ctx.tenantId } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Regla no encontrada");
-  if (ctx.companyId && existing.companyId !== ctx.companyId) {
+  if (isCrossCompany(existing.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "Regla fuera del alcance de empresa");
   }
   await assertRuleMutationCompany(ctx, existing.companyId, input.companyId ?? null);

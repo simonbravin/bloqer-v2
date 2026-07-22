@@ -47,7 +47,7 @@ La ruta **`/dashboard`** es el tablero **por tenant** al entrar a Bloqer: KPIs r
 | Avance promedio de obra | — | — | **No calculado** (`averageProgressPct: null`); UI: “Sin avance cargado”. |
 | Pista control de costos | — | — | Removida del dashboard (Phase declutter); control de costos vive por proyecto. |
 | CxC / CxP abierto por moneda, vencidas, próximas 14 días | `AR` / `AP` | `VIEW AR` / `VIEW AP` | `getReceivableAgingReport` / `getPayableAgingReport` → **KPIs** |
-| Caja / bancos por moneda | `TREASURY` | `VIEW TREASURY` | `getTreasurySummaryByCompany` → **KPI** |
+| Caja / bancos por moneda | `TREASURY` | `VIEW TREASURY` | `getTreasurySummaryByTenant` (tenant-wide) → **KPI** |
 | Últimos movimientos de tesorería (bloque detalle) | `TREASURY` | `VIEW TREASURY` | `AccountMovement` CONFIRMED (últimos 6), href a reporte por cuenta |
 | Asientos borrador / contabilizados | `ACCOUNTING` | `VIEW ACCOUNTING` | `prisma.journalEntry.count` (con `companyId`) |
 | Notificaciones sin leer | — | — | `getUnreadNotificationCount` |

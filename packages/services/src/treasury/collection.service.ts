@@ -11,6 +11,7 @@ import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { assertTreasuryAccountCurrencyMatches } from "./treasury-currency-guards";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
+import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
@@ -109,7 +110,7 @@ export async function createCollection(
   });
   if (!receivablePreview) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
   if (receivablePreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (ctx.companyId && receivablePreview.companyId !== ctx.companyId) {
+  if (isCrossCompany(receivablePreview.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
   }
   if (receivablePreview.projectId) {

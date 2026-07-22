@@ -68,18 +68,11 @@ export type AccountBalanceSummary = {
   balance: string;
 };
 
-export async function getTreasurySummaryByCompany(
-  ctx: ServiceContext,
+async function loadAccountSummaries(
+  where: Prisma.TreasuryAccountWhereInput,
 ): Promise<AccountBalanceSummary[]> {
-  await assertTreasuryTenantModule(ctx);
-  const tenantId = ctx.tenantId;
-  const companyId = ctx.companyId ?? null;
   const accounts = await prisma.treasuryAccount.findMany({
-    where: {
-      tenantId,
-      ...(companyId ? { companyId } : {}),
-      status: "ACTIVE",
-    },
+    where,
     select: { id: true, name: true, type: true, currency: true, status: true },
     orderBy: { name: "asc" },
   });
@@ -97,4 +90,25 @@ export async function getTreasurySummaryByCompany(
     });
   }
   return results;
+}
+
+/**
+ * Saldos de cuentas activas con alcance **tenant** (todas las empresas del tenant).
+ *
+ * Tesorería es corporativa/compartida en la plataforma: las cuentas y sus movimientos
+ * no se auto-filtran por `ctx.companyId` en ningún lugar del módulo `/tesoreria`
+ * (`listTreasuryAccounts`, reportes de posición/flujo/movimientos, transferencias son
+ * todos tenant-scoped; sólo un `filters.companyId` explícito acota). Por eso este resumen
+ * —usado por el hub de tesorería, el tablero, el hub de finanzas y la proyección de caja—
+ * es tenant-scoped: así la "Posición de caja" de Finanzas coincide con el reporte de Tesorería
+ * y no se pierden las cuentas con `companyId` null cuando el usuario tiene empresa activa.
+ */
+export async function getTreasurySummaryByTenant(
+  ctx: ServiceContext,
+): Promise<AccountBalanceSummary[]> {
+  await assertTreasuryTenantModule(ctx);
+  return loadAccountSummaries({
+    tenantId: ctx.tenantId,
+    status: "ACTIVE",
+  });
 }

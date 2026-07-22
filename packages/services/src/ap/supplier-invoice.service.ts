@@ -3,6 +3,7 @@ import { can } from "@bloqer/domain";
 import type { CreateSupplierInvoiceInput, UpdateSupplierInvoiceInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { assertCanCancelSupplierInvoice } from "./supplier-invoice-cancel-guards";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
@@ -189,6 +190,7 @@ export async function listCompanySupplierInvoices(
   const where: Prisma.SupplierInvoiceWhereInput = {
     tenantId:  ctx.tenantId,
     projectId: null,
+    // SupplierInvoice.companyId es NOT NULL → scope directo por empresa.
     ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     ...(filters?.status ? { status: filters.status } : {}),
     ...(filters?.supplierContactId ? { supplierContactId: filters.supplierContactId } : {}),
@@ -249,7 +251,7 @@ export async function getCompanySupplierInvoiceById(
   if (inv.projectId !== null) {
     throw new ServiceError("FORBIDDEN", "Esta factura está asignada a un proyecto; usá el espacio de trabajo del proyecto");
   }
-  if (ctx.companyId && inv.companyId !== ctx.companyId) {
+  if (isCrossCompany(inv.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
   }
   return serializeInvoice(inv);
@@ -299,7 +301,7 @@ export async function createSupplierInvoice(
     });
     if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
     if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    if (ctx.companyId && project.companyId && project.companyId !== ctx.companyId) {
+    if (isCrossCompany(project.companyId, ctx)) {
       throw new ServiceError("FORBIDDEN", "El proyecto no pertenece a la empresa activa");
     }
   }

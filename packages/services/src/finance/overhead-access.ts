@@ -1,4 +1,5 @@
 import { can } from "@bloqer/domain";
+import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 
 export function assertOverheadEdit(ctx: ServiceContext): void {
@@ -15,7 +16,7 @@ export function assertOverheadView(ctx: ServiceContext): void {
 
 /** Evita acciones GG sobre otra empresa cuando la sesión tiene `companyId` fijado. */
 export function assertOverheadCompanyScope(companyId: string, ctx: ServiceContext): void {
-  if (ctx.companyId && ctx.companyId !== companyId) {
+  if (isCrossCompany(companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La empresa no coincide con el contexto de sesión");
   }
 }

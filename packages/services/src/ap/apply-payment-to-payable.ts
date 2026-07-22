@@ -7,6 +7,7 @@ import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { toMoneyDecimal } from "../finance/money-decimal";
 import { getAccountBalance } from "../treasury/balance.service";
 import { assertTreasuryAccountCurrencyMatches } from "../treasury/treasury-currency-guards";
+import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 
 type TxClient = Omit<
@@ -78,9 +79,9 @@ export async function applyPaymentToPayable(
   if (account.status !== "ACTIVE") {
     throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
   }
-  // Allow legacy accounts with null companyId (same filter as pagar UI pages).
-  // Reject only explicit cross-company mismatches.
-  if (ctx.companyId && account.companyId && account.companyId !== ctx.companyId) {
+  // Tesorería es tenant-wide: cuentas corporativas (companyId null) son usables.
+  // Rechazamos sólo cuentas de OTRA empresa.
+  if (isCrossCompany(account.companyId, ctx)) {
     throw new ServiceError(
       "FORBIDDEN",
       "La cuenta de tesorería no pertenece a la empresa activa.",

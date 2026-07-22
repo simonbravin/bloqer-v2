@@ -73,6 +73,7 @@ const KEY_ICON: Record<string, { Icon: LucideIcon; accent: KpiIconAccent }> = {
   ar_due_soon: { Icon: Clock, accent: "muted" },
   ap_due_soon: { Icon: Clock, accent: "muted" },
   treasury_balance: { Icon: Landmark, accent: "success" },
+  treasury_accounts: { Icon: Wallet, accent: "info" },
   treasury_monthly_expenses: { Icon: Receipt, accent: "default" },
   tr_cash: { Icon: Landmark, accent: "success" },
   tr_ar_open: { Icon: ArrowUpCircle, accent: "info" },

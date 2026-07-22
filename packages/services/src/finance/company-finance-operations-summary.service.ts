@@ -89,6 +89,7 @@ export async function getCompanyFinanceOperationsSummary(
   try {
     await assertApTenantModule(ctx);
 
+    // Payment.companyId es NOT NULL → scope directo por empresa.
     const companyWhere = ctx.companyId ? { companyId: ctx.companyId } : {};
 
     const [payableRows, draftInvoiceCount, recentPayRows] = await Promise.all([

@@ -46,6 +46,15 @@
 - No abstraer “plugin system” sin necesidad.  
 - No crear capa `AbstractFactory` si un service + repository alcanza.
 
+## Company scoping (tenant vs empresa) — obligatorio
+
+Estándar: [`TENANT_COMPANY_SCOPING.md`](./TENANT_COMPANY_SCOPING.md). Reglas duras:
+
+- Aislamiento entre tenants **siempre** por `tenantId` (nunca depender de `companyId`).
+- `companyId = null` = **compartido/corporativo** → visible para cualquier empresa del tenant. **Prohibido** ocultarlo o bloquearlo.
+- Entidad con `companyId` **nullable** (verificar en `schema.prisma`): en lecturas usar `companyScopeFilter(ctx)` y en guards `isCrossCompany(entity.companyId, ctx)` (de `@bloqer/services`). **Jamás** `ctx.companyId ? { companyId } : {}` (oculta compartidas) ni `ctx.companyId && x.companyId !== ctx.companyId` (bloquea compartidas).
+- Tesorería (`TreasuryAccount`, `AccountMovement`, `InternalTransfer`) es **tenant-wide**: no filtrar por `ctx.companyId`.
+
 ## Evitar shortcuts peligrosos
 
 - “Solo esta vez” sin `tenant_id`.  

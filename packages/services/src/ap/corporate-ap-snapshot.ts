@@ -48,6 +48,7 @@ export async function fetchCorporatePayableSnapshotRows(
       tenantId: ctx.tenantId,
       projectId: null,
       status: { notIn: ["PAID", "CANCELLED"] },
+      // Payable.companyId es NOT NULL → scope directo por empresa (no hay filas compartidas).
       ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     },
     select: {
@@ -68,6 +69,7 @@ export async function countCorporateDraftInvoices(ctx: ServiceContext): Promise<
       tenantId: ctx.tenantId,
       projectId: null,
       status: "DRAFT",
+      // SupplierInvoice.companyId es NOT NULL → scope directo por empresa.
       ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     },
   });

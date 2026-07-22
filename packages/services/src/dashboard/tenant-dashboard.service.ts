@@ -5,7 +5,7 @@ import { getUnreadNotificationCount } from "../notifications/notification.servic
 import { canRunOperationalAlerts } from "../notifications/operational-alerts-runner.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { canEditTeamMembership, canReadTenantConfigArea } from "../tenant-settings/tenant-settings-guards";
-import { getTreasurySummaryByCompany } from "../treasury/balance.service";
+import { getTreasurySummaryByTenant } from "../treasury/balance.service";
 import { getCashFlowReport, type CashFlowReport } from "../treasury-reports/treasury-reports.service";
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { ServiceContext } from "../types";
@@ -645,7 +645,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       cashFlowChart = { byRange, detailHref: "/tesoreria/reportes/flujo-caja" };
     }
 
-    const tr = await safeRun("Treasury summary", () => getTreasurySummaryByCompany(ctx));
+    const tr = await safeRun("Treasury summary", () => getTreasurySummaryByTenant(ctx));
     if (tr && tr.length > 0) {
       const byCur = new Map<string, Prisma.Decimal>();
       for (const acc of tr) {
@@ -685,9 +685,8 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
         where: {
           tenantId: ctx.tenantId,
           status: "CONFIRMED",
-          // Align with getTreasurySummaryByCompany: scope by account company, not movement.companyId
-          // (some rows may have null companyId while the account is scoped).
-          ...(ctx.companyId ? { account: { companyId: ctx.companyId } } : {}),
+          // Tesorería es tenant-wide (ver getTreasurySummaryByTenant): no auto-filtramos
+          // por ctx.companyId; así los movimientos recientes coinciden con las cuentas mostradas.
         },
         orderBy: [{ movementDate: "desc" }, { createdAt: "desc" }],
         take: RECENT_TREASURY_MOVEMENTS,

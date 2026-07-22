@@ -10,6 +10,7 @@ import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/register-transaction.types";
 import { assertArTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea } from "./ar-access";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
@@ -249,7 +250,9 @@ export async function registerArSale(
           if (account.status !== "ACTIVE") {
             throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
           }
-          if (ctx.companyId && (!account.companyId || account.companyId !== ctx.companyId)) {
+          // Tesorería es tenant-wide: cuentas corporativas (companyId null) son usables por
+          // cualquier empresa; sólo bloqueamos cuentas de OTRA empresa.
+          if (isCrossCompany(account.companyId, ctx)) {
             throw new ServiceError(
               "FORBIDDEN",
               "La cuenta de tesorería no pertenece a la empresa activa.",

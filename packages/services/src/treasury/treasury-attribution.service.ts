@@ -22,7 +22,8 @@ const ZERO = new Prisma.Decimal(0);
 const TREASURY_ATTRIBUTION_HREF = "/tesoreria/reportes/flujo-caja";
 
 /** Desglose de movimientos de caja confirmados: imputados a obra vs corporativos (projectId null).
- *  Con ctx.companyId activo solo incluye movimientos de esa empresa (sin mezclar companyId null). */
+ *  Tesorería es tenant-wide (ver getTreasurySummaryByTenant): no auto-filtramos por ctx.companyId
+ *  para no perder movimientos de cuentas corporativas/compartidas (companyId null). */
 export async function getTreasuryAttributionSummary(
   ctx: ServiceContext,
 ): Promise<TreasuryAttributionSummary> {
@@ -36,7 +37,6 @@ export async function getTreasuryAttributionSummary(
       tenantId: ctx.tenantId,
       status: "CONFIRMED",
       type: { in: ["INFLOW", "OUTFLOW"] },
-      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     },
     select: {
       currency: true,

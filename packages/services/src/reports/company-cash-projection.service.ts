@@ -6,7 +6,7 @@ import { aggregateCorporateProjectionOutflows } from "../ap/corporate-ap-snapsho
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
-import { getTreasurySummaryByCompany } from "../treasury/balance.service";
+import { getTreasurySummaryByTenant } from "../treasury/balance.service";
 import type { ServiceContext } from "../types";
 import { isDueOnOrBeforeHorizon, projectionHorizon } from "./report-month";
 
@@ -51,7 +51,7 @@ export async function getCompanyCashProjectionReport(
 
   if (gate.isEnabled("TREASURY") && can(ctx.roles, "VIEW", "TREASURY")) {
     await assertTreasuryTenantModule(ctx);
-    const accounts = await getTreasurySummaryByCompany(ctx);
+    const accounts = await getTreasurySummaryByTenant(ctx);
     for (const acc of accounts) {
       const bal = new Prisma.Decimal(acc.balance);
       cashByCurrency.set(acc.currency, (cashByCurrency.get(acc.currency) ?? zero).add(bal));
@@ -69,6 +69,7 @@ export async function getCompanyCashProjectionReport(
           tenantId: ctx.tenantId,
           projectId: null,
           status: { notIn: ["PAID", "CANCELLED"] },
+          // Payable.companyId es NOT NULL → scope directo por empresa.
           ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
         },
         select: {

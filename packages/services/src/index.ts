@@ -1,4 +1,5 @@
 export * from "./types";
+export * from "./company-scope";
 export * from "./tenant/tenant.service";
 export * from "./company/company.service";
 export * from "./user/user.service";
@@ -41,7 +42,7 @@ export * from "./treasury/treasury-account.service";
 export * from "./treasury/account-movement.service";
 export * from "./treasury/collection.service";
 export * from "./treasury/internal-transfer.service";
-export { getTreasurySummaryByCompany } from "./treasury/balance.service";
+export { getTreasurySummaryByTenant } from "./treasury/balance.service";
 export type { AccountBalanceSummary } from "./treasury/balance.service";
 export {
   getTreasuryHubOverview,

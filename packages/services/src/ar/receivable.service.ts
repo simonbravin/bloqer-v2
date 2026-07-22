@@ -7,6 +7,7 @@ import {
 import { openReceivableBalanceWhere } from "../finance/obligation-balance-filter";
 import { auditAr } from "./ar-audit";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
@@ -173,6 +174,7 @@ export async function listCompanyReceivables(
 
   const where: Prisma.ReceivableWhereInput = {
     tenantId: ctx.tenantId,
+    // Receivable.companyId es NOT NULL → scope directo por empresa.
     ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     ...(filters?.clientContactId ? { clientContactId: filters.clientContactId } : {}),
     ...(filters?.dueDateFrom || filters?.dueDateTo
@@ -240,7 +242,7 @@ export async function getCompanyReceivableById(id: string, ctx: ServiceContext):
       "Esta cuenta está asignada a un proyecto; usá el espacio de trabajo del proyecto",
     );
   }
-  if (ctx.companyId && r.companyId !== ctx.companyId) {
+  if (isCrossCompany(r.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
   }
   const reconciled = await reconcileReceivableStatusIfSettled(r, ctx);
@@ -272,7 +274,7 @@ export async function assertCompanyReceivableMutable(
       "Esta cuenta está asignada a un proyecto; usá el espacio de trabajo del proyecto",
     );
   }
-  if (ctx.companyId && r.companyId !== ctx.companyId) {
+  if (isCrossCompany(r.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
   }
 }

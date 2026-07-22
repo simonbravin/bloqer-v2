@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import { companyScopeFilter, companyScopeRelationFilter } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { defaultReportDateRange, monthKey, monthLabel } from "./report-month";
 import {
@@ -89,7 +90,7 @@ export async function getCompanyIncomeExpenseReport(
     where: {
       tenantId: ctx.tenantId,
       status: { notIn: ["CANCELLED"] },
-      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+      ...companyScopeFilter(ctx),
     },
     select: { id: true },
   });
@@ -124,6 +125,7 @@ export async function getCompanyIncomeExpenseReport(
         projectId: null,
         status: "CONFIRMED",
         paymentDate: { gte: dateFrom, lte: dateTo },
+        // Payment.companyId es NOT NULL → scope directo por empresa.
         ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
       },
       select: { paymentDate: true, amount: true },
@@ -151,6 +153,7 @@ export async function getCompanyIncomeExpenseReport(
         projectId: null,
         status: "ISSUED",
         issueDate: { gte: dateFrom, lte: dateTo },
+        // SupplierInvoice.companyId es NOT NULL → scope directo por empresa.
         ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
       },
       select: { issueDate: true, totalAmount: true },
@@ -181,7 +184,7 @@ export async function getCompanyIncomeExpenseReport(
     where: {
       tenantId: ctx.tenantId,
       status: { in: ["APPROVED", "CLOSED"] },
-      project: ctx.companyId ? { companyId: ctx.companyId } : undefined,
+      ...companyScopeRelationFilter("project", ctx),
     },
     select: { currency: true },
     distinct: ["currency"],

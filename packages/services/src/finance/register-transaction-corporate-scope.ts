@@ -1,4 +1,5 @@
-﻿import type { ServiceContext } from "../types";
+﻿import { isCrossCompany } from "../company-scope";
+import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 
 export type CorporatePayableScopeRow = {
@@ -21,7 +22,7 @@ export function assertCorporatePayableScope(
       "Solo se pueden pagar obligaciones corporativas desde Transacciones.",
     );
   }
-  if (ctx.companyId && payable.companyId !== ctx.companyId) {
+  if (isCrossCompany(payable.companyId, ctx)) {
     throw new ServiceError(
       "FORBIDDEN",
       "La obligación no pertenece a la empresa activa.",
@@ -40,7 +41,7 @@ export function assertCorporateReceivableScope(
       "Esta cuenta está asignada a un proyecto; usá el espacio de trabajo del proyecto",
     );
   }
-  if (ctx.companyId && receivable.companyId !== ctx.companyId) {
+  if (isCrossCompany(receivable.companyId, ctx)) {
     throw new ServiceError(
       "FORBIDDEN",
       "La cuenta no pertenece a la empresa activa",

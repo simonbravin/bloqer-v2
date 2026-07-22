@@ -268,7 +268,7 @@ La **ficha** `/proyectos/[id]` conserva atajos en botones; la **navegación prin
 
 ### 1.4 ¿Existe una visión global financiera “real” en `/finanzas`?
 
-**Sí (Phase 14C+; tablero Phase 16D).** La página usa **`getFinanceHubOverview(ctx)`** (`packages/services/src/finance/finance-hub-overview.service.ts`): aging AR/AP global (`getReceivableAgingReport` / `getPayableAgingReport`) con **desglose por moneda** y **split AP** con obra vs corporativo en ítems de aging; tesorería con **`getTreasurySummaryByCompany`**; **accesos rápidos** y **alertas** (p. ej. multimoneda); bloque **contabilidad** solo como enlace si módulo + `VIEW ACCOUNTING`. **No** duplica fórmulas de cost-control ni project-cash-flow; **no** agrega KPIs contables calculados.
+**Sí (Phase 14C+; tablero Phase 16D).** La página usa **`getFinanceHubOverview(ctx)`** (`packages/services/src/finance/finance-hub-overview.service.ts`): aging AR/AP global (`getReceivableAgingReport` / `getPayableAgingReport`) con **desglose por moneda** y **split AP** con obra vs corporativo en ítems de aging; tesorería con **`getTreasurySummaryByTenant`** (tenant-wide; tesorería es corporativa/compartida y no se auto-filtra por `ctx.companyId`); **accesos rápidos** y **alertas** (p. ej. multimoneda); bloque **contabilidad** solo como enlace si módulo + `VIEW ACCOUNTING`. **No** duplica fórmulas de cost-control ni project-cash-flow; **no** agrega KPIs contables calculados.
 
 ### 1.5 ¿Cómo se registran hoy gastos “sin proyecto”?
 
@@ -311,7 +311,7 @@ Comentario en schema (`Receivable`): *“product concepts may allow debt without
 | Aging CxC / CxP global | `getReceivableAgingReport` / `getPayableAgingReport` | Ya soportan `AgingFilters` (`companyId`, `projectId`, …) |
 | Flujo de caja **por proyecto** | `getProjectCashFlowReport` | Ya por `projectId` |
 | Control de costos **por proyecto** | `getProjectCostControl`, `getWbsItemCostDetail` | Ya por `projectId` |
-| Tesorería saldo por cuenta | `getTreasurySummaryByCompany`, reportes en `treasury-reports` | Por `companyId` / tenant; **no** hay agregado por proyecto en una sola columna en `AccountMovement` |
+| Tesorería saldo por cuenta | `getTreasurySummaryByTenant`, reportes en `treasury-reports` | Tenant-wide (tesorería corporativa/compartida); sólo un `filters.companyId` explícito acota. **No** hay agregado por proyecto en una sola columna en `AccountMovement` |
 | Mayor / asientos | `journal-entry`, listados | Filtrar por `projectId` null vs no null para “corporativo” vs obra |
 | Dashboard tenant (14B) | `getTenantDashboard` | Ya compone KPIs sin duplicar cost-control |
 | Hub finanzas empresa (14C+ / 16D) | `getFinanceHubOverview` | Aging AR/AP + tesorería; split AP obra/corporativo (16D) |

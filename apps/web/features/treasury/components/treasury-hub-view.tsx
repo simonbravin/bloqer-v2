@@ -57,6 +57,11 @@ export function TreasuryHubView({
   const inflowKpi = formatMoneyBucket(overview.monthlyInflowByCurrency);
   const outflowKpi = formatMoneyBucket(overview.monthlyOutflowByCurrency);
 
+  const accountCount = overview.accounts.length;
+  const currencies = [...new Set(overview.accounts.map((a) => a.currency))].sort();
+  const accountsHelper =
+    currencies.length > 0 ? currencies.join(" · ") : undefined;
+
   if (!hasAccounts) {
     return (
       <div className="space-y-4">
@@ -72,7 +77,7 @@ export function TreasuryHubView({
 
   return (
     <div className="space-y-6">
-      <KpiStatGrid title={null} columns={3}>
+      <KpiStatGrid title={null} columns={4}>
         <KpiStatCard
           iconKey="treasury_balance"
           label="Saldo en cuentas"
@@ -81,6 +86,14 @@ export function TreasuryHubView({
           href="/tesoreria/cuentas"
           tone={balanceKpi.tone}
           variant="highlight"
+        />
+        <KpiStatCard
+          iconKey="treasury_accounts"
+          label="Cuentas activas"
+          value={String(accountCount)}
+          helper={accountsHelper}
+          href="/tesoreria/cuentas"
+          tone={accountCount > 0 ? "default" : "muted"}
         />
         <KpiStatCard
           iconKey="ar_open"

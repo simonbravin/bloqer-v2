@@ -8,6 +8,7 @@ import { resolveObligationStoredStatus } from "../finance/obligation-stored-stat
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
@@ -56,7 +57,7 @@ export async function getCompanyPaymentById(id: string, ctx: ServiceContext): Pr
   if (p.projectId !== null) {
     throw new ServiceError("FORBIDDEN", "Este pago pertenece a un proyecto; usá el espacio de trabajo del proyecto");
   }
-  if (ctx.companyId && p.companyId !== ctx.companyId) {
+  if (isCrossCompany(p.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "El pago no pertenece a la empresa activa");
   }
   return serialize(p);
@@ -142,6 +143,7 @@ export async function listCompanyPayments(
   const where: Prisma.PaymentWhereInput = {
     tenantId:  ctx.tenantId,
     projectId: null,
+    // Payment.companyId es NOT NULL → scope directo por empresa.
     ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     ...(filters?.status ? { status: filters.status } : {}),
     ...(filters?.paymentDateFrom || filters?.paymentDateTo

@@ -4,6 +4,7 @@ import { buildStorageKey, putObject, getPresignedGetUrl } from "@bloqer/storage"
 import { isStorageConfigured } from "@bloqer/config";
 import { can, type PermissionModule } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
+import { isCrossCompany } from "../company-scope";
 import { log } from "../audit/audit.service";
 import { createSystemNotification } from "../notifications/notification.service";
 import type { CreateDocumentMetadataInput, InitiateUploadInput, ListProjectDocumentsInput } from "@bloqer/validators";
@@ -276,7 +277,7 @@ async function resolveDocumentUploadPlan(
         throw new ServiceError("VALIDATION", "Esta factura es corporativa: no indique proyecto para el adjunto");
       }
       anchorProjectId = null;
-      if (ctx.companyId && inv.companyId !== ctx.companyId) {
+      if (isCrossCompany(inv.companyId, ctx)) {
         throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
       }
     }
@@ -869,7 +870,7 @@ async function assertSupplierInvoiceDocumentTarget(
       throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
     }
   } else {
-    if (ctx.companyId && inv.companyId !== ctx.companyId) {
+    if (isCrossCompany(inv.companyId, ctx)) {
       throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
     }
     if (routeProjectId != null && routeProjectId !== "") {
