@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { computeDateRangePreset } from "@bloqer/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CurrencyFilterSelect } from "@/components/ui/currency-select";
+import { DateRangePresets } from "@/components/ui/date-range-presets";
 
 const TYPE_OPTIONS = [
   { value: "_all", label: "Todos los tipos" },
@@ -101,165 +103,174 @@ export function MovementFilters({
         : "false"
       : (sp.get("includeInternalTransfers") ?? "_all");
 
+  // Finance applies a 90-day default server-side when URL has no dates; mirror that
+  // in the inputs so presets and Desde/Hasta stay in sync (controlled values).
+  const financeDefaults = variant === "finance" ? computeDateRangePreset("d90") : null;
+  const dateFrom = sp.get("dateFrom") ?? financeDefaults?.dateFrom ?? "";
+  const dateTo = sp.get("dateTo") ?? financeDefaults?.dateTo ?? "";
+
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Desde</Label>
-        <Input
-          type="date"
-          defaultValue={sp.get("dateFrom") ?? ""}
-          onChange={(e) => update("dateFrom", e.target.value)}
-          className="w-36"
-        />
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Hasta</Label>
-        <Input
-          type="date"
-          defaultValue={sp.get("dateTo") ?? ""}
-          onChange={(e) => update("dateTo", e.target.value)}
-          className="w-36"
-        />
-      </div>
-      {variant === "finance" && (
-        <>
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Alcance</Label>
-            <Select value={scopeValue} onValueChange={updateScope}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SCOPE_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {projects.length > 0 && (
+    <div className="space-y-3">
+      <DateRangePresets defaultPreset={variant === "finance" ? "d90" : null} />
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Desde</Label>
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => update("dateFrom", e.target.value)}
+            className="w-36"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Hasta</Label>
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => update("dateTo", e.target.value)}
+            className="w-36"
+          />
+        </div>
+        {variant === "finance" && (
+          <>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Proyecto</Label>
-              <Select
-                value={sp.get("projectId") ?? "_all"}
-                onValueChange={updateProject}
-              >
-                <SelectTrigger className="w-52">
-                  <SelectValue placeholder="Todos" />
+              <Label className="text-xs text-muted-foreground">Alcance</Label>
+              <Select value={scopeValue} onValueChange={updateScope}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_all">Todos los proyectos</SelectItem>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
+                  {SCOPE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
-        </>
-      )}
-      <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Moneda</Label>
-        <CurrencyFilterSelect
-          value={sp.get("currency") ?? ""}
-          onValueChange={(v) => update("currency", v)}
-          triggerClassName="w-[14rem]"
-        />
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Tipo</Label>
-        <Select
-          value={sp.get("type") ?? "_all"}
-          onValueChange={(v) => update("type", v === "_all" ? "" : v)}
-        >
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TYPE_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Origen</Label>
-        <Select
-          value={sp.get("sourceType") ?? "_all"}
-          onValueChange={(v) => update("sourceType", v === "_all" ? "" : v)}
-        >
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SOURCE_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Transf. internas</Label>
-        <Select
-          value={internalTransfersValue}
-          onValueChange={(v) =>
-            update(
-              "includeInternalTransfers",
-              variant === "finance"
-                ? v === "true"
-                  ? "true"
-                  : "false"
-                : v === "_all"
-                  ? ""
-                  : v,
-            )
-          }
-        >
-          <SelectTrigger className="w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {variant === "treasury" ? (
-              <>
-                <SelectItem value="_all">Incluir todas</SelectItem>
-                <SelectItem value="false">Excluir internas</SelectItem>
-              </>
-            ) : (
-              <>
-                <SelectItem value="false">Excluir internas</SelectItem>
-                <SelectItem value="true">Incluir internas</SelectItem>
-              </>
+            {projects.length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Proyecto</Label>
+                <Select
+                  value={sp.get("projectId") ?? "_all"}
+                  onValueChange={updateProject}
+                >
+                  <SelectTrigger className="w-52">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">Todos los proyectos</SelectItem>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
-          </SelectContent>
-        </Select>
-      </div>
-      {variant === "treasury" && (
+          </>
+        )}
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Pagos AP empresa</Label>
+          <Label className="text-xs text-muted-foreground">Moneda</Label>
+          <CurrencyFilterSelect
+            value={sp.get("currency") ?? ""}
+            onValueChange={(v) => update("currency", v)}
+            triggerClassName="w-[14rem]"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Tipo</Label>
           <Select
-            value={sp.get("corporateApPayments") ?? "_all"}
-            onValueChange={(v) => update("corporateApPayments", v === "_all" ? "" : v)}
+            value={sp.get("type") ?? "_all"}
+            onValueChange={(v) => update("type", v === "_all" ? "" : v)}
           >
-            <SelectTrigger className="w-52">
+            <SelectTrigger className="w-44">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="_all">Todos los pagos</SelectItem>
-              <SelectItem value="true">Solo corporativos (sin obra)</SelectItem>
+              {TYPE_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
-      )}
-      <Button variant="ghost" size="sm" onClick={clearFilters} className="self-end">
-        Limpiar
-      </Button>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Origen</Label>
+          <Select
+            value={sp.get("sourceType") ?? "_all"}
+            onValueChange={(v) => update("sourceType", v === "_all" ? "" : v)}
+          >
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SOURCE_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Transf. internas</Label>
+          <Select
+            value={internalTransfersValue}
+            onValueChange={(v) =>
+              update(
+                "includeInternalTransfers",
+                variant === "finance"
+                  ? v === "true"
+                    ? "true"
+                    : "false"
+                  : v === "_all"
+                    ? ""
+                    : v,
+              )
+            }
+          >
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {variant === "treasury" ? (
+                <>
+                  <SelectItem value="_all">Incluir todas</SelectItem>
+                  <SelectItem value="false">Excluir internas</SelectItem>
+                </>
+              ) : (
+                <>
+                  <SelectItem value="false">Excluir internas</SelectItem>
+                  <SelectItem value="true">Incluir internas</SelectItem>
+                </>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+        {variant === "treasury" && (
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Pagos AP empresa</Label>
+            <Select
+              value={sp.get("corporateApPayments") ?? "_all"}
+              onValueChange={(v) => update("corporateApPayments", v === "_all" ? "" : v)}
+            >
+              <SelectTrigger className="w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all">Todos los pagos</SelectItem>
+                <SelectItem value="true">Solo corporativos (sin obra)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <Button variant="ghost" size="sm" onClick={clearFilters} className="self-end">
+          Limpiar
+        </Button>
+      </div>
     </div>
   );
 }

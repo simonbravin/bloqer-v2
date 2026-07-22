@@ -146,7 +146,14 @@ export * from "./notifications/operational-alerts-cron.service";
 export * from "./notifications/notification-email.service";
 export * from "./report-exports/report-export.types";
 export * from "./report-exports/report-export.service";
-export { MAX_EXPORT_ROWS } from "./finance/pagination";
+export {
+  DEFAULT_CASH_DATE_RANGE_DAYS,
+  DEFAULT_PAGE_SIZE,
+  MAX_EXPORT_ROWS,
+  MAX_PAGE_SIZE,
+  defaultDateRangeDays,
+  resolvePagination,
+} from "./finance/pagination";
 export * from "./email-delivery/email-delivery-log.service";
 export * from "./platform/platform-auth.service";
 export * from "./platform/platform-audit.service";

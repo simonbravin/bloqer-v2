@@ -28,6 +28,20 @@
 - `TIMESTAMPTZ` en DB; en TS tipar explícito (no mezclar `Date` y string sin frontera).  
 - `date_accounting` vs `date_value` respetados en tesorería ([D-023](../00-product/DECISION_LOG.md)).
 
+## Filtros y temporalidad (UI)
+
+- **Control canónico de rango de fechas:** `DateRangePresets` (`apps/web/components/ui/date-range-presets.tsx`).
+  Estilo *segmented pill* (mismo que el selector de período del dashboard de flujo de caja). **No usar dropdowns
+  ni botones sueltos `secondary/outline` para presets temporales** — ese estilo queda solo para selección de
+  cantidad de meses en gráficos (legacy).
+- Los presets **escriben `dateFrom`/`dateTo` en la URL** y resetean `page`; conviven con los inputs "Desde/Hasta"
+  (inputs **controlled** con `value`, nunca `defaultValue` — si no, al elegir un preset la URL cambia y el input queda stale).
+- Rangos calendario vía `@bloqer/utils` (`computeDateRangePreset` / `defaultCalendarDateRangeDays`) en zona
+  `America/Argentina/Buenos_Aires`. **No usar `toISOString().slice(0, 10)`** para “hoy / este mes” (desfase en Vercel UTC).
+- **Paginación estándar de listados/ledgers:** 20 por página (`DEFAULT_PAGE_SIZE` en `@bloqer/services`) + navegación
+  de páginas. Rango por defecto del libro de movimientos: 90 días. Excepción documentada: el reporte de
+  Tesorería → Movimientos con saldo acumulado por cuenta se muestra sin paginar (histórico completo) a propósito.
+
 ## Dinero y decimales
 
 - Ver [`MONEY_AND_DECIMAL_STRATEGY.md`](./MONEY_AND_DECIMAL_STRATEGY.md) y [D-053](../00-product/DECISION_LOG.md).

@@ -1,3 +1,5 @@
+import { defaultCalendarDateRangeDays } from "@bloqer/utils";
+
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
 export const DEFAULT_CASH_DATE_RANGE_DAYS = 90;
@@ -10,14 +12,9 @@ export function resolvePagination(opts?: { page?: number; pageSize?: number }) {
   return { page, pageSize, skip: (page - 1) * pageSize, take: pageSize };
 }
 
+/** Rolling window ending today in product TZ (America/Argentina/Buenos_Aires). */
 export function defaultDateRangeDays(days: number): { dateFrom: string; dateTo: string } {
-  const to = new Date();
-  const from = new Date(to);
-  from.setUTCDate(from.getUTCDate() - days);
-  return {
-    dateFrom: from.toISOString().slice(0, 10),
-    dateTo: to.toISOString().slice(0, 10),
-  };
+  return defaultCalendarDateRangeDays(days);
 }
 
 export function startOfTodayUtc(): Date {

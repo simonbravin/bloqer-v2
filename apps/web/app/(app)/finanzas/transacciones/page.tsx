@@ -11,6 +11,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import {
   canViewCompanyAp,
+  DEFAULT_CASH_DATE_RANGE_DAYS,
+  DEFAULT_PAGE_SIZE,
+  defaultDateRangeDays,
   getAccountMovementReport,
   getTenantModuleGate,
   listContacts,
@@ -20,9 +23,6 @@ import {
   ServiceError,
   type MovementReportRow,
 } from "@bloqer/services";
-
-const PAGE_SIZE = 20;
-const DEFAULT_RANGE_DAYS = 90;
 
 interface PageProps {
   searchParams: Promise<{
@@ -49,16 +49,6 @@ function wantsRegisterAp(sp: Awaited<PageProps["searchParams"]>): boolean {
   return sp.register === "ap";
 }
 
-function defaultDateRange(): { dateFrom: string; dateTo: string } {
-  const to = new Date();
-  const from = new Date(to);
-  from.setUTCDate(from.getUTCDate() - DEFAULT_RANGE_DAYS);
-  return {
-    dateFrom: from.toISOString().slice(0, 10),
-    dateTo: to.toISOString().slice(0, 10),
-  };
-}
-
 function movementExportParams(sp: Awaited<PageProps["searchParams"]>): Record<string, string | undefined> {
   const params: Record<string, string | undefined> = {
     accountId: sp.accountId,
@@ -72,7 +62,7 @@ function movementExportParams(sp: Awaited<PageProps["searchParams"]>): Record<st
     includeInternalTransfers: sp.includeInternalTransfers ?? "false",
   };
   if (!params.accountId && (!params.dateFrom || !params.dateTo)) {
-    const defaults = defaultDateRange();
+    const defaults = defaultDateRangeDays(DEFAULT_CASH_DATE_RANGE_DAYS);
     params.dateFrom = params.dateFrom ?? defaults.dateFrom;
     params.dateTo = params.dateTo ?? defaults.dateTo;
   }
@@ -84,14 +74,14 @@ function buildMovementFilters(
   page: number,
 ): Parameters<typeof getAccountMovementReport>[0] {
   const parsed = parseMovementReportFilters(sp);
-  const defaults = defaultDateRange();
+  const defaults = defaultDateRangeDays(DEFAULT_CASH_DATE_RANGE_DAYS);
   return {
     ...parsed,
     includeInternalTransfers: sp.includeInternalTransfers === "true",
     dateFrom: sp.dateFrom || defaults.dateFrom,
     dateTo: sp.dateTo || defaults.dateTo,
     page,
-    pageSize: PAGE_SIZE,
+    pageSize: DEFAULT_PAGE_SIZE,
   };
 }
 
@@ -261,8 +251,8 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
-              Movimientos confirmados (rango por defecto: 90 días). Las transferencias internas se excluyen por
-              defecto.
+              Movimientos confirmados (rango por defecto: {DEFAULT_CASH_DATE_RANGE_DAYS} días). Las transferencias
+              internas se excluyen por defecto.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <ReportExportActions
@@ -295,7 +285,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
           />
 
           <Suspense fallback={null}>
-            <Pagination page={page} pageSize={PAGE_SIZE} total={movementTotal} />
+            <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={movementTotal} />
           </Suspense>
         </>
       ) : (
