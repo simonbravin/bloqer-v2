@@ -1,25 +1,29 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
 import {
   canRunOperationalAlerts,
   listMyNotifications,
+  NOTIFICATION_INBOX_PAGE_SIZE,
   type NotificationInboxFilter,
   type NotificationListItem,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/ui/pagination";
 import {
   archiveNotificationFormAction,
   markAllNotificationsReadAction,
   markNotificationReadFormAction,
 } from "./actions";
 import { formatDateTime } from "@/lib/format";
+import { notificationSeverityLabelEs } from "@/lib/notification-severity-label";
 import { PageShell } from "@/components/layout/page-shell";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 
 interface PageProps {
-  searchParams: Promise<{ filtro?: string }>;
+  searchParams: Promise<{ filtro?: string; page?: string }>;
 }
 
 const FILTERS: { key: NotificationInboxFilter; label: string }[] = [
@@ -54,6 +58,10 @@ function fmtWhen(iso: string) {
   return formatDateTime(iso, iso);
 }
 
+function filterHref(filtro: NotificationInboxFilter): string {
+  return filtro === "all" ? "/notificaciones" : `/notificaciones?filtro=${filtro}`;
+}
+
 export default async function NotificacionesPage({ searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -61,6 +69,9 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
   const sp = await searchParams;
   const raw = sp.filtro ?? "all";
   const filtro = FILTERS.some((f) => f.key === raw) ? (raw as NotificationInboxFilter) : "all";
+  const parsedPage = Number(sp.page ?? 1);
+  const requestedPage =
+    Number.isFinite(parsedPage) && parsedPage >= 1 ? Math.floor(parsedPage) : 1;
 
   const ctx = {
     actorUserId: current.session.user.id!,
@@ -69,7 +80,19 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
     roles:       current.tenantCtx.roles,
   };
 
-  const items = await listMyNotifications(filtro, ctx);
+  const { items, total, page, pageSize } = await listMyNotifications(filtro, ctx, {
+    page: requestedPage,
+    pageSize: NOTIFICATION_INBOX_PAGE_SIZE,
+  });
+
+  // Keep address bar in sync when the service clamps an out-of-range ?page=
+  if (page !== requestedPage) {
+    const params = new URLSearchParams();
+    if (filtro !== "all") params.set("filtro", filtro);
+    if (page > 1) params.set("page", String(page));
+    const qs = params.toString();
+    redirect(qs ? `/notificaciones?${qs}` : "/notificaciones");
+  }
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -113,9 +136,7 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
             size="sm"
             asChild
           >
-            <Link href={f.key === "all" ? "/notificaciones" : `/notificaciones?filtro=${f.key}`}>
-              {f.label}
-            </Link>
+            <Link href={filterHref(f.key)}>{f.label}</Link>
           </Button>
         ))}
       </div>
@@ -132,63 +153,68 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
           }
         />
       ) : (
-        <ul className="space-y-3">
-          {items.map((n) => {
-            const actionHref = safeActionHref(n.actionUrl);
-            return (
-            <li key={n.id}>
-              <div
-                className={`rounded-lg border bg-card p-4 ${
-                  n.status === "UNREAD" ? "border-primary/30 bg-primary/5 dark:bg-primary/10" : ""
-                }`}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-semibold leading-tight">{n.title}</h2>
-                      <Badge variant={severityVariant(n.severity)} className="text-[10px] uppercase">
-                        {n.severity}
-                      </Badge>
-                      {n.status === "UNREAD" && (
-                        <Badge variant="default" className="text-[10px]">
-                          Nueva
-                        </Badge>
-                      )}
+        <>
+          <ul className="space-y-3">
+            {items.map((n) => {
+              const actionHref = safeActionHref(n.actionUrl);
+              return (
+                <li key={n.id}>
+                  <div
+                    className={`rounded-lg border bg-card p-4 ${
+                      n.status === "UNREAD" ? "border-primary/30 bg-primary/5 dark:bg-primary/10" : ""
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="font-semibold leading-tight">{n.title}</h2>
+                          <Badge variant={severityVariant(n.severity)} className="text-[10px]">
+                            {notificationSeverityLabelEs(n.severity)}
+                          </Badge>
+                          {n.status === "UNREAD" && (
+                            <Badge variant="default" className="text-[10px]">
+                              Nueva
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="whitespace-pre-wrap text-sm text-muted-foreground">{n.body}</p>
+                        <p className="text-xs text-muted-foreground">{fmtWhen(n.createdAt)}</p>
+                        {actionHref && (
+                          <p className="pt-1">
+                            <Button variant="link" className="h-auto p-0 text-sm" asChild>
+                              <Link href={actionHref}>Abrir detalle</Link>
+                            </Button>
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        {n.status === "UNREAD" && (
+                          <form action={markNotificationReadFormAction}>
+                            <input type="hidden" name="notificationId" value={n.id} />
+                            <Button type="submit" size="sm" variant="secondary">
+                              Marcar leída
+                            </Button>
+                          </form>
+                        )}
+                        {(n.status === "UNREAD" || n.status === "READ") && (
+                          <form action={archiveNotificationFormAction}>
+                            <input type="hidden" name="notificationId" value={n.id} />
+                            <Button type="submit" size="sm" variant="outline">
+                              Archivar
+                            </Button>
+                          </form>
+                        )}
+                      </div>
                     </div>
-                    <p className="whitespace-pre-wrap text-sm text-muted-foreground">{n.body}</p>
-                    <p className="text-xs text-muted-foreground">{fmtWhen(n.createdAt)}</p>
-                    {actionHref && (
-                      <p className="pt-1">
-                        <Button variant="link" className="h-auto p-0 text-sm" asChild>
-                          <Link href={actionHref}>Abrir detalle</Link>
-                        </Button>
-                      </p>
-                    )}
                   </div>
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    {n.status === "UNREAD" && (
-                      <form action={markNotificationReadFormAction}>
-                        <input type="hidden" name="notificationId" value={n.id} />
-                        <Button type="submit" size="sm" variant="secondary">
-                          Marcar leída
-                        </Button>
-                      </form>
-                    )}
-                    {(n.status === "UNREAD" || n.status === "READ") && (
-                      <form action={archiveNotificationFormAction}>
-                        <input type="hidden" name="notificationId" value={n.id} />
-                        <Button type="submit" size="sm" variant="outline">
-                          Archivar
-                        </Button>
-                      </form>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+          <Suspense fallback={null}>
+            <Pagination page={page} pageSize={pageSize} total={total} />
+          </Suspense>
+        </>
       )}
     </PageShell>
   );

@@ -99,9 +99,10 @@ Las rutas bajo **`/finanzas/**`** comparten layout: subnav filtrada por módulo 
 |-------|--------|-------|
 | `/notificaciones` | Authenticated user with active tenant membership | Personal inbox only; **not** gated on `VIEW NOTIFICATIONS` |
 | `/notificaciones/alertas` | **OWNER** or **ADMIN** on active tenant membership (`canRunOperationalAlerts`) | Manual operational alert runner; others get `notFound()` |
+| `GET /api/notifications/bell` | Authenticated user with active tenant membership | Bell snapshot (`unreadCount` + last 5 non-archived); used by header polling ([D-054]) |
 | `/api/cron/operational-alerts` | **No session.** Valid `CRON_SECRET` via `Authorization: Bearer` or `x-cron-secret` | Server-to-server / Vercel Cron; optional `?tenantId=` (UUID, ACTIVE only); respuesta agregada sin PII ([`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md)) |
 | `/api/cron/scheduled-reports` | **No session.** Mismo `CRON_SECRET` | Vercel Cron horario; envíos programados `REPORT_SCHEDULED` ([`SCHEDULED_REPORTS_ARCHITECTURE.md`](./SCHEDULED_REPORTS_ARCHITECTURE.md)) |
-| Header bell + badge | Same as inbox | Count = `getUnreadNotificationCount` (SSR en layout) |
+| Header bell + badge | Same as inbox | SSR seed + client poll `GET /api/notifications/bell` (30s); dropdown last 5 ([D-054]) |
 
 See [`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md).
 

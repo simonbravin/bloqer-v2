@@ -35,9 +35,12 @@ export default async function OperationalAlertsPage() {
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight">Alertas operativas</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Generá notificaciones in-app según reglas del tenant (AR/AP vencidos, stock negativo, certificaciones sin
-          factura, cargas de documentos pendientes). Los duplicados recientes se omiten automáticamente. Solo OWNER o
-          ADMIN.
+          En producción las alertas corren solas todos los días a las <strong>12:00 UTC</strong> (cron
+          de Vercel). Los vencimientos AR/AP usan <strong>día calendario UTC</strong> (vencen si la fecha
+          de vencimiento es estrictamente anterior a hoy UTC). Este panel es solo para corridas
+          manuales (smoke, demos o si el cron falló): AR/AP vencidos, stock negativo, certificaciones sin
+          factura, cargas de documentos pendientes. Los duplicados recientes (7 días) se omiten. Solo
+          OWNER o ADMIN.
         </p>
       </div>
 

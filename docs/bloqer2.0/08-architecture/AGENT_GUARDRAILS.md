@@ -63,6 +63,7 @@ Estándar: [`TENANT_COMPANY_SCOPING.md`](./TENANT_COMPANY_SCOPING.md). Reglas du
 - Calcular dinero con `parseFloat` / `Number` / `float`.  
 - Serializar montos money en DTOs con `.toString()` crudo (usar `serializeMoney`).  
 - Redondear el saldo en UI y reenviarlo como “pago total” (usar `payFullBalance` / saldo almacenado en server) — [D-053](../00-product/DECISION_LOG.md).
+- Cambiar UX / rutas / flujos visibles **sin** actualizar [`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md) (y regenerar `guides/Guía_Operativa_Bloqer_v2.docx` si aplica).
 
 ## Scripts provisionales (prohibido)
 

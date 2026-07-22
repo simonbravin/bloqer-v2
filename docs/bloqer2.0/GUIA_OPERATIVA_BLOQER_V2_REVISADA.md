@@ -1,11 +1,13 @@
-# Guía operativa — Bloqer v2 (revisada)
+# Guía operativa — Bloqer v2
 
 > **Audiencia:** dueños/directores, Project Managers, jefes de obra, capataces, compras, administración, finanzas, tesorería y contabilidad.
 > **Alcance:** operación de punta a punta a **nivel empresa** y **nivel proyecto**, desde la configuración inicial hasta el control de costos, la facturación, la cobranza y el pago.
 > **Base de evidencia:** rutas implementadas en `apps/web`, servicios en `packages/services`, enums en `packages/database/prisma/schema.prisma` y la spec funcional de `docs/bloqer2.0/`.
 > **Regla de prevalencia:** cuando el texto de una pantalla o de la documentación difiere del comportamiento del código, esta guía describe **lo que hace el sistema hoy**.
-> **Relación con otros documentos:** para la visión ejecutiva ver [`PANORAMA_GENERAL_BLOQER_V2.md`](./PANORAMA_GENERAL_BLOQER_V2.md); para el estado técnico y clasificación A–G ver [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md). Esta guía **no reemplaza** ni sobrescribe [`guides/GUIA_OPERATIVA_PROYECTO.md`](./guides/GUIA_OPERATIVA_PROYECTO.md), que se conserva como fuente original.
-> **Capturas:** los bloques `📷 Captura sugerida` indican dónde insertar pantallazos reales en el DOCX / PDF. No inventar UI: fotografiar el producto actual (Lotes 1–7).
+> **Relación con otros documentos:** visión ejecutiva [`PANORAMA_GENERAL_BLOQER_V2.md`](./PANORAMA_GENERAL_BLOQER_V2.md); estado técnico A–G [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md); smoke por rol [`08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md).
+> **Entregable DOCX:** un solo archivo `guides/Guía_Operativa_Bloqer_v2.docx`, regenerado con `cd docs/bloqer2.0/guides && node build_guide.js` desde **esta** MD.
+> **Mantenimiento obligatorio:** todo cambio de UX, rutas, etiquetas, flujos financieros o reglas visibles al usuario **debe actualizar esta guía en el mismo PR** (y regenerar el DOCX si se entrega a cliente). Ver [D-052](./00-product/DECISION_LOG.md), [D-053](./00-product/DECISION_LOG.md) y `AGENT_GUARDRAILS.md`.
+> **Capturas:** los bloques `📷 Captura sugerida` indican dónde insertar pantallazos reales. No inventar UI: fotografiar el producto actual.
 
 ---
 
@@ -81,7 +83,8 @@ flowchart TB
 ### 1.3 Datos de la empresa
 
 - **Ruta:** `/configuracion`.
-- Datos de la empresa, preferencias de visualización y políticas (incluida la política de compras en `/configuracion/compras`, accesible desde la subnavegación de configuración).
+- Datos de la empresa, preferencias de visualización y políticas.
+- **Política de compras:** `/configuracion/compras` (subnavegación Configuración → **Compras**, o card desde `/configuracion`): umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos.
 
 > **📷 Captura sugerida — Configuración + acceso Compras**  
 > Ruta: `/configuracion` · Mostrar card/enlace a política de compras · Tip: incluir subnav de configuración si está visible.
@@ -158,6 +161,23 @@ Configurar tesorería **antes** de operar cobranzas y pagos.
 > **Terminología correcta:** los tipos de movimiento en el sistema son `INFLOW` (ingreso), `OUTFLOW` (egreso), `TRANSFER_IN`, `TRANSFER_OUT` y `ADJUSTMENT`. (La guía original mencionaba `INCOME`/`OUTCOME`; esos términos **no existen** en el código.)
 
 > **Limitación actual (importante):** cobros, pagos y transferencias internas operan en **una sola moneda por operación**. **No hay conversión de moneda dentro de tesorería.** Cada documento guarda su moneda, tipo de cambio y monto en pesos, pero el movimiento de caja no convierte.
+
+> **Fondos insuficientes:** un **pago** a proveedor no puede dejar la cuenta de origen en saldo negativo (mismo criterio que las transferencias internas). El sistema muestra el disponible y bloquea la operación.
+
+---
+
+## 4.1 Montos y decimales (regla de trabajo diaria) — D-053
+
+Para operadores: **no hace falta pensar en “escalas de base de datos”**. En pantalla y al cargar montos de dinero:
+
+| Qué | Cómo se ve / se carga |
+|-----|------------------------|
+| **Dinero** (totales, saldos, pagos, cobros, caja) | Siempre **2 decimales** (ej. `1.234,56`). Redondeo comercial half-up. |
+| **Tipo de cambio** | Hasta **6** decimales. |
+| **Cantidades** (líneas, stock) y **%** (IVA, etc.) | Hasta **4** decimales. |
+
+- Al **pagar o cobrar el total**, usá el saldo que muestra el sistema (o el default del formulario). El servidor aplica el saldo almacenado; no reescribás a mano un redondeo distinto.
+- Si la cuenta no tiene fondos suficientes para el pago, la operación **se rechaza** con el disponible.
 
 ---
 
@@ -334,9 +354,12 @@ flowchart LR
 
 ### 9.2 Órdenes de compra
 
-- **Ruta:** `/proyectos/[id]/ordenes-compra`.
-- Ciclo (enum `PurchaseOrderStatus`): `DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED` (o `CANCELLED`).
-- **Devolución para cambios:** un aprobador puede **devolver** una OC en `SUBMITTED` de vuelta a `DRAFT` indicando un **motivo**; el solicitante corrige y reenvía. Queda registrado quién y por qué.
+- **Ruta:** `/proyectos/[id]/ordenes-compra` (+ `/nueva`, detalle `/[poId]`, edición `/[poId]/editar`).
+- **Estados en pantalla:** Borrador → Pend. aprobación → Aprobada → Confirmada → Recepción parcial / Recibida · Anulada.
+- Ciclo técnico (enum `PurchaseOrderStatus`): `DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED` (o `CANCELLED`).
+- **Devolución:** un aprobador puede **devolver** una OC en `SUBMITTED` a `DRAFT` con **motivo obligatorio**; queda auditoría de quién y por qué.
+
+**Acciones del detalle (según estado y permisos):** Editar · Enviar a aprobación · Aprobar · Devolver a borrador · **Confirmar al proveedor** · Registrar recepción · **Registrar factura desde OC** (requiere cantidades recibidas) · Anular.
 
 **Flujo formal (un paso por acción):**
 
@@ -356,18 +379,19 @@ stateDiagram-v2
 
 | Hito | Impacto económico |
 |------|-------------------|
-| **APPROVED** | Aprobación interna (segregación: quien solicita no aprueba, salvo autoaprobación habilitada por empresa y bajo umbral) |
+| **APPROVED** | Aprobación interna (segregación / política de empresa) |
 | **CONFIRMED** | **Comprometido** en el control de costos |
-| Recepción | Ingreso de stock + cantidades recibidas |
-| Factura del proveedor | **Devengado** + cuenta por pagar |
+| Recepción | Ingreso de stock + cantidades recibidas (**no** crea CxP por sí sola) |
+| Factura de proveedor **emitida** | **Devengado** + cuenta por pagar |
 
-- **Imputación:** cada línea se asigna a un nodo **WBS** ítem hoja (obligatorio).
-- **Control de desvíos de precio** contra el costo referencial del presupuesto por tramos: alerta suave, **nota/justificación** requerida a partir de un umbral y **aprobación de administración** para desvíos altos. La justificación de desvío se guarda en la línea.
-- **OC directa (sin solicitud):** permitida solo si la política de la empresa lo habilita. Por encima del umbral configurado exige **motivo de emergencia** y solo la puede autorizar administración (`OWNER`/`ADMIN`).
-- **Notificaciones (in‑app + email):** OC pendiente de aprobación, aprobada, devuelta y confirmada; más **recordatorio por SLA** cuando una OC lleva demasiado tiempo pendiente de aprobación.
+- **Imputación:** cada línea → WBS ítem hoja (**obligatorio**, D-050). Al elegir partida: **costo ref. materiales** y **saldo de partida** (alerta, no bloqueo).
+- **Desvíos de precio** vs costo referencial: alerta → justificación → aprobación admin en tramos altos.
+- **OC directa (sin solicitud):** solo si `/configuracion/compras` lo habilita; umbral alto exige motivo de emergencia (`OWNER`/`ADMIN`).
+- **Cotizaciones:** comparar **precio y plazo (días)**.
+- **Notificaciones:** pendiente / aprobada / devuelta / confirmada + recordatorio SLA.
 
 > **📷 Captura sugerida — OC confirmada con links**  
-> Ruta: `/proyectos/[id]/ordenes-compra/[poId]` · Mostrar estado CONFIRMED + enlace a recepción / factura · Tip: incluir botones Enviar/Aprobar/Devolver según estado.
+> Ruta: `/proyectos/[id]/ordenes-compra/[poId]` · Mostrar estado Confirmada + enlace a recepción / factura · Tip: incluir botones Enviar/Aprobar/Devolver según estado.
 
 ### 9.3 Recepciones
 
@@ -444,50 +468,80 @@ flowchart LR
   AR --> COL["Cobranza"] --> TES["Tesorería: movimiento INFLOW"]
 ```
 
-- **Facturas de venta de obra** (`/proyectos/[id]/facturas`, estados `DRAFT/ISSUED/CANCELLED`): una vez emitidas son inmutables; solo se pueden **anular**.
-- **Cuentas por cobrar de obra** (`/proyectos/[id]/cuentas-por-cobrar`): listado y cobranza ligada al proyecto.
-- **Cobranzas de obra** (`/proyectos/[id]/cobranzas`): ingresan dinero a una cuenta de tesorería (movimiento `INFLOW`) y reducen el saldo pendiente.
-- **Venta rápida / anticipo** (`/proyectos/[id]/facturas/anticipo/nueva`): crea factura + cuenta por cobrar (+ cobro opcional) en un paso.
+#### Obra (proyecto)
+
+- **Facturas emitidas** (`/proyectos/[id]/facturas`, estados Borrador / Emitida / Anulada): una vez emitidas son inmutables; solo se pueden **anular**. Detalle: **Emitir** desde borrador; panel de **adjuntos** del comprobante.
+- **Cuentas por cobrar** (`/proyectos/[id]/cuentas-por-cobrar`): estados Pendiente / Parcial / Pagado / Vencido. Desde el detalle → **Cobrar** (`…/[receivableId]/cobrar`): cuenta, fecha, monto (2 decimales). Para saldar el total, dejá el saldo que muestra el sistema.
+- **Cobranzas** (`/proyectos/[id]/cobranzas`): ingresan dinero (`INFLOW`) y bajan el saldo.
+- **Venta rápida / anticipo** (`/proyectos/[id]/facturas/anticipo/nueva`): factura + CxC (+ cobro opcional) en un paso.
+- **No disponible hoy:** “Cobrar ahora” **inline** al crear una factura de venta **de proyecto** (diferido; el cobro se hace desde CxC). El cobro inmediato corporativo sí existe en Transacciones (abajo).
 
 #### Ingreso / factura corporativa (sin obra) — D-051
 
-Casos como capacitaciones, venta de materiales o servicios de estructura **sin proyecto** se registran a nivel empresa (espejo del gasto corporativo AP):
+Casos como capacitaciones, venta de materiales o servicios de estructura **sin proyecto**:
 
-1. Ir a **Finanzas → Transacciones** (`/finanzas/transacciones`) → **Registrar transacción** → tab **Ingreso / cobro**.
-2. Elegir modo **Factura / cuenta por cobrar** (crea `SalesInvoice` + `Receivable` con `projectId` null). Completar cliente, fechas, líneas, impuestos y vencimiento; N° de comprobante externo opcional; cobro inmediato opcional.
-3. Si solo necesitás mover caja **sin** CxC (aportes, préstamos, reintegros), usar el modo **Solo caja** (`TREASURY_INFLOW`).
-4. Gestionar el saldo y cobrar en **Cuentas por cobrar** (`/finanzas/cuentas-por-cobrar` → detalle `/finanzas/cuentas-por-cobrar/[id]` → **Cobrar**). En aging, las filas sin obra se etiquetan **Empresa**.
+1. **Finanzas → Transacciones** (`/finanzas/transacciones`) → **Registrar transacción** → tab **Ingreso / cobro**.
+2. Modo **Factura / cuenta por cobrar** (`AR_INCOME`): cliente, fechas, líneas, impuestos, vencimiento; N° comprobante externo opcional; **Cobrar ahora (ingreso a caja)** opcional (cuenta + fecha; requiere permiso de tesorería).
+3. Si solo necesitás mover caja **sin** CxC (aportes, préstamos, reintegros): modo **Solo caja** (`TREASURY_INFLOW`).
+4. Gestionar saldos en **Cuentas por cobrar** (`/finanzas/cuentas-por-cobrar` → **Cobrar**). Filas sin obra se etiquetan **Empresa**.
 
 > **📷 Captura sugerida — Factura emitida → CxC / cobranza**  
-> Ruta: `/proyectos/[id]/facturas/[invoiceId]` · Mostrar panel CxC vinculada + CTA Registrar cobranza · Tip: Lote 3 D-03.
+> Ruta: `/proyectos/[id]/facturas/[invoiceId]` · Mostrar panel CxC + CTA Registrar cobranza + adjuntos · Tip: Lote 3 D-03 / D-052.
 
 > **📷 Captura sugerida — Ingreso corporativo con CxC**  
-> Ruta: `/finanzas/transacciones` · Abrir Registrar transacción → Ingreso / cobro → Factura / cuenta por cobrar · Tip: D-051.
+> Ruta: `/finanzas/transacciones` · Registrar transacción → Ingreso / cobro → Factura / cuenta por cobrar · Tip: D-051.
 
-### 12.2 Facturas de proveedor y pagos (AP)
+### 12.2 Facturas de proveedor y pagos (AP) — D-052
 
 ```mermaid
 flowchart LR
   SI["Factura de proveedor (ISSUED)"] --> AP["Cuenta por pagar (Payable)"]
-  AP --> PAY["Pago"] --> TES["Tesorería: movimiento OUTFLOW"]
+  AP --> PAY["Pago"] --> TES["Tesorería: OUTFLOW"]
 ```
 
-- **Facturas de proveedor** (`/proyectos/[id]/facturas-proveedor` y consolidado `/finanzas/facturas-proveedor`).
-- **Cuentas por pagar** (`/proyectos/[id]/cuentas-por-pagar` y `/finanzas/cuentas-por-pagar`), con aging.
-- **Pagos** (`/proyectos/[id]/pagos`, o desde CxP): egresan dinero (movimiento `OUTFLOW`) y actualizan el estado del payable a `PARTIAL`/`PAID`.
-- **Gasto corporativo:** desde `/finanzas/facturas-proveedor`, **Nueva factura** abre un diálogo para registrar el documento sin proyecto. El alta rápida con pago opcional vive en `/finanzas/transacciones`.
+Siempre existe la cadena **Factura → Payable → Payment → movimiento de caja**, aunque se pague en el mismo momento (“pagar ahora”).
+
+#### Proyecto
+
+| Pantalla | Ruta |
+|----------|------|
+| Listado / alta | `/proyectos/[id]/facturas-proveedor` · `/nueva` |
+| Detalle | `/proyectos/[id]/facturas-proveedor/[id]` (Emitir · Anular · adjuntos · editar borrador) |
+| CxP | `/proyectos/[id]/cuentas-por-pagar` → `/[payableId]/pagar` |
+| Pagos (consulta) | `/proyectos/[id]/pagos` (también desde CxP / trazabilidad) |
+
+**Alta en obra (`/nueva`):**
+
+1. Proveedor, fechas, líneas, OC opcional, **adjunto** opcional (foto/PDF del comprobante).
+2. Sin más: **Crear factura** → queda en **borrador** → luego **Emitir** en el detalle (crea CxP).
+3. Con permiso **EDIT tesorería** y módulo Tesorería activo: checkbox **Emitir y pagar ahora (egreso de caja)** → cuenta de pago + fecha → **Emitir y pagar**. Crea factura emitida + CxP + pago + egreso en un paso. Si no hay fondos suficientes, **bloquea**.
+
+#### Empresa (corporativo)
+
+| Pantalla | Ruta / etiqueta |
+|----------|-----------------|
+| Facturas y gastos | `/finanzas/facturas-proveedor` → diálogo **Nueva factura de gasto** (borrador sin proyecto) |
+| Alta rápida con pago | `/finanzas/transacciones` → **Gasto / factura proveedor** → opcional **Pagar ahora** |
+| CxP | `/finanzas/cuentas-por-pagar` → `/[payableId]/pagar` (**Registrar pago**) |
+| Detalle de pago | `/finanzas/pagos-proveedor/[paymentId]` |
+
+**Registrar pago (obra o empresa):** cuenta de tesorería (misma moneda), fecha, monto a 2 decimales, notas. El default es el **saldo pendiente**; usarlo para saldar sin residual. Fondos insuficientes → error con disponible.
 
 > **Notas de navegación y límites:**
-> - Los pagos a proveedor se consultan en `/finanzas/transacciones` filtrando origen `PAYMENT` y egreso. No existe un listado independiente; el detalle del pago sigue disponible desde CxP y trazabilidad.
-> - **Retenciones** en pagos son **manuales** (no hay módulo dedicado ni acumulados de retención).
-> - Igual que en tesorería, cobros y pagos operan en **una sola moneda**.
-> - Desde CxP y Facturas y gastos se pueden **exportar CSV/PDF** del listado corporativo.
+> - Consulta consolidada de pagos: `/finanzas/transacciones` filtrando origen `PAYMENT` y egreso.
+> - **Retenciones** manuales (sin módulo dedicado).
+> - Cobros y pagos: **una sola moneda** por operación.
+> - Export **CSV/PDF** desde CxP y Facturas y gastos corporativos.
+> - Desde OC confirmada: **Registrar factura desde OC** cuando hay cantidades recibidas.
+
+> **📷 Captura sugerida — Emitir y pagar ahora (obra)**  
+> Ruta: `/proyectos/[id]/facturas-proveedor/nueva` · Checkbox Emitir y pagar ahora + cuenta + fecha · Tip: D-052; usuario con EDIT tesorería.
 
 > **📷 Captura sugerida — CxP corporativo con export**  
-> Ruta: `/finanzas/cuentas-por-pagar` · Mostrar aging o listado + botones Exportar · Tip: Lote 5 F-01/G-01.
+> Ruta: `/finanzas/cuentas-por-pagar` · Listado + Exportar · Tip: Lote 5.
 
 > **📷 Captura sugerida — Transacciones / pagos proveedor**  
-> Ruta: `/finanzas/transacciones?sourceType=PAYMENT&type=OUTFLOW` · Mostrar filtros y movimientos de pago.
+> Ruta: `/finanzas/transacciones?sourceType=PAYMENT&type=OUTFLOW` · Filtros y movimientos de pago.
 
 ---
 
@@ -551,10 +605,11 @@ flowchart LR
 | Confirmar OC | **Comprometido** | — | — |
 | Recepción de OC | Ingreso de stock | — | — |
 | Emitir factura de proveedor | **Devengado** + cuenta por pagar | — | Sugerencia (manual) |
-| Pago a proveedor | **Pagado** | Movimiento `OUTFLOW` | Sugerencia (manual) |
+| Emitir y pagar ahora (AP) | Devengado + pagado en un paso | Movimiento `OUTFLOW` | Sugerencia (manual) |
+| Pago a proveedor | **Pagado** | Movimiento `OUTFLOW` (bloquea si fondos insuficientes) | Sugerencia (manual) |
 | Certificación aprobada | **Certificado** | — | — |
 | Emitir factura de venta | **Facturado** + cuenta por cobrar | — | Sugerencia (manual) |
-| Cobranza | **Cobrado** | Movimiento `INFLOW` | Sugerencia (manual) |
+| Cobranza / Cobrar ahora (AR corporativo) | **Cobrado** | Movimiento `INFLOW` | Sugerencia (manual) |
 | Aprobar cert. de subcontrato | **Devengado** (factura proveedor DRAFT) | — | — |
 | Imputar gasto general | Afecta rentabilidad neta | Según pago | — |
 
@@ -581,10 +636,13 @@ flowchart LR
 | Confundir avance de Gantt con certificado | Reportes incoherentes | Real = libro de obra; Certificado = certificaciones |
 | Sumar OC + factura como costo total | Doble conteo | Usar **exposición esperada** |
 | Editar fechas de un contenedor del cronograma | Se pisa con el rollup | Editar solo hojas |
-| Pagar sin factura/devengado | Caja sin respaldo | Factura → cuenta por pagar → pago |
+| Pagar sin factura/devengado | Caja sin respaldo | Factura → cuenta por pagar → pago (o Emitir y pagar ahora) |
 | Duplicar contactos por rol | Datos partidos | Un contacto con múltiples roles |
 | Asumir que la contabilidad se actualiza sola | Libro contable desalineado | Revisar y postear asientos manualmente |
 | Cobrar/pagar esperando conversión de moneda | Descalce | Operar en la misma moneda de la cuenta |
+| Reescribir el monto “a ojo” al pagar el total | Residual o rechazo | Usar el saldo pendiente que muestra el sistema (2 decimales) |
+| Pagar con cuenta sin fondos | Operación bloqueada | Verificar saldo de tesorería antes |
+| Esperar “Cobrar ahora” al crear factura de obra | No existe (diferido) | Cobrar desde CxC del proyecto |
 
 ---
 
@@ -627,21 +685,24 @@ flowchart LR
 
 ### Compras
 
+- [ ] Política de compras revisada en `/configuracion/compras`
 - [ ] Todas las líneas con **WBS** (indirectos → partida de gastos generales)
 - [ ] Solicitudes cotizadas (mínimo según política), comparando **precio y plazo**
 - [ ] Desvíos de precio con **justificación** cuando corresponde
 - [ ] OC enviada → aprobada (o **devuelta con motivo**) → **confirmada** al proveedor
 - [ ] Recepciones registradas (menú Operación o desde la OC)
-- [ ] Facturas de proveedor vinculadas a la OC
+- [ ] Facturas de proveedor vinculadas a la OC (Registrar factura desde OC / alta manual)
 
 ### Administración / Finanzas / Tesorería
 
-- [ ] Facturas de venta emitidas desde certificaciones
-- [ ] Cobranzas de obra aplicadas a las cuentas por cobrar del proyecto
-- [ ] Ingresos corporativos con CxC registrados desde Transacciones (modo Factura / cuenta por cobrar) cuando corresponde
-- [ ] Ingresos solo caja (sin CxC) registrados solo cuando no hay obligación de cobro
+- [ ] Facturas de venta emitidas desde certificaciones (o venta directa / anticipo)
+- [ ] Cobranzas de obra aplicadas desde CxC del proyecto
+- [ ] Ingresos corporativos con CxC desde Transacciones (Factura / cuenta por cobrar) cuando corresponde
+- [ ] Ingresos solo caja (sin CxC) solo cuando no hay obligación de cobro
 - [ ] CxC empresa revisadas en `/finanzas/cuentas-por-cobrar` (filas **Empresa**)
-- [ ] Cuentas por pagar revisadas y pagos consultados en Transacciones (`sourceType=PAYMENT`)
+- [ ] Facturas de proveedor de obra: borrador → emitir, o **Emitir y pagar ahora** si hay permiso de tesorería
+- [ ] Gastos corporativos desde Facturas y gastos / Transacciones
+- [ ] CxP revisadas; pagos con saldo a 2 decimales; fondos suficientes en la cuenta
 - [ ] Exports CSV/PDF de CxP / facturas corporativas cuando haga falta
 - [ ] Movimientos de caja conciliados manualmente (no hay conciliación bancaria automática)
 - [ ] Reportes de flujo de caja y aging revisados
@@ -668,10 +729,11 @@ flowchart LR
 | **Impuestos / retenciones** | Solo IVA por línea; retenciones manuales, sin módulo dedicado. |
 | **Documentos** | Si R2 no está configurado: metadata + badge **PLACEHOLDER**; la descarga explica el límite. |
 | **Anticipo a proveedor** | Servicio stub (ADR-013); **sin** CTA en UI. |
+| **Cobrar ahora en factura de obra** | Diferido (Q-055); cobrar desde CxC. Corporativo sí tiene cobro opcional en Transacciones. |
 | **Ajustes de stock/caja (`ADJUSTMENT`)** | Enum reservado; sin UI. |
 | **Permisos** | La matriz es de solo lectura; los roles son fijos. |
 | **Segundo factor (2FA)** | No disponible; el acceso es solo con Google. |
-| **DOCX de guía** | Regenerar desde esta MD + [`guides/CHANGELOG_UI_LOTES_1_6.md`](./guides/CHANGELOG_UI_LOTES_1_6.md). Los bloques `📷 Captura sugerida` marcan huecos para pantallazos reales. |
+| **DOCX de guía** | Un solo entregable: `guides/Guía_Operativa_Bloqer_v2.docx`. Regenerar con `node build_guide.js` tras editar **esta** MD. |
 
 > Estas limitaciones **no impiden** el uso productivo del sistema, pero deben conocerse para no asumir capacidades que hoy son manuales o inexistentes.
 
@@ -683,11 +745,22 @@ flowchart LR
 - Relevamiento técnico y clasificación A–G: [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md)
 - Plan de mejoras corto plazo: [`PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md`](./PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md)
 - Smoke por rol (J-02): [`08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md)
-- Changelog UI Lotes 1–6 (autores DOCX): [`guides/CHANGELOG_UI_LOTES_1_6.md`](./guides/CHANGELOG_UI_LOTES_1_6.md)
-- Guía original (conservada): [`guides/GUIA_OPERATIVA_PROYECTO.md`](./guides/GUIA_OPERATIVA_PROYECTO.md)
+- Changelog UI Lotes 1–6 (autores): [`guides/CHANGELOG_UI_LOTES_1_6.md`](./guides/CHANGELOG_UI_LOTES_1_6.md)
+- Decisiones recientes de flujos: [D-050](./00-product/DECISION_LOG.md) (compras/WBS), [D-051](./00-product/DECISION_LOG.md) (AR corporativo), [D-052](./00-product/DECISION_LOG.md) (AP pay-now / adjuntos / fondos), [D-053](./00-product/DECISION_LOG.md) (decimales)
 - Estados canónicos: [`01-domain/STATE_MACHINES.md`](./01-domain/STATE_MACHINES.md)
 - Fórmulas de costo: [`04-formulas/COST_FORMULAS.md`](./04-formulas/COST_FORMULAS.md)
+- Módulos: [`02-modules/EXPENSES_AND_PAYMENTS.md`](./02-modules/EXPENSES_AND_PAYMENTS.md), [`02-modules/SALES_AND_COLLECTIONS.md`](./02-modules/SALES_AND_COLLECTIONS.md)
 
 ---
 
-*Documento vivo. Actualizado post Lotes 1–7 (UI/UX + placeholders de capturas). Actualizar cuando cambien rutas, servicios o el Prisma schema.*
+## 21. Mantenimiento de esta guía (obligatorio para el equipo)
+
+1. **Fuente viva:** este archivo (`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`).
+2. **Entregable cliente:** únicamente `docs/bloqer2.0/guides/Guía_Operativa_Bloqer_v2.docx` (no hay variante “PROFESIONAL”).
+3. **Cuándo actualizar:** todo PR que cambie rutas, menús, etiquetas, flujos de OC/CxP/CxC/tesorería, permisos visibles o reglas de montos.
+4. **Cómo regenerar el DOCX:** `cd docs/bloqer2.0/guides && node build_guide.js`.
+5. **Smoke:** validar con [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) si el cambio afecta operación diaria.
+
+---
+
+*Documento vivo. Actualizado julio 2026 (D-050…D-053, Lotes UI, pay-now AP, decimales). Actualizar en el mismo PR que el cambio de producto.*

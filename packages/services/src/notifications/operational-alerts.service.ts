@@ -1,10 +1,16 @@
 import type { EmailDeliveryStatus, LinkedEntityType, NotificationSeverity, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
-import { can, type PermissionAction, type PermissionModule } from "@bloqer/domain";
+import { serializeMoney } from "@bloqer/utils";
 import { listNegativeStockBalancesForTenant } from "../inventory/stock-balance.service";
 import { hasOpenObligationBalance, isObligationOverdue } from "../finance/obligation-date";
 import { ServiceContext, ServiceError } from "../types";
+import {
+  resolveNotificationAudience,
+} from "./notification-audience.service";
 import { createSystemNotification } from "./notification.service";
+
+/** Re-export recipient helpers for existing call sites. */
+export { findActiveOwnerAdminUserIds, findActiveUsersForPermission } from "./notification-audience.service";
 
 /** Rolling window to avoid duplicate operational alerts for the same entity + recipient. */
 const DEDUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -31,46 +37,6 @@ export type OperationalAlertRunSummary = {
 
 function emptySummary(): OperationalAlertRunSummary {
   return { checkedCount: 0, createdCount: 0, skippedCount: 0, errors: [] };
-}
-
-/**
- * Active memberships in the tenant whose combined roles satisfy `can(roles, action, module)`.
- */
-export async function findActiveUsersForPermission(
-  tenantId: string,
-  action: PermissionAction,
-  module: PermissionModule,
-): Promise<string[]> {
-  const memberships = await prisma.userMembership.findMany({
-    where: { tenantId, status: "ACTIVE" },
-    select: { userId: true, roles: true },
-  });
-  const out: string[] = [];
-  for (const m of memberships) {
-    if (can(m.roles, action, module)) out.push(m.userId);
-  }
-  return [...new Set(out)];
-}
-
-/** OWNER or ADMIN active memberships (fallback recipients). */
-export async function findActiveOwnerAdminUserIds(tenantId: string): Promise<string[]> {
-  const rows = await prisma.userMembership.findMany({
-    where: {
-      tenantId,
-      status: "ACTIVE",
-      OR: [{ roles: { has: "OWNER" } }, { roles: { has: "ADMIN" } }],
-    },
-    select: { userId: true },
-  });
-  return [...new Set(rows.map((r) => r.userId))];
-}
-
-async function hasActiveMembership(tenantId: string, userId: string): Promise<boolean> {
-  const m = await prisma.userMembership.findFirst({
-    where: { tenantId, userId, status: "ACTIVE" },
-    select: { id: true },
-  });
-  return Boolean(m);
 }
 
 async function hasRecentDuplicate(params: {
@@ -132,15 +98,14 @@ async function tryCreateAlert(
   }
 }
 
-function mergeUniqueUserIds(...lists: string[][]): string[] {
-  return [...new Set(lists.flat())];
-}
-
 // ─── Public runners (invoke manually or from future jobs) ────────────────────
 
 export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<OperationalAlertRunSummary> {
   const summary = emptySummary();
-  const recipients = await findActiveUsersForPermission(ctx.tenantId, "VIEW", "AR");
+  const recipients = await resolveNotificationAudience({
+    tenantId: ctx.tenantId,
+    permissionTargets: [{ action: "VIEW", module: "AR" }],
+  });
 
   const rows = await prisma.receivable.findMany({
     where: {
@@ -149,6 +114,7 @@ export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<O
     },
     select: {
       id: true,
+      status: true,
       projectId: true,
       companyId: true,
       originalAmount: true,
@@ -165,8 +131,24 @@ export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<O
     if (!isObligationOverdue(r.dueDate)) continue;
 
     summary.checkedCount += 1;
+
+    if (r.status === "OPEN" || r.status === "PARTIAL") {
+      try {
+        await prisma.receivable.updateMany({
+          where: {
+            id: r.id,
+            tenantId: ctx.tenantId,
+            status: { in: ["OPEN", "PARTIAL"] },
+          },
+          data: { status: "OVERDUE", updatedBy: ctx.actorUserId },
+        });
+      } catch (e) {
+        summary.errors.push(e instanceof Error ? e.message : String(e));
+      }
+    }
+
     const clientName = r.clientContact.fantasyName ?? r.clientContact.legalName;
-    const body = `Cliente: ${clientName}. Saldo vencido: ${balanceDue.toString()} (venc. ${r.dueDate.toISOString().slice(0, 10)}).`;
+    const body = `Cliente: ${clientName}. Saldo vencido: ${serializeMoney(balanceDue.toString())} (venc. ${r.dueDate.toISOString().slice(0, 10)}).`;
 
     if (recipients.length === 0) continue;
 
@@ -200,7 +182,10 @@ export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<O
 
 export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<OperationalAlertRunSummary> {
   const summary = emptySummary();
-  const recipients = await findActiveUsersForPermission(ctx.tenantId, "VIEW", "AP");
+  const recipients = await resolveNotificationAudience({
+    tenantId: ctx.tenantId,
+    permissionTargets: [{ action: "VIEW", module: "AP" }],
+  });
 
   const rows = await prisma.payable.findMany({
     where: {
@@ -209,6 +194,7 @@ export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<Oper
     },
     select: {
       id: true,
+      status: true,
       projectId: true,
       companyId: true,
       originalAmount: true,
@@ -225,8 +211,24 @@ export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<Oper
     if (!isObligationOverdue(p.dueDate)) continue;
 
     summary.checkedCount += 1;
+
+    if (p.status === "OPEN" || p.status === "PARTIAL") {
+      try {
+        await prisma.payable.updateMany({
+          where: {
+            id: p.id,
+            tenantId: ctx.tenantId,
+            status: { in: ["OPEN", "PARTIAL"] },
+          },
+          data: { status: "OVERDUE", updatedBy: ctx.actorUserId },
+        });
+      } catch (e) {
+        summary.errors.push(e instanceof Error ? e.message : String(e));
+      }
+    }
+
     const supplierName = p.supplierContact.fantasyName ?? p.supplierContact.legalName;
-    const body = `Proveedor: ${supplierName}. Saldo vencido: ${balanceDue.toString()} (venc. ${p.dueDate.toISOString().slice(0, 10)}).`;
+    const body = `Proveedor: ${supplierName}. Saldo vencido: ${serializeMoney(balanceDue.toString())} (venc. ${p.dueDate.toISOString().slice(0, 10)}).`;
 
     if (recipients.length === 0) continue;
 
@@ -264,7 +266,10 @@ function negativeStockLinkedEntityId(row: { productId: string; warehouseId: stri
 
 export async function runNegativeStockAlert(ctx: ServiceContext): Promise<OperationalAlertRunSummary> {
   const summary = emptySummary();
-  const recipients = await findActiveUsersForPermission(ctx.tenantId, "VIEW", "INVENTORY");
+  const recipients = await resolveNotificationAudience({
+    tenantId: ctx.tenantId,
+    permissionTargets: [{ action: "VIEW", module: "INVENTORY" }],
+  });
 
   const negatives = await listNegativeStockBalancesForTenant({ tenantId: ctx.tenantId });
 
@@ -305,9 +310,13 @@ export async function runNegativeStockAlert(ctx: ServiceContext): Promise<Operat
 
 export async function runApprovedCertificationsWithoutInvoiceAlert(ctx: ServiceContext): Promise<OperationalAlertRunSummary> {
   const summary = emptySummary();
-  const arRecipients = await findActiveUsersForPermission(ctx.tenantId, "VIEW", "AR");
-  const certRecipients = await findActiveUsersForPermission(ctx.tenantId, "VIEW", "CERTIFICATIONS");
-  const recipients = mergeUniqueUserIds(arRecipients, certRecipients);
+  const recipients = await resolveNotificationAudience({
+    tenantId: ctx.tenantId,
+    permissionTargets: [
+      { action: "VIEW", module: "AR" },
+      { action: "VIEW", module: "CERTIFICATIONS" },
+    ],
+  });
 
   const rows = await prisma.certification.findMany({
     where: {
@@ -369,17 +378,13 @@ export async function runStaleUploadingDocumentsAlert(ctx: ServiceContext): Prom
     },
   });
 
-  const ownerAdmins = await findActiveOwnerAdminUserIds(ctx.tenantId);
-
   for (const d of docs) {
     summary.checkedCount += 1;
     const uploader = d.uploadedBy?.trim();
-    let recipientIds: string[] = [];
-    if (uploader && (await hasActiveMembership(ctx.tenantId, uploader))) {
-      recipientIds = [uploader];
-    } else {
-      recipientIds = ownerAdmins;
-    }
+    const recipientIds = await resolveNotificationAudience({
+      tenantId: ctx.tenantId,
+      primaryUserIds: uploader ? [uploader] : [],
+    });
     if (recipientIds.length === 0) continue;
 
     const actionUrl = d.projectId ? `/proyectos/${d.projectId}/documentos/${d.id}` : null;

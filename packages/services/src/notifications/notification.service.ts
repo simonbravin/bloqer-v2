@@ -147,21 +147,58 @@ export async function createSystemNotification(input: CreateSystemNotificationIn
   return { id: row.id };
 }
 
+export const NOTIFICATION_BELL_LIMIT = 5;
+export const NOTIFICATION_INBOX_PAGE_SIZE = 20;
+const NOTIFICATION_INBOX_MAX_PAGE_SIZE = 50;
+
+export type ListMyNotificationsResult = {
+  items: NotificationListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export async function listMyNotifications(
   filter: NotificationInboxFilter,
   ctx: ServiceContext,
-): Promise<NotificationListItem[]> {
+  options?: { page?: number; pageSize?: number },
+): Promise<ListMyNotificationsResult> {
+  const rawPage = options?.page ?? 1;
+  const requestedPage =
+    typeof rawPage === "number" && Number.isFinite(rawPage) && rawPage >= 1
+      ? Math.floor(rawPage)
+      : 1;
+  const rawSize = options?.pageSize ?? NOTIFICATION_INBOX_PAGE_SIZE;
+  const pageSize = Math.min(
+    NOTIFICATION_INBOX_MAX_PAGE_SIZE,
+    Math.max(
+      1,
+      typeof rawSize === "number" && Number.isFinite(rawSize) ? Math.floor(rawSize) : NOTIFICATION_INBOX_PAGE_SIZE,
+    ),
+  );
+  const where = {
+    tenantId: ctx.tenantId,
+    recipientUserId: ctx.actorUserId,
+    ...inboxStatusFilter(filter),
+  };
+
+  const total = await prisma.notification.count({ where });
+  const totalPages = total === 0 ? 1 : Math.ceil(total / pageSize);
+  const page = Math.min(requestedPage, totalPages);
+
   const rows = await prisma.notification.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      recipientUserId: ctx.actorUserId,
-      ...inboxStatusFilter(filter),
-    },
+    where,
     orderBy: { createdAt: "desc" },
-    take: 200,
+    skip: (page - 1) * pageSize,
+    take: pageSize,
   });
 
-  return rows.map(serializeRow);
+  return {
+    items: rows.map(serializeRow),
+    total,
+    page,
+    pageSize,
+  };
 }
 
 export async function getUnreadNotificationCount(ctx: ServiceContext): Promise<number> {
@@ -172,6 +209,31 @@ export async function getUnreadNotificationCount(ctx: ServiceContext): Promise<n
       status: "UNREAD",
     },
   });
+}
+
+export type NotificationBellSnapshot = {
+  unreadCount: number;
+  items: NotificationListItem[];
+};
+
+/**
+ * Header bell: unread badge + last N non-archived notifications (read or unread).
+ */
+export async function getNotificationBellSnapshot(ctx: ServiceContext): Promise<NotificationBellSnapshot> {
+  const [unreadCount, rows] = await Promise.all([
+    getUnreadNotificationCount(ctx),
+    prisma.notification.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        recipientUserId: ctx.actorUserId,
+        status: { in: ["UNREAD", "READ"] },
+      },
+      orderBy: { createdAt: "desc" },
+      take: NOTIFICATION_BELL_LIMIT,
+    }),
+  ]);
+
+  return { unreadCount, items: rows.map(serializeRow) };
 }
 
 export async function markNotificationAsRead(notificationId: string, ctx: ServiceContext): Promise<void> {

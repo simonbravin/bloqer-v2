@@ -3,6 +3,7 @@ import { can } from "@bloqer/domain";
 import type { CreateJobsiteLogInput, UpdateJobsiteLogInput, ReturnJobsiteLogInput } from "@bloqer/validators";
 import { listEntityAuditLogs, log } from "../audit/audit.service";
 import { createSystemNotification } from "../notifications/notification.service";
+import { resolveNotificationAudience } from "../notifications/notification-audience.service";
 import { getStockBalance } from "../inventory/stock-balance.service";
 import { createJobsiteLogMaterialStockMovements } from "../inventory/stock-movement.service";
 import { syncScheduleProgressFromJobsiteLog } from "../schedule/schedule-progress-sync.service";
@@ -1094,18 +1095,26 @@ export async function returnJobsiteLog(
   });
 
   const creatorId = existing.createdBy;
-  if (creatorId && creatorId !== ctx.actorUserId) {
+  const notes = input.returnNotes?.trim();
+  const body = notes
+    ? `Motivo: ${notes.length > 500 ? `${notes.slice(0, 500)}…` : notes}`
+    : "Un supervisor devolvió el parte a borrador.";
+
+  const recipients = await resolveNotificationAudience({
+    tenantId: ctx.tenantId,
+    primaryUserIds: creatorId ? [creatorId] : [],
+    excludeUserId: ctx.actorUserId,
+  });
+
+  for (const recipientUserId of recipients) {
     try {
-      const notes = input.returnNotes?.trim();
       await createSystemNotification({
         tenantId: ctx.tenantId,
         companyId: existing.companyId,
-        recipientUserId: creatorId,
+        recipientUserId,
         type: "JOBSITE_LOG_RETURNED",
         title: "Parte devuelto para corrección",
-        body: notes
-          ? `Motivo: ${notes.length > 500 ? `${notes.slice(0, 500)}…` : notes}`
-          : "Un supervisor devolvió el parte a borrador.",
+        body,
         severity: "WARNING",
         linkedEntityType: "JOBSITE_LOG",
         linkedEntityId: id,

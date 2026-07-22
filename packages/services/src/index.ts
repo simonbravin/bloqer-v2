@@ -140,6 +140,7 @@ export * from "./project-cash-flow/project-cash-flow.service";
 export * from "./project-cash-flow/project-cash-position-projection.service";
 export * from "./documents/document.service";
 export * from "./notifications/notification.service";
+export * from "./notifications/notification-audience.service";
 export * from "./notifications/operational-alerts.service";
 export * from "./notifications/operational-alerts-runner.service";
 export * from "./notifications/operational-alerts-cron.service";

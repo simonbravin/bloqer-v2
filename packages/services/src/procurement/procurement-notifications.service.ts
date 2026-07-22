@@ -3,9 +3,9 @@ import { prisma } from "@bloqer/database";
 import { createSystemNotification } from "../notifications/notification.service";
 import { sendNotificationEmailAsSystem } from "../notifications/notification-email.service";
 import {
-  findActiveUsersForPermission,
   findActiveOwnerAdminUserIds,
-} from "../notifications/operational-alerts.service";
+  resolveNotificationAudience,
+} from "../notifications/notification-audience.service";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 import type { ServiceContext } from "../types";
 
@@ -30,10 +30,16 @@ async function notifyRecipients(params: {
   companyId: string;
   actionUrl: string;
   excludeUserId?: string;
-}): Promise<void> {
-  const unique = [...new Set(params.recipients)].filter(
-    (id) => id && id !== params.excludeUserId,
-  );
+  /** Default true. SLA reminders pass false because recipients are already OWNER/ADMIN. */
+  alwaysCcOwnerAdmin?: boolean;
+}): Promise<number> {
+  const unique = await resolveNotificationAudience({
+    tenantId: params.ctx.tenantId,
+    primaryUserIds: params.recipients,
+    excludeUserId: params.excludeUserId,
+    alwaysCcOwnerAdmin: params.alwaysCcOwnerAdmin ?? true,
+  });
+  let created = 0;
   for (const recipientUserId of unique) {
     try {
       const { id: notificationId } = await createSystemNotification({
@@ -51,10 +57,12 @@ async function notifyRecipients(params: {
       });
       // Best-effort email (D-050 / BR-PUR-015); never abort the business flow.
       await sendNotificationEmailAsSystem(notificationId, params.ctx).catch(() => undefined);
+      created += 1;
     } catch {
       /* best-effort */
     }
   }
+  return created;
 }
 
 export async function notifyPurchaseRequestSubmitted(params: {
@@ -64,25 +72,18 @@ export async function notifyPurchaseRequestSubmitted(params: {
   companyId: string;
   code: string;
 }): Promise<void> {
-  const procurement = await findActiveUsersForPermission(
-    params.ctx.tenantId,
-    "EDIT",
-    "PROCUREMENT",
-  );
-  const poApprovers = await findActiveUsersForPermission(
-    params.ctx.tenantId,
-    "APPROVE",
-    "PURCHASE_ORDERS",
-  );
-  const recipients = [...new Set([...procurement, ...poApprovers])];
-  const fallback =
-    recipients.length === 0
-      ? await findActiveOwnerAdminUserIds(params.ctx.tenantId)
-      : recipients;
+  const recipients = await resolveNotificationAudience({
+    tenantId: params.ctx.tenantId,
+    permissionTargets: [
+      { action: "EDIT", module: "PROCUREMENT" },
+      { action: "APPROVE", module: "PURCHASE_ORDERS" },
+    ],
+    excludeUserId: params.ctx.actorUserId,
+  });
 
   await notifyRecipients({
     ctx: params.ctx,
-    recipients: fallback,
+    recipients,
     type: "PURCHASE_REQUEST_SUBMITTED",
     title: "Nueva solicitud de compra",
     body: `La solicitud ${params.code} fue enviada y espera cotizaciones.`,
@@ -93,6 +94,7 @@ export async function notifyPurchaseRequestSubmitted(params: {
     companyId: params.companyId,
     actionUrl: `/proyectos/${params.projectId}/solicitudes-compra/${params.purchaseRequestId}`,
     excludeUserId: params.ctx.actorUserId,
+    alwaysCcOwnerAdmin: false,
   });
 }
 
@@ -105,13 +107,16 @@ export async function notifyPurchaseOrderPendingApproval(params: {
   requiresHighLevel: boolean;
   requiresVarianceExtra: boolean;
 }): Promise<void> {
-  const approvers = params.requiresHighLevel
-    ? await findActiveOwnerAdminUserIds(params.ctx.tenantId)
-    : await findActiveUsersForPermission(params.ctx.tenantId, "APPROVE", "PURCHASE_ORDERS");
-  const fallback =
-    approvers.length === 0
-      ? await findActiveOwnerAdminUserIds(params.ctx.tenantId)
-      : approvers;
+  const recipients = params.requiresHighLevel
+    ? await resolveNotificationAudience({
+        tenantId: params.ctx.tenantId,
+        excludeUserId: params.ctx.actorUserId,
+      })
+    : await resolveNotificationAudience({
+        tenantId: params.ctx.tenantId,
+        permissionTargets: [{ action: "APPROVE", module: "PURCHASE_ORDERS" }],
+        excludeUserId: params.ctx.actorUserId,
+      });
 
   const reason = params.requiresVarianceExtra
     ? "desvío presupuestario elevado"
@@ -121,7 +126,7 @@ export async function notifyPurchaseOrderPendingApproval(params: {
 
   await notifyRecipients({
     ctx: params.ctx,
-    recipients: fallback,
+    recipients,
     type: "PURCHASE_ORDER_PENDING_APPROVAL",
     title: "OC pendiente de aprobación",
     body: `La orden ${params.code} requiere aprobación (${reason}).`,
@@ -132,6 +137,7 @@ export async function notifyPurchaseOrderPendingApproval(params: {
     companyId: params.companyId,
     actionUrl: `/proyectos/${params.projectId}/ordenes-compra/${params.purchaseOrderId}`,
     excludeUserId: params.ctx.actorUserId,
+    alwaysCcOwnerAdmin: false,
   });
 }
 
@@ -254,6 +260,7 @@ export async function runProcurementSlaReminders(
       checkedCount += 1;
       const code = `OC-${String(po.number).padStart(3, "0")}`;
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const needing: string[] = [];
       for (const recipientUserId of owners) {
         const dup = await prisma.notification.findFirst({
           where: {
@@ -271,21 +278,23 @@ export async function runProcurementSlaReminders(
           skippedCount += 1;
           continue;
         }
-        await notifyRecipients({
-          ctx,
-          recipients: [recipientUserId],
-          type: "PROCUREMENT_SLA_REMINDER",
-          title: "OC demorada en aprobación",
-          body: `La orden ${code} lleva más de ${settings.approvalSlaHours}h pendiente de aprobación.`,
-          severity: "WARNING",
-          linkedEntityType: "PURCHASE_ORDER",
-          linkedEntityId: po.id,
-          projectId: po.projectId,
-          companyId: po.companyId,
-          actionUrl: `/proyectos/${po.projectId}/ordenes-compra/${po.id}`,
-        });
-        createdCount += 1;
+        needing.push(recipientUserId);
       }
+      if (needing.length === 0) continue;
+      createdCount += await notifyRecipients({
+        ctx,
+        recipients: needing,
+        type: "PROCUREMENT_SLA_REMINDER",
+        title: "OC demorada en aprobación",
+        body: `La orden ${code} lleva más de ${settings.approvalSlaHours}h pendiente de aprobación.`,
+        severity: "WARNING",
+        linkedEntityType: "PURCHASE_ORDER",
+        linkedEntityId: po.id,
+        projectId: po.projectId,
+        companyId: po.companyId,
+        actionUrl: `/proyectos/${po.projectId}/ordenes-compra/${po.id}`,
+        alwaysCcOwnerAdmin: false,
+      });
     }
 
     const stalePrs = await prisma.purchaseRequest.findMany({
@@ -306,6 +315,7 @@ export async function runProcurementSlaReminders(
       checkedCount += 1;
       const code = `SC-${String(pr.number).padStart(3, "0")}`;
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const needing: string[] = [];
       for (const recipientUserId of owners) {
         const dup = await prisma.notification.findFirst({
           where: {
@@ -323,21 +333,23 @@ export async function runProcurementSlaReminders(
           skippedCount += 1;
           continue;
         }
-        await notifyRecipients({
-          ctx,
-          recipients: [recipientUserId],
-          type: "PROCUREMENT_SLA_REMINDER",
-          title: "Solicitud demorada sin cotizar",
-          body: `La solicitud ${code} lleva más de ${settings.approvalSlaHours}h sin cotizaciones.`,
-          severity: "WARNING",
-          linkedEntityType: "PURCHASE_REQUEST",
-          linkedEntityId: pr.id,
-          projectId: pr.projectId,
-          companyId: pr.companyId,
-          actionUrl: `/proyectos/${pr.projectId}/solicitudes-compra/${pr.id}`,
-        });
-        createdCount += 1;
+        needing.push(recipientUserId);
       }
+      if (needing.length === 0) continue;
+      createdCount += await notifyRecipients({
+        ctx,
+        recipients: needing,
+        type: "PROCUREMENT_SLA_REMINDER",
+        title: "Solicitud demorada sin cotizar",
+        body: `La solicitud ${code} lleva más de ${settings.approvalSlaHours}h sin cotizaciones.`,
+        severity: "WARNING",
+        linkedEntityType: "PURCHASE_REQUEST",
+        linkedEntityId: pr.id,
+        projectId: pr.projectId,
+        companyId: pr.companyId,
+        actionUrl: `/proyectos/${pr.projectId}/solicitudes-compra/${pr.id}`,
+        alwaysCcOwnerAdmin: false,
+      });
     }
   }
 

@@ -1,6 +1,13 @@
 # Guía operativa — Ciclo completo de un proyecto en Bloqer v2
 
-> **Audiencia:** PM, compras, finanzas, capataz, administración.  
+> **SUPERSEDED.** Esta versión corta quedó **reemplazada** por la guía canónica completa:  
+> [`../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md)  
+> Entregable DOCX: `guides/Guía_Operativa_Bloqer_v2.docx` (regenerar con `node build_guide.js`).  
+> **No actualizar este archivo**; se conserva solo como archivo histórico.
+
+---
+
+> **Audiencia (histórico):** PM, compras, finanzas, capataz, administración.  
 > **Alcance:** flujo end-to-end desde alta de obra hasta control de costos, cobranzas y pagos.  
 > **Base:** spec funcional `docs/bloqer2.0/` + rutas implementadas en `apps/web` (2026-06).
 

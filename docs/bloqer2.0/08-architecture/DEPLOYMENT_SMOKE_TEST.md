@@ -24,9 +24,12 @@ Run after first production (or staging) deploy, **before** announcing availabili
 | 14 | Email enabled | With Resend **on** + public base URL, a test email sends (optional in staging). |
 | 15 | Cron secret | `GET` or `POST` `/api/cron/operational-alerts` **without** `CRON_SECRET` (or too short) → **503** `cron_unconfigured`. |
 | 16 | Cron wrong secret | Same route with wrong Bearer / `x-cron-secret` → **401** `unauthorized`. |
-| 17 | Cron success | Same route with correct secret → **200** JSON with run summary. |
+| 17 | Cron success | Same route with correct secret → **200** JSON with `ok`, `tenantsProcessed`, `totals` (`checkedCount`, `createdCount`, `skippedCount`, `errorCount`). |
+| 17b | Cron schedule in Vercel | Project cron `0 12 * * *` (12:00 UTC) targets `/api/cron/operational-alerts`. Confirm deploy **root** is `apps/web` (or the effective `vercel.json` that Vercel resolves includes this `crons` entry). `CRON_SECRET` in Vercel env matches what the scheduled job sends (`Authorization: Bearer`). |
+| 17c | Cron effect (optional staging) | With a test AR past due (OPEN/PARTIAL, balance &gt; 0): after a successful run, receivable `status` is `OVERDUE` and an in-app `RECEIVABLE_OVERDUE` exists for a VIEW AR / OWNER-ADMIN user — **or** `totals.skippedCount` increases if within the 7-day dedupe window. |
 | 18 | Scheduled reports cron | `GET` or `POST` `/api/cron/scheduled-reports` without secret → **503**; wrong secret → **401**. |
 | 19 | Scheduled reports run | With `CRON_SECRET`, route returns **200** JSON (`tenantsProcessed`, `totals.sent`, …). |
 | 20 | Scheduled reports UI | OWNER/ADMIN: crear envío en `/configuracion/reportes`, **Ejecutar ahora**, ver fila en historial (`REPORT_SCHEDULED`). |
+| 21 | Notifications inbox UX | `/notificaciones` paginates (20/page); `?page=` beyond range still shows last page (no empty false-negative). Severity badges in Spanish (Info / Éxito / Aviso / Error). |
 
 Record who ran the checklist, date, and environment.

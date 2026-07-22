@@ -3,13 +3,11 @@
 import { signOut } from "next-auth/react";
 import type { Session } from "next-auth";
 import Link from "next/link";
-import { Bell } from "lucide-react";
 import { clearActiveTenantCookieAction } from "@/lib/auth-session-actions";
 import { AppShellBreadcrumb } from "@/components/layout/shell-breadcrumb";
 import { ShellHeaderLeading } from "@/components/layout/sidebar-shell-context";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -52,37 +50,7 @@ export function Header({
         {tenantName ? <AppShellBreadcrumb tenantName={tenantName} /> : null}
       </ShellHeaderLeading>
       <div className="flex items-center gap-1 sm:gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
-          asChild
-          title={
-            notificationUnreadCount > 0
-              ? `Notificaciones (${notificationUnreadCount} sin leer)`
-              : "Notificaciones"
-          }
-        >
-          <Link
-            href="/notificaciones"
-            aria-label={
-              notificationUnreadCount > 0
-                ? `Notificaciones, ${notificationUnreadCount} sin leer`
-                : "Notificaciones"
-            }
-          >
-            <Bell className="h-4 w-4" aria-hidden />
-            {notificationUnreadCount > 0 ? (
-              <Badge
-                variant="destructive"
-                className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center px-1 text-[10px] font-semibold leading-none tabular-nums"
-                aria-hidden
-              >
-                {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
-              </Badge>
-            ) : null}
-          </Link>
-        </Button>
+        <NotificationBell initialUnreadCount={notificationUnreadCount} />
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

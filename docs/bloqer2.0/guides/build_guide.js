@@ -1,12 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // build_guide.js — Generador del DOCX "Guía Operativa Bloqer v2"
 //
-// FUENTE VIVA: ../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md  (post Lotes 1–7 UI/UX)
+// FUENTE VIVA: ../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md
 // El contenido NO se hardcodea: se parsea el Markdown y se renderiza con `docx`.
 //
-// Salida:
-//   - Guía_Operativa_Bloqer_v2_PROFESIONAL.docx  (entregable principal)
-//   - Guía_Operativa_Bloqer_v2.docx              (copia idéntica)
+// Salida (única):
+//   - Guía_Operativa_Bloqer_v2.docx
 //
 // Correr:  node build_guide.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -579,7 +578,7 @@ const doc = new Document({
           children: [new ImageRun({ type: "png", data: logoBuffer, transformation: { width: 140, height: 38 },
             altText: { title: "Bloqer", description: "Logo Bloqer", name: "BloqerLogoFooter" } })] }),
         new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 },
-          children: [new TextRun({ text: "Documento vivo — regenerado desde GUIA_OPERATIVA_BLOQER_V2_REVISADA.md (post Lotes 1–7).", size: 16, color: TEXT_MID, font: "Arial", italic: true })] }),
+          children: [new TextRun({ text: "Documento vivo — regenerado desde GUIA_OPERATIVA_BLOQER_V2_REVISADA.md. Actualizar la MD ante cualquier cambio de UX.", size: 16, color: TEXT_MID, font: "Arial", italic: true })] }),
         new Paragraph({ alignment: AlignmentType.CENTER,
           children: [new TextRun({ text: "Construido para el constructor moderno  ·  bloqer.com", size: 16, color: BLUE_ACCENT, font: "Arial" })] }),
       ],
@@ -589,12 +588,9 @@ const doc = new Document({
 
 // ─── EMITIR ────────────────────────────────────────────────────────────────
 Packer.toBuffer(doc).then(buffer => {
-  const outPro = path.join(__dirname, "Guía_Operativa_Bloqer_v2_PROFESIONAL.docx");
   const outStd = path.join(__dirname, "Guía_Operativa_Bloqer_v2.docx");
-  fs.writeFileSync(outPro, buffer);
   fs.writeFileSync(outStd, buffer);
-  console.log("OK  → " + outPro + "  (" + (buffer.length / 1024).toFixed(1) + " KB)");
-  console.log("OK  → " + outStd + "  (copia)");
+  console.log("OK  → " + outStd + "  (" + (buffer.length / 1024).toFixed(1) + " KB)");
   console.log("Placeholders de captura renderizados: " + captureCount);
 }).catch(err => {
   console.error("ERROR:", err);

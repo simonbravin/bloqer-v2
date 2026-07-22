@@ -1,17 +1,17 @@
 # Changelog UI — Lotes 1–6 (para autores de guía / DOCX)
 
-> **Uso:** checklist de alineación UI al regenerar `guides/Guía_Operativa_Bloqer_v2*.docx`.  
+> **Uso:** checklist de alineación UI al regenerar `guides/Guía_Operativa_Bloqer_v2.docx`.  
 > **Fuente viva de operación:** [`../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md).  
 > **Smoke por rol:** [`../08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](../08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md).  
-> **Estado DOCX:** regenerado julio 2026 desde la MD revisada (placeholders `📷 Captura sugerida` listos para pantallazos).
+> **Entregable DOCX:** **solo** `Guía_Operativa_Bloqer_v2.docx` (la variante `_PROFESIONAL` fue eliminada; era un duplicado).
 
 ---
 
 ## Cómo usar
 
-1. Al regenerar DOCX, revisar cada fila y alinear copy / capturas.
-2. No inventar features fuera de esta tabla + guía revisada.
-3. Contabilidad completa, adendas formales, anticipo proveedor real, RFIs: **fuera de alcance** (ver limitaciones de la guía).
+1. Editar la MD viva ante cualquier cambio de UX / flujos.
+2. Regenerar: `cd docs/bloqer2.0/guides && node build_guide.js`.
+3. No inventar features fuera de la MD + este changelog histórico.
 
 ---
 
@@ -48,17 +48,20 @@
 
 ---
 
-## DOCX regenerado (julio 2026)
+## Post Lotes — decisiones de producto (guía MD)
 
-- `guides/build_guide.js` **reescrito** como parser Markdown → `docx`: lee la fuente viva `../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md` y renderiza portada, TOC, headings, tablas, listas, callouts y placeholders de captura (no hardcodea el contenido).
-- Entregables regenerados en `guides/`:
-  - `Guía_Operativa_Bloqer_v2_PROFESIONAL.docx` (entregable principal, **v2.1 — julio 2026**).
-  - `Guía_Operativa_Bloqer_v2.docx` (copia idéntica; reemplaza la versión de junio).
-- **25 bloques `📷 Captura sugerida`** renderizados como cajas placeholder (borde punteado, «[ Insertar captura aquí ]») listas para pegar pantallazos reales de los Lotes 1–7.
-- Regenerar: `cd docs/bloqer2.0/guides && node build_guide.js` (dependencia local `docx`).
-
-> Si cambian rutas de la app, decisiones en `DECISION_LOG.md` o la MD revisada: actualizar la MD y **volver a correr** `build_guide.js`.
+| ID | Tema | Impacto en guía |
+|----|------|-----------------|
+| D-050 | Compras: WBS obligatorio, cotizaciones, notificaciones | §9 |
+| D-051 | AR corporativo con CxC | §12.1 |
+| D-052 | AP proyecto “Emitir y pagar ahora”, adjuntos, fondos | §12.2 |
+| D-053 | Decimales dinero 2 / FX 6 / qty 4 | §4.1 |
 
 ---
 
-*Lote 7 — preparación docs · DOCX regenerado desde la MD revisada.*
+## DOCX
+
+- Regenerar: `cd docs/bloqer2.0/guides && node build_guide.js`
+- Salida: **`Guía_Operativa_Bloqer_v2.docx`** únicamente.
+
+> Si cambian rutas, `DECISION_LOG` o la MD: actualizar la MD **en el mismo PR** y volver a correr `build_guide.js`.

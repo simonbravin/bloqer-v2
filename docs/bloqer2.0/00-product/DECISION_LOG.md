@@ -725,6 +725,24 @@
 
 ---
 
+### D-054 — Campana in-app, polling y CC OWNER/ADMIN
+
+- **Fecha:** 2026-07-22
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** La campana solo enlazaba al inbox; el badge era snapshot SSR sin refresh; algunos eventos 8A notificaban a un único usuario; OWNER/ADMIN no siempre recibían copia. Web Push del browser se consideró prematuro.
+- **Decisión:**
+  1. **Push in-app únicamente:** dropdown en la campana con las **últimas 5** notificaciones no archivadas; badge solo si `unreadCount > 0`; pie “Ver todas” → `/notificaciones`.
+  2. **Polling** cada **30s** vía `GET /api/notifications/bell` mientras la pestaña está visible (pausa en background); refresh al abrir el dropdown. Sin Web Push / SSE / WebSocket en esta iteración.
+  3. **Leído por usuario:** una fila `Notification` por destinatario; marcar leída no afecta otras copias.
+  4. **Audiencia:** `resolveNotificationAudience` — destinatarios primarios y/o por permiso, con **CC siempre a OWNER/ADMIN** activos (salvo exclusiones explícitas del actor). Sin routing por obra (no hay `ProjectMembership`). **Excepción anti-ruido:** `CERTIFICATION_APPROVED` = `createdBy` ∪ OWNER/ADMIN (no fan-out por `VIEW CERTIFICATIONS` hasta asignación a obra).
+  5. **Sin migración Prisma** en esta iteración. Diferidos: preferencias/mute, Web Push, tipos nuevos (cobros, transferencias internas), realtime push.
+  6. **Alertas AR/AP vencidas:** el runner 8B **materializa** `status → OVERDUE` (si estaba OPEN/PARTIAL) y luego notifica (día calendario UTC; dedupe 7 días).
+- **Implicancias:** endurece fan-out de alertas operativas, procurement y eventos 8A; puede aumentar volumen in-app (y email en procurement) hacia OWNER/ADMIN; listados AR/AP con filtro OVERDUE quedan alineados al cron/runner.
+- **Documentos afectados:** [`02-modules/NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md), [`08-architecture/NOTIFICATIONS_ARCHITECTURE.md`](../08-architecture/NOTIFICATIONS_ARCHITECTURE.md), [`08-architecture/DEPLOYMENT_SMOKE_TEST.md`](../08-architecture/DEPLOYMENT_SMOKE_TEST.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

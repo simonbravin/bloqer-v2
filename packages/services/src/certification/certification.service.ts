@@ -4,6 +4,7 @@ import { can } from "@bloqer/domain";
 import type { CreateCertificationInput, UpdateCertificationInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { createSystemNotification } from "../notifications/notification.service";
+import { resolveNotificationAudience } from "../notifications/notification-audience.service";
 import { ServiceContext, ServiceError } from "../types";
 import { _computePreviousQty, _recalcCertificationTotals } from "./certification-calc.service";
 import {
@@ -295,13 +296,20 @@ export async function approveCertification(id: string, ctx: ServiceContext): Pro
     select: { createdBy: true, projectId: true, number: true, companyId: true },
   });
   const updated = await _transition(id, ctx, ["ISSUED"], "APPROVED", "certification.approved");
-  const creatorId = meta?.createdBy;
-  if (creatorId && creatorId !== ctx.actorUserId && meta) {
+  if (!meta) return updated;
+
+  const recipients = await resolveNotificationAudience({
+    tenantId: ctx.tenantId,
+    primaryUserIds: meta.createdBy ? [meta.createdBy] : [],
+    excludeUserId: ctx.actorUserId,
+  });
+
+  for (const recipientUserId of recipients) {
     try {
       await createSystemNotification({
         tenantId: ctx.tenantId,
         companyId: meta.companyId,
-        recipientUserId: creatorId,
+        recipientUserId,
         type: "CERTIFICATION_APPROVED",
         title: "Certificación aprobada",
         body: `La certificación n.º ${meta.number} fue aprobada.`,

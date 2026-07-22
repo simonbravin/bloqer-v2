@@ -7,6 +7,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { isCrossCompany } from "../company-scope";
 import { log } from "../audit/audit.service";
 import { createSystemNotification } from "../notifications/notification.service";
+import { resolveNotificationAudience } from "../notifications/notification-audience.service";
 import type { CreateDocumentMetadataInput, InitiateUploadInput, ListProjectDocumentsInput } from "@bloqer/validators";
 import { ALLOWED_MIME_TYPES } from "@bloqer/validators";
 import {
@@ -373,12 +374,23 @@ async function notifyDocumentUploadConfirmed(
   },
   ctx: ServiceContext,
 ): Promise<void> {
+  let recipients: string[] = [];
   try {
-    if (doc.uploadedBy?.trim()) {
+    recipients = await resolveNotificationAudience({
+      tenantId: ctx.tenantId,
+      primaryUserIds: doc.uploadedBy?.trim() ? [doc.uploadedBy.trim()] : [],
+      excludeUserId: ctx.actorUserId,
+    });
+  } catch {
+    return;
+  }
+
+  for (const recipientUserId of recipients) {
+    try {
       await createSystemNotification({
         tenantId: ctx.tenantId,
         companyId: doc.companyId,
-        recipientUserId: doc.uploadedBy,
+        recipientUserId,
         type: "DOCUMENT_UPLOAD_CONFIRMED",
         title: "Documento listo",
         body: `El archivo «${doc.originalFileName}» se subió correctamente.`,
@@ -389,9 +401,9 @@ async function notifyDocumentUploadConfirmed(
         actionUrl: doc.projectId ? `/proyectos/${doc.projectId}/documentos/${doc.id}` : null,
         metadata: { documentId: doc.id },
       });
+    } catch {
+      /* best-effort in-app notification (Phase 8A) — one failure must not block others */
     }
-  } catch {
-    /* best-effort in-app notification (Phase 8A) */
   }
 }
 
