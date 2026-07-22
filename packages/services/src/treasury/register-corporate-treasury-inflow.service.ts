@@ -6,6 +6,7 @@ import { auditTreasury } from "./treasury-audit";
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/register-transaction.types";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 
 export async function registerCorporateTreasuryInflow(
@@ -43,7 +44,9 @@ export async function registerCorporateTreasuryInflow(
     if (account.status !== "ACTIVE") {
       throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
     }
-    if (!account.companyId || account.companyId !== ctx.companyId) {
+    // Tesorería es tenant-wide: las cuentas corporativas (companyId null) son válidas para
+    // ingresos corporativos; sólo rechazamos cuentas que pertenezcan a OTRA empresa.
+    if (isCrossCompany(account.companyId, ctx)) {
       throw new ServiceError(
         "FORBIDDEN",
         "La cuenta de tesorería no pertenece a la empresa activa.",
