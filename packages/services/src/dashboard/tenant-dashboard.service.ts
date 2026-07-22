@@ -45,7 +45,7 @@ export type DashboardProjectSummary = {
   activeProjectsCount: number;
   draftProjectsCount: number;
   onHoldProjectsCount: number;
-  /** Suma del último presupuesto aprobado/cerrado **por moneda** (solo proyectos activos). Nunca mezcla divisas. */
+  /** Reserved: tenant-wide budget totals are not shown on the home KPI grid (low signal / multicurrency). */
   budgetSaleByCurrency: { currency: string; amount: string }[];
   averageProgressPct: number | null;
   projects: DashboardProjectRow[];
@@ -415,60 +415,9 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
 
     const budgetByProject = pickLatestBudgetsPerProject(budgetRows);
 
-    let budgetSaleByCurrency: { currency: string; amount: string }[] = [];
-    if (canViewBudgets) {
-      const allActiveIds = await prisma.project.findMany({
-        where: { tenantId: ctx.tenantId, status: "ACTIVE" },
-        select: { id: true },
-      });
-      const allIds = allActiveIds.map((p) => p.id);
-      if (allIds.length > 0) {
-        const allBudgetRows = await prisma.budget.findMany({
-          where: {
-            tenantId:  ctx.tenantId,
-            projectId: { in: allIds },
-            status:    { in: ["APPROVED", "CLOSED"] },
-          },
-          orderBy: [{ projectId: "asc" }, { versionNumber: "desc" }],
-          select: { projectId: true, totalSalePrice: true, totalCost: true, currency: true },
-        });
-        const byP = pickLatestBudgetsPerProject(allBudgetRows);
-        const saleByCur = new Map<string, Prisma.Decimal>();
-        for (const v of byP.values()) {
-          saleByCur.set(v.currency, (saleByCur.get(v.currency) ?? ZERO).plus(v.totalSalePrice));
-        }
-        budgetSaleByCurrency = [...saleByCur.entries()]
-          .filter(([, a]) => a.greaterThan(ZERO))
-          .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
-          .sort((a, b) => a.currency.localeCompare(b.currency));
-      }
-
-      if (budgetSaleByCurrency.length === 1) {
-        const only = budgetSaleByCurrency[0]!;
-        kpis.push({
-          key:    "projects_budgeted_total",
-          label:  "Presupuesto total (activos)",
-          value:  fmtDecimalEs(only.amount, only.currency),
-          href:   "/proyectos",
-        });
-      } else if (budgetSaleByCurrency.length > 1) {
-        kpis.push({
-          key:    "projects_budgeted_total",
-          label:  "Presupuesto total (activos)",
-          value:  "Multimoneda",
-          href:   "/proyectos",
-          tone:   "muted",
-        });
-      } else {
-        kpis.push({
-          key:    "projects_budgeted_total",
-          label:  "Presupuesto total (activos)",
-          value:  "—",
-          href:   "/proyectos",
-          tone:   "muted",
-        });
-      }
-    }
+    // Tenant-wide "Presupuesto total (activos)" KPI removed: low signal on the home
+    // panel and broke the 4-column KPI grid. Per-project amounts still show in the list below.
+    const budgetSaleByCurrency: { currency: string; amount: string }[] = [];
 
     const projects: DashboardProjectRow[] = recent.map((p) => {
       const b = budgetByProject.get(p.id);

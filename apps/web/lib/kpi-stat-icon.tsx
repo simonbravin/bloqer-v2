@@ -64,7 +64,6 @@ export const kpiIconAccentClass: Record<KpiIconAccent, { container: string; icon
 const KEY_ICON: Record<string, { Icon: LucideIcon; accent: KpiIconAccent }> = {
   notifications_unread: { Icon: Bell, accent: "warning" },
   projects_active: { Icon: FolderKanban, accent: "info" },
-  projects_budgeted_total: { Icon: Calculator, accent: "default" },
   certifications_pending: { Icon: ClipboardCheck, accent: "warning" },
   ar_open: { Icon: ArrowUpCircle, accent: "info" },
   ap_open: { Icon: ArrowDownCircle, accent: "warning" },
