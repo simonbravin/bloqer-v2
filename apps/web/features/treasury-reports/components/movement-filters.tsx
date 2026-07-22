@@ -15,7 +15,7 @@ import {
 import { CurrencyFilterSelect } from "@/components/ui/currency-select";
 import { DateRangePresets } from "@/components/ui/date-range-presets";
 
-const TYPE_OPTIONS = [
+const TYPE_OPTIONS_ALL = [
   { value: "_all", label: "Todos los tipos" },
   { value: "INFLOW", label: "Ingreso" },
   { value: "OUTFLOW", label: "Egreso" },
@@ -24,7 +24,12 @@ const TYPE_OPTIONS = [
   { value: "ADJUSTMENT", label: "Ajuste" },
 ];
 
-const SOURCE_OPTIONS = [
+/** Finanzas → Transacciones: operational cash only (no internal bank transfers). */
+const TYPE_OPTIONS_FINANCE = TYPE_OPTIONS_ALL.filter(
+  (o) => o.value !== "TRANSFER_IN" && o.value !== "TRANSFER_OUT",
+);
+
+const SOURCE_OPTIONS_ALL = [
   { value: "_all", label: "Todos los orígenes" },
   { value: "COLLECTION", label: "Cobranza" },
   { value: "PAYMENT", label: "Pago" },
@@ -32,6 +37,10 @@ const SOURCE_OPTIONS = [
   { value: "OPENING_BALANCE", label: "Saldo inicial" },
   { value: "MANUAL_ADJUSTMENT", label: "Ingreso manual de caja" },
 ];
+
+const SOURCE_OPTIONS_FINANCE = SOURCE_OPTIONS_ALL.filter(
+  (o) => o.value !== "INTERNAL_TRANSFER",
+);
 
 const SCOPE_OPTIONS = [
   { value: "_all", label: "Todos los alcances" },
@@ -96,18 +105,26 @@ export function MovementFilters({
   }
 
   const scopeValue = sp.get("projectId") ? "_all" : (sp.get("scope") ?? "_all");
-  const internalTransfersValue =
-    variant === "finance"
-      ? sp.get("includeInternalTransfers") === "true"
-        ? "true"
-        : "false"
-      : (sp.get("includeInternalTransfers") ?? "_all");
+  const internalTransfersValue = sp.get("includeInternalTransfers") ?? "_all";
+  const typeOptions = variant === "finance" ? TYPE_OPTIONS_FINANCE : TYPE_OPTIONS_ALL;
+  const sourceOptions = variant === "finance" ? SOURCE_OPTIONS_FINANCE : SOURCE_OPTIONS_ALL;
 
   // Finance applies a 90-day default server-side when URL has no dates; mirror that
   // in the inputs so presets and Desde/Hasta stay in sync (controlled values).
   const financeDefaults = variant === "finance" ? computeDateRangePreset("d90") : null;
   const dateFrom = sp.get("dateFrom") ?? financeDefaults?.dateFrom ?? "";
   const dateTo = sp.get("dateTo") ?? financeDefaults?.dateTo ?? "";
+
+  // Ignore stale transfer filter params if someone landed with a bookmarked finance URL.
+  const typeValue =
+    variant === "finance" &&
+    (sp.get("type") === "TRANSFER_IN" || sp.get("type") === "TRANSFER_OUT")
+      ? "_all"
+      : (sp.get("type") ?? "_all");
+  const sourceTypeValue =
+    variant === "finance" && sp.get("sourceType") === "INTERNAL_TRANSFER"
+      ? "_all"
+      : (sp.get("sourceType") ?? "_all");
 
   return (
     <div className="space-y-3">
@@ -182,14 +199,14 @@ export function MovementFilters({
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Tipo</Label>
           <Select
-            value={sp.get("type") ?? "_all"}
+            value={typeValue}
             onValueChange={(v) => update("type", v === "_all" ? "" : v)}
           >
             <SelectTrigger className="w-44">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {TYPE_OPTIONS.map((o) => (
+              {typeOptions.map((o) => (
                 <SelectItem key={o.value} value={o.value}>
                   {o.label}
                 </SelectItem>
@@ -200,14 +217,14 @@ export function MovementFilters({
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Origen</Label>
           <Select
-            value={sp.get("sourceType") ?? "_all"}
+            value={sourceTypeValue}
             onValueChange={(v) => update("sourceType", v === "_all" ? "" : v)}
           >
             <SelectTrigger className="w-44">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SOURCE_OPTIONS.map((o) => (
+              {sourceOptions.map((o) => (
                 <SelectItem key={o.value} value={o.value}>
                   {o.label}
                 </SelectItem>
@@ -215,41 +232,25 @@ export function MovementFilters({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Transf. internas</Label>
-          <Select
-            value={internalTransfersValue}
-            onValueChange={(v) =>
-              update(
-                "includeInternalTransfers",
-                variant === "finance"
-                  ? v === "true"
-                    ? "true"
-                    : "false"
-                  : v === "_all"
-                    ? ""
-                    : v,
-              )
-            }
-          >
-            <SelectTrigger className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {variant === "treasury" ? (
-                <>
-                  <SelectItem value="_all">Incluir todas</SelectItem>
-                  <SelectItem value="false">Excluir internas</SelectItem>
-                </>
-              ) : (
-                <>
-                  <SelectItem value="false">Excluir internas</SelectItem>
-                  <SelectItem value="true">Incluir internas</SelectItem>
-                </>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
+        {variant === "treasury" && (
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Transf. internas</Label>
+            <Select
+              value={internalTransfersValue}
+              onValueChange={(v) =>
+                update("includeInternalTransfers", v === "_all" ? "" : v)
+              }
+            >
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all">Incluir todas</SelectItem>
+                <SelectItem value="false">Excluir internas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         {variant === "treasury" && (
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Pagos AP empresa</Label>

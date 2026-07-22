@@ -57,6 +57,12 @@ export type SupplierInvoiceView = Omit<SupplierInvoice, "subtotal" | "taxAmount"
   subcontractId: string | null;
 };
 
+/** Payable snapshot for invoice lists (payment status lives on Payable, not the document). */
+export type SupplierInvoiceListPayable = {
+  id: string;
+  status: string;
+} | null;
+
 // ─── Guard ────────────────────────────────────────────────────────────────────
 
 export function assertSupplierInvoiceEditable(invoice: SupplierInvoice): void {
@@ -104,9 +110,34 @@ export async function getSupplierInvoiceById(
 export type ProjectSupplierInvoiceListFilters = {
   page?: number;
   pageSize?: number;
+  search?: string;
+  sortDir?: "asc" | "desc";
 };
 
-export type ProjectSupplierInvoiceListRow = Omit<SupplierInvoiceView, "lines">;
+export type ProjectSupplierInvoiceListRow = Omit<SupplierInvoiceView, "lines"> & {
+  payable: SupplierInvoiceListPayable;
+};
+
+/** Parse "FP-00012", "fp-12", or "12" into invoice number for list search. */
+function parseSupplierInvoiceNumberSearch(search: string): number | undefined {
+  const trimmed = search.trim();
+  if (!trimmed) return undefined;
+  const match = /^(?:FP-?)?0*(\d+)$/i.exec(trimmed);
+  if (!match?.[1]) return undefined;
+  const n = Number(match[1]);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function supplierInvoiceSearchWhere(search: string): Prisma.SupplierInvoiceWhereInput {
+  const numberEq = parseSupplierInvoiceNumberSearch(search);
+  return {
+    OR: [
+      { supplierContact: { legalName: { contains: search, mode: "insensitive" } } },
+      { supplierContact: { fantasyName: { contains: search, mode: "insensitive" } } },
+      ...(numberEq !== undefined ? [{ number: numberEq }] : []),
+    ],
+  };
+}
 
 export async function listSupplierInvoicesByProject(
   projectId: string,
@@ -126,15 +157,23 @@ export async function listSupplierInvoicesByProject(
     pageSize: filters?.pageSize,
   });
 
-  const where = { projectId, tenantId: ctx.tenantId };
+  const search = filters?.search?.trim();
+  const where: Prisma.SupplierInvoiceWhereInput = {
+    projectId,
+    tenantId: ctx.tenantId,
+    ...(search ? supplierInvoiceSearchWhere(search) : {}),
+  };
+
+  const issueDir = filters?.sortDir === "asc" ? "asc" : "desc";
 
   const [invoices, total] = await Promise.all([
     prisma.supplierInvoice.findMany({
       where,
       include: {
         supplierContact: { select: { legalName: true, fantasyName: true } },
+        payable: { select: { id: true, status: true } },
       },
-      orderBy: [{ number: "asc" }, { id: "asc" }],
+      orderBy: [{ issueDate: issueDir }, { number: issueDir }, { id: issueDir }],
       skip,
       take,
     }),
@@ -166,11 +205,15 @@ export type CompanySupplierInvoiceListFilters = {
   supplierContactId?: string;
   issueDateFrom?:    string;
   issueDateTo?:      string;
+  search?:            string;
+  sortDir?:           "asc" | "desc";
   page?:              number;
   pageSize?:          number;
 };
 
-export type CompanySupplierInvoiceListRow = Omit<SupplierInvoiceView, "lines">;
+export type CompanySupplierInvoiceListRow = Omit<SupplierInvoiceView, "lines"> & {
+  payable: SupplierInvoiceListPayable;
+};
 
 /** AP at company level: invoices with no project. Requires VIEW AP (not VIEW PROJECTS). */
 export async function listCompanySupplierInvoices(
@@ -187,6 +230,7 @@ export async function listCompanySupplierInvoices(
     pageSize: filters?.pageSize,
   });
 
+  const search = filters?.search?.trim();
   const where: Prisma.SupplierInvoiceWhereInput = {
     tenantId:  ctx.tenantId,
     projectId: null,
@@ -202,15 +246,19 @@ export async function listCompanySupplierInvoices(
           },
         }
       : {}),
+    ...(search ? supplierInvoiceSearchWhere(search) : {}),
   };
+
+  const issueDir = filters?.sortDir === "asc" ? "asc" : "desc";
 
   const [invoices, total] = await Promise.all([
     prisma.supplierInvoice.findMany({
       where,
       include: {
         supplierContact: { select: { legalName: true, fantasyName: true } },
+        payable: { select: { id: true, status: true } },
       },
-      orderBy: [{ number: "desc" }, { id: "desc" }],
+      orderBy: [{ issueDate: issueDir }, { number: issueDir }, { id: issueDir }],
       skip,
       take,
     }),
@@ -757,6 +805,7 @@ type RawInvoice = SupplierInvoice & {
 
 type RawInvoiceListRow = SupplierInvoice & {
   supplierContact: { legalName: string; fantasyName: string | null };
+  payable?: { id: string; status: string } | null;
 };
 
 function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoiceListRow {
@@ -769,6 +818,7 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoice
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
     subcontractCertificationCode: null,
     subcontractId: null,
+    payable: inv.payable ? { id: inv.payable.id, status: inv.payable.status } : null,
   };
 }
 

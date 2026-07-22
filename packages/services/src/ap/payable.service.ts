@@ -198,6 +198,8 @@ export type CompanyPayableListFilters = {
   supplierContactId?: string;
   dueDateFrom?:       string;
   dueDateTo?:         string;
+  search?:            string;
+  sortDir?:           "asc" | "desc";
   page?:              number;
   pageSize?:          number;
 };
@@ -222,6 +224,7 @@ export async function listCompanyPayables(
     pageSize: filters?.pageSize,
   });
 
+  const search = filters?.search?.trim();
   const where: Prisma.PayableWhereInput = {
     tenantId: ctx.tenantId,
     projectId: null,
@@ -236,11 +239,21 @@ export async function listCompanyPayables(
           },
         }
       : {}),
+    ...(search
+      ? {
+          OR: [
+            { supplierContact: { legalName: { contains: search, mode: "insensitive" } } },
+            { supplierContact: { fantasyName: { contains: search, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
   };
   if (filters?.pendingOnly && !filters.status) {
     appendPendingPayablesFilter(where);
   }
   appendPayableStatusFilter(where, filters?.status);
+
+  const dueDir = filters?.sortDir === "desc" ? "desc" : "asc";
 
   const [rows, total] = await Promise.all([
     prisma.payable.findMany({
@@ -249,7 +262,7 @@ export async function listCompanyPayables(
         supplierContact: { select: { legalName: true, fantasyName: true } },
         supplierInvoice: { select: { number: true } },
       },
-      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+      orderBy: [{ dueDate: dueDir }, { id: dueDir }],
       skip,
       take,
     }),

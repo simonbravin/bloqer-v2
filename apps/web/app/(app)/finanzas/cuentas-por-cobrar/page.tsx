@@ -36,6 +36,8 @@ interface PageProps {
     to?: string;
     page?: string;
     view?: string;
+    sort?: string;
+    dir?: string;
   }>;
 }
 
@@ -69,6 +71,8 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
         pendingOnly,
         dueDateFrom: sp.from,
         dueDateTo: sp.to,
+        search: sp.search,
+        sortDir: sp.dir === "desc" ? "desc" : "asc",
         page,
         pageSize: PAGE_SIZE,
       }),

@@ -21,6 +21,8 @@ interface PageProps {
     corporateApPayments?: string;
     scope?: string;
     projectId?: string;
+    sort?: string;
+    dir?: string;
   }>;
 }
 

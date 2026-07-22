@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { formatDate } from "@/lib/format";
 import {
   Table,
@@ -11,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { UrlSortableTableHead } from "@/components/ui/url-sortable-table-head";
 import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
 import { ReceivableStatusBadge } from "./receivable-status-badge";
 import {
@@ -57,7 +59,9 @@ export function ReceivableTable({
           <TableRow>
             <TableHead>Cliente</TableHead>
             {showProjectColumn ? <TableHead>Proyecto</TableHead> : null}
-            <TableHead>Vencimiento</TableHead>
+            <Suspense fallback={<TableHead>Vencimiento</TableHead>}>
+              <UrlSortableTableHead label="Vencimiento" defaultDir="asc" />
+            </Suspense>
             {showProjectColumn ? <TableHead>Factura</TableHead> : null}
             <TableHead>Cobrada</TableHead>
             <TableHead>Estado</TableHead>

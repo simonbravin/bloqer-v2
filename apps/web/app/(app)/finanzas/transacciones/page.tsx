@@ -42,6 +42,8 @@ interface PageProps {
     scope?: string;
     projectId?: string;
     register?: string;
+    sort?: string;
+    dir?: string;
   }>;
 }
 
@@ -49,17 +51,27 @@ function wantsRegisterAp(sp: Awaited<PageProps["searchParams"]>): boolean {
   return sp.register === "ap";
 }
 
+/** Strip transfer-only filters that do not apply to Finanzas → Transacciones. */
+function sanitizeFinanceMovementSp(sp: Awaited<PageProps["searchParams"]>) {
+  const type =
+    sp.type === "TRANSFER_IN" || sp.type === "TRANSFER_OUT" ? undefined : sp.type;
+  const sourceType = sp.sourceType === "INTERNAL_TRANSFER" ? undefined : sp.sourceType;
+  return { ...sp, type, sourceType };
+}
+
 function movementExportParams(sp: Awaited<PageProps["searchParams"]>): Record<string, string | undefined> {
+  const clean = sanitizeFinanceMovementSp(sp);
   const params: Record<string, string | undefined> = {
-    accountId: sp.accountId,
-    dateFrom: sp.dateFrom,
-    dateTo: sp.dateTo,
-    type: sp.type,
-    sourceType: sp.sourceType,
-    currency: sp.currency,
-    scope: sp.scope,
-    projectId: sp.projectId,
-    includeInternalTransfers: sp.includeInternalTransfers ?? "false",
+    accountId: clean.accountId,
+    dateFrom: clean.dateFrom,
+    dateTo: clean.dateTo,
+    type: clean.type,
+    sourceType: clean.sourceType,
+    currency: clean.currency,
+    scope: clean.scope,
+    projectId: clean.projectId,
+    // Operational ledger never includes bank↔bank internal transfers.
+    includeInternalTransfers: "false",
   };
   if (!params.accountId && (!params.dateFrom || !params.dateTo)) {
     const defaults = defaultDateRangeDays(DEFAULT_CASH_DATE_RANGE_DAYS);
@@ -73,13 +85,15 @@ function buildMovementFilters(
   sp: Awaited<PageProps["searchParams"]>,
   page: number,
 ): Parameters<typeof getAccountMovementReport>[0] {
-  const parsed = parseMovementReportFilters(sp);
+  const clean = sanitizeFinanceMovementSp(sp);
+  const parsed = parseMovementReportFilters(clean);
   const defaults = defaultDateRangeDays(DEFAULT_CASH_DATE_RANGE_DAYS);
   return {
     ...parsed,
-    includeInternalTransfers: sp.includeInternalTransfers === "true",
-    dateFrom: sp.dateFrom || defaults.dateFrom,
-    dateTo: sp.dateTo || defaults.dateTo,
+    includeInternalTransfers: false,
+    dateFrom: clean.dateFrom || defaults.dateFrom,
+    dateTo: clean.dateTo || defaults.dateTo,
+    sortDir: clean.dir === "asc" ? "asc" : "desc",
     page,
     pageSize: DEFAULT_PAGE_SIZE,
   };
@@ -215,7 +229,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Transacciones</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Ingresos y egresos de caja confirmados (obra y empresa). Para obligaciones pendientes ver{" "}
+            Ingresos y egresos de caja confirmados con terceros (obra y empresa). Para obligaciones pendientes ver{" "}
             <Link href="/finanzas/cuentas-por-pagar" className="underline underline-offset-2 text-foreground">
               Cuentas por pagar
             </Link>
@@ -226,6 +240,10 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
             ; indicadores en{" "}
             <Link href="/finanzas" className="underline underline-offset-2 text-foreground">
               Resumen
+            </Link>
+            . Las transferencias entre cuentas propias se gestionan en{" "}
+            <Link href="/tesoreria/transferencias" className="underline underline-offset-2 text-foreground">
+              Tesorería → Transferencias
             </Link>
             .
           </p>
@@ -251,8 +269,8 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
-              Movimientos confirmados (rango por defecto: {DEFAULT_CASH_DATE_RANGE_DAYS} días). Las transferencias
-              internas se excluyen por defecto.
+              Caja operativa confirmada (rango por defecto: {DEFAULT_CASH_DATE_RANGE_DAYS} días). La descripción
+              abre el documento origen cuando existe.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <ReportExportActions

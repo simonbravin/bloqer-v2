@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { formatDate } from "@/lib/format";
 import type { MovementReportRow } from "@bloqer/services";
 import { TreasuryMovementAccountingButton } from "@/features/accounting";
@@ -12,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { UrlSortableTableHead } from "@/components/ui/url-sortable-table-head";
 import { formatMoneyAmount } from "@/lib/format-money";
 
 function treasuryMovementTypeSupportsAccountingDraft(type: string): boolean {
@@ -29,6 +31,13 @@ const TYPE_LABELS: Record<string, string> = {
 function fmtSigned(signed: string) {
   const n = parseFloat(signed);
   return (n >= 0 ? "+" : "") + formatMoneyAmount(signed);
+}
+
+function safeDetailHref(url: string | null): string | null {
+  if (!url) return null;
+  const u = url.trim();
+  if (!u.startsWith("/") || u.startsWith("//")) return null;
+  return u;
 }
 
 interface Props {
@@ -58,11 +67,12 @@ export function MovementLedgerTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Fecha</TableHead>
+              <Suspense fallback={<TableHead>Fecha</TableHead>}>
+                <UrlSortableTableHead label="Fecha" defaultDir="desc" />
+              </Suspense>
               <TableHead>Cuenta</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Origen</TableHead>
-              <TableHead>Contraparte</TableHead>
               <TableHead>Descripción</TableHead>
               {showProjectColumn && <TableHead>Proyecto</TableHead>}
               <TableHead>Moneda</TableHead>
@@ -74,6 +84,7 @@ export function MovementLedgerTable({
           <TableBody>
             {rows.map((m) => {
               const signed = parseFloat(m.signedAmount);
+              const detailHref = safeDetailHref(m.detailHref);
               return (
                 <TableRow key={m.id}>
                   <TableCell className="whitespace-nowrap">{formatDate(m.movementDate)}</TableCell>
@@ -84,26 +95,18 @@ export function MovementLedgerTable({
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">{m.sourceLabel}</TableCell>
-                  <TableCell className="max-w-[160px] truncate text-muted-foreground text-xs">
-                    {m.counterpartyName ? (
-                      <span title={m.externalInvoiceRef ?? undefined}>
-                        {m.counterpartyName}
-                        {m.externalInvoiceRef ? (
-                          <span className="block truncate text-[11px] opacity-80">
-                            {m.externalInvoiceRef}
-                          </span>
-                        ) : null}
-                      </span>
-                    ) : m.externalInvoiceRef ? (
-                      <span className="truncate" title={m.externalInvoiceRef}>
-                        {m.externalInvoiceRef}
-                      </span>
+                  <TableCell className="max-w-[220px] truncate text-muted-foreground">
+                    {detailHref ? (
+                      <Link
+                        href={detailHref}
+                        className="underline underline-offset-2 hover:text-foreground"
+                        title={m.description}
+                      >
+                        {m.description}
+                      </Link>
                     ) : (
-                      "—"
+                      <span title={m.description}>{m.description}</span>
                     )}
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate text-muted-foreground">
-                    {m.description}
                   </TableCell>
                   {showProjectColumn && (
                     <TableCell className="max-w-[160px] truncate text-muted-foreground text-xs">

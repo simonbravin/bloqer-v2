@@ -3,6 +3,7 @@ import { can } from "@bloqer/domain";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { DEFAULT_CASH_DATE_RANGE_DAYS, defaultDateRangeDays, MAX_CORPORATE_PAYMENT_FILTER_IDS, resolvePagination } from "../finance/pagination";
+import { buildFinancialHref } from "../finance/financial-trace.service";
 import { getAccountBalance, getAccountBalanceAsOf } from "../treasury/balance.service";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -55,6 +56,36 @@ function movementSourceLabel(
   return SOURCE_LABELS[sourceType] ?? sourceType;
 }
 
+/** Deep-link to the document that originated this cash line (not a generic movement page). */
+export function resolveMovementDetailHref(input: {
+  sourceType: string;
+  sourceId: string;
+  projectId: string | null;
+  accountId: string;
+  transferId: string | null;
+}): string | null {
+  const { sourceType, sourceId, projectId } = input;
+  if (!sourceId?.trim()) return null;
+
+  switch (sourceType) {
+    case "PAYMENT":
+      return buildFinancialHref("Payment", sourceId, { projectId });
+    case "COLLECTION":
+      // Corporate collections have no dedicated detail route (only project cobranzas).
+      if (!projectId) return null;
+      return buildFinancialHref("Collection", sourceId, { projectId });
+    case "INTERNAL_TRANSFER":
+      // Canonical list for own-account transfers (no dedicated detail route yet).
+      return "/tesoreria/transferencias";
+    case "OPENING_BALANCE":
+    case "MANUAL_ADJUSTMENT":
+      // No separate document; avoid a weak link to the whole account extract.
+      return null;
+    default:
+      return null;
+  }
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type CashPositionAccount = {
@@ -92,11 +123,14 @@ export type MovementReportRow = {
   movementDate:       string;
   type:               string;
   sourceType:         string;
+  sourceId:           string;
   sourceLabel:        string;
   amount:             string;
   signedAmount:       string;
   currency:           string;
   description:        string;
+  /** Deep-link to source document when available. */
+  detailHref:         string | null;
   transferId:         string | null;
   isInternalTransfer: boolean;
   projectId:          string | null;
@@ -152,6 +186,8 @@ export type MovementReportFilters = {
   projectOnly?:             boolean;
   page?:                    number;
   pageSize?:                number;
+  /** Sort by movementDate; default desc (recent first). */
+  sortDir?:                 "asc" | "desc";
 };
 
 export type MovementReportResult = {
@@ -438,9 +474,22 @@ export async function getAccountMovementReport(
     ...projectWhere,
   };
 
+  const needsRunningBalance = !paginated && Boolean(filters.accountId);
+  // Explicit URL dir wins; otherwise: running-balance extracts stay chronological (asc),
+  // paginated ledgers default to recent-first (desc).
+  const dateDir: "asc" | "desc" =
+    filters.sortDir === "asc" || filters.sortDir === "desc"
+      ? filters.sortDir
+      : needsRunningBalance
+        ? "asc"
+        : "desc";
+  // Running balance must be accumulated chronologically; reverse after map if UI wants desc.
+  const fetchDir = needsRunningBalance ? "asc" : dateDir;
   const orderBy = paginated
-    ? ([{ movementDate: "desc" as const }, { id: "desc" as const }] as const)
-    : ([{ movementDate: "asc" as const }, { createdAt: "asc" as const }] as const);
+    ? ([{ movementDate: fetchDir }, { id: fetchDir }] as const)
+    : needsRunningBalance
+      ? ([{ movementDate: "asc" as const }, { createdAt: "asc" as const }] as const)
+      : ([{ movementDate: fetchDir }, { id: fetchDir }] as const);
 
   const [rawRows, total] = await Promise.all([
     prisma.accountMovement.findMany({
@@ -456,9 +505,9 @@ export async function getAccountMovementReport(
   ]);
 
   let runningBalance: Prisma.Decimal | undefined;
-  if (!paginated && filters.accountId) {
+  if (needsRunningBalance) {
     runningBalance = await getAccountBalanceAsOf(
-      filters.accountId,
+      filters.accountId!,
       dateFrom ? { beforeDate: new Date(dateFrom) } : undefined,
     );
   }
@@ -472,7 +521,7 @@ export async function getAccountMovementReport(
   ];
   const projectNames = await loadProjectNames(ctx.tenantId, uniqueProjectIds);
 
-  const rows: MovementReportRow[] = typedRawRows.map((m) => {
+  let rows: MovementReportRow[] = typedRawRows.map((m) => {
     const isAdj = m.type === "ADJUSTMENT";
     const signed = isAdj ? m.amount : signedAmount(m.type as string, m.amount);
     if (runningBalance !== undefined && !isAdj) {
@@ -482,15 +531,17 @@ export async function getAccountMovementReport(
     const counterpartyName = m.counterparty
       ? (m.counterparty.fantasyName ?? m.counterparty.legalName)
       : null;
+    const sourceType = m.sourceType as string;
     return {
       id: m.id,
       accountId: m.accountId,
       accountName: m.account.name,
       movementDate: m.movementDate.toISOString().slice(0, 10),
       type: m.type as string,
-      sourceType: m.sourceType as string,
+      sourceType,
+      sourceId: m.sourceId,
       sourceLabel: movementSourceLabel(
-        m.sourceType as string,
+        sourceType,
         counterpartyName,
         m.externalInvoiceRef,
       ),
@@ -498,6 +549,13 @@ export async function getAccountMovementReport(
       signedAmount: signed.toString(),
       currency: m.currency,
       description: m.description,
+      detailHref: resolveMovementDetailHref({
+        sourceType,
+        sourceId: m.sourceId,
+        projectId: resolvedProjectId,
+        accountId: m.accountId,
+        transferId: m.transferId,
+      }),
       transferId: m.transferId,
       isInternalTransfer: m.transferId !== null,
       projectId: resolvedProjectId,
@@ -507,6 +565,10 @@ export async function getAccountMovementReport(
       ...(runningBalance !== undefined ? { runningBalance: runningBalance.toString() } : {}),
     };
   });
+
+  if (needsRunningBalance && dateDir === "desc") {
+    rows = rows.slice().reverse();
+  }
 
   return { rows, total: paginated ? total : rows.length };
 }

@@ -144,6 +144,8 @@ export type CompanyReceivableListFilters = {
   clientContactId?: string;
   dueDateFrom?: string;
   dueDateTo?: string;
+  search?: string;
+  sortDir?: "asc" | "desc";
   page?: number;
   pageSize?: number;
 };
@@ -172,6 +174,7 @@ export async function listCompanyReceivables(
     pageSize: filters?.pageSize,
   });
 
+  const search = filters?.search?.trim();
   const where: Prisma.ReceivableWhereInput = {
     tenantId: ctx.tenantId,
     // Receivable.companyId es NOT NULL → scope directo por empresa.
@@ -185,11 +188,21 @@ export async function listCompanyReceivables(
           },
         }
       : {}),
+    ...(search
+      ? {
+          OR: [
+            { clientContact: { legalName: { contains: search, mode: "insensitive" } } },
+            { clientContact: { fantasyName: { contains: search, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
   };
   if (filters?.pendingOnly && !filters.status) {
     appendPendingReceivablesFilter(where);
   }
   appendReceivableStatusFilter(where, filters?.status);
+
+  const dueDir = filters?.sortDir === "desc" ? "desc" : "asc";
 
   const [rows, total] = await Promise.all([
     prisma.receivable.findMany({
@@ -199,7 +212,7 @@ export async function listCompanyReceivables(
         salesInvoice: { select: { number: true } },
         project: { select: { code: true, name: true } },
       },
-      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+      orderBy: [{ dueDate: dueDir }, { id: dueDir }],
       skip,
       take,
     }),

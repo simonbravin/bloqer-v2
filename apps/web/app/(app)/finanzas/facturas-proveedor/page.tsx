@@ -6,6 +6,7 @@ import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import {
   NewCompanySupplierInvoiceDialog,
+  SupplierInvoiceListFilters,
   SupplierInvoiceListSection,
   type SupplierInvoiceListItem,
   type SupplierOption,
@@ -22,7 +23,17 @@ const PAGE_SIZE = 20;
 const STATUSES = ["DRAFT", "ISSUED", "CANCELLED"] as const;
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; from?: string; to?: string; page?: string; create?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    from?: string;
+    to?: string;
+    page?: string;
+    create?: string;
+    search?: string;
+    sort?: string;
+    dir?: string;
+    view?: string;
+  }>;
 }
 
 export default async function FinanzasFacturasProveedorPage({ searchParams }: PageProps) {
@@ -51,6 +62,8 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
       status,
       issueDateFrom: sp.from,
       issueDateTo: sp.to,
+      search: sp.search,
+      sortDir: sp.dir === "asc" ? "asc" : "desc",
       page,
       pageSize: PAGE_SIZE,
     });
@@ -79,6 +92,8 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     totalAmount: inv.totalAmount,
     currency: inv.currency,
     status: inv.status,
+    payableId: inv.payable?.id ?? null,
+    payableStatus: inv.payable?.status ?? null,
   }));
   const suppliers: SupplierOption[] = (suppliersResult?.data ?? []).map((contact) => ({
     id: contact.id,
@@ -90,6 +105,9 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     if (next.status) p.set("status", next.status);
     if (next.from) p.set("from", next.from);
     if (next.to) p.set("to", next.to);
+    if (next.search) p.set("search", next.search);
+    if (next.dir) p.set("dir", next.dir);
+    if (next.sort) p.set("sort", next.sort);
     const s = p.toString();
     return s ? `?${s}` : "";
   }
@@ -148,16 +166,24 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted-foreground mr-1">Estado:</span>
         <Button asChild variant={!status ? "secondary" : "outline"} size="sm">
-          <Link href="/finanzas/facturas-proveedor">Todas</Link>
+          <Link href={`/finanzas/facturas-proveedor${q({ from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort })}`}>
+            Todas
+          </Link>
         </Button>
         {STATUSES.map((s) => (
           <Button key={s} asChild variant={status === s ? "secondary" : "outline"} size="sm">
-            <Link href={`/finanzas/facturas-proveedor${q({ status: s, from: sp.from, to: sp.to })}`}>
+            <Link
+              href={`/finanzas/facturas-proveedor${q({ status: s, from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort })}`}
+            >
               {s === "DRAFT" ? "Borrador" : s === "ISSUED" ? "Emitidas" : "Anuladas"}
             </Link>
           </Button>
         ))}
       </div>
+
+      <Suspense fallback={null}>
+        <SupplierInvoiceListFilters />
+      </Suspense>
 
       {items.length === 0 ? (
         <div className="space-y-3 rounded-lg border bg-card px-6 py-8 text-center text-sm text-muted-foreground">
@@ -176,6 +202,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
           <SupplierInvoiceListSection
             invoices={items}
             hrefPrefix="/finanzas/facturas-proveedor"
+            payableHrefPrefix="/finanzas/cuentas-por-pagar"
           />
         </Suspense>
       )}

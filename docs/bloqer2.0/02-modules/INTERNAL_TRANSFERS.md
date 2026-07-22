@@ -28,7 +28,9 @@ Borrador opcional → confirmado → anulado (revierte par).
 
 ## 9. Pantallas y vistas necesarias
 - Formulario transferencia con vista previa de impacto en ambas cuentas.
-- Lista transferencias filtrable.
+- Lista transferencias filtrable (`/tesoreria/transferencias`) — **canónica** para crear/consultar pares OUT/IN.
+- Extracto de cuenta: `/tesoreria/reportes/movimientos` (puede incluir/excluir internas).
+- **No** aparecen en `/finanzas/transacciones` (ledger operativo con terceros).
 
 ## 10. Reglas de negocio
 - **BR-TRZ-004**: exactamente 2 movimientos por transferencia ([BR-TRZ-004]).

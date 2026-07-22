@@ -188,6 +188,7 @@ export async function listSupplierInvoicesByPurchaseOrder(
     },
     include: {
       supplierContact: { select: { legalName: true, fantasyName: true } },
+      payable: { select: { id: true, status: true } },
     },
     orderBy: [{ number: "asc" }, { id: "asc" }],
   });
@@ -201,6 +202,7 @@ export async function listSupplierInvoicesByPurchaseOrder(
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
     subcontractCertificationCode: null,
     subcontractId: null,
+    payable: inv.payable ? { id: inv.payable.id, status: inv.payable.status } : null,
   }));
 }
 

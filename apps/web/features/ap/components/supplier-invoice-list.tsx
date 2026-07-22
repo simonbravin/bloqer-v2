@@ -7,4 +7,6 @@ export type SupplierInvoiceListItem = {
   totalAmount: string;
   currency: string;
   status: string;
+  payableId?: string | null;
+  payableStatus?: string | null;
 };

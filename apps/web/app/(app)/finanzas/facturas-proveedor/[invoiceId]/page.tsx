@@ -1,4 +1,5 @@
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
@@ -10,18 +11,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { SupplierInvoiceStatusBadge } from "@/features/ap";
+import { PayableStatusBadge, SupplierInvoiceStatusBadge } from "@/features/ap";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
-import { getCompanySupplierInvoiceById, listEntityDocuments, ServiceError } from "@bloqer/services";
+import {
+  getCompanySupplierInvoiceById,
+  getPayableBySupplierInvoiceId,
+  listEntityDocuments,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   issueCompanySupplierInvoiceAction,
   cancelCompanySupplierInvoiceAction,
 } from "@/app/(app)/finanzas/facturas-proveedor/actions";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PageProps {
   params: Promise<{ invoiceId: string }>;
@@ -48,9 +55,22 @@ export default async function FinanzasFacturaProveedorDetailPage({ params }: Pag
     throw err;
   }
 
+  let payable = null;
+  try {
+    payable = await getPayableBySupplierInvoiceId(invoiceId, ctx);
+  } catch {
+    payable = null;
+  }
+
   const invoiceAttachments = await listEntityDocuments("SUPPLIER_INVOICE", invoiceId, ctx, {});
   const storageConfigured = isStorageConfigured();
   const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "AP");
+  const canPay =
+    Boolean(payable) &&
+    can(ctx.roles, "EDIT", "AP") &&
+    (payable!.status === "OPEN" ||
+      payable!.status === "PARTIAL" ||
+      payable!.status === "OVERDUE");
 
   const isDraft = invoice.status === "DRAFT";
   const isIssued = invoice.status === "ISSUED";
@@ -167,12 +187,41 @@ export default async function FinanzasFacturaProveedorDetailPage({ params }: Pag
             </Button>
           </form>
         )}
-        {isIssued && (
+        {isIssued && !payable && (
           <Button asChild variant="outline">
             <Link href="/finanzas/cuentas-por-pagar">Ver cuentas por pagar empresa →</Link>
           </Button>
         )}
       </div>
+
+      {isIssued && payable ? (
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-base">Cuenta por pagar</CardTitle>
+            <PayableStatusBadge status={payable.status} />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm">
+              Saldo pendiente:{" "}
+              <span className="font-semibold tabular-nums">
+                {formatMoneyAmount(payable.balanceDue, payable.currency)}
+              </span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/finanzas/cuentas-por-pagar/${payable.id}`}>Ver C×P</Link>
+              </Button>
+              {canPay ? (
+                <Button asChild size="sm">
+                  <Link href={`/finanzas/cuentas-por-pagar/${payable.id}/pagar`}>
+                    Registrar pago
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <EntityDocumentsPanel
         scope={{ kind: "company-finanzas-supplier-invoice" }}

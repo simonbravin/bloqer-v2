@@ -628,7 +628,7 @@
 - **Decidido por:** Owner
 - **Decisión:**
   1. **Facturas y gastos** conserva una vista propia porque representa documentos y obligaciones antes del movimiento de caja; el alta corporativa se abre en un diálogo desde el listado.
-  2. **Transacciones** conserva una vista propia como ledger consolidado de movimientos confirmados.
+  2. **Transacciones** conserva una vista propia como ledger consolidado de movimientos confirmados de **caja operativa** (cobros, pagos, ingresos/egresos con terceros). Las **transferencias internas** entre cuentas propias **no** se listan ahí; viven en Tesorería → Transferencias / Movimientos.
   3. No existe un listado independiente **Pagos a proveedores**: los pagos se consultan en Transacciones mediante filtros de origen/tipo.
   4. El detalle de un `Payment` permanece como vista contextual para trazabilidad, anulación y contabilidad, accesible desde CxP, auditoría o el movimiento relacionado.
 - **Implicancias:** se retiran `/finanzas/pagos-proveedor` (listado) y `/finanzas/facturas-proveedor/nueva`; se mantienen `/finanzas/pagos-proveedor/[paymentId]` y el flujo de pago desde Cuentas por pagar.
@@ -646,7 +646,7 @@
   1. Fase 1 (ahora): `AccountMovement` de ingreso corporativo (`sourceType = MANUAL_ADJUSTMENT`) admite opcionales `counterpartyContactId` (Contact del directorio, típicamente CLIENT) y `externalInvoiceRef` (N° de comprobante oficial emitido fuera de Bloqer, p. ej. ARCA).
   2. No crea `SalesInvoice` / `Receivable` / `Collection` corporativos; sigue la opción **(2)** de Q-030 / [D-037](./DECISION_LOG.md).
   3. Fase 2 (planificada, requiere decisión explícita): AR corporativo con `projectId` nullable + UI bajo `/finanzas`, con extensión futura a emisión legal ARCA; `externalInvoiceRef` actúa de puente para lo cargado manualmente.
-- **Implicancias:** UI “Ingreso / cobro” en Transacciones; ledger y export muestran contraparte y comprobante; sin enum nuevo de `sourceType`.
+- **Implicancias:** UI “Ingreso / cobro” en Transacciones; el alta guarda contraparte y comprobante en `AccountMovement`; el ledger UI prioriza descripción → documento origen (sin columna Contraparte fija); sin enum nuevo de `sourceType`.
 - **Documentos afectados:** [`03-finance/ACCOUNT_MOVEMENTS.md`](../03-finance/ACCOUNT_MOVEMENTS.md), [`02-modules/SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md`](../08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md).
 
 ---

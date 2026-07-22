@@ -26,6 +26,7 @@
 - **Solo `CONFIRMED` y `RECONCILED`** impactan saldos reportados.
 - **Transferencia interna:** dos movimientos con mismo `transfer_id` ([BR-TRZ-004]).
 - **Anulación:** estado `CANCELLED` + movimiento espejo o reversión explícita.
+- **UX Finanzas vs Tesorería:** `/finanzas/transacciones` es el ledger de **caja operativa** (cobros/pagos/ingresos/egresos con terceros) y **nunca** lista transferencias internas. Esas viven en `/tesoreria/transferencias` y en el extracto `/tesoreria/reportes/movimientos` ([D-048](../00-product/DECISION_LOG.md)). La columna Contraparte no se muestra en el ledger UI; el campo sigue disponible en el alta de ingreso manual ([D-049](../00-product/DECISION_LOG.md)).
 
 ## Relación con capas de costo (`paid_amount`)
 

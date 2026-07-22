@@ -93,6 +93,7 @@ export function parseMovementReportFilters(sp: Record<string, string | undefined
     projectId: sp.projectId,
     corporateOnly: scope === "corporate" || sp.corporateOnly === "true",
     projectOnly: scope === "project" || sp.projectOnly === "true",
+    sortDir: sp.dir === "asc" ? "asc" : sp.dir === "desc" ? "desc" : undefined,
   };
 }
 
@@ -382,7 +383,6 @@ export async function exportTreasuryMovementsCsv(
     "Origen",
     "EtiquetaOrigen",
     "Proyecto",
-    "Contraparte",
     "ComprobanteExterno",
     "Importe",
     "ImporteSignado",
@@ -398,7 +398,6 @@ export async function exportTreasuryMovementsCsv(
     r.sourceType,
     r.sourceLabel,
     r.projectName ?? (r.projectId ? r.projectId : "Empresa"),
-    r.counterpartyName ?? "",
     r.externalInvoiceRef ?? "",
     r.amount,
     r.signedAmount,

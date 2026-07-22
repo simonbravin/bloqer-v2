@@ -31,11 +31,11 @@ Ver PurchaseInvoice, Payable en [`STATE_MACHINES.md`](../01-domain/STATE_MACHINE
 - Anular con reversión.
 
 ## 9. Pantallas y vistas necesarias
-- **Facturas y gastos:** listado documental; alta corporativa en diálogo desde la misma pantalla.
+- **Facturas y gastos:** listado documental con columna de **estado de pago** (Payable); desde OPEN/PARTIAL/OVERDUE se puede ir a pagar; alta corporativa en diálogo desde la misma pantalla.
 - **Alta de factura en proyecto:** formulario con borrador → emitir; opción express **“Emitir y pagar ahora”** (cuenta de tesorería + fecha), visible solo con permiso de tesorería ([D-052]).
 - **Adjuntos:** foto/copia de factura en el alta (create-then-upload) y en el detalle (`SUPPLIER_INVOICE`).
 - **Cuentas por pagar:** bandeja de obligaciones ordenadas por vencimiento; “Registrar pago” posterior (parcial o total).
-- **Transacciones:** consulta consolidada de pagos confirmados mediante filtros; no hay listado independiente de pagos.
+- **Transacciones:** ledger de **caja operativa** confirmada (cobros/pagos/ingresos/egresos); transferencias entre cuentas propias solo en Tesorería; no hay listado independiente de pagos.
 - Detalle contextual de `Payment` para trazabilidad, anulación y contabilidad.
 - Wizard de pago con retenciones manuales (Fase 2).
 - **Fondos:** el pago bloquea si la cuenta quedaría en saldo negativo ([D-052], alineado a [BR-TRZ-004]).

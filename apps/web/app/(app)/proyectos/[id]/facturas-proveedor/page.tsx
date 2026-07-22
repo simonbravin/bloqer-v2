@@ -4,7 +4,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { ProjectFinanceListHeaderActions } from "@/features/projects/components/project-finance-list-header-actions";
-import { SupplierInvoiceListSection } from "@/features/ap";
+import { SupplierInvoiceListFilters, SupplierInvoiceListSection } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectShellInfo, listSupplierInvoicesByProject, ServiceError } from "@bloqer/services";
@@ -15,7 +15,7 @@ const PAGE_SIZE = 20;
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; search?: string; sort?: string; dir?: string; view?: string }>;
 }
 
 export default async function FacturasProveedorPage({ params, searchParams }: PageProps) {
@@ -42,7 +42,12 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
 
   let invoicesResult;
   try {
-    invoicesResult = await listSupplierInvoicesByProject(id, ctx, { page, pageSize: PAGE_SIZE });
+    invoicesResult = await listSupplierInvoicesByProject(id, ctx, {
+      page,
+      pageSize: PAGE_SIZE,
+      search: sp.search,
+      sortDir: sp.dir === "asc" ? "asc" : "desc",
+    });
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
@@ -60,6 +65,8 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
     totalAmount: inv.totalAmount,
     currency: inv.currency,
     status: inv.status,
+    payableId: inv.payable?.id ?? null,
+    payableStatus: inv.payable?.status ?? null,
   }));
 
   return (
@@ -76,10 +83,18 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
         }
       />
 
+      <Suspense fallback={null}>
+        <SupplierInvoiceListFilters
+          showDateFilters={false}
+          preserveParams={["search", "sort", "dir", "view"]}
+        />
+      </Suspense>
+
       <Suspense fallback={<ListSectionSkeleton />}>
         <SupplierInvoiceListSection
           invoices={items}
           hrefPrefix={`/proyectos/${id}/facturas-proveedor`}
+          payableHrefPrefix={`/proyectos/${id}/cuentas-por-pagar`}
         />
       </Suspense>
 

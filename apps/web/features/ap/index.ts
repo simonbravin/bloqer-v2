@@ -5,6 +5,7 @@ export { PayableStatusBadge } from "./components/payable-status-badge";
 export { SupplierInvoiceTable } from "./components/supplier-invoice-table";
 export { SupplierInvoiceCards } from "./components/supplier-invoice-cards";
 export { SupplierInvoiceListSection } from "./components/supplier-invoice-list-section";
+export { SupplierInvoiceListFilters } from "./components/supplier-invoice-list-filters";
 export type { SupplierInvoiceListItem } from "./components/supplier-invoice-list";
 export { SupplierInvoiceForm } from "./components/supplier-invoice-form";
 export type { SupplierOption, POOption, TreasuryAccountOption } from "./components/supplier-invoice-form";

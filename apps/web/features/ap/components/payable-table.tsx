@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { formatDate } from "@/lib/format";
 import {
   Table,
@@ -11,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { UrlSortableTableHead } from "@/components/ui/url-sortable-table-head";
 import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { PayableListItem } from "./payable-list";
@@ -46,7 +48,9 @@ export function PayableTable({
         <TableHeader>
           <TableRow>
             <TableHead>Proveedor</TableHead>
-            <TableHead>Vencimiento</TableHead>
+            <Suspense fallback={<TableHead>Vencimiento</TableHead>}>
+              <UrlSortableTableHead label="Vencimiento" defaultDir="asc" />
+            </Suspense>
             <TableHead>Factura</TableHead>
             <TableHead className="text-right">Saldo</TableHead>
             <TableHead>Pagada</TableHead>
