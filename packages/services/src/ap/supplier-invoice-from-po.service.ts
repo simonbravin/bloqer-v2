@@ -18,6 +18,7 @@ import {
   buildInvoiceDraftLinesFromPo,
   computePendingToInvoiceAmount,
   sumPoLinesReceivedAmount,
+  type InvoiceDraftLineInput,
   type PoLineForInvoiceDraft,
 } from "./supplier-invoice-from-po-pure";
 
@@ -123,6 +124,48 @@ export async function getPurchaseOrderBillingSummary(
     pendingToInvoice: pendingToInvoice.toFixed(2),
     hasReceivedQuantity,
     draftInvoiceCount,
+  };
+}
+
+export type PurchaseOrderInvoiceDraftPreview = {
+  summary: PurchaseOrderBillingSummary;
+  supplierContactId: string;
+  currency: string;
+  /** Líneas sugeridas (pendiente de facturar) — editables en el form, sin persistir. */
+  lines: InvoiceDraftLineInput[];
+};
+
+/**
+ * Previsualiza las líneas a facturar de una OC (matching a 3 vías: recibido − facturado),
+ * sin crear la factura. Alimenta el botón "Traer líneas de la OC" del alta manual.
+ */
+export async function getPurchaseOrderInvoiceDraftPreview(
+  purchaseOrderId: string,
+  projectId: string,
+  ctx: ServiceContext,
+): Promise<PurchaseOrderInvoiceDraftPreview> {
+  await assertApTenantModule(ctx);
+  if (!canViewApProjectArea(ctx.roles) && !canViewProcurementProjectArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver el estado de facturación de la OC");
+  }
+
+  const po = await loadPoForBilling(purchaseOrderId, ctx);
+  if (po.projectId !== projectId) {
+    throw new ServiceError("CONFLICT", "La orden de compra no pertenece a este proyecto");
+  }
+
+  const summary = await getPurchaseOrderBillingSummary(purchaseOrderId, ctx);
+  const poLines = po.lines.map(toPoLineDraft);
+  const receivedAmount = sumPoLinesReceivedAmount(poLines);
+  const invoicedAmount = new Prisma.Decimal(summary.invoicedAmount);
+  const basis = invoicedAmount.greaterThan(0) ? "remaining" : "received";
+  const lines = buildInvoiceDraftLinesFromPo(poLines, { basis, receivedAmount, invoicedAmount });
+
+  return {
+    summary,
+    supplierContactId: po.supplierContactId,
+    currency: po.currency,
+    lines,
   };
 }
 

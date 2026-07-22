@@ -8,6 +8,7 @@ import {
   getTreasurySummaryByCompany,
   type AccountBalanceSummary,
 } from "./balance.service";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 const ZERO = new Prisma.Decimal(0);
 const RECENT_MOVEMENTS = 8;
@@ -75,7 +76,7 @@ function sumByCurrency(
     map.set(r.currency, (map.get(r.currency) ?? ZERO).plus(r.amount));
   }
   return [...map.entries()]
-    .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
+    .map(([currency, amount]) => ({ currency, amount: serializeMoneyDecimal(amount) }))
     .sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
@@ -150,7 +151,7 @@ export async function getTreasuryHubOverview(ctx: ServiceContext): Promise<Treas
     id: m.id,
     movementDate: isoDate(m.movementDate),
     description: m.description,
-    amount: m.amount.toString(),
+    amount: serializeMoneyDecimal(m.amount),
     currency: m.currency,
     type: m.type,
     accountName: m.account.name,

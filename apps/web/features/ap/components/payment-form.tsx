@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { roundMoney, serializeMoney } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { FillableAmount } from "@/components/ui/fillable-amount";
+import { cn } from "@/lib/utils";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -42,20 +45,48 @@ export function PaymentForm({
   const [accountId, setAccountId] = useState("");
 
   const matchingAccounts = accounts.filter((a) => a.currency === payableCurrency);
+  const balanceSerialized = serializeMoney(payableBalance);
+  const [amount, setAmount] = useState(balanceSerialized);
+  const [flash, setFlash] = useState(false);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+  }, []);
+
+  function fillAmount(next: string) {
+    setAmount(serializeMoney(next));
+    setFlash(true);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(false), 900);
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!accountId) { setError("Seleccione una cuenta de tesorería"); return; }
     const fd = new FormData(e.currentTarget);
+    const rawAmount = String(fd.get("amount") ?? "").trim();
+    let rounded: string;
+    try {
+      rounded = roundMoney(rawAmount);
+    } catch {
+      setError("Monto inválido");
+      return;
+    }
+    // D-053: full balance uses stored balanceDue server-side (avoid round-then-reapply).
+    const payFullBalance =
+      rounded === balanceSerialized || rawAmount === payableBalance || rawAmount === balanceSerialized;
+    const payload = {
+      payableId,
+      accountId,
+      paymentDate: fd.get("paymentDate") as string,
+      amount: payFullBalance ? undefined : rounded,
+      payFullBalance: payFullBalance || undefined,
+      notes: (fd.get("notes") as string) || null,
+    };
     startTransition(async () => {
       if (companyFinanzas) {
-        const res = await createCompanyPaymentAction({
-          payableId,
-          accountId,
-          paymentDate: fd.get("paymentDate") as string,
-          amount:      fd.get("amount") as string,
-          notes:       (fd.get("notes") as string) || null,
-        });
+        const res = await createCompanyPaymentAction(payload);
         if ("error" in res) {
           setError(res.error);
         } else {
@@ -67,13 +98,7 @@ export function PaymentForm({
         setError("Configuración inválida del formulario");
         return;
       }
-      const res = await createPaymentAction(projectId, {
-        payableId,
-        accountId,
-        paymentDate: fd.get("paymentDate") as string,
-        amount:      fd.get("amount") as string,
-        notes:       (fd.get("notes") as string) || null,
-      });
+      const res = await createPaymentAction(projectId, payload);
       if ("error" in res) {
         setError(res.error);
       } else {
@@ -120,16 +145,32 @@ export function PaymentForm({
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="amount">
-              Monto (máx. {payableBalance} {payableCurrency})
-            </Label>
+            <Label htmlFor="amount">Monto ({payableCurrency})</Label>
             <Input
               id="amount"
               name="amount"
+              type="number"
               required
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
-              pattern="^\d+(\.\d+)?$"
-              max={payableBalance}
+              step="0.01"
+              min="0.01"
+              inputMode="decimal"
+              max={balanceSerialized}
+              className={cn(flash && "ring-2 ring-primary transition-shadow")}
+            />
+            <FillableAmount
+              className="pt-1"
+              onPick={(v) => fillAmount(v)}
+              toastOnPick={() => "Monto completado con el saldo pendiente."}
+              suggestions={[
+                {
+                  label: "Saldo pendiente",
+                  amount: payableBalance,
+                  currency: payableCurrency,
+                },
+              ]}
             />
           </div>
         </div>

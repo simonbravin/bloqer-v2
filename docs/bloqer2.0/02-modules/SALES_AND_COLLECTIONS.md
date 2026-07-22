@@ -35,6 +35,10 @@ Ver máquinas SalesInvoice y Receivable.
 - Facturas pendientes de cobro por cliente/proyecto.
 - Registro cobranza con aplicación de montos a facturas.
 - Venta directa simplificada (sin certificación).
+- **Adjuntos** en detalle de factura de venta (`SALES_INVOICE`) — foto/copia del comprobante ([D-052]).
+- AR corporativo: alta rápida con cobro opcional vía Registrar transacción ([D-051]); “Cobrar ahora” inline en facturas de venta **de proyecto** diferido ([Q-055]).
+
+> Ver [D-051](../00-product/DECISION_LOG.md), [D-052](../00-product/DECISION_LOG.md).
 
 ## 10. Reglas de negocio
 - Retenciones/percepciones manuales por línea ([D-011]).

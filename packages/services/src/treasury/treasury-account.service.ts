@@ -5,6 +5,7 @@ import { auditTreasury } from "./treasury-audit";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { getAccountBalance, AccountBalanceSummary } from "./balance.service";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export type TreasuryAccountView = Omit<TreasuryAccount, "openingBalance"> & {
   openingBalance: string;
@@ -218,7 +219,7 @@ async function _setStatus(
 function serialize(acc: TreasuryAccount, balance: Prisma.Decimal): TreasuryAccountView {
   return {
     ...acc,
-    openingBalance: acc.openingBalance.toString(),
-    balance: balance.toString(),
+    openingBalance: serializeMoneyDecimal(acc.openingBalance),
+    balance: serializeMoneyDecimal(balance),
   };
 }

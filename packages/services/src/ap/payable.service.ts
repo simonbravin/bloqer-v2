@@ -11,6 +11,7 @@ import {
   computeObligationBalanceDue,
   normalizeObligationBalanceDue,
 } from "../finance/obligation-balance";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 import {
   aggregateCorporatePayableBalances,
   fetchCorporatePayableSnapshotRows,
@@ -183,7 +184,7 @@ function aggregateOpenPayableBalances(
   const toRows = (m: Map<string, Prisma.Decimal>) =>
     [...m.entries()]
       .filter(([, v]) => hasOpenObligationBalance(v, OBLIGATION_OPEN_BALANCE_EPSILON))
-      .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
+      .map(([currency, amount]) => ({ currency, amount: serializeMoneyDecimal(amount) }))
       .sort((a, b) => a.currency.localeCompare(b.currency));
 
   return { totalByCurrency: toRows(total), overdueByCurrency: toRows(overdue) };
@@ -381,9 +382,9 @@ export function serializePayable(p: RawPayable): PayableView {
   return {
     ...p,
     status,
-    originalAmount: p.originalAmount.toString(),
-    paidAmount:     p.paidAmount.toString(),
-    balanceDue:     balanceDue.toString(),
+    originalAmount: serializeMoneyDecimal(p.originalAmount),
+    paidAmount:     serializeMoneyDecimal(p.paidAmount),
+    balanceDue:     serializeMoneyDecimal(balanceDue),
     supplierName:   p.supplierContact.fantasyName ?? p.supplierContact.legalName,
   };
 }

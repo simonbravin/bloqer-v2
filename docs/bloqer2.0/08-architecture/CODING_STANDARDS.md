@@ -30,7 +30,12 @@
 
 ## Dinero y decimales
 
-- Ver [`MONEY_AND_DECIMAL_STRATEGY.md`](./MONEY_AND_DECIMAL_STRATEGY.md): **nunca `number` float** para persistir dinero; usar decimal/ string según librería elegida en implementación.
+- Ver [`MONEY_AND_DECIMAL_STRATEGY.md`](./MONEY_AND_DECIMAL_STRATEGY.md) y [D-053](../00-product/DECISION_LOG.md).
+- **Nunca `number`/`float`/`parseFloat`** para calcular o agregar dinero.
+- Montos operativos: `roundMoney` / `serializeMoney` de `@bloqer/utils` (2 dp half-up). DTOs money: siempre `serializeMoney`, no `.toString()` crudo.
+- Display: `formatMoneyAmount` (min=max 2). No inventar `Intl.NumberFormat` locales para dinero.
+- Entrada: schemas Zod `moneyAmountString` (preprocess round-to-2). `fxRateString` (6), `qtyString` / `ratePctString` (4).
+- “Pagar/cobrar todo”: flag server-side sobre saldo almacenado; no redondear en UI y reaplicar.
 
 ## Enums
 

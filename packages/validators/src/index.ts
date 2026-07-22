@@ -28,3 +28,4 @@ export * from "./finance-overhead";
 export * from "./audit-log";
 export * from "./ar-advance";
 export * from "./scheduled-report";
+export * from "./money";

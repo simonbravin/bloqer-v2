@@ -13,6 +13,7 @@ import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { assertCanCancelReceivableDirect } from "./receivable-cancel-guards";
 import { deriveObligationDisplayStatus, hasOpenObligationBalance, isObligationOverdue, OBLIGATION_OPEN_BALANCE_EPSILON } from "../finance/obligation-date";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 import {
   computeObligationBalanceDue,
   normalizeObligationBalanceDue,
@@ -323,7 +324,7 @@ export async function summarizeReceivablesByProject(
   const toRows = (m: Map<string, Prisma.Decimal>) =>
     [...m.entries()]
       .filter(([, v]) => hasOpenObligationBalance(v, OBLIGATION_OPEN_BALANCE_EPSILON))
-      .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
+      .map(([currency, amount]) => ({ currency, amount: serializeMoneyDecimal(amount) }))
       .sort((a, b) => a.currency.localeCompare(b.currency));
 
   return { totalByCurrency: toRows(total), overdueByCurrency: toRows(overdue) };
@@ -418,9 +419,9 @@ function serializeReceivable(r: RawReceivable): ReceivableView {
   return {
     ...r,
     status,
-    originalAmount: r.originalAmount.toString(),
-    paidAmount: r.paidAmount.toString(),
-    balanceDue: balanceDue.toString(),
+    originalAmount: serializeMoneyDecimal(r.originalAmount),
+    paidAmount: serializeMoneyDecimal(r.paidAmount),
+    balanceDue: serializeMoneyDecimal(balanceDue),
     clientName: r.clientContact.fantasyName ?? r.clientContact.legalName,
   };
 }

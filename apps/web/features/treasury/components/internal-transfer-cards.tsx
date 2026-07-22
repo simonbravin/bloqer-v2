@@ -4,18 +4,8 @@ import { formatDate } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { InternalTransferView } from "@bloqer/services";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { CancelInternalTransferButton } from "./cancel-internal-transfer-button";
-
-function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(parseFloat(value)) +
-    " " +
-    currency
-  );
-}
 
 export function InternalTransferCards({ transfers }: { transfers: InternalTransferView[] }) {
   if (transfers.length === 0) {
@@ -38,7 +28,9 @@ export function InternalTransferCards({ transfers }: { transfers: InternalTransf
           <p className="mt-1 text-sm">
             <span className="text-muted-foreground">Destino:</span> {t.destinationAccountName}
           </p>
-          <p className="mt-3 text-lg font-semibold tabular-nums">{fmtMoney(t.amount, t.currency)}</p>
+          <p className="mt-3 text-lg font-semibold tabular-nums">
+            {formatMoneyAmount(t.amount)} {t.currency}
+          </p>
           {t.status === "CONFIRMED" ? (
             <div className="mt-3">
               <CancelInternalTransferButton transferId={t.id} />

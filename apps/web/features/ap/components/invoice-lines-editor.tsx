@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  addDecimal,
+  divideDecimal,
+  multiplyDecimal,
+  roundMoney,
+} from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { formatDecimalAr } from "@/lib/format-money";
+import { formatDecimalArFromString } from "@/lib/format-money";
 
 export type InvoiceLine = {
   description: string;
@@ -20,18 +26,21 @@ export type InvoiceLine = {
   taxRate: string;
 };
 
-function safeNum(v: string) {
-  const n = parseFloat(v);
-  return isNaN(n) || n < 0 ? 0 : n;
+function safeDecimal(v: string): string {
+  const t = v.trim();
+  if (!t || !/^-?\d+(\.\d+)?$/.test(t) || t.startsWith("-")) return "0";
+  return t;
 }
 
+/** Client preview aligned with server calcLine [D-053] (round each money component). */
 function linePreview(l: InvoiceLine) {
-  const qty      = safeNum(l.quantity);
-  const price    = safeNum(l.unitPrice);
-  const rate     = safeNum(l.taxRate);
-  const subtotal = qty * price;
-  const tax      = subtotal * (rate / 100);
-  return { subtotal, tax, total: subtotal + tax };
+  const qty = safeDecimal(l.quantity);
+  const price = safeDecimal(l.unitPrice);
+  const rate = safeDecimal(l.taxRate);
+  const subtotal = roundMoney(multiplyDecimal(qty, price));
+  const tax = roundMoney(divideDecimal(multiplyDecimal(subtotal, rate), "100"));
+  const total = roundMoney(addDecimal(subtotal, tax));
+  return { subtotal, tax, total };
 }
 
 interface Props {
@@ -57,9 +66,13 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
   const totals = lines.reduce(
     (acc, l) => {
       const p = linePreview(l);
-      return { subtotal: acc.subtotal + p.subtotal, tax: acc.tax + p.tax, total: acc.total + p.total };
+      return {
+        subtotal: roundMoney(addDecimal(acc.subtotal, p.subtotal)),
+        tax: roundMoney(addDecimal(acc.tax, p.tax)),
+        total: roundMoney(addDecimal(acc.total, p.total)),
+      };
     },
-    { subtotal: 0, tax: 0, total: 0 },
+    { subtotal: "0.00", tax: "0.00", total: "0.00" },
   );
 
   return (
@@ -125,9 +138,9 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
                       className="h-9 w-full min-w-[3.5rem] text-sm tabular-nums"
                     />
                   </TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.subtotal)}</TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.tax)}</TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalAr(p.total)}</TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalArFromString(p.subtotal)}</TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalArFromString(p.tax)}</TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalArFromString(p.total)}</TableCell>
                   <TableCell className="align-top pt-2">
                     {lines.length > 1 && (
                       <button
@@ -150,15 +163,15 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
       <div className="flex justify-end gap-8 text-sm border-t pt-3">
         <div className="text-right">
           <p className="text-xs text-muted-foreground">Subtotal</p>
-          <p className="tabular-nums font-medium">{formatDecimalAr(totals.subtotal)}</p>
+          <p className="tabular-nums font-medium">{formatDecimalArFromString(totals.subtotal)}</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">IVA</p>
-          <p className="tabular-nums font-medium">{formatDecimalAr(totals.tax)}</p>
+          <p className="tabular-nums font-medium">{formatDecimalArFromString(totals.tax)}</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground font-semibold">Total (vista previa)</p>
-          <p className="tabular-nums font-semibold">{formatDecimalAr(totals.total)}</p>
+          <p className="tabular-nums font-semibold">{formatDecimalArFromString(totals.total)}</p>
         </div>
       </div>
       <p className="text-xs text-muted-foreground">

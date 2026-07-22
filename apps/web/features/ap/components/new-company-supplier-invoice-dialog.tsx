@@ -16,9 +16,14 @@ import { SupplierInvoiceForm, type SupplierOption } from "./supplier-invoice-for
 interface Props {
   suppliers: SupplierOption[];
   defaultOpen?: boolean;
+  storageConfigured?: boolean;
 }
 
-export function NewCompanySupplierInvoiceDialog({ suppliers, defaultOpen = false }: Props) {
+export function NewCompanySupplierInvoiceDialog({
+  suppliers,
+  defaultOpen = false,
+  storageConfigured = false,
+}: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -63,6 +68,7 @@ export function NewCompanySupplierInvoiceDialog({ suppliers, defaultOpen = false
           companyFinanzas
           suppliers={suppliers}
           poOptions={[]}
+          storageConfigured={storageConfigured}
           variant="plain"
           onCancel={closeDialog}
           onSuccess={closeDialog}

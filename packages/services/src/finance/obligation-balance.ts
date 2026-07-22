@@ -10,7 +10,8 @@ export function computeObligationBalanceDue(
   return originalAmount.minus(paidAmount);
 }
 
-/** MONEY_MODEL § Redondeo: saldo ≤ 0.01 ARS se trata como saldado. */
+/** MONEY_MODEL / D-053: saldo &lt; 0.01 (polvo sub-centavo) se trata como saldado.
+ * Un centavo real (0.01) permanece abierto — no write-off de pagos parciales a 2 dp. */
 export function normalizeObligationBalanceDue(balanceDue: Prisma.Decimal): Prisma.Decimal {
   return hasOpenObligationBalance(balanceDue) ? balanceDue : ZERO;
 }

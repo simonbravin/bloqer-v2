@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { toast } from "sonner";
+import { divideDecimal, roundQty, QTY_DECIMALS } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -97,6 +99,41 @@ export function PurchaseOrderLinesEditor({
     onChange(next);
   }
 
+  /** Trae el costo unitario del presupuesto (APU) al campo Precio unit. */
+  function fillBudgetUnitPrice(i: number, wbs?: WbsOption) {
+    if (!wbs?.budgetUnitCost || safeNum(wbs.budgetUnitCost) <= 0) return;
+    update(i, "unitPrice", wbs.budgetUnitCost);
+    toast.success("Precio unitario completado con el referencial del presupuesto.");
+  }
+
+  /** Ajusta la cantidad para consumir el saldo disponible de la partida. */
+  function consumePartidaSaldo(i: number, line: PurchaseOrderLine, wbs?: WbsOption) {
+    if (wbs?.availableSaldo == null) return;
+    if (safeNum(wbs.availableSaldo) <= 0) {
+      toast.error("La partida no tiene saldo disponible para consumir.");
+      return;
+    }
+    const price = line.unitPrice.trim() || wbs.budgetUnitCost || "";
+    if (!price || safeNum(price) <= 0) {
+      toast.error("Definí primero un precio unitario (o usá el referencial).");
+      return;
+    }
+    let qty: string;
+    try {
+      qty = roundQty(divideDecimal(wbs.availableSaldo, price, QTY_DECIMALS));
+    } catch {
+      toast.error("No se pudo calcular la cantidad para el saldo de la partida.");
+      return;
+    }
+    const next: PurchaseOrderLine = {
+      ...line,
+      unitPrice: line.unitPrice.trim() ? line.unitPrice : price,
+      quantity: qty,
+    };
+    onChange(lines.map((l, idx) => (idx === i ? next : l)));
+    toast.success("Cantidad ajustada para consumir el saldo de la partida.");
+  }
+
   function addLine() {
     onChange([...lines, { ...DEFAULT_LINE }]);
   }
@@ -163,14 +200,17 @@ export function PurchaseOrderLinesEditor({
                       searchPlaceholder="Buscar partida…"
                     />
                     {wbs?.availableSaldo != null && (
-                      <p
-                        className={`mt-1 text-[10px] ${
+                      <button
+                        type="button"
+                        onClick={() => consumePartidaSaldo(i, line, wbs)}
+                        title="Ajustar la cantidad para consumir este saldo"
+                        className={`mt-1 block text-left text-[10px] underline decoration-dotted underline-offset-2 hover:opacity-80 ${
                           wbs.wouldExceedBudget ? "text-destructive" : "text-muted-foreground"
                         }`}
                       >
                         Saldo part.: {formatDecimalAr(Number(wbs.availableSaldo))}
                         {wbs.wouldExceedBudget ? " (alerta)" : ""}
-                      </p>
+                      </button>
                     )}
                   </TableCell>
                   {productOptions.length > 0 && (
@@ -230,9 +270,19 @@ export function PurchaseOrderLinesEditor({
                     />
                   </TableCell>
                   <TableCell className="py-1.5 text-xs tabular-nums text-muted-foreground">
-                    {wbs?.budgetUnitCost != null
-                      ? `${formatDecimalAr(Number(wbs.budgetUnitCost))}${wbs.budgetUnit ? ` / ${wbs.budgetUnit}` : ""}`
-                      : "—"}
+                    {wbs?.budgetUnitCost != null ? (
+                      <button
+                        type="button"
+                        onClick={() => fillBudgetUnitPrice(i, wbs)}
+                        title="Usar este costo como precio unitario"
+                        className="text-left underline decoration-dotted underline-offset-2 hover:text-foreground"
+                      >
+                        {formatDecimalAr(Number(wbs.budgetUnitCost))}
+                        {wbs.budgetUnit ? ` / ${wbs.budgetUnit}` : ""}
+                      </button>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className="py-1.5">
                     <Input

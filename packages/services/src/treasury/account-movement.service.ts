@@ -4,6 +4,7 @@ import { auditTreasury } from "./treasury-audit";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { assertCanCancelAccountMovement } from "./account-movement-cancel-guards";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export type AccountMovementView = Omit<AccountMovement, "amount"> & {
   amount: string;
@@ -76,7 +77,7 @@ export async function cancelAccountMovement(
       "AccountMovement",
       id,
       { companyId: m.companyId, projectId: m.projectId },
-      { after: { status: "CANCELLED", amount: m.amount.toString() }, tx },
+      { after: { status: "CANCELLED", amount: serializeMoneyDecimal(m.amount) }, tx },
     );
 
     return updatedMovement;
@@ -88,5 +89,5 @@ export async function cancelAccountMovement(
 // ─── Serialization ────────────────────────────────────────────────────────────
 
 function serialize(m: AccountMovement): AccountMovementView {
-  return { ...m, amount: m.amount.toString() };
+  return { ...m, amount: serializeMoneyDecimal(m.amount) };
 }

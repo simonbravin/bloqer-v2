@@ -13,6 +13,7 @@ import {
 import { ReportExportActions } from "@/features/reports";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
+import { isStorageConfigured } from "@bloqer/config";
 import { listCompanySupplierInvoices, listContacts, ServiceError } from "@bloqer/services";
 import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
@@ -134,7 +135,11 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
           />
           {canCreateInvoice ? (
             <Suspense fallback={null}>
-              <NewCompanySupplierInvoiceDialog suppliers={suppliers} defaultOpen={sp.create === "1"} />
+              <NewCompanySupplierInvoiceDialog
+                suppliers={suppliers}
+                defaultOpen={sp.create === "1"}
+                storageConfigured={isStorageConfigured()}
+              />
             </Suspense>
           ) : null}
         </div>

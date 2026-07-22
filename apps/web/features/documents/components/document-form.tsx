@@ -38,6 +38,7 @@ export type DocumentFormProps = {
     | { type: "JOBSITE_LOG"; id: string }
     | { type: "CERTIFICATION"; id: string }
     | { type: "SUPPLIER_INVOICE"; id: string }
+    | { type: "SALES_INVOICE"; id: string }
     | { type: "PURCHASE_ORDER"; id: string }
     | { type: "PURCHASE_RECEIPT"; id: string }
     | { type: "PURCHASE_REQUEST"; id: string }

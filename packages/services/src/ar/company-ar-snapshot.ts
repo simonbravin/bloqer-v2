@@ -5,6 +5,7 @@ import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcemen
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import type { ReceivablesProjectSummary } from "./receivable.service";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export type CompanyReceivableSnapshotRow = {
   currency: string;
@@ -66,7 +67,7 @@ export function aggregateCompanyReceivableBalances(
   const toRows = (m: Map<string, Prisma.Decimal>) =>
     [...m.entries()]
       .filter(([, v]) => hasOpenObligationBalance(v, OBLIGATION_OPEN_BALANCE_EPSILON))
-      .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
+      .map(([currency, amount]) => ({ currency, amount: serializeMoneyDecimal(amount) }))
       .sort((a, b) => a.currency.localeCompare(b.currency));
 
   return { totalByCurrency: toRows(total), overdueByCurrency: toRows(overdue) };

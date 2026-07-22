@@ -17,15 +17,19 @@
 | `amount_ars` | Monto en ARS derivado; almacenado para reporting y sumas |
 | `base_amount` | Opcional para impuestos / bases imponibles |
 
-**Precisión sugerida (ajustable en migración):**
+**Storage (capacidad de columna) vs escala de negocio ([D-053](../00-product/DECISION_LOG.md)):**
 
-- Montos ARS / facturación: `NUMERIC(19, 4)`  
-- FX: `NUMERIC(18, 6)`  
-- Cantidades inventario: `NUMERIC(18, 4)` ([`../03-finance/MONEY_MODEL.md`](../03-finance/MONEY_MODEL.md))
+| Concepto | Escala de negocio | Capacidad DB típica |
+|---|---|---|
+| Montos operativos / `amount_ars` | **2** dp half-up | `NUMERIC(18, 4)` o `(19, 4)` — capacidad, no “guardar 4 dp de dinero” |
+| FX (`fx_rate`) | **6** dp | `NUMERIC(18, 6)` |
+| Cantidades inventario | **4** dp | `NUMERIC(18, 4)` ([`../03-finance/MONEY_MODEL.md`](../03-finance/MONEY_MODEL.md)) |
+
+Kernel de aplicación: `roundMoney` / `serializeMoney` / `resolveFxAmounts` en `@bloqer/utils`; DTOs money siempre con 2 dp; prohibido `float`/`parseFloat` en cálculo de dinero.
 
 ## Redondeo
 
-- Política **half-up** a la precisión del campo destino; suma de líneas: redondear línea y controlar tolerancia ([`../03-finance/MONEY_MODEL.md`](../03-finance/MONEY_MODEL.md)).
+- Política **half-up** a la precisión del campo destino; algoritmo de líneas y tolerancia en [`../03-finance/MONEY_MODEL.md`](../03-finance/MONEY_MODEL.md) y [D-053](../00-product/DECISION_LOG.md).
 
 ## Estados derivados (no son “dinero almacenado arbitrario”)
 

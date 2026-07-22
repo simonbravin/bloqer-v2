@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { roundMoney, serializeMoney } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { FillableAmount } from "@/components/ui/fillable-amount";
+import { cn } from "@/lib/utils";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -42,6 +45,21 @@ export function CollectionForm({
   const [accountId, setAccountId] = useState("");
 
   const matchingAccounts = accounts.filter((a) => a.currency === receivableCurrency);
+  const balanceSerialized = serializeMoney(receivableBalance);
+  const [amount, setAmount] = useState(balanceSerialized);
+  const [flash, setFlash] = useState(false);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+  }, []);
+
+  function fillAmount(next: string) {
+    setAmount(serializeMoney(next));
+    setFlash(true);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(false), 900);
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -51,12 +69,26 @@ export function CollectionForm({
       return;
     }
     const fd = new FormData(e.currentTarget);
+    const rawAmount = String(fd.get("amount") ?? "").trim();
+    let rounded: string;
+    try {
+      rounded = roundMoney(rawAmount);
+    } catch {
+      setError("Monto inválido");
+      return;
+    }
+    // D-053: full balance uses stored balanceDue server-side (avoid round-then-reapply).
+    const collectFullBalance =
+      rounded === balanceSerialized ||
+      rawAmount === receivableBalance ||
+      rawAmount === balanceSerialized;
     const payload = {
       receivableId,
       accountId,
       collectionDate: fd.get("collectionDate") as string,
-      amount:         fd.get("amount") as string,
-      notes:          (fd.get("notes") as string) || null,
+      amount: collectFullBalance ? undefined : rounded,
+      collectFullBalance: collectFullBalance || undefined,
+      notes: (fd.get("notes") as string) || null,
     };
     startTransition(async () => {
       const res = companyFinanzas
@@ -112,16 +144,32 @@ export function CollectionForm({
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="amount">
-              Monto (máx. {receivableBalance} {receivableCurrency})
-            </Label>
+            <Label htmlFor="amount">Monto ({receivableCurrency})</Label>
             <Input
               id="amount"
               name="amount"
+              type="number"
               required
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
-              pattern="^\d+(\.\d+)?$"
-              max={receivableBalance}
+              step="0.01"
+              min="0.01"
+              inputMode="decimal"
+              max={balanceSerialized}
+              className={cn(flash && "ring-2 ring-primary transition-shadow")}
+            />
+            <FillableAmount
+              className="pt-1"
+              onPick={(v) => fillAmount(v)}
+              toastOnPick={() => "Monto completado con el saldo pendiente."}
+              suggestions={[
+                {
+                  label: "Saldo pendiente",
+                  amount: receivableBalance,
+                  currency: receivableCurrency,
+                },
+              ]}
             />
           </div>
         </div>

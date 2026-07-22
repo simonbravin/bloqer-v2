@@ -13,8 +13,10 @@ Donde `fx_rate` = ARS por 1 unidad de moneda extranjera.
 |---:|---|---:|---:|
 | 5.000 | USD | 1.180 | 5.900.000 |
 
-## Redondeo
-`amount_ars` redondeado a **2** decimales.
+## Redondeo ([D-053](../00-product/DECISION_LOG.md))
+- `fx_rate` almacenado/redondeado a **6** decimales.
+- `amount_ars = roundMoney(amount × fx_rate)` a **2** decimales (half-up).
+- Sin `float` en la conversión; usar el kernel decimal de `@bloqer/utils`.
 
 ## Inversa (solo para visualización)
 \[

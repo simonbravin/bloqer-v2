@@ -3,15 +3,19 @@
 import {
   createSupplierInvoice,
   createSupplierInvoiceDraftFromPurchaseOrder,
+  getPurchaseOrderInvoiceDraftPreview,
   updateSupplierInvoice,
   issueSupplierInvoice,
   cancelSupplierInvoice,
+  registerApExpense,
   ServiceError,
+  type PurchaseOrderInvoiceDraftPreview,
 } from "@bloqer/services";
 import {
   createSupplierInvoiceSchema,
   createSupplierInvoiceFromPurchaseOrderSchema,
   updateSupplierInvoiceSchema,
+  registerApExpenseSchema,
   type CreateSupplierInvoiceInput,
   type UpdateSupplierInvoiceInput,
 } from "@bloqer/validators";
@@ -66,6 +70,67 @@ export async function createSupplierInvoiceFromPurchaseOrderAction(
       `/proyectos/${projectId}/facturas-proveedor/${inv.id}`,
     ]);
     return { id: inv.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function getPurchaseOrderInvoiceDraftPreviewAction(
+  projectId: string,
+  purchaseOrderId: string,
+): Promise<PurchaseOrderInvoiceDraftPreview | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    return await getPurchaseOrderInvoiceDraftPreview(purchaseOrderId, projectId, ctx);
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function registerProjectApExpenseAction(
+  projectId: string,
+  data: {
+    supplierContactId: string;
+    issueDate: string;
+    dueDate: string;
+    currency?: string;
+    notes?: string | null;
+    purchaseOrderId?: string | null;
+    lines: CreateSupplierInvoiceInput["lines"];
+    payNow?: {
+      accountId: string;
+      paymentDate: string;
+      amount?: string;
+      payFullBalance?: boolean;
+      notes?: string | null;
+    };
+  },
+): Promise<{ id: string; paymentId?: string } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = registerApExpenseSchema.safeParse({
+    ...data,
+    projectId,
+    currency: data.currency ?? "ARS",
+    internalNotes: null,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    const result = await registerApExpense(parsed.data, ctx);
+    const invoiceId =
+      result.primaryEntityType === "SupplierInvoice"
+        ? result.primaryEntityId
+        : result.traceChain.find((l) => l.entityType === "SupplierInvoice")?.entityId;
+    if (!invoiceId) {
+      return { error: "No se pudo resolver la factura creada" };
+    }
+    revalidateProjectApPaths(projectId, [
+      `/proyectos/${projectId}/facturas-proveedor/${invoiceId}`,
+      `/proyectos/${projectId}/pagos`,
+    ]);
+    return {
+      id: invoiceId,
+      paymentId: result.primaryEntityType === "Payment" ? result.primaryEntityId : undefined,
+    };
   } catch (err) {
     return handle(err);
   }

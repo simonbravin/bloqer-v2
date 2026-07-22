@@ -87,7 +87,7 @@ export async function registerArAdvance(
       collectNow: {
         accountId: input.collectNow.accountId,
         collectionDate: input.collectNow.collectionDate,
-        amount: input.collectNow.amount ?? amount,
+        collectFullBalance: true,
         notes: input.collectNow.notes ?? "Cobro de anticipo",
       },
     },

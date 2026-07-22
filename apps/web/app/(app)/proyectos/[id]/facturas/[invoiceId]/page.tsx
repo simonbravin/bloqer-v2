@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
@@ -12,8 +12,16 @@ import {
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SalesInvoiceStatusBadge } from "@/features/sales-invoices";
+import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
-import { getReceivableBySalesInvoiceId, getSalesInvoiceById, ServiceError } from "@bloqer/services";
+import { can } from "@bloqer/domain";
+import { isStorageConfigured } from "@bloqer/config";
+import {
+  getReceivableBySalesInvoiceId,
+  getSalesInvoiceById,
+  listEntityDocuments,
+  ServiceError,
+} from "@bloqer/services";
 import { issueSalesInvoiceAction, cancelSalesInvoiceAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
@@ -58,6 +66,12 @@ export default async function FacturaDetailPage({ params }: PageProps) {
     throw err;
   }
   if (invoice.projectId !== id || (receivable && receivable.projectId !== id)) notFound();
+
+  const invoiceAttachments = await listEntityDocuments("SALES_INVOICE", invoiceId, ctx, {
+    projectId: id,
+  });
+  const storageConfigured = isStorageConfigured();
+  const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "AR");
 
   const doIssue = async () => {
     "use server";
@@ -221,6 +235,14 @@ export default async function FacturaDetailPage({ params }: PageProps) {
           </div>
         </TableScroll>
       </DataTableSection>
+
+      <EntityDocumentsPanel
+        scope={{ kind: "project", projectId: id }}
+        linkedEntity={{ type: "SALES_INVOICE", id: invoiceId }}
+        storageConfigured={storageConfigured}
+        docs={invoiceAttachments}
+        canEdit={canEditAttachments}
+      />
     </PageShell>
   );
 }

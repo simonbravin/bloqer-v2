@@ -12,6 +12,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea, canViewArProjectArea } from "./ar-access";
 import { resolvePagination } from "../finance/pagination";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 // ─── View types ───────────────────────────────────────────────────────────────
@@ -610,9 +611,9 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): ProjectSalesInvoiceLis
     ...inv,
     code: `FAC-${String(inv.number).padStart(5, "0")}`,
     clientName: inv.clientContact.fantasyName ?? inv.clientContact.legalName,
-    subtotal: inv.subtotal.toString(),
-    taxAmount: inv.taxAmount.toString(),
-    totalAmount: inv.totalAmount.toString(),
+    subtotal: serializeMoneyDecimal(inv.subtotal),
+    taxAmount: serializeMoneyDecimal(inv.taxAmount),
+    totalAmount: serializeMoneyDecimal(inv.totalAmount),
   };
 }
 
@@ -638,19 +639,19 @@ function serializeInvoice(inv: RawInvoice): SalesInvoiceWithLines {
     ...inv,
     code: `FAC-${String(inv.number).padStart(5, "0")}`,
     clientName: inv.clientContact.fantasyName ?? inv.clientContact.legalName,
-    subtotal: inv.subtotal.toString(),
-    taxAmount: inv.taxAmount.toString(),
-    totalAmount: inv.totalAmount.toString(),
+    subtotal: serializeMoneyDecimal(inv.subtotal),
+    taxAmount: serializeMoneyDecimal(inv.taxAmount),
+    totalAmount: serializeMoneyDecimal(inv.totalAmount),
     lines: inv.lines.map((l) => ({
       id: l.id,
       invoiceId: l.invoiceId,
       description: l.description,
       quantity: l.quantity.toString(),
-      unitPrice: l.unitPrice.toString(),
+      unitPrice: serializeMoneyDecimal(l.unitPrice),
       taxRate: l.taxRate.toString(),
-      lineSubtotal: l.lineSubtotal.toString(),
-      lineTax: l.lineTax.toString(),
-      lineTotal: l.lineTotal.toString(),
+      lineSubtotal: serializeMoneyDecimal(l.lineSubtotal),
+      lineTax: serializeMoneyDecimal(l.lineTax),
+      lineTotal: serializeMoneyDecimal(l.lineTotal),
       certificationLineId: l.certificationLineId,
       sortOrder: l.sortOrder,
     })),

@@ -12,6 +12,10 @@ describe("normalizeObligationBalanceDue", () => {
     assert.equal(normalizeObligationBalanceDue(new Prisma.Decimal("0.0022")).toString(), "0");
   });
 
+  it("preserves a real cent (0.01) as open balance", () => {
+    assert.equal(normalizeObligationBalanceDue(new Prisma.Decimal("0.01")).toString(), "0.01");
+  });
+
   it("preserves open balances above tolerance", () => {
     assert.equal(normalizeObligationBalanceDue(new Prisma.Decimal("0.02")).toString(), "0.02");
   });

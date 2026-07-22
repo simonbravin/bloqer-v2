@@ -13,6 +13,7 @@ import { assertArTenantModule, assertTreasuryTenantModule } from "../tenant-modu
 import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea } from "./ar-access";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
+import { toMoneyDecimal } from "../finance/money-decimal";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 function isUniqueConstraintError(err: unknown): boolean {
@@ -226,9 +227,11 @@ export async function registerArSale(
         let collectAccountId: string | undefined;
 
         if (input.collectNow) {
-          const collectAmount = input.collectNow.amount
-            ? new Prisma.Decimal(input.collectNow.amount)
-            : refreshed.totalAmount;
+          // D-053: collectFullBalance / omitted amount → stored invoice total.
+          const collectAmount =
+            input.collectNow.collectFullBalance || input.collectNow.amount == null
+              ? refreshed.totalAmount
+              : toMoneyDecimal(input.collectNow.amount);
           if (collectAmount.lessThanOrEqualTo(0)) {
             throw new ServiceError("VALIDATION", "El monto de cobro debe ser mayor a 0");
           }
@@ -331,9 +334,10 @@ export async function registerArSale(
         );
 
         if (collectionId) {
-          const collectAmount = input.collectNow!.amount
-            ? new Prisma.Decimal(input.collectNow!.amount)
-            : refreshed.totalAmount;
+          const collectAmount =
+            input.collectNow!.collectFullBalance || input.collectNow!.amount == null
+              ? refreshed.totalAmount
+              : toMoneyDecimal(input.collectNow!.amount);
           await auditAr(
             ctx,
             "collection.confirmed",

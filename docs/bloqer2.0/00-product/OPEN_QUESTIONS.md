@@ -449,6 +449,31 @@
 - **Decisión:** toda línea de `PurchaseRequest` y `PurchaseOrder` de proyecto **debe** imputar a un WBS `ITEM` del presupuesto aprobado/cerrado. Los gastos generales / indirectos de obra se modelan como **partida(s) WBS presupuestables**, nunca como línea sin `wbs_node_id`. Overhead de empresa sin obra queda fuera de este flujo ([D-035], [D-040]).
 - **Documentos:** [`02-modules/PURCHASE_REQUESTS.md`](../02-modules/PURCHASE_REQUESTS.md), [`02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md`](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [BR-PUR-007].
 
+### Q-053 — Cost code / WBS en líneas de factura de proveedor (gasto manual)
+
+- **Categoría:** Costos / AP
+- **Estado:** ABIERTA
+- **Contexto:** `SupplierInvoiceLine` no tiene `wbsNodeId`. Un gasto de proyecto sin OC no imputa a ítem de presupuesto; el presupuesto-vs-real por partida queda ciego a esos egresos ([COST_FORMULAS §1.4/§3](../04-formulas/COST_FORMULAS.md)). Detectado al alinear AP con Procore ([D-052]).
+- **Opciones tentativas:**
+  1. Agregar `wbsNodeId` opcional/obligatorio en líneas de factura de proyecto.
+  2. Exigir OC vinculada para gastos de obra (sin gasto manual libre).
+  3. Imputar solo a nivel proyecto (status quo) y aceptar pérdida de granularidad.
+- **Bloquea:** reporting de costo real por ítem para gastos directos sin OC. Alta prioridad post [D-052].
+
+### Q-054 — Método de pago y referencia/comprobante en Payment / Collection
+
+- **Categoría:** Tesorería / AP-AR
+- **Estado:** ABIERTA
+- **Contexto:** `Payment` y `Collection` no tienen `paymentMethod` (efectivo / transferencia / cheque / tarjeta) ni `reference` (nro de transferencia o cheque). Hoy solo `notes`. Estándar en QuickBooks/Xero; útil para conciliación ([Q-007]).
+- **Bloquea:** UX de conciliación y trazabilidad bancaria fina. Requiere migración.
+
+### Q-055 — Cobrar ahora inline en facturas de venta de proyecto
+
+- **Categoría:** AR / UX
+- **Estado:** ABIERTA — diferida conscientemente en [D-052](./DECISION_LOG.md)
+- **Contexto:** a nivel empresa ya existe `collectNow` ([D-051]). En obra la CxC suele venir de certificaciones; el alta manual de factura de venta de proyecto no ofrece cobro inmediato.
+- **Bloquea:** paridad UX AP/AR a nivel proyecto (no bloquea el flujo de cobro posterior ni anticipos).
+
 ---
 
 ## Cómo se resuelve una pregunta

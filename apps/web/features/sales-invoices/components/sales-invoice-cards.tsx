@@ -3,16 +3,7 @@ import { formatDate } from "@/lib/format";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { SalesInvoiceStatusBadge } from "./sales-invoice-status-badge";
 import type { SalesInvoiceListItem } from "./sales-invoice-list";
-
-function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      parseFloat(value),
-    ) +
-    " " +
-    currency
-  );
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 export function SalesInvoiceCards({
   invoices,
@@ -44,7 +35,7 @@ export function SalesInvoiceCards({
             {formatDate(inv.issueDate)} · vto. {formatDate(inv.dueDate)}
           </p>
           <p className="mt-3 text-lg font-semibold tabular-nums">
-            {fmtMoney(inv.totalAmount, inv.currency)}
+            {formatMoneyAmount(inv.totalAmount)} {inv.currency}
           </p>
         </Link>
       ))}

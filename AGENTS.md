@@ -25,7 +25,7 @@ Leer en este orden:
   Si falta algo, agregarlo a `docs/bloqer2.0/00-product/OPEN_QUESTIONS.md` y preguntar.
 - **No poner lógica financiera crítica en componentes React.** Toda mutación va por `packages/services`.
 - **No acceder a Prisma directamente desde `apps/web`.** Usar repositorios en `packages/database`.
-- **No usar `float` para dinero.** Ver `docs/bloqer2.0/03-finance/MONEY_MODEL.md`.
+- **No usar `float` para dinero.** Ver `docs/bloqer2.0/03-finance/MONEY_MODEL.md` y [D-053]: montos operativos a 2 dp half-up vía `roundMoney`/`serializeMoney` (`@bloqer/utils`); FX 6; qty/% 4.
 - **Toda entidad operativa debe tener `tenant_id`.** No hay excepción de "solo para demo".
 - **Toda mutación importante pasa por el service layer** (`packages/services`).
 - **Los estados de las entidades son los documentados** en `docs/bloqer2.0/01-domain/STATE_MACHINES.md`. No inventar estados nuevos sin actualizar ese documento primero.

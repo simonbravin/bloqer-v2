@@ -2,14 +2,12 @@ import { Prisma, prisma, Payment } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreatePaymentInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
-import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
+import { applyPaymentToPayable } from "./apply-payment-to-payable";
+import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
-import { effectiveObligationPaidAfterPayment } from "../finance/obligation-balance";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
-import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
-import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
-import { assertTreasuryAccountCurrencyMatches } from "../treasury/treasury-currency-guards";
+import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
@@ -180,13 +178,9 @@ export async function createPayment(
   projectScopeId?: string,
 ): Promise<PaymentView> {
   await assertApTenantModule(ctx);
+  await assertTreasuryTenantModule(ctx);
   if (!can(ctx.roles, "EDIT", "AP")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para registrar pagos");
-  }
-
-  const amount = new Prisma.Decimal(input.amount);
-  if (amount.lessThanOrEqualTo(0)) {
-    throw new ServiceError("VALIDATION", "El monto debe ser mayor a 0");
   }
 
   const payablePreview = await prisma.payable.findUnique({
@@ -217,6 +211,20 @@ export async function createPayment(
       throw new ServiceError("CONFLICT", "La cuenta por pagar ya está totalmente pagada");
     }
 
+    const balanceDue = payable.originalAmount.minus(payable.paidAmount);
+    // D-053: payFullBalance applies stored balance; never round-then-reapply from UI.
+    // Also treat amount that rounds to the same 2dp as balance as full (API clients).
+    let amount: Prisma.Decimal;
+    if (input.payFullBalance) {
+      amount = balanceDue;
+    } else {
+      const partial = toMoneyDecimal(input.amount ?? "0");
+      amount = partial.eq(toMoneyDecimal(balanceDue)) ? balanceDue : partial;
+    }
+    if (amount.lessThanOrEqualTo(0)) {
+      throw new ServiceError("VALIDATION", "El monto debe ser mayor a 0");
+    }
+
     const supplierInvoice = await tx.supplierInvoice.findUnique({
       where: { id: payable.supplierInvoiceId },
       select: { status: true, number: true },
@@ -228,90 +236,20 @@ export async function createPayment(
       throw new ServiceError("CONFLICT", "No se puede pagar una factura de proveedor cancelada");
     }
 
-    const balanceDue = payable.originalAmount.minus(payable.paidAmount);
-    // BR-AP-005: block overpayment
-    if (amount.greaterThan(balanceDue)) {
-      throw new ServiceError(
-        "CONFLICT",
-        `El monto (${amount}) supera el saldo pendiente (${balanceDue}). No se permiten sobrepagos.`,
-      );
-    }
-
-    // Validate account
-    const account = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
-    if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
-    if (account.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    if (account.status !== "ACTIVE") {
-      throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
-    }
-    assertTreasuryAccountCurrencyMatches(account.currency, payable.currency);
-
-    const companyId = ctx.companyId ?? account.companyId ?? payable.companyId;
-    const fx = computeDocumentFxAmounts(payable.currency, amount);
-
-    // Create Payment
-    const payment = await tx.payment.create({
-      data: {
-        tenantId:          ctx.tenantId,
-        companyId,
-        projectId:         payable.projectId,
-        supplierContactId: payable.supplierContactId,
-        payableId:         payable.id,
-        supplierInvoiceId: payable.supplierInvoiceId,
-        accountId:         input.accountId,
-        paymentDate:       new Date(input.paymentDate),
-        currency:          payable.currency,
+    const applied = await applyPaymentToPayable(
+      tx,
+      {
+        payable,
+        accountId: input.accountId,
         amount,
-        fxRate:            fx.fxRate,
-        amountArs:         fx.amountArs,
-        notes:             input.notes ?? null,
-        status:            "CONFIRMED",
-        createdBy:         ctx.actorUserId,
-        updatedBy:         ctx.actorUserId,
+        paymentDate: input.paymentDate,
+        notes: input.notes ?? null,
       },
-    });
-
-    // Create AccountMovement OUTFLOW
-    await tx.accountMovement.create({
-      data: {
-        tenantId:    ctx.tenantId,
-        companyId:   account.companyId,
-        projectId:   payable.projectId,
-        accountId:   input.accountId,
-        movementDate: new Date(input.paymentDate),
-        type:        "OUTFLOW",
-        sourceType:  "PAYMENT",
-        sourceId:    payment.id,
-        currency:    payable.currency,
-        amount,
-        description: `Pago factura proveedor ${payable.supplierInvoiceId}`,
-        status:      "CONFIRMED",
-        createdBy:   ctx.actorUserId,
-      },
-    });
-
-    // Update Payable
-    const newPaid    = effectiveObligationPaidAfterPayment(
-      payable.originalAmount,
-      payable.paidAmount.plus(amount),
-    );
-    const newStatus  = resolveObligationStoredStatus(newPaid, payable.originalAmount);
-
-    const payableUpdate = await tx.payable.updateMany({
-      where: {
-        id: payable.id,
-        paidAmount: payable.paidAmount,
-        status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
-      },
-      data: { paidAmount: newPaid, status: newStatus, updatedBy: ctx.actorUserId },
-    });
-    assertOptimisticRowUpdate(
-      payableUpdate.count,
-      "El saldo cambió mientras registrabas el pago. Revisá el saldo pendiente e intentá de nuevo.",
+      ctx,
     );
 
     const result = await tx.payment.findUniqueOrThrow({
-      where: { id: payment.id },
+      where: { id: applied.paymentId },
       include: { account: { select: { name: true } } },
     });
 
@@ -324,7 +262,8 @@ export async function createPayment(
       {
         after: {
           payableId: input.payableId,
-          amount: input.amount,
+          amount: serializeMoneyDecimal(amount),
+          payFullBalance: Boolean(input.payFullBalance),
           number: supplierInvoice.number,
         },
         tx,
@@ -420,5 +359,5 @@ export async function cancelPayment(
 type RawPayment = Payment & { account: { name: string } };
 
 function serialize(p: RawPayment): PaymentView {
-  return { ...p, amount: p.amount.toString(), accountName: p.account.name };
+  return { ...p, amount: serializeMoneyDecimal(p.amount), accountName: p.account.name };
 }

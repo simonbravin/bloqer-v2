@@ -1,10 +1,16 @@
 import { z } from "zod";
+import {
+  moneyAmountString,
+  optionalMoneyAmountString,
+  qtyString,
+  ratePctString,
+} from "./money";
 
 const invoiceLineSchema = z.object({
   description: z.string().min(1),
-  quantity:    z.string().regex(/^\d+(\.\d+)?$/, "Cantidad inválida"),
-  unitPrice:   z.string().regex(/^\d+(\.\d+)?$/, "Precio inválido"),
-  taxRate:     z.string().regex(/^\d+(\.\d+)?$/).optional().default("0"),
+  quantity:    qtyString,
+  unitPrice:   moneyAmountString,
+  taxRate:     ratePctString.optional().default("0.0000"),
   sortOrder:   z.number().int().min(0).optional().default(0),
   certificationLineId: z.string().uuid().optional().nullable(),
 });
@@ -33,7 +39,7 @@ export const createInvoiceFromCertificationSchema = z.object({
   certificationId: z.string().uuid(),
   issueDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dueDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  taxRate:         z.string().regex(/^\d+(\.\d+)?$/).optional().default("21"),
+  taxRate:         ratePctString.optional().default("21.0000"),
   notes:           z.string().optional().nullable(),
   internalNotes:   z.string().optional().nullable(),
 });
@@ -48,10 +54,12 @@ export const updateSalesInvoiceSchema = z.object({
 
 
 export const collectNowSchema = z.object({
-  accountId:      z.string().uuid(),
-  collectionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  amount:         z.string().regex(/^\d+(\.\d+)?$/, "Monto invalido").optional(),
-  notes:          z.string().optional().nullable(),
+  accountId:            z.string().uuid(),
+  collectionDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  amount:               optionalMoneyAmountString,
+  /** When true or amount omitted, server collects stored total ([D-053]). */
+  collectFullBalance:   z.boolean().optional(),
+  notes:                z.string().optional().nullable(),
 });
 
 export const registerArSaleSchema = createSalesInvoiceSchema.extend({

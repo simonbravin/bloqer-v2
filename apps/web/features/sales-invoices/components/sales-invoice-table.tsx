@@ -12,16 +12,7 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SalesInvoiceStatusBadge } from "./sales-invoice-status-badge";
 import type { SalesInvoiceListItem } from "./sales-invoice-list";
-
-function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      parseFloat(value),
-    ) +
-    " " +
-    currency
-  );
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 export function SalesInvoiceTable({
   invoices,
@@ -67,7 +58,7 @@ export function SalesInvoiceTable({
                 <SalesInvoiceStatusBadge status={inv.status} />
               </TableCell>
               <TableCell className="text-right font-mono text-sm">
-                {fmtMoney(inv.totalAmount, inv.currency)}
+                {formatMoneyAmount(inv.totalAmount)} {inv.currency}
               </TableCell>
             </TableRow>
           ))}

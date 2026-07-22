@@ -13,6 +13,7 @@ import {
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatCurrencyDisplay } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 const TYPE_LABELS: Record<string, string> = {
   BANK: "Banco",
@@ -26,17 +27,6 @@ const STATUS_LABELS: Record<string, string> = {
   INACTIVE: "Inactiva",
   CLOSED: "Cerrada",
 };
-
-function formatAmount(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
-
-function fmtBalance(value: string, currency: string) {
-  return `${formatAmount(value)} ${currency}`;
-}
 
 interface Props {
   report: CashPositionReport;
@@ -54,7 +44,7 @@ export function CashPositionTable({ report }: Props) {
           <KpiStatCard
             key={c.currency}
             label={`Posición ${c.currency}`}
-            value={formatAmount(c.totalBalance)}
+            value={formatMoneyAmount(c.totalBalance)}
             subtitle={formatCurrencyDisplay(c.currency)}
           />
         ))}
@@ -86,7 +76,7 @@ export function CashPositionTable({ report }: Props) {
                     {STATUS_LABELS[acc.status] ?? acc.status}
                   </TableCell>
                   <TableCell className="text-right tabular-nums font-mono">
-                    {fmtBalance(acc.balance, acc.currency)}
+                    {formatMoneyAmount(acc.balance)} {acc.currency}
                   </TableCell>
                 </TableRow>
               ))}
@@ -117,7 +107,7 @@ export function CashPositionTable({ report }: Props) {
                       )}
                       <TableCell>{formatCurrencyDisplay(c.currency)}</TableCell>
                       <TableCell className="text-right tabular-nums font-mono">
-                        {fmtBalance(c.totalBalance, c.currency)}
+                        {formatMoneyAmount(c.totalBalance)} {c.currency}
                       </TableCell>
                     </TableRow>
                   )),

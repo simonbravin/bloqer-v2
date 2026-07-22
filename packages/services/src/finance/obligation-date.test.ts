@@ -102,8 +102,8 @@ describe("aggregateCorporatePayableBalances", () => {
     ];
     const summary = aggregateCorporatePayableBalances(rows, TODAY);
     assert.equal(summary.totalByCurrency.length, 1);
-    assert.equal(summary.totalByCurrency[0]!.amount, "150");
-    assert.equal(summary.overdueByCurrency[0]!.amount, "100");
+    assert.equal(summary.totalByCurrency[0]!.amount, "150.00");
+    assert.equal(summary.overdueByCurrency[0]!.amount, "100.00");
   });
 });
 

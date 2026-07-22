@@ -7,7 +7,7 @@ export { SupplierInvoiceCards } from "./components/supplier-invoice-cards";
 export { SupplierInvoiceListSection } from "./components/supplier-invoice-list-section";
 export type { SupplierInvoiceListItem } from "./components/supplier-invoice-list";
 export { SupplierInvoiceForm } from "./components/supplier-invoice-form";
-export type { SupplierOption, POOption } from "./components/supplier-invoice-form";
+export type { SupplierOption, POOption, TreasuryAccountOption } from "./components/supplier-invoice-form";
 export { NewCompanySupplierInvoiceDialog } from "./components/new-company-supplier-invoice-dialog";
 export { SupplierInvoiceEditForm } from "./components/supplier-invoice-edit-form";
 export type { PayableListItem } from "./components/payable-list";

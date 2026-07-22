@@ -11,12 +11,14 @@ import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
 
 const PO_AP_LINKABLE_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
 
-function assertPurchaseOrderLinkableForAp(status: string): void {
+/** Shared with registerApExpense — OC must be confirmed (or later receipt states) before AP link. */
+export function assertPurchaseOrderLinkableForAp(status: string): void {
   if (status === "CANCELLED") {
     throw new ServiceError("CONFLICT", "No se puede vincular a una orden de compra anulada");
   }
@@ -758,9 +760,9 @@ type RawInvoiceListRow = SupplierInvoice & {
 function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoiceListRow {
   return {
     ...inv,
-    subtotal:    inv.subtotal.toString(),
-    taxAmount:   inv.taxAmount.toString(),
-    totalAmount: inv.totalAmount.toString(),
+    subtotal:    serializeMoneyDecimal(inv.subtotal),
+    taxAmount:   serializeMoneyDecimal(inv.taxAmount),
+    totalAmount: serializeMoneyDecimal(inv.totalAmount),
     code:        `FP-${String(inv.number).padStart(5, "0")}`,
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
     subcontractCertificationCode: null,
@@ -771,9 +773,9 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoice
 function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
   return {
     ...inv,
-    subtotal:    inv.subtotal.toString(),
-    taxAmount:   inv.taxAmount.toString(),
-    totalAmount: inv.totalAmount.toString(),
+    subtotal:    serializeMoneyDecimal(inv.subtotal),
+    taxAmount:   serializeMoneyDecimal(inv.taxAmount),
+    totalAmount: serializeMoneyDecimal(inv.totalAmount),
     code:        `FP-${String(inv.number).padStart(5, "0")}`,
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
     subcontractCertificationCode: inv.subcontractCertification
@@ -785,11 +787,11 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
       invoiceId:   l.invoiceId,
       description: l.description,
       quantity:    l.quantity.toString(),
-      unitPrice:   l.unitPrice.toString(),
+      unitPrice:   serializeMoneyDecimal(l.unitPrice),
       taxRate:     l.taxRate.toString(),
-      lineSubtotal: l.lineSubtotal.toString(),
-      lineTax:     l.lineTax.toString(),
-      lineTotal:   l.lineTotal.toString(),
+      lineSubtotal: serializeMoneyDecimal(l.lineSubtotal),
+      lineTax:     serializeMoneyDecimal(l.lineTax),
+      lineTotal:   serializeMoneyDecimal(l.lineTotal),
       sortOrder:   l.sortOrder,
     })),
   };

@@ -11,20 +11,7 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatDate } from "@/lib/format";
-
-function formatMoney(raw: string, currency: string): string {
-  const n = Number(raw);
-  if (Number.isNaN(n)) return raw;
-  try {
-    return new Intl.NumberFormat("es-AR", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(n);
-  } catch {
-    return `${raw} ${currency}`;
-  }
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 export function FinanceProjectionPanel({ projection }: { projection: FinanceProjectionSummary }) {
   const hasProjectionRows = projection.rows.length > 0;
@@ -66,10 +53,10 @@ export function FinanceProjectionPanel({ projection }: { projection: FinanceProj
                   <TableRow key={row.currency}>
                     <TableCell className="font-medium">{row.currency}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatMoney(row.cashBalance, row.currency)}
+                      {formatMoneyAmount(row.cashBalance, row.currency)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {formatMoney(row.expectedOutflows90d, row.currency)}
+                      {formatMoneyAmount(row.expectedOutflows90d, row.currency)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
                       {row.openPayableCount}
@@ -81,7 +68,7 @@ export function FinanceProjectionPanel({ projection }: { projection: FinanceProj
                           : "text-right tabular-nums font-medium"
                       }
                     >
-                      {formatMoney(row.projectedBalance, row.currency)}
+                      {formatMoneyAmount(row.projectedBalance, row.currency)}
                     </TableCell>
                   </TableRow>
                 ))}

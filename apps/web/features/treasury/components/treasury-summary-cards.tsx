@@ -3,13 +3,7 @@
 import type { AccountBalanceSummary } from "@bloqer/services";
 import { KpiStatCard, type KpiStatTone } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
-
-function fmtMoney(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 interface TreasurySummaryCardsProps {
   summaries: AccountBalanceSummary[];
@@ -33,7 +27,7 @@ export function TreasurySummaryCards({ summaries }: TreasurySummaryCardsProps) {
           key={s.accountId}
           iconKey="treasury_balance"
           label={s.name}
-          value={fmtMoney(s.balance)}
+          value={formatMoneyAmount(s.balance)}
           subtitle={s.currency}
           tone={treasuryBalanceTone(s.balance)}
         />
@@ -43,7 +37,7 @@ export function TreasurySummaryCards({ summaries }: TreasurySummaryCardsProps) {
         <KpiStatCard
           iconKey="treasury_balance"
           label="Total ARS (cuentas activas)"
-          value={fmtMoney(totalARS.toFixed(2))}
+          value={formatMoneyAmount(totalARS.toFixed(2))}
           subtitle="ARS"
           variant="highlight"
           tone={treasuryBalanceTone(String(totalARS))}

@@ -3,13 +3,7 @@ import { formatDate } from "@/lib/format";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { CollectionStatusBadge } from "./collection-status-badge";
 import type { CollectionListItem } from "./collection-list";
-
-function fmtMoney(value: string, currency: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value)) + " " + currency;
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 export function CollectionCards({
   collections,
@@ -38,7 +32,9 @@ export function CollectionCards({
           <p className="mt-1 text-sm text-muted-foreground">{c.notes ?? "Sin notas"}</p>
           <div className="mt-3 flex justify-between gap-2 text-sm tabular-nums">
             <span className="text-muted-foreground">Monto</span>
-            <span className="font-medium">{fmtMoney(c.amount, c.currency)}</span>
+            <span className="font-medium">
+              {formatMoneyAmount(c.amount)} {c.currency}
+            </span>
           </div>
         </Link>
       ))}

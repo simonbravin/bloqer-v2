@@ -16,7 +16,8 @@ export async function registerTransaction(
   switch (input.kind) {
     case "AP_EXPENSE": {
       const { kind: _k, ...payload } = input;
-      return registerApExpense(payload, ctx);
+      // Corporate entry point always creates company-level AP ([D-048]); project uses its own action.
+      return registerApExpense({ ...payload, projectId: null, purchaseOrderId: null }, ctx);
     }
     case "TREASURY_INFLOW": {
       const { kind: _k, ...payload } = input;

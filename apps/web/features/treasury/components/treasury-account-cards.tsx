@@ -3,6 +3,7 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TreasuryAccountStatusBadge } from "./treasury-account-status-badge";
 import type { TreasuryAccountListItem } from "./treasury-account-list";
 import type { TreasuryAccountType } from "@bloqer/database";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 const TYPE_LABELS: Record<TreasuryAccountType, string> = {
   BANK: "Banco",
@@ -10,17 +11,6 @@ const TYPE_LABELS: Record<TreasuryAccountType, string> = {
   DIGITAL_WALLET: "Billetera",
   OTHER: "Otro",
 };
-
-function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(parseFloat(value)) +
-    " " +
-    currency
-  );
-}
 
 export function TreasuryAccountCards({ accounts }: { accounts: TreasuryAccountListItem[] }) {
   if (accounts.length === 0) {
@@ -45,7 +35,9 @@ export function TreasuryAccountCards({ accounts }: { accounts: TreasuryAccountLi
           ) : null}
           <div className="mt-3 flex justify-between gap-2 text-sm tabular-nums">
             <span className="text-muted-foreground">Saldo</span>
-            <span className="font-medium">{fmtMoney(acc.balance, acc.currency)}</span>
+            <span className="font-medium">
+              {formatMoneyAmount(acc.balance)} {acc.currency}
+            </span>
           </div>
         </Link>
       ))}

@@ -8,6 +8,7 @@ import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { canViewCompanyAp } from "./ap-access";
 import type { PayablesProjectSummary } from "./payable.service";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export type CorporatePayableSnapshotRow = {
   currency: string;
@@ -99,7 +100,7 @@ export function aggregateCorporatePayableBalances(
   const toRows = (m: Map<string, Prisma.Decimal>) =>
     [...m.entries()]
       .filter(([, v]) => hasOpenObligationBalance(v, OBLIGATION_OPEN_BALANCE_EPSILON))
-      .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
+      .map(([currency, amount]) => ({ currency, amount: serializeMoneyDecimal(amount) }))
       .sort((a, b) => a.currency.localeCompare(b.currency));
 
   return { totalByCurrency: toRows(total), overdueByCurrency: toRows(overdue) };
@@ -132,7 +133,7 @@ export function aggregateCorporatePayableOperations(
       .map(([currency, agg]) => ({
         currency,
         openLineCount: agg.count,
-        totalBalanceDue: agg.sum.toString(),
+        totalBalanceDue: serializeMoneyDecimal(agg.sum),
       })),
   };
 }

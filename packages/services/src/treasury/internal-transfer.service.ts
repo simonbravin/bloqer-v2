@@ -5,6 +5,7 @@ import { auditTreasury } from "./treasury-audit";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { getAccountBalance } from "./balance.service";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export type InternalTransferView = Omit<InternalTransfer, "amount"> & {
   amount: string;
@@ -228,7 +229,7 @@ export async function cancelInternalTransfer(
       "InternalTransfer",
       id,
       { companyId: updated.companyId },
-      { after: { status: "CANCELLED", amount: t.amount.toString() }, tx },
+      { after: { status: "CANCELLED", amount: serializeMoneyDecimal(t.amount) }, tx },
     );
 
     return updated;
@@ -247,7 +248,7 @@ type RawTransfer = InternalTransfer & {
 function serialize(t: RawTransfer): InternalTransferView {
   return {
     ...t,
-    amount: t.amount.toString(),
+    amount: serializeMoneyDecimal(t.amount),
     sourceAccountName:      t.sourceAccount.name,
     destinationAccountName: t.destinationAccount.name,
   };

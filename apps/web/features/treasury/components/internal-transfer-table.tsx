@@ -13,18 +13,8 @@ import {
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import type { InternalTransferView } from "@bloqer/services";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { CancelInternalTransferButton } from "./cancel-internal-transfer-button";
-
-function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(parseFloat(value)) +
-    " " +
-    currency
-  );
-}
 
 export function InternalTransferTable({ transfers }: { transfers: InternalTransferView[] }) {
   if (transfers.length === 0) {
@@ -53,7 +43,7 @@ export function InternalTransferTable({ transfers }: { transfers: InternalTransf
               <TableCell className="text-sm">{t.destinationAccountName}</TableCell>
               <TableCell className="text-sm">{t.currency}</TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">
-                {fmtMoney(t.amount, t.currency)}
+                {formatMoneyAmount(t.amount)} {t.currency}
               </TableCell>
               <TableCell>
                 <Badge variant={t.status === "CONFIRMED" ? "default" : "secondary"}>

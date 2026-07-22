@@ -31,7 +31,19 @@
       "Bash(New-Item -ItemType Directory -Path \"C:\\\\Dev\\\\bloqer-v2\\\\apps\\\\web\\\\app\\\\api\\\\documents\\\\[documentId]\\\\confirm\" -Force)",
       "Bash(New-Item -ItemType Directory -Path \"C:\\\\Dev\\\\bloqer-v2\\\\apps\\\\web\\\\app\\\\api\\\\documents\\\\[documentId]\\\\download\" -Force)",
       "Bash(Write-Output \"dirs created\")",
-      "Bash(cd /mnt/c/Dev/bloqer-v2 && pnpm install --filter @bloqer/storage 2>&1 | tail -5)"
+      "Bash(cd /mnt/c/Dev/bloqer-v2 && pnpm install --filter @bloqer/storage 2>&1 | tail -5)",
+      "Bash(pandoc \"C:\\\\Dev\\\\bloqer-v2\\\\docs\\\\bloqer2.0\\\\guides\\\\Guía_Operativa_Bloqer_v2.docx\" -o \"C:\\\\Dev\\\\bloqer-v2\\\\docs\\\\bloqer2.0\\\\guides\\\\guia_temp.md\")",
+      "Read(//c/Users/bravi/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/5ad73251-f7db-439b-9cbc-5cde6be99ade/422b97c8-0643-4635-ab7c-2162cf295b71/skills/docx/**)",
+      "Bash(python scripts/office/unpack.py \"C:\\\\Dev\\\\bloqer-v2\\\\docs\\\\bloqer2.0\\\\guides\\\\Guía_Operativa_Bloqer_v2.docx\" \"C:\\\\Dev\\\\bloqer-v2\\\\docs\\\\bloqer2.0\\\\guides\\\\guia_unpacked\")",
+      "Bash(node build_guide.js)",
+      "Bash(node \"C:\\\\Dev\\\\bloqer-v2\\\\docs\\\\bloqer2.0\\\\guides\\\\build_guide.js\")",
+      "Bash(npm install *)",
+      "Bash(echo \"EXIT:$?\")",
+      "PowerShell(npm install -g docx 2>&1)",
+      "PowerShell($env:NODE_PATH = npm root -g; node -e \"require\\('docx'\\); console.log\\('OK'\\)\")",
+      "Bash(python scripts/office/validate.py \"C:\\\\Dev\\\\bloqer-v2\\\\docs\\\\bloqer2.0\\\\guides\\\\Guía_Operativa_Bloqer_v2_PROFESIONAL.docx\")",
+      "Bash(python scripts/office/unpack.py \"C:\\\\Dev\\\\bloqer-v2\\\\docs\\\\bloqer2.0\\\\guides\\\\Guía_Operativa_Bloqer_v2_PROFESIONAL.docx\" \"C:\\\\Dev\\\\bloqer-v2\\\\docs\\\\bloqer2.0\\\\guides\\\\profesional_unpacked\")",
+      "Bash(dir \"C:\\\\Dev\\\\Planta_Argentina\")"
     ]
   }
 }

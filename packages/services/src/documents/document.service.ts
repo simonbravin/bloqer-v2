@@ -135,6 +135,7 @@ type DocumentUploadPlan = {
     | "JOBSITE_LOG"
     | "CERTIFICATION"
     | "SUPPLIER_INVOICE"
+    | "SALES_INVOICE"
     | "PURCHASE_ORDER"
     | "PURCHASE_RECEIPT"
     | "PURCHASE_REQUEST"
@@ -160,6 +161,10 @@ async function resolveDocumentUploadPlan(
   const linkedSupplierInvoice =
     input.linkedEntityType === "SUPPLIER_INVOICE" && input.linkedEntityId
       ? { supplierInvoiceId: input.linkedEntityId as string }
+      : null;
+  const linkedSalesInvoice =
+    input.linkedEntityType === "SALES_INVOICE" && input.linkedEntityId
+      ? { salesInvoiceId: input.linkedEntityId as string }
       : null;
   const linkedPurchaseOrder =
     input.linkedEntityType === "PURCHASE_ORDER" && input.linkedEntityId
@@ -202,6 +207,10 @@ async function resolveDocumentUploadPlan(
     if (!can(ctx.roles, "EDIT", "AP")) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la factura de proveedor");
     }
+  } else if (linkedSalesInvoice) {
+    if (!can(ctx.roles, "EDIT", "AR")) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la factura de venta");
+    }
   } else if (linkedPurchaseOrder || linkedPurchaseReceipt) {
     if (!can(ctx.roles, "EDIT", "PROCUREMENT")) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos en compras");
@@ -225,6 +234,8 @@ async function resolveDocumentUploadPlan(
     assertTenantModuleEnabledWithGate(gate, "CERTIFICATIONS");
   } else if (linkedSupplierInvoice) {
     assertTenantModuleEnabledWithGate(gate, "AP");
+  } else if (linkedSalesInvoice) {
+    assertTenantModuleEnabledWithGate(gate, "AR");
   } else if (linkedPurchaseOrder || linkedPurchaseReceipt) {
     assertTenantModuleEnabledWithGate(gate, "PROCUREMENT");
   } else if (linkedSubcontract || linkedSubcontractCertification) {
@@ -297,6 +308,10 @@ async function resolveDocumentUploadPlan(
   } else if (linkedSupplierInvoice) {
     linkedEntityType = "SUPPLIER_INVOICE";
     linkedEntityId   = linkedSupplierInvoice.supplierInvoiceId;
+  } else if (linkedSalesInvoice) {
+    await assertSalesInvoiceDocumentTarget(strictProjectId!, linkedSalesInvoice.salesInvoiceId, ctx);
+    linkedEntityType = "SALES_INVOICE";
+    linkedEntityId   = linkedSalesInvoice.salesInvoiceId;
   } else if (linkedPurchaseOrder) {
     await assertPurchaseOrderDocumentTarget(strictProjectId!, linkedPurchaseOrder.purchaseOrderId, ctx);
     linkedEntityType = "PURCHASE_ORDER";
@@ -602,6 +617,7 @@ export async function listEntityDocuments(
     "JOBSITE_LOG",
     "CERTIFICATION",
     "SUPPLIER_INVOICE",
+    "SALES_INVOICE",
     "PURCHASE_ORDER",
     "PURCHASE_RECEIPT",
     "PURCHASE_REQUEST",
@@ -635,6 +651,11 @@ export async function listEntityDocuments(
     }
     const { invoiceProjectId } = await assertSupplierInvoiceDocumentTarget(options?.projectId, entityId, ctx);
     if (invoiceProjectId != null) supplierInvoiceDocScope = { projectId: invoiceProjectId };
+  } else if (entityType === "SALES_INVOICE") {
+    if (!can(ctx.roles, "VIEW", "AR") && !can(ctx.roles, "VIEW", "PROJECTS")) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la factura de venta");
+    }
+    await assertSalesInvoiceDocumentTarget(options!.projectId!, entityId, ctx);
   } else if (entityType === "PURCHASE_ORDER") {
     if (!canViewProcurementProjectArea(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la orden de compra");
@@ -858,6 +879,23 @@ async function assertSupplierInvoiceDocumentTarget(
   return { invoiceProjectId: inv.projectId };
 }
 
+async function assertSalesInvoiceDocumentTarget(
+  projectId: string,
+  salesInvoiceId: string,
+  ctx: ServiceContext,
+): Promise<void> {
+  const inv = await prisma.salesInvoice.findUnique({
+    where: { id: salesInvoiceId },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!inv || inv.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Factura de venta no encontrada");
+  }
+  if (inv.projectId !== projectId) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+  }
+}
+
 async function assertPurchaseOrderDocumentTarget(
   projectId:      string,
   purchaseOrderId: string,
@@ -968,6 +1006,7 @@ function canViewDocumentByLink(
   if (linkedEntityType === "JOBSITE_LOG" && can(ctx.roles, "VIEW", "JOBSITE_LOG")) return true;
   if (linkedEntityType === "CERTIFICATION" && can(ctx.roles, "VIEW", "CERTIFICATIONS")) return true;
   if (linkedEntityType === "SUPPLIER_INVOICE" && can(ctx.roles, "VIEW", "AP")) return true;
+  if (linkedEntityType === "SALES_INVOICE" && can(ctx.roles, "VIEW", "AR")) return true;
   if (
     (linkedEntityType === "PURCHASE_ORDER" || linkedEntityType === "PURCHASE_RECEIPT") &&
     canViewProcurementProjectArea(ctx.roles)
@@ -1007,6 +1046,9 @@ function canMutateDocumentByLink(
   if (t === "SUPPLIER_INVOICE") {
     return can(ctx.roles, "EDIT", "AP");
   }
+  if (t === "SALES_INVOICE") {
+    return can(ctx.roles, "EDIT", "AR");
+  }
   if (t === "PURCHASE_ORDER" || t === "PROCUREMENT_QUOTE") {
     return canEditPurchaseOrders(ctx.roles);
   }
@@ -1031,6 +1073,7 @@ function linkedEntityTypeToPermissionModule(linkedEntityType: string | null): Pe
   if (t === "JOBSITE_LOG") return "JOBSITE_LOG";
   if (t === "CERTIFICATION") return "CERTIFICATIONS";
   if (t === "SUPPLIER_INVOICE") return "AP";
+  if (t === "SALES_INVOICE") return "AR";
   if (t === "PURCHASE_ORDER" || t === "PURCHASE_RECEIPT" || t === "PROCUREMENT_QUOTE") {
     return "PROCUREMENT";
   }

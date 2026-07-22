@@ -178,6 +178,7 @@ export function NewTransactionDialog({
             ? {
                 accountId: payAccountId,
                 paymentDate,
+                payFullBalance: true,
                 notes: null,
               }
             : undefined,
@@ -228,6 +229,7 @@ export function NewTransactionDialog({
             ? {
                 accountId: collectAccountId,
                 collectionDate,
+                collectFullBalance: true,
                 notes: null,
               }
             : undefined,

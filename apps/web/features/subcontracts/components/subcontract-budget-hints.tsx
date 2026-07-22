@@ -2,18 +2,12 @@
 
 import type { WbsSubcontractBudgetHint } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   hints: WbsSubcontractBudgetHint[];
   onPick: (hint: WbsSubcontractBudgetHint) => void;
 };
-
-function formatMoney(value: string) {
-  return parseFloat(value).toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 export function SubcontractBudgetHints({ hints, onPick }: Props) {
   if (hints.length === 0) return null;
@@ -37,7 +31,7 @@ export function SubcontractBudgetHints({ hints, onPick }: Props) {
               <span className="font-mono text-xs text-muted-foreground">{h.code}</span>{" "}
               <span className="font-medium">{h.name}</span>
               <span className="block text-xs text-muted-foreground">
-                Presup. subcontrato: {formatMoney(h.budgetSubcontractTotal)} ({h.quantity}{" "}
+                Presup. subcontrato: {formatMoneyAmount(h.budgetSubcontractTotal)} ({h.quantity}{" "}
                 {h.unit})
               </span>
             </span>

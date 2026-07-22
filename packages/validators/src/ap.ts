@@ -1,10 +1,19 @@
 import { z } from "zod";
+import {
+  fxRateString,
+  moneyAmountString,
+  optionalFxRateString,
+  optionalMoneyAmountString,
+  positiveMoneyAmountString,
+  qtyString,
+  ratePctString,
+} from "./money";
 
 const supplierInvoiceLineSchema = z.object({
   description: z.string().min(1, "Descripción requerida"),
-  quantity:    z.string().regex(/^\d+(\.\d+)?$/, "Cantidad inválida"),
-  unitPrice:   z.string().regex(/^\d+(\.\d+)?$/, "Precio inválido"),
-  taxRate:     z.string().regex(/^\d+(\.\d+)?$/).optional().default("0"),
+  quantity:    qtyString,
+  unitPrice:   moneyAmountString,
+  taxRate:     ratePctString.optional().default("0.0000"),
   sortOrder:   z.number().int().min(0).optional().default(0),
 });
 
@@ -15,7 +24,7 @@ export const createSupplierInvoiceSchema = z.object({
   issueDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dueDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   currency:          z.string().length(3).default("ARS"),
-  fxRate:            z.string().regex(/^\d+(\.\d+)?$/).optional(),
+  fxRate:            optionalFxRateString,
   notes:             z.string().optional().nullable(),
   internalNotes:     z.string().optional().nullable(),
   purchaseOrderId:   z.string().uuid().optional().nullable(),
@@ -26,36 +35,46 @@ export const updateSupplierInvoiceSchema = z.object({
   supplierContactId: z.string().uuid().optional(),
   issueDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   dueDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  fxRate:            z.string().regex(/^\d+(\.\d+)?$/).optional(),
+  fxRate:            optionalFxRateString,
   notes:             z.string().optional().nullable(),
   internalNotes:     z.string().optional().nullable(),
   purchaseOrderId:   z.string().uuid().optional().nullable(),
   lines:             z.array(supplierInvoiceLineSchema).min(1).optional(),
 });
 
-export const createPaymentSchema = z.object({
-  payableId:   z.string().uuid(),
-  accountId:   z.string().uuid(),
-  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  amount:      z.string().regex(/^\d+(\.\d+)?$/, "Monto inválido"),
-  notes:       z.string().optional().nullable(),
+export const createPaymentFieldsSchema = z.object({
+  payableId:      z.string().uuid(),
+  accountId:      z.string().uuid(),
+  paymentDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  amount:         optionalMoneyAmountString,
+  /** Server applies stored balanceDue — [D-053]. */
+  payFullBalance: z.boolean().optional(),
+  notes:          z.string().optional().nullable(),
 });
 
-
+export const createPaymentSchema = createPaymentFieldsSchema.superRefine((val, ctx) => {
+  if (!val.payFullBalance && val.amount == null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Monto inválido",
+      path: ["amount"],
+    });
+  }
+});
 
 export const payNowSchema = z.object({
-  accountId:   z.string().uuid(),
-  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  amount:      z.string().regex(/^\d+(\.\d+)?$/, "Monto invalido").optional(),
-  notes:       z.string().optional().nullable(),
+  accountId:      z.string().uuid(),
+  paymentDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  amount:         optionalMoneyAmountString,
+  /** When true or amount omitted, server pays stored invoice total ([D-053]). */
+  payFullBalance: z.boolean().optional(),
+  notes:          z.string().optional().nullable(),
 });
 
-/** Corporate AP composite flow. */
-export const registerApExpenseSchema = createSupplierInvoiceSchema
-  .omit({ projectId: true, purchaseOrderId: true })
-  .extend({
-    payNow: payNowSchema.optional(),
-  });
+/** Corporate or project AP composite flow ([D-052]). */
+export const registerApExpenseSchema = createSupplierInvoiceSchema.extend({
+  payNow: payNowSchema.optional(),
+});
 
 export type CreateSupplierInvoiceInput = z.infer<typeof createSupplierInvoiceSchema>;
 export type UpdateSupplierInvoiceInput = z.infer<typeof updateSupplierInvoiceSchema>;
@@ -72,3 +91,6 @@ export const createSupplierInvoiceFromPurchaseOrderSchema = z.object({
 export type CreateSupplierInvoiceFromPurchaseOrderInput = z.infer<
   typeof createSupplierInvoiceFromPurchaseOrderSchema
 >;
+
+// Re-export money helpers used by AP forms/tests
+export { moneyAmountString, positiveMoneyAmountString, fxRateString, qtyString, ratePctString };

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { AccountMovementTypeBadge } from "./account-movement-type-badge";
 import type { AccountMovementType, AccountMovementStatus } from "@bloqer/database";
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 export type AccountMovementListItem = {
   id: string;
@@ -19,13 +20,6 @@ export type AccountMovementListItem = {
 };
 
 const OUTFLOW_TYPES: AccountMovementType[] = ["OUTFLOW", "TRANSFER_OUT"];
-
-function fmtMoney(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
 
 interface AccountMovementListProps {
   movements: AccountMovementListItem[];
@@ -65,7 +59,7 @@ export function AccountMovementList({ movements }: AccountMovementListProps) {
               <TableCell
                 className={`text-right font-mono text-sm${isOutflow ? " text-destructive" : ""}`}
               >
-                {isOutflow ? "−" : "+"}{fmtMoney(m.amount)}
+                {isOutflow ? "−" : "+"}{formatMoneyAmount(m.amount)}
               </TableCell>
               <TableCell>
                 <Badge variant={m.status === "CONFIRMED" ? "default" : "secondary"}>

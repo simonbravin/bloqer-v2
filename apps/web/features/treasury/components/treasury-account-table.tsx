@@ -13,6 +13,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { TreasuryAccountStatusBadge } from "./treasury-account-status-badge";
 import type { TreasuryAccountListItem } from "./treasury-account-list";
 import type { TreasuryAccountType } from "@bloqer/database";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 const TYPE_LABELS: Record<TreasuryAccountType, string> = {
   BANK: "Banco",
@@ -20,13 +21,6 @@ const TYPE_LABELS: Record<TreasuryAccountType, string> = {
   DIGITAL_WALLET: "Billetera",
   OTHER: "Otro",
 };
-
-function fmtMoney(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
 
 export function TreasuryAccountTable({ accounts }: { accounts: TreasuryAccountListItem[] }) {
   if (accounts.length === 0) {
@@ -53,7 +47,7 @@ export function TreasuryAccountTable({ accounts }: { accounts: TreasuryAccountLi
               <TableCell className="text-sm text-muted-foreground">{TYPE_LABELS[acc.type]}</TableCell>
               <TableCell className="text-sm">{acc.currency}</TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">
-                {fmtMoney(acc.balance)} {acc.currency}
+                {formatMoneyAmount(acc.balance)} {acc.currency}
               </TableCell>
               <TableCell>
                 <TreasuryAccountStatusBadge status={acc.status} />

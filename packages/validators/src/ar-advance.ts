@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { moneyAmountString } from "./money";
 import { collectNowSchema } from "./sales-invoice";
 
 export const registerArAdvanceSchema = z.object({
@@ -7,7 +8,7 @@ export const registerArAdvanceSchema = z.object({
   issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   currency: z.string().length(3).default("ARS"),
-  amount: z.string().regex(/^\d+(\.\d+)?$/, "Monto inválido"),
+  amount: moneyAmountString,
   notes: z.string().optional().nullable(),
   collectNow: collectNowSchema,
 });
@@ -21,7 +22,7 @@ export const registerSupplierAdvanceSchema = z.object({
   paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   accountId: z.string().uuid(),
   currency: z.string().length(3).default("ARS"),
-  amount: z.string().regex(/^\d+(\.\d+)?$/, "Monto inválido"),
+  amount: moneyAmountString,
   notes: z.string().optional().nullable(),
 });
 

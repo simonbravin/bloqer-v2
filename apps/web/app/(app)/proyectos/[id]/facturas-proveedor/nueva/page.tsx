@@ -1,8 +1,16 @@
 import { notFound, redirect } from "next/navigation";
 import { SupplierInvoiceForm } from "@/features/ap";
-import type { SupplierOption, POOption } from "@/features/ap";
+import type { SupplierOption, POOption, TreasuryAccountOption } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
-import { listContacts, listLinkablePurchaseOrders, ServiceError } from "@bloqer/services";
+import { can } from "@bloqer/domain";
+import { isStorageConfigured } from "@bloqer/config";
+import {
+  getTenantModuleGate,
+  listContacts,
+  listLinkablePurchaseOrders,
+  listTreasuryAccounts,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
@@ -23,7 +31,12 @@ export default async function NuevaFacturaProveedorPage({ params, searchParams }
     roles: current.tenantCtx.roles,
   };
 
-  let suppliersResult, linkablePOs;
+  const gate = await getTenantModuleGate(ctx);
+  const canPayNow =
+    gate.isEnabled("TREASURY") && can(ctx.roles, "EDIT", "TREASURY");
+
+  let suppliersResult;
+  let linkablePOs;
   try {
     [suppliersResult, linkablePOs] = await Promise.all([
       listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
@@ -46,6 +59,22 @@ export default async function NuevaFacturaProveedorPage({ params, searchParams }
     currency: po.currency,
   }));
 
+  let treasuryAccounts: TreasuryAccountOption[] = [];
+  if (canPayNow) {
+    try {
+      const accountsResult = await listTreasuryAccounts(ctx, { page: 1, pageSize: 200 });
+      treasuryAccounts = accountsResult.data
+        .filter(
+          (a) =>
+            a.status === "ACTIVE" &&
+            (!ctx.companyId || !a.companyId || a.companyId === ctx.companyId),
+        )
+        .map((a) => ({ id: a.id, label: a.name, currency: a.currency }));
+    } catch {
+      // omit accounts if VIEW TREASURY fails unexpectedly
+    }
+  }
+
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
@@ -58,7 +87,14 @@ export default async function NuevaFacturaProveedorPage({ params, searchParams }
         </div>
       )}
 
-      <SupplierInvoiceForm projectId={id} suppliers={suppliers} poOptions={poOptions} />
+      <SupplierInvoiceForm
+        projectId={id}
+        suppliers={suppliers}
+        poOptions={poOptions}
+        treasuryAccounts={treasuryAccounts}
+        canPayNow={canPayNow}
+        storageConfigured={isStorageConfigured()}
+      />
     </PageShell>
   );
 }

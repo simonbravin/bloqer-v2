@@ -43,6 +43,7 @@ export type EntityDocumentsLink =
   | { type: "JOBSITE_LOG"; id: string }
   | { type: "CERTIFICATION"; id: string }
   | { type: "SUPPLIER_INVOICE"; id: string }
+  | { type: "SALES_INVOICE"; id: string }
   | { type: "PURCHASE_ORDER"; id: string }
   | { type: "PURCHASE_RECEIPT"; id: string }
   | { type: "PURCHASE_REQUEST"; id: string }
@@ -109,6 +110,16 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
         emptyMessage: "No hay adjuntos en esta factura de proveedor.",
         defaultCategory: "INVOICE",
         uploadHint: "Factura, remito o comprobante",
+      };
+    }
+    case "SALES_INVOICE": {
+      const p = `/proyectos/${projectId}/facturas/${linkedEntity.id}`;
+      return {
+        revalidateExtra: [p],
+        afterUploadPath: p,
+        emptyMessage: "No hay adjuntos en esta factura de venta.",
+        defaultCategory: "INVOICE",
+        uploadHint: "Copia digital o foto de la factura",
       };
     }
     case "PURCHASE_ORDER": {

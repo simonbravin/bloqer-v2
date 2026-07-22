@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@bloqer/domain": "workspace:*",
+    "@bloqer/utils": "workspace:*",
     "zod": "^3.23.0"
   },
   "devDependencies": {

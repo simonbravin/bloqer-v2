@@ -30,14 +30,14 @@ export function obligationDaysOverdue(dueDate: Date, asOf: Date = startOfTodayUt
 
 export type ObligationDisplayStatus = "OPEN" | "PARTIAL" | "PAID" | "OVERDUE" | "CANCELLED";
 
-type DecimalLike = { greaterThan(n: number | Prisma.Decimal): boolean };
-
-/** True when obligation has material open balance (BR-AR-002). */
+/** True when obligation has material open balance (BR-AR-002 / D-053).
+ * A real cent (0.01) stays open; only sub-cent legacy dust (&lt; 0.01) is ignored.
+ */
 export function hasOpenObligationBalance(
-  balanceDue: DecimalLike,
+  balanceDue: Prisma.Decimal,
   epsilon: Prisma.Decimal = OBLIGATION_OPEN_BALANCE_EPSILON,
 ): boolean {
-  return balanceDue.greaterThan(epsilon);
+  return balanceDue.greaterThanOrEqualTo(epsilon);
 }
 
 /**
@@ -46,10 +46,10 @@ export function hasOpenObligationBalance(
  */
 export function deriveObligationDisplayStatus(
   storedStatus: string,
-  balanceDue: DecimalLike,
+  balanceDue: Prisma.Decimal,
   dueDate: Date,
   asOf: Date = startOfTodayUtc(),
-  paidAmount?: DecimalLike,
+  paidAmount?: Prisma.Decimal,
 ): ObligationDisplayStatus {
   if (storedStatus === "CANCELLED") return "CANCELLED";
   if (storedStatus === "PAID") return "PAID";

@@ -6,13 +6,17 @@ function formatDecimalEs(value: string, currencyCode?: string): string {
       return new Intl.NumberFormat("es-AR", {
         style: "currency",
         currency: currencyCode,
+        minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }).format(number);
     } catch {
       return `${value} ${currencyCode}`;
     }
   }
-  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(number);
+  return new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(number);
 }
 
 export function formatDashboardMoney(value: string, currency?: string | null): string {

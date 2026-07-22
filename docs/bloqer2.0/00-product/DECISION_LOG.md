@@ -688,6 +688,43 @@
 
 ---
 
+### D-052 — AP proyecto: pago inmediato inline, adjuntos en el alta y chequeo de fondos en pagos
+
+- **Fecha:** 2026-07-22
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** a nivel empresa ya existía el alta rápida con “Pagar ahora” (cuenta de tesorería + fecha). A nivel proyecto el alta de factura de proveedor era solo documental (borrador → emitir → pagar después). Además, los pagos podían sobregirar una cuenta en silencio, a diferencia de las transferencias internas ([BR-TRZ-004]).
+- **Decisión:**
+  1. El alta de factura de proveedor a nivel **proyecto** ofrece **“Emitir y pagar ahora”** inline (checkbox + cuenta de tesorería + fecha), simétrico al flujo corporativo.
+  2. El pago inmediato **siempre** crea `SupplierInvoice → Payable → Payment → AccountMovement` (el Payable nace saldado si se paga el total). No hay patrón “gasto directo sin CxP”.
+  3. El bloque “Pagar ahora” a nivel proyecto se muestra **solo** si el usuario tiene permiso `EDIT` sobre `TREASURY` (segregación de funciones; igual que empresa).
+  4. Adjuntos (foto/copia de factura) en el **alta** (create-then-upload) y en el detalle; adjuntos habilitados también en facturas de venta (`SALES_INVOICE`).
+  5. Todo **pago** (`createPayment` y pago inline) **bloquea** si la cuenta quedaría con saldo negativo, consistente con transferencias internas ([BR-TRZ-004]).
+  6. “Cobrar ahora” inline en facturas de venta **de proyecto** queda **diferido**; el AR corporativo ([D-051]) se mantiene.
+- **Implicancias:** sin migración de schema (`projectId` ya nullable); la lógica de pago se unifica en un helper compartido; los gaps de cost code / método de pago / retenciones quedan en [OPEN_QUESTIONS.md](./OPEN_QUESTIONS.md) (Q-053+).
+- **Documentos afectados:** [`02-modules/EXPENSES_AND_PAYMENTS.md`](../02-modules/EXPENSES_AND_PAYMENTS.md), [`02-modules/SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`00-product/OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md).
+
+---
+
+### D-053 — Precisión monetaria: 2 decimales half-up en dinero operativo
+
+- **Fecha:** 2026-07-22
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Los montos se persistían hasta 4 dp (`Decimal(18,4)`) sin quantize de negocio; DTOs usaban `.toString()` y la UI a veces mostraba 2 dp. Eso generaba saldos imposibles de cerrar al pagar/cobrar y divergencia docs vs runtime (FX/`amount_ars`).
+- **Decisión:**
+  1. **Dinero operativo** (líneas/totales de documento, CxP/CxC, pagos/cobranzas, movimientos, opening balances, `amount_ars`, costos monetarios): redondeo **half-up a 2 decimales** al calcular y antes de persistir. Display/DTO/CSV/PDF/email: siempre 2 dp.
+  2. **No-money:** `fx_rate` hasta **6** dp; cantidades y % impuestos/overhead hasta **4**; APU coef/unitCost según [D-047] en **4** (totales money derivados a 2).
+  3. Columnas Prisma `Decimal(18,4)` / `(18,6)` = **capacidad de storage**; la escala de negocio la impone el kernel (`@bloqer/utils` + services). **Sin migración** a `(18,2)`.
+  4. Algoritmo de línea: `lineSubtotal = roundMoney(qty×price)`; `lineTax = roundMoney(subtotal×rate/100)`; `lineTotal = roundMoney(subtotal+tax)`; header = suma de líneas (sin re-redondear la suma).
+  5. **Pagar/cobrar todo:** el server aplica el **saldo almacenado** (`payFullBalance` / equivalente); la UI solo muestra 2 dp. No redondear en cliente y reaplicar.
+  6. Datos **confirmados/emitidos** no se reescriben (inmutabilidad). Escrituras nuevas ya nacen a 2 dp. Polvo histórico: cierre vía epsilon de obligación solo cuando el residual es polvo sub-centavo de datos viejos; no write-off de centavos reales en pagos parciales.
+  7. Validación Zod de money: preprocess **round-to-2** (edits históricos no rompen); inputs money `step=0.01`.
+- **Implicancias:** helpers canónicos `roundMoney` / `serializeMoney` / `formatMoneyAmount`; prohibido `parseFloat` en paths de dinero y `.toString()` crudo en DTOs money.
+- **Documentos afectados:** [`03-finance/MONEY_MODEL.md`](../03-finance/MONEY_MODEL.md), [`08-architecture/MONEY_AND_DECIMAL_STRATEGY.md`](../08-architecture/MONEY_AND_DECIMAL_STRATEGY.md), [`04-formulas/CURRENCY_CONVERSION_FORMULAS.md`](../04-formulas/CURRENCY_CONVERSION_FORMULAS.md), [`08-architecture/AGENT_GUARDRAILS.md`](../08-architecture/AGENT_GUARDRAILS.md), [`08-architecture/CODING_STANDARDS.md`](../08-architecture/CODING_STANDARDS.md), [`AGENTS.md`](../AGENTS.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

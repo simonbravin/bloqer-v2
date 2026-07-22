@@ -10,22 +10,17 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatCurrencyDisplay } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 function formatAmount(value: string) {
   const n = parseFloat(value);
   if (n === 0) return "—";
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
+  return formatMoneyAmount(value);
 }
 
 function fmtNet(value: string) {
   const n = parseFloat(value);
-  const formatted = new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Math.abs(n));
+  const formatted = formatMoneyAmount(String(Math.abs(n)));
   return n >= 0 ? `+${formatted}` : `-${formatted}`;
 }
 

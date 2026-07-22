@@ -13,13 +13,7 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { CollectionStatusBadge } from "./collection-status-badge";
 import type { CollectionListItem } from "./collection-list";
-
-function fmtMoney(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 export function CollectionTable({
   collections,
@@ -53,7 +47,7 @@ export function CollectionTable({
               <TableCell className="text-sm">{c.accountName}</TableCell>
               <TableCell className="text-sm">{c.currency}</TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">
-                {fmtMoney(c.amount)}
+                {formatMoneyAmount(c.amount)}
               </TableCell>
               <TableCell className="max-w-[180px] truncate text-sm text-muted-foreground">
                 {c.notes ?? "—"}

@@ -51,6 +51,9 @@
 - “Solo esta vez” sin `tenant_id`.  
 - “Confío en el front” para aprobar pago.  
 - Borrar movimiento confirmado en lugar de compensar.
+- Calcular dinero con `parseFloat` / `Number` / `float`.  
+- Serializar montos money en DTOs con `.toString()` crudo (usar `serializeMoney`).  
+- Redondear el saldo en UI y reenviarlo como “pago total” (usar `payFullBalance` / saldo almacenado en server) — [D-053](../00-product/DECISION_LOG.md).
 
 ## Scripts provisionales (prohibido)
 

@@ -1,5 +1,10 @@
-import { createPaymentSchema, registerApExpenseSchema } from "./ap";
+import { createPaymentFieldsSchema, registerApExpenseSchema } from "./ap";
 import { registerArIncomeSchema } from "./sales-invoice";
+import {
+  moneyAmountString,
+  optionalMoneyAmountString,
+  positiveMoneyAmountString,
+} from "./money";
 import { z } from "zod";
 
 export const createTreasuryAccountSchema = z.object({
@@ -10,7 +15,7 @@ export const createTreasuryAccountSchema = z.object({
   accountNumber:  z.string().optional().nullable(),
   alias:          z.string().optional().nullable(),
   notes:          z.string().optional().nullable(),
-  openingBalance: z.string().regex(/^\d+(\.\d+)?$/).optional().default("0"),
+  openingBalance: moneyAmountString.optional().default("0.00"),
   companyId:      z.string().uuid().optional().nullable(),
 });
 
@@ -22,19 +27,31 @@ export const updateTreasuryAccountSchema = z.object({
   notes:         z.string().optional().nullable(),
 });
 
-export const createCollectionSchema = z.object({
-  receivableId:   z.string().uuid(),
-  accountId:      z.string().uuid(),
-  collectionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  amount:         z.string().regex(/^\d+(\.\d+)?$/, "Monto inválido"),
-  notes:          z.string().optional().nullable(),
-});
+export const createCollectionSchema = z
+  .object({
+    receivableId:       z.string().uuid(),
+    accountId:          z.string().uuid(),
+    collectionDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    amount:             optionalMoneyAmountString,
+    /** Server applies stored balanceDue — [D-053]. */
+    collectFullBalance: z.boolean().optional(),
+    notes:              z.string().optional().nullable(),
+  })
+  .superRefine((val, ctx) => {
+    if (!val.collectFullBalance && val.amount == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Monto inválido",
+        path: ["amount"],
+      });
+    }
+  });
 
 export const createInternalTransferSchema = z.object({
   sourceAccountId:      z.string().uuid(),
   destinationAccountId: z.string().uuid(),
   transferDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  amount:               z.string().regex(/^\d+(\.\d+)?$/, "Monto inválido"),
+  amount:               positiveMoneyAmountString,
   description:          z.string().optional().nullable(),
 });
 
@@ -43,7 +60,7 @@ export const createInternalTransferSchema = z.object({
 export const createCorporateTreasuryInflowSchema = z.object({
   accountId:              z.string().uuid(),
   movementDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  amount:                 z.string().regex(/^\d+(\.\d+)?$/, "Monto invalido"),
+  amount:                 positiveMoneyAmountString,
   description:            z.string().trim().min(1, "Descripcion requerida"),
   /** Optional directory contact with CLIENT role for corporate inflows — D-049. */
   counterpartyContactId:  z.string().uuid().optional().nullable(),
@@ -57,12 +74,23 @@ export const createCorporateTreasuryInflowSchema = z.object({
     .transform((v) => (v && v.length > 0 ? v : null)),
 });
 
-export const registerTransactionSchema = z.discriminatedUnion("kind", [
-  registerApExpenseSchema.extend({ kind: z.literal("AP_EXPENSE") }),
-  createCorporateTreasuryInflowSchema.extend({ kind: z.literal("TREASURY_INFLOW") }),
-  createPaymentSchema.extend({ kind: z.literal("PAYMENT") }),
-  registerArIncomeSchema.extend({ kind: z.literal("AR_INCOME") }),
-]);
+export const registerTransactionSchema = z
+  .discriminatedUnion("kind", [
+    registerApExpenseSchema.extend({ kind: z.literal("AP_EXPENSE") }),
+    createCorporateTreasuryInflowSchema.extend({ kind: z.literal("TREASURY_INFLOW") }),
+    // Plain object so discriminatedUnion stays ZodObject (refine lives below).
+    createPaymentFieldsSchema.extend({ kind: z.literal("PAYMENT") }),
+    registerArIncomeSchema.extend({ kind: z.literal("AR_INCOME") }),
+  ])
+  .superRefine((val, ctx) => {
+    if (val.kind === "PAYMENT" && !val.payFullBalance && val.amount == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Monto inválido",
+        path: ["amount"],
+      });
+    }
+  });
 
 export type CreateTreasuryAccountInput   = z.infer<typeof createTreasuryAccountSchema>;
 export type UpdateTreasuryAccountInput   = z.infer<typeof updateTreasuryAccountSchema>;

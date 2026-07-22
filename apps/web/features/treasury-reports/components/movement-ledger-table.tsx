@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 function treasuryMovementTypeSupportsAccountingDraft(type: string): boolean {
   return type === "INFLOW" || type === "OUTFLOW" || type === "TRANSFER_IN" || type === "TRANSFER_OUT";
@@ -25,16 +26,9 @@ const TYPE_LABELS: Record<string, string> = {
   ADJUSTMENT: "Ajuste",
 };
 
-function formatAmount(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
-
 function fmtSigned(signed: string) {
   const n = parseFloat(signed);
-  return (n >= 0 ? "+" : "") + formatAmount(signed);
+  return (n >= 0 ? "+" : "") + formatMoneyAmount(signed);
 }
 
 interface Props {
@@ -139,7 +133,7 @@ export function MovementLedgerTable({
                   </TableCell>
                   {showRunningBalance && (
                     <TableCell className="text-right tabular-nums font-mono text-muted-foreground">
-                      {m.runningBalance ? formatAmount(m.runningBalance) : "—"}
+                      {m.runningBalance ? formatMoneyAmount(m.runningBalance) : "—"}
                     </TableCell>
                   )}
                   {showGl && (

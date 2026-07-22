@@ -72,7 +72,7 @@ export function AdvanceInvoiceForm({
         collectNow: {
           accountId,
           collectionDate,
-          amount,
+          collectFullBalance: true,
           notes: "Cobro de anticipo",
         },
       });

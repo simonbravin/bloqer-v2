@@ -174,7 +174,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
         .filter(
           (a) =>
             a.status === "ACTIVE" &&
-            (!ctx.companyId || a.companyId === ctx.companyId),
+            (!ctx.companyId || !a.companyId || a.companyId === ctx.companyId),
         )
         .map((a) => ({ id: a.id, label: a.name, currency: a.currency }));
     } catch {

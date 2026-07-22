@@ -10,6 +10,7 @@ import { resolvePagination } from "../finance/pagination";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { assertTreasuryAccountCurrencyMatches } from "./treasury-currency-guards";
+import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
@@ -102,11 +103,6 @@ export async function createCollection(
     throw new ServiceError("FORBIDDEN", "Sin permisos para registrar cobranzas");
   }
 
-  const amount = new Prisma.Decimal(input.amount);
-  if (amount.lessThanOrEqualTo(0)) {
-    throw new ServiceError("VALIDATION", "El monto debe ser mayor a 0");
-  }
-
   const receivablePreview = await prisma.receivable.findUnique({
     where: { id: input.receivableId },
     select: { tenantId: true, projectId: true, companyId: true },
@@ -144,6 +140,17 @@ export async function createCollection(
     }
 
     const balanceDue = receivable.originalAmount.minus(receivable.paidAmount);
+    // D-053: collectFullBalance applies stored balance; never round-then-reapply from UI.
+    let amount: Prisma.Decimal;
+    if (input.collectFullBalance) {
+      amount = balanceDue;
+    } else {
+      const partial = toMoneyDecimal(input.amount ?? "0");
+      amount = partial.eq(toMoneyDecimal(balanceDue)) ? balanceDue : partial;
+    }
+    if (amount.lessThanOrEqualTo(0)) {
+      throw new ServiceError("VALIDATION", "El monto debe ser mayor a 0");
+    }
     // BR-TRZ-006: block overpayment
     if (amount.greaterThan(balanceDue)) {
       throw new ServiceError(
@@ -239,7 +246,8 @@ export async function createCollection(
       {
         after: {
           receivableId: input.receivableId,
-          amount: input.amount,
+          amount: serializeMoneyDecimal(amount),
+          collectFullBalance: Boolean(input.collectFullBalance),
           number: salesInvoice.number,
         },
         tx,
@@ -330,5 +338,5 @@ export async function cancelCollection(
 type RawCollection = Collection & { account: { name: string } };
 
 function serialize(c: RawCollection): CollectionView {
-  return { ...c, amount: c.amount.toString(), accountName: c.account.name };
+  return { ...c, amount: serializeMoneyDecimal(c.amount), accountName: c.account.name };
 }

@@ -15,21 +15,8 @@ import { DashboardKpiCard } from "@/features/dashboard/dashboard-kpi-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { FinanceProjectionPanel } from "@/features/finance/components/finance-projection-panel";
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { Inbox } from "lucide-react";
-
-function formatMoney(raw: string, currency: string): string {
-  const n = Number(raw);
-  if (Number.isNaN(n)) return raw;
-  try {
-    return new Intl.NumberFormat("es-AR", {
-      style:                 "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(n);
-  } catch {
-    return `${raw} ${currency}`;
-  }
-}
 
 function EmptyState({ title, body }: { title: string; body: string }) {
   return (
@@ -81,7 +68,7 @@ function CompanyOperationsSection({ summary }: { summary: CompanyFinanceOperatio
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{formatDate(p.paymentDate)}</TableCell>
                     <TableCell className="text-right tabular-nums font-medium">
-                      {formatMoney(p.amount, p.currency)}
+                      {formatMoneyAmount(p.amount, p.currency)}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { ServiceContext } from "../types";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 type TxClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -92,7 +93,7 @@ export async function getTreasurySummaryByCompany(
       type: acc.type as string,
       currency: acc.currency,
       status: acc.status as string,
-      balance: balance.toString(),
+      balance: serializeMoneyDecimal(balance),
     });
   }
   return results;

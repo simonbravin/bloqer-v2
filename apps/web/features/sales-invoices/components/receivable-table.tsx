@@ -18,16 +18,7 @@ import {
   receivableInvoiceHref,
   type ReceivableListItem,
 } from "./receivable-list";
-
-function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      parseFloat(value),
-    ) +
-    " " +
-    currency
-  );
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   receivables: ReceivableListItem[];
@@ -112,10 +103,10 @@ export function ReceivableTable({
                   <ReceivableStatusBadge status={r.status} />
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">
-                  {fmtMoney(r.originalAmount, r.currency)}
+                  {formatMoneyAmount(r.originalAmount)} {r.currency}
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">
-                  {fmtMoney(r.balanceDue, r.currency)}
+                  {formatMoneyAmount(r.balanceDue)} {r.currency}
                 </TableCell>
                 <TableCell>
                   <Button variant="ghost" size="sm" asChild>

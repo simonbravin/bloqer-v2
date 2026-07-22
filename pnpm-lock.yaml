@@ -431,6 +431,9 @@ importers:
 
   packages/utils:
     devDependencies:
+      tsx:
+        specifier: ^4.23.1
+        version: 4.23.1
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -440,6 +443,9 @@ importers:
       '@bloqer/domain':
         specifier: workspace:*
         version: link:../domain
+      '@bloqer/utils':
+        specifier: workspace:*
+        version: link:../utils
       zod:
         specifier: ^3.23.0
         version: 3.25.76

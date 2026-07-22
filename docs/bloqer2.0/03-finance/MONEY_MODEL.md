@@ -22,16 +22,25 @@ Definir cómo Bloqer representa **montos monetarios** de forma consistente, sin 
 
 ## Precisión decimal (defaults)
 
-| Concepto | Decimales |
-|---|---|
-| ARS y montos locales | 2 |
-| Cantidades inventario | 4 |
-| Tipo de cambio | 4 |
-| Porcentajes impuestos | 4 |
+| Concepto | Decimales de **negocio** | Capacidad típica en DB |
+|---|---|---|
+| ARS / USD / montos operativos / `amount_ars` | **2** | `NUMERIC(18,4)` (capacidad; no escala de negocio) |
+| Cantidades inventario / cómputo | 4 | `NUMERIC(18,4)` |
+| Tipo de cambio (`fx_rate`) | **6** | `NUMERIC(18,6)` |
+| Porcentajes impuestos / overhead | 4 | `NUMERIC(8,4)` |
+
+> Ver [D-053](../00-product/DECISION_LOG.md): la precisión de negocio la impone el kernel de aplicación; las columnas no se migran a `(18,2)`.
 
 ## Redondeo
-- Redondeo **half-up** a la precisión del campo destino.
-- Suma de líneas: redondear línea, luego sumar; validar tolerancia 0.01 ARS vs total documento.
+- Redondeo **half-up** a la precisión del campo destino ([D-053](../00-product/DECISION_LOG.md)).
+- **Líneas de documento (canónico):**
+  1. `lineSubtotal = roundMoney(quantity × unitPrice)` (2 dp)
+  2. `lineTax = roundMoney(lineSubtotal × taxRate / 100)` (2 dp)
+  3. `lineTotal = roundMoney(lineSubtotal + lineTax)` (2 dp)
+  4. Totales de cabecera = **suma** de líneas (sin re-redondear la suma).
+- Tolerancia de validación documento vs suma: **0.01** en moneda del documento.
+- `amount_ars = roundMoney(amount × fx_rate)` a **2** dp; `fx_rate` a **6** dp.
+- **Pagar/cobrar todo:** aplicar saldo **almacenado** en servidor; display siempre 2 dp.
 
 ## Signos
 - **Ingresos** a tesorería: positivos en cuenta destino según convención ledger ([`ACCOUNT_MOVEMENTS.md`](./ACCOUNT_MOVEMENTS.md)).

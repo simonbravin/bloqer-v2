@@ -82,6 +82,7 @@ export const initiateUploadSchema = z
         "JOBSITE_LOG",
         "CERTIFICATION",
         "SUPPLIER_INVOICE",
+        "SALES_INVOICE",
         "PURCHASE_ORDER",
         "PURCHASE_RECEIPT",
         "PURCHASE_REQUEST",
