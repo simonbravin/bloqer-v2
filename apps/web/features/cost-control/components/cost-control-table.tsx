@@ -31,7 +31,7 @@ export function CostControlTable({ rows, totals, projectId }: Props) {
         <Table className="text-xs">
           <TableHeader className="sticky top-0 z-10 bg-muted/50">
             <TableRow>
-              <TableHead className="w-28">WBS</TableHead>
+              <TableHead className="w-28">EDT</TableHead>
               <TableHead>Ítem</TableHead>
               <TableHead className="text-right">Pres. costo</TableHead>
               <TableHead className="text-right">Pres. venta</TableHead>

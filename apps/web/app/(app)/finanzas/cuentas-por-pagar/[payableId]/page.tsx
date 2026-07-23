@@ -1,4 +1,5 @@
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DataTableSection } from "@/components/ui/data-table-section";
@@ -7,6 +8,7 @@ import type { PaymentListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import { getCompanyPayableById, listPaymentsByPayable, ServiceError } from "@bloqer/services";
+import { can } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -48,8 +50,10 @@ export default async function FinanzasPayableDetailPage({ params }: PageProps) {
     supplierInvoiceId: p.supplierInvoiceId,
   }));
 
+  const canEditAp = can(ctx.roles, "EDIT", "AP");
   const canPay =
-    payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE";
+    canEditAp &&
+    (payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE");
 
   return (
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={payable.supplierName}>
@@ -84,28 +88,19 @@ export default async function FinanzasPayableDetailPage({ params }: PageProps) {
           <div>
             <p className="text-muted-foreground">Total original</p>
             <p className="font-medium tabular-nums">
-              {Number(payable.originalAmount).toLocaleString("es-AR", {
-                style: "currency",
-                currency: payable.currency,
-              })}
+              {formatMoneyAmount(payable.originalAmount, payable.currency)}
             </p>
           </div>
           <div>
             <p className="text-muted-foreground">Pagado</p>
             <p className="font-medium tabular-nums">
-              {Number(payable.paidAmount).toLocaleString("es-AR", {
-                style: "currency",
-                currency: payable.currency,
-              })}
+              {formatMoneyAmount(payable.paidAmount, payable.currency)}
             </p>
           </div>
           <div>
             <p className="text-muted-foreground font-semibold">Saldo pendiente</p>
             <p className="font-semibold tabular-nums">
-              {Number(payable.balanceDue).toLocaleString("es-AR", {
-                style: "currency",
-                currency: payable.currency,
-              })}
+              {formatMoneyAmount(payable.balanceDue, payable.currency)}
             </p>
           </div>
         </div>

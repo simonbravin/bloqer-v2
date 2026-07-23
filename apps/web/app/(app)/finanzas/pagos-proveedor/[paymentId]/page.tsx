@@ -1,18 +1,21 @@
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { getCurrentUser } from "@/lib/auth";
 import { generateJournalFromPaymentAction } from "@/app/(app)/contabilidad/source-draft-actions";
 import { getCompanyPaymentById, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { cancelCompanyPaymentAction } from "@/app/(app)/finanzas/cuentas-por-pagar/actions";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ paymentId: string }>;
-  searchParams: Promise<{ contabilidad?: string }>;
+  searchParams: Promise<{ contabilidad?: string; actionError?: string }>;
 }
 
 export default async function FinanzasPagoProveedorDetailPage({ params, searchParams }: PageProps) {
@@ -40,6 +43,7 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
 
   const isConfirmed = payment.status === "CONFIRMED";
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
+  const canEditAp = can(current.tenantCtx.roles, "EDIT", "AP");
   const returnPath = `/finanzas/pagos-proveedor/${paymentId}`;
 
   return (
@@ -50,6 +54,8 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
           {isConfirmed ? "Confirmado" : "Cancelado"}
         </Badge>
       </div>
+
+      <ActionErrorBanner message={sp.actionError} />
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -68,10 +74,7 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
           <div>
             <p className="text-muted-foreground">Monto</p>
             <p className="font-semibold tabular-nums">
-              {Number(payment.amount).toLocaleString("es-AR", {
-                style: "currency",
-                currency: payment.currency,
-              })}
+              {formatMoneyAmount(payment.amount, payment.currency)}
             </p>
           </div>
         </div>
@@ -113,11 +116,12 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
         </div>
       )}
 
-      {isConfirmed && (
+      {canEditAp && isConfirmed && (
         <form
           action={async () => {
             "use server";
-            await cancelCompanyPaymentAction(paymentId);
+            const result = await cancelCompanyPaymentAction(paymentId);
+            if ("error" in result) redirectWithActionError(returnPath, result.error);
             redirect(returnPath);
           }}
         >

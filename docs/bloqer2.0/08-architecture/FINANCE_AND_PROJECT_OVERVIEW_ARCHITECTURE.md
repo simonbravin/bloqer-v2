@@ -409,7 +409,7 @@ Las mismas reglas que la antigua lista plana: cada enlace solo si el **módulo t
 | Sección UI | Enlaces (mismo criterio que tabla siguiente) |
 |------------|-----------------------------------------------|
 | Resumen | Resumen |
-| Planificación | Presupuesto, Cronograma, WBS y costos, Reportes |
+| Planificación | Presupuesto, Cronograma, EDT y costos, Reportes |
 | Operación | Libro de obra, Certificaciones, Inventario, Documentos |
 | Finanzas del proyecto | Tablero de finanzas, Flujo de caja, Compras, Subcontratos, Cuentas por pagar, Cuentas por cobrar, Facturas proveedor, Facturas emitidas |
 | Administración | Configuración |

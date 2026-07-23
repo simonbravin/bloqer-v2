@@ -92,7 +92,7 @@ export function CostControlFilters({ budgets, currentBudgetId }: Props) {
         />
       </div>
       <div className="min-w-56 flex-1 basis-72 space-y-1">
-        <Label className="text-xs">Buscar WBS</Label>
+        <Label className="text-xs">Buscar EDT</Label>
         <Input
           name="wbsSearch"
           className="h-8 w-full text-xs"

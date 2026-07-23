@@ -31,6 +31,14 @@ describe("buildFinancialHref", () => {
       buildFinancialHref("Collection", "col-1"),
       "/finanzas/cuentas-por-cobrar",
     );
+    assert.equal(
+      buildFinancialHref("SalesInvoice", "inv-1", { receivableId: "rec-1" }),
+      "/finanzas/cuentas-por-cobrar/rec-1",
+    );
+    assert.equal(
+      buildFinancialHref("Collection", "col-1", { receivableId: "rec-1" }),
+      "/finanzas/cuentas-por-cobrar/rec-1",
+    );
   });
 
   it("builds project AR paths", () => {

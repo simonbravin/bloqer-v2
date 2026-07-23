@@ -6,8 +6,10 @@ import {
   archiveDocument,
   restoreDocument,
   softDeleteDocument,
+  ServiceError,
 } from "@bloqer/services";
 import { redirect } from "next/navigation";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 
 function serviceCtx(current: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
   return {
@@ -18,6 +20,13 @@ function serviceCtx(current: NonNullable<Awaited<ReturnType<typeof getCurrentUse
   };
 }
 
+function failOrThrow(pathsToRevalidate: string[], err: unknown): never {
+  const message = err instanceof ServiceError ? err.message : "Error inesperado";
+  const path = pathsToRevalidate[0];
+  if (path) redirectWithActionError(path, message);
+  throw err instanceof Error ? err : new Error(message);
+}
+
 /** Revalidate Finanzas invoice detail (and extras) after attachment mutations. */
 export async function archiveCompanyFinanzasAttachmentAction(
   documentId: string,
@@ -25,7 +34,11 @@ export async function archiveCompanyFinanzasAttachmentAction(
 ): Promise<void> {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
-  await archiveDocument(documentId, serviceCtx(current));
+  try {
+    await archiveDocument(documentId, serviceCtx(current));
+  } catch (err) {
+    failOrThrow(pathsToRevalidate, err);
+  }
   for (const p of pathsToRevalidate) revalidatePath(p);
 }
 
@@ -35,7 +48,11 @@ export async function restoreCompanyFinanzasAttachmentAction(
 ): Promise<void> {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
-  await restoreDocument(documentId, serviceCtx(current));
+  try {
+    await restoreDocument(documentId, serviceCtx(current));
+  } catch (err) {
+    failOrThrow(pathsToRevalidate, err);
+  }
   for (const p of pathsToRevalidate) revalidatePath(p);
 }
 
@@ -45,6 +62,10 @@ export async function softDeleteCompanyFinanzasAttachmentAction(
 ): Promise<void> {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
-  await softDeleteDocument(documentId, serviceCtx(current));
+  try {
+    await softDeleteDocument(documentId, serviceCtx(current));
+  } catch (err) {
+    failOrThrow(pathsToRevalidate, err);
+  }
   for (const p of pathsToRevalidate) revalidatePath(p);
 }

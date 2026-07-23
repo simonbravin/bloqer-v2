@@ -13,6 +13,7 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PayableStatusBadge, SupplierInvoiceStatusBadge } from "@/features/ap";
 import { EntityDocumentsPanel } from "@/features/documents";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
@@ -27,18 +28,25 @@ import {
   issueCompanySupplierInvoiceAction,
   cancelCompanySupplierInvoiceAction,
 } from "@/app/(app)/finanzas/facturas-proveedor/actions";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PageProps {
   params: Promise<{ invoiceId: string }>;
+  searchParams: Promise<{ actionError?: string }>;
 }
 
-export default async function FinanzasFacturaProveedorDetailPage({ params }: PageProps) {
+export default async function FinanzasFacturaProveedorDetailPage({
+  params,
+  searchParams,
+}: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { invoiceId } = await params;
+  const sp = await searchParams;
+  const detailPath = `/finanzas/facturas-proveedor/${invoiceId}`;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -64,10 +72,11 @@ export default async function FinanzasFacturaProveedorDetailPage({ params }: Pag
 
   const invoiceAttachments = await listEntityDocuments("SUPPLIER_INVOICE", invoiceId, ctx, {});
   const storageConfigured = isStorageConfigured();
-  const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "AP");
+  const canEditAp = can(current.tenantCtx.roles, "EDIT", "AP");
+  const canEditAttachments = canEditAp;
   const canPay =
     Boolean(payable) &&
-    can(ctx.roles, "EDIT", "AP") &&
+    canEditAp &&
     (payable!.status === "OPEN" ||
       payable!.status === "PARTIAL" ||
       payable!.status === "OVERDUE");
@@ -82,6 +91,8 @@ export default async function FinanzasFacturaProveedorDetailPage({ params }: Pag
         <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
         <SupplierInvoiceStatusBadge status={invoice.status} />
       </div>
+
+      <ActionErrorBanner message={sp.actionError} />
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -155,34 +166,36 @@ export default async function FinanzasFacturaProveedorDetailPage({ params }: Pag
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {isDraft && (
-          <>
+      {canEditAp ? (
+        <div className="flex flex-wrap gap-2">
+          {isDraft && (
             <form
               action={async () => {
                 "use server";
-                await issueCompanySupplierInvoiceAction(invoiceId);
-                redirect(`/finanzas/facturas-proveedor/${invoiceId}`);
+                const result = await issueCompanySupplierInvoiceAction(invoiceId);
+                if ("error" in result) redirectWithActionError(detailPath, result.error);
+                redirect(detailPath);
               }}
             >
               <Button type="submit">Emitir factura</Button>
             </form>
-          </>
-        )}
-        {(isDraft || isIssued) && !isCancelled && (
-          <form
-            action={async () => {
-              "use server";
-              await cancelCompanySupplierInvoiceAction(invoiceId);
-              redirect(`/finanzas/facturas-proveedor/${invoiceId}`);
-            }}
-          >
-            <Button type="submit" variant="destructive">
-              Anular
-            </Button>
-          </form>
-        )}
-      </div>
+          )}
+          {(isDraft || isIssued) && !isCancelled && (
+            <form
+              action={async () => {
+                "use server";
+                const result = await cancelCompanySupplierInvoiceAction(invoiceId);
+                if ("error" in result) redirectWithActionError(detailPath, result.error);
+                redirect(detailPath);
+              }}
+            >
+              <Button type="submit" variant="destructive">
+                Anular
+              </Button>
+            </form>
+          )}
+        </div>
+      ) : null}
 
       {isIssued && payable ? (
         <Card>

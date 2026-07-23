@@ -132,7 +132,7 @@ La aplicación tiene un **menú lateral por empresa** y, al entrar a una obra, s
 | Sección | Ítems |
 |---------|-------|
 | Resumen | Resumen del proyecto |
-| Planificación | Presupuesto, Cronograma, WBS y costos, Reportes |
+| Planificación | Presupuesto, Cronograma, EDT y costos, Reportes |
 | Operación | Libro de obra, Certificaciones, Inventario, Documentos |
 | Finanzas del proyecto | Tablero de finanzas, Flujo de caja, Solicitudes de compra, Órdenes de compra, Subcontratos, Cuentas por pagar, Cuentas por cobrar, Facturas proveedor, Facturas emitidas |
 | Administración | Configuración del proyecto |

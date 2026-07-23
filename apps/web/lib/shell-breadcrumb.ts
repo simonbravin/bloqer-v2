@@ -44,7 +44,7 @@ const PATH_SEGMENT_LABELS: Record<string, string> = {
   notificaciones: "Notificaciones",
   presupuestos: "Presupuesto",
   cronograma: "Cronograma",
-  "control-costos": "Control de costos",
+  "control-costos": "EDT y costos",
   "libro-obra": "Libro de obra",
   certificaciones: "Certificaciones",
   documentos: "Documentos",

@@ -7,6 +7,15 @@ const allOnGate: TenantModuleGate = {
   isEnabled: () => true,
 };
 
+test("project nav labels cost control as EDT y costos under Planificación", () => {
+  const sections = buildProjectWorkspaceNavSections("proj-1", allOnGate, ["PROJECT_MANAGER"]);
+  const planificacion = sections.find((s) => s.title === "Planificación");
+  assert.ok(planificacion);
+  const edt = planificacion!.items.find((i) => i.label === "EDT y costos");
+  assert.ok(edt);
+  assert.equal(edt!.href, "/proyectos/proj-1/control-costos");
+});
+
 test("project nav includes Recepciones under Operación for procurement viewers", () => {
   const sections = buildProjectWorkspaceNavSections("proj-1", allOnGate, ["PROJECT_MANAGER"]);
   const operacion = sections.find((s) => s.title === "Operación");

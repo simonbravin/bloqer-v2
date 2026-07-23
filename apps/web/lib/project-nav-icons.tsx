@@ -25,7 +25,7 @@ const PROJECT_NAV_ICON_BY_LABEL: Record<string, LucideIcon> = {
   Resumen: LayoutDashboard,
   Presupuesto: FileSpreadsheet,
   Cronograma: CalendarRange,
-  "WBS y costos": FolderKanban,
+  "EDT y costos": FolderKanban,
   Reportes: BarChart3,
   "Flujo de caja": TrendingUp,
   "Tablero de finanzas": Wallet,

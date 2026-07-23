@@ -44,7 +44,9 @@ function buildArIncomeTraceChain(outcome: ArIncomeOutcome): FinancialTraceLink[]
       entityType: "SalesInvoice",
       entityId: outcome.invoiceId,
       code: salesInvoiceCode(outcome.number),
-      href: buildFinancialHref("SalesInvoice", outcome.invoiceId),
+      href: buildFinancialHref("SalesInvoice", outcome.invoiceId, {
+        receivableId: outcome.receivableId,
+      }),
     },
     {
       entityType: "Receivable",
@@ -57,7 +59,9 @@ function buildArIncomeTraceChain(outcome: ArIncomeOutcome): FinancialTraceLink[]
       {
         entityType: "Collection",
         entityId: outcome.collectionId,
-        href: buildFinancialHref("Collection", outcome.collectionId),
+        href: buildFinancialHref("Collection", outcome.collectionId, {
+          receivableId: outcome.receivableId,
+        }),
       },
       {
         entityType: "AccountMovement",

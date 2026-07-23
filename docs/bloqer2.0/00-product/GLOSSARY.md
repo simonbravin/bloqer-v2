@@ -147,6 +147,9 @@ Conjunto único de **contactos** de la empresa, con roles múltiples. Ver [Conta
 ### Egreso
 Movimiento de **salida de dinero** desde una cuenta de tesorería. Puede ser un pago, una transferencia interna o un gasto.
 
+### EDT — Estructura de Desglose de Trabajo
+**Label de UI (es-AR)** para la [WBS](#wbs--work-breakdown-structure). En pantallas y navegación se usa **EDT** / **EDT y costos** (título largo: *Estructura de Desglose de Trabajo y Costos*). En código, Prisma, APIs y campos (`wbsNode`, `wbsNodeId`, etc.) se mantiene **WBS** — no duplicar entidades ni tablas.
+
 ### Empresa
 Sinónimo conversacional de **razón social** dentro de un tenant. Pendiente: ¿un tenant puede tener varias empresas o son 1:1? — ver [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md).
 
@@ -371,7 +374,8 @@ Cada **iteración del presupuesto de un proyecto**. Una sola está activa a la v
 ## W
 
 ### WBS — Work Breakdown Structure
-**Estructura jerárquica** del presupuesto. Niveles típicos: rubro → subrubro → ítem. Cada ítem tiene cantidad, unidad, precio unitario y análisis de costos.
+**Estructura jerárquica** del presupuesto. Niveles típicos: rubro → subrubro → ítem. Cada ítem tiene cantidad, unidad, precio unitario y análisis de costos.  
+**Nombre canónico en código/modelo:** WBS. **Label de UI (es-AR):** [EDT](#edt--estructura-de-desglose-de-trabajo).
 
 ---
 
@@ -383,6 +387,7 @@ Cada **iteración del presupuesto de un proyecto**. Una sola está activa a la v
 | "Plan de cuentas" tradicional | Ledger + categorías de movimiento | Bloqer no es contable formal |
 | "Cierre contable" formal | [Periodo](#periodo) cerrado | Es un cierre operativo, no contable |
 | "MVP" como producto distinto | "Fase 1" interna | El MVP es el producto final |
-| "Item de presupuesto" sin WBS | "Ítem del WBS" | Para reforzar que cuelga de jerarquía |
+| "Item de presupuesto" sin WBS/EDT | "Ítem del EDT" (UI) / "Ítem del WBS" (doc técnica) | Para reforzar que cuelga de jerarquía |
+| Renombrar tablas/campos a `edt_*` | Mantener `wbs_*` en modelo; EDT solo en UI | Evitar duplicar entidades y migraciones innecesarias |
 | "Movimiento bancario" | "Movimiento de tesorería" | También aplica a caja, no solo bancos |
 | "Estado de pago" como atributo | [Estado](#estado) de la entidad | No mezclar atributos con máquina de estado |

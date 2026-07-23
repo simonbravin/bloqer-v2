@@ -33,8 +33,6 @@ export default async function WbsItemDetailPage({ params, searchParams }: PagePr
     throw err;
   }
 
-  const backUrl = `/proyectos/${projectId}/control-costos${sp.budgetId ? `?budgetId=${sp.budgetId}` : ""}`;
-
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={detail.wbsCode}>
       <div className="flex items-center gap-4">

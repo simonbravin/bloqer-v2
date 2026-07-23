@@ -1,9 +1,11 @@
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { ReceivableStatusBadge } from "@/features/sales-invoices";
 import { EntityDocumentsPanel } from "@/features/documents";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import { isStorageConfigured } from "@bloqer/config";
@@ -15,29 +17,22 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { cancelCompanyReceivableAction } from "../actions";
 
 interface PageProps {
   params: Promise<{ receivableId: string }>;
-}
-
-function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      parseFloat(value),
-    ) +
-    " " +
-    currency
-  );
+  searchParams: Promise<{ actionError?: string }>;
 }
 
 const OPEN_STATUSES = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
 
-export default async function FinanzasReceivableDetailPage({ params }: PageProps) {
+export default async function FinanzasReceivableDetailPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { receivableId } = await params;
+  const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -66,15 +61,13 @@ export default async function FinanzasReceivableDetailPage({ params }: PageProps
     {},
   );
   const storageConfigured = isStorageConfigured();
-  const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "AR");
-
-  const doCancel = async () => {
-    "use server";
-    await cancelCompanyReceivableAction(receivableId);
-  };
-
-  const canCollect = OPEN_STATUSES.has(receivable.status);
+  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
+  const canEditAttachments = canEditAr;
   const detailPath = `/finanzas/cuentas-por-cobrar/${receivableId}`;
+
+  const canCollect = canEditAr && OPEN_STATUSES.has(receivable.status);
+  const canCancel =
+    canEditAr && receivable.status !== "CANCELLED" && receivable.status !== "PAID";
 
   return (
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={receivable.clientName}>
@@ -91,8 +84,15 @@ export default async function FinanzasReceivableDetailPage({ params }: PageProps
               </Link>
             </Button>
           )}
-          {receivable.status !== "CANCELLED" && receivable.status !== "PAID" && (
-            <form action={doCancel}>
+          {canCancel && (
+            <form
+              action={async () => {
+                "use server";
+                const result = await cancelCompanyReceivableAction(receivableId);
+                if ("error" in result) redirectWithActionError(detailPath, result.error);
+                redirect(detailPath);
+              }}
+            >
               <Button variant="ghost" size="sm" className="text-muted-foreground">
                 Cancelar
               </Button>
@@ -100,6 +100,8 @@ export default async function FinanzasReceivableDetailPage({ params }: PageProps
           )}
         </div>
       </div>
+
+      <ActionErrorBanner message={sp.actionError} />
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -125,20 +127,20 @@ export default async function FinanzasReceivableDetailPage({ params }: PageProps
           </div>
           <div>
             <p className="text-muted-foreground">Monto original</p>
-            <p className="font-medium font-mono">
-              {fmtMoney(receivable.originalAmount, receivable.currency)}
+            <p className="font-medium tabular-nums">
+              {formatMoneyAmount(receivable.originalAmount, receivable.currency)}
             </p>
           </div>
           <div>
             <p className="text-muted-foreground">Cobrado</p>
-            <p className="font-medium font-mono">
-              {fmtMoney(receivable.paidAmount, receivable.currency)}
+            <p className="font-medium tabular-nums">
+              {formatMoneyAmount(receivable.paidAmount, receivable.currency)}
             </p>
           </div>
           <div>
             <p className="text-muted-foreground font-semibold">Saldo pendiente</p>
-            <p className="font-bold font-mono text-lg">
-              {fmtMoney(receivable.balanceDue, receivable.currency)}
+            <p className="font-bold tabular-nums text-lg">
+              {formatMoneyAmount(receivable.balanceDue, receivable.currency)}
             </p>
           </div>
         </div>
@@ -155,8 +157,8 @@ export default async function FinanzasReceivableDetailPage({ params }: PageProps
                   <p className="font-medium">{formatDate(c.collectionDate)}</p>
                   <p className="text-muted-foreground">{c.accountName}</p>
                 </div>
-                <p className="font-mono font-medium">
-                  {fmtMoney(c.amount, c.currency)}
+                <p className="font-medium tabular-nums">
+                  {formatMoneyAmount(c.amount, c.currency)}
                 </p>
               </li>
             ))}

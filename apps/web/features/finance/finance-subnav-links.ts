@@ -18,6 +18,7 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
 
   if (
     (gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP")) ||
+    (gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR")) ||
     (gate.isEnabled("TREASURY") && can(ctx.roles, "VIEW", "TREASURY"))
   ) {
     links.push({

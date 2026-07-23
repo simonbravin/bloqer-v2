@@ -3,6 +3,8 @@ import type { FinancialTraceEntityType } from "./register-transaction.types";
 export type FinancialHrefOptions = {
   projectId?: string | null;
   accountId?: string;
+  /** Corporate AR: deep-link SalesInvoice / Collection to receivable detail when known. */
+  receivableId?: string;
 };
 
 export function buildFinancialHref(
@@ -44,11 +46,15 @@ export function buildFinancialHref(
     case "Payment":
       return `/finanzas/pagos-proveedor/${entityId}`;
     case "SalesInvoice":
-      return `/finanzas/cuentas-por-cobrar`;
+      return options?.receivableId
+        ? `/finanzas/cuentas-por-cobrar/${options.receivableId}`
+        : `/finanzas/cuentas-por-cobrar`;
     case "Receivable":
       return `/finanzas/cuentas-por-cobrar/${entityId}`;
     case "Collection":
-      return `/finanzas/cuentas-por-cobrar`;
+      return options?.receivableId
+        ? `/finanzas/cuentas-por-cobrar/${options.receivableId}`
+        : `/finanzas/cuentas-por-cobrar`;
     case "AccountMovement": {
       const accountId = options?.accountId;
       return accountId

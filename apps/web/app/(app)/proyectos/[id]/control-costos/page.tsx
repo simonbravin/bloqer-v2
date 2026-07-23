@@ -12,6 +12,7 @@ import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dial
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -73,7 +74,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
-        title="Control de costos"
+        title="Estructura de Desglose de Trabajo y Costos"
         subtitle={subtitle}
         actions={
           result.type === "REPORT" ? (
@@ -169,20 +170,20 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
 
           {result.rows.length === 0 ? (
             <div className="rounded-lg border bg-card p-12 text-center text-muted-foreground text-sm">
-              No hay ítems WBS en este presupuesto
+              No hay ítems EDT en este presupuesto
               {sp.wbsSearch ? ` que coincidan con "${sp.wbsSearch}"` : ""}.
             </div>
           ) : (
             <CostControlTable rows={result.rows} totals={result.totals} projectId={projectId} />
           )}
 
-          {(parseFloat(result.unallocatedCommittedCost) > 0 ||
-            parseFloat(result.unallocatedReceivedCost) > 0 ||
-            parseFloat(result.unallocatedAccruedCost) > 0 ||
-            parseFloat(result.unallocatedPaidCost) > 0 ||
-            parseFloat(result.unallocatedInventoryConsumedCost) > 0) && (
+          {(Number(result.unallocatedCommittedCost) > 0 ||
+            Number(result.unallocatedReceivedCost) > 0 ||
+            Number(result.unallocatedAccruedCost) > 0 ||
+            Number(result.unallocatedPaidCost) > 0 ||
+            Number(result.unallocatedInventoryConsumedCost) > 0) && (
             <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm font-semibold mb-3">Costos no asignados a WBS</p>
+              <p className="text-sm font-semibold mb-3">Costos no asignados a EDT</p>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
                 {[
                   { label: "Comprometido", v: result.unallocatedCommittedCost },
@@ -193,9 +194,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
                 ].map(({ label, v }) => (
                   <div key={label}>
                     <p className="text-muted-foreground">{label}</p>
-                    <p className="font-medium">
-                      {parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                    </p>
+                    <p className="font-medium">{formatMoneyAmount(v)}</p>
                   </div>
                 ))}
               </div>

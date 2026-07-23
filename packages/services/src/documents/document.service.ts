@@ -213,9 +213,21 @@ async function resolveDocumentUploadPlan(
     if (!can(ctx.roles, "EDIT", "AR")) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la factura de venta");
     }
-  } else if (linkedPurchaseOrder || linkedPurchaseReceipt) {
-    if (!can(ctx.roles, "EDIT", "PROCUREMENT")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos en compras");
+  } else if (linkedPurchaseOrder) {
+    if (!canEditPurchaseOrders(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la orden de compra");
+    }
+  } else if (linkedPurchaseReceipt) {
+    if (!canEditPurchaseReceipts(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la recepción");
+    }
+  } else if (linkedPurchaseRequest) {
+    if (!canEditPurchaseRequests(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la solicitud de compra");
+    }
+  } else if (linkedProcurementQuote) {
+    if (!canEditPurchaseOrders(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la cotización");
     }
   } else if (linkedSubcontract || linkedSubcontractCertification) {
     if (!can(ctx.roles, "EDIT", "SUBCONTRACTS")) {
@@ -238,8 +250,10 @@ async function resolveDocumentUploadPlan(
     assertTenantModuleEnabledWithGate(gate, "AP");
   } else if (linkedSalesInvoice) {
     assertTenantModuleEnabledWithGate(gate, "AR");
-  } else if (linkedPurchaseOrder || linkedPurchaseReceipt) {
+  } else if (linkedPurchaseOrder || linkedPurchaseReceipt || linkedProcurementQuote) {
     assertTenantModuleEnabledWithGate(gate, "PROCUREMENT");
+  } else if (linkedPurchaseRequest) {
+    assertTenantModuleEnabledWithGate(gate, "PURCHASE_REQUESTS");
   } else if (linkedSubcontract || linkedSubcontractCertification) {
     assertTenantModuleEnabledWithGate(gate, "SUBCONTRACTS");
   } else if (linkedBudget) {

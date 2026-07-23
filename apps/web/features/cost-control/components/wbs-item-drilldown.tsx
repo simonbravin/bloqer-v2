@@ -36,7 +36,7 @@ export function WbsItemDrilldown({ detail }: Props) {
         </Section>
       ) : (
         <div className="rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20 p-3 text-sm text-yellow-700 dark:text-yellow-400">
-          Este ítem WBS no tiene análisis de costo en el presupuesto.
+          Este ítem EDT no tiene análisis de costo en el presupuesto.
         </div>
       )}
 
@@ -140,7 +140,7 @@ export function WbsItemDrilldown({ detail }: Props) {
       {detail.certificationLines.length === 0 && detail.purchaseOrderLines.length === 0 &&
        detail.subcontractLines.length === 0 && detail.stockMovements.length === 0 &&
        detail.jobsiteProgress.length === 0 && (
-        <p className="text-sm text-muted-foreground">No hay documentos asociados a este ítem WBS.</p>
+        <p className="text-sm text-muted-foreground">No hay documentos asociados a este ítem EDT.</p>
       )}
     </div>
   );

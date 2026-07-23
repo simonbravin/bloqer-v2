@@ -220,7 +220,7 @@ stateDiagram-v2
 | Sección | Ítems (etiqueta → ruta relativa) |
 |---------|----------------------------------|
 | Resumen | Resumen → `/proyectos/[id]` |
-| Planificación | Presupuesto → `/presupuestos` · Cronograma → `/cronograma` · WBS y costos → `/control-costos` · Reportes → `/reportes` |
+| Planificación | Presupuesto → `/presupuestos` · Cronograma → `/cronograma` · EDT y costos → `/control-costos` · Reportes → `/reportes` |
 | Operación | Libro de obra → `/libro-obra` · Certificaciones → `/certificaciones` · Recepciones → `/recepciones` · Inventario → `/inventario` · Consumos → `/consumos` · Documentos → `/documentos` |
 | Finanzas del proyecto | Tablero de finanzas → `/finanzas` · Flujo de caja → `/flujo-caja` · Solicitudes de compra → `/solicitudes-compra` · Órdenes de compra → `/ordenes-compra` · Subcontratos → `/subcontratos` · Cuentas por pagar → `/cuentas-por-pagar` · Cuentas por cobrar → `/cuentas-por-cobrar` · Facturas proveedor → `/facturas-proveedor` · Facturas emitidas → `/facturas` |
 | Administración | Configuración → `/editar` |

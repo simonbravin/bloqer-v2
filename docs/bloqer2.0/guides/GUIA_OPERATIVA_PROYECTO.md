@@ -344,7 +344,7 @@ Reporte: `/proyectos/[id]/reportes/subcontratos`.
 
 ## 8. Módulo: Control de costos y reportes de planificación
 
-**Ruta:** `/proyectos/[id]/control-costos` (**WBS y costos**)
+**Ruta:** `/proyectos/[id]/control-costos` (**EDT y costos** — título: Estructura de Desglose de Trabajo y Costos; código/modelo: WBS)
 
 ### 8.1 Tres capas de costo (canónico)
 
