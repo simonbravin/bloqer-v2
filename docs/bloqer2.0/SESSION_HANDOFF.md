@@ -170,7 +170,6 @@ Ver matrices: `PERMISSIONS_ROUTE_MATRIX.md`, `SECURITY_ARCHITECTURE.md`.
 /contabilidad/asientos, /nuevo, /[journalEntryId], /[journalEntryId]/editar
 /contabilidad/reglas, /nueva, /[ruleId], /[ruleId]/editar
 /tesoreria/cuentas, /nueva, /[accountId]
-/tesoreria/posicion-caja
 /tesoreria/movimientos
 /tesoreria/flujo-caja
 /tesoreria/transferencias, /nueva

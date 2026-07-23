@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,8 +20,11 @@ import {
   toSearchableOptions,
   withNoneOption,
 } from "@/components/ui/searchable-combobox";
+import { cn } from "@/lib/utils";
 import { InvoiceLinesEditor } from "@/features/ap/components/invoice-lines-editor";
 import type { InvoiceLine } from "@/features/ap/components/invoice-lines-editor";
+import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
+import { uploadDocumentAction } from "@/features/documents/upload-document-action";
 import { registerTransactionAction } from "@/app/(app)/finanzas/transacciones/actions";
 
 export type SupplierOption = { id: string; label: string };
@@ -29,6 +33,8 @@ export type TreasuryAccountOption = { id: string; label: string; currency: strin
 
 type TransactionKind = "AP_EXPENSE" | "AR_INCOME" | "TREASURY_INFLOW";
 type InflowMode = "AR_INVOICE" | "CASH_ONLY";
+
+type TraceLink = { entityType: string; entityId: string };
 
 interface Props {
   suppliers: SupplierOption[];
@@ -40,9 +46,44 @@ interface Props {
   canAr?: boolean;
   /** Abre el diálogo al montar (p. ej. /finanzas/transacciones?register=ap). */
   defaultOpen?: boolean;
+  /** Storage ready for optional attachment on create (AP/AR invoice). */
+  storageConfigured?: boolean;
 }
 
 const DEFAULT_LINE: InvoiceLine = { description: "", quantity: "1", unitPrice: "", taxRate: "21" };
+
+function findTraceEntityId(chain: TraceLink[], entityType: string): string | null {
+  return chain.find((l) => l.entityType === entityType)?.entityId ?? null;
+}
+
+function SegmentedOption({
+  active,
+  onClick,
+  children,
+  disabled = false,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+        disabled && "pointer-events-none opacity-50",
+        active
+          ? "bg-background text-foreground shadow-sm"
+          : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
 export function NewTransactionDialog({
   suppliers,
@@ -52,6 +93,7 @@ export function NewTransactionDialog({
   canTreasury,
   canAr = false,
   defaultOpen = false,
+  storageConfigured = false,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -61,6 +103,7 @@ export function NewTransactionDialog({
   const [inflowMode, setInflowMode] = useState<InflowMode>(canAr ? "AR_INVOICE" : "CASH_ONLY");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [attachment, setAttachment] = useState<File | null>(null);
 
   const [supplierContactId, setSupplierContactId] = useState("");
   const [clientContactId, setClientContactId] = useState("");
@@ -105,6 +148,7 @@ export function NewTransactionDialog({
 
   function resetForm() {
     setError(null);
+    setAttachment(null);
     setSupplierContactId("");
     setClientContactId("");
     setLines([{ ...DEFAULT_LINE }]);
@@ -126,12 +170,14 @@ export function NewTransactionDialog({
       setInflowMode("CASH_ONLY");
     }
     setLines([{ ...DEFAULT_LINE }]);
+    setAttachment(null);
     setError(null);
   }
 
   function selectApTab() {
     setKind("AP_EXPENSE");
     setLines([{ ...DEFAULT_LINE }]);
+    setAttachment(null);
     setError(null);
   }
 
@@ -139,7 +185,44 @@ export function NewTransactionDialog({
     setInflowMode(mode);
     setKind(mode === "AR_INVOICE" ? "AR_INCOME" : "TREASURY_INFLOW");
     setLines([{ ...DEFAULT_LINE }]);
+    setAttachment(null);
     setError(null);
+  }
+
+  const wantsAttachment = Boolean(attachment && storageConfigured);
+  const pendingAttachment = attachment;
+
+  async function uploadInvoiceAttachment(opts: {
+    file: File;
+    linkedEntityType: "SUPPLIER_INVOICE" | "SALES_INVOICE";
+    invoiceId: string;
+    detailPath: string;
+    paidOrCollected: boolean;
+  }): Promise<boolean> {
+    const fd = new FormData();
+    fd.set("file", opts.file);
+    fd.set("linkedEntityType", opts.linkedEntityType);
+    fd.set("linkedEntityId", opts.invoiceId);
+    fd.set("category", "INVOICE");
+    fd.set("revalidatePaths", JSON.stringify([opts.detailPath]));
+    const uploadRes = await uploadDocumentAction(fd);
+    if ("error" in uploadRes) {
+      toast.warning(
+        opts.paidOrCollected
+          ? `Registrado, pero no se pudo adjuntar el archivo: ${uploadRes.error}. Podés reintentar desde el detalle.`
+          : `Creado, pero no se pudo adjuntar el archivo: ${uploadRes.error}. Podés reintentar desde el detalle.`,
+      );
+      return false;
+    }
+    return true;
+  }
+
+  function finishAndNavigate(href: string) {
+    setOpen(false);
+    resetForm();
+    clearRegisterQueryParam();
+    router.refresh();
+    router.push(href);
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -158,7 +241,7 @@ export function NewTransactionDialog({
           return;
         }
         if (payNow && !payAccountId) {
-          setError("Selecciona la cuenta de pago");
+          setError("Seleccioná la cuenta de pago");
           return;
         }
         const issueDate = fd.get("issueDate") as string;
@@ -186,11 +269,27 @@ export function NewTransactionDialog({
           setError(res.error);
           return;
         }
-        setOpen(false);
-        resetForm();
-        clearRegisterQueryParam();
-        router.refresh();
-        router.push(res.href);
+        const invoiceId = findTraceEntityId(res.traceChain, "SupplierInvoice");
+        const invoiceHref = invoiceId
+          ? `/finanzas/facturas-proveedor/${invoiceId}`
+          : null;
+        if (wantsAttachment) {
+          if (!invoiceId || !invoiceHref) {
+            toast.warning(
+              "Registrado, pero no se pudo vincular el comprobante. Podés adjuntarlo desde la factura.",
+            );
+          } else {
+            await uploadInvoiceAttachment({
+              file: pendingAttachment!,
+              linkedEntityType: "SUPPLIER_INVOICE",
+              invoiceId,
+              detailPath: invoiceHref,
+              paidOrCollected: payNow,
+            });
+          }
+        }
+        // Con adjunto (o intento), aterrizar en la factura donde viven los documentos — no en el pago.
+        finishAndNavigate(wantsAttachment && invoiceHref ? invoiceHref : res.href);
         return;
       }
 
@@ -204,7 +303,7 @@ export function NewTransactionDialog({
           return;
         }
         if (collectNow && !collectAccountId) {
-          setError("Selecciona la cuenta de cobro");
+          setError("Seleccioná la cuenta de cobro");
           return;
         }
         if (collectNow && !canTreasury) {
@@ -237,11 +336,27 @@ export function NewTransactionDialog({
           setError(res.error);
           return;
         }
-        setOpen(false);
-        resetForm();
-        clearRegisterQueryParam();
-        router.refresh();
-        router.push(res.href);
+        const invoiceId = findTraceEntityId(res.traceChain, "SalesInvoice");
+        const receivableId = findTraceEntityId(res.traceChain, "Receivable");
+        const detailPath = receivableId
+          ? `/finanzas/cuentas-por-cobrar/${receivableId}`
+          : res.href;
+        if (wantsAttachment) {
+          if (!invoiceId) {
+            toast.warning(
+              "Registrado, pero no se pudo vincular el comprobante. Podés adjuntarlo desde la cuenta por cobrar.",
+            );
+          } else {
+            await uploadInvoiceAttachment({
+              file: pendingAttachment!,
+              linkedEntityType: "SALES_INVOICE",
+              invoiceId,
+              detailPath,
+              paidOrCollected: collectNow,
+            });
+          }
+        }
+        finishAndNavigate(detailPath);
         return;
       }
 
@@ -262,20 +377,18 @@ export function NewTransactionDialog({
         setError(res.error);
         return;
       }
-      setOpen(false);
-      resetForm();
-      clearRegisterQueryParam();
-      router.refresh();
-      router.push(res.href);
+      finishAndNavigate(res.href);
     });
   }
 
   const incomeTabActive = kind === "AR_INCOME" || kind === "TREASURY_INFLOW";
+  const showInvoiceAttachment = storageConfigured && (kind === "AP_EXPENSE" || kind === "AR_INCOME");
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (!next && isPending) return;
         setOpen(next);
         if (!next) {
           resetForm();
@@ -286,31 +399,33 @@ export function NewTransactionDialog({
       <DialogTrigger asChild>
         <Button size="sm">Nueva transacción</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
+      <DialogContent
+        className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl"
+        onInteractOutside={(e) => {
+          if (isPending) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (isPending) e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Registrar transacción</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-wrap gap-2">
+        <div
+          className="inline-flex flex-wrap rounded-lg border bg-muted/40 p-1"
+          role="group"
+          aria-label="Tipo de transacción"
+        >
           {canAp && (
-            <Button
-              type="button"
-              size="sm"
-              variant={kind === "AP_EXPENSE" ? "secondary" : "outline"}
-              onClick={selectApTab}
-            >
+            <SegmentedOption active={kind === "AP_EXPENSE"} onClick={selectApTab} disabled={isPending}>
               Gasto / factura proveedor
-            </Button>
+            </SegmentedOption>
           )}
           {showIncomeTab && (
-            <Button
-              type="button"
-              size="sm"
-              variant={incomeTabActive ? "secondary" : "outline"}
-              onClick={selectIncomeTab}
-            >
+            <SegmentedOption active={incomeTabActive} onClick={selectIncomeTab} disabled={isPending}>
               Ingreso / cobro
-            </Button>
+            </SegmentedOption>
           )}
         </div>
 
@@ -347,6 +462,20 @@ export function NewTransactionDialog({
                 <Label htmlFor="notes">Notas (opcional)</Label>
                 <Textarea id="notes" name="notes" rows={2} />
               </div>
+              {showInvoiceAttachment && (
+                <div className="space-y-2">
+                  <Label>Comprobante (opcional)</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Foto o PDF de la factura. Se adjunta después de registrar.
+                  </p>
+                  <DocumentUploadZone
+                    selectedFile={attachment}
+                    onFileSelect={setAttachment}
+                    onValidationError={setError}
+                    disabled={isPending}
+                  />
+                </div>
+              )}
               {canAp && canTreasury && treasuryAccounts.length > 0 && (
                 <div className="rounded-md border p-3 space-y-3">
                   <label className="flex items-center gap-2 text-sm font-medium">
@@ -382,24 +511,26 @@ export function NewTransactionDialog({
 
           {incomeTabActive && (
             <>
-              {(canAr && canTreasury) && (
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={inflowMode === "AR_INVOICE" ? "secondary" : "outline"}
+              {canAr && canTreasury && (
+                <div
+                  className="inline-flex flex-wrap rounded-lg border bg-muted/40 p-1"
+                  role="group"
+                  aria-label="Modo de ingreso"
+                >
+                  <SegmentedOption
+                    active={inflowMode === "AR_INVOICE"}
                     onClick={() => handleInflowModeChange("AR_INVOICE")}
+                    disabled={isPending}
                   >
-                    Factura / cuenta por cobrar
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={inflowMode === "CASH_ONLY" ? "secondary" : "outline"}
+                    Factura / cobro
+                  </SegmentedOption>
+                  <SegmentedOption
+                    active={inflowMode === "CASH_ONLY"}
                     onClick={() => handleInflowModeChange("CASH_ONLY")}
+                    disabled={isPending}
                   >
                     Solo ingreso a caja
-                  </Button>
+                  </SegmentedOption>
                 </div>
               )}
 
@@ -440,6 +571,20 @@ export function NewTransactionDialog({
                     <Label htmlFor="arNotes">Notas (opcional)</Label>
                     <Textarea id="arNotes" name="arNotes" rows={2} />
                   </div>
+                  {showInvoiceAttachment && (
+                    <div className="space-y-2">
+                      <Label>Comprobante (opcional)</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Foto o PDF de la factura. Se adjunta después de registrar.
+                      </p>
+                      <DocumentUploadZone
+                        selectedFile={attachment}
+                        onFileSelect={setAttachment}
+                        onValidationError={setError}
+                        disabled={isPending}
+                      />
+                    </div>
+                  )}
                   {canTreasury && treasuryAccounts.length > 0 && (
                     <div className="rounded-md border p-3 space-y-3">
                       <label className="flex items-center gap-2 text-sm font-medium">
@@ -527,7 +672,7 @@ export function NewTransactionDialog({
           )}
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
               Cancelar
             </Button>
             <Button type="submit" disabled={isPending}>

@@ -31,7 +31,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 export type DocumentFormProps = {
-  /** Project UUID, or `null` for corporate supplier-invoice uploads. */
+  /** Project UUID, or `null` for corporate SUPPLIER_INVOICE / SALES_INVOICE uploads. */
   projectId: string | null;
   storageConfigured: boolean;
   linkedEntity?:

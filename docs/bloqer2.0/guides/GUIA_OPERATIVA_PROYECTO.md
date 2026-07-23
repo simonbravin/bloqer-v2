@@ -450,7 +450,7 @@ Reporte: `/proyectos/[id]/reportes/subcontratos`.
 | Cuentas por cobrar (obra + Empresa) | `/finanzas/cuentas-por-cobrar` |
 | Cuentas por pagar | `/finanzas/cuentas-por-pagar` |
 | Tesorería | `/tesoreria` |
-| Posición de caja | `/tesoreria/posicion-caja` |
+| Tesorería (resumen) | `/tesoreria` |
 | Flujo de caja global | `/tesoreria/flujo-caja` |
 | Gastos generales | `/finanzas/gastos-generales` |
 | Contabilidad | `/contabilidad` |

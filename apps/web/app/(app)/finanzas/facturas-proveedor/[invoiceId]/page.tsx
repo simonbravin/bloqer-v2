@@ -214,7 +214,10 @@ export default async function FinanzasFacturaProveedorDetailPage({ params }: Pag
       ) : null}
 
       <EntityDocumentsPanel
-        scope={{ kind: "company-finanzas-supplier-invoice" }}
+        scope={{
+          kind: "company-finanzas",
+          afterUploadPath: `/finanzas/facturas-proveedor/${invoiceId}`,
+        }}
         linkedEntity={{ type: "SUPPLIER_INVOICE", id: invoiceId }}
         storageConfigured={storageConfigured}
         docs={invoiceAttachments}

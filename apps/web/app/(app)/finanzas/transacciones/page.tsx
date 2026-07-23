@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Pagination } from "@/components/ui/pagination";
+import { isStorageConfigured } from "@bloqer/config";
 import { NewTransactionDialog } from "@/features/finance/components/new-transaction-dialog";
 import { ReportExportActions } from "@/features/reports";
 import { MovementFilters, MovementLedgerTable } from "@/features/treasury-reports";
@@ -228,6 +229,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
                 canTreasury={canEditTreasury}
                 canAr={canEditAr}
                 defaultOpen={wantsRegisterAp(sp)}
+                storageConfigured={isStorageConfigured()}
               />
             </Suspense>
           )}

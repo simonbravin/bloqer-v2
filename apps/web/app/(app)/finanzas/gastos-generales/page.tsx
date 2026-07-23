@@ -122,16 +122,13 @@ export default async function GastosGeneralesPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {canEditAp ? (
+      {canEditAp ? (
+        <div className="flex flex-wrap gap-2">
           <Button asChild>
             <Link href="/finanzas/facturas-proveedor?create=1">Nueva factura de gasto</Link>
           </Button>
-        ) : null}
-        <Button asChild variant="outline">
-          <Link href="/finanzas/transacciones?register=ap">Alta rápida</Link>
-        </Button>
-      </div>
+        </div>
+      ) : null}
 
       {companyId && periodSummaries.length > 0 ? (
         <OverheadPeriodSummaryPanel

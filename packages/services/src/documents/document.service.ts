@@ -282,6 +282,30 @@ async function resolveDocumentUploadPlan(
         throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
       }
     }
+  } else if (linkedSalesInvoice) {
+    const inv = await prisma.salesInvoice.findUnique({
+      where: { id: linkedSalesInvoice.salesInvoiceId },
+      select: { tenantId: true, projectId: true, companyId: true },
+    });
+    if (!inv || inv.tenantId !== ctx.tenantId) {
+      throw new ServiceError("NOT_FOUND", "Factura de venta no encontrada");
+    }
+    if (inv.projectId) {
+      if (!input.projectId || input.projectId !== inv.projectId) {
+        throw new ServiceError("FORBIDDEN", "La factura no pertenece al proyecto indicado");
+      }
+      await assertProjectAllowsBudgetPlanning(inv.projectId, ctx.tenantId);
+      anchorProjectId = inv.projectId;
+      strictProjectId   = inv.projectId;
+    } else {
+      if (input.projectId) {
+        throw new ServiceError("VALIDATION", "Esta factura es corporativa: no indique proyecto para el adjunto");
+      }
+      anchorProjectId = null;
+      if (isCrossCompany(inv.companyId, ctx)) {
+        throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+      }
+    }
   } else {
     if (!input.projectId) {
       throw new ServiceError("VALIDATION", "Proyecto requerido");
@@ -311,7 +335,6 @@ async function resolveDocumentUploadPlan(
     linkedEntityType = "SUPPLIER_INVOICE";
     linkedEntityId   = linkedSupplierInvoice.supplierInvoiceId;
   } else if (linkedSalesInvoice) {
-    await assertSalesInvoiceDocumentTarget(strictProjectId!, linkedSalesInvoice.salesInvoiceId, ctx);
     linkedEntityType = "SALES_INVOICE";
     linkedEntityId   = linkedSalesInvoice.salesInvoiceId;
   } else if (linkedPurchaseOrder) {
@@ -362,6 +385,28 @@ async function resolveDocumentUploadPlan(
   };
 }
 
+async function resolveCorporateDocumentActionUrl(
+  linkedEntityType: LinkedEntityType | null,
+  linkedEntityId: string | null,
+  ctx: ServiceContext,
+): Promise<string | null> {
+  if (!linkedEntityType || !linkedEntityId) return null;
+  if (linkedEntityType === "SUPPLIER_INVOICE") {
+    return `/finanzas/facturas-proveedor/${linkedEntityId}`;
+  }
+  if (linkedEntityType === "SALES_INVOICE") {
+    const receivable = await prisma.receivable.findUnique({
+      where: { salesInvoiceId: linkedEntityId },
+      select: { id: true, tenantId: true, projectId: true },
+    });
+    if (!receivable || receivable.tenantId !== ctx.tenantId || receivable.projectId != null) {
+      return null;
+    }
+    return `/finanzas/cuentas-por-cobrar/${receivable.id}`;
+  }
+  return null;
+}
+
 async function notifyDocumentUploadConfirmed(
   doc: {
     id: string;
@@ -385,6 +430,10 @@ async function notifyDocumentUploadConfirmed(
     return;
   }
 
+  const actionUrl = doc.projectId
+    ? `/proyectos/${doc.projectId}/documentos/${doc.id}`
+    : await resolveCorporateDocumentActionUrl(doc.linkedEntityType, doc.linkedEntityId, ctx);
+
   for (const recipientUserId of recipients) {
     try {
       await createSystemNotification({
@@ -398,7 +447,7 @@ async function notifyDocumentUploadConfirmed(
         linkedEntityType: doc.linkedEntityType,
         linkedEntityId: doc.linkedEntityId,
         projectId: doc.projectId,
-        actionUrl: doc.projectId ? `/proyectos/${doc.projectId}/documentos/${doc.id}` : null,
+        actionUrl,
         metadata: { documentId: doc.id },
       });
     } catch {
@@ -478,7 +527,7 @@ export async function getDocumentDownloadUrl(
 ): Promise<string> {
   const doc = await prisma.documentAttachment.findUnique({ where: { id } });
   if (!doc || doc.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Documento no encontrado");
-  if (!canViewDocumentByLink(doc.linkedEntityType, ctx)) {
+  if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para descargar documentos");
   }
   if (doc.status === "DELETED") throw new ServiceError("FORBIDDEN", "El documento ha sido eliminado");
@@ -547,7 +596,7 @@ export async function softDeleteDocument(id: string, ctx: ServiceContext): Promi
 export async function getDocumentById(id: string, ctx: ServiceContext): Promise<DocumentAttachmentView> {
   const doc = await prisma.documentAttachment.findUnique({ where: { id } });
   if (!doc || doc.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Documento no encontrado");
-  if (!canViewDocumentByLink(doc.linkedEntityType, ctx)) {
+  if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver documentos");
   }
   const gate = await getTenantModuleGate(ctx);
@@ -639,14 +688,16 @@ export async function listEntityDocuments(
     "SUBCONTRACT_CERTIFICATION",
     "BUDGET",
   ] as const;
-  /** Corporate supplier invoices are listed without a project scope. */
+  /** Corporate supplier / sales invoices are listed without a project scope. */
   const needsProject =
-    (scoped as readonly string[]).includes(entityType) && entityType !== "SUPPLIER_INVOICE";
+    (scoped as readonly string[]).includes(entityType) &&
+    entityType !== "SUPPLIER_INVOICE" &&
+    entityType !== "SALES_INVOICE";
   if (needsProject && !options?.projectId) {
     throw new ServiceError("VALIDATION", "projectId requerido para listar adjuntos de esta entidad");
   }
 
-  let supplierInvoiceDocScope: { projectId?: string } = {};
+  let entityDocScope: { projectId?: string | null } = {};
 
   if (entityType === "JOBSITE_LOG") {
     if (!can(ctx.roles, "VIEW", "JOBSITE_LOG") && !can(ctx.roles, "VIEW", "PROJECTS")) {
@@ -659,16 +710,31 @@ export async function listEntityDocuments(
     }
     await assertCertificationDocumentTarget(options!.projectId!, entityId, ctx);
   } else if (entityType === "SUPPLIER_INVOICE") {
-    if (!can(ctx.roles, "VIEW", "AP") && !can(ctx.roles, "VIEW", "PROJECTS")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la factura de proveedor");
-    }
     const { invoiceProjectId } = await assertSupplierInvoiceDocumentTarget(options?.projectId, entityId, ctx);
-    if (invoiceProjectId != null) supplierInvoiceDocScope = { projectId: invoiceProjectId };
-  } else if (entityType === "SALES_INVOICE") {
-    if (!can(ctx.roles, "VIEW", "AR") && !can(ctx.roles, "VIEW", "PROJECTS")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la factura de venta");
+    if (invoiceProjectId == null) {
+      if (!can(ctx.roles, "VIEW", "AP")) {
+        throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la factura de proveedor");
+      }
+      entityDocScope = { projectId: null };
+    } else {
+      if (!can(ctx.roles, "VIEW", "AP") && !can(ctx.roles, "VIEW", "PROJECTS")) {
+        throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la factura de proveedor");
+      }
+      entityDocScope = { projectId: invoiceProjectId };
     }
-    await assertSalesInvoiceDocumentTarget(options!.projectId!, entityId, ctx);
+  } else if (entityType === "SALES_INVOICE") {
+    const { invoiceProjectId } = await assertSalesInvoiceDocumentTarget(options?.projectId, entityId, ctx);
+    if (invoiceProjectId == null) {
+      if (!can(ctx.roles, "VIEW", "AR")) {
+        throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la factura de venta");
+      }
+      entityDocScope = { projectId: null };
+    } else {
+      if (!can(ctx.roles, "VIEW", "AR") && !can(ctx.roles, "VIEW", "PROJECTS")) {
+        throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la factura de venta");
+      }
+      entityDocScope = { projectId: invoiceProjectId };
+    }
   } else if (entityType === "PURCHASE_ORDER") {
     if (!canViewProcurementProjectArea(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la orden de compra");
@@ -720,7 +786,7 @@ export async function listEntityDocuments(
       linkedEntityType: entityType as never,
       linkedEntityId:   entityId,
       status:           { not: "DELETED" },
-      ...supplierInvoiceDocScope,
+      ...entityDocScope,
       ...(needsProject && options?.projectId ? { projectId: options.projectId } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -893,20 +959,30 @@ async function assertSupplierInvoiceDocumentTarget(
 }
 
 async function assertSalesInvoiceDocumentTarget(
-  projectId: string,
+  routeProjectId: string | null | undefined,
   salesInvoiceId: string,
   ctx: ServiceContext,
-): Promise<void> {
+): Promise<{ invoiceProjectId: string | null }> {
   const inv = await prisma.salesInvoice.findUnique({
     where: { id: salesInvoiceId },
-    select: { tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!inv || inv.tenantId !== ctx.tenantId) {
     throw new ServiceError("NOT_FOUND", "Factura de venta no encontrada");
   }
-  if (inv.projectId !== projectId) {
-    throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+  if (inv.projectId != null) {
+    if (routeProjectId !== inv.projectId) {
+      throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+    }
+  } else {
+    if (isCrossCompany(inv.companyId, ctx)) {
+      throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+    }
+    if (routeProjectId != null && routeProjectId !== "") {
+      throw new ServiceError("VALIDATION", "Esta factura es corporativa; no use filtro por proyecto");
+    }
   }
+  return { invoiceProjectId: inv.projectId };
 }
 
 async function assertPurchaseOrderDocumentTarget(
@@ -1014,7 +1090,18 @@ async function assertSubcontractCertificationDocumentTarget(
 function canViewDocumentByLink(
   linkedEntityType: string | null,
   ctx:              ServiceContext,
+  options?:         { projectId?: string | null },
 ): boolean {
+  const isCorporateInvoice =
+    (linkedEntityType === "SUPPLIER_INVOICE" || linkedEntityType === "SALES_INVOICE") &&
+    (options?.projectId == null || options.projectId === "");
+
+  // Corporate Finanzas attachments are not project-scoped: VIEW PROJECTS alone is not enough.
+  if (isCorporateInvoice) {
+    if (linkedEntityType === "SUPPLIER_INVOICE") return can(ctx.roles, "VIEW", "AP");
+    return can(ctx.roles, "VIEW", "AR");
+  }
+
   if (can(ctx.roles, "VIEW", "PROJECTS")) return true;
   if (linkedEntityType === "JOBSITE_LOG" && can(ctx.roles, "VIEW", "JOBSITE_LOG")) return true;
   if (linkedEntityType === "CERTIFICATION" && can(ctx.roles, "VIEW", "CERTIFICATIONS")) return true;

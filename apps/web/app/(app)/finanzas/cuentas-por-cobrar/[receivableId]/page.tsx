@@ -3,11 +3,15 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { ReceivableStatusBadge } from "@/features/sales-invoices";
+import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
+import { isStorageConfigured } from "@bloqer/config";
+import { can } from "@bloqer/domain";
 import {
   getCompanyReceivableById,
   listCollectionsByReceivable,
+  listEntityDocuments,
   ServiceError,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
@@ -55,12 +59,22 @@ export default async function FinanzasReceivableDetailPage({ params }: PageProps
     throw err;
   }
 
+  const invoiceAttachments = await listEntityDocuments(
+    "SALES_INVOICE",
+    receivable.salesInvoiceId,
+    ctx,
+    {},
+  );
+  const storageConfigured = isStorageConfigured();
+  const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "AR");
+
   const doCancel = async () => {
     "use server";
     await cancelCompanyReceivableAction(receivableId);
   };
 
   const canCollect = OPEN_STATUSES.has(receivable.status);
+  const detailPath = `/finanzas/cuentas-por-cobrar/${receivableId}`;
 
   return (
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={receivable.clientName}>
@@ -149,6 +163,14 @@ export default async function FinanzasReceivableDetailPage({ params }: PageProps
           </ul>
         )}
       </DataTableSection>
+
+      <EntityDocumentsPanel
+        scope={{ kind: "company-finanzas", afterUploadPath: detailPath }}
+        linkedEntity={{ type: "SALES_INVOICE", id: receivable.salesInvoiceId }}
+        storageConfigured={storageConfigured}
+        docs={invoiceAttachments}
+        canEdit={canEditAttachments}
+      />
     </PageShell>
   );
 }

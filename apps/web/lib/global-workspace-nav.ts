@@ -57,6 +57,7 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
         require: {
           anyOf: [
             { action: "VIEW", module: "AP" },
+            { action: "VIEW", module: "AR" },
             { action: "VIEW", module: "TREASURY" },
           ],
         },
@@ -76,11 +77,6 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
     items: [
       { label: "Resumen", href: "/tesoreria", matchExact: true, require: { action: "VIEW", module: "TREASURY" } },
       { label: "Cuentas", href: "/tesoreria/cuentas", require: { action: "VIEW", module: "TREASURY" } },
-      {
-        label: "Posición de caja",
-        href: "/tesoreria/posicion-caja",
-        require: { action: "VIEW", module: "TREASURY" },
-      },
       {
         label: "Movimientos",
         href: "/tesoreria/movimientos",

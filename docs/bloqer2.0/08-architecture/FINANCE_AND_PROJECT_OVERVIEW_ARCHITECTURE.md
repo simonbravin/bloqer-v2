@@ -149,7 +149,7 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 - **Representación de “gastos generales”:** mismas entidades **SupplierInvoice → Payable → Payment** con `projectId` null (sin tabla `Expense`).
 - **Aislamiento:** servicios `listCompanySupplierInvoices`, `getCompanySupplierInvoiceById`, `listCompanyPayables`, `getCompanyPayableById`, `getCompanyPaymentById` exigen **`VIEW AP`** (`canViewCompanyAp`) y filas con **`projectId === null`** (más `ctx.companyId` cuando aplica). Las rutas proyecto siguen con `projectScopeId` / `list*ByProject`.
 - **Hub:** `getFinanceHubOverview` agrega enlaces de reporte a facturas/C×P empresa y “gastos generales”. **Phase 16D** amplía el mismo servicio a tablero multimoneda + split AP obra/corporativo (aging) + accesos rápidos + bloque contabilidad (solo enlace).
-- **Adjuntos:** `EntityDocumentsPanel` con `scope: { kind: "company-finanzas-supplier-invoice" }` + `DocumentForm` con `projectId` null; acciones server `attachment-actions.ts` revalidan `/finanzas/facturas-proveedor/...`.
+- **Adjuntos:** `EntityDocumentsPanel` con `scope: { kind: "company-finanzas", afterUploadPath }` + `DocumentForm` con `projectId` null; acciones server `attachment-actions.ts` revalidan rutas de Finanzas.
 - **Contabilidad:** sin auto-post; botón “Generar asiento” en pago empresa reutiliza `suggestJournalFromPayment` como en proyecto.
 
 ### 16C.2 Fuera de alcance (historial)

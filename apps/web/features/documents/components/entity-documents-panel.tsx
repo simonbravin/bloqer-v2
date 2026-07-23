@@ -54,7 +54,8 @@ export type EntityDocumentsLink =
 
 export type EntityDocumentsPanelScope =
   | { kind: "project"; projectId: string }
-  | { kind: "company-finanzas-supplier-invoice" };
+  /** Corporate Finanzas attachments (AP supplier invoice or AR sales invoice / CxC detail). */
+  | { kind: "company-finanzas"; afterUploadPath: string };
 
 interface PanelPaths {
   revalidateExtra: string[];
@@ -65,17 +66,22 @@ interface PanelPaths {
 }
 
 function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDocumentsLink): PanelPaths {
-  if (scope.kind === "company-finanzas-supplier-invoice") {
-    if (linkedEntity.type !== "SUPPLIER_INVOICE") {
-      throw new Error("EntityDocumentsPanel: alcance empresa solo admite facturas de proveedor");
+  if (scope.kind === "company-finanzas") {
+    if (linkedEntity.type !== "SUPPLIER_INVOICE" && linkedEntity.type !== "SALES_INVOICE") {
+      throw new Error("EntityDocumentsPanel: alcance empresa solo admite facturas AP/AR");
     }
-    const p = `/finanzas/facturas-proveedor/${linkedEntity.id}`;
+    const p = scope.afterUploadPath;
+    const isSales = linkedEntity.type === "SALES_INVOICE";
     return {
       revalidateExtra: [p],
       afterUploadPath: p,
-      emptyMessage: "No hay adjuntos en esta factura de proveedor.",
+      emptyMessage: isSales
+        ? "No hay adjuntos en esta factura de venta."
+        : "No hay adjuntos en esta factura de proveedor.",
       defaultCategory: "INVOICE",
-      uploadHint: "Factura, remito o comprobante",
+      uploadHint: isSales
+        ? "Copia digital o foto de la factura"
+        : "Factura, remito o comprobante",
     };
   }
 
@@ -213,12 +219,12 @@ export function EntityDocumentsPanel({
   const { revalidateExtra, afterUploadPath, emptyMessage, defaultCategory, uploadHint } =
     getPanelPaths(scope, linkedEntity);
 
-  const isCompany = scope.kind === "company-finanzas-supplier-invoice";
+  const isCompany = scope.kind === "company-finanzas";
   const projectIdForForm = scope.kind === "project" ? scope.projectId : null;
   const projectIdForTable = scope.kind === "project" ? scope.projectId : null;
 
   const subtitle = isCompany
-    ? "Adjuntos de la factura corporativa."
+    ? "Adjuntos del comprobante corporativo."
     : "También visibles en la biblioteca de documentos del proyecto.";
 
   return (

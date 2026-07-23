@@ -13,7 +13,12 @@ const nextConfig: NextConfig = {
       { source: "/tesoreria/reportes", destination: "/tesoreria", permanent: true },
       {
         source: "/tesoreria/reportes/posicion-caja",
-        destination: "/tesoreria/posicion-caja",
+        destination: "/tesoreria",
+        permanent: true,
+      },
+      {
+        source: "/tesoreria/posicion-caja",
+        destination: "/tesoreria",
         permanent: true,
       },
       {

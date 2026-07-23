@@ -79,7 +79,7 @@ Todas las rutas listadas en §Rutas API con `?format=pdf` generan PDF vía `expo
 | Ámbito | Ejemplos |
 |--------|----------|
 | Finanzas corporativas | AR/AP aging, CXP corporativo, facturas proveedor |
-| Tesorería | Posición de caja, movimientos, flujo de caja |
+| Tesorería | Movimientos, flujo de caja; export de posición de caja (API / reportes programados) |
 | Inventario | Stock, movimientos |
 | Proyecto | Control de costos, presupuesto vs real, certificaciones, subcontratos, ingresos-gastos, rentabilidad, materiales, compras, flujo de caja |
 | Configuración | Registro de actividad (audit log) |

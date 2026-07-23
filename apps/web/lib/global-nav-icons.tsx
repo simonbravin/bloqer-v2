@@ -31,7 +31,6 @@ const GLOBAL_NAV_ICON_BY_HREF: Record<string, LucideIcon> = {
   "/inventario": Package,
   "/tesoreria": Landmark,
   "/tesoreria/cuentas": Wallet,
-  "/tesoreria/posicion-caja": Wallet,
   "/tesoreria/movimientos": ScrollText,
   "/tesoreria/flujo-caja": BarChart3,
   "/tesoreria/transferencias": ArrowLeftRight,

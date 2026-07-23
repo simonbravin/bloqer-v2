@@ -48,7 +48,7 @@ export type FinanceProjectionSummary = {
 export const CORPORATE_OBLIGATIONS_HREF = "/finanzas/cuentas-por-pagar";
 export const CORPORATE_OVERDUE_HREF = "/finanzas/cuentas-por-pagar?status=OVERDUE";
 export const COMPANY_AR_AGING_HREF = "/finanzas/cuentas-por-cobrar";
-export const POSICION_CAJA_HREF = "/tesoreria/posicion-caja";
+export const POSICION_CAJA_HREF = "/tesoreria";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -106,7 +106,7 @@ export async function buildFinanceCorporateKpis(
       const accounts = await getTreasurySummaryByTenant(ctx);
       const byCur = treasuryBalanceMap(accounts);
       for (const c of byCur.keys()) currenciesSeen.add(c);
-      pushMoneyKpi(kpis, "tr_cash", "Posición de caja", byCur, POSICION_CAJA_HREF);
+      pushMoneyKpi(kpis, "tr_cash", "Saldo en cuentas", byCur, POSICION_CAJA_HREF);
       try {
         const attribution = await getTreasuryAttributionSummary(ctx);
         kpis.push(...buildTreasuryAttributionKpis(attribution));
@@ -119,14 +119,14 @@ export async function buildFinanceCorporateKpis(
     } catch {
       kpis.push({
         key: "tr_cash",
-        label: "Posición de caja",
+        label: "Saldo en cuentas",
         value: "—",
         href: POSICION_CAJA_HREF,
         tone: "muted",
       });
       pushUniqueFinanceAlert(alerts, {
         variant: "info",
-        message: "No se pudo cargar la posición de caja.",
+        message: "No se pudo cargar el saldo de tesorería.",
       });
     }
   }

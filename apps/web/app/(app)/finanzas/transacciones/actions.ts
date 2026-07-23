@@ -23,13 +23,14 @@ function handle(err: unknown): { error: string } {
 }
 
 const REVALIDATE_PATHS = [
+  "/finanzas",
   "/finanzas/transacciones",
   "/finanzas/facturas-proveedor",
   "/finanzas/cuentas-por-pagar",
   "/finanzas/cuentas-por-cobrar",
+  "/finanzas/gastos-generales",
   "/tesoreria",
   "/tesoreria/movimientos",
-  "/tesoreria/posicion-caja",
   "/tesoreria/flujo-caja",
 ];
 

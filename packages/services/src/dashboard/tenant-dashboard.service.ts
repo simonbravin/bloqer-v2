@@ -708,9 +708,9 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
   }
   if (!arAllowed && !apAllowed && trAllowed) {
     quickActions.push({
-      label:       "Posición de caja",
-      href:        "/tesoreria/posicion-caja",
-      description: "Saldos por cuenta",
+      label:       "Tesorería",
+      href:        "/tesoreria",
+      description: "Saldos y cuentas",
     });
   }
 

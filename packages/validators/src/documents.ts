@@ -67,7 +67,7 @@ export const createDocumentMetadataSchema = z.object({
 
 export const initiateUploadSchema = z
   .object({
-    /** Required for project-scoped entities; omit/null only for corporate supplier invoices (see document.service). */
+    /** Required for project-scoped entities; omit/null for corporate SUPPLIER_INVOICE / SALES_INVOICE (see document.service). */
     projectId:        z.string().uuid().optional().nullable(),
     originalFileName: z.string().min(1, "Nombre de archivo requerido").max(500),
     mimeType:         z.enum(ALLOWED_MIME_TYPES, {
@@ -110,7 +110,9 @@ export const initiateUploadSchema = z
       });
     }
     const hasProject = data.projectId != null && data.projectId !== "";
-    if (!hasProject && data.linkedEntityType && data.linkedEntityType !== "SUPPLIER_INVOICE") {
+    const corporateWithoutProject =
+      data.linkedEntityType === "SUPPLIER_INVOICE" || data.linkedEntityType === "SALES_INVOICE";
+    if (!hasProject && data.linkedEntityType && !corporateWithoutProject) {
       ctx.addIssue({
         code:    "custom",
         message: "Proyecto requerido para este tipo de adjunto",

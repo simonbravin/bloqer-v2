@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { CertificationInvoiceForm, ManualInvoiceForm } from "@/features/sales-invoices";
 import type { CertSummary, ClientOption } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
+import { isStorageConfigured } from "@bloqer/config";
 import { getCertificationById, listContacts, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -82,7 +83,11 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Nueva factura</h1>
       </div>
-      <ManualInvoiceForm projectId={projectId} clients={clients} />
+      <ManualInvoiceForm
+        projectId={projectId}
+        clients={clients}
+        storageConfigured={isStorageConfigured()}
+      />
     </PageShell>
   );
 }
