@@ -27,7 +27,10 @@ const REVALIDATE_PATHS = [
   "/finanzas/facturas-proveedor",
   "/finanzas/cuentas-por-pagar",
   "/finanzas/cuentas-por-cobrar",
-  "/tesoreria/reportes/movimientos",
+  "/tesoreria",
+  "/tesoreria/movimientos",
+  "/tesoreria/posicion-caja",
+  "/tesoreria/flujo-caja",
 ];
 
 export async function registerTransactionAction(

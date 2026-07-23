@@ -15,7 +15,7 @@ import {
   updateCompanyOverheadPctAction,
 } from "@/app/(app)/finanzas/gastos-generales/actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -119,11 +119,6 @@ export function OverheadAllocationsPanel({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Método de imputación a obra</CardTitle>
-          <CardDescription className="max-w-prose">
-            {isAuto
-              ? "Automático: pool mensual en ARS repartido por peso del CD. Cerrá cada período arriba para fijar margen."
-              : "Manual: imputaciones por obra y/o % sobre CD devengado de cada proyecto (no redistribuye el pool entre obras)."}
-          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3">
           <div className="space-y-1 min-w-[220px]">
@@ -168,10 +163,6 @@ export function OverheadAllocationsPanel({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Vista previa del período</CardTitle>
-            <CardDescription>
-              Vista alineada con el cierre: excluye proyectos en borrador. El margen en obra usa pesos en vivo
-              hasta que cierres el período.
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
@@ -259,10 +250,6 @@ export function OverheadAllocationsPanel({
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">Prorrateo automático (% empresa)</CardTitle>
-              <CardDescription>
-                Se aplica sobre el <strong>costo directo devengado</strong> de cada obra (D-040). Distinto
-                del % GG del presupuesto de venta.
-              </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">
@@ -309,10 +296,6 @@ export function OverheadAllocationsPanel({
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">Imputaciones manuales a obra</CardTitle>
-              <CardDescription>
-                Un monto por proyecto y período (<code className="text-xs">YYYY-MM</code>). Alimenta el
-                margen neto en rentabilidad del proyecto.
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {canEdit && projects.length > 0 ? (

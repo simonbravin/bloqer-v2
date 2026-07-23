@@ -1,4 +1,4 @@
-﻿import type { FinancialTraceEntityType } from "./register-transaction.types";
+import type { FinancialTraceEntityType } from "./register-transaction.types";
 
 export type FinancialHrefOptions = {
   projectId?: string | null;
@@ -28,8 +28,8 @@ export function buildFinancialHref(
       case "AccountMovement": {
         const accountId = options?.accountId;
         return accountId
-          ? `/tesoreria/reportes/movimientos?accountId=${encodeURIComponent(accountId)}`
-          : "/tesoreria/reportes/movimientos";
+          ? `/tesoreria/movimientos?accountId=${encodeURIComponent(accountId)}`
+          : "/tesoreria/movimientos";
       }
       default:
         return "/finanzas/transacciones";
@@ -52,8 +52,8 @@ export function buildFinancialHref(
     case "AccountMovement": {
       const accountId = options?.accountId;
       return accountId
-        ? `/tesoreria/reportes/movimientos?accountId=${encodeURIComponent(accountId)}`
-        : "/tesoreria/reportes/movimientos";
+        ? `/tesoreria/movimientos?accountId=${encodeURIComponent(accountId)}`
+        : "/tesoreria/movimientos";
     }
     default:
       return "/finanzas/transacciones";

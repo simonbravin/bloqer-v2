@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   createScheduledReportAction,
   updateScheduledReportAction,
@@ -213,7 +213,6 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">General</CardTitle>
-          <CardDescription>Nombre y alcance del envío automático (sin ejecución en esta fase).</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -277,7 +276,6 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Reportes incluidos</CardTitle>
-          <CardDescription>Máximo 5. Solo claves habilitadas por módulos del tenant.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           {catalog.length === 0 ? (
@@ -307,9 +305,6 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Filtros del reporte</CardTitle>
-          <CardDescription>
-            Opcionales. Se aplican al exportar en la fase de envío (mismos parámetros que las pantallas de reporte).
-          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -433,7 +428,6 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Destinatarios</CardTitle>
-          <CardDescription>Usuarios activos del equipo (sin correos externos en esta fase).</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           {props.members

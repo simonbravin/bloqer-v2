@@ -1,10 +1,8 @@
 import Link from "next/link";
 import type { ProjectFinanceOverview, ProjectFinanceOverviewWarning } from "@bloqer/services";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { formatMoneyAmount } from "@/lib/format-money";
-import { ProjectFinanceLayersGuide, FinanceLayerBadge } from "@/features/finance/components/project-finance-layers-guide";
 
 function MoneyList({ rows, emptyLabel }: { rows: { currency: string; amount: string }[]; emptyLabel: string }) {
   if (rows.length === 0) {
@@ -24,25 +22,19 @@ function MoneyList({ rows, emptyLabel }: { rows: { currency: string; amount: str
 
 function warningText(w: ProjectFinanceOverviewWarning): string {
   const mod = w.module;
-  if (w.reason === "TENANT_MODULE_DISABLED") return `El módulo ${mod} está deshabilitado para este tenant (${w.section}).`;
-  if (w.reason === "MISSING_PERMISSION") return `Sin permiso para ver datos de ${mod} (${w.section}).`;
+  if (w.reason === "TENANT_MODULE_DISABLED") return `El módulo ${mod} está deshabilitado (${w.section}).`;
+  if (w.reason === "MISSING_PERMISSION") return `Sin permiso para ver ${mod} (${w.section}).`;
   return `No se pudieron cargar datos de ${mod} (${w.section}).`;
 }
 
 export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFinanceOverview }) {
-  const { project, sections, quickActions, warnings } = overview;
+  const { project, sections, warnings } = overview;
 
   return (
     <div className="space-y-6">
       <ProjectPageHeader
         title="Tablero de finanzas"
-        subtitle={
-          project.code ? (
-            <span className="font-mono text-sm">{project.code}</span>
-          ) : (
-            "Cobros, pagos y saldos de la obra"
-          )
-        }
+        subtitle={project.code ? <span className="font-mono text-sm">{project.code}</span> : undefined}
       />
 
       {warnings.length > 0 ? (
@@ -56,200 +48,139 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
         </div>
       ) : null}
 
-      <ProjectFinanceLayersGuide />
-
       <div className="grid gap-4 md:grid-cols-2">
         {sections.ar ? (
           <Card className={sections.ar.canView ? "" : "border-dashed"}>
             <CardHeader>
-              <CardTitle className="text-base flex flex-wrap items-center gap-2">
-                Cuentas por cobrar
-                <FinanceLayerBadge layer="obligations" />
+              <CardTitle className="text-base">
+                {sections.ar.canView ? (
+                  <Link href={sections.ar.links.receivables} className="hover:underline">
+                    Cuentas por cobrar
+                  </Link>
+                ) : (
+                  "Cuentas por cobrar"
+                )}
               </CardTitle>
-              <CardDescription>Saldo abierto por moneda (sin convertir entre monedas).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {!sections.ar.canView ? (
-                <p className="text-sm text-muted-foreground">No tenés permiso para ver cuentas por cobrar de este proyecto.</p>
+                <p className="text-sm text-muted-foreground">Sin permiso.</p>
               ) : (
                 <>
                   <div>
-                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Saldo total</p>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Saldo total
+                    </p>
                     <MoneyList rows={sections.ar.totalReceivableByCurrency} emptyLabel="Sin saldo abierto." />
                   </div>
                   <div>
-                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Vencido</p>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Vencido
+                    </p>
                     <MoneyList rows={sections.ar.overdueByCurrency} emptyLabel="Sin saldo vencido." />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Facturas emitidas (abiertas):{" "}
-                    <span className="font-medium text-foreground">{sections.ar.openInvoicesCount}</span>
-                  </p>
                 </>
               )}
             </CardContent>
-            {sections.ar.canView ? (
-              <CardFooter className="flex flex-wrap gap-2">
-                <Button asChild variant="outline" size="sm">
-                  <Link href={sections.ar.links.invoices}>Facturas emitidas</Link>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={sections.ar.links.receivables}>Cuentas por cobrar</Link>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={sections.ar.links.collections}>Cobranzas</Link>
-                </Button>
-              </CardFooter>
-            ) : null}
           </Card>
         ) : null}
 
         {sections.ap ? (
           <Card className={sections.ap.canView ? "" : "border-dashed"}>
             <CardHeader>
-              <CardTitle className="text-base flex flex-wrap items-center gap-2">
-                Cuentas por pagar
-                <FinanceLayerBadge layer="obligations" />
+              <CardTitle className="text-base">
+                {sections.ap.canView ? (
+                  <Link href={sections.ap.links.payables} className="hover:underline">
+                    Cuentas por pagar
+                  </Link>
+                ) : (
+                  "Cuentas por pagar"
+                )}
               </CardTitle>
-              <CardDescription>Saldo abierto por moneda (sin convertir entre monedas).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {!sections.ap.canView ? (
-                <p className="text-sm text-muted-foreground">No tenés permiso para ver cuentas por pagar de este proyecto.</p>
+                <p className="text-sm text-muted-foreground">Sin permiso.</p>
               ) : (
                 <>
                   <div>
-                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Saldo total</p>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Saldo total
+                    </p>
                     <MoneyList rows={sections.ap.totalPayableByCurrency} emptyLabel="Sin saldo abierto." />
                   </div>
                   <div>
-                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Vencido</p>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Vencido
+                    </p>
                     <MoneyList rows={sections.ap.overdueByCurrency} emptyLabel="Sin saldo vencido." />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Facturas proveedor emitidas:{" "}
-                    <span className="font-medium text-foreground">{sections.ap.openSupplierInvoicesCount}</span>
-                  </p>
                 </>
               )}
             </CardContent>
-            {sections.ap.canView ? (
-              <CardFooter className="flex flex-wrap gap-2">
-                <Button asChild variant="outline" size="sm">
-                  <Link href={sections.ap.links.supplierInvoices}>Facturas proveedor</Link>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={sections.ap.links.payables}>Cuentas por pagar</Link>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={sections.ap.links.payments}>Pagos</Link>
-                </Button>
-              </CardFooter>
-            ) : null}
           </Card>
         ) : null}
 
         {sections.treasury ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex flex-wrap items-center gap-2">
-                Flujo de caja
-                <FinanceLayerBadge layer="cash" />
+              <CardTitle className="text-base">
+                <Link href={sections.treasury.cashFlowLink} className="hover:underline">
+                  Flujo de caja
+                </Link>
               </CardTitle>
-              <CardDescription>Cobros y pagos imputados a la obra (reporte existente).</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {sections.treasury.notes.map((note, i) => (
-                <p key={i} className="text-sm text-muted-foreground">
-                  {note}
-                </p>
-              ))}
+            <CardContent>
+              {sections.treasury.notes.length > 0 ? (
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {sections.treasury.notes.map((note, i) => (
+                    <li key={i}>{note}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">Cobros y pagos de la obra.</p>
+              )}
             </CardContent>
-            <CardFooter>
-              <Button asChild size="sm">
-                <Link href={sections.treasury.cashFlowLink}>Abrir flujo de caja</Link>
-              </Button>
-            </CardFooter>
           </Card>
         ) : null}
 
         {sections.budget ? (
-          <Card className={!sections.budget.canViewBudgets && !sections.budget.canViewCostControl ? "border-dashed" : ""}>
+          <Card
+            className={
+              !sections.budget.canViewBudgets && !sections.budget.canViewCostControl ? "border-dashed" : ""
+            }
+          >
             <CardHeader>
-              <CardTitle className="text-base flex flex-wrap items-center gap-2">
-                Presupuesto y costos
-                <FinanceLayerBadge layer="accrued" />
+              <CardTitle className="text-base">
+                {sections.budget.canViewBudgets ? (
+                  <Link href={sections.budget.budgetLink} className="hover:underline">
+                    Presupuesto y costos
+                  </Link>
+                ) : sections.budget.canViewCostControl ? (
+                  <Link href={sections.budget.costControlLink} className="hover:underline">
+                    Presupuesto y costos
+                  </Link>
+                ) : (
+                  "Presupuesto y costos"
+                )}
               </CardTitle>
-              <CardDescription>Enlaces al presupuesto y al control de costos del proyecto.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            <CardContent className="space-y-2 text-sm">
               {sections.budget.latestApprovedBudgetName != null ? (
                 <p>
-                  <span className="text-muted-foreground">Último presupuesto aprobado/cerrado: </span>
+                  <span className="text-muted-foreground">Aprobado: </span>
                   <span className="font-medium">{sections.budget.latestApprovedBudgetName}</span>
                   {sections.budget.latestApprovedBudgetVersion != null ? (
                     <span className="text-muted-foreground"> (v{sections.budget.latestApprovedBudgetVersion})</span>
                   ) : null}
                 </p>
-              ) : null}
-              {sections.budget.notes.map((n, i) => (
-                <p key={i} className="text-muted-foreground">
-                  {n}
-                </p>
-              ))}
-              {!sections.budget.canViewBudgets ? (
-                <p className="text-muted-foreground">Sin acceso a la lista de presupuestos.</p>
-              ) : null}
-              {!sections.budget.canViewCostControl ? (
-                <p className="text-muted-foreground">Sin acceso al control de costos.</p>
-              ) : null}
+              ) : (
+                <p className="text-muted-foreground">Sin presupuesto aprobado.</p>
+              )}
             </CardContent>
-            <CardFooter className="flex flex-wrap gap-2">
-              {sections.budget.canViewBudgets ? (
-                <Button asChild variant="outline" size="sm">
-                  <Link href={sections.budget.budgetLink}>Presupuestos</Link>
-                </Button>
-              ) : null}
-              {sections.budget.canViewCostControl ? (
-                <Button asChild variant="outline" size="sm">
-                  <Link href={sections.budget.costControlLink}>Control de costos</Link>
-                </Button>
-              ) : null}
-            </CardFooter>
           </Card>
         ) : null}
       </div>
-
-      {quickActions.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Accesos rápidos</CardTitle>
-            <CardDescription>Atajos a rutas ya implementadas en el proyecto.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {quickActions.map((a) => (
-                <li key={a.href + a.label}>
-                  <Link
-                    href={a.href}
-                    className="group block rounded-md border bg-card px-3 py-2 transition-colors hover:bg-muted/60"
-                  >
-                    <span className="font-medium text-foreground group-hover:underline">{a.label}</span>
-                    {a.description ? (
-                      <p className="mt-0.5 text-xs text-muted-foreground">{a.description}</p>
-                    ) : null}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <p className="text-center text-xs text-muted-foreground">
-        Los gastos generales fuera de obra y un módulo de gastos dedicado siguen sin definirse en producto. No se
-        muestran totales mezclando monedas distintas.
-      </p>
     </div>
   );
 }

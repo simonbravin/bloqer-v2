@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { CompanyFinanceOperationsSummary, FinanceHubOverview } from "@bloqer/services";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -38,7 +37,6 @@ function CompanyOperationsSection({ summary }: { summary: CompanyFinanceOperatio
     <Card className="rounded-xl border bg-card shadow-sm">
       <CardHeader className="border-b border-border/60 pb-4">
         <CardTitle className="text-base">Gastos generales (empresa)</CardTitle>
-        <CardDescription>Últimos pagos corporativos sin proyecto.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 pt-4">
         {summary.loadFailed ? (
@@ -76,16 +74,6 @@ function CompanyOperationsSection({ summary }: { summary: CompanyFinanceOperatio
             </Table>
           </TableScroll>
         )}
-        <div className="flex flex-wrap gap-2">
-          <Button asChild size="sm" variant="outline">
-            <Link href="/finanzas/transacciones?sourceType=PAYMENT&type=OUTFLOW">
-              Ver pagos en transacciones
-            </Link>
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/finanzas/gastos-generales">Imputar a obra</Link>
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );
@@ -94,19 +82,13 @@ function CompanyOperationsSection({ summary }: { summary: CompanyFinanceOperatio
 export function FinanceHubView({ overview }: { overview: FinanceHubOverview }) {
   if (!overview.hasFinanceModules) {
     return (
-      <EmptyState
-        title="Finanzas no habilitadas"
-        body="Los módulos de cuentas por cobrar, cuentas por pagar, tesorería o contabilidad no están activos para este tenant."
-      />
+      <EmptyState title="Finanzas no habilitadas" body="Activá los módulos financieros para este tenant." />
     );
   }
 
   if (!overview.canSeeAnything) {
     return (
-      <EmptyState
-        title="Sin acceso al tablero"
-        body="Necesitás permiso VIEW AR, VIEW AP, VIEW TREASURY o VIEW ACCOUNTING con el módulo habilitado."
-      />
+      <EmptyState title="Sin acceso" body="Pedí permiso de visualización en Finanzas o Tesorería." />
     );
   }
 

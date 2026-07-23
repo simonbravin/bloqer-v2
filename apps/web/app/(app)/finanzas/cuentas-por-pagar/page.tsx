@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { TransaccionesDateFilters } from "@/features/finance/components/transacciones-date-filters";
@@ -134,9 +134,7 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cuentas por pagar</h1>
-          <p className="text-xs text-muted-foreground">
-            Obligaciones empresa (sin proyecto) · Al {agingReport.asOfDate}
-          </p>
+          <p className="text-xs text-muted-foreground">Al {agingReport.asOfDate}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ReportExportActions
@@ -168,10 +166,7 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
         <CardHeader className="pb-2">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle className="text-lg">Detalle de obligaciones</CardTitle>
-              <CardDescription className="mt-1 max-w-prose">
-                Facturas corporativas sin imputar a obra. Desde acá abrís el detalle y registrás pagos.
-              </CardDescription>
+              <CardTitle className="text-lg">Detalle</CardTitle>
             </div>
             <Suspense fallback={null}>
               <ListViewToggle storageKey="finanzas-cuentas-por-pagar" />

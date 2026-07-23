@@ -170,11 +170,10 @@ Ver matrices: `PERMISSIONS_ROUTE_MATRIX.md`, `SECURITY_ARCHITECTURE.md`.
 /contabilidad/asientos, /nuevo, /[journalEntryId], /[journalEntryId]/editar
 /contabilidad/reglas, /nueva, /[ruleId], /[ruleId]/editar
 /tesoreria/cuentas, /nueva, /[accountId]
+/tesoreria/posicion-caja
+/tesoreria/movimientos
+/tesoreria/flujo-caja
 /tesoreria/transferencias, /nueva
-/tesoreria/reportes
-/tesoreria/reportes/posicion-caja
-/tesoreria/reportes/movimientos
-/tesoreria/reportes/flujo-caja
 
 /api/reports/finanzas/ar-aging.csv
 /api/reports/finanzas/ap-aging.csv
@@ -479,7 +478,7 @@ R2 endpoint: `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
 
 ### Phase 7D — Financial reporting visibility scope
 
-- **Globales:** aging AR/AP y reportes de tesorería ya exigían `VIEW AR` / `VIEW AP` / `VIEW TREASURY` (sin `VIEW PROJECTS`). Se añadió guard en `/tesoreria` y `/tesoreria/reportes` para deep links.
+- **Globales:** aging AR/AP y vistas de tesorería ya exigían `VIEW AR` / `VIEW AP` / `VIEW TREASURY` (sin `VIEW PROJECTS`). Se añadió guard en `/tesoreria` (y deep links de caja) para deep links.
 - **Proyecto:** `getProjectCashFlowReport` → `canViewProjectCashFlowReport` = `VIEW PROJECTS | VIEW AR | VIEW AP | VIEW TREASURY`. Cost control → `canViewProjectCostControlReport` = `VIEW PROJECTS | VIEW BUDGETS`.
 - **UI:** `/finanzas` filtra enlaces por permiso; detalle proyecto oculta botones de flujo de caja / control de costos si no aplica.
 

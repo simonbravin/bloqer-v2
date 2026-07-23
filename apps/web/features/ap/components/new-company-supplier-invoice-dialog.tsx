@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -60,9 +59,6 @@ export function NewCompanySupplierInvoiceDialog({
       <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Nueva factura de gasto</DialogTitle>
-          <DialogDescription>
-            Registrá una factura corporativa sin proyecto. Quedará en borrador para revisión.
-          </DialogDescription>
         </DialogHeader>
         <SupplierInvoiceForm
           companyFinanzas

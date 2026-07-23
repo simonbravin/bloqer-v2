@@ -19,7 +19,7 @@ export type TreasuryAttributionSummary = {
 };
 
 const ZERO = new Prisma.Decimal(0);
-const TREASURY_ATTRIBUTION_HREF = "/tesoreria/reportes/flujo-caja";
+const TREASURY_ATTRIBUTION_HREF = "/tesoreria/flujo-caja";
 
 /** Desglose de movimientos de caja confirmados: imputados a obra vs corporativos (projectId null).
  *  Tesorería es tenant-wide (ver getTreasurySummaryByTenant): no auto-filtramos por ctx.companyId

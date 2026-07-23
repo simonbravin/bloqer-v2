@@ -144,10 +144,6 @@ export default async function FacturaDetailPage({ params }: PageProps) {
             </div>
           </div>
         </div>
-      ) : invoice.status === "DRAFT" ? (
-        <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-          Al emitir la factura se crea la cuenta por cobrar vinculada.
-        </div>
       ) : null}
 
       <div className="rounded-lg border bg-card">

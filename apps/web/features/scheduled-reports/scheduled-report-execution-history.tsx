@@ -3,7 +3,7 @@ import type {
   ScheduledReportExecutionRun,
 } from "@bloqer/services";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -49,25 +49,12 @@ export function ScheduledReportExecutionHistory({ runs, deliveries }: Props) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Historial de ejecuciones</CardTitle>
-        <CardDescription>
-          Cada corrida del cron puede generar varios registros (uno por destinatario). Agrupado por
-          ventana de ejecución; los registros históricos sin identificador de corrida se muestran
-          por separado para no mezclar envíos distintos.
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {!hasHistory ? (
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p>
-              Todavía no hay intentos de envío registrados. Cuando el cron ejecute este envío,
-              aparecerán aquí.
-            </p>
-            <p>
-              Si la última corrida figura como <strong>Omitido</strong>, suele ser porque Resend no
-              está configurado o no hay destinatarios válidos — no es lo mismo que{" "}
-              <strong>Fallido</strong>.
-            </p>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Todavía no hay intentos de envío registrados.
+          </p>
         ) : (
           <>
             <div className="space-y-3">

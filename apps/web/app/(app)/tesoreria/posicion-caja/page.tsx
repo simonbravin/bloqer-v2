@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { getCashPositionReport } from "@bloqer/services";
+import { getCashPositionReport, ServiceError } from "@bloqer/services";
+import { can } from "@bloqer/domain";
 import { CashPositionTable } from "@/features/treasury-reports";
 import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
@@ -13,6 +14,7 @@ interface PageProps {
 export default async function PosicionCajaPage({ searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
+  if (!can(current.tenantCtx.roles, "VIEW", "TREASURY")) redirect("/dashboard");
 
   const sp = await searchParams;
   const ctx = {
@@ -22,13 +24,19 @@ export default async function PosicionCajaPage({ searchParams }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
-  const report = await getCashPositionReport(
-    {
-      companyId: sp.companyId || undefined,
-      currency: sp.currency || undefined,
-    },
-    ctx,
-  );
+  let report;
+  try {
+    report = await getCashPositionReport(
+      {
+        companyId: sp.companyId || undefined,
+        currency: sp.currency || undefined,
+      },
+      ctx,
+    );
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
 
   return (
     <PageShell variant="default" className="space-y-6">

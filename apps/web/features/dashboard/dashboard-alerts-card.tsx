@@ -1,5 +1,5 @@
 import type { DashboardModuleWarning } from "@bloqer/services";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export function DashboardAlertsCard({ warnings }: { warnings: DashboardModuleWarning[] }) {
@@ -8,7 +8,6 @@ export function DashboardAlertsCard({ warnings }: { warnings: DashboardModuleWar
     <Card className="rounded-xl border bg-card shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Alertas</CardTitle>
-        <CardDescription>Avisos del tenant (plan, vencimientos, etc.).</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {warnings.map((w, i) => (

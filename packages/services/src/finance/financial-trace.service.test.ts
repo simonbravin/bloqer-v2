@@ -52,7 +52,7 @@ describe("buildFinancialHref", () => {
   it("includes accountId for treasury movement href", () => {
     assert.equal(
       buildFinancialHref("AccountMovement", "mov-1", { accountId: "acc-1" }),
-      "/tesoreria/reportes/movimientos?accountId=acc-1",
+      "/tesoreria/movimientos?accountId=acc-1",
     );
   });
 });

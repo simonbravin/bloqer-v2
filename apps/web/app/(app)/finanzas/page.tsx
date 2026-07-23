@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getFinanceHubCharts, getFinanceHubOverview } from "@bloqer/services";
@@ -6,7 +5,6 @@ import { FinanceHubView } from "@/features/finance";
 import { FinanceHubChartsPanel } from "@/features/finance/components/finance-hub-charts-panel";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
@@ -43,17 +41,7 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
 
   return (
     <PageShell variant="default" className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Finanzas</h1>
-          <p className="text-sm text-muted-foreground max-w-prose">
-            Indicadores, proyección de liquidez y operaciones corporativas de cuentas por cobrar, por pagar y tesorería.
-          </p>
-        </div>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/dashboard">← Inicio</Link>
-        </Button>
-      </div>
+      <h1 className="text-2xl font-bold tracking-tight">Finanzas</h1>
 
       <FinanceHubView overview={overview} />
 

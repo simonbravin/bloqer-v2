@@ -86,16 +86,13 @@ export default async function ProjectReportesPage({ params }: PageProps) {
 
   return (
     <PageShell variant="default" className="space-y-6">
-      <ProjectPageHeader
-        title="Reportes del proyecto"
-        subtitle="Análisis de costos, varianzas y caja"
-      />
+      <ProjectPageHeader title="Reportes del proyecto" />
 
       {!hasAnyReport ? (
         <div className="rounded-lg border bg-card p-8 text-center space-y-3">
           <p className="font-semibold">Sin reportes disponibles</p>
           <p className="text-sm text-muted-foreground">
-            Activá los módulos de presupuestos o revisá tus permisos para este proyecto.
+            Activá presupuestos o revisá tus permisos.
           </p>
           <Button variant="outline" size="sm" asChild>
             <Link href={`/proyectos/${projectId}`}>Volver al resumen</Link>

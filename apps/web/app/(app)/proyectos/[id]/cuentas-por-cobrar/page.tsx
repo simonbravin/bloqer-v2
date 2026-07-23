@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
-import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
@@ -14,7 +12,7 @@ import {
   type SalesInvoiceListItem,
 } from "@/features/sales-invoices";
 import { CollectionListSection, type CollectionListItem } from "@/features/collections";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getProjectShellInfo,
@@ -129,7 +127,7 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Cuentas por cobrar"
-        subtitle={`Aging + ${receivablesTotal} ${receivablesTotal === 1 ? "cuenta" : "cuentas"} del proyecto`}
+        subtitle={`${receivablesTotal} ${receivablesTotal === 1 ? "cuenta" : "cuentas"}`}
         actions={
           <Suspense fallback={null}>
             <ListViewToggle storageKey={`cuentas-por-cobrar-${id}`} />
@@ -137,27 +135,7 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
         }
       />
 
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <p className="text-xs text-muted-foreground">Al {agingReport.asOfDate}</p>
-        <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/proyectos/${id}/facturas`}>Ver facturas</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/proyectos/${id}/cobranzas`}>Ver cobranzas</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/proyectos/${id}/flujo-caja`}>Flujo de caja</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/proyectos/${id}/reportes/ingresos-gastos`}>Ingresos vs gastos</Link>
-          </Button>
-        </div>
-      </div>
-
-      <p className="text-sm text-muted-foreground">
-        Esta vista concentra antiguedad de deuda y riesgo de cobro; facturas/cobranzas mantienen el detalle transaccional.
-      </p>
+      <p className="text-xs text-muted-foreground">Al {agingReport.asOfDate}</p>
 
       <AgingFilters />
       <AgingSummaryCards report={agingReport} currency={sp.currency} />
@@ -166,28 +144,17 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Transacciones relacionadas</CardTitle>
-          <CardDescription>Últimos comprobantes y cobranzas para navegar sin salir del contexto financiero.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-medium">Facturas recientes</h3>
-              <Button asChild variant="link" size="sm" className="px-0">
-                <Link href={`/proyectos/${id}/facturas`}>Ver todas</Link>
-              </Button>
-            </div>
+            <h3 className="text-sm font-medium">Facturas recientes</h3>
             <Suspense fallback={<ListSectionSkeleton />}>
               <SalesInvoiceListSection invoices={invoices} projectId={id} />
             </Suspense>
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-medium">Cobranzas recientes</h3>
-              <Button asChild variant="link" size="sm" className="px-0">
-                <Link href={`/proyectos/${id}/cobranzas`}>Ver todas</Link>
-              </Button>
-            </div>
+            <h3 className="text-sm font-medium">Cobranzas recientes</h3>
             <Suspense fallback={<ListSectionSkeleton />}>
               <CollectionListSection collections={collections} projectId={id} />
             </Suspense>

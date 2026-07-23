@@ -14,7 +14,7 @@ import { ProjectCashFlowChart, ProjectCashFlowFilters } from "@/features/project
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { formatMoneyAmount } from "@/lib/format-money";
@@ -85,7 +85,6 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Caja — real y proyección"
-        subtitle="R-005 flujo de caja confirmado · R-006 cobros/pagos esperados por vencimiento"
         actions={
           <ReportExportActions
             exportPath={`/api/reports/proyectos/${projectId}/flujo-caja.csv`}
@@ -124,7 +123,7 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
       </div>
 
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold">Flujo de caja real (R-005)</h2>
+        <h2 className="text-sm font-semibold">Flujo de caja real</h2>
         {cashCur ? (
           <>
             <KpiStatGrid title={null} columns={3}>
@@ -146,9 +145,6 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Evolución por período</CardTitle>
-                <CardDescription>
-                  {formatDateRange(cashReport.dateFrom, cashReport.dateTo)} · solo movimientos confirmados
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ProjectCashFlowChart periods={cashCur.periods} currency={cashCur.currency} variant="bars" />
@@ -161,7 +157,7 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold">Proyección de liquidez (R-006)</h2>
+        <h2 className="text-sm font-semibold">Proyección de liquidez</h2>
         <p className="text-xs text-muted-foreground">
           Horizonte: {formatDateRange(projection.dateFrom, projection.dateTo)}
         </p>

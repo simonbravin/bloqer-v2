@@ -72,7 +72,6 @@ export default async function ReporteRentabilidadPage({ params, searchParams }: 
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Rentabilidad del proyecto"
-        subtitle="R-003 margen bruto · R-004 margen neto (cuando aplique política GG)"
         actions={
           report.type === "REPORT" ? (
             <ReportExportActions

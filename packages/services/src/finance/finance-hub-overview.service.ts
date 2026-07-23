@@ -429,9 +429,9 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
       balancesByCurrency,
       displayHeadline,
       treasuryHref:       "/tesoreria",
-      reportsHref:        "/tesoreria/reportes",
-      posicionCajaHref:   "/tesoreria/reportes/posicion-caja",
-      movimientosHref:    "/tesoreria/reportes/movimientos",
+      reportsHref:        "/tesoreria/posicion-caja",
+      posicionCajaHref:   "/tesoreria/posicion-caja",
+      movimientosHref:    "/tesoreria/movimientos",
       loadFailed,
     };
   }

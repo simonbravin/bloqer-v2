@@ -19,7 +19,7 @@ import { ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -123,7 +123,6 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Material presupuestado vs ejecución</CardTitle>
-              <CardDescription>Por partida WBS · capa MATERIAL del APU</CardDescription>
             </CardHeader>
             <CardContent>
               <ProcurementWbsDeviationTable rows={report.byWbs} />
@@ -133,9 +132,6 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Sin imputación WBS</CardTitle>
-              <CardDescription>
-                Líneas de OC o facturas sin partida asignada ({report.unallocated.length})
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <ProcurementUnallocatedTable rows={report.unallocated} />
@@ -145,7 +141,6 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Por proveedor</CardTitle>
-              <CardDescription>Comprometido, devengado y pagado en el proyecto</CardDescription>
             </CardHeader>
             <CardContent>
               <ProcurementSupplierTable rows={report.bySupplier} />
@@ -155,9 +150,6 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Desvíos en líneas de OC</CardTitle>
-              <CardDescription>
-                Líneas con varianza vs presupuesto (nota, aprobación extra o sin baseline)
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <PurchaseOrderVarianceTable rows={poVariance.rows} projectId={projectId} />

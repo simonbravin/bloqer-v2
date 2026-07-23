@@ -187,8 +187,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
             id="configuracion"
             className="rounded-xl border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground"
           >
-            Este presupuesto no tiene parámetros económicos configurados. Contactá soporte si necesitás
-            editar márgenes.
+            Sin parámetros económicos configurados.
           </section>
         )}
       </PageShell>

@@ -49,14 +49,11 @@ export default async function TransferenciasPage({
         <div className="flex items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Transferencias internas</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Mové fondos entre cuentas propias de la empresa (mismo tenant).
-            </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link href="/tesoreria/reportes/movimientos?sourceType=INTERNAL_TRANSFER">
+            <Link href="/tesoreria/movimientos?sourceType=INTERNAL_TRANSFER">
               Ver en movimientos
             </Link>
           </Button>

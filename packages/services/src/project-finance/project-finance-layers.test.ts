@@ -38,7 +38,7 @@ describe("pushMoneyKpi", () => {
       "treasury_monthly_expenses",
       "Gastos del mes",
       map,
-      "/tesoreria/reportes/flujo-caja",
+      "/tesoreria/flujo-caja",
       "$ 0,00",
     );
     assert.equal(kpis.length, 1);

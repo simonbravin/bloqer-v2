@@ -20,21 +20,21 @@ export default async function ContabilidadPage() {
 
   return (
     <PageShell variant="default" className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Contabilidad</h1>
-      <p className="text-sm text-muted-foreground">
-        Libro mayor (debe/haber). Los movimientos de tesorería siguen en Tesorería; plan de cuentas, asientos manuales y reglas de mapeo (fase 11A–11B).
-      </p>
-      <div className="flex flex-wrap gap-3">
-        <Button asChild><Link href={`${base}/cuentas`}>Plan de cuentas</Link></Button>
-        <Button variant="outline" asChild><Link href={`${base}/asientos`}>Asientos</Link></Button>
-        <Button variant="outline" asChild><Link href={`${base}/reglas`}>Reglas contables</Link></Button>
-        {can(current.tenantCtx.roles, "EDIT", "ACCOUNTING") && (
-          <>
-            <Button variant="outline" asChild><Link href={`${base}/cuentas/nueva`}>Nueva cuenta</Link></Button>
-            <Button variant="outline" asChild><Link href={`${base}/asientos/nuevo`}>Nuevo asiento</Link></Button>
-            <Button variant="outline" asChild><Link href={`${base}/reglas/nueva`}>Nueva regla</Link></Button>
-          </>
-        )}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">Contabilidad</h1>
+        {can(current.tenantCtx.roles, "EDIT", "ACCOUNTING") ? (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`${base}/cuentas/nueva`}>Nueva cuenta</Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`${base}/asientos/nuevo`}>Nuevo asiento</Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`${base}/reglas/nueva`}>Nueva regla</Link>
+            </Button>
+          </div>
+        ) : null}
       </div>
       {!current.tenantCtx.companyId && companies.length > 1 && (
         <div className="rounded-md border bg-muted/30 p-4 text-sm">

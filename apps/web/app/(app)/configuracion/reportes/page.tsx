@@ -47,7 +47,6 @@ export default async function ConfiguracionReportesPage({ searchParams }: Props)
     <PageShell variant="default" className="space-y-6">
       <PageListHeader
         title="Reportes programados"
-        subtitle="Envíos automáticos por email según la programación configurada. El cron diario genera adjuntos y registra cada intento."
         actions={
           <Button asChild>
             <Link href="/configuracion/reportes/nuevo">Nuevo envío</Link>
@@ -62,17 +61,6 @@ export default async function ConfiguracionReportesPage({ searchParams }: Props)
       {rows.length === 0 ? (
         <div className="space-y-3 rounded-lg border bg-card px-6 py-8 text-center text-sm text-muted-foreground">
           <p>Todavía no hay envíos programados.</p>
-          <p>
-            Creá un envío para que el cron diario genere adjuntos y registre cada intento. El
-            historial de mails está en{" "}
-            <Link
-              href="/notificaciones/emails?emailType=REPORT_SCHEDULED"
-              className="text-foreground underline underline-offset-2"
-            >
-              Notificaciones → Emails
-            </Link>
-            .
-          </p>
           <Button asChild variant="outline" size="sm">
             <Link href="/configuracion/reportes/nuevo">Crear primer envío</Link>
           </Button>

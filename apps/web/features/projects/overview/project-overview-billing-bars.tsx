@@ -1,5 +1,5 @@
 import type { ProjectOverviewBillingVsCollections } from "@bloqer/services";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function pct(invoiced: number, collected: number): number {
   if (invoiced <= 0) return 0;
@@ -52,9 +52,6 @@ export function ProjectOverviewBillingCard({ data }: { data: ProjectOverviewBill
     <Card className="rounded-xl border bg-card shadow-sm">
       <CardHeader>
         <CardTitle className="text-base">Facturado vs cobrado</CardTitle>
-        <CardDescription>
-          Facturas en estado emitido y cobranzas confirmadas, por moneda. Sin conversión de cambio.
-        </CardDescription>
       </CardHeader>
       <CardContent>
         <ProjectOverviewBillingBars data={data} />

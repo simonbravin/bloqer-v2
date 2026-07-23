@@ -576,7 +576,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
         "treasury_monthly_expenses",
         "Gastos del mes",
         monthlyOut,
-        "/tesoreria/reportes/flujo-caja",
+        "/tesoreria/flujo-caja",
         "$ 0,00",
       );
     }
@@ -591,7 +591,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       if (report && report.length > 0) byRange[range] = report;
     }
     if (Object.keys(byRange).length > 0) {
-      cashFlowChart = { byRange, detailHref: "/tesoreria/reportes/flujo-caja" };
+      cashFlowChart = { byRange, detailHref: "/tesoreria/flujo-caja" };
     }
 
     const tr = await safeRun("Treasury summary", () => getTreasurySummaryByTenant(ctx));
@@ -675,7 +675,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
     quickActions.push({
       label:       "Ver finanzas",
       href:        "/finanzas",
-      description: "Cuentas por cobrar, cuentas por pagar y reportes",
+      description: "Cuentas por cobrar y por pagar",
     });
   }
 
@@ -708,9 +708,9 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
   }
   if (!arAllowed && !apAllowed && trAllowed) {
     quickActions.push({
-      label:       "Ver reportes",
-      href:        "/tesoreria/reportes",
-      description: "Posición de caja y flujos",
+      label:       "Posición de caja",
+      href:        "/tesoreria/posicion-caja",
+      description: "Saldos por cuenta",
     });
   }
 

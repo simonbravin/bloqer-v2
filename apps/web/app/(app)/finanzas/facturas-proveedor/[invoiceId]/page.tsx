@@ -83,11 +83,6 @@ export default async function FinanzasFacturaProveedorDetailPage({ params }: Pag
         <SupplierInvoiceStatusBadge status={invoice.status} />
       </div>
 
-      <p className="text-sm text-muted-foreground rounded-md border border-dashed bg-muted/30 px-3 py-2">
-        Factura a nivel <strong>empresa</strong> (sin proyecto). Los adjuntos y la cuenta por pagar
-        no están ligados a una obra.
-      </p>
-
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
@@ -186,11 +181,6 @@ export default async function FinanzasFacturaProveedorDetailPage({ params }: Pag
               Anular
             </Button>
           </form>
-        )}
-        {isIssued && !payable && (
-          <Button asChild variant="outline">
-            <Link href="/finanzas/cuentas-por-pagar">Ver cuentas por pagar empresa →</Link>
-          </Button>
         )}
       </div>
 

@@ -22,8 +22,6 @@ import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { formatDateRange } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import type { ProjectCashFlowCurrency } from "@bloqer/services";
 
 interface PageProps {
@@ -130,7 +128,6 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Flujo de caja"
-        subtitle="Cobros y pagos confirmados del proyecto, agrupados por período (día, semana o mes)."
         actions={
           <>
             <ReportExportActions
@@ -147,20 +144,6 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
           </>
         }
       />
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
-          Incluye movimientos confirmados; las proyecciones se calculan desde saldos abiertos de CxC/CxP.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/proyectos/${id}/cuentas-por-cobrar`}>Ver CxC</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/proyectos/${id}/cuentas-por-pagar`}>Ver CxP</Link>
-          </Button>
-        </div>
-      </div>
 
       <ProjectCashPositionProjectionPanel
         projectId={id}

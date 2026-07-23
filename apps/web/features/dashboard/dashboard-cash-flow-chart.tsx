@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { CashFlowCurrency, DashboardCashFlowChart, DashboardCashFlowRange } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CashFlowChart } from "@/features/treasury-reports/components/cash-flow-chart";
 import { formatCurrencyDisplay } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,6 @@ export function DashboardCashFlowChart({ chart }: { chart: DashboardCashFlowChar
 
   const report = chart.byRange[range] ?? [];
   const primary = useMemo(() => pickPrimarySeries(report), [report]);
-  const multicurrency = report.length > 1;
 
   if (available.length === 0) return null;
 
@@ -37,10 +36,6 @@ export function DashboardCashFlowChart({ chart }: { chart: DashboardCashFlowChar
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <CardTitle className="text-base">Flujo de caja</CardTitle>
-          <CardDescription>
-            Evolución del neto operativo confirmado en tesorería. Sin conversión entre monedas.
-            {multicurrency ? " Mostrando la moneda principal." : null}
-          </CardDescription>
         </div>
         <div
           className="inline-flex flex-wrap rounded-lg border border-border/80 bg-muted/30 p-0.5"

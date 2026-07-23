@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ProjectOverviewActivity } from "@bloqer/services";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function Cell({
   label,
@@ -55,7 +55,6 @@ export function ProjectOverviewActivityCard({
     <Card className="rounded-xl border bg-card shadow-sm">
       <CardHeader>
         <CardTitle className="text-base">Actividad y gestión</CardTitle>
-        <CardDescription>Conteos del proyecto según tus permisos y módulos habilitados.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

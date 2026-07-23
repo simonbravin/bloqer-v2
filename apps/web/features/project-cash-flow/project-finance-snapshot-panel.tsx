@@ -1,10 +1,7 @@
 import type { ProjectFinanceSnapshot, ProjectAttributedCashInceptionSource } from "@bloqer/services";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { DashboardKpiCard } from "@/features/dashboard/dashboard-kpi-card";
-import {
-  FinanceLayerBadge,
-  ProjectFinanceLayersGuide,
-} from "@/features/finance/components/project-finance-layers-guide";
+import { FinanceLayerBadge } from "@/features/finance/components/project-finance-layers-guide";
 
 function inceptionSourceLabel(source: ProjectAttributedCashInceptionSource): string {
   switch (source) {
@@ -23,8 +20,6 @@ export function ProjectFinanceSnapshotPanel({ snapshot }: { snapshot: ProjectFin
 
   return (
     <div className="space-y-4">
-      {hasKpis ? <ProjectFinanceLayersGuide /> : null}
-
       {snapshot.alerts.length > 0 ? (
         <div className="space-y-2">
           {snapshot.alerts.map((a) => (

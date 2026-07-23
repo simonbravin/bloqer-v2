@@ -33,7 +33,7 @@ function fmtMoneyAr(amount: { toString(): string }, currency: string): string {
 function treasuryMovimientosHref(accountId: string, movementDate: Date): string {
   const d = fmtDate(movementDate);
   const q = new URLSearchParams({ accountId, dateFrom: d, dateTo: d });
-  return `/tesoreria/reportes/movimientos?${q.toString()}`;
+  return `/tesoreria/movimientos?${q.toString()}`;
 }
 
 async function resolvedTreasuryMovementCompanyId(

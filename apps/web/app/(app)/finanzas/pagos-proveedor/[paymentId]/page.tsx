@@ -51,10 +51,6 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
         </Badge>
       </div>
 
-      <p className="text-sm text-muted-foreground rounded-md border border-dashed bg-muted/30 px-3 py-2">
-        Pago de cuenta por pagar <strong>sin proyecto</strong>. No hay enlace a obra.
-      </p>
-
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>

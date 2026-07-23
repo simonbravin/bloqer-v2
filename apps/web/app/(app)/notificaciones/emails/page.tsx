@@ -96,15 +96,6 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
     ctx,
   );
 
-  const qs = new URLSearchParams();
-  if (sp.status) qs.set("status", sp.status);
-  if (sp.emailType) qs.set("emailType", sp.emailType);
-  if (sp.recipientEmail) qs.set("recipientEmail", sp.recipientEmail);
-  if (sp.dateFrom) qs.set("dateFrom", sp.dateFrom);
-  if (sp.dateTo) qs.set("dateTo", sp.dateTo);
-  if (scheduledReportId) qs.set("scheduledReportId", scheduledReportId);
-  const querySuffix = qs.toString() ? `?${qs.toString()}` : "";
-
   return (
     <PageShell variant="default" className="space-y-6">
       <div>
@@ -114,23 +105,6 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
           </Link>
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight">Historial de emails enviados</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Registro de intentos de envío (reportes manuales, programados, notificaciones y alertas).
-          Solo OWNER o ADMIN.
-        </p>
-        <ul className="mt-3 max-w-2xl space-y-1 text-xs text-muted-foreground">
-          <li>
-            <strong className="text-foreground">Enviado</strong> — {EMAIL_DELIVERY_STATUS_HINT.SENT}
-          </li>
-          <li>
-            <strong className="text-foreground">Omitido</strong> —{" "}
-            {EMAIL_DELIVERY_STATUS_HINT.SKIPPED}
-          </li>
-          <li>
-            <strong className="text-foreground">Fallido</strong> —{" "}
-            {EMAIL_DELIVERY_STATUS_HINT.FAILED}
-          </li>
-        </ul>
         {scheduledReportId ? (
           <p className="mt-2 text-sm">
             Filtro: envío programado{" "}
@@ -244,15 +218,7 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
             {items.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                  No hay registros para los filtros. Si esperabas envíos de reportes programados,
-                  revisá{" "}
-                  <Link
-                    href="/configuracion/reportes"
-                    className="text-foreground underline underline-offset-2"
-                  >
-                    Configuración → Reportes
-                  </Link>{" "}
-                  (estado de la última corrida) o quitá filtros.
+                  No hay registros para los filtros seleccionados.
                 </TableCell>
               </TableRow>
             ) : (
@@ -297,16 +263,6 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
           </TableBody>
         </Table>
       </TableScroll>
-
-      <p className="text-xs text-muted-foreground">
-        Mostrando hasta 80 filas. Filtros activos:{" "}
-        <Link
-          href={`/notificaciones/emails${querySuffix}`}
-          className="underline-offset-2 hover:underline"
-        >
-          compartir URL
-        </Link>
-      </p>
     </PageShell>
   );
 }

@@ -8,6 +8,26 @@ const monorepoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: monorepoRoot,
+  async redirects() {
+    return [
+      { source: "/tesoreria/reportes", destination: "/tesoreria", permanent: true },
+      {
+        source: "/tesoreria/reportes/posicion-caja",
+        destination: "/tesoreria/posicion-caja",
+        permanent: true,
+      },
+      {
+        source: "/tesoreria/reportes/movimientos",
+        destination: "/tesoreria/movimientos",
+        permanent: true,
+      },
+      {
+        source: "/tesoreria/reportes/flujo-caja",
+        destination: "/tesoreria/flujo-caja",
+        permanent: true,
+      },
+    ];
+  },
   serverExternalPackages: [
     "@prisma/client",
     "@prisma/engines",

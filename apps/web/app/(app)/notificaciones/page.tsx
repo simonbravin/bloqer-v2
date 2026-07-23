@@ -99,27 +99,23 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Notificaciones</h1>
-          <p className="text-sm text-muted-foreground">
-            Alertas y avisos dentro de Bloqer.
-            {canRunOperationalAlerts(ctx) && (
-              <>
-                {" "}
-                <Link
-                  href="/notificaciones/alertas"
-                  className="text-primary underline-offset-4 hover:underline"
-                >
-                  Alertas operativas
-                </Link>
-                {" · "}
-                <Link
-                  href="/notificaciones/emails"
-                  className="text-primary underline-offset-4 hover:underline"
-                >
-                  Emails enviados
-                </Link>
-              </>
-            )}
-          </p>
+          {canRunOperationalAlerts(ctx) && (
+            <p className="text-sm text-muted-foreground">
+              <Link
+                href="/notificaciones/alertas"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                Alertas operativas
+              </Link>
+              {" · "}
+              <Link
+                href="/notificaciones/emails"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                Emails enviados
+              </Link>
+            </p>
+          )}
         </div>
         <form action={markAllNotificationsReadAction}>
           <Button type="submit" variant="outline" size="sm">
@@ -149,7 +145,7 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
               ? "No tenés notificaciones sin leer."
               : filtro === "archived"
                 ? "No hay notificaciones archivadas."
-                : "Cuando haya alertas o avisos del sistema aparecerán acá. También podés abrirlos desde la campana del encabezado."
+                : undefined
           }
         />
       ) : (

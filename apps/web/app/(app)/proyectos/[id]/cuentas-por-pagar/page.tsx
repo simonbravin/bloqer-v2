@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
-import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
@@ -15,7 +13,7 @@ import {
   type SupplierInvoiceListItem,
   type PaymentListItem,
 } from "@/features/ap";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getPayableAgingReport,
@@ -126,7 +124,7 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Cuentas por pagar"
-        subtitle={`Aging + ${payablesTotal} ${payablesTotal === 1 ? "cuenta" : "cuentas"} del proyecto`}
+        subtitle={`${payablesTotal} ${payablesTotal === 1 ? "cuenta" : "cuentas"}`}
         actions={
           <Suspense fallback={null}>
             <ListViewToggle storageKey={`cuentas-por-pagar-${id}`} />
@@ -134,24 +132,7 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
         }
       />
 
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <p className="text-xs text-muted-foreground">Al {agingReport.asOfDate}</p>
-        <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/proyectos/${id}/facturas-proveedor`}>Ver facturas proveedor</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/proyectos/${id}/pagos`}>Ver pagos</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/proyectos/${id}/reportes/caja`}>Reporte de caja</Link>
-          </Button>
-        </div>
-      </div>
-
-      <p className="text-sm text-muted-foreground">
-        Priorizá este tablero para vencimientos y riesgo de liquidez; usá facturas/pagos para el detalle operativo.
-      </p>
+      <p className="text-xs text-muted-foreground">Al {agingReport.asOfDate}</p>
 
       <AgingFilters />
       <AgingSummaryCards report={agingReport} currency={sp.currency} />
@@ -160,16 +141,10 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Transacciones relacionadas</CardTitle>
-          <CardDescription>Últimos comprobantes y movimientos para contexto rápido.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-medium">Facturas proveedor recientes</h3>
-              <Button asChild variant="link" size="sm" className="px-0">
-                <Link href={`/proyectos/${id}/facturas-proveedor`}>Ver todas</Link>
-              </Button>
-            </div>
+            <h3 className="text-sm font-medium">Facturas proveedor recientes</h3>
             <Suspense fallback={<ListSectionSkeleton />}>
               <SupplierInvoiceListSection
                 invoices={supplierInvoices}
@@ -179,12 +154,7 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-medium">Pagos recientes</h3>
-              <Button asChild variant="link" size="sm" className="px-0">
-                <Link href={`/proyectos/${id}/pagos`}>Ver todos</Link>
-              </Button>
-            </div>
+            <h3 className="text-sm font-medium">Pagos recientes</h3>
             <Suspense fallback={<ListSectionSkeleton />}>
               <PaymentListSection payments={payments} hrefPrefix={`/proyectos/${id}/pagos`} />
             </Suspense>

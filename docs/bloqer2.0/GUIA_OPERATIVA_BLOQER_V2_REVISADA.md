@@ -74,7 +74,7 @@ flowchart TB
 |---------|--------------------------|
 | General | Inicio → `/dashboard` · Proyectos → `/proyectos` · Directorio → `/directorio` · Inventario → `/inventario` |
 | Finanzas | Tablero → `/finanzas` · Transacciones → `/finanzas/transacciones` · Facturas y gastos → `/finanzas/facturas-proveedor` · Cuentas por cobrar → `/finanzas/cuentas-por-cobrar` · Cuentas por pagar → `/finanzas/cuentas-por-pagar` · Imputación GG → `/finanzas/gastos-generales` |
-| Tesorería | Resumen → `/tesoreria` · Cuentas → `/tesoreria/cuentas` · Transferencias → `/tesoreria/transferencias` · Reportes → `/tesoreria/reportes` |
+| Tesorería | Resumen → `/tesoreria` · Cuentas → `/tesoreria/cuentas` · Posición de caja → `/tesoreria/posicion-caja` · Movimientos → `/tesoreria/movimientos` · Flujo de caja → `/tesoreria/flujo-caja` · Transferencias → `/tesoreria/transferencias` |
 | Contabilidad | Resumen → `/contabilidad` · Plan de cuentas → `/contabilidad/cuentas` · Asientos → `/contabilidad/asientos` · Reglas → `/contabilidad/reglas` |
 | Configuración | General → `/configuracion` · Mi perfil → `/configuracion/perfil` · Equipo → `/configuracion/equipo` · Permisos → `/configuracion/permisos` · Reportes programados → `/configuracion/reportes` · Registro → `/configuracion/registro` |
 
@@ -153,10 +153,12 @@ Configurar tesorería **antes** de operar cobranzas y pagos.
 - **Cuentas** (`/tesoreria/cuentas`, alta en `/tesoreria/cuentas/nueva`): banco, caja o billetera, con **saldo de apertura**.
 - **Movimientos:** se generan **automáticamente** al cobrar (ingreso) y pagar (egreso); se pueden **anular** con traza (nunca se borran).
 - **Transferencias internas** (`/tesoreria/transferencias`): mueven fondos entre cuentas propias como **dos movimientos atómicos** (salida + entrada).
-- **Reportes** (`/tesoreria/reportes`): posición de caja, movimientos y flujo de caja.
+- **Posición de caja** (`/tesoreria/posicion-caja`): saldos por cuenta y moneda.
+- **Movimientos** (`/tesoreria/movimientos`): extracto / ledger de caja.
+- **Flujo de caja** (`/tesoreria/flujo-caja`): ingresos y egresos por período.
 
 > **📷 Captura sugerida — Tesorería con subnav**  
-> Ruta: `/tesoreria` · Mostrar `ModuleSubnav` (Resumen · Cuentas · Transferencias · Reportes) · Tip: incluir al menos una cuenta con saldo.
+> Ruta: `/tesoreria` · Mostrar `ModuleSubnav` (Resumen · Cuentas · Posición de caja · Movimientos · Flujo de caja · Transferencias) · Tip: incluir al menos una cuenta con saldo.
 
 > **Terminología correcta:** los tipos de movimiento en el sistema son `INFLOW` (ingreso), `OUTFLOW` (egreso), `TRANSFER_IN`, `TRANSFER_OUT` y `ADJUSTMENT`. (La guía original mencionaba `INCOME`/`OUTCOME`; esos términos **no existen** en el código.)
 

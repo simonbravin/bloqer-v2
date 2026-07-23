@@ -10,7 +10,6 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { ProjectFinanceLayersGuide } from "@/features/finance/components/project-finance-layers-guide";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -70,8 +69,6 @@ export default async function NuevaAnticipoPage({ params }: PageProps) {
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Registrar anticipo de cliente</h1>
       </div>
-
-      <ProjectFinanceLayersGuide compact />
 
       <AdvanceInvoiceForm
         projectId={projectId}

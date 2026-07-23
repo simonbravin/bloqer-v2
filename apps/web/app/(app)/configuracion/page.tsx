@@ -8,7 +8,7 @@ import {
   canReadTenantConfigArea,
   getTenantSettings,
 } from "@bloqer/services";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/page-shell";
 import { TenantDisplaySettingsForm } from "@/features/tenant-config/tenant-display-settings-form";
@@ -51,16 +51,11 @@ export default async function ConfiguracionHomePage() {
     <PageShell variant="default" className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
-        <p className="text-sm text-muted-foreground">Ajustes del tenant y administración del equipo.</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Datos fiscales y operativos</CardTitle>
-          <CardDescription>
-            Identificación legal y estado del tenant. Para cambiar el nombre visible en la app, usá los ajustes de
-            abajo.
-          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
@@ -119,9 +114,6 @@ export default async function ConfiguracionHomePage() {
           </div>
           <div className="min-w-0 flex-1 space-y-1">
             <CardTitle className="text-base">Política de compras</CardTitle>
-            <CardDescription>
-              Mínimo de cotizaciones, umbrales de aprobación y reglas de órdenes de compra por empresa.
-            </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
@@ -135,10 +127,6 @@ export default async function ConfiguracionHomePage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Ajustes de visualización y contacto</CardTitle>
-            <CardDescription>
-              Nombre comercial visible, zona horaria, moneda base y datos de contacto editables. No podés modificar CUIT
-              ni razón social desde acá.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <TenantDisplaySettingsForm

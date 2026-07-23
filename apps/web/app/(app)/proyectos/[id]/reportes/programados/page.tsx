@@ -53,7 +53,6 @@ export default async function ProjectReportesProgramadosPage({ params }: Props) 
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Envíos programados"
-        subtitle="Reportes por email automáticos para esta obra. Ver detalle e historial de ejecuciones en cada envío."
         actions={
           <Button asChild>
             <Link href={`/configuracion/reportes/nuevo?scope=PROJECT&projectId=${projectId}`}>

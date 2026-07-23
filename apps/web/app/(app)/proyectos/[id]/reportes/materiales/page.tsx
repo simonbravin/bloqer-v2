@@ -12,7 +12,7 @@ import { MaterialWbsTable, ReportDateFilters, ReportExportActions } from "@/feat
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { formatMoneyAmount } from "@/lib/format-money";
@@ -69,7 +69,6 @@ export default async function ReporteMaterialesPage({ params, searchParams }: Pa
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Materiales — consumo vs presupuesto"
-        subtitle="R-MAT-01 consumo de stock · R-MAT-02 APU sin producto"
         actions={
           report.type === "REPORT" ? (
             <ReportExportActions
@@ -124,7 +123,6 @@ export default async function ReporteMaterialesPage({ params, searchParams }: Pa
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Por partida WBS</CardTitle>
-              <CardDescription>Baseline MATERIAL del APU vs consumos de inventario</CardDescription>
             </CardHeader>
             <CardContent>
               <MaterialWbsTable rows={report.byWbs} />
@@ -134,10 +132,7 @@ export default async function ReporteMaterialesPage({ params, searchParams }: Pa
           {withoutProduct && withoutProduct.length > 0 ? (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">APU material sin producto (R-MAT-02)</CardTitle>
-                <CardDescription>
-                  {withoutProduct.length} línea(s) MATERIAL sin vínculo a catálogo de productos
-                </CardDescription>
+                <CardTitle className="text-base">APU material sin producto</CardTitle>
               </CardHeader>
               <CardContent className="text-xs space-y-2">
                 {withoutProduct.slice(0, 20).map((l) => (

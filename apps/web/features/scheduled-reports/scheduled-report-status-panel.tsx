@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ScheduledReportDetail } from "@bloqer/services";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/format";
 import {
   SCHEDULED_REPORT_FREQUENCY_LABEL,
@@ -21,9 +21,6 @@ export function ScheduledReportStatusPanel({ detail, emailsFilterHref }: Props) 
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Estado del envío</CardTitle>
-        <CardDescription>
-          Resumen de programación y última corrida del cron. Los correos aparecen en el historial de abajo.
-        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
         <div>
@@ -80,15 +77,9 @@ export function ScheduledReportStatusPanel({ detail, emailsFilterHref }: Props) 
               href={emailsFilterHref}
               className="text-primary text-sm underline-offset-4 hover:underline"
             >
-              Historial de emails de este envío →
+              Ver emails de este envío
             </Link>
           ) : null}
-          <Link
-            href="/notificaciones/emails?emailType=REPORT_SCHEDULED"
-            className="text-primary text-sm underline-offset-4 hover:underline"
-          >
-            Todos los reportes programados del tenant →
-          </Link>
         </div>
       </CardContent>
     </Card>

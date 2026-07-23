@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ProjectFinanceDashboard } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -197,7 +197,6 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Composición de gastos</CardTitle>
-              <CardDescription>Costo devengado por rubro APU</CardDescription>
             </CardHeader>
             <CardContent className="py-8 text-center text-sm text-muted-foreground">
               Sin datos de composición.{" "}
@@ -219,14 +218,13 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
               Flujo de caja mensual
               <FinanceLayerBadge layer="cash" />
             </CardTitle>
-            <CardDescription>
-              Movimientos confirmados ·{" "}
-              <Link href={`/proyectos/${projectId}/flujo-caja`} className="underline underline-offset-2">
-                Ver detalle
-              </Link>
-            </CardDescription>
           </CardHeader>
           <CardContent>
+            <p className="mb-3 text-xs">
+              <Link href={`/proyectos/${projectId}/flujo-caja`} className="text-primary underline underline-offset-2">
+                Ver detalle
+              </Link>
+            </p>
             <ProjectCashFlowChart
               periods={cashCur.periods}
               currency={cashCur.currency}
@@ -252,9 +250,6 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
                 Cuentas por cobrar
                 <FinanceLayerBadge layer="obligations" />
               </CardTitle>
-              <CardDescription>
-                La certificación aprobada impacta en facturación y luego en cobranzas.
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <MoneyList rows={sections.ar.totalReceivableByCurrency} emptyLabel="Sin saldo abierto." />
@@ -294,14 +289,13 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
         <Card>
           <CardHeader className="border-b border-border/60">
             <CardTitle className="text-base">Proyección de caja (90 días)</CardTitle>
-            <CardDescription>
-              Cobros y pagos esperados por C×C/C×P de la obra.{" "}
-              <Link href={`/proyectos/${projectId}/reportes/caja`} className="underline underline-offset-2">
-                Reporte completo
-              </Link>
-            </CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
+            <p className="mb-3 text-xs">
+              <Link href={`/proyectos/${projectId}/reportes/caja`} className="text-primary underline underline-offset-2">
+                Reporte completo
+              </Link>
+            </p>
             <TableScroll>
               <Table>
                 <TableHeader>
@@ -346,7 +340,6 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Top proveedores</CardTitle>
-            <CardDescription>Por costo devengado en la obra</CardDescription>
           </CardHeader>
           <CardContent>
             <TableScroll>
@@ -390,7 +383,6 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
           {wbs.nearCompletion.length > 0 ? (
             <WbsTable
               title="WBS cerca de completarse"
-              description="Avance físico (libro de obra aprobado) entre 85% y 99%"
               rows={wbs.nearCompletion}
               valueColumn="progressPct"
               valueSuffix="%"
@@ -399,7 +391,6 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
           {wbs.unfavorableAtCompletion.length > 0 ? (
             <WbsTable
               title="Sobre presupuesto al 100%"
-              description="Partidas completas con costo esperado superior al presupuestado"
               rows={wbs.unfavorableAtCompletion}
               valueColumn="varianceAmount"
               moneyCurrency={moneyCurrency}
@@ -409,7 +400,6 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
           {wbs.favorableAtCompletion.length > 0 ? (
             <WbsTable
               title="Bajo presupuesto al 100%"
-              description="Partidas completas con ahorro vs presupuesto"
               rows={wbs.favorableAtCompletion}
               valueColumn="varianceAmount"
               moneyCurrency={moneyCurrency}
@@ -439,7 +429,6 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
 
 function WbsTable({
   title,
-  description,
   rows,
   valueColumn,
   valueSuffix = "",
@@ -447,7 +436,6 @@ function WbsTable({
   tone,
 }: {
   title: string;
-  description: string;
   rows: {
     wbsCode: string;
     wbsName: string;
@@ -464,7 +452,6 @@ function WbsTable({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <TableScroll>

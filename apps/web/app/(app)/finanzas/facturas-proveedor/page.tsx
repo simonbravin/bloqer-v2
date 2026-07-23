@@ -117,29 +117,6 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Facturas y gastos</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Gastos generales de la empresa: facturas de proveedor{" "}
-            <strong>sin imputar a un proyecto</strong>. Acceso desde el menú lateral en{" "}
-            <Link href="/finanzas/transacciones" className="font-medium text-foreground underline underline-offset-4 hover:no-underline">
-              Transacciones
-            </Link>
-            ,{" "}
-            <Link href="/finanzas" className="font-medium text-foreground underline underline-offset-4 hover:no-underline">
-              Resumen
-            </Link>{" "}
-            (borradores) o{" "}
-            <Link href="/finanzas/gastos-generales" className="font-medium text-foreground underline underline-offset-4 hover:no-underline">
-              Imputación GG
-            </Link>
-            . Las compras de obra se cargan desde{" "}
-            <Link
-              href="/proyectos"
-              className="font-medium text-foreground underline underline-offset-4 hover:no-underline"
-            >
-              Proyectos
-            </Link>
-            .
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Suspense fallback={null}>
@@ -186,16 +163,8 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
       </Suspense>
 
       {items.length === 0 ? (
-        <div className="space-y-3 rounded-lg border bg-card px-6 py-8 text-center text-sm text-muted-foreground">
-          <p>No hay facturas corporativas con los filtros actuales.</p>
-          <p>
-            Acá cargás <strong>gastos generales</strong> de la empresa (servicios, suministros no
-            imputados a una obra, etc.). Si la compra es de una obra, usá{" "}
-            <Link href="/proyectos" className="underline underline-offset-2 text-foreground">
-              Proyectos
-            </Link>
-            .
-          </p>
+        <div className="rounded-lg border bg-card px-6 py-8 text-center text-sm text-muted-foreground">
+          <p>No hay facturas con los filtros actuales.</p>
         </div>
       ) : (
         <Suspense fallback={<ListSectionSkeleton />}>

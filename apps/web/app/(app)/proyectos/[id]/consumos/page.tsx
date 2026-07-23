@@ -52,33 +52,23 @@ export default async function ProyectoConsumosPage({ params }: PageProps) {
         title="Consumos del proyecto"
         subtitle={`${movements.length} ${movements.length === 1 ? "consumo confirmado" : "consumos confirmados"}`}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <Link href={`/proyectos/${id}/inventario`}>Ver inventario</Link>
+          canCreateConsumption ? (
+            <Button asChild>
+              <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar consumo</Link>
             </Button>
-            {canCreateConsumption ? (
-              <Button asChild>
-                <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar consumo</Link>
-              </Button>
-            ) : null}
-          </div>
+          ) : null
         }
       />
-
-      <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
-        Este listado usa los movimientos de stock existentes con origen consumo. No crea una tabla
-        separada: el historial queda reconciliado con inventario, WBS y control de costos.
-      </div>
 
       <Suspense fallback={<ListSectionSkeleton />}>
         <StockMovementList
           movements={movements}
           emptyTitle="Sin consumos registrados"
-          emptyDescription="Los consumos aparecen acá después de descontar materiales del stock del proyecto."
+          emptyDescription="Todavía no hay consumos confirmados."
           emptyAction={
             canCreateConsumption ? (
               <Button asChild size="sm">
-                <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar primer consumo</Link>
+                <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar consumo</Link>
               </Button>
             ) : undefined
           }

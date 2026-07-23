@@ -23,23 +23,11 @@ function ggPeriodFromIssueDate(issueDate: string | Date): string {
 
 type Props = {
   invoices: SupplierInvoiceListItem[];
-  listHref: string;
 };
 
-export function CorporateGgRecentInvoices({ invoices, listHref }: Props) {
+export function CorporateGgRecentInvoices({ invoices }: Props) {
   return (
-    <DataTableSection
-      title="Últimas facturas corporativas"
-      description={
-        <>
-          Solo las <strong>emitidas</strong> integran el pool de gastos generales del mes. La imputación
-          a obra se define por período, no por factura.{" "}
-          <Link href={listHref} className="text-primary underline underline-offset-2">
-            Ver todas
-          </Link>
-        </>
-      }
-    >
+    <DataTableSection title="Últimas facturas corporativas">
       {invoices.length === 0 ? (
         <p className="text-sm text-muted-foreground px-1 py-4">
           No hay facturas corporativas registradas.

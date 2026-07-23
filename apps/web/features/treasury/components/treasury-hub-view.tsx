@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { TreasuryHubOverview, TreasuryMoneyByCurrency } from "@bloqer/services";
 import { formatDashboardMoney } from "@bloqer/services/dashboard-format";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiStatCard, type KpiStatTone } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
@@ -100,7 +100,7 @@ export function TreasuryHubView({
           label="Ingresos del mes"
           value={inflowKpi.value}
           helper={inflowKpi.helper}
-          href="/tesoreria/reportes/flujo-caja"
+          href="/tesoreria/flujo-caja"
           tone={inflowKpi.tone === "muted" ? "muted" : "success"}
         />
         <KpiStatCard
@@ -108,7 +108,7 @@ export function TreasuryHubView({
           label="Egresos del mes"
           value={outflowKpi.value}
           helper={outflowKpi.helper}
-          href="/tesoreria/reportes/flujo-caja"
+          href="/tesoreria/flujo-caja"
           tone={outflowKpi.tone === "muted" ? "muted" : "default"}
         />
       </KpiStatGrid>
@@ -136,11 +136,6 @@ export function TreasuryHubView({
               ))}
             </ul>
           </CardContent>
-          <CardFooter>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/tesoreria/cuentas">Ver todas</Link>
-            </Button>
-          </CardFooter>
         </Card>
 
         <Card className="rounded-xl border bg-card shadow-sm">
@@ -179,11 +174,6 @@ export function TreasuryHubView({
               </ul>
             )}
           </CardContent>
-          <CardFooter>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/tesoreria/reportes/movimientos">Ver movimientos</Link>
-            </Button>
-          </CardFooter>
         </Card>
       </div>
     </div>

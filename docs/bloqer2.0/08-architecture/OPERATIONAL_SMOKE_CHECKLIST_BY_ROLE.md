@@ -116,7 +116,7 @@ Usar un usuario con rol de proyecto `PROJECT_MANAGER` (y sin roles globales que 
 | F3 | `/finanzas/facturas-proveedor` | Nueva factura + exportar | Alta abre en diálogo; Exportar CSV/PDF |
 | F4 | `/finanzas/transacciones?sourceType=PAYMENT&type=OUTFLOW` | Consultar pagos | Lista movimientos de pago; detalle contextual accesible |
 | F5 | `/finanzas/cuentas-por-cobrar` | Aging + empty state | Empty accionable si no hay datos |
-| F6 | `/tesoreria` | Subnav | Cuentas / Transferencias / Reportes |
+| F6 | `/tesoreria` | Subnav | Cuentas / Posición de caja / Movimientos / Flujo de caja / Transferencias |
 | F7 | Cobranza o pago | Moneda cuenta ≠ documento | Error `CONFLICT` claro (sin FX) |
 | F8 | Proyecto: `/cobranzas` o CxC | Registrar cobranza | Movimiento tesorería + saldo AR |
 

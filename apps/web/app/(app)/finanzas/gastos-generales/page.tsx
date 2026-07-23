@@ -119,10 +119,6 @@ export default async function GastosGeneralesPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Gastos generales</h1>
-          <p className="text-sm text-muted-foreground max-w-prose">
-            Imputación de gastos corporativos a obra. Las facturas sin proyecto se cargan en Facturas y
-            gastos.
-          </p>
         </div>
       </div>
 
@@ -133,13 +129,7 @@ export default async function GastosGeneralesPage() {
           </Button>
         ) : null}
         <Button asChild variant="outline">
-          <Link href="/finanzas/transacciones?register=ap">Alta rápida (emitir ya)</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/finanzas/facturas-proveedor">Ver todas las facturas</Link>
-        </Button>
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/finanzas/cuentas-por-pagar">Cuentas por pagar</Link>
+          <Link href="/finanzas/transacciones?register=ap">Alta rápida</Link>
         </Button>
       </div>
 
@@ -151,10 +141,7 @@ export default async function GastosGeneralesPage() {
         />
       ) : null}
 
-      <CorporateGgRecentInvoices
-        invoices={recentInvoices}
-        listHref="/finanzas/facturas-proveedor"
-      />
+      <CorporateGgRecentInvoices invoices={recentInvoices} />
 
       {overheadPanel}
     </PageShell>

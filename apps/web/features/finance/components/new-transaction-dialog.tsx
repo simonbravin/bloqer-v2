@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -290,10 +289,6 @@ export function NewTransactionDialog({
       <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Registrar transacción</DialogTitle>
-          <DialogDescription>
-            Alta rápida de gasto o ingreso corporativo (sin obra). La factura de venta crea cuenta por
-            cobrar con vencimiento; el ingreso a caja solo mueve tesorería.
-          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-wrap gap-2">
@@ -410,10 +405,6 @@ export function NewTransactionDialog({
 
               {kind === "AR_INCOME" && (
                 <>
-                  <p className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                    Emite factura de venta sin obra y crea la cuenta por cobrar con vencimiento. Podés
-                    cobrar ahora o dejar el saldo pendiente.
-                  </p>
                   <div className="space-y-1">
                     <Label>Cliente</Label>
                     <SearchableCombobox
@@ -484,10 +475,6 @@ export function NewTransactionDialog({
 
               {kind === "TREASURY_INFLOW" && (
                 <>
-                  <p className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                    Registrá un ingreso a caja sin crear factura ni cuenta por cobrar (aportes,
-                    préstamos, reintegros, etc.).
-                  </p>
                   <div className="space-y-1">
                     <Label>Cuenta</Label>
                     <SearchableCombobox

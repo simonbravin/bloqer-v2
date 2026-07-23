@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
-import { getCashFlowReport } from "@bloqer/services";
+import { getCashFlowReport, ServiceError } from "@bloqer/services";
+import { can } from "@bloqer/domain";
 import { CashFlowTable, CashFlowChart, CashFlowFilters } from "@/features/treasury-reports";
 import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
@@ -19,6 +20,7 @@ interface PageProps {
 export default async function FlujoCajaPage({ searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
+  if (!can(current.tenantCtx.roles, "VIEW", "TREASURY")) redirect("/dashboard");
 
   const sp = await searchParams;
   const ctx = {
@@ -33,27 +35,26 @@ export default async function FlujoCajaPage({ searchParams }: PageProps) {
     ? (sp.period as "day" | "week" | "month")
     : "month";
 
-  const report = await getCashFlowReport(
-    {
-      dateFrom: sp.dateFrom || undefined,
-      dateTo: sp.dateTo || undefined,
-      period,
-      currency: sp.currency || undefined,
-    },
-    ctx,
-  );
+  let report;
+  try {
+    report = await getCashFlowReport(
+      {
+        dateFrom: sp.dateFrom || undefined,
+        dateTo: sp.dateTo || undefined,
+        period,
+        currency: sp.currency || undefined,
+      },
+      ctx,
+    );
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
 
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Flujo de caja</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Solo movimientos confirmados. Sin conversión de moneda.
-            </p>
-          </div>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Flujo de caja</h1>
         <div className="flex flex-wrap items-center gap-2">
           <ReportExportActions exportPath="/api/reports/tesoreria/flujo-caja.csv" params={sp} pdf />
           <ReportEmailSendDialog
@@ -87,11 +88,6 @@ export default async function FlujoCajaPage({ searchParams }: PageProps) {
           ))}
         </div>
       )}
-
-      <p className="text-xs text-muted-foreground">
-        Ajustes (ADJUSTMENT): la convención de signo del módulo de ajuste manual está pendiente. Los
-        ajustes se muestran como egresos por defecto.
-      </p>
     </PageShell>
   );
 }

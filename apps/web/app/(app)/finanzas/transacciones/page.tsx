@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import { NewTransactionDialog } from "@/features/finance/components/new-transaction-dialog";
 import { ReportExportActions } from "@/features/reports";
@@ -212,41 +211,11 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
     }
   }
 
-  const treasuryQs = new URLSearchParams();
-  if (sp.accountId) treasuryQs.set("accountId", sp.accountId);
-  if (sp.dateFrom) treasuryQs.set("dateFrom", sp.dateFrom);
-  if (sp.dateTo) treasuryQs.set("dateTo", sp.dateTo);
-  if (sp.type) treasuryQs.set("type", sp.type);
-  if (sp.sourceType) treasuryQs.set("sourceType", sp.sourceType);
-  if (sp.currency) treasuryQs.set("currency", sp.currency);
-  if (sp.scope) treasuryQs.set("scope", sp.scope);
-  if (sp.projectId) treasuryQs.set("projectId", sp.projectId);
-  const treasuryHref = `/tesoreria/reportes/movimientos${treasuryQs.size ? `?${treasuryQs}` : ""}`;
-
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Transacciones</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Ingresos y egresos de caja confirmados con terceros (obra y empresa). Para obligaciones pendientes ver{" "}
-            <Link href="/finanzas/cuentas-por-pagar" className="underline underline-offset-2 text-foreground">
-              Cuentas por pagar
-            </Link>
-            {" "}o{" "}
-            <Link href="/finanzas/cuentas-por-cobrar" className="underline underline-offset-2 text-foreground">
-              Cuentas por cobrar
-            </Link>
-            ; indicadores en{" "}
-            <Link href="/finanzas" className="underline underline-offset-2 text-foreground">
-              Resumen
-            </Link>
-            . Las transferencias entre cuentas propias se gestionan en{" "}
-            <Link href="/tesoreria/transferencias" className="underline underline-offset-2 text-foreground">
-              Tesorería → Transferencias
-            </Link>
-            .
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {(canEditAp || canEditTreasury || canEditAr) && (
@@ -262,28 +231,18 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
               />
             </Suspense>
           )}
+          {canTreasury ? (
+            <ReportExportActions
+              exportPath="/api/reports/tesoreria/movimientos.csv"
+              params={movementExportParams(sp)}
+              pdf
+            />
+          ) : null}
         </div>
       </div>
 
       {canTreasury ? (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-muted-foreground">
-              Caja operativa confirmada (rango por defecto: {DEFAULT_CASH_DATE_RANGE_DAYS} días). La descripción
-              abre el documento origen cuando existe.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <ReportExportActions
-                exportPath="/api/reports/tesoreria/movimientos.csv"
-                params={movementExportParams(sp)}
-                pdf
-              />
-              <Button asChild variant="outline" size="sm">
-                <Link href={treasuryHref}>Abrir en Tesorería</Link>
-              </Button>
-            </div>
-          </div>
-
           <div className="rounded-lg border bg-card p-4">
             <Suspense>
               <MovementFilters variant="finance" projects={projectOptions} />
@@ -307,36 +266,21 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
           </Suspense>
         </>
       ) : (
-        <div className="rounded-lg border bg-card px-6 py-8 space-y-4">
-          <p className="text-sm text-muted-foreground">
-            No tenés acceso al libro de caja consolidado. Podés registrar gastos o ingresos corporativos con el botón
-            de arriba, o consultar:
-          </p>
-          <ul className="text-sm space-y-2 list-disc pl-5 text-muted-foreground">
-            {canAp && (
-              <>
-                <li>
-                  <Link href="/finanzas/cuentas-por-pagar" className="underline underline-offset-2 text-foreground">
-                    Cuentas por pagar
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/finanzas/facturas-proveedor?status=DRAFT"
-                    className="underline underline-offset-2 text-foreground"
-                  >
-                    Facturas borrador
-                  </Link>
-                </li>
-              </>
-            )}
-            {treasuryModuleOn && !can(ctx.roles, "VIEW", "TREASURY") && (
-              <li>Contactá a un administrador para permiso de Tesorería y ver movimientos de caja.</li>
-            )}
-            {!treasuryModuleOn && (
-              <li>El módulo Tesorería no está habilitado para este tenant.</li>
-            )}
-          </ul>
+        <div className="rounded-lg border bg-card px-6 py-8 text-center text-sm text-muted-foreground space-y-3">
+          <p>Sin permiso para ver movimientos de caja.</p>
+          {canAp ? (
+            <p className="flex flex-wrap justify-center gap-3">
+              <Link href="/finanzas/cuentas-por-pagar" className="underline underline-offset-2 text-foreground">
+                Cuentas por pagar
+              </Link>
+              <Link
+                href="/finanzas/facturas-proveedor?status=DRAFT"
+                className="underline underline-offset-2 text-foreground"
+              >
+                Facturas borrador
+              </Link>
+            </p>
+          ) : null}
         </div>
       )}
     </PageShell>

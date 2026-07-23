@@ -45,7 +45,7 @@ function supplierLabel(legalName: string | null, fantasyName: string | null): st
 
 function emptySummary(visible: boolean, loadFailed: boolean): CompanyFinanceOperationsSummary {
   const movimientosCorporateFilterHref =
-    "/tesoreria/reportes/movimientos?sourceType=PAYMENT&type=OUTFLOW&corporateApPayments=true";
+    "/tesoreria/movimientos?sourceType=PAYMENT&type=OUTFLOW&corporateApPayments=true";
   return {
     visible,
     loadFailed,
@@ -79,7 +79,7 @@ export async function getCompanyFinanceOperationsSummary(
   opts?: { payableRows?: CorporatePayableSnapshotRow[] },
 ): Promise<CompanyFinanceOperationsSummary> {
   const movimientosCorporateFilterHref =
-    "/tesoreria/reportes/movimientos?sourceType=PAYMENT&type=OUTFLOW&corporateApPayments=true";
+    "/tesoreria/movimientos?sourceType=PAYMENT&type=OUTFLOW&corporateApPayments=true";
 
   const gate = await getTenantModuleGate(ctx);
   if (!gate.isEnabled("AP") || !canViewCompanyAp(ctx.roles)) {

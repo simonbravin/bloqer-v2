@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { FinanceHubCharts } from "@bloqer/services";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CashFlowChart } from "@/features/treasury-reports/components/cash-flow-chart";
 import { IncomeExpenseChart } from "@/features/reports/income-expense-chart";
@@ -43,7 +43,7 @@ export function FinanceHubChartsPanel({ charts, defaultTab }: Props) {
             key: "monthly_net_cash",
             label: "Flujo neto del mes",
             value: charts.currentMonthNetCash.label,
-            href: "/tesoreria/reportes/flujo-caja",
+            href: "/tesoreria/flujo-caja",
             helper: `Neto operativo (${charts.currentMonthNetCash.periodKey})`,
           }}
         />
@@ -54,11 +54,6 @@ export function FinanceHubChartsPanel({ charts, defaultTab }: Props) {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <CardTitle className="text-base">Tendencia mensual</CardTitle>
-              <CardDescription>
-                {tab === "caja"
-                  ? "Ingresos y egresos de tesorería (R-005). Solo movimientos de caja confirmados."
-                  : "Certificado vs costo devengado consolidado por tenant (obras + gastos corporativos)."}
-              </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -111,7 +106,7 @@ export function FinanceHubChartsPanel({ charts, defaultTab }: Props) {
             ) : (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 Sin movimientos de tesorería en el rango.{" "}
-                <Link href="/tesoreria/reportes/flujo-caja" className="underline underline-offset-2">
+                <Link href="/tesoreria/flujo-caja" className="underline underline-offset-2">
                   Ver flujo de caja
                 </Link>
               </p>

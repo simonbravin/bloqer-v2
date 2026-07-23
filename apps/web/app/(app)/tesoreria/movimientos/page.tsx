@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
-import { getAccountMovementReport, parseMovementReportFilters } from "@bloqer/services";
+import { getAccountMovementReport, parseMovementReportFilters, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { MovementLedgerTable, MovementFilters } from "@/features/treasury-reports";
 import { ReportExportActions } from "@/features/reports";
@@ -29,6 +28,7 @@ interface PageProps {
 export default async function MovimientosPage({ searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
+  if (!can(current.tenantCtx.roles, "VIEW", "TREASURY")) redirect("/dashboard");
 
   const sp = await searchParams;
   const ctx = {
@@ -49,10 +49,18 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
   if (sp.corporateApPayments === "true") qs.set("corporateApPayments", "true");
   if (sp.scope) qs.set("scope", sp.scope);
   if (sp.projectId) qs.set("projectId", sp.projectId);
-  const accountingReturnPath = `/tesoreria/reportes/movimientos${qs.size ? `?${qs}` : ""}`;
+  if (sp.sort) qs.set("sort", sp.sort);
+  if (sp.dir) qs.set("dir", sp.dir);
+  const accountingReturnPath = `/tesoreria/movimientos${qs.size ? `?${qs}` : ""}`;
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
 
-  const { rows } = await getAccountMovementReport(parseMovementReportFilters(sp), ctx);
+  let rows;
+  try {
+    ({ rows } = await getAccountMovementReport(parseMovementReportFilters(sp), ctx));
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
 
   const showRunningBalance = !!sp.accountId;
 
@@ -79,27 +87,9 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
         </Suspense>
       </div>
 
-      <div className="text-sm text-muted-foreground space-y-2">
-        <p>
-          {rows.length} movimiento{rows.length === 1 ? "" : "s"} encontrado
-          {rows.length === 1 ? "" : "s"}.
-          {!sp.accountId && " Saldo acumulado disponible al filtrar por cuenta."}
-        </p>
-        {sp.sourceType === "MANUAL_ADJUSTMENT" && (
-          <p className="rounded-md border border-border/80 bg-muted/40 px-3 py-2 text-foreground/90">
-            Los movimientos con este origen son <strong>ingresos manuales de caja</strong> registrados desde{" "}
-            <Link href="/finanzas/transacciones" className="font-medium underline underline-offset-4 hover:no-underline">
-              Finanzas → Transacciones
-            </Link>{" "}
-            (tipo «Ingreso de caja»). Todavía no hay pantalla en Tesorería para egresos o ajustes libres por cuenta.
-          </p>
-        )}
-        {sp.corporateApPayments === "true" && (
-          <p className="text-foreground/90">
-            Filtro activo: egresos por <strong>pago a proveedor</strong> cuya obligación es{" "}
-            <strong>sin proyecto</strong> (gastos generales de empresa).
-          </p>
-        )}
+      <div className="text-sm text-muted-foreground">
+        {rows.length} movimiento{rows.length === 1 ? "" : "s"} encontrado
+        {rows.length === 1 ? "" : "s"}.
       </div>
 
       <MovementLedgerTable

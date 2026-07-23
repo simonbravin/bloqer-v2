@@ -19,7 +19,7 @@ import type {
   ProjectOverviewBillingVsCollections,
   ProjectOverviewCashFlowMini,
 } from "@bloqer/services";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function moneyTooltip(value: number | string) {
   const n = typeof value === "string" ? Number(value) : value;
@@ -70,9 +70,6 @@ export function ProjectOverviewCharts({
       <Card className="rounded-xl border bg-card shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Facturación y cobranzas</CardTitle>
-          <CardDescription>
-            Total facturado (emitido) vs cobranzas confirmadas por moneda. Sin conversión de cambio.
-          </CardDescription>
         </CardHeader>
         <CardContent className="h-72 pt-0">
           {billingRows.length === 0 ? (
@@ -97,11 +94,10 @@ export function ProjectOverviewCharts({
 
       <Card className="rounded-xl border bg-card shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Flujo de caja imputado</CardTitle>
-          <CardDescription>
-            Cobros y pagos del proyecto agrupados por mes
-            {cashFlowMini ? ` (${cashFlowMini.currency})` : ""}.
-          </CardDescription>
+          <CardTitle className="text-base">
+            Flujo de caja imputado
+            {cashFlowMini ? ` (${cashFlowMini.currency})` : ""}
+          </CardTitle>
         </CardHeader>
         <CardContent className="h-72 pt-0">
           {cashRows.length === 0 ? (

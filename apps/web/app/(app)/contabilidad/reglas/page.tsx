@@ -38,10 +38,6 @@ export default async function ContabilidadReglasPage({
           </Button>
         )}
       </div>
-      <p className="text-sm text-muted-foreground">
-        Mapeo debe/haber por tipo de evento operativo. Los asientos sugeridos se crean en borrador;
-        la fase 11C puede enlazar botones desde cobranzas, pagos, tesorería e inventario.
-      </p>
       <AccountingMappingRuleList rules={rules} empresa={empresa} />
     </PageShell>
   );

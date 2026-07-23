@@ -72,15 +72,6 @@ export default async function ReglaContableDetallePage({
         </p>
       </div>
 
-      <div className="rounded-lg border bg-muted/30 p-6 text-sm text-muted-foreground space-y-2">
-        <p className="font-medium text-foreground">Sugerencias de asiento</p>
-        <p>
-          Las reglas activas se usan al generar borradores desde cobranzas, pagos, tesorería o
-          consumos de inventario (fase 11C). Nada se contabiliza ni se postea en automático: siempre
-          revisá el asiento en Contabilidad.
-        </p>
-      </div>
-
       {canEdit && rule.isActive && (
         <div className="rounded-lg border bg-card p-6">
           <h2 className="font-semibold mb-3">Acciones</h2>

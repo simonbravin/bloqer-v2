@@ -10,27 +10,13 @@ function hrefSearchParams(href: string): URLSearchParams | null {
   return new URLSearchParams(href.slice(idx + 1));
 }
 
+/** Filtered movimientos deep-link (e.g. from Transferencias → Ver en movimientos). */
 export function isInternalTransferMovimientosHref(href: string): boolean {
   const params = hrefSearchParams(href);
   return (
-    navHrefPathname(href) === "/tesoreria/reportes/movimientos" &&
+    navHrefPathname(href) === "/tesoreria/movimientos" &&
     params?.get("sourceType") === "INTERNAL_TRANSFER"
   );
-}
-
-function isInternalTransferMovimientosRoute(
-  pathname: string,
-  searchParams: { get(name: string): string | null } | null | undefined,
-): boolean {
-  return (
-    pathname === "/tesoreria/reportes/movimientos" &&
-    searchParams?.get("sourceType") === "INTERNAL_TRANSFER"
-  );
-}
-
-/** Parent "Reportes" hub must not highlight when Transferencias owns the filtered movimientos view. */
-function isTesoreriaReportesHubHref(href: string): boolean {
-  return navHrefPathname(href) === "/tesoreria/reportes" && !href.includes("?");
 }
 
 export function isNavLinkActive(
@@ -50,15 +36,14 @@ export function isNavLinkActive(
   const hrefPath = navHrefPathname(href);
 
   if (isInternalTransferMovimientosHref(href)) {
-    return isInternalTransferMovimientosRoute(pathname, searchParams);
+    return (
+      pathname === "/tesoreria/movimientos" &&
+      searchParams?.get("sourceType") === "INTERNAL_TRANSFER"
+    );
   }
 
   if (matchExact) {
     return pathname === hrefPath;
-  }
-
-  if (isTesoreriaReportesHubHref(href) && isInternalTransferMovimientosRoute(pathname, searchParams)) {
-    return false;
   }
 
   return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);

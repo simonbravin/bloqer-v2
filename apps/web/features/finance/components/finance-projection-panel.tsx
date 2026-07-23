@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { FinanceProjectionSummary } from "@bloqer/services";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -10,7 +10,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 
 export function FinanceProjectionPanel({ projection }: { projection: FinanceProjectionSummary }) {
@@ -19,14 +18,12 @@ export function FinanceProjectionPanel({ projection }: { projection: FinanceProj
   return (
     <Card className="rounded-xl border bg-card shadow-sm">
       <CardHeader className="border-b border-border/60 pb-4">
-        <CardTitle className="text-base">Proyección de liquidez (90 días)</CardTitle>
-        <CardDescription>
-          Saldo de caja hoy menos egresos por C×P corporativas con vencimiento entre{" "}
-          {formatDate(projection.dateFrom)} y {formatDate(projection.dateTo)} (incluye vencidas).{" "}
-          <Link href={projection.href} className="underline underline-offset-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-base">Proyección de liquidez (90 días)</CardTitle>
+          <Link href={projection.href} className="text-sm underline underline-offset-2 text-muted-foreground">
             Ver obligaciones
           </Link>
-        </CardDescription>
+        </div>
         {projection.moduleWarnings.length > 0 ? (
           <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
             {projection.moduleWarnings.map((w) => (
@@ -76,9 +73,7 @@ export function FinanceProjectionPanel({ projection }: { projection: FinanceProj
             </Table>
           </TableScroll>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            No hay egresos esperados por C×P corporativas en el horizonte de 90 días.
-          </p>
+          <p className="text-sm text-muted-foreground">Sin egresos esperados en 90 días.</p>
         )}
       </CardContent>
     </Card>

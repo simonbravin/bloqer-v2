@@ -11,7 +11,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { ScheduleWorkspace } from "@/features/schedule";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -82,10 +82,6 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Sin presupuesto aprobado</CardTitle>
-            <CardDescription>
-              Necesitás un presupuesto en estado Aprobado o Cerrado para planificar y comparar
-              costos.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild>
@@ -99,9 +95,6 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Elegí presupuesto base</CardTitle>
-            <CardDescription>
-              Hay varios presupuestos aprobados o cerrados. Seleccioná uno para el cronograma.
-            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             {result.availableBudgets.map((b) => (

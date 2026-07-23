@@ -18,7 +18,7 @@ import { ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -122,7 +122,6 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Estado de certificaciones</CardTitle>
-              <CardDescription>Certificado, facturado y cobrado por documento</CardDescription>
             </CardHeader>
             <CardContent>
               <CertificationPortfolioTable rows={report.portfolio} projectId={projectId} />
@@ -132,7 +131,6 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Certificado vs venta presupuestada</CardTitle>
-              <CardDescription>Por partida WBS · pendientes: {report.pendingCount}</CardDescription>
             </CardHeader>
             <CardContent>
               <CertificationVsBudgetTable rows={report.vsBudget} />

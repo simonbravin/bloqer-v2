@@ -17,7 +17,7 @@ import {
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -127,7 +127,6 @@ export default async function ReporteSubcontratosPage({ params, searchParams }: 
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">SUB presupuestado vs contratado</CardTitle>
-              <CardDescription>Por partida WBS · capa SUBCONTRACT del APU</CardDescription>
             </CardHeader>
             <CardContent>
               <SubcontractWbsVarianceTable rows={report.byWbs} projectId={projectId} />
@@ -137,7 +136,6 @@ export default async function ReporteSubcontratosPage({ params, searchParams }: 
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Contratos del proyecto</CardTitle>
-              <CardDescription>Valor contractual y certificado acumulado</CardDescription>
             </CardHeader>
             <CardContent>
               <SubcontractContractsTable rows={report.contracts} projectId={projectId} />
