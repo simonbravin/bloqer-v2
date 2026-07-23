@@ -4,6 +4,7 @@ import {
   getSupplierInvoiceById,
   listContacts,
   listLinkablePurchaseOrders,
+  listProcurementWbsOptions,
   ServiceError,
 } from "@bloqer/services";
 import { SupplierInvoiceEditForm } from "@/features/ap";
@@ -25,12 +26,13 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
     roles: current.tenantCtx.roles,
   };
 
-  let invoice, suppliersResult, linkablePOs;
+  let invoice, suppliersResult, linkablePOs, wbsNodes;
   try {
-    [invoice, suppliersResult, linkablePOs] = await Promise.all([
+    [invoice, suppliersResult, linkablePOs, wbsNodes] = await Promise.all([
       getSupplierInvoiceById(supplierInvoiceId, ctx, id),
       listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
       listLinkablePurchaseOrders(id, ctx),
+      listProcurementWbsOptions(id, ctx),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
@@ -53,6 +55,12 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
     currency: po.currency,
   }));
 
+  const wbsOptions = wbsNodes.map((n) => ({
+    id: n.id,
+    code: n.code,
+    name: n.name,
+  }));
+
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={invoice.code}>
       <div className="flex items-center gap-4">
@@ -64,6 +72,7 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
         invoice={invoice}
         suppliers={suppliers}
         poOptions={poOptions}
+        wbsOptions={wbsOptions}
       />
     </PageShell>
   );

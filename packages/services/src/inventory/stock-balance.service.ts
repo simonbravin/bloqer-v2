@@ -22,19 +22,29 @@ export type StockBalanceResult = {
 // Returns aggregated confirmed stock balance for a given product/warehouse/tenant.
 // CONFIRMED IN movements add; CONFIRMED OUT movements subtract.
 // Cancelled movements are excluded.
-export async function getStockBalance(filters: {
-  tenantId:    string;
-  warehouseId: string;
-  productId:   string;
-  projectId?:  string;
-}): Promise<Prisma.Decimal> {
-  const rows = await prisma.stockMovement.findMany({
+type StockBalanceDb = {
+  stockMovement: {
+    findMany: typeof prisma.stockMovement.findMany;
+  };
+};
+
+export async function getStockBalance(
+  filters: {
+    tenantId: string;
+    warehouseId: string;
+    productId: string;
+    projectId?: string;
+  },
+  /** Pass the transaction client when checking stock inside a write tx (race-safe). */
+  db: StockBalanceDb = prisma,
+): Promise<Prisma.Decimal> {
+  const rows = await db.stockMovement.findMany({
     where: {
-      tenantId:    filters.tenantId,
+      tenantId: filters.tenantId,
       warehouseId: filters.warehouseId,
-      productId:   filters.productId,
-      projectId:   filters.projectId ?? undefined,
-      status:      "CONFIRMED",
+      productId: filters.productId,
+      projectId: filters.projectId ?? undefined,
+      status: "CONFIRMED",
     },
     select: { type: true, quantity: true },
   });

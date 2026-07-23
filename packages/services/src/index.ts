@@ -76,6 +76,8 @@ export { runProcurementSlaReminders } from "./procurement/procurement-notificati
 export { canViewSubcontractsArea } from "./subcontracts/subcontract-access";
 export * from "./procurement/purchase-order.service";
 export * from "./procurement/purchase-receipt.service";
+export * from "./procurement/project-procurement-hub.service";
+export * from "./materials/project-materials-board.service";
 export * from "./inventory/product.service";
 export * from "./inventory/warehouse.service";
 export * from "./inventory/stock-movement.service";

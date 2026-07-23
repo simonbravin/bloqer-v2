@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox, SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/components/ui/searchable-combobox";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
-import type { InvoiceLine } from "./invoice-lines-editor";
+import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
 import {
@@ -31,6 +31,8 @@ interface Props {
   companyFinanzas?: boolean;
   suppliers: SupplierOption[];
   poOptions?: POOption[];
+  /** Project WBS items for line imputation ([D-055]). */
+  wbsOptions?: InvoiceWbsOption[];
   /** Active treasury accounts for “pay now” (project only). */
   treasuryAccounts?: TreasuryAccountOption[];
   /** Show pay-now when user has EDIT TREASURY ([D-052]). */
@@ -42,7 +44,13 @@ interface Props {
   onSuccess?: () => void;
 }
 
-const DEFAULT_LINE: InvoiceLine = { description: "", quantity: "1", unitPrice: "", taxRate: "21" };
+const DEFAULT_LINE: InvoiceLine = {
+  description: "",
+  quantity: "1",
+  unitPrice: "",
+  taxRate: "21",
+  wbsNodeId: null,
+};
 const INVOICE_CURRENCY = "ARS";
 
 export function SupplierInvoiceForm({
@@ -50,6 +58,7 @@ export function SupplierInvoiceForm({
   companyFinanzas = false,
   suppliers,
   poOptions = [],
+  wbsOptions = [],
   treasuryAccounts = [],
   canPayNow = false,
   storageConfigured = false,
@@ -102,6 +111,7 @@ export function SupplierInvoiceForm({
         quantity: l.quantity,
         unitPrice: l.unitPrice,
         taxRate: l.taxRate,
+        wbsNodeId: l.wbsNodeId ?? null,
       })),
     );
     toast.success("Líneas traídas desde la OC (pendiente de facturar). Podés ajustarlas.");
@@ -168,6 +178,10 @@ export function SupplierInvoiceForm({
     if (!supplierContactId) { setError("Debe seleccionar un proveedor"); return; }
     if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {
       setError("Completar descripción, cantidad y precio en todas las líneas");
+      return;
+    }
+    if (projectId && !companyFinanzas && lines.some((l) => !l.wbsNodeId)) {
+      setError("Cada línea debe imputar a una partida EDT");
       return;
     }
     if (payNow && showPayNow && !payAccountId) {
@@ -323,7 +337,12 @@ export function SupplierInvoiceForm({
 
         <hr />
 
-        <InvoiceLinesEditor lines={lines} onChange={setLines} />
+        <InvoiceLinesEditor
+          lines={lines}
+          onChange={setLines}
+          requireWbs={Boolean(projectId) && !companyFinanzas}
+          wbsOptions={wbsOptions}
+        />
 
         <hr />
 

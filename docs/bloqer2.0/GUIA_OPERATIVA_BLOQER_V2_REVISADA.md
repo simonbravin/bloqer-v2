@@ -221,8 +221,9 @@ stateDiagram-v2
 |---------|----------------------------------|
 | Resumen | Resumen → `/proyectos/[id]` |
 | Planificación | Presupuesto → `/presupuestos` · Cronograma → `/cronograma` · EDT y costos → `/control-costos` · Reportes → `/reportes` |
-| Operación | Libro de obra → `/libro-obra` · Certificaciones → `/certificaciones` · Recepciones → `/recepciones` · Inventario → `/inventario` · Consumos → `/consumos` · Documentos → `/documentos` |
-| Finanzas del proyecto | Tablero de finanzas → `/finanzas` · Flujo de caja → `/flujo-caja` · Solicitudes de compra → `/solicitudes-compra` · Órdenes de compra → `/ordenes-compra` · Subcontratos → `/subcontratos` · Cuentas por pagar → `/cuentas-por-pagar` · Cuentas por cobrar → `/cuentas-por-cobrar` · Facturas proveedor → `/facturas-proveedor` · Facturas emitidas → `/facturas` |
+| Operación | Libro de obra → `/libro-obra` · Certificaciones → `/certificaciones` · Materiales → `/materiales` · Inventario → `/inventario` · Consumos → `/consumos` · Documentos → `/documentos` |
+| Compras | Hub → `/compras` · Solicitudes → `/solicitudes-compra` · Órdenes → `/ordenes-compra` · Recepciones → `/recepciones` |
+| Finanzas del proyecto | Tablero → `/finanzas` · Flujo de caja → `/flujo-caja` · Subcontratos → `/subcontratos` · CxP → `/cuentas-por-pagar` · CxC → `/cuentas-por-cobrar` · Facturas proveedor → `/facturas-proveedor` · Facturas emitidas → `/facturas` |
 | Administración | Configuración → `/editar` |
 
 ---
@@ -335,6 +336,10 @@ flowchart LR
 
 ## 9. Compras y abastecimiento (nivel proyecto)
 
+**Hub de compras:** `/proyectos/[id]/compras` — pendientes de SC, cotización, OC y recepción en un solo lugar (menú **Compras**).
+
+**Materiales del proyecto:** `/proyectos/[id]/materiales` — necesidad APU MAT vs pedido/recibido/consumido con filtro de ventana (esta semana / 14 días / mes). El reporte de varianza $ quedó en la pestaña **Varianza** (antes `/reportes/materiales`).
+
 ```mermaid
 flowchart LR
   PR["Solicitud de compra"] --> Q["Cotizaciones (precio + plazo)"]
@@ -345,7 +350,7 @@ flowchart LR
   PO --> SI["Factura de proveedor → Cuenta por pagar"]
 ```
 
-> **Regla base (D-050): toda línea de compra —de solicitud o de orden— imputa obligatoriamente a un ítem WBS del presupuesto.** Los gastos generales/indirectos no quedan sin WBS: se imputan a la **partida de indirectos** correspondiente. Al elegir la partida se muestra el **costo referencial de materiales** y el **saldo de la partida** (presupuestado − comprometido) como ayuda; el saldo es una **alerta**, no un bloqueo.
+> **Regla base (D-050 / D-055): toda línea de compra y toda línea de factura de proveedor de proyecto imputa obligatoriamente a un ítem WBS.** Los consumos de libro de obra con producto también imputan WBS al aprobar el parte.
 
 ### 9.1 Solicitudes de compra
 
@@ -561,7 +566,7 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 ### 13.2 Rentabilidad y reportes
 
 - **Rentabilidad:** `/proyectos/[id]/reportes/rentabilidad` (margen bruto; neto según overhead imputado, visible a `OWNER`/`ADMIN`).
-- **Hub de reportes:** `/proyectos/[id]/reportes` (presupuesto vs. real, compras y proveedores, materiales, subcontratos, certificaciones/ingresos‑gastos, caja).
+- **Hub de reportes:** `/proyectos/[id]/reportes` (presupuesto vs. real, compras y proveedores, materiales → `/materiales?tab=varianza`, subcontratos, certificaciones/ingresos‑gastos, caja).
 - **Exportaciones CSV/PDF** desde cada pantalla de reporte.
 
 ---

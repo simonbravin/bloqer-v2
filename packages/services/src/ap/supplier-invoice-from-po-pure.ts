@@ -8,6 +8,7 @@ export type PoLineForInvoiceDraft = {
   orderQuantity: string;
   receivedQuantity: string;
   lineTotal: string;
+  wbsNodeId: string | null;
 };
 
 export type InvoiceDraftLineInput = {
@@ -15,6 +16,7 @@ export type InvoiceDraftLineInput = {
   quantity: string;
   unitPrice: string;
   taxRate: string;
+  wbsNodeId?: string | null;
 };
 
 const ZERO = new Prisma.Decimal(0);
@@ -102,6 +104,7 @@ export function buildInvoiceDraftLinesFromPo(
       quantity: formatInvoiceLineQuantity(qty),
       unitPrice: line.unitPrice,
       taxRate: line.taxRate,
+      wbsNodeId: line.wbsNodeId,
     });
   }
 

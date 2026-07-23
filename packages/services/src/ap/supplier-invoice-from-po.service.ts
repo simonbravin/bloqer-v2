@@ -60,6 +60,7 @@ function toPoLineDraft(
     taxRate: Prisma.Decimal;
     lineTotal: Prisma.Decimal;
     receivedQuantity: Prisma.Decimal;
+    wbsNodeId: string | null;
   },
 ): PoLineForInvoiceDraft {
   return {
@@ -70,6 +71,7 @@ function toPoLineDraft(
     orderQuantity: line.quantity.toString(),
     receivedQuantity: line.receivedQuantity.toString(),
     lineTotal: line.lineTotal.toString(),
+    wbsNodeId: line.wbsNodeId,
   };
 }
 

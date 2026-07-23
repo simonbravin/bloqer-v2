@@ -15,6 +15,7 @@ import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
+import { assertWbsLineForProject } from "../procurement/procurement-wbs";
 
 const PO_AP_LINKABLE_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
 
@@ -36,6 +37,7 @@ export function assertPurchaseOrderLinkableForAp(status: string): void {
 export type SupplierInvoiceLineView = {
   id: string;
   invoiceId: string;
+  wbsNodeId: string | null;
   description: string;
   quantity: string;
   unitPrice: string;
@@ -64,6 +66,34 @@ export type SupplierInvoiceListPayable = {
 } | null;
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
+
+/** [D-055] Project invoices require WBS on every line; corporate invoices must not carry WBS. */
+export async function assertSupplierInvoiceLinesWbs(
+  projectId: string | null,
+  lines: Array<{ wbsNodeId?: string | null }>,
+  tenantId: string,
+): Promise<void> {
+  if (!projectId) {
+    for (const line of lines) {
+      if (line.wbsNodeId) {
+        throw new ServiceError(
+          "CONFLICT",
+          "Las facturas corporativas (sin proyecto) no llevan partida WBS",
+        );
+      }
+    }
+    return;
+  }
+  for (const line of lines) {
+    if (!line.wbsNodeId) {
+      throw new ServiceError(
+        "VALIDATION",
+        "Cada línea de factura de proyecto debe imputar a una partida WBS",
+      );
+    }
+    await assertWbsLineForProject(line.wbsNodeId, projectId, tenantId);
+  }
+}
 
 export function assertSupplierInvoiceEditable(invoice: SupplierInvoice): void {
   if (invoice.status !== "DRAFT") {
@@ -399,6 +429,8 @@ export async function createSupplierInvoice(
     assertProjectApDirectSpendAllowed(settings, estimatedFx.amountArs, ctx);
   }
 
+  await assertSupplierInvoiceLinesWbs(projectId, input.lines, ctx.tenantId);
+
   const companyId = await resolveCompanyIdForAp(projectId, ctx);
 
   const maxNum = await prisma.supplierInvoice.aggregate({
@@ -435,6 +467,7 @@ export async function createSupplierInvoice(
       await tx.supplierInvoiceLine.create({
         data: {
           invoiceId:   created.id,
+          wbsNodeId:   line.wbsNodeId ?? null,
           description: line.description,
           quantity:    qty,
           unitPrice:   price,
@@ -525,6 +558,10 @@ export async function updateSupplierInvoice(
     }
   }
 
+  if (input.lines) {
+      await assertSupplierInvoiceLinesWbs(existing.projectId, input.lines, ctx.tenantId);
+    }
+
   const inv = await prisma.$transaction(async (tx) => {
     await tx.supplierInvoice.update({
       where: { id },
@@ -550,6 +587,7 @@ export async function updateSupplierInvoice(
         await tx.supplierInvoiceLine.create({
           data: {
             invoiceId: id,
+            wbsNodeId: line.wbsNodeId ?? null,
             description: line.description,
             quantity: qty,
             unitPrice: price,
@@ -619,10 +657,14 @@ export async function issueSupplierInvoice(
       throw new ServiceError("CONFLICT", "Solo se pueden emitir facturas en estado Borrador");
     }
 
-    const lineCount = await tx.supplierInvoiceLine.count({ where: { invoiceId: id } });
-    if (lineCount === 0) {
+    const lines = await tx.supplierInvoiceLine.findMany({
+      where: { invoiceId: id },
+      select: { wbsNodeId: true },
+    });
+    if (lines.length === 0) {
       throw new ServiceError("CONFLICT", "La factura debe tener al menos una línea");
     }
+    await assertSupplierInvoiceLinesWbs(inv.projectId, lines, ctx.tenantId);
 
     // Re-fetch totals
     await recalcSupplierInvoiceTotals(tx, id);
@@ -790,6 +832,7 @@ type RawInvoice = SupplierInvoice & {
   lines: Array<{
     id: string;
     invoiceId: string;
+    wbsNodeId: string | null;
     description: string;
     quantity: Prisma.Decimal;
     unitPrice: Prisma.Decimal;
@@ -837,6 +880,7 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
     lines: inv.lines.map((l) => ({
       id:          l.id,
       invoiceId:   l.invoiceId,
+      wbsNodeId:   l.wbsNodeId,
       description: l.description,
       quantity:    l.quantity.toString(),
       unitPrice:   serializeMoneyDecimal(l.unitPrice),

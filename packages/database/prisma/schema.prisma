@@ -1206,12 +1206,14 @@ model WbsNode {
   children             WbsNode[]             @relation("WbsChildren")
   costItem             CostItem?
   certificationLines   CertificationLine[]
-  purchaseOrderLines   PurchaseOrderLine[]
-  purchaseRequestLines PurchaseRequestLine[]
-  stockMovements       StockMovement[]
-  subcontractLines     SubcontractLine[]
-  jobsiteLogProgress   JobsiteLogProgress[]
-  scheduleItemWbsLinks ScheduleItemWbsLink[]
+  purchaseOrderLines     PurchaseOrderLine[]
+  purchaseRequestLines   PurchaseRequestLine[]
+  stockMovements         StockMovement[]
+  subcontractLines       SubcontractLine[]
+  jobsiteLogProgress     JobsiteLogProgress[]
+  jobsiteLogMaterials    JobsiteLogMaterialUsage[]
+  scheduleItemWbsLinks   ScheduleItemWbsLink[]
+  supplierInvoiceLines   SupplierInvoiceLine[]
 
   @@unique([budgetId, code])
   @@index([budgetId, parentId])
@@ -1753,6 +1755,8 @@ model SupplierInvoice {
 model SupplierInvoiceLine {
   id           String   @id @default(uuid())
   invoiceId    String
+  /// Required in service when invoice.projectId is set ([D-055] / Q-053).
+  wbsNodeId    String?
   description  String
   quantity     Decimal  @db.Decimal(18, 4)
   unitPrice    Decimal  @db.Decimal(18, 4)
@@ -1765,8 +1769,10 @@ model SupplierInvoiceLine {
   updatedAt    DateTime @updatedAt
 
   invoice SupplierInvoice @relation(fields: [invoiceId], references: [id])
+  wbsNode WbsNode?        @relation(fields: [wbsNodeId], references: [id])
 
   @@index([invoiceId])
+  @@index([wbsNodeId])
   @@map("supplier_invoice_lines")
 }
 
@@ -2452,9 +2458,11 @@ model JobsiteLogLabor {
 
 // On APPROVED: creates StockMovement OUT (CONSUMPTION) per line with productId+warehouseId.
 // description mandatory fallback when productId is null.
+// wbsNodeId: preferred for cost/materials board; resolved on approve if omitted ([D-055]).
 model JobsiteLogMaterialUsage {
   id           String   @id @default(uuid())
   jobsiteLogId String
+  wbsNodeId    String?
   productId    String?
   warehouseId  String?
   description  String
@@ -2465,10 +2473,12 @@ model JobsiteLogMaterialUsage {
   updatedAt    DateTime @updatedAt
 
   jobsiteLog JobsiteLog @relation(fields: [jobsiteLogId], references: [id])
+  wbsNode    WbsNode?   @relation(fields: [wbsNodeId], references: [id])
   product    Product?   @relation(fields: [productId], references: [id])
   warehouse  Warehouse? @relation(fields: [warehouseId], references: [id])
 
   @@index([jobsiteLogId])
+  @@index([wbsNodeId])
   @@map("jobsite_log_material_usages")
 }
 

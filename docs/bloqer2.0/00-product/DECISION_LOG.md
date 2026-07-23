@@ -743,6 +743,23 @@
 
 ---
 
+### D-055 — WBS en líneas de factura de proveedor de proyecto y consumo JL
+
+- **Fecha:** 2026-07-23
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Cierre de [Q-053](./OPEN_QUESTIONS.md). Facturas de proyecto sin OC y consumos de libro de obra no imputaban WBS; control de costos / R-MAT-01 quedaban ciegos. Parte del plan operativo de materiales ([`PLAN_MEJORAS_OPERATIVAS_PROYECTO.md`](../PLAN_MEJORAS_OPERATIVAS_PROYECTO.md)).
+- **Decisión:**
+  1. `SupplierInvoiceLine.wbsNodeId` (nullable en DB). **Obligatorio en service** cuando `SupplierInvoice.projectId` no es null (mismo espíritu que [D-050] para SC/OC). Facturas corporativas (`projectId` null) **sin** WBS.
+  2. Facturas generadas desde OC copian `wbsNodeId` de la línea de OC.
+  3. Control de costos: si las líneas de factura tienen WBS, imputar `accrued`/`paid` por línea; si no, mantener prorrateo vía OC (legacy).
+  4. `JobsiteLogMaterialUsage.wbsNodeId` opcional. Al aprobar el parte: usar WBS de la línea de material; si falta y hay **exactamente una** partida de progreso en el log, usarla; si hay varias partidas de progreso y el material no trae WBS → **CONFLICT** (no crear consumo sin partida).
+  5. `StockMovement` CONSUMPTION e IN de recepción copian `wbsNodeId` cuando está disponible.
+- **Implicancias:** migración Prisma; validators/UI de factura y libro de obra; board de materiales / R-MAT-01 reciben consumos JL con WBS.
+- **Documentos afectados:** [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) Q-053, [`PLAN_MEJORAS_OPERATIVAS_PROYECTO.md`](../PLAN_MEJORAS_OPERATIVAS_PROYECTO.md), módulos AP / JOBSITE_LOG / cost control.
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

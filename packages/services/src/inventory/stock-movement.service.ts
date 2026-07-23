@@ -259,6 +259,7 @@ export async function createReceiptStockMovement(
     warehouseId: string;
     productId: string;
     projectId: string | null;
+    wbsNodeId?: string | null;
     purchaseReceiptId: string;
     purchaseReceiptLineId: string;
     quantity: Prisma.Decimal;
@@ -274,6 +275,7 @@ export async function createReceiptStockMovement(
       warehouseId: params.warehouseId,
       productId: params.productId,
       projectId: params.projectId,
+      wbsNodeId: params.wbsNodeId ?? null,
       purchaseReceiptId: params.purchaseReceiptId,
       purchaseReceiptLineId: params.purchaseReceiptLineId,
       type: "IN",
@@ -299,6 +301,26 @@ export async function cancelReceiptStockMovements(
   });
 }
 
+/** [D-055] Resolve WBS for a material line that will create stock consumption. */
+export function resolveJobsiteLogMaterialWbs(
+  materialWbsNodeId: string | null | undefined,
+  progressWbsNodeIds: string[],
+): string {
+  if (materialWbsNodeId) return materialWbsNodeId;
+  const unique = [...new Set(progressWbsNodeIds.filter(Boolean))];
+  if (unique.length === 1) return unique[0]!;
+  if (unique.length === 0) {
+    throw new ServiceError(
+      "CONFLICT",
+      "Los materiales con producto requieren partida WBS (indicá la partida en la línea o cargá avance en una sola partida)",
+    );
+  }
+  throw new ServiceError(
+    "CONFLICT",
+    "Hay varias partidas de avance: indicá la partida WBS en cada línea de material con producto",
+  );
+}
+
 /** P-LOG-05 — consumo de inventario al aprobar un parte de obra (idempotente por línea de material). */
 export async function createJobsiteLogMaterialStockMovements(
   tx: TxClient,
@@ -309,10 +331,12 @@ export async function createJobsiteLogMaterialStockMovements(
     tenantId: string;
     companyId: string;
     actorUserId: string;
+    progressWbsNodeIds: string[];
     materials: Array<{
       id: string;
       productId: string | null;
       warehouseId: string | null;
+      wbsNodeId: string | null;
       quantity: Prisma.Decimal;
       description: string;
       notes: string | null;
@@ -342,11 +366,14 @@ export async function createJobsiteLogMaterialStockMovements(
   }
 
   for (const { productId, warehouseId, qty } of qtyByPair.values()) {
-    const balance = await getStockBalance({
-      tenantId: params.tenantId,
-      warehouseId,
-      productId,
-    });
+    const balance = await getStockBalance(
+      {
+        tenantId: params.tenantId,
+        warehouseId,
+        productId,
+      },
+      tx,
+    );
     if (qty.greaterThan(balance)) {
       throw new ServiceError(
         "CONFLICT",
@@ -374,6 +401,14 @@ export async function createJobsiteLogMaterialStockMovements(
       throw new ServiceError("CONFLICT", "El depósito del material no está activo");
     }
 
+    const wbsNodeId = resolveJobsiteLogMaterialWbs(m.wbsNodeId, params.progressWbsNodeIds);
+    if (!m.wbsNodeId) {
+      await tx.jobsiteLogMaterialUsage.update({
+        where: { id: m.id },
+        data: { wbsNodeId },
+      });
+    }
+
     const noteParts = [`Parte de obra`, m.description];
     if (m.notes) noteParts.push(m.notes);
 
@@ -384,6 +419,7 @@ export async function createJobsiteLogMaterialStockMovements(
         warehouseId: m.warehouseId,
         productId: m.productId,
         projectId: params.projectId,
+        wbsNodeId,
         type: "OUT",
         sourceType: "CONSUMPTION",
         sourceId: m.id,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,13 +18,26 @@ import { createPurchaseRequestAction } from "@/app/(app)/proyectos/[id]/solicitu
 interface PurchaseRequestFormProps {
   projectId: string;
   wbsOptions: WbsOption[];
+  initialLine?: {
+    wbsNodeId?: string;
+    description?: string;
+    quantity?: string;
+    productId?: string;
+  };
+  /** When true, show banner that fields came from materiales board. */
+  prefilledFromMaterials?: boolean;
 }
 
-export function PurchaseRequestForm({ projectId, wbsOptions }: PurchaseRequestFormProps) {
+export function PurchaseRequestForm({
+  projectId,
+  wbsOptions,
+  initialLine,
+  prefilledFromMaterials = false,
+}: PurchaseRequestFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [wbsNodeId, setWbsNodeId] = useState<string>("");
+  const [wbsNodeId, setWbsNodeId] = useState<string>(initialLine?.wbsNodeId ?? "");
 
   const wbsComboboxOptions = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
   const selectedWbs = wbsOptions.find((w) => w.id === wbsNodeId);
@@ -47,6 +61,7 @@ export function PurchaseRequestForm({ projectId, wbsOptions }: PurchaseRequestFo
                 {
                   wbsNodeId,
                   lineType: "MATERIAL",
+                  productId: initialLine?.productId ?? null,
                   description: fd.get("description")?.toString() ?? "",
                   unit: fd.get("unit")?.toString() ?? "u",
                   quantity: fd.get("quantity")?.toString() ?? "1",
@@ -63,19 +78,38 @@ export function PurchaseRequestForm({ projectId, wbsOptions }: PurchaseRequestFo
           });
         }}
       >
-        {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
-        )}
+        {prefilledFromMaterials ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+            Prefill desde Materiales (faltante). Revisá cantidad y partida antes de crear.
+          </p>
+        ) : null}
+
+        {error ? (
+          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
 
         <div className="space-y-2">
           <Label htmlFor="description">Descripción</Label>
-          <Input id="description" name="description" required />
+          <Input
+            id="description"
+            name="description"
+            required
+            defaultValue={initialLine?.description ?? ""}
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="quantity">Cantidad</Label>
-            <Input id="quantity" name="quantity" defaultValue="1" required />
+            <Input
+              id="quantity"
+              name="quantity"
+              inputMode="decimal"
+              defaultValue={initialLine?.quantity ?? "1"}
+              required
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="unit">Unidad</Label>
@@ -84,13 +118,14 @@ export function PurchaseRequestForm({ projectId, wbsOptions }: PurchaseRequestFo
         </div>
 
         <div className="space-y-2">
-          <Label>Ítem WBS (obligatorio)</Label>
+          <Label htmlFor="pr-wbs">Ítem WBS (obligatorio)</Label>
           {wbsOptions.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No hay ítems WBS en presupuestos aprobados/cerrados.
             </p>
           ) : (
             <SearchableCombobox
+              id="pr-wbs"
               popoverWidth="wide"
               options={wbsComboboxOptions}
               value={wbsNodeId}
@@ -99,14 +134,19 @@ export function PurchaseRequestForm({ projectId, wbsOptions }: PurchaseRequestFo
               searchPlaceholder="Buscar partida…"
             />
           )}
-          {selectedWbs?.budgetUnitCost != null && (
+          {selectedWbs?.budgetUnitCost != null ? (
             <p className="text-xs text-muted-foreground">
               Costo ref. materiales: {formatDecimalAr(Number(selectedWbs.budgetUnitCost))}
               {selectedWbs.availableSaldo != null
                 ? ` · Saldo disponible: ${formatDecimalAr(Number(selectedWbs.availableSaldo))}`
                 : ""}
             </p>
-          )}
+          ) : null}
+          {selectedWbs?.wouldExceedBudget ? (
+            <p className="text-xs text-destructive">
+              Este ítem ya está cerca o por encima del saldo disponible.
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-2">
@@ -119,9 +159,14 @@ export function PurchaseRequestForm({ projectId, wbsOptions }: PurchaseRequestFo
           <Textarea id="notes" name="notes" rows={3} />
         </div>
 
-        <Button type="submit" disabled={pending || wbsOptions.length === 0}>
-          {pending ? "Guardando…" : "Crear solicitud"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" disabled={pending || wbsOptions.length === 0}>
+            {pending ? "Guardando…" : "Crear solicitud"}
+          </Button>
+          <Button type="button" variant="ghost" asChild>
+            <Link href={`/proyectos/${projectId}/solicitudes-compra`}>Cancelar</Link>
+          </Button>
+        </div>
       </form>
     </div>
   );

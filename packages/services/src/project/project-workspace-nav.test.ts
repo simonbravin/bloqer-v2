@@ -16,41 +16,42 @@ test("project nav labels cost control as EDT y costos under Planificación", () 
   assert.equal(edt!.href, "/proyectos/proj-1/control-costos");
 });
 
-test("project nav includes Recepciones under Operación for procurement viewers", () => {
+test("project nav includes Compras section with hub, SC, OC and Recepciones", () => {
   const sections = buildProjectWorkspaceNavSections("proj-1", allOnGate, ["PROJECT_MANAGER"]);
-  const operacion = sections.find((s) => s.title === "Operación");
-  assert.ok(operacion);
-  const recepciones = operacion!.items.find((i) => i.label === "Recepciones");
-  assert.ok(recepciones);
-  assert.equal(recepciones!.href, "/proyectos/proj-1/recepciones");
+  const compras = sections.find((s) => s.title === "Compras");
+  assert.ok(compras);
+  assert.equal(
+    compras!.items.find((i) => i.label === "Tablero de compras")!.href,
+    "/proyectos/proj-1/compras",
+  );
+  assert.ok(compras!.items.some((i) => i.label === "Solicitudes de compra"));
+  assert.ok(compras!.items.some((i) => i.label === "Órdenes de compra"));
+  assert.ok(compras!.items.some((i) => i.label === "Recepciones"));
 });
 
-test("project nav does not place Recepciones under Finanzas del proyecto", () => {
+test("project nav does not place Recepciones or SC under Finanzas del proyecto", () => {
   const sections = buildProjectWorkspaceNavSections("proj-1", allOnGate, ["PROJECT_MANAGER"]);
   const finanzas = sections.find((s) => s.title === "Finanzas del proyecto");
   assert.ok(finanzas);
-  assert.equal(
-    finanzas!.items.some((i) => i.label === "Recepciones"),
-    false,
-  );
+  assert.equal(finanzas!.items.some((i) => i.label === "Recepciones"), false);
+  assert.equal(finanzas!.items.some((i) => i.label === "Solicitudes de compra"), false);
+  assert.equal(finanzas!.items.some((i) => i.label === "Órdenes de compra"), false);
 });
 
-test("project nav hides Recepciones when PROCUREMENT module is off", () => {
+test("project nav hides Compras when PROCUREMENT module is off", () => {
   const gate: TenantModuleGate = {
     isEnabled: (m) => m !== "PROCUREMENT",
   };
   const sections = buildProjectWorkspaceNavSections("proj-1", gate, ["PROJECT_MANAGER"]);
-  const operacion = sections.find((s) => s.title === "Operación");
-  assert.equal(operacion?.items.some((i) => i.label === "Recepciones") ?? false, false);
+  assert.equal(sections.some((s) => s.title === "Compras"), false);
 });
 
-test("project nav includes Consumos under Operación for inventory viewers", () => {
+test("project nav includes Materiales and Consumos under Operación", () => {
   const sections = buildProjectWorkspaceNavSections("proj-1", allOnGate, ["PROJECT_MANAGER"]);
   const operacion = sections.find((s) => s.title === "Operación");
   assert.ok(operacion);
-  const consumos = operacion!.items.find((i) => i.label === "Consumos");
-  assert.ok(consumos);
-  assert.equal(consumos!.href, "/proyectos/proj-1/consumos");
+  assert.equal(operacion!.items.find((i) => i.label === "Materiales")!.href, "/proyectos/proj-1/materiales");
+  assert.equal(operacion!.items.find((i) => i.label === "Consumos")!.href, "/proyectos/proj-1/consumos");
 });
 
 test("project nav hides Consumos when INVENTORY module is off", () => {

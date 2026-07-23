@@ -8,7 +8,15 @@ import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { getCurrentUser } from "@/lib/auth";
 import { StockMovementList } from "@/features/inventory";
 import { can } from "@bloqer/domain";
-import { getProjectShellInfo, listStockMovements, ServiceError } from "@bloqer/services";
+import {
+  canViewProcurementProjectArea,
+  canViewProjectCostControlReport,
+  canViewPurchaseRequests,
+  getProjectShellInfo,
+  getTenantModuleGate,
+  listStockMovements,
+  ServiceError,
+} from "@bloqer/services";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -45,6 +53,14 @@ export default async function ProyectoConsumosPage({ params }: PageProps) {
     throw err;
   }
   const canCreateConsumption = can(current.tenantCtx.roles, "EDIT", "INVENTORY");
+  const gate = await getTenantModuleGate(ctx);
+  const showMateriales =
+    gate.isEnabled("PROJECTS") &&
+    gate.isEnabled("BUDGETS") &&
+    (canViewProjectCostControlReport(ctx.roles) || can(ctx.roles, "VIEW", "PROJECTS"));
+  const showCompras =
+    gate.isEnabled("PROCUREMENT") &&
+    (canViewProcurementProjectArea(ctx.roles) || canViewPurchaseRequests(ctx.roles));
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -52,11 +68,23 @@ export default async function ProyectoConsumosPage({ params }: PageProps) {
         title="Consumos del proyecto"
         subtitle={`${movements.length} ${movements.length === 1 ? "consumo confirmado" : "consumos confirmados"}`}
         actions={
-          canCreateConsumption ? (
-            <Button asChild>
-              <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar consumo</Link>
-            </Button>
-          ) : null
+          <div className="flex flex-wrap gap-2">
+            {showMateriales ? (
+              <Button asChild variant="outline">
+                <Link href={`/proyectos/${id}/materiales`}>Materiales</Link>
+              </Button>
+            ) : null}
+            {showCompras ? (
+              <Button asChild variant="outline">
+                <Link href={`/proyectos/${id}/compras`}>Tablero de compras</Link>
+              </Button>
+            ) : null}
+            {canCreateConsumption ? (
+              <Button asChild>
+                <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar consumo</Link>
+              </Button>
+            ) : null}
+          </div>
         }
       />
 

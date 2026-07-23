@@ -32,6 +32,7 @@ type Props = {
   canSubcontractReports: boolean;
   canCashFlow: boolean;
   canProfitability: boolean;
+  /** @deprecated Materials board uses canCostReports; kept optional for call-site compat. */
   canInventoryReports?: boolean;
 };
 
@@ -45,7 +46,6 @@ export function ReportsHub({
   canSubcontractReports,
   canCashFlow,
   canProfitability,
-  canInventoryReports = false,
 }: Props) {
   const base = `/proyectos/${projectId}/reportes`;
 
@@ -81,11 +81,13 @@ export function ReportsHub({
       available: canProcurementReports,
     },
     {
-      title: "Materiales (stock)",
-      description: "Consumo de inventario vs baseline MATERIAL; líneas APU sin producto.",
-      href: `${base}/materiales`,
+      title: "Materiales",
+      description:
+        "Cobertura APU vs pedido/recibido/consumido y varianza $ por partida (tablero operativo).",
+      href: `/proyectos/${projectId}/materiales`,
       icon: <Package className="h-5 w-5" />,
-      available: canInventoryReports && canCostReports,
+      // Same gate as /materiales (cost-control / budgets) — inventory optional for cobertura.
+      available: canCostReports,
     },
     {
       title: "Subcontratos",

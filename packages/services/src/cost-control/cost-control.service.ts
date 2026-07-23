@@ -376,7 +376,10 @@ export async function getProjectCostControl(
             purchaseOrderId: null, subcontractCertificationId: null,
             ...(dateWhere(dateFrom, dateTo) ? { issueDate: dateWhere(dateFrom, dateTo) } : {}),
           },
-          select: { totalAmount: true },
+          select: {
+            totalAmount: true,
+            lines: { select: { wbsNodeId: true, lineTotal: true } },
+          },
         })
       : Promise.resolve([]),
     incAp
@@ -394,6 +397,7 @@ export async function getProjectCostControl(
                     id: true, totalAmount: true,
                     purchaseOrderId: true, subcontractCertificationId: true,
                     purchaseOrder: { select: { totalAmount: true, lines: { select: { wbsNodeId: true, lineTotal: true } } } },
+                    lines: { select: { wbsNodeId: true, lineTotal: true } },
                   },
                 },
               },
@@ -547,12 +551,31 @@ export async function getProjectCostControl(
     }
   }
 
-  // F. Unallocated invoices (no PO, no sub cert)
+  // F. Direct project invoices (no PO, no sub cert) — prefer line WBS ([D-055])
   for (const inv of unallocatedInvoices) {
-    unalloc.accruedCost = unalloc.accruedCost.add(inv.totalAmount);
+    const linesWithWbs = inv.lines.filter((l) => l.wbsNodeId);
+    if (linesWithWbs.length > 0) {
+      for (const line of linesWithWbs) {
+        const wbsId = line.wbsNodeId!;
+        if (wbsNodeIds.has(wbsId)) {
+          add(accMap, wbsId, "accruedCost", new Prisma.Decimal(line.lineTotal));
+        } else {
+          unalloc.accruedCost = unalloc.accruedCost.add(line.lineTotal);
+        }
+      }
+      const linesWithoutWbs = inv.lines.filter((l) => !l.wbsNodeId);
+      for (const line of linesWithoutWbs) {
+        unalloc.accruedCost = unalloc.accruedCost.add(line.lineTotal);
+      }
+    } else {
+      unalloc.accruedCost = unalloc.accruedCost.add(inv.totalAmount);
+    }
   }
-  if (unallocatedInvoices.length > 0) {
-    warnings.push(`${unallocatedInvoices.length} factura(s) de proveedor sin OC ni certificación de subcontrato vinculada — costo no asignado a WBS.`);
+  const unallocWithoutLineWbs = unallocatedInvoices.filter(
+    (inv) => inv.lines.every((l) => !l.wbsNodeId),
+  );
+  if (unallocWithoutLineWbs.length > 0) {
+    warnings.push(`${unallocWithoutLineWbs.length} factura(s) de proveedor sin OC ni WBS en líneas — costo no asignado a WBS.`);
   }
 
   // G. Paid cost (CONFIRMED payments, proportional WBS allocation via invoice chain)
@@ -577,6 +600,14 @@ export async function getProjectCostControl(
       for (const f of fracs) {
         const share = f.fraction.mul(pmt.amount);
         if (f.wbsNodeId && wbsNodeIds.has(f.wbsNodeId)) add(accMap, f.wbsNodeId, "paidCost", share);
+        else unalloc.paidCost = unalloc.paidCost.add(share);
+      }
+    } else if (inv.lines?.some((l) => l.wbsNodeId)) {
+      const lineTotal = inv.lines.reduce((s, l) => s.add(l.lineTotal), ZERO);
+      if (lineTotal.isZero()) { unalloc.paidCost = unalloc.paidCost.add(pmt.amount); continue; }
+      for (const line of inv.lines) {
+        const share = new Prisma.Decimal(line.lineTotal).div(lineTotal).mul(pmt.amount);
+        if (line.wbsNodeId && wbsNodeIds.has(line.wbsNodeId)) add(accMap, line.wbsNodeId, "paidCost", share);
         else unalloc.paidCost = unalloc.paidCost.add(share);
       }
     } else {

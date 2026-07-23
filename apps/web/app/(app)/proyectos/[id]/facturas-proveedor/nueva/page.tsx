@@ -8,6 +8,7 @@ import {
   getTenantModuleGate,
   listContacts,
   listLinkablePurchaseOrders,
+  listProcurementWbsOptions,
   listTreasuryAccounts,
   ServiceError,
 } from "@bloqer/services";
@@ -37,10 +38,12 @@ export default async function NuevaFacturaProveedorPage({ params, searchParams }
 
   let suppliersResult;
   let linkablePOs;
+  let wbsNodes;
   try {
-    [suppliersResult, linkablePOs] = await Promise.all([
+    [suppliersResult, linkablePOs, wbsNodes] = await Promise.all([
       listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
       listLinkablePurchaseOrders(id, ctx),
+      listProcurementWbsOptions(id, ctx),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
@@ -57,6 +60,12 @@ export default async function NuevaFacturaProveedorPage({ params, searchParams }
     code: po.code,
     supplierContactId: po.supplierContactId,
     currency: po.currency,
+  }));
+
+  const wbsOptions = wbsNodes.map((n) => ({
+    id: n.id,
+    code: n.code,
+    name: n.name,
   }));
 
   let treasuryAccounts: TreasuryAccountOption[] = [];
@@ -91,6 +100,7 @@ export default async function NuevaFacturaProveedorPage({ params, searchParams }
         projectId={id}
         suppliers={suppliers}
         poOptions={poOptions}
+        wbsOptions={wbsOptions}
         treasuryAccounts={treasuryAccounts}
         canPayNow={canPayNow}
         storageConfigured={isStorageConfigured()}

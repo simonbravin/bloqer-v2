@@ -223,7 +223,7 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
     where: { id },
     include: {
       lines: {
-        include: { purchaseOrderLine: { select: { productId: true, unitPrice: true } } },
+        include: { purchaseOrderLine: { select: { productId: true, unitPrice: true, wbsNodeId: true } } },
       },
     },
   });
@@ -257,6 +257,7 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
           warehouseId:           existing.warehouseId,
           productId,
           projectId:             existing.projectId ?? null,
+          wbsNodeId:             line.purchaseOrderLine.wbsNodeId,
           purchaseReceiptId:     existing.id,
           purchaseReceiptLineId: line.id,
           quantity:              line.quantityReceived,

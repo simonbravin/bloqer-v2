@@ -16,15 +16,43 @@ import {
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
+const PO_STATUS_FILTERS = [
+  "DRAFT",
+  "SUBMITTED",
+  "APPROVED",
+  "CONFIRMED",
+  "PARTIALLY_RECEIVED",
+  "RECEIVED",
+  "CANCELLED",
+] as const;
+
+type PoStatusFilter = (typeof PO_STATUS_FILTERS)[number];
+
+const STATUS_LABELS: Record<PoStatusFilter, string> = {
+  DRAFT: "borrador (por enviar)",
+  SUBMITTED: "enviadas (por aprobar)",
+  APPROVED: "aprobadas (por confirmar)",
+  CONFIRMED: "confirmadas",
+  PARTIALLY_RECEIVED: "parcialmente recibidas",
+  RECEIVED: "recibidas",
+  CANCELLED: "canceladas",
+};
+
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ status?: string; view?: string }>;
 }
 
-export default async function OrdenesCompraPage({ params }: PageProps) {
+export default async function OrdenesCompraPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id } = await params;
+  const sp = await searchParams;
+  const statusFilter = PO_STATUS_FILTERS.includes(sp.status as PoStatusFilter)
+    ? (sp.status as PoStatusFilter)
+    : undefined;
+
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -62,30 +90,52 @@ export default async function OrdenesCompraPage({ params }: PageProps) {
     status: o.status,
   }));
 
+  const filtered = statusFilter ? items.filter((o) => o.status === statusFilter) : items;
+  const listHref = `/proyectos/${id}/ordenes-compra`;
+
+  const subtitle = statusFilter
+    ? `${filtered.length} ${STATUS_LABELS[statusFilter]}`
+    : `${items.length} ${items.length === 1 ? "orden" : "órdenes"}`;
+
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Órdenes de compra"
-        subtitle={`${items.length} ${items.length === 1 ? "orden" : "órdenes"}`}
+        subtitle={subtitle}
         actions={
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <Suspense fallback={null}>
               <ListViewToggle storageKey={`ordenes-compra-${id}`} />
             </Suspense>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/proyectos/${id}/compras`}>Tablero de compras</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
               <Link href={`/proyectos/${id}/solicitudes-compra`}>Solicitudes</Link>
             </Button>
-            {canCreatePo && (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/proyectos/${id}/recepciones`}>Recepciones</Link>
+            </Button>
+            {canCreatePo ? (
               <Button asChild>
                 <Link href={`/proyectos/${id}/ordenes-compra/nueva`}>Nueva OC</Link>
               </Button>
-            )}
-          </>
+            ) : null}
+          </div>
         }
       />
 
+      {statusFilter ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+          <span>Filtro activo: {STATUS_LABELS[statusFilter]}.</span>
+          <Button asChild variant="link" size="sm" className="h-auto p-0">
+            <Link href={listHref}>Ver todas</Link>
+          </Button>
+        </div>
+      ) : null}
+
       <Suspense fallback={<ListSectionSkeleton />}>
-        <PurchaseOrderListSection orders={items} projectId={id} />
+        <PurchaseOrderListSection orders={filtered} projectId={id} />
       </Suspense>
     </PageShell>
   );

@@ -62,9 +62,13 @@ export function buildProjectWorkspaceNavSections(
   if (gate.isEnabled("CERTIFICATIONS") && can(roles, "VIEW", "CERTIFICATIONS")) {
     operacion.push({ label: "Certificaciones", href: `${base}/certificaciones` });
   }
-  // Recepciones: operación/compras (no finanzas). Misma visibilidad que OC.
-  if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) {
-    operacion.push({ label: "Recepciones", href: `${base}/recepciones` });
+  // Same gate as getProjectMaterialsBoard (cost-control / VIEW PROJECTS) — avoid nav → FORBIDDEN.
+  if (
+    gate.isEnabled("PROJECTS") &&
+    gate.isEnabled("BUDGETS") &&
+    (canViewProjectCostControlReport(roles) || can(roles, "VIEW", "PROJECTS"))
+  ) {
+    operacion.push({ label: "Materiales", href: `${base}/materiales` });
   }
   if (gate.isEnabled("INVENTORY") && can(roles, "VIEW", "INVENTORY")) {
     operacion.push({ label: "Inventario", href: `${base}/inventario` });
@@ -75,18 +79,26 @@ export function buildProjectWorkspaceNavSections(
   }
   if (operacion.length) sections.push({ title: "Operación", items: operacion });
 
+  const compras: ProjectWorkspaceNavLink[] = [];
+  if (gate.isEnabled("PROCUREMENT") && (canViewProcurementProjectArea(roles) || canViewPurchaseRequests(roles))) {
+    // Parallel to "Tablero de finanzas" — avoid label collision with section title "Compras".
+    compras.push({ label: "Tablero de compras", href: `${base}/compras`, matchExact: true });
+  }
+  if (gate.isEnabled("PROCUREMENT") && canViewPurchaseRequests(roles)) {
+    compras.push({ label: "Solicitudes de compra", href: `${base}/solicitudes-compra` });
+  }
+  if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) {
+    compras.push({ label: "Órdenes de compra", href: `${base}/ordenes-compra` });
+    compras.push({ label: "Recepciones", href: `${base}/recepciones` });
+  }
+  if (compras.length) sections.push({ title: "Compras", items: compras });
+
   const finanzasProyecto: ProjectWorkspaceNavLink[] = [];
   if (canShowProjectFinanzasNavLink(gate, roles)) {
     finanzasProyecto.push({ label: "Tablero de finanzas", href: `${base}/finanzas` });
   }
   if (gate.isEnabled("PROJECTS") && canViewProjectCashFlowReport(roles)) {
     finanzasProyecto.push({ label: "Flujo de caja", href: `${base}/flujo-caja` });
-  }
-  if (gate.isEnabled("PROCUREMENT") && canViewPurchaseRequests(roles)) {
-    finanzasProyecto.push({ label: "Solicitudes de compra", href: `${base}/solicitudes-compra` });
-  }
-  if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) {
-    finanzasProyecto.push({ label: "Órdenes de compra", href: `${base}/ordenes-compra` });
   }
   if (gate.isEnabled("SUBCONTRACTS") && (can(roles, "VIEW", "SUBCONTRACTS") || can(roles, "VIEW", "PROJECTS"))) {
     finanzasProyecto.push({ label: "Subcontratos", href: `${base}/subcontratos` });

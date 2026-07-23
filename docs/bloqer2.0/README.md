@@ -265,6 +265,13 @@ Leer en este orden:
 
 *(Índice narrado: [`08-architecture/README.md`](./08-architecture/README.md).)*
 
+### Planes de mejora (trabajo en curso)
+
+| Archivo | Propósito |
+|---|---|
+| [`PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md`](./PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md) | Higiene, nav, exports (lotes 1–4 hechos) |
+| [`PLAN_MEJORAS_OPERATIVAS_PROYECTO.md`](./PLAN_MEJORAS_OPERATIVAS_PROYECTO.md) | Hub compras, materiales look-ahead, integridad WBS ([D-055]) |
+
 ---
 
 ## 5. Convenciones del documento

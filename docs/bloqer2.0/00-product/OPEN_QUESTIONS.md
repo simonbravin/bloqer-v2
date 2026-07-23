@@ -452,13 +452,9 @@
 ### Q-053 — Cost code / WBS en líneas de factura de proveedor (gasto manual)
 
 - **Categoría:** Costos / AP
-- **Estado:** ABIERTA
-- **Contexto:** `SupplierInvoiceLine` no tiene `wbsNodeId`. Un gasto de proyecto sin OC no imputa a ítem de presupuesto; el presupuesto-vs-real por partida queda ciego a esos egresos ([COST_FORMULAS §1.4/§3](../04-formulas/COST_FORMULAS.md)). Detectado al alinear AP con Procore ([D-052]).
-- **Opciones tentativas:**
-  1. Agregar `wbsNodeId` opcional/obligatorio en líneas de factura de proyecto.
-  2. Exigir OC vinculada para gastos de obra (sin gasto manual libre).
-  3. Imputar solo a nivel proyecto (status quo) y aceptar pérdida de granularidad.
-- **Bloquea:** reporting de costo real por ítem para gastos directos sin OC. Alta prioridad post [D-052].
+- **Estado:** CERRADA — ver [D-055](./DECISION_LOG.md#d-055--wbs-en-líneas-de-factura-de-proveedor-de-proyecto-y-consumo-jl)
+- **Contexto:** `SupplierInvoiceLine` no tenía `wbsNodeId`. Un gasto de proyecto sin OC no imputaba a ítem de presupuesto.
+- **Decisión:** opción 1 — `wbsNodeId` obligatorio en líneas de factura **con proyecto**; corporativo sin WBS. Consumos de libro de obra también imputan WBS al crear `StockMovement` CONSUMPTION.
 
 ### Q-054 — Método de pago y referencia/comprobante en Payment / Collection
 

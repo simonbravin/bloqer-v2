@@ -15,6 +15,8 @@ const supplierInvoiceLineSchema = z.object({
   unitPrice:   moneyAmountString,
   taxRate:     ratePctString.optional().default("0.0000"),
   sortOrder:   z.number().int().min(0).optional().default(0),
+  /** Required when invoice has projectId ([D-055]). */
+  wbsNodeId:   z.string().uuid().optional().nullable(),
 });
 
 /** projectId null/omit = company-level AP (Phase 16B). Project routes must still pass projectId from URL. */

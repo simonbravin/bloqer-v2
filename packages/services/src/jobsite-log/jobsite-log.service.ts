@@ -71,6 +71,7 @@ export type JobsiteLogLaborView = {
 export type JobsiteLogMaterialView = {
   id:           string;
   jobsiteLogId: string;
+  wbsNodeId:    string | null;
   productId:    string | null;
   warehouseId:  string | null;
   description:  string;
@@ -171,7 +172,8 @@ type LogWithRelations = JobsiteLog & {
     subcontract: { number: number } | null;
   }>;
   materials: Array<{
-    id: string; jobsiteLogId: string; productId: string | null; warehouseId: string | null;
+    id: string; jobsiteLogId: string; wbsNodeId: string | null;
+    productId: string | null; warehouseId: string | null;
     description: string; quantity: Prisma.Decimal; notes: string | null; sortOrder: number;
     product: { name: string } | null;
     warehouse: { name: string } | null;
@@ -204,7 +206,8 @@ function serializeLog(l: LogWithRelations): JobsiteLogView {
       subcontractCode: lb.subcontract ? `SC-${String(lb.subcontract.number).padStart(3, "0")}` : null,
     })),
     materials: l.materials.map((m) => ({
-      id: m.id, jobsiteLogId: m.jobsiteLogId, productId: m.productId, warehouseId: m.warehouseId,
+      id: m.id, jobsiteLogId: m.jobsiteLogId, wbsNodeId: m.wbsNodeId,
+      productId: m.productId, warehouseId: m.warehouseId,
       description: m.description, quantity: m.quantity.toString(),
       notes: m.notes, sortOrder: m.sortOrder,
       productName: m.product?.name ?? null,
@@ -302,8 +305,8 @@ export async function getWbsCumulativePhysicalPct(
 
 
 async function assertWbsBelongsToProject(wbsNodeId: string, projectId: string, tenantId: string) {
-  const wbs = await prisma.wbsNode.findUnique({
-    where: { id: wbsNodeId },
+  const wbs = await prisma.wbsNode.findFirst({
+    where: { id: wbsNodeId, budget: { tenantId } },
     include: { budget: { select: { projectId: true, tenantId: true } } },
   });
   if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo WBS no encontrado: ${wbsNodeId}`);
@@ -345,6 +348,9 @@ async function validateJobsiteLogBusinessRules(
   }
 
   for (const m of input.materials ?? []) {
+    if (m.wbsNodeId) {
+      await assertWbsBelongsToProject(m.wbsNodeId, projectId, tenantId);
+    }
     if (m.productId) {
       const product = await prisma.product.findUnique({ where: { id: m.productId } });
       if (!product || product.tenantId !== tenantId) throw new ServiceError("NOT_FOUND", "Producto no encontrado");
@@ -439,6 +445,7 @@ async function validateJobsiteLogFromDb(
         select: {
           productId: true,
           warehouseId: true,
+          wbsNodeId: true,
           description: true,
           quantity: true,
           notes: true,
@@ -482,6 +489,7 @@ async function validateJobsiteLogFromDb(
       materials: existing.materials.map((m) => ({
         productId: m.productId,
         warehouseId: m.warehouseId,
+        wbsNodeId: m.wbsNodeId,
         description: m.description,
         quantity: m.quantity.toString(),
         notes: m.notes,
@@ -538,6 +546,7 @@ async function writeChildren(
     await tx.jobsiteLogMaterialUsage.create({
       data: {
         jobsiteLogId: logId,
+        wbsNodeId:    m.wbsNodeId ?? null,
         productId:    m.productId ?? null,
         warehouseId:  m.warehouseId ?? null,
         description:  m.description,
@@ -1010,7 +1019,7 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
     if (gate.isEnabled("INVENTORY")) {
       const logWithMaterials = await tx.jobsiteLog.findUniqueOrThrow({
         where: { id },
-        include: { materials: true },
+        include: { materials: true, progress: { select: { wbsNodeId: true } } },
       });
       stockMovementsCreated = await createJobsiteLogMaterialStockMovements(tx, {
         jobsiteLogId: id,
@@ -1019,6 +1028,7 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
         tenantId:     ctx.tenantId,
         companyId:    existing.companyId,
         actorUserId:  ctx.actorUserId,
+        progressWbsNodeIds: logWithMaterials.progress.map((p) => p.wbsNodeId),
         materials:    logWithMaterials.materials,
       });
     }

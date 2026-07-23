@@ -19,6 +19,7 @@ const sampleLine: PoLineForInvoiceDraft = {
   orderQuantity: "10",
   receivedQuantity: "5",
   lineTotal: "1210",
+  wbsNodeId: "wbs-1",
 };
 
 test("buildAutoFromPoInternalNotes includes receipt when provided", () => {

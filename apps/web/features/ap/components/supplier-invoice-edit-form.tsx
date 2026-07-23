@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox, SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/components/ui/searchable-combobox";
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
-import type { InvoiceLine } from "./invoice-lines-editor";
+import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { updateSupplierInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
 import type { SupplierInvoiceView } from "@bloqer/services";
 import type { SupplierOption, POOption } from "./supplier-invoice-form";
@@ -18,13 +18,20 @@ interface Props {
   invoice: SupplierInvoiceView;
   suppliers: SupplierOption[];
   poOptions?: POOption[];
+  wbsOptions?: InvoiceWbsOption[];
 }
 
 function toDateStr(d: Date | string): string {
   return d instanceof Date ? d.toISOString().split("T")[0] : String(d).split("T")[0];
 }
 
-export function SupplierInvoiceEditForm({ projectId, invoice, suppliers, poOptions = [] }: Props) {
+export function SupplierInvoiceEditForm({
+  projectId,
+  invoice,
+  suppliers,
+  poOptions = [],
+  wbsOptions = [],
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -49,14 +56,19 @@ export function SupplierInvoiceEditForm({ projectId, invoice, suppliers, poOptio
           quantity:    l.quantity,
           unitPrice:   l.unitPrice,
           taxRate:     l.taxRate,
+          wbsNodeId:   l.wbsNodeId,
         }))
-      : [{ description: "", quantity: "1", unitPrice: "", taxRate: "21" }],
+      : [{ description: "", quantity: "1", unitPrice: "", taxRate: "21", wbsNodeId: null }],
   );
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {
       setError("Completar descripción, cantidad y precio en todas las líneas");
+      return;
+    }
+    if (lines.some((l) => !l.wbsNodeId)) {
+      setError("Cada línea debe imputar a una partida EDT");
       return;
     }
     const fd = new FormData(e.currentTarget);
@@ -130,7 +142,12 @@ export function SupplierInvoiceEditForm({ projectId, invoice, suppliers, poOptio
 
         <hr />
 
-        <InvoiceLinesEditor lines={lines} onChange={setLines} />
+        <InvoiceLinesEditor
+          lines={lines}
+          onChange={setLines}
+          requireWbs
+          wbsOptions={wbsOptions}
+        />
 
         <hr />
 

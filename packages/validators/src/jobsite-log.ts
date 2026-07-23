@@ -25,6 +25,8 @@ const laborLineSchema = z.object({
 const materialLineSchema = z.object({
   productId:   z.string().uuid().optional().nullable(),
   warehouseId: z.string().uuid().optional().nullable(),
+  /** Preferred for inventory consumption imputation ([D-055]). */
+  wbsNodeId:   z.string().uuid().optional().nullable(),
   description: z.string().min(1, "La descripción es requerida"),
   quantity:    decimalString,
   notes:       z.string().optional().nullable(),

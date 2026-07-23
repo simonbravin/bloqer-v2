@@ -44,8 +44,8 @@
 | R-SCC-02 | Contratado vs certificado | OP | Por `Subcontract` y por partida SUB del APU | 1 | Sí |
 | R-SUB-01 | Brecha SUB sin contrato | OP | Partidas con APU sub y sin `Subcontract` ACTIVE; wizard desde reporte | 1 | Completo |
 | R-SUB-02 | Varianza SUB por partida | OP | Presup. sub vs contratado / certificado | 1 | Sí |
-| R-MAT-01 | Consumo vs presupuesto material | INV / OP | Consumo/stock vs baseline MAT | 2 | Completo |
-| R-MAT-02 | APU material sin producto | INV | Líneas MAT sin `product_id` | 2 | Completo |
+| R-MAT-01 | Consumo vs presupuesto material | INV / OP | Consumo/stock vs baseline MAT | 2 | Completo — UI `/proyectos/[id]/materiales?tab=varianza` |
+| R-MAT-02 | APU material sin producto | INV | Líneas MAT sin `product_id` | 2 | Completo — misma página materiales |
 
 ### Hub caja y rentabilidad (Phase E)
 

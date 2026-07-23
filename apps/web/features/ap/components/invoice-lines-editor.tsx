@@ -18,12 +18,24 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatDecimalArFromString } from "@/lib/format-money";
+import {
+  SearchableCombobox,
+  SEARCHABLE_NONE,
+  wbsToSearchableOptions,
+} from "@/components/ui/searchable-combobox";
 
 export type InvoiceLine = {
   description: string;
   quantity: string;
   unitPrice: string;
   taxRate: string;
+  wbsNodeId?: string | null;
+};
+
+export type InvoiceWbsOption = {
+  id: string;
+  code: string;
+  name: string;
 };
 
 function safeDecimal(v: string): string {
@@ -46,16 +58,29 @@ function linePreview(l: InvoiceLine) {
 interface Props {
   lines: InvoiceLine[];
   onChange: (lines: InvoiceLine[]) => void;
+  /** When set, each line must pick a WBS ITEM ([D-055]). */
+  requireWbs?: boolean;
+  wbsOptions?: InvoiceWbsOption[];
 }
 
-export function InvoiceLinesEditor({ lines, onChange }: Props) {
-  function update(i: number, field: keyof InvoiceLine, value: string) {
-    const next = lines.map((l, idx) => idx === i ? { ...l, [field]: value } : l);
+export function InvoiceLinesEditor({
+  lines,
+  onChange,
+  requireWbs = false,
+  wbsOptions = [],
+}: Props) {
+  const wbsCombobox = wbsToSearchableOptions(wbsOptions);
+
+  function update(i: number, field: keyof InvoiceLine, value: string | null) {
+    const next = lines.map((l, idx) => (idx === i ? { ...l, [field]: value } : l));
     onChange(next);
   }
 
   function addLine() {
-    onChange([...lines, { description: "", quantity: "1", unitPrice: "", taxRate: "21" }]);
+    onChange([
+      ...lines,
+      { description: "", quantity: "1", unitPrice: "", taxRate: "21", wbsNodeId: null },
+    ]);
   }
 
   function removeLine(i: number) {
@@ -88,6 +113,7 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
         <Table className="min-w-[44rem]">
           <TableHeader>
             <TableRow>
+              {requireWbs ? <TableHead className="min-w-[12rem]">Partida EDT</TableHead> : null}
               <TableHead className="min-w-[14rem]">Descripción</TableHead>
               <TableHead className="min-w-[5rem] w-[5.5rem]">Cant.</TableHead>
               <TableHead className="min-w-[7rem] w-[7.5rem]">Precio unit.</TableHead>
@@ -103,6 +129,21 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
               const p = linePreview(line);
               return (
                 <TableRow key={i} className="align-top">
+                  {requireWbs ? (
+                    <TableCell className="min-w-[12rem] py-2">
+                      <SearchableCombobox
+                        options={wbsCombobox}
+                        value={line.wbsNodeId ?? ""}
+                        onValueChange={(v) =>
+                          update(i, "wbsNodeId", !v || v === SEARCHABLE_NONE ? null : v)
+                        }
+                        placeholder="Partida…"
+                        searchPlaceholder="Buscar partida…"
+                        emptyText="Sin partidas"
+                        className="h-9 text-xs"
+                      />
+                    </TableCell>
+                  ) : null}
                   <TableCell className="min-w-[14rem] py-2">
                     <Input
                       required
@@ -138,9 +179,15 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
                       className="h-9 w-full min-w-[3.5rem] text-sm tabular-nums"
                     />
                   </TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalArFromString(p.subtotal)}</TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalArFromString(p.tax)}</TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">{formatDecimalArFromString(p.total)}</TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">
+                    {formatDecimalArFromString(p.subtotal)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">
+                    {formatDecimalArFromString(p.tax)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums align-top pt-3">
+                    {formatDecimalArFromString(p.total)}
+                  </TableCell>
                   <TableCell className="align-top pt-2">
                     {lines.length > 1 && (
                       <button
@@ -174,9 +221,22 @@ export function InvoiceLinesEditor({ lines, onChange }: Props) {
           <p className="tabular-nums font-semibold">{formatDecimalArFromString(totals.total)}</p>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        * Los totales son una vista previa. El servidor recalcula al guardar.
-      </p>
+      {requireWbs && wbsOptions.length === 0 ? (
+        <p className="text-xs text-destructive" role="alert">
+          No hay partidas EDT disponibles. Aprobá un presupuesto con ítems WBS antes de
+          cargar la factura.
+        </p>
+      ) : null}
+      {requireWbs ? (
+        <p className="text-xs text-muted-foreground">
+          Cada línea de factura de proyecto debe imputar a una partida EDT. Los totales son
+          una vista previa; el servidor recalcula al guardar.
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Los totales son una vista previa. El servidor recalcula al guardar.
+        </p>
+      )}
     </div>
   );
 }

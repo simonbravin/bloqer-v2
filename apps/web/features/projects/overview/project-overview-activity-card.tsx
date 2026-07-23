@@ -51,10 +51,21 @@ export function ProjectOverviewActivityCard({
       ? `${awaiting} pendiente${awaiting === 1 ? "" : "s"} de cotización`
       : undefined;
 
+  const showComprasHub =
+    activity.purchaseRequestsCount != null || activity.purchaseOrdersCount != null;
+
   return (
     <Card className="rounded-xl border bg-card shadow-sm">
-      <CardHeader>
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base">Actividad y gestión</CardTitle>
+        {showComprasHub ? (
+          <Link
+            href={`${base}/compras`}
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            Tablero de compras
+          </Link>
+        ) : null}
       </CardHeader>
       <CardContent>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

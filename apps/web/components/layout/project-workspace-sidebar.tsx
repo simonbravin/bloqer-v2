@@ -46,7 +46,10 @@ export function ProjectWorkspaceSidebar({
             activeWhenPathPrefix: item.activeWhenPathPrefix,
           }),
         );
-        next[s.title] = hasActive ? true : (prev[s.title] ?? false);
+        // Keep active section open; default-open Operación/Compras for process discoverability.
+        const defaultOpen =
+          s.title === "Resumen" || s.title === "Operación" || s.title === "Compras";
+        next[s.title] = hasActive ? true : (prev[s.title] ?? defaultOpen);
       }
       return next;
     });

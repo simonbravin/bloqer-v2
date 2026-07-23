@@ -410,7 +410,7 @@ export async function getProjectOverviewDashboard(
         label: "Solicitudes pendientes de cotización",
         description: `${purchaseRequestsAwaitingQuotesCount} solicitud${purchaseRequestsAwaitingQuotesCount === 1 ? "" : "es"} enviada${purchaseRequestsAwaitingQuotesCount === 1 ? "" : "s"} sin cotización completa.`,
         severity: "warning",
-        href: `${base}/solicitudes-compra?status=SUBMITTED`,
+        href: `${base}/compras`,
       });
     }
   } else if (!gate.isEnabled("PROCUREMENT")) {

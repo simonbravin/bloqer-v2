@@ -82,11 +82,19 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
         title="Solicitudes de compra"
         subtitle={subtitle}
         actions={
-          canCreate ? (
-            <Button asChild>
-              <Link href={`/proyectos/${id}/solicitudes-compra/nueva`}>Nueva solicitud</Link>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/proyectos/${id}/compras`}>Tablero de compras</Link>
             </Button>
-          ) : undefined
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/proyectos/${id}/materiales`}>Materiales</Link>
+            </Button>
+            {canCreate ? (
+              <Button asChild>
+                <Link href={`/proyectos/${id}/solicitudes-compra/nueva`}>Nueva solicitud</Link>
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
@@ -130,20 +138,27 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
                     description={
                       statusFilter
                         ? "Probá quitar el filtro o crear una nueva solicitud."
-                        : "Pedí materiales u otros ítems antes de generar una orden de compra."
+                        : "Revisá la cobertura en Materiales o creá una solicitud para generar una OC."
                     }
                     action={
-                      canCreate && !statusFilter ? (
-                        <Button asChild size="sm">
-                          <Link href={`/proyectos/${id}/solicitudes-compra/nueva`}>
-                            Nueva solicitud
-                          </Link>
-                        </Button>
-                      ) : statusFilter ? (
+                      !statusFilter ? (
+                        <div className="flex flex-wrap justify-center gap-2">
+                          <Button asChild size="sm" variant="outline">
+                            <Link href={`/proyectos/${id}/materiales`}>Ver materiales</Link>
+                          </Button>
+                          {canCreate ? (
+                            <Button asChild size="sm">
+                              <Link href={`/proyectos/${id}/solicitudes-compra/nueva`}>
+                                Nueva solicitud
+                              </Link>
+                            </Button>
+                          ) : null}
+                        </div>
+                      ) : (
                         <Button asChild size="sm" variant="outline">
                           <Link href={listHref}>Ver todas</Link>
                         </Button>
-                      ) : undefined
+                      )
                     }
                   />
                 </TableCell>

@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
+import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
@@ -56,9 +57,20 @@ export default async function RecepcionesPage({ params }: PageProps) {
         title="Recepciones"
         subtitle={`${items.length} ${items.length === 1 ? "recepción" : "recepciones"}`}
         actions={
-          <Suspense fallback={null}>
-            <ListViewToggle storageKey={`recepciones-${id}`} />
-          </Suspense>
+          <div className="flex flex-wrap items-center gap-2">
+            <Suspense fallback={null}>
+              <ListViewToggle storageKey={`recepciones-${id}`} />
+            </Suspense>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/proyectos/${id}/compras`}>Tablero de compras</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/proyectos/${id}/ordenes-compra`}>Órdenes</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/proyectos/${id}/materiales`}>Materiales</Link>
+            </Button>
+          </div>
         }
       />
 
