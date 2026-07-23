@@ -1,5 +1,6 @@
 import type { LinkedEntityType, NotificationSeverity, NotificationStatus, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
+import { isUuid } from "@bloqer/utils";
 import { ServiceContext, ServiceError } from "../types";
 
 export type NotificationInboxFilter = "all" | "unread" | "read" | "archived";
@@ -69,7 +70,7 @@ async function assertProjectInTenant(projectId: string | null | undefined, tenan
   }
 }
 
-function inboxStatusFilter(filter: NotificationInboxFilter): Pick<Prisma.NotificationWhereInput, "status"> | Record<string, never> {
+function inboxStatusFilter(filter: NotificationInboxFilter): Pick<Prisma.NotificationWhereInput, "status"> {
   switch (filter) {
     case "unread":
       return { status: "UNREAD" };
@@ -79,7 +80,8 @@ function inboxStatusFilter(filter: NotificationInboxFilter): Pick<Prisma.Notific
       return { status: "ARCHIVED" };
     case "all":
     default:
-      return {};
+      // Default inbox: active items only. Archived has its own filter.
+      return { status: { in: ["UNREAD", "READ"] } };
   }
 }
 
@@ -236,7 +238,14 @@ export async function getNotificationBellSnapshot(ctx: ServiceContext): Promise<
   return { unreadCount, items: rows.map(serializeRow) };
 }
 
+function assertOwnNotificationId(notificationId: string): void {
+  if (!isUuid(notificationId)) {
+    throw new ServiceError("NOT_FOUND", "Notificación no encontrada o ya procesada");
+  }
+}
+
 export async function markNotificationAsRead(notificationId: string, ctx: ServiceContext): Promise<void> {
+  assertOwnNotificationId(notificationId);
   const res = await prisma.notification.updateMany({
     where: {
       id: notificationId,
@@ -245,6 +254,22 @@ export async function markNotificationAsRead(notificationId: string, ctx: Servic
       status: "UNREAD",
     },
     data: { status: "READ", readAt: new Date() },
+  });
+  if (res.count === 0) {
+    throw new ServiceError("NOT_FOUND", "Notificación no encontrada o ya procesada");
+  }
+}
+
+export async function markNotificationAsUnread(notificationId: string, ctx: ServiceContext): Promise<void> {
+  assertOwnNotificationId(notificationId);
+  const res = await prisma.notification.updateMany({
+    where: {
+      id: notificationId,
+      tenantId: ctx.tenantId,
+      recipientUserId: ctx.actorUserId,
+      status: "READ",
+    },
+    data: { status: "UNREAD", readAt: null },
   });
   if (res.count === 0) {
     throw new ServiceError("NOT_FOUND", "Notificación no encontrada o ya procesada");
@@ -263,6 +288,7 @@ export async function markAllNotificationsAsRead(ctx: ServiceContext): Promise<v
 }
 
 export async function archiveNotification(notificationId: string, ctx: ServiceContext): Promise<void> {
+  assertOwnNotificationId(notificationId);
   const res = await prisma.notification.updateMany({
     where: {
       id: notificationId,

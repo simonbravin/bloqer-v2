@@ -4,6 +4,7 @@ import {
   archiveNotification,
   markAllNotificationsAsRead,
   markNotificationAsRead,
+  markNotificationAsUnread,
 } from "@bloqer/services";
 import type { UserRole } from "@bloqer/domain";
 import { getCurrentUser } from "@/lib/auth";
@@ -68,6 +69,18 @@ export async function markNotificationReadAction(notificationId: string): Promis
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+export async function markNotificationUnreadFormAction(formData: FormData): Promise<void> {
+  const id = formData.get("notificationId");
+  if (typeof id !== "string" || !id) return;
+  const ctx = await requireServiceCtx();
+  try {
+    await markNotificationAsUnread(id, ctx);
+    revalidateNotificationViews();
+  } catch {
+    /* NOT_FOUND / FORBIDDEN: no data leak; keep UI stable */
   }
 }
 

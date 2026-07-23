@@ -64,10 +64,11 @@ Indexes: `[tenantId, recipientUserId, status, createdAt]`, `[tenantId, projectId
 |----------|---------|
 | `createNotification` | Authenticated path; recipient must equal `ctx.actorUserId` |
 | `createSystemNotification` | Internal; explicit `tenantId`; validates recipient membership, optional `projectId` in tenant, and `actionUrl` shape |
-| `listMyNotifications` | Inbox for current user; filter `all` \| `unread` \| `read` \| `archived`; returns `{ items, total, page, pageSize }` (default **20**/page, max 50); **clamps** `page` to last valid page when out of range |
+| `listMyNotifications` | Inbox for current user; filter `all` (non-archived: `UNREAD`/`READ`) \| `unread` \| `read` \| `archived`; returns `{ items, total, page, pageSize }` (default **20**/page, max 50); **clamps** `page` to last valid page when out of range |
 | `getUnreadNotificationCount` | Badge count |
 | `getNotificationBellSnapshot` | `{ unreadCount, items }` — last 5 non-archived (`UNREAD`/`READ`) for the header dropdown |
-| `markNotificationAsRead` | Own rows only |
+| `markNotificationAsRead` | Own rows only (`UNREAD` → `READ`) |
+| `markNotificationAsUnread` | Own rows only (`READ` → `UNREAD`, clears `readAt`) |
 | `markAllNotificationsAsRead` | Own `UNREAD` → `READ` |
 | `archiveNotification` | Own `UNREAD`/`READ` → `ARCHIVED` |
 
@@ -163,7 +164,7 @@ Contexto de sistema: `buildOperationalAlertsCronServiceContext` + `runAllOperati
 - **Phase 9D:** historial de intentos de email en `/notificaciones/emails` (OWNER/ADMIN); ver `listEmailDeliveryLogs` en `email-delivery-log.service.ts`.
 
 - **Header (in-app “push” UX, [D-054]):** `NotificationBell` dropdown — last **5** non-archived notifications, badge **only when `unreadCount > 0`**, footer “Ver todas” → `/notificaciones`. Client polls `GET /api/notifications/bell` every **30s** while the tab is visible (pauses when hidden); also refreshes on open. Initial unread seed from SSR in `app/(app)/layout.tsx` (try/catch → `0`).
-- **Page:** `/notificaciones` — filters, **pagination 20**/page (`?page=`), mark read / mark all read / archive, optional `actionUrl` link (defense-in-depth filter on render). No search in this phase. Access is via header bell (“Ver todas”); **no** Config sidebar item. Server actions revalidate `/notificaciones` and `/` layout so the SSR badge stays consistent after mutations.
+- **Page:** `/notificaciones` — filters, **pagination 20**/page (`?page=`), mark read / mark unread / mark all read / archive, optional `actionUrl` link (defense-in-depth filter on render). No search in this phase. Access is via header bell (“Ver todas”); **no** Config sidebar item. Server actions revalidate `/notificaciones` and `/` layout so the SSR badge stays consistent after mutations.
 - **Phase 8B:** new `NotificationType` values render like existing ones (title/body/severity badges).
 - **Phase 8C:** `/notificaciones/alertas` — formularios que disparan `runOperationalAlertsDispatchAction` (todas o una alerta); muestra contadores y lista breve de mensajes de error (sin stack traces); tras éxito se llama `revalidatePath` de `/notificaciones` y `/notificaciones/alertas` para refrescar badge SSR en navegación posterior.
 

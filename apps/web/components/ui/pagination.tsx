@@ -20,8 +20,10 @@ export function Pagination({ page, pageSize, total }: PaginationProps) {
   const goTo = useCallback(
     (p: number) => {
       const params = new URLSearchParams(searchParams.toString());
-      params.set("page", String(p));
-      router.push(`${pathname}?${params.toString()}`);
+      if (p <= 1) params.delete("page");
+      else params.set("page", String(p));
+      const qs = params.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname);
     },
     [router, pathname, searchParams],
   );

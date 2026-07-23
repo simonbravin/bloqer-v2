@@ -16,9 +16,11 @@ import {
   archiveNotificationFormAction,
   markAllNotificationsReadAction,
   markNotificationReadFormAction,
+  markNotificationUnreadFormAction,
 } from "./actions";
 import { formatDateTime } from "@/lib/format";
 import { notificationSeverityLabelEs } from "@/lib/notification-severity-label";
+import { safeActionHref } from "@/lib/safe-action-href";
 import { PageShell } from "@/components/layout/page-shell";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 
@@ -44,14 +46,6 @@ function severityVariant(s: NotificationListItem["severity"]): "default" | "seco
     default:
       return "outline";
   }
-}
-
-/** Only allow same-origin relative paths (defense in depth vs. tampered DB rows). */
-function safeActionHref(url: string | null): string | null {
-  if (!url) return null;
-  const u = url.trim();
-  if (!u.startsWith("/") || u.startsWith("//")) return null;
-  return u;
 }
 
 function fmtWhen(iso: string) {
@@ -143,9 +137,11 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
           description={
             filtro === "unread"
               ? "No tenés notificaciones sin leer."
-              : filtro === "archived"
-                ? "No hay notificaciones archivadas."
-                : undefined
+              : filtro === "read"
+                ? "No hay notificaciones leídas."
+                : filtro === "archived"
+                  ? "No hay notificaciones archivadas."
+                  : "No hay notificaciones activas."
           }
         />
       ) : (
@@ -189,6 +185,14 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
                             <input type="hidden" name="notificationId" value={n.id} />
                             <Button type="submit" size="sm" variant="secondary">
                               Marcar leída
+                            </Button>
+                          </form>
+                        )}
+                        {n.status === "READ" && (
+                          <form action={markNotificationUnreadFormAction}>
+                            <input type="hidden" name="notificationId" value={n.id} />
+                            <Button type="submit" size="sm" variant="secondary">
+                              Marcar como no leída
                             </Button>
                           </form>
                         )}

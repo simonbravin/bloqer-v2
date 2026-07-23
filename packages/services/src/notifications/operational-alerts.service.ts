@@ -1,6 +1,6 @@
 import type { EmailDeliveryStatus, LinkedEntityType, NotificationSeverity, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
-import { serializeMoney } from "@bloqer/utils";
+import { roundQty, serializeMoney } from "@bloqer/utils";
 import { listNegativeStockBalancesForTenant } from "../inventory/stock-balance.service";
 import { hasOpenObligationBalance, isObligationOverdue } from "../finance/obligation-date";
 import { ServiceContext, ServiceError } from "../types";
@@ -276,7 +276,7 @@ export async function runNegativeStockAlert(ctx: ServiceContext): Promise<Operat
   for (const row of negatives) {
     summary.checkedCount += 1;
     const linkedId = negativeStockLinkedEntityId(row);
-    const body = `Producto ${row.productId}, depósito ${row.warehouseId}. Cantidad: ${row.totalQuantity}.`;
+    const body = `Producto ${row.productId}, depósito ${row.warehouseId}. Cantidad: ${roundQty(row.totalQuantity)}.`;
 
     if (recipients.length === 0) continue;
 

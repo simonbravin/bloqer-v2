@@ -22,16 +22,16 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 - **Notification**, preferencias usuario (Fase 2).
 
 ## 7. Estados y transiciones
-`UNREAD` → `READ` → `ARCHIVED` (sin hard delete). El estado es **por destinatario** (una fila por usuario).
+`UNREAD` ↔ `READ` → `ARCHIVED` (sin hard delete). El estado es **por destinatario** (una fila por usuario). Desde `READ` se puede volver a `UNREAD` (limpia `readAt`). Las archivadas no vuelven a leídas/no leídas en esta fase.
 
 ## 8. Acciones disponibles
-- Marcar leída, marcar todas leídas, archivar.
+- Marcar leída, marcar como no leída, marcar todas leídas, archivar.
 - Ir a entidad origen (deep link).
 - Silenciar tipo de notificación (Fase 2).
 
 ## 9. Pantallas y vistas necesarias
 - Campana en header: dropdown con las **últimas 5** no archivadas, badge solo si hay no leídas, enlace “Ver todas” (acceso principal a la bandeja; **sin** ítem en Configuración).
-- Centro `/notificaciones` con filtros (todas / no leídas / leídas / archivadas) y **paginación 20** por página. Sin búsqueda en esta fase.
+- Centro `/notificaciones` con filtros (todas = no archivadas / no leídas / leídas / archivadas) y **paginación 20** por página. Sin búsqueda en esta fase.
 - `/notificaciones/alertas` y `/notificaciones/emails` (OWNER/ADMIN). Alertas: cron diario **12:00 UTC** en prod; panel = corrida manual. Vencimientos = día calendario **UTC**.
 
 ## 10. Reglas de negocio

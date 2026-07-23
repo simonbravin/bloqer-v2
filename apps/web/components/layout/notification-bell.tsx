@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { markNotificationReadAction } from "@/app/(app)/notificaciones/actions";
+import { safeActionHref } from "@/lib/safe-action-href";
 import { cn } from "@/lib/utils";
 
 const POLL_MS = 30_000;
@@ -33,13 +34,6 @@ type BellSnapshot = {
   unreadCount: number;
   items: BellItem[];
 };
-
-function safeActionHref(url: string | null): string | null {
-  if (!url) return null;
-  const u = url.trim();
-  if (!u.startsWith("/") || u.startsWith("//")) return null;
-  return u;
-}
 
 function formatRelative(iso: string): string {
   try {
@@ -114,12 +108,19 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
       }
     };
 
+    // Inbox form actions revalidate the layout badge; also resync dropdown items.
+    const onFocus = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+
     if (document.visibilityState === "visible") start();
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
     return () => {
       mountedRef.current = false;
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
     };
   }, [refresh]);
 
