@@ -6,7 +6,13 @@ import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { getCurrentUser } from "@/lib/auth";
-import { StockMovementList } from "@/features/inventory";
+import {
+  NewStockConsumptionDialog,
+  StockMovementList,
+  type ProductOption,
+  type WarehouseOption,
+  type WbsOption,
+} from "@/features/inventory";
 import { can } from "@bloqer/domain";
 import {
   canViewProcurementProjectArea,
@@ -14,19 +20,24 @@ import {
   canViewPurchaseRequests,
   getProjectShellInfo,
   getTenantModuleGate,
+  listInventoryConsumptionWbsOptions,
+  listProducts,
   listStockMovements,
+  listWarehouses,
   ServiceError,
 } from "@bloqer/services";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ create?: string }>;
 }
 
-export default async function ProyectoConsumosPage({ params }: PageProps) {
+export default async function ProyectoConsumosPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id } = await params;
+  const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -62,6 +73,60 @@ export default async function ProyectoConsumosPage({ params }: PageProps) {
     gate.isEnabled("PROCUREMENT") &&
     (canViewProcurementProjectArea(ctx.roles) || canViewPurchaseRequests(ctx.roles));
 
+  let products: ProductOption[] = [];
+  let warehouses: WarehouseOption[] = [];
+  let wbsOptions: WbsOption[] = [];
+  let createOptionsReady = false;
+
+  if (canCreateConsumption) {
+    try {
+      const [productsResult, warehouseRows, wbsNodes] = await Promise.all([
+        listProducts({ status: "ACTIVE" }, ctx),
+        listWarehouses({ status: "ACTIVE" }, ctx),
+        listInventoryConsumptionWbsOptions(id, ctx),
+      ]);
+      products = productsResult.data.map((p) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        unit: p.unit,
+      }));
+      warehouses = warehouseRows.map((w) => ({
+        id: w.id,
+        name: w.name,
+      }));
+      wbsOptions = wbsNodes.map((w) => ({
+        id: w.id,
+        code: w.code,
+        name: w.name,
+      }));
+      createOptionsReady = true;
+    } catch (err) {
+      // Keep the list usable; hide create CTA if catalogs cannot be loaded.
+      if (err instanceof ServiceError && err.code === "FORBIDDEN") {
+        createOptionsReady = false;
+      } else if (err instanceof ServiceError && err.code === "NOT_FOUND") {
+        createOptionsReady = false;
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  const showCreate = canCreateConsumption && createOptionsReady;
+
+  const createDialog = showCreate ? (
+    <Suspense fallback={<Button disabled>Registrar consumo</Button>}>
+      <NewStockConsumptionDialog
+        projectId={id}
+        products={products}
+        warehouses={warehouses}
+        wbsOptions={wbsOptions}
+        defaultOpen={sp.create === "1"}
+      />
+    </Suspense>
+  ) : null;
+
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
@@ -79,11 +144,7 @@ export default async function ProyectoConsumosPage({ params }: PageProps) {
                 <Link href={`/proyectos/${id}/compras`}>Tablero de compras</Link>
               </Button>
             ) : null}
-            {canCreateConsumption ? (
-              <Button asChild>
-                <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar consumo</Link>
-              </Button>
-            ) : null}
+            {createDialog}
           </div>
         }
       />
@@ -94,9 +155,9 @@ export default async function ProyectoConsumosPage({ params }: PageProps) {
           emptyTitle="Sin consumos registrados"
           emptyDescription="Todavía no hay consumos confirmados."
           emptyAction={
-            canCreateConsumption ? (
+            showCreate ? (
               <Button asChild size="sm">
-                <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar consumo</Link>
+                <Link href={`/proyectos/${id}/consumos?create=1`}>Registrar consumo</Link>
               </Button>
             ) : undefined
           }

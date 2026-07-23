@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@bloqer/domain";
 import { getProjectShellInfo, listStockMovements, ServiceError } from "@bloqer/services";
 import { StockMovementList } from "@/features/inventory";
 import { PageShell } from "@/components/layout/page-shell";
@@ -41,6 +42,8 @@ export default async function ProyectoInventarioPage({ params }: PageProps) {
     throw err;
   }
 
+  const canCreateConsumption = can(current.tenantCtx.roles, "EDIT", "INVENTORY");
+
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
@@ -51,9 +54,11 @@ export default async function ProyectoInventarioPage({ params }: PageProps) {
             <Button asChild variant="outline">
               <Link href={`/proyectos/${id}/consumos`}>Ver consumos</Link>
             </Button>
-            <Button asChild>
-              <Link href={`/proyectos/${id}/consumos/nuevo`}>Registrar consumo</Link>
-            </Button>
+            {canCreateConsumption ? (
+              <Button asChild>
+                <Link href={`/proyectos/${id}/consumos?create=1`}>Registrar consumo</Link>
+              </Button>
+            ) : null}
           </div>
         }
       />
