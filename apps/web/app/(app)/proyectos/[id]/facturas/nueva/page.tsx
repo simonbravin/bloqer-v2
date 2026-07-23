@@ -1,10 +1,9 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { notFound, redirect } from "next/navigation";
-import { CertificationInvoiceForm, ManualInvoiceForm } from "@/features/sales-invoices";
-import type { CertSummary, ClientOption } from "@/features/sales-invoices";
+import { CertificationInvoiceForm } from "@/features/sales-invoices";
+import type { CertSummary } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
-import { isStorageConfigured } from "@bloqer/config";
-import { getCertificationById, listContacts, ServiceError } from "@bloqer/services";
+import { canEditArArea, getCertificationById, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
@@ -26,7 +25,7 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
     roles: current.tenantCtx.roles,
   };
 
-  // ── Certification-based flow ──────────────────────────────────────────────
+  // Certification-based flow stays full-page (special wizard).
   if (certificationId) {
     let cert;
     try {
@@ -70,24 +69,9 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
     );
   }
 
-  // ── Manual flow ───────────────────────────────────────────────────────────
-  const { data: contacts } = await listContacts({ role: "CLIENT", status: "ACTIVE" }, ctx);
-
-  const clients: ClientOption[] = contacts.map((c) => ({
-    id: c.id,
-    label: c.fantasyName ?? c.legalName,
-  }));
-
-  return (
-    <PageShell variant="default" className="space-y-6">
-      <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-bold tracking-tight">Nueva factura</h1>
-      </div>
-      <ManualInvoiceForm
-        projectId={projectId}
-        clients={clients}
-        storageConfigured={isStorageConfigured()}
-      />
-    </PageShell>
-  );
+  // Manual create → list dialog
+  if (!canEditArArea(current.tenantCtx.roles)) {
+    redirect(`/proyectos/${projectId}/facturas`);
+  }
+  redirect(`/proyectos/${projectId}/facturas?create=1`);
 }

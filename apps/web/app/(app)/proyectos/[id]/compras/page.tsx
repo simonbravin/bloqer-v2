@@ -72,12 +72,12 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
             ) : null}
             {canCreateSc ? (
               <Button asChild variant="outline">
-                <Link href={`${hub.links.solicitudes}/nueva`}>Nueva solicitud</Link>
+                <Link href={`${hub.links.solicitudes}?create=1`}>Nueva solicitud</Link>
               </Button>
             ) : null}
             {canCreateOc ? (
               <Button asChild>
-                <Link href={`${hub.links.ordenes}/nueva`}>Nueva OC</Link>
+                <Link href={`${hub.links.ordenes}?create=1`}>Nueva OC</Link>
               </Button>
             ) : null}
           </div>

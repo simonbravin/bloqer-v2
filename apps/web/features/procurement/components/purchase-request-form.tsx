@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +25,9 @@ interface PurchaseRequestFormProps {
   };
   /** When true, show banner that fields came from materiales board. */
   prefilledFromMaterials?: boolean;
+  variant?: "card" | "plain";
+  onCancel?: () => void;
+  onSuccess?: () => void;
 }
 
 export function PurchaseRequestForm({
@@ -33,6 +35,9 @@ export function PurchaseRequestForm({
   wbsOptions,
   initialLine,
   prefilledFromMaterials = false,
+  variant = "card",
+  onCancel,
+  onSuccess,
 }: PurchaseRequestFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -43,7 +48,7 @@ export function PurchaseRequestForm({
   const selectedWbs = wbsOptions.find((w) => w.id === wbsNodeId);
 
   return (
-    <div className="rounded-lg border bg-card p-6">
+    <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
       <form
         className="space-y-5"
         action={(fd) => {
@@ -73,6 +78,7 @@ export function PurchaseRequestForm({
               setError(result.error);
               return;
             }
+            onSuccess?.();
             router.push(`/proyectos/${projectId}/solicitudes-compra/${result.id}`);
             router.refresh();
           });
@@ -113,7 +119,12 @@ export function PurchaseRequestForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="unit">Unidad</Label>
-            <Input id="unit" name="unit" defaultValue="u" />
+            <Input
+              key={selectedWbs?.budgetUnit ?? "u"}
+              id="unit"
+              name="unit"
+              defaultValue={selectedWbs?.budgetUnit ?? "u"}
+            />
           </div>
         </div>
 
@@ -137,7 +148,7 @@ export function PurchaseRequestForm({
           {selectedWbs?.budgetUnitCost != null ? (
             <p className="text-xs text-muted-foreground">
               Costo ref. materiales: {formatDecimalAr(Number(selectedWbs.budgetUnitCost))}
-              {selectedWbs.availableSaldo != null
+              {selectedWbs?.availableSaldo != null
                 ? ` · Saldo disponible: ${formatDecimalAr(Number(selectedWbs.availableSaldo))}`
                 : ""}
             </p>
@@ -159,12 +170,16 @@ export function PurchaseRequestForm({
           <Textarea id="notes" name="notes" rows={3} />
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel ?? (() => router.back())}
+          >
+            Cancelar
+          </Button>
           <Button type="submit" disabled={pending || wbsOptions.length === 0}>
             {pending ? "Guardando…" : "Crear solicitud"}
-          </Button>
-          <Button type="button" variant="ghost" asChild>
-            <Link href={`/proyectos/${projectId}/solicitudes-compra`}>Cancelar</Link>
           </Button>
         </div>
       </form>

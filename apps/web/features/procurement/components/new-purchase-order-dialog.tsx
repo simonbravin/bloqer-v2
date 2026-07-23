@@ -6,22 +6,34 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { SupplierInvoiceForm, type SupplierOption } from "./supplier-invoice-form";
+import { PurchaseOrderForm, type SupplierOption } from "./purchase-order-form";
+import type { ProductOption, WbsOption } from "./purchase-order-lines-editor";
 
 interface Props {
+  projectId: string;
   suppliers: SupplierOption[];
+  wbsOptions: WbsOption[];
+  productOptions: ProductOption[];
+  allowEmergencyDirectPo?: boolean;
   defaultOpen?: boolean;
-  storageConfigured?: boolean;
+  triggerLabel?: string;
+  triggerVariant?: "default" | "outline";
 }
 
-export function NewCompanySupplierInvoiceDialog({
+export function NewPurchaseOrderDialog({
+  projectId,
   suppliers,
+  wbsOptions,
+  productOptions,
+  allowEmergencyDirectPo = false,
   defaultOpen = false,
-  storageConfigured = false,
+  triggerLabel = "Nueva OC",
+  triggerVariant = "default",
 }: Props) {
   const pathname = usePathname();
   const router = useRouter();
@@ -59,18 +71,22 @@ export function NewCompanySupplierInvoiceDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button>Nueva factura</Button>
+        <Button variant={triggerVariant}>{triggerLabel}</Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Nueva factura de gasto</DialogTitle>
+          <DialogTitle>Nueva orden de compra</DialogTitle>
+          <DialogDescription className="sr-only">
+            Completá los datos para crear una orden de compra del proyecto.
+          </DialogDescription>
         </DialogHeader>
         {open ? (
-          <SupplierInvoiceForm
-            companyFinanzas
+          <PurchaseOrderForm
+            projectId={projectId}
             suppliers={suppliers}
-            poOptions={[]}
-            storageConfigured={storageConfigured}
+            wbsOptions={wbsOptions}
+            productOptions={productOptions}
+            allowEmergencyDirectPo={allowEmergencyDirectPo}
             variant="plain"
             onCancel={closeDialog}
             onSuccess={handleSuccess}

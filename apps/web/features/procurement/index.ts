@@ -5,6 +5,9 @@ export { PurchaseOrderLinesEditor } from "./components/purchase-order-lines-edit
 export type { PurchaseOrderLine, WbsOption, ProductOption } from "./components/purchase-order-lines-editor";
 export { PurchaseOrderForm } from "./components/purchase-order-form";
 export type { SupplierOption } from "./components/purchase-order-form";
+export { NewPurchaseRequestDialog } from "./components/new-purchase-request-dialog";
+export { NewPurchaseOrderDialog } from "./components/new-purchase-order-dialog";
+export { PurchaseRequestForm } from "./components/purchase-request-form";
 export { PurchaseOrderEditForm } from "./components/purchase-order-edit-form";
 export { ReceiptForm } from "./components/receipt-form";
 export type { WarehouseOption as ReceiptWarehouseOption } from "./components/receipt-form";

@@ -6,11 +6,21 @@ import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { PurchaseOrderListSection } from "@/features/procurement/components/purchase-order-list-section";
-import type { PurchaseOrderListItem } from "@/features/procurement";
+import {
+  NewPurchaseOrderDialog,
+  type PurchaseOrderListItem,
+  type ProductOption,
+  type SupplierOption,
+  type WbsOption,
+} from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
 import {
   canEditPurchaseOrders,
+  getCompanyProcurementSettingsForProject,
   getProjectShellInfo,
+  listContacts,
+  listProcurementWbsOptions,
+  listProducts,
   listPurchaseOrdersByProject,
   ServiceError,
 } from "@bloqer/services";
@@ -40,7 +50,7 @@ const STATUS_LABELS: Record<PoStatusFilter, string> = {
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ status?: string; view?: string }>;
+  searchParams: Promise<{ status?: string; view?: string; create?: string }>;
 }
 
 export default async function OrdenesCompraPage({ params, searchParams }: PageProps) {
@@ -78,6 +88,51 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
   }
 
   const canCreatePo = canEditPurchaseOrders(current.tenantCtx.roles);
+
+  let suppliers: SupplierOption[] = [];
+  let wbsOptions: WbsOption[] = [];
+  let productOptions: ProductOption[] = [];
+  let allowEmergency = false;
+
+  if (canCreatePo) {
+    try {
+      const [suppliersResult, wbsNodes, productsResult] = await Promise.all([
+        listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
+        listProcurementWbsOptions(id, ctx),
+        listProducts({ status: "ACTIVE" }, ctx),
+      ]);
+      suppliers = suppliersResult.data.map((c) => ({
+        id: c.id,
+        label: c.fantasyName ?? c.legalName,
+      }));
+      wbsOptions = wbsNodes.map((n) => ({
+        id: n.id,
+        code: n.code,
+        name: n.name,
+        budgetName: n.budgetName,
+        budgetUnitCost: n.budgetUnitCost,
+        budgetUnit: n.budgetUnit,
+        availableSaldo: n.availableSaldo,
+        wouldExceedBudget: n.wouldExceedBudget,
+      }));
+      productOptions = productsResult.data.map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        unit: p.unit,
+      }));
+    } catch (err) {
+      if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+      if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+      throw err;
+    }
+    try {
+      const settings = await getCompanyProcurementSettingsForProject(id, ctx);
+      allowEmergency = settings.allowEmergencyDirectPo;
+    } catch {
+      allowEmergency = false;
+    }
+  }
 
   const items: PurchaseOrderListItem[] = orders.map((o) => ({
     id: o.id,
@@ -117,9 +172,16 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
               <Link href={`/proyectos/${id}/recepciones`}>Recepciones</Link>
             </Button>
             {canCreatePo ? (
-              <Button asChild>
-                <Link href={`/proyectos/${id}/ordenes-compra/nueva`}>Nueva OC</Link>
-              </Button>
+              <Suspense fallback={<Button disabled>Nueva OC</Button>}>
+                <NewPurchaseOrderDialog
+                  projectId={id}
+                  suppliers={suppliers}
+                  wbsOptions={wbsOptions}
+                  productOptions={productOptions}
+                  allowEmergencyDirectPo={allowEmergency}
+                  defaultOpen={sp.create === "1"}
+                />
+              </Suspense>
             ) : null}
           </div>
         }

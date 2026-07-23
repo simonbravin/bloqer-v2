@@ -74,7 +74,7 @@ export function MaterialsBoardTable({ rows, projectId, canRequest = true }: Prop
         <TableBody>
           {rows.map((row) => {
             const hasShortfall = !/^-?0+(\.0+)?$/.test(row.shortfallQty.trim());
-            const pedirHref = `/proyectos/${projectId}/solicitudes-compra/nueva?wbsNodeId=${encodeURIComponent(row.wbsNodeId)}&description=${encodeURIComponent(row.description)}&quantity=${encodeURIComponent(shortfallForPrefill(row.shortfallQty))}${row.productId ? `&productId=${encodeURIComponent(row.productId)}` : ""}&from=materiales`;
+            const pedirHref = `/proyectos/${projectId}/solicitudes-compra?create=1&wbsNodeId=${encodeURIComponent(row.wbsNodeId)}&description=${encodeURIComponent(row.description)}&quantity=${encodeURIComponent(shortfallForPrefill(row.shortfallQty))}${row.productId ? `&productId=${encodeURIComponent(row.productId)}` : ""}&from=materiales`;
 
             return (
               <TableRow key={row.rowKey}>

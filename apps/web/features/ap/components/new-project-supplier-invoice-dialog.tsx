@@ -6,22 +6,39 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { SupplierInvoiceForm, type SupplierOption } from "./supplier-invoice-form";
+import {
+  SupplierInvoiceForm,
+  type POOption,
+  type SupplierOption,
+  type TreasuryAccountOption,
+} from "./supplier-invoice-form";
+import type { InvoiceWbsOption } from "./invoice-lines-editor";
 
 interface Props {
+  projectId: string;
   suppliers: SupplierOption[];
-  defaultOpen?: boolean;
+  poOptions: POOption[];
+  wbsOptions: InvoiceWbsOption[];
+  treasuryAccounts?: TreasuryAccountOption[];
+  canPayNow?: boolean;
   storageConfigured?: boolean;
+  defaultOpen?: boolean;
 }
 
-export function NewCompanySupplierInvoiceDialog({
+export function NewProjectSupplierInvoiceDialog({
+  projectId,
   suppliers,
-  defaultOpen = false,
+  poOptions,
+  wbsOptions,
+  treasuryAccounts = [],
+  canPayNow = false,
   storageConfigured = false,
+  defaultOpen = false,
 }: Props) {
   const pathname = usePathname();
   const router = useRouter();
@@ -32,17 +49,21 @@ export function NewCompanySupplierInvoiceDialog({
     if (defaultOpen) setOpen(true);
   }, [defaultOpen]);
 
-  function clearCreateQueryParam() {
-    if (searchParams.get("create") !== "1") return;
+  function clearCreateQueryParams() {
+    const hasCreate = searchParams.get("create") === "1";
+    const hasError = Boolean(searchParams.get("error"));
+    if (!hasCreate && !hasError) return;
+
     const next = new URLSearchParams(searchParams.toString());
     next.delete("create");
+    next.delete("error");
     const query = next.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
 
   function closeDialog() {
     setOpen(false);
-    clearCreateQueryParam();
+    clearCreateQueryParams();
   }
 
   /** Avoid router.replace racing the form's router.push to the detail page. */
@@ -55,21 +76,27 @@ export function NewCompanySupplierInvoiceDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) clearCreateQueryParam();
+        if (!next) clearCreateQueryParams();
       }}
     >
       <DialogTrigger asChild>
-        <Button>Nueva factura</Button>
+        <Button size="sm">Nueva factura</Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Nueva factura de gasto</DialogTitle>
+          <DialogTitle>Nueva factura de proveedor</DialogTitle>
+          <DialogDescription className="sr-only">
+            Completá los datos para registrar una factura de proveedor del proyecto.
+          </DialogDescription>
         </DialogHeader>
         {open ? (
           <SupplierInvoiceForm
-            companyFinanzas
+            projectId={projectId}
             suppliers={suppliers}
-            poOptions={[]}
+            poOptions={poOptions}
+            wbsOptions={wbsOptions}
+            treasuryAccounts={treasuryAccounts}
+            canPayNow={canPayNow}
             storageConfigured={storageConfigured}
             variant="plain"
             onCancel={closeDialog}

@@ -1,12 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { PurchaseRequestForm } from "@/features/procurement/components/purchase-request-form";
-import type { WbsOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
-import { canEditPurchaseRequests, listProcurementWbsOptions } from "@bloqer/services";
-import { PageShell } from "@/components/layout/page-shell";
-import { ProjectPageHeader } from "@/components/layout/project-page-header";
-import { Button } from "@/components/ui/button";
+import { canEditPurchaseRequests } from "@bloqer/services";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -19,6 +13,7 @@ interface PageProps {
   }>;
 }
 
+/** Legacy `/nueva` → list dialog (`?create=1`), preserving materiales prefill. */
 export default async function NuevaSolicitudCompraPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -26,55 +21,13 @@ export default async function NuevaSolicitudCompraPage({ params, searchParams }:
 
   const { id } = await params;
   const sp = await searchParams;
-  const ctx = {
-    actorUserId: current.session.user.id!,
-    tenantId: current.tenantCtx.tenantId,
-    companyId: current.tenantCtx.companyId,
-    roles: current.tenantCtx.roles,
-  };
+  const next = new URLSearchParams();
+  next.set("create", "1");
+  if (sp.wbsNodeId) next.set("wbsNodeId", sp.wbsNodeId);
+  if (sp.description) next.set("description", sp.description);
+  if (sp.quantity) next.set("quantity", sp.quantity);
+  if (sp.productId) next.set("productId", sp.productId);
+  if (sp.from) next.set("from", sp.from);
 
-  const wbsNodes = await listProcurementWbsOptions(id, ctx);
-  const wbsOptions: WbsOption[] = wbsNodes.map((n) => ({
-    id: n.id,
-    code: n.code,
-    name: n.name,
-    budgetName: n.budgetName,
-    budgetUnitCost: n.budgetUnitCost,
-    budgetUnit: n.budgetUnit,
-    availableSaldo: n.availableSaldo,
-    wouldExceedBudget: n.wouldExceedBudget,
-  }));
-
-  const fromMaterials = sp.from === "materiales";
-
-  return (
-    <PageShell variant="default" className="space-y-6">
-      <ProjectPageHeader
-        title="Nueva solicitud de compra"
-        subtitle={
-          fromMaterials
-            ? "Prefill desde cobertura de materiales"
-            : "Pedido de materiales u otros insumos del proyecto"
-        }
-        actions={
-          <Button asChild variant="outline" size="sm">
-            <Link href={fromMaterials ? `/proyectos/${id}/materiales` : `/proyectos/${id}/solicitudes-compra`}>
-              Volver
-            </Link>
-          </Button>
-        }
-      />
-      <PurchaseRequestForm
-        projectId={id}
-        wbsOptions={wbsOptions}
-        prefilledFromMaterials={fromMaterials}
-        initialLine={{
-          wbsNodeId: sp.wbsNodeId,
-          description: sp.description,
-          quantity: sp.quantity,
-          productId: sp.productId,
-        }}
-      />
-    </PageShell>
-  );
+  redirect(`/proyectos/${id}/solicitudes-compra?${next.toString()}`);
 }

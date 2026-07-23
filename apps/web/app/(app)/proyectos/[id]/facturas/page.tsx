@@ -1,13 +1,25 @@
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
+import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { ProjectFinanceListHeaderActions } from "@/features/projects/components/project-finance-list-header-actions";
-import { SalesInvoiceListSection } from "@/features/sales-invoices";
-import type { SalesInvoiceListItem } from "@/features/sales-invoices";
+import {
+  NewProjectSalesInvoiceDialog,
+  SalesInvoiceListSection,
+  type ClientOption,
+  type SalesInvoiceListItem,
+} from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
-import { getProjectShellInfo, listInvoicesByProject, ServiceError } from "@bloqer/services";
+import { isStorageConfigured } from "@bloqer/config";
+import {
+  canEditArArea,
+  getProjectShellInfo,
+  listContacts,
+  listInvoicesByProject,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { parsePage } from "@/lib/parse-page";
 
@@ -15,7 +27,7 @@ const PAGE_SIZE = 20;
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; create?: string }>;
 }
 
 export default async function FacturasPage({ params, searchParams }: PageProps) {
@@ -63,6 +75,16 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
     clientName: inv.clientName,
   }));
 
+  const canCreate = canEditArArea(ctx.roles);
+  let clients: ClientOption[] = [];
+  if (canCreate) {
+    const { data: contacts } = await listContacts({ role: "CLIENT", status: "ACTIVE" }, ctx);
+    clients = contacts.map((c) => ({
+      id: c.id,
+      label: c.fantasyName ?? c.legalName,
+    }));
+  }
+
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
@@ -72,7 +94,18 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
           <ProjectFinanceListHeaderActions
             listViewStorageKey={`facturas-${id}`}
             secondary={{ href: `/proyectos/${id}/cobranzas`, label: "Ver cobranzas" }}
-            primary={{ href: `/proyectos/${id}/facturas/nueva`, label: "Nueva factura" }}
+            primarySlot={
+              canCreate ? (
+                <Suspense fallback={<Button size="sm" disabled>Nueva factura</Button>}>
+                  <NewProjectSalesInvoiceDialog
+                    projectId={id}
+                    clients={clients}
+                    storageConfigured={isStorageConfigured()}
+                    defaultOpen={sp.create === "1"}
+                  />
+                </Suspense>
+              ) : null
+            }
           />
         }
       />

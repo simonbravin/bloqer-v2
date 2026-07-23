@@ -9,6 +9,7 @@ export { ReceivableListSection } from "./components/receivable-list-section";
 export { CertificationInvoiceForm } from "./components/certification-invoice-form";
 export { InvoiceEditForm } from "./components/invoice-edit-form";
 export { ManualInvoiceForm } from "./components/manual-invoice-form";
+export { NewProjectSalesInvoiceDialog } from "./components/new-project-sales-invoice-dialog";
 export { AdvanceInvoiceForm } from "./components/advance-invoice-form";
 export type { SalesInvoiceListItem } from "./components/sales-invoice-list";
 export type { ReceivableListItem } from "./components/receivable-list";

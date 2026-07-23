@@ -6,22 +6,25 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { SupplierInvoiceForm, type SupplierOption } from "./supplier-invoice-form";
+import { ManualInvoiceForm, type ClientOption } from "./manual-invoice-form";
 
 interface Props {
-  suppliers: SupplierOption[];
-  defaultOpen?: boolean;
+  projectId: string;
+  clients: ClientOption[];
   storageConfigured?: boolean;
+  defaultOpen?: boolean;
 }
 
-export function NewCompanySupplierInvoiceDialog({
-  suppliers,
-  defaultOpen = false,
+export function NewProjectSalesInvoiceDialog({
+  projectId,
+  clients,
   storageConfigured = false,
+  defaultOpen = false,
 }: Props) {
   const pathname = usePathname();
   const router = useRouter();
@@ -59,17 +62,19 @@ export function NewCompanySupplierInvoiceDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button>Nueva factura</Button>
+        <Button size="sm">Nueva factura</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
+      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Nueva factura de gasto</DialogTitle>
+          <DialogTitle>Nueva factura emitida</DialogTitle>
+          <DialogDescription className="sr-only">
+            Completá los datos para emitir una factura del proyecto.
+          </DialogDescription>
         </DialogHeader>
         {open ? (
-          <SupplierInvoiceForm
-            companyFinanzas
-            suppliers={suppliers}
-            poOptions={[]}
+          <ManualInvoiceForm
+            projectId={projectId}
+            clients={clients}
             storageConfigured={storageConfigured}
             variant="plain"
             onCancel={closeDialog}

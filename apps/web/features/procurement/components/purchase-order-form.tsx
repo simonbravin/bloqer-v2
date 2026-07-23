@@ -19,6 +19,9 @@ interface Props {
   wbsOptions: WbsOption[];
   productOptions?: ProductOption[];
   allowEmergencyDirectPo?: boolean;
+  variant?: "card" | "plain";
+  onCancel?: () => void;
+  onSuccess?: () => void;
 }
 
 const DEFAULT_LINE: PurchaseOrderLine = {
@@ -37,6 +40,9 @@ export function PurchaseOrderForm({
   wbsOptions,
   productOptions = [],
   allowEmergencyDirectPo = false,
+  variant = "card",
+  onCancel,
+  onSuccess,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -79,13 +85,14 @@ export function PurchaseOrderForm({
       if ("error" in res) {
         setError(res.error);
       } else {
+        onSuccess?.();
         router.push(`/proyectos/${projectId}/ordenes-compra/${res.id}`);
       }
     });
   }
 
   return (
-    <div className="rounded-lg border bg-card p-6">
+    <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
           <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
@@ -149,7 +156,11 @@ export function PurchaseOrderForm({
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel ?? (() => router.back())}
+          >
             Cancelar
           </Button>
           <Button type="submit" disabled={isPending || suppliers.length === 0}>

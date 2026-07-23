@@ -21,9 +21,19 @@ interface Props {
   projectId: string;
   clients: ClientOption[];
   storageConfigured?: boolean;
+  variant?: "card" | "plain";
+  onCancel?: () => void;
+  onSuccess?: () => void;
 }
 
-export function ManualInvoiceForm({ projectId, clients, storageConfigured = false }: Props) {
+export function ManualInvoiceForm({
+  projectId,
+  clients,
+  storageConfigured = false,
+  variant = "card",
+  onCancel,
+  onSuccess,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -74,12 +84,13 @@ export function ManualInvoiceForm({ projectId, clients, storageConfigured = fals
           `Factura creada, pero no se pudo adjuntar el archivo: ${uploadRes.error}. Podés reintentar desde el detalle.`,
         );
       }
+      onSuccess?.();
       router.push(`/proyectos/${projectId}/facturas/${res.id}`);
     });
   }
 
   return (
-    <div className="rounded-lg border bg-card p-6">
+    <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
@@ -157,7 +168,13 @@ export function ManualInvoiceForm({ projectId, clients, storageConfigured = fals
         )}
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel ?? (() => router.back())}
+          >
+            Cancelar
+          </Button>
           <Button type="submit" disabled={isPending || clients.length === 0}>
             {isPending ? "Guardando…" : "Crear factura"}
           </Button>

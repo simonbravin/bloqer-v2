@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -12,12 +13,15 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { PurchaseRequestStatusBadge } from "@/features/procurement/components/purchase-request-status-badge";
+import { NewPurchaseRequestDialog } from "@/features/procurement";
+import type { WbsOption } from "@/features/procurement";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { getCurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import {
   canEditPurchaseRequests,
   getProjectShellInfo,
+  listProcurementWbsOptions,
   listPurchaseRequestsByProject,
   ServiceError,
 } from "@bloqer/services";
@@ -25,7 +29,15 @@ import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    create?: string;
+    wbsNodeId?: string;
+    description?: string;
+    quantity?: string;
+    productId?: string;
+    from?: string;
+  }>;
 }
 
 export default async function SolicitudesCompraPage({ params, searchParams }: PageProps) {
@@ -69,6 +81,38 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
   const canCreate = canEditPurchaseRequests(current.tenantCtx.roles);
   const listHref = `/proyectos/${id}/solicitudes-compra`;
 
+  let wbsOptions: WbsOption[] = [];
+  if (canCreate) {
+    const wbsNodes = await listProcurementWbsOptions(id, ctx);
+    wbsOptions = wbsNodes.map((n) => ({
+      id: n.id,
+      code: n.code,
+      name: n.name,
+      budgetName: n.budgetName,
+      budgetUnitCost: n.budgetUnitCost,
+      budgetUnit: n.budgetUnit,
+      availableSaldo: n.availableSaldo,
+      wouldExceedBudget: n.wouldExceedBudget,
+    }));
+  }
+
+  const createDialog = canCreate ? (
+    <Suspense fallback={<Button disabled>Nueva solicitud</Button>}>
+      <NewPurchaseRequestDialog
+        projectId={id}
+        wbsOptions={wbsOptions}
+        defaultOpen={sp.create === "1"}
+        initialLine={{
+          wbsNodeId: sp.wbsNodeId,
+          description: sp.description,
+          quantity: sp.quantity,
+          productId: sp.productId,
+        }}
+        prefilledFromMaterials={sp.from === "materiales"}
+      />
+    </Suspense>
+  ) : null;
+
   const subtitle =
     statusFilter === "SUBMITTED"
       ? `${filtered.length} enviada${filtered.length === 1 ? "" : "s"} pendiente${filtered.length === 1 ? "" : "s"} de cotización`
@@ -89,11 +133,7 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
             <Button asChild variant="outline" size="sm">
               <Link href={`/proyectos/${id}/materiales`}>Materiales</Link>
             </Button>
-            {canCreate ? (
-              <Button asChild>
-                <Link href={`/proyectos/${id}/solicitudes-compra/nueva`}>Nueva solicitud</Link>
-              </Button>
-            ) : null}
+            {createDialog}
           </div>
         }
       />
@@ -148,9 +188,7 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
                           </Button>
                           {canCreate ? (
                             <Button asChild size="sm">
-                              <Link href={`/proyectos/${id}/solicitudes-compra/nueva`}>
-                                Nueva solicitud
-                              </Link>
+                              <Link href={`${listHref}?create=1`}>Nueva solicitud</Link>
                             </Button>
                           ) : null}
                         </div>
