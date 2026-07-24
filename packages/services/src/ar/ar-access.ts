@@ -29,3 +29,14 @@ export function canViewCompanyAr(roles: ServiceContext["roles"]): boolean {
 export function canEditCompanyAr(roles: ServiceContext["roles"]): boolean {
   return hasCompanyFinanceRole(roles) && can(roles, "EDIT", "AR");
 }
+
+/**
+ * Mutación AR según scope: corporativo (`projectId` null) exige company-finance;
+ * proyecto exige techo `EDIT AR` (D-056).
+ */
+export function canMutateArForScope(
+  roles: ServiceContext["roles"],
+  projectId: string | null,
+): boolean {
+  return projectId === null ? canEditCompanyAr(roles) : canEditArArea(roles);
+}

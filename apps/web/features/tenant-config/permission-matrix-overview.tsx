@@ -67,6 +67,7 @@ const ROLE_LABEL_ES: Record<UserRole, string> = {
   OWNER: "Propietario",
   ADMIN: "Administrador",
   FINANCE: "Finanzas",
+  TREASURER: "Tesorería",
   PROJECT_FINANCE: "Finanzas de obra",
   PROCUREMENT: "Compras",
   WAREHOUSE: "Depósito",

@@ -765,17 +765,17 @@
 - **Fecha:** 2026-07-24
 - **Estado:** ACTIVA
 - **Decidido por:** Owner
-- **Contexto:** Usuarios con roles operativos (PROCUREMENT, SALES, PROJECT_MANAGER, etc.) veían hub `/finanzas`, tesorería y saldos de empresa por unión OR de `VIEW TREASURY`/`AR`/`AP`. Se buscó un modelo alineado a Procore (company tools ≠ project tools) sin partir KPIs de caja fuera de `FINANCE`.
+- **Contexto:** Usuarios con roles operativos (PROCUREMENT, SALES, PROJECT_MANAGER, etc.) veían hub `/finanzas`, tesorería y saldos de empresa por unión OR de `VIEW TREASURY`/`AR`/`AP`. Se buscó un modelo alineado a Procore (company tools ≠ project tools) y segregación caja vs controller.
 - **Decisión:**
-  1. **Company finance** (`/finanzas`, `/tesoreria`, `/contabilidad`, listados CxC/CxP/GG corporativos, saldos): solo `OWNER`, `ADMIN`, `FINANCE`, y `VIEWER` (lectura auditor).
-  2. **`FINANCE` conserva caja/saldos** (KPIs de cuentas incluidos). No se crea rol `TREASURER` en esta iteración.
+  1. **Company finance** (`/finanzas`, `/tesoreria`, `/contabilidad`, listados CxC/CxP/GG corporativos, saldos): solo `OWNER`, `ADMIN`, `FINANCE`, `TREASURER`, y `VIEWER` (lectura auditor).
+  2. **`FINANCE`** = controller (caja + AR/AP + **GL/impuestos** `APPROVE`). **`TREASURER`** = caja/bancos/cobros/pagos (`APPROVE` tesorería; `EDIT` AR/AP; `VIEW` contabilidad; sin `APPROVE` GL/impuestos).
   3. Nuevo rol **`PROJECT_FINANCE`**: contador de obra — AR/AP/gastos de **proyecto**; sin company hub ni tesorería/GL de empresa.
   4. `PROJECT_MANAGER`, `PROCUREMENT`, `SALES` (y `PROJECT_FINANCE`): finanzas vía **proyecto** + módulos operativos; sin `VIEW TREASURY` / `VIEW ACCOUNTING` de empresa.
-  5. GG corporativo y CxC/CxP **sin proyecto** quedan en company tools (`FINANCE` / admin).
+  5. GG corporativo y CxC/CxP **sin proyecto** quedan en company tools (`FINANCE` / `TREASURER` / admin).
   6. Techos “su proyecto” siguen sin `ProjectMembership` (deuda conocida); este cambio es company-tool vs project-tool.
-- **Implicancias:** enum Prisma `PROJECT_FINANCE`; recorte `matrix.ts`; helpers `canViewCompany*`; gates nav/páginas; `BANK_ACCOUNTS` / `INTERNAL_TRANSFERS` no colapsan solo a `TREASURY`.
+- **Implicancias:** enum Prisma `PROJECT_FINANCE` + `TREASURER`; recorte `matrix.ts`; helpers `canViewCompany*`; gates nav/páginas; `BANK_ACCOUNTS` / `INTERNAL_TRANSFERS` no colapsan solo a `TREASURY`.
 - **Documentos afectados:** [`USER_ROLES.md`](./USER_ROLES.md), [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md), [`08-architecture/PERMISSIONS_ROUTE_MATRIX.md`](../08-architecture/PERMISSIONS_ROUTE_MATRIX.md), [`08-architecture/ARCHITECTURE_DECISION_RECORDS.md`](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md).
-
+- **Nota:** la primera redacción de D-056 difería `TREASURER` (YAGNI); se incorporó el mismo día a pedido del owner para listado/matriz y segregación caja vs controller.
 ---
 
 ## Decisiones SUPERSEDED

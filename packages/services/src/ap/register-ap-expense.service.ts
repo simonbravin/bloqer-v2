@@ -10,6 +10,7 @@ import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modu
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
+import { canMutateApForScope } from "./ap-access";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 import { toMoneyDecimal } from "../finance/money-decimal";
 import {
@@ -90,7 +91,8 @@ export async function registerApExpense(
   ctx: ServiceContext,
 ): Promise<RegisterTransactionResult> {
   await assertApTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "AP")) {
+  const projectId = input.projectId ?? null;
+  if (!canMutateApForScope(ctx.roles, projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para registrar gastos");
   }
   if (input.payNow) {
@@ -100,7 +102,6 @@ export async function registerApExpense(
     }
   }
 
-  const projectId = input.projectId ?? null;
   if (projectId) {
     await assertProjectAllowsOperationalMutation(projectId, ctx.tenantId);
     const project = await prisma.project.findUnique({

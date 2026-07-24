@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { can } from "@bloqer/domain";
+import { canViewCompanyFinanceHub } from "@bloqer/services";
 import { ModuleSubnav } from "@/components/layout/module-subnav";
 import { SectionSubnavLayout } from "@/components/layout/section-subnav-layout";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
@@ -10,7 +11,7 @@ export default async function ContabilidadLayout({ children }: { children: React
   const ctx = await buildTenantServiceContext();
   if (!ctx) redirect("/login");
 
-  if (!can(ctx.roles, "VIEW", "ACCOUNTING")) {
+  if (!canViewCompanyFinanceHub(ctx.roles) || !can(ctx.roles, "VIEW", "ACCOUNTING")) {
     redirect("/dashboard");
   }
 

@@ -1,5 +1,5 @@
 import { Prisma, prisma, TreasuryAccount } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import type { CreateTreasuryAccountInput, UpdateTreasuryAccountInput } from "@bloqer/validators";
 import { auditTreasury } from "./treasury-audit";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
@@ -22,13 +22,19 @@ export type TreasuryAccountOption = {
 };
 
 function assertCanViewBankAccounts(roles: ServiceContext["roles"]): void {
-  if (!can(roles, "VIEW", "BANK_ACCOUNTS") && !can(roles, "VIEW", "TREASURY")) {
+  if (
+    !hasCompanyFinanceRole(roles)
+    || (!can(roles, "VIEW", "BANK_ACCOUNTS") && !can(roles, "VIEW", "TREASURY"))
+  ) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas de tesorería");
   }
 }
 
 function assertCanEditBankAccounts(roles: ServiceContext["roles"]): void {
-  if (!can(roles, "EDIT", "BANK_ACCOUNTS") && !can(roles, "EDIT", "TREASURY")) {
+  if (
+    !hasCompanyFinanceRole(roles)
+    || (!can(roles, "EDIT", "BANK_ACCOUNTS") && !can(roles, "EDIT", "TREASURY"))
+  ) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para gestionar cuentas de tesorería");
   }
 }

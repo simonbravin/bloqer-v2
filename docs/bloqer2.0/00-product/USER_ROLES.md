@@ -29,12 +29,19 @@
 - **Cuántos hay:** típicamente 1-3.
 
 ### 2.3 `FINANCE`
-- **Quién es:** responsable financiero / tesorero de la **empresa**.
-- **Acceso:** completo en tesorería (incl. saldos/caja), AR, AP, conciliación bancaria, contabilidad, hub `/finanzas`, reportes financieros de empresa ([D-056](./DECISION_LOG.md)).
-- **Acciones típicas:** registrar pagos, cobranzas, transferencias internas, conciliar cuentas, emitir reportes, GG corporativo.
+- **Quién es:** responsable financiero / controller de la **empresa**.
+- **Acceso:** completo en tesorería (incl. saldos/caja), AR, AP, conciliación bancaria, contabilidad (GL), impuestos, hub `/finanzas`, reportes financieros de empresa ([D-056](./DECISION_LOG.md)).
+- **Acciones típicas:** registrar pagos, cobranzas, transferencias internas, conciliar cuentas, asientos, emitir reportes, GG corporativo.
 - **Vista limitada:** sí ve rentabilidad bruta; rentabilidad neta solo si Admin lo habilita.
+- **Vs `TREASURER`:** `FINANCE` aprueba contabilidad e impuestos; el tesorero opera caja sin techo `APPROVE` en GL.
 
-### 2.3.1 `PROJECT_FINANCE`
+### 2.3.1 `TREASURER`
+- **Quién es:** tesorero / cajero de la **empresa** (caja y bancos).
+- **Acceso:** company tools de tesorería — `/tesoreria`, cuentas bancarias, transferencias, conciliación, cobros/pagos operativos, hub `/finanzas` (KPIs de caja). Lectura de contabilidad; **sin** aprobar GL ni impuestos ([D-056](./DECISION_LOG.md)).
+- **Acciones típicas:** movimientos de caja, conciliar bancos, registrar cobranzas y pagos, transferencias internas.
+- **Vista limitada:** no aprueba asientos contables ni cierre de periodo.
+
+### 2.3.2 `PROJECT_FINANCE`
 - **Quién es:** contador / analista financiero de **obra** (no de caja empresa).
 - **Acceso:** CxC, CxP, cobranzas y gastos **en el contexto de proyecto** (`/proyectos/[id]/finanzas` y rutas hermanas). Sin hub `/finanzas` de empresa, sin `/tesoreria`, sin `/contabilidad` GL ([D-056](./DECISION_LOG.md)).
 - **Acciones típicas:** emitir/gestionar facturas de venta de obra, registrar cobranzas de obra, consultar CxP de obra.
@@ -107,6 +114,8 @@ Estos roles **solo aplican a un proyecto** asignado. Una persona puede ser PM de
 | Dueño de empresa pequeña | `OWNER` + `ADMIN` + `FINANCE` | `PROJECT_MANAGER` en todas las obras |
 | Director de empresa mediana | `OWNER` | `VIEWER` en todas las obras |
 | Administradora | `ADMIN` + `FINANCE` | `VIEWER` en todas las obras |
+| Tesorero / cajero | `TREASURER` | _ninguno_ |
+| Contador de obra | `PROJECT_FINANCE` | opcional `VIEWER` en otras obras |
 | Jefe de obra | _ninguno global_ | `PROJECT_MANAGER` en su obra, `VIEWER` en otras |
 | Capataz | _ninguno global_ | `SITE_FOREMAN` en su obra |
 | Compras | `PROCUREMENT` | _ninguno_ |
@@ -143,7 +152,7 @@ Detalle completo en [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md).
 - **No hay** rol "supervisor" abstracto. Si alguien tiene que aprobar, es `ADMIN`, `OWNER`, o `PROJECT_MANAGER`.
 - **No hay** rol "asistente" o "junior". Los permisos no se basan en seniority sino en función.
 - **No hay** rol "RRHH". Bloqer no gestiona sueldos.
-- **No hay** rol "contador interno". El contador externo entra como `VIEWER` global. Si gestiona internamente, es `ADMIN` + `FINANCE`.
+- El **contador de obra** es `PROJECT_FINANCE`. El **controller** de empresa es `FINANCE`. El **tesorero/cajero** es `TREASURER`. Un contador externo solo-lectura entra como `VIEWER` global.
 
 ---
 

@@ -1,10 +1,11 @@
 import { can } from "@bloqer/domain";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
-import { canViewCompanyAp } from "../ap/ap-access";
+import { canEditCompanyAp, canViewCompanyAp } from "../ap/ap-access";
 
 export function assertOverheadEdit(ctx: ServiceContext): void {
-  if (!can(ctx.roles, "EDIT", "AP") && !can(ctx.roles, "APPROVE", "TENANT_SETTINGS")) {
+  // GG is a company tool (D-056): EDIT AP alone (e.g. PROCUREMENT) is not enough.
+  if (!canEditCompanyAp(ctx.roles) && !can(ctx.roles, "APPROVE", "TENANT_SETTINGS")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar imputaciones de gastos generales");
   }
 }

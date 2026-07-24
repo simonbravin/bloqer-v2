@@ -1,16 +1,16 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { can } from "@bloqer/domain";
 import { ModuleSubnav } from "@/components/layout/module-subnav";
 import { SectionSubnavLayout } from "@/components/layout/section-subnav-layout";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { TESORERIA_SUBNAV_LINKS } from "@/lib/tesoreria-subnav";
+import { canViewCompanyTreasury } from "@bloqer/services";
 
 export default async function TesoreriaLayout({ children }: { children: ReactNode }) {
   const ctx = await buildTenantServiceContext();
   if (!ctx) redirect("/login");
 
-  if (!can(ctx.roles, "VIEW", "TREASURY")) {
+  if (!canViewCompanyTreasury(ctx.roles)) {
     redirect("/dashboard");
   }
 

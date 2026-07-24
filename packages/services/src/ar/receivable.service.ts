@@ -1,5 +1,10 @@
 import { Prisma, prisma, Receivable, ReceivableStatus } from "@bloqer/database";
-import { canEditArArea, canViewArProjectArea, canViewCompanyAr } from "./ar-access";
+import {
+  canEditCompanyAr,
+  canMutateArForScope,
+  canViewArProjectArea,
+  canViewCompanyAr,
+} from "./ar-access";
 import {
   appendPendingReceivablesFilter,
   appendReceivableStatusFilter,
@@ -283,7 +288,7 @@ export async function assertCompanyReceivableMutable(
   ctx: ServiceContext,
 ): Promise<void> {
   await assertArTenantModule(ctx);
-  if (!canEditArArea(ctx.roles)) {
+  if (!canEditCompanyAr(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para modificar cuentas por cobrar");
   }
   const r = await prisma.receivable.findUnique({
@@ -359,7 +364,14 @@ export async function summarizeReceivablesByProject(
 
 export async function cancelReceivable(id: string, ctx: ServiceContext): Promise<Receivable> {
   await assertArTenantModule(ctx);
-  if (!canEditArArea(ctx.roles)) {
+
+  const preview = await prisma.receivable.findUnique({
+    where: { id },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!preview) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
+  if (preview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (!canMutateArForScope(ctx.roles, preview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar cuentas por cobrar");
   }
 

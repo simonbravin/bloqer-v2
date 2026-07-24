@@ -215,7 +215,7 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 - **Fecha:** 2026-07-24
 - **Estado:** ACEPTADO
 - **Contexto:** Fuga de visibilidad de caja/hub empresa hacia roles operativos por unión OR de permisos financieros.
-- **Decisión:** Separar **company tools** (`/finanzas`, `/tesoreria`, `/contabilidad`) de **project tools** (finanzas bajo `/proyectos/[id]/…`). Rol nuevo `PROJECT_FINANCE`. Helpers `canViewCompanyFinanceHub` / `canViewCompanyAr` / `canViewCompanyAp` / `canViewCompanyTreasury` exigen rol company-finance (`OWNER|ADMIN|FINANCE|VIEWER`) además del techo de módulo. Sin rol `TREASURER`. `BANK_ACCOUNTS` e `INTERNAL_TRANSFERS` se gatean en servicios (no solo `TREASURY`).
+- **Decisión:** Separar **company tools** (`/finanzas`, `/tesoreria`, `/contabilidad`) de **project tools** (finanzas bajo `/proyectos/[id]/…`). Roles nuevos `PROJECT_FINANCE` (obra) y `TREASURER` (caja empresa sin `APPROVE` GL). Helpers `canViewCompanyFinanceHub` / `canViewCompanyAr` / `canViewCompanyAp` / `canViewCompanyTreasury` exigen rol company-finance (`OWNER|ADMIN|FINANCE|TREASURER|VIEWER`) además del techo de módulo. `BANK_ACCOUNTS` e `INTERNAL_TRANSFERS` se gatean en servicios (no solo `TREASURY`).
 - **Consecuencias:** migración enum Prisma; recorte matriz; tests de `can()`; smoke/UAT por rol.
 - **Referencias:** [D-056](../00-product/DECISION_LOG.md), [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md).
 

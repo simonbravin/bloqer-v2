@@ -2,8 +2,9 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { can } from "@bloqer/domain";
 import {
+  canEditCompanyAp,
+  canViewCompanyAp,
   currentOverheadPeriod,
   AUTO_WEIGHT_PERIOD_CLOSE_OPTS,
   getAutoWeightOverheadPreviewForPeriod,
@@ -35,12 +36,11 @@ export default async function GastosGeneralesPage() {
   };
 
   const gate = await getTenantModuleGate(ctx);
-  if (!gate.isEnabled("AP") || !can(current.tenantCtx.roles, "VIEW", "AP")) {
+  if (!gate.isEnabled("AP") || !canViewCompanyAp(current.tenantCtx.roles)) {
     redirect("/finanzas");
   }
 
-  const canEditAp = can(current.tenantCtx.roles, "EDIT", "AP");
-
+  const canEditAp = canEditCompanyAp(current.tenantCtx.roles);
   const companies = await getCompanies(ctx);
   const companyId = ctx.companyId ?? companies[0]?.id;
 

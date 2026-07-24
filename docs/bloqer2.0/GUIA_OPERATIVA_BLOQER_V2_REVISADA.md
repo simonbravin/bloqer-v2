@@ -111,7 +111,7 @@ flowchart TB
 
 | Ámbito | Roles |
 |--------|-------|
-| Empresa | `OWNER`, `ADMIN`, `FINANCE`, `PROCUREMENT`, `WAREHOUSE`, `SALES`, `VIEWER` |
+| Empresa | `OWNER`, `ADMIN`, `FINANCE`, `TREASURER`, `PROJECT_FINANCE`, `PROCUREMENT`, `WAREHOUSE`, `SALES`, `VIEWER` |
 | Proyecto | `PROJECT_MANAGER`, `SITE_FOREMAN`, `PROJECT_VIEWER` |
 
 - **Los roles son fijos** (no se crean roles personalizados).

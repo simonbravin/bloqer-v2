@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { Prisma, prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import type { CreateCorporateTreasuryInflowInput } from "@bloqer/validators";
 import { auditTreasury } from "./treasury-audit";
 import { buildFinancialHref } from "../finance/financial-trace.service";
@@ -14,7 +14,7 @@ export async function registerCorporateTreasuryInflow(
   ctx: ServiceContext,
 ): Promise<RegisterTransactionResult> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "TREASURY")) {
+  if (!hasCompanyFinanceRole(ctx.roles) || !can(ctx.roles, "EDIT", "TREASURY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para registrar ingresos de tesorería");
   }
   if (!ctx.companyId) {

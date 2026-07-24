@@ -1,5 +1,4 @@
 import { Prisma, prisma, SupplierInvoice } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import type { CreateSupplierInvoiceInput, UpdateSupplierInvoiceInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
@@ -8,7 +7,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { assertCanCancelSupplierInvoice } from "./supplier-invoice-cancel-guards";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
-import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
+import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -365,11 +364,11 @@ export async function createSupplierInvoice(
   ctx: ServiceContext,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "AP")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas de proveedor");
-  }
 
   const projectId = input.projectId ?? null;
+  if (!canMutateApForScope(ctx.roles, projectId)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas de proveedor");
+  }
 
   if (projectId) {
     await assertProjectAllowsOperationalMutation(projectId, ctx.tenantId);
@@ -513,13 +512,13 @@ export async function updateSupplierInvoice(
   projectScopeId?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "AP")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para editar facturas de proveedor");
-  }
 
   const existing = await prisma.supplierInvoice.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (!canMutateApForScope(ctx.roles, existing.projectId)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para editar facturas de proveedor");
+  }
   if (projectScopeId !== undefined && existing.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
@@ -632,9 +631,6 @@ export async function issueSupplierInvoice(
   projectScopeId?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "AP")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para emitir facturas de proveedor");
-  }
 
   const invPreview = await prisma.supplierInvoice.findUnique({
     where: { id },
@@ -642,6 +638,9 @@ export async function issueSupplierInvoice(
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (!canMutateApForScope(ctx.roles, invPreview.projectId)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para emitir facturas de proveedor");
+  }
   if (invPreview.projectId) {
     await assertProjectAllowsOperationalMutation(invPreview.projectId, ctx.tenantId);
   }
@@ -735,8 +734,18 @@ export async function cancelSupplierInvoice(
   projectScopeId?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "AP")) {
+
+  const invPreview = await prisma.supplierInvoice.findUnique({
+    where: { id },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
+  if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (!canMutateApForScope(ctx.roles, invPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar facturas de proveedor");
+  }
+  if (projectScopeId !== undefined && invPreview.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
 
   const result = await prisma.$transaction(async (tx) => {

@@ -2,7 +2,7 @@
 // Product source of truth: docs/bloqer2.0/00-product/PERMISSIONS_MATRIX.md
 // Phase 7C: `SALES_COLLECTIONS` removed from `PermissionModule` (unused in `can()` gates; AR covers invoices / receivables / collections).
 // Phase 12A: Full role set matches `USER_ROLES.md` + `roles.ts`; service `can()` gates audited against this MATRIX — see PERMISSIONS_ROUTE_MATRIX.md.
-// D-056: Company treasury/GL/hub only OWNER|ADMIN|FINANCE|VIEWER; PROJECT_FINANCE = project finance tools; no TREASURY/ACCOUNTING on PM/PROCUREMENT/SALES.
+// D-056: Company treasury/GL/hub only OWNER|ADMIN|FINANCE|TREASURER|VIEWER; PROJECT_FINANCE = project finance tools; no TREASURY/ACCOUNTING on PM/PROCUREMENT/SALES.
 //
 // Project-scoped qualifications ("su proyecto") are enforced at the query/service
 // layer, not here. This function resolves the role-level ceiling.
@@ -108,6 +108,17 @@ const MATRIX: Record<UserRole, Partial<Record<PermissionModule, PermissionAction
     EXPENSES_PAYMENTS: "APPROVE",
     INTERNAL_TRANSFERS: "APPROVE", AR: "APPROVE", AP: "APPROVE",
     TAXES: "APPROVE", ACCOUNTING: "APPROVE", MASTER_DATA: "VIEW",
+  },
+  /** Company cash ops: caja, bancos, cobros/pagos; sin GL/impuestos a nivel APPROVE (eso es FINANCE). */
+  TREASURER: {
+    DIRECTORY: "VIEW", CLIENTS: "VIEW", SUPPLIERS: "VIEW",
+    SUBCONTRACTORS: "VIEW", PROJECTS: "VIEW", SCHEDULE: "VIEW",
+    BUDGETS: "VIEW", CONTRACTS: "VIEW", CERTIFICATIONS: "VIEW",
+    DOCUMENTS: "EDIT", NOTIFICATIONS: "VIEW",
+    TREASURY: "APPROVE", BANK_ACCOUNTS: "APPROVE", BANK_RECONCILIATION: "APPROVE",
+    EXPENSES_PAYMENTS: "APPROVE",
+    INTERNAL_TRANSFERS: "APPROVE", AR: "EDIT", AP: "EDIT",
+    TAXES: "VIEW", ACCOUNTING: "VIEW", MASTER_DATA: "VIEW",
   },
   PROCUREMENT: {
     DIRECTORY: "EDIT", SUPPLIERS: "EDIT", SUBCONTRACTORS: "EDIT",

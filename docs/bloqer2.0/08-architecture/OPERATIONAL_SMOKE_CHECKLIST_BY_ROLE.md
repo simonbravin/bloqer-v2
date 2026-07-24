@@ -26,6 +26,7 @@ Cada ítem tiene: **Ruta** · **Acción** · **Criterio de éxito**. Los bloques
 | `PROJECT_MANAGER` | §2 |
 | `PROCUREMENT` | §3 |
 | `FINANCE` | §4 |
+| `TREASURER` | §4.1 |
 | `SITE_FOREMAN` | §5 |
 | `WAREHOUSE` | §6 |
 | `VIEWER` | §7 |
@@ -34,7 +35,7 @@ Cada ítem tiene: **Ruta** · **Acción** · **Criterio de éxito**. Los bloques
 
 Roles de proyecto `PROJECT_VIEWER`: fuera de alcance Fase 1 (portal externo).
 
-> **D-056:** company tools (`/finanzas`, `/tesoreria`, `/contabilidad`) solo `OWNER`/`ADMIN`/`FINANCE`/`VIEWER`. PM, PROCUREMENT, SALES y `PROJECT_FINANCE` usan finanzas de **proyecto**.
+> **D-056:** company tools (`/finanzas`, `/tesoreria`, `/contabilidad`) solo `OWNER`/`ADMIN`/`FINANCE`/`TREASURER`/`VIEWER`. PM, PROCUREMENT, SALES y `PROJECT_FINANCE` usan finanzas de **proyecto**. `TREASURER` opera caja; sin `APPROVE` en contabilidad.
 
 ---
 
@@ -132,6 +133,16 @@ Usar un usuario con rol de proyecto `PROJECT_MANAGER` (y sin roles globales que 
 |---|--------|-------------------|
 | FN1 | Tenant con módulo AR/AP **off** (plataforma) | Rutas financieras bloqueadas / nav oculta |
 | FN2 | Ver “conciliación bancaria” como módulo operativo | No disponible en esta versión |
+
+---
+
+## 4.1 TREASURER
+
+| # | Ruta | Acción | Criterio de éxito |
+|---|------|--------|-------------------|
+| T1 | `/finanzas` / `/tesoreria` | Abrir hub y cuentas | Saldos y movimientos visibles |
+| T2 | Cobranza / pago / transferencia | Registrar | OK en company tools |
+| T3 | Contabilidad (asientos / GL) | Mutar / aprobar | Solo lectura; sin APPROVE GL |
 
 ---
 

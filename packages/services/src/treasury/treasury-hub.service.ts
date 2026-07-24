@@ -1,6 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import { buildFinancialHref } from "../finance/financial-trace.service";
+import { canViewCompanyTreasury } from "../finance/finance-access";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
@@ -91,7 +91,7 @@ function sumByCurrency(
  */
 export async function getTreasuryHubOverview(ctx: ServiceContext): Promise<TreasuryHubOverview> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "TREASURY")) {
+  if (!canViewCompanyTreasury(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver tesorería");
   }
 

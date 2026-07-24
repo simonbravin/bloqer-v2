@@ -9,7 +9,7 @@ import { assertCanCancelSalesInvoice } from "./sales-invoice-cancel-guards";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { canEditArArea, canViewArProjectArea } from "./ar-access";
+import { canEditArArea, canMutateArForScope, canViewArProjectArea } from "./ar-access";
 import { resolvePagination } from "../finance/pagination";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
@@ -387,12 +387,12 @@ export async function updateSalesInvoice(
   ctx: ServiceContext,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
-  if (!canEditArArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para editar facturas");
-  }
   const inv = await prisma.salesInvoice.findUnique({ where: { id } });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (!canMutateArForScope(ctx.roles, inv.projectId)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para editar facturas");
+  }
   await assertProjectGuardIfPresent(inv.projectId, ctx.tenantId);
   assertInvoiceEditable(inv);
 
@@ -440,9 +440,6 @@ export async function updateSalesInvoice(
 
 export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
-  if (!canEditArArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para emitir facturas");
-  }
 
   const invPreview = await prisma.salesInvoice.findUnique({
     where: { id },
@@ -450,6 +447,9 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (!canMutateArForScope(ctx.roles, invPreview.projectId)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para emitir facturas");
+  }
   await assertProjectGuardIfPresent(invPreview.projectId, ctx.tenantId);
 
   const result = await prisma.$transaction(async (tx) => {
@@ -520,7 +520,14 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
 
 export async function cancelSalesInvoice(id: string, ctx: ServiceContext): Promise<SalesInvoice> {
   await assertArTenantModule(ctx);
-  if (!canEditArArea(ctx.roles)) {
+
+  const invPreview = await prisma.salesInvoice.findUnique({
+    where: { id },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
+  if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (!canMutateArForScope(ctx.roles, invPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para anular facturas");
   }
 

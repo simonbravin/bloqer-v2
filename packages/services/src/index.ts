@@ -34,7 +34,13 @@ export {
 export type { WbsImportProfile } from "./budget/wbs-code-rules";
 export * from "./certification/certification.service";
 export * from "./certification/certification-line.service";
-export { canViewArProjectArea, canEditArArea, canViewCompanyAr, canEditCompanyAr } from "./ar/ar-access";
+export {
+  canViewArProjectArea,
+  canEditArArea,
+  canViewCompanyAr,
+  canEditCompanyAr,
+  canMutateArForScope,
+} from "./ar/ar-access";
 export { canViewCompanyFinanceHub, canViewCompanyTreasury } from "./finance/finance-access";
 export * from "./ar/sales-invoice.service";
 export * from "./ar/receivable.service";
@@ -51,7 +57,12 @@ export {
   type TreasuryHubMovementRow,
   type TreasuryMoneyByCurrency,
 } from "./treasury/treasury-hub.service";
-export { canViewApProjectArea, canViewCompanyAp } from "./ap/ap-access";
+export {
+  canViewApProjectArea,
+  canViewCompanyAp,
+  canEditCompanyAp,
+  canMutateApForScope,
+} from "./ap/ap-access";
 export * from "./ap/supplier-invoice.service";
 export * from "./ap/supplier-invoice-from-po.service";
 export * from "./ap/payable.service";

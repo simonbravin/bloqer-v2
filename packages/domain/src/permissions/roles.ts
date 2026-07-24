@@ -5,6 +5,7 @@ export type UserRole =
   | "OWNER"
   | "ADMIN"
   | "FINANCE"
+  | "TREASURER"
   | "PROJECT_FINANCE"
   | "PROCUREMENT"
   | "WAREHOUSE"
@@ -19,6 +20,7 @@ export const COMPANY_FINANCE_ROLES: readonly UserRole[] = [
   "OWNER",
   "ADMIN",
   "FINANCE",
+  "TREASURER",
   "VIEWER",
 ] as const;
 

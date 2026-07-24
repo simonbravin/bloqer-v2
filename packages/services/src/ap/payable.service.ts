@@ -1,5 +1,4 @@
 import { prisma, Payable, Prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import { auditAp } from "./ap-audit";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
@@ -18,7 +17,7 @@ import {
   fetchCorporatePayableSnapshotRows,
 } from "./corporate-ap-snapshot";
 import { assertCanCancelPayableDirect } from "./payable-cancel-guards";
-import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
+import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 
 // ─── View type ────────────────────────────────────────────────────────────────
 
@@ -310,7 +309,14 @@ export async function getCompanyPayableById(id: string, ctx: ServiceContext): Pr
 
 export async function cancelPayable(id: string, ctx: ServiceContext): Promise<Payable> {
   await assertApTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "AP")) {
+
+  const preview = await prisma.payable.findUnique({
+    where: { id },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!preview) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
+  if (preview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (!canMutateApForScope(ctx.roles, preview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar cuentas por pagar");
   }
 

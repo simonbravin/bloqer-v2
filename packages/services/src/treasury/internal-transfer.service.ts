@@ -1,5 +1,5 @@
 import { Prisma, prisma, InternalTransfer } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import type { CreateInternalTransferInput } from "@bloqer/validators";
 import { auditTreasury } from "./treasury-audit";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
@@ -13,6 +13,24 @@ export type InternalTransferView = Omit<InternalTransfer, "amount"> & {
   destinationAccountName: string;
 };
 
+function assertCanViewInternalTransfers(roles: ServiceContext["roles"]): void {
+  if (
+    !hasCompanyFinanceRole(roles)
+    || (!can(roles, "VIEW", "INTERNAL_TRANSFERS") && !can(roles, "VIEW", "TREASURY"))
+  ) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver transferencias");
+  }
+}
+
+function assertCanEditInternalTransfers(roles: ServiceContext["roles"]): void {
+  if (
+    !hasCompanyFinanceRole(roles)
+    || (!can(roles, "EDIT", "INTERNAL_TRANSFERS") && !can(roles, "EDIT", "TREASURY"))
+  ) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para registrar transferencias");
+  }
+}
+
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 export async function getInternalTransferById(
@@ -20,9 +38,7 @@ export async function getInternalTransferById(
   ctx: ServiceContext,
 ): Promise<InternalTransferView> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "INTERNAL_TRANSFERS") && !can(ctx.roles, "VIEW", "TREASURY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver transferencias");
-  }
+  assertCanViewInternalTransfers(ctx.roles);
   const t = await prisma.internalTransfer.findUnique({
     where: { id },
     include: {
@@ -40,9 +56,7 @@ export async function listInternalTransfers(
   opts?: { page?: number; pageSize?: number },
 ): Promise<{ data: InternalTransferView[]; total: number }> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "INTERNAL_TRANSFERS") && !can(ctx.roles, "VIEW", "TREASURY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver transferencias");
-  }
+  assertCanViewInternalTransfers(ctx.roles);
 
   const where = { tenantId: ctx.tenantId };
   const page = opts?.page ?? 1;
@@ -72,9 +86,7 @@ export async function createInternalTransfer(
   ctx: ServiceContext,
 ): Promise<InternalTransferView> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "INTERNAL_TRANSFERS") && !can(ctx.roles, "EDIT", "TREASURY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para crear transferencias");
-  }
+  assertCanEditInternalTransfers(ctx.roles);
 
   const amount = new Prisma.Decimal(input.amount);
   if (amount.lessThanOrEqualTo(0)) {
@@ -202,9 +214,7 @@ export async function cancelInternalTransfer(
   ctx: ServiceContext,
 ): Promise<InternalTransfer> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "TREASURY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar transferencias");
-  }
+  assertCanEditInternalTransfers(ctx.roles);
 
   const updated = await prisma.$transaction(async (tx) => {
     const t = await tx.internalTransfer.findUnique({ where: { id } });

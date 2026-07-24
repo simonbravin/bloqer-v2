@@ -29,50 +29,52 @@ Lectura: ✅ = permitido, ⛔ = no permitido, ⚙️ = configurable por Admin.
 
 ### 2.1 Operativos
 
-| Módulo | OWNER | ADMIN | PM (proyecto) | SITE_FOREMAN | PROCUREMENT | WAREHOUSE | SALES | FINANCE | VIEWER |
-|---|---|---|---|---|---|---|---|---|---|
-| Directorio | A | A | V | ⛔ | E (proveedores) | ⛔ | E (clientes) | V | V |
-| Clientes | A | A | V | ⛔ | ⛔ | ⛔ | E | V | V |
-| Proveedores | A | A | V | ⛔ | E | V | ⛔ | V | V |
-| Subcontratistas | A | A | E (en su proyecto) | ⛔ | E | ⛔ | ⛔ | V | V |
-| Proyectos | A | A | E (su proyecto) | V (su proyecto) | V | V | V | V | V |
-| Cronograma | A | A | E (su proyecto) | V | ⛔ | ⛔ | ⛔ | V | V |
-| Presupuestos | A | A | E (su proyecto) | V | ⛔ | ⛔ | V | V | V |
-| WBS / Cómputos | A | A | E (su proyecto) | V | ⛔ | ⛔ | ⛔ | V | V |
-| Contratos / Adendas | A | A | E (su proyecto) | ⛔ | ⛔ | ⛔ | E (cliente) | V | V |
-| Change Orders | A | A | E (su proyecto) | ⛔ | ⛔ | ⛔ | ⛔ | V | V |
-| RFIs | A | A | E (su proyecto) | E | ⛔ | ⛔ | ⛔ | V | V |
-| Libro de Obra | A | A | E (su proyecto) | E | ⛔ | ⛔ | ⛔ | V | V |
-| Certificaciones | A | A | E (su proyecto) | V | ⛔ | ⛔ | ⛔ | V | V |
-| Solicitudes de compra (`PURCHASE_REQUESTS`) | A | A | E (su proyecto) | E (capataz) | A | V | ⛔ | V | V |
-| Compras / cotizaciones (`PROCUREMENT`) | A | A | E (su proyecto) | ⛔ | A | V | ⛔ | V | V |
-| OC y Recepción (`PURCHASE_ORDERS`) | A | A | E (su proyecto) | ⛔ | A | E (recepción) | ⛔ | V | V |
-| Subcontratos | A | A | E (su proyecto) | ⛔ | E | ⛔ | ⛔ | V | V |
-| Inventario | A | A | V (su proyecto) | V | V | A | ⛔ | V | V |
-| Depósitos | A | A | V | ⛔ | V | A | ⛔ | V | V |
-| Documentos | A | A | E (su proyecto) | V | E | V | E | E | V |
-| Notificaciones | A | A | V | V | V | V | V | V | V |
+| Módulo | OWNER | ADMIN | PM | PROJECT_FINANCE | FINANCE | TREASURER | PROCUREMENT | WAREHOUSE | SALES | VIEWER |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Directorio | A | A | V | ⛔ | V | V | E (proveedores) | ⛔ | E (clientes) | V |
+| Clientes | A | A | V | ⛔ | V | V | ⛔ | ⛔ | E | V |
+| Proveedores | A | A | V | ⛔ | V | V | E | V | ⛔ | V |
+| Subcontratistas | A | A | E (su proyecto) | ⛔ | V | V | E | ⛔ | ⛔ | V |
+| Proyectos | A | A | E (su proyecto) | V | V | V | V | V | V | V |
+| Cronograma | A | A | E (su proyecto) | ⛔ | V | V | ⛔ | ⛔ | ⛔ | V |
+| Presupuestos | A | A | E (su proyecto) | V | V | V | ⛔ | ⛔ | V | V |
+| WBS / Cómputos | A | A | E (su proyecto) | V | V | ⛔ | ⛔ | ⛔ | ⛔ | V |
+| Contratos / Adendas | A | A | E (su proyecto) | V | V | V | ⛔ | ⛔ | E (cliente) | V |
+| Change Orders | A | A | E (su proyecto) | ⛔ | V | ⛔ | ⛔ | ⛔ | ⛔ | V |
+| RFIs | A | A | E (su proyecto) | ⛔ | V | ⛔ | ⛔ | ⛔ | ⛔ | V |
+| Libro de Obra | A | A | E (su proyecto) | ⛔ | V | ⛔ | ⛔ | ⛔ | ⛔ | V |
+| Certificaciones | A | A | E (su proyecto) | V | V | V | ⛔ | ⛔ | V | V |
+| Solicitudes de compra (`PURCHASE_REQUESTS`) | A | A | E (su proyecto) | ⛔ | V | ⛔ | A | V | ⛔ | V |
+| Compras / cotizaciones (`PROCUREMENT`) | A | A | E (su proyecto) | ⛔ | V | ⛔ | A | V | ⛔ | V |
+| OC y Recepción (`PURCHASE_ORDERS`) | A | A | E (su proyecto) | ⛔ | V | ⛔ | A | E (recepción) | ⛔ | V |
+| Subcontratos | A | A | E (su proyecto) | ⛔ | V | ⛔ | E | ⛔ | ⛔ | V |
+| Inventario | A | A | V (su proyecto) | ⛔ | V | ⛔ | V | A | ⛔ | V |
+| Depósitos | A | A | V | ⛔ | V | ⛔ | V | A | ⛔ | V |
+| Documentos | A | A | E (su proyecto) | E | E | E | E | V | E | V |
+| Notificaciones | A | A | V | V | V | V | V | V | V | V |
+
+> Capataz (`SITE_FOREMAN`) y `PROJECT_VIEWER`: techos en `packages/domain/src/permissions/matrix.ts` y columnas en `/configuracion/permisos` (ver también [`USER_ROLES.md`](./USER_ROLES.md) §3).
 
 Códigos: `V`=VIEW, `E`=EDIT (incluye VIEW), `A`=APPROVE (incluye EDIT y VIEW), `⛔`=sin acceso.
 
 ### 2.2 Financieros
 
-> **Company vs project ([D-056](./DECISION_LOG.md)):** tesorería de empresa, cuentas bancarias, transferencias, GL y hub `/finanzas` son **company tools** (`OWNER` / `ADMIN` / `FINANCE` / `VIEWER` lectura). PM, `PROJECT_FINANCE`, PROCUREMENT y SALES operan finanzas en **project tools** (sin caja empresa).
+> **Company vs project ([D-056](./DECISION_LOG.md)):** tesorería de empresa, cuentas bancarias, transferencias, GL y hub `/finanzas` son **company tools** (`OWNER` / `ADMIN` / `FINANCE` / `TREASURER` / `VIEWER` lectura). PM, `PROJECT_FINANCE`, PROCUREMENT y SALES operan finanzas en **project tools** (sin caja empresa). `TREASURER` opera caja/cobros/pagos; `FINANCE` además aprueba GL e impuestos.
 
-| Módulo | OWNER | ADMIN | PM | PROJECT_FINANCE | FINANCE | PROCUREMENT | SALES | VIEWER |
-|---|---|---|---|---|---|---|---|---|
-| Tesorería | A | A | ⛔ | ⛔ | A | ⛔ | ⛔ | V |
-| Cuentas Bancarias | A | A | ⛔ | ⛔ | A | ⛔ | ⛔ | V |
-| Conciliación Bancaria | A | A | ⛔ | ⛔ | A | ⛔ | ⛔ | V |
-| Ventas / Cobranzas | A | A | E (su proyecto) | E (su proyecto) | A | ⛔ | E (su proyecto) | V |
-| Gastos / Pagos | A | A | E (su proyecto) | E (su proyecto) | A | E (compras / su proyecto) | ⛔ | V |
-| Transferencias internas | A | A | ⛔ | ⛔ | A | ⛔ | ⛔ | V |
-| Cuentas por Cobrar | A | A | E (su proyecto) | E (su proyecto) | A | ⛔ | E (su proyecto) | V |
-| Cuentas por Pagar | A | A | V (su proyecto) | V (su proyecto) | A | E (su proyecto / compras) | ⛔ | V |
-| Impuestos / Retenciones | A | A | V (su proyecto) | V (su proyecto) | A | E | E | V |
-| Contabilidad (libro mayor) | A | A | ⛔ | ⛔ | A | ⛔ | ⛔ | V |
-| Cierre de Periodo | A | A | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ |
-| Hub `/finanzas` empresa | ✅ | ✅ | ⛔ | ⛔ | ✅ | ⛔ | ⛔ | ✅ (lectura) |
+| Módulo | OWNER | ADMIN | PM | PROJECT_FINANCE | FINANCE | TREASURER | PROCUREMENT | SALES | VIEWER |
+|---|---|---|---|---|---|---|---|---|---|
+| Tesorería | A | A | ⛔ | ⛔ | A | A | ⛔ | ⛔ | V |
+| Cuentas Bancarias | A | A | ⛔ | ⛔ | A | A | ⛔ | ⛔ | V |
+| Conciliación Bancaria | A | A | ⛔ | ⛔ | A | A | ⛔ | ⛔ | V |
+| Ventas / Cobranzas | A | A | E (su proyecto) | E (su proyecto) | A | E | ⛔ | E (su proyecto) | V |
+| Gastos / Pagos | A | A | E (su proyecto) | E (su proyecto) | A | A | E (compras / su proyecto) | ⛔ | V |
+| Transferencias internas | A | A | ⛔ | ⛔ | A | A | ⛔ | ⛔ | V |
+| Cuentas por Cobrar | A | A | E (su proyecto) | E (su proyecto) | A | E | ⛔ | E (su proyecto) | V |
+| Cuentas por Pagar | A | A | V (su proyecto) | V (su proyecto) | A | E | E (su proyecto / compras) | ⛔ | V |
+| Impuestos / Retenciones | A | A | V (su proyecto) | V (su proyecto) | A | V | E | E | V |
+| Contabilidad (libro mayor) | A | A | ⛔ | ⛔ | A | V | ⛔ | ⛔ | V |
+| Cierre de Periodo | A | A | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ |
+| Hub `/finanzas` empresa | ✅ | ✅ | ⛔ | ⛔ | ✅ | ✅ | ⛔ | ⛔ | ✅ (lectura) |
 
 ### 2.2.1 `PermissionModule` en código (Phase 7C; audit Phase 12A)
 
@@ -89,25 +91,25 @@ En `packages/domain/src/permissions/matrix.ts`, las claves son las únicas strin
 
 ### 2.3 Reportes
 
-| Reporte | OWNER | ADMIN | PM | FINANCE | PROCUREMENT | WAREHOUSE | SALES | VIEWER |
-|---|---|---|---|---|---|---|---|---|
-| Rentabilidad bruta del proyecto | V | V | V (su proyecto) | V | ⛔ | ⛔ | ⛔ | V |
-| Rentabilidad neta del proyecto | V | V | ⚙️ | ⚙️ | ⛔ | ⛔ | ⛔ | ⚙️ |
-| Rentabilidad neta consolidada | V | V | ⛔ | ⚙️ | ⛔ | ⛔ | ⛔ | ⚙️ |
-| Presupuesto vs Real | V | V | V (su proyecto) | V | V (su área) | ⛔ | V (su área) | V |
-| Avance vs Costo | V | V | V (su proyecto) | V | V | ⛔ | ⛔ | V |
-| Cashflow Real | V | V | V (su proyecto) | V | ⛔ | ⛔ | ⛔ | V |
-| Proyección de Caja | V | V | V (su proyecto) | V | ⛔ | ⛔ | ⛔ | V |
-| AR (aging) | V | V | V (su proyecto) | V | ⛔ | ⛔ | V | V |
-| AP (aging) | V | V | V (su proyecto) | V | V | ⛔ | ⛔ | V |
-| Stock / Valorización | V | V | V (su proyecto) | V | V | V | ⛔ | V |
-| Compras por proveedor | V | V | V (su proyecto) | V | V | V | ⛔ | V |
-| Compras multi-proyecto | V | V | ⛔ | V | V | V | ⛔ | V |
-| Materiales más caros | V | V | V (su proyecto) | V | V | V | ⛔ | V |
-| Evolución de certificaciones | V | V | V (su proyecto) | V | ⛔ | ⛔ | V | V |
-| Auditoría | V | V | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ |
-| Query Builder | V | V | V (su proyecto) | V | V (su área) | V (su área) | V (su área) | V |
-| Dashboard ejecutivo | V | V | V (su proyecto, recortado) | V | ⛔ | ⛔ | ⛔ | V |
+| Reporte | OWNER | ADMIN | PM | PROJECT_FINANCE | FINANCE | TREASURER | PROCUREMENT | WAREHOUSE | SALES | VIEWER |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Rentabilidad bruta del proyecto | V | V | V (su proyecto) | V (su proyecto) | V | V | ⛔ | ⛔ | ⛔ | V |
+| Rentabilidad neta del proyecto | V | V | ⚙️ | ⚙️ | ⚙️ | ⚙️ | ⛔ | ⛔ | ⛔ | ⚙️ |
+| Rentabilidad neta consolidada | V | V | ⛔ | ⛔ | ⚙️ | ⚙️ | ⛔ | ⛔ | ⛔ | ⚙️ |
+| Presupuesto vs Real | V | V | V (su proyecto) | V (su proyecto) | V | V | V (su área) | ⛔ | V (su área) | V |
+| Avance vs Costo | V | V | V (su proyecto) | V (su proyecto) | V | V | V | ⛔ | ⛔ | V |
+| Cashflow Real | V | V | V (su proyecto) | V (su proyecto) | V | V | ⛔ | ⛔ | ⛔ | V |
+| Proyección de Caja | V | V | V (su proyecto) | ⛔ | V | V | ⛔ | ⛔ | ⛔ | V |
+| AR (aging) | V | V | V (su proyecto) | V (su proyecto) | V | V | ⛔ | ⛔ | V | V |
+| AP (aging) | V | V | V (su proyecto) | V (su proyecto) | V | V | V | ⛔ | ⛔ | V |
+| Stock / Valorización | V | V | V (su proyecto) | ⛔ | V | ⛔ | V | V | ⛔ | V |
+| Compras por proveedor | V | V | V (su proyecto) | ⛔ | V | ⛔ | V | V | ⛔ | V |
+| Compras multi-proyecto | V | V | ⛔ | ⛔ | V | ⛔ | V | V | ⛔ | V |
+| Materiales más caros | V | V | V (su proyecto) | ⛔ | V | ⛔ | V | V | ⛔ | V |
+| Evolución de certificaciones | V | V | V (su proyecto) | V (su proyecto) | V | V | ⛔ | ⛔ | V | V |
+| Auditoría | V | V | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ |
+| Query Builder | V | V | V (su proyecto) | V (su proyecto) | V | V | V (su área) | V (su área) | V (su área) | V |
+| Dashboard ejecutivo | V | V | V (su proyecto, recortado) | V (su proyecto, recortado) | V | V | ⛔ | ⛔ | ⛔ | V |
 
 ### 2.4 Administración
 
@@ -215,7 +217,7 @@ Esta sección **no** cambia reglas de código; documenta huecos entre matriz doc
 ### 9.3 Aging global y `PROJECT_MANAGER` — cerrado [D-056]
 
 - **Antes:** PM con `EDIT AR` ⇒ `VIEW AR` ⇒ aging CxC tenant-wide.
-- **Ahora:** listados/hub company AR/AP requieren rol de company finance (`OWNER`/`ADMIN`/`FINANCE`/`VIEWER`). PM y `PROJECT_FINANCE` usan rutas de proyecto.
+- **Ahora:** listados/hub company AR/AP requieren rol de company finance (`OWNER`/`ADMIN`/`FINANCE`/`TREASURER`/`VIEWER`). PM y `PROJECT_FINANCE` usan rutas de proyecto.
 
 ### 9.4 Certificaciones vs atajo `VIEW PROJECTS`
 

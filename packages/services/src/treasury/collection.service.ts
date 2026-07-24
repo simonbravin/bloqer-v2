@@ -1,5 +1,5 @@
 import { Prisma, prisma, Collection } from "@bloqer/database";
-import { canEditArArea, canViewArProjectArea, canViewCompanyAr } from "../ar/ar-access";
+import { canMutateArForScope, canViewArProjectArea, canViewCompanyAr } from "../ar/ar-access";
 import type { CreateCollectionInput } from "@bloqer/validators";
 import { auditAr } from "../ar/ar-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
@@ -129,9 +129,6 @@ export async function createCollection(
   projectScopeId?: string,
 ): Promise<CollectionView> {
   await assertArTenantModule(ctx);
-  if (!canEditArArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para registrar cobranzas");
-  }
 
   const receivablePreview = await prisma.receivable.findUnique({
     where: { id: input.receivableId },
@@ -139,6 +136,9 @@ export async function createCollection(
   });
   if (!receivablePreview) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
   if (receivablePreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (!canMutateArForScope(ctx.roles, receivablePreview.projectId)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para registrar cobranzas");
+  }
   if (isCrossCompany(receivablePreview.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
   }
@@ -299,8 +299,20 @@ export async function cancelCollection(
   projectScopeId?: string,
 ): Promise<Collection> {
   await assertArTenantModule(ctx);
-  if (!canEditArArea(ctx.roles)) {
+
+  const collectionPreview = await prisma.collection.findUnique({
+    where: { id },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!collectionPreview) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
+  if (collectionPreview.tenantId !== ctx.tenantId) {
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  }
+  if (!canMutateArForScope(ctx.roles, collectionPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar cobranzas");
+  }
+  if (projectScopeId !== undefined && collectionPreview.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a este proyecto");
   }
 
   const updated = await prisma.$transaction(async (tx) => {

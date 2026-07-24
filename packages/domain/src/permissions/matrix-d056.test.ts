@@ -22,7 +22,20 @@ test("D-056: FINANCE keeps company treasury and GL", () => {
   assert.equal(can(["FINANCE"], "VIEW", "TREASURY"), true);
   assert.equal(can(["FINANCE"], "VIEW", "BANK_ACCOUNTS"), true);
   assert.equal(can(["FINANCE"], "VIEW", "ACCOUNTING"), true);
+  assert.equal(can(["FINANCE"], "APPROVE", "ACCOUNTING"), true);
   assert.equal(hasCompanyFinanceRole(["FINANCE"]), true);
+});
+
+test("D-056: TREASURER has company cash without GL approve", () => {
+  assert.equal(can(["TREASURER"], "APPROVE", "TREASURY"), true);
+  assert.equal(can(["TREASURER"], "APPROVE", "BANK_ACCOUNTS"), true);
+  assert.equal(can(["TREASURER"], "EDIT", "AR"), true);
+  assert.equal(can(["TREASURER"], "EDIT", "AP"), true);
+  assert.equal(can(["TREASURER"], "VIEW", "ACCOUNTING"), true);
+  assert.equal(can(["TREASURER"], "EDIT", "ACCOUNTING"), false);
+  assert.equal(can(["TREASURER"], "APPROVE", "ACCOUNTING"), false);
+  assert.equal(can(["TREASURER"], "APPROVE", "TAXES"), false);
+  assert.equal(hasCompanyFinanceRole(["TREASURER"]), true);
 });
 
 test("D-056: PROJECT_FINANCE has project AR/AP without treasury", () => {

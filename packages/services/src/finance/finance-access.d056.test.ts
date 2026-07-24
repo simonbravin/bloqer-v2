@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { canViewCompanyAp } from "../ap/ap-access";
-import { canViewCompanyAr } from "../ar/ar-access";
+import { canEditCompanyAp, canMutateApForScope, canViewCompanyAp } from "../ap/ap-access";
+import { canMutateArForScope, canViewCompanyAr } from "../ar/ar-access";
 import { canViewCompanyFinanceHub, canViewCompanyTreasury } from "../finance/finance-access";
 
 describe("D-056 company finance helpers", () => {
@@ -18,6 +18,25 @@ describe("D-056 company finance helpers", () => {
     assert.equal(canViewCompanyTreasury(["FINANCE"]), true);
     assert.equal(canViewCompanyAr(["FINANCE"]), true);
     assert.equal(canViewCompanyAp(["FINANCE"]), true);
+  });
+
+  it("allows TREASURER company hub and treasury", () => {
+    assert.equal(canViewCompanyFinanceHub(["TREASURER"]), true);
+    assert.equal(canViewCompanyTreasury(["TREASURER"]), true);
+    assert.equal(canViewCompanyAr(["TREASURER"]), true);
+    assert.equal(canViewCompanyAp(["TREASURER"]), true);
+  });
+
+  it("blocks PROCUREMENT from company AP edit helper", () => {
+    assert.equal(canEditCompanyAp(["PROCUREMENT"]), false);
+    assert.equal(canMutateApForScope(["PROCUREMENT"], null), false);
+    assert.equal(canMutateApForScope(["PROCUREMENT"], "proj-1"), true);
+  });
+
+  it("blocks SALES from company AR mutate on corporate scope", () => {
+    assert.equal(canMutateArForScope(["SALES"], null), false);
+    assert.equal(canMutateArForScope(["SALES"], "proj-1"), true);
+    assert.equal(canMutateArForScope(["TREASURER"], null), true);
   });
 
   it("allows VIEWER read company finance", () => {

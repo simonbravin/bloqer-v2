@@ -1,6 +1,7 @@
 import { Prisma, prisma, AccountMovement } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import { auditTreasury } from "./treasury-audit";
+import { canViewCompanyTreasury } from "../finance/finance-access";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { assertCanCancelAccountMovement } from "./account-movement-cancel-guards";
@@ -17,7 +18,7 @@ export async function getAccountMovementById(
   ctx: ServiceContext,
 ): Promise<AccountMovementView> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "TREASURY")) {
+  if (!canViewCompanyTreasury(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver movimientos");
   }
   const m = await prisma.accountMovement.findUnique({ where: { id } });
@@ -31,7 +32,7 @@ export async function listAccountMovements(
   ctx: ServiceContext,
 ): Promise<AccountMovementView[]> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "TREASURY")) {
+  if (!canViewCompanyTreasury(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver movimientos");
   }
   const acc = await prisma.treasuryAccount.findUnique({ where: { id: accountId } });
@@ -53,7 +54,7 @@ export async function cancelAccountMovement(
   ctx: ServiceContext,
 ): Promise<AccountMovement> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "TREASURY")) {
+  if (!hasCompanyFinanceRole(ctx.roles) || !can(ctx.roles, "EDIT", "TREASURY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar movimientos");
   }
   const m = await prisma.accountMovement.findUnique({ where: { id } });

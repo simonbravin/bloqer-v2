@@ -1,5 +1,4 @@
 import { Prisma, prisma, Payment } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import type { CreatePaymentInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
 import { applyPaymentToPayable } from "./apply-payment-to-payable";
@@ -10,7 +9,7 @@ import { resolvePagination } from "../finance/pagination";
 import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
-import { canViewApProjectArea, canViewCompanyAp } from "./ap-access";
+import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 export type PaymentView = Omit<Payment, "amount"> & {
@@ -181,9 +180,6 @@ export async function createPayment(
 ): Promise<PaymentView> {
   await assertApTenantModule(ctx);
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "AP")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para registrar pagos");
-  }
 
   const payablePreview = await prisma.payable.findUnique({
     where: { id: input.payableId },
@@ -191,6 +187,9 @@ export async function createPayment(
   });
   if (!payablePreview) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
   if (payablePreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (!canMutateApForScope(ctx.roles, payablePreview.projectId)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para registrar pagos");
+  }
   if (projectScopeId !== undefined && payablePreview.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
   }
@@ -285,8 +284,18 @@ export async function cancelPayment(
   projectScopeId?: string,
 ): Promise<Payment> {
   await assertApTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "AP")) {
+
+  const paymentPreview = await prisma.payment.findUnique({
+    where: { id },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!paymentPreview) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
+  if (paymentPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (!canMutateApForScope(ctx.roles, paymentPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar pagos");
+  }
+  if (projectScopeId !== undefined && paymentPreview.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");
   }
 
   const updated = await prisma.$transaction(async (tx) => {

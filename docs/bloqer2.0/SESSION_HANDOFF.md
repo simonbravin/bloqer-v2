@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
 Last updated: 2026-07-24  
-Status: **D-056** company vs project finance RBAC — hub `/finanzas` + tesorería/GL solo `OWNER|ADMIN|FINANCE|VIEWER`; rol `PROJECT_FINANCE`; PM/SALES/PROCUREMENT sin caja empresa; hardening IDOR/scope AR-AP (Fase 0). Ver [`PERMISSIONS_MATRIX.md`](./00-product/PERMISSIONS_MATRIX.md) §2.2 + [D-056](./00-product/DECISION_LOG.md).
+Status: **D-056** company vs project finance RBAC — hub `/finanzas` + tesorería/GL solo `OWNER|ADMIN|FINANCE|TREASURER|VIEWER`; roles `PROJECT_FINANCE` (obra) y `TREASURER` (caja sin APPROVE GL); PM/SALES/PROCUREMENT sin caja empresa; hardening IDOR/scope AR-AP (Fase 0). Ver [`PERMISSIONS_MATRIX.md`](./00-product/PERMISSIONS_MATRIX.md) §2.2 + [D-056](./00-product/DECISION_LOG.md).
 
 ---
 
