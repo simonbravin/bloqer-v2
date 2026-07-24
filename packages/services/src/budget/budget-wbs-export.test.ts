@@ -153,6 +153,64 @@ describe("buildBudgetWbsExportTable", () => {
     assert.equal(totalRow[4], grand.totalCostDirect.toFixed(2));
   });
 
+  it("unitario adds unit columns alongside totals", () => {
+    const { headers, rows } = buildBudgetWbsExportTable(tree, {
+      base: "cost",
+      scale: "unit",
+      detail: "compact",
+      showIncidence: false,
+    });
+    assert.deepEqual(headers.slice(4), ["CostoDirecto_u", "CostoDirecto"]);
+    const leafA = rows.find((r) => r[0] === "1.1")!;
+    assert.equal(leafA[5], "300.00"); // total always present
+    const totalRow = rows[rows.length - 1]!;
+    assert.equal(totalRow[4], ""); // unit blank on TOTAL
+    assert.equal(totalRow[5], computeTreeGrandTotals(tree).totalCostDirect.toFixed(2));
+  });
+
+  it("breakdown + unitario keeps header/row length and blank unit TOTAL cells", () => {
+    const { headers, rows } = buildBudgetWbsExportTable(tree, {
+      base: "cost",
+      scale: "unit",
+      detail: "breakdown",
+      showIncidence: true,
+    });
+    assert.equal(headers.length, 15); // 4 fixed + 10 money + incidencia
+    assert.deepEqual(headers.slice(4, 14), [
+      "Materiales_u",
+      "ManoDeObra_u",
+      "Equipos_u",
+      "Subcontrato_u",
+      "CostoDirecto_u",
+      "Materiales",
+      "ManoDeObra",
+      "Equipos",
+      "Subcontrato",
+      "CostoDirecto",
+    ]);
+    for (const row of rows) {
+      assert.equal(row.length, headers.length);
+    }
+    const totalRow = rows[rows.length - 1]!;
+    assert.deepEqual(totalRow.slice(4, 9), ["", "", "", "", ""]);
+    assert.equal(totalRow[13], computeTreeGrandTotals(tree).totalCostDirect.toFixed(2));
+    assert.equal(totalRow[14], "100.00%");
+
+    const pdfRows = budgetWbsExportPdfRowsFromTable(
+      {
+        base: "cost",
+        scale: "unit",
+        detail: "breakdown",
+        showIncidence: true,
+        view: "breakdown",
+      },
+      rows,
+    );
+    const pdfTotal = pdfRows[pdfRows.length - 1]!;
+    assert.equal(pdfTotal.c13, totalRow[13]);
+    assert.equal(pdfTotal.c14, "100.00%");
+  });
+
   it("sale + incidence adds IncidenciaPct and uses sale totals", () => {
     const { headers, rows } = buildBudgetWbsExportTable(tree, {
       base: "sale",

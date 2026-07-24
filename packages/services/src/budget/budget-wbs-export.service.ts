@@ -45,13 +45,12 @@ function normalizeExportMode(partial: Partial<BudgetWbsExportMode>): BudgetWbsEx
 }
 
 function viewLabelEs(mode: BudgetWbsExportMode): string {
-  const parts = [
-    mode.base === "sale" ? "Venta" : "Costo",
-    mode.scale === "unit" ? "Unitario" : "Total",
-  ];
+  const parts = [mode.base === "sale" ? "Venta" : "Costo"];
   if (mode.base === "cost") {
     parts.push(mode.detail === "breakdown" ? "Desglose" : "Compacto");
   }
+  // Totals always included; Unitario is additive ([D-058] amend).
+  if (mode.scale === "unit") parts.push("Unitario");
   if (mode.showIncidence) parts.push("Incidencia");
   return parts.join(" · ");
 }
@@ -114,18 +113,25 @@ function flattenWbsTree(nodes: WbsViewNode[]): WbsViewNode[] {
 
 function buildHeaders(mode: BudgetWbsExportMode): string[] {
   const headers = ["CodigoWBS", "Item", "Unidad", "Cantidad"];
+  const withUnit = mode.scale === "unit";
+
   if (mode.base === "sale") {
-    headers.push(mode.scale === "unit" ? "PUVenta" : "TotalVenta");
+    if (withUnit) headers.push("PUVenta");
+    headers.push("TotalVenta");
   } else if (mode.detail === "breakdown") {
-    headers.push(
-      mode.scale === "unit" ? "Materiales_u" : "Materiales",
-      mode.scale === "unit" ? "ManoDeObra_u" : "ManoDeObra",
-      mode.scale === "unit" ? "Equipos_u" : "Equipos",
-      mode.scale === "unit" ? "Subcontrato_u" : "Subcontrato",
-      mode.scale === "unit" ? "CD_unit" : "CostoDirecto",
-    );
+    if (withUnit) {
+      headers.push(
+        "Materiales_u",
+        "ManoDeObra_u",
+        "Equipos_u",
+        "Subcontrato_u",
+        "CostoDirecto_u",
+      );
+    }
+    headers.push("Materiales", "ManoDeObra", "Equipos", "Subcontrato", "CostoDirecto");
   } else {
-    headers.push(mode.scale === "unit" ? "CD_unit" : "CostoDirecto");
+    if (withUnit) headers.push("CostoDirecto_u");
+    headers.push("CostoDirecto");
   }
   if (mode.showIncidence) headers.push("IncidenciaPct");
   return headers;
@@ -140,63 +146,70 @@ function moneyCellsForNode(
   const unitCats = isLeaf ? computeUnitCategoryCosts(node) : null;
   const unitCd = isLeaf ? parseFloat(node.costItem!.unitCostDirect) || 0 : null;
   const unitSale = isLeaf ? parseFloat(node.costItem!.unitSalePrice) || 0 : null;
+  const withUnit = mode.scale === "unit";
+  const cells: string[] = [];
 
   if (mode.base === "sale") {
-    if (mode.scale === "unit") {
-      return [unitSale != null ? formatDecimal(unitSale) : ""];
-    }
-    return [formatDecimal(metrics.totalSalePrice)];
+    if (withUnit) cells.push(unitSale != null ? formatDecimal(unitSale) : "");
+    cells.push(formatDecimal(metrics.totalSalePrice));
+    return cells;
   }
 
   if (mode.detail === "breakdown") {
-    if (mode.scale === "unit") {
+    if (withUnit) {
       if (!unitCats || unitCd == null) {
-        return ["", "", "", "", ""];
+        cells.push("", "", "", "", "");
+      } else {
+        cells.push(
+          formatDecimal(unitCats.MATERIAL),
+          formatDecimal(unitCats.LABOR),
+          formatDecimal(unitCats.EQUIPMENT),
+          formatDecimal(unitCats.SUBCONTRACT),
+          formatDecimal(unitCd),
+        );
       }
-      return [
-        formatDecimal(unitCats.MATERIAL),
-        formatDecimal(unitCats.LABOR),
-        formatDecimal(unitCats.EQUIPMENT),
-        formatDecimal(unitCats.SUBCONTRACT),
-        formatDecimal(unitCd),
-      ];
     }
-    return [
+    cells.push(
       formatDecimal(metrics.byCategory.MATERIAL),
       formatDecimal(metrics.byCategory.LABOR),
       formatDecimal(metrics.byCategory.EQUIPMENT),
       formatDecimal(metrics.byCategory.SUBCONTRACT),
       formatDecimal(metrics.totalCostDirect),
-    ];
+    );
+    return cells;
   }
 
-  if (mode.scale === "unit") {
-    return [unitCd != null ? formatDecimal(unitCd) : ""];
-  }
-  return [formatDecimal(metrics.totalCostDirect)];
+  if (withUnit) cells.push(unitCd != null ? formatDecimal(unitCd) : "");
+  cells.push(formatDecimal(metrics.totalCostDirect));
+  return cells;
 }
 
 function moneyCellsForGrand(
   grand: ReturnType<typeof computeTreeGrandTotals>,
   mode: BudgetWbsExportMode,
 ): string[] {
-  if (mode.scale === "unit") {
-    const n = mode.base === "cost" && mode.detail === "breakdown" ? 5 : 1;
-    return Array.from({ length: n }, () => "");
-  }
+  const withUnit = mode.scale === "unit";
+  const cells: string[] = [];
+
   if (mode.base === "sale") {
-    return [formatDecimal(grand.totalSalePrice)];
+    if (withUnit) cells.push("");
+    cells.push(formatDecimal(grand.totalSalePrice));
+    return cells;
   }
   if (mode.detail === "breakdown") {
-    return [
+    if (withUnit) cells.push("", "", "", "", "");
+    cells.push(
       formatDecimal(grand.byCategory.MATERIAL),
       formatDecimal(grand.byCategory.LABOR),
       formatDecimal(grand.byCategory.EQUIPMENT),
       formatDecimal(grand.byCategory.SUBCONTRACT),
       formatDecimal(grand.totalCostDirect),
-    ];
+    );
+    return cells;
   }
-  return [formatDecimal(grand.totalCostDirect)];
+  if (withUnit) cells.push("");
+  cells.push(formatDecimal(grand.totalCostDirect));
+  return cells;
 }
 
 function incidenceForMetrics(
@@ -385,20 +398,50 @@ export function budgetWbsExportPdfColumns(
   const headers = buildHeaders(mode);
   return headers.map((label, index) => ({
     key: `c${index}`,
-    label:
-      label === "CodigoWBS"
-        ? "Nº"
-        : label === "Item"
-          ? "Ítem"
-          : label === "Unidad"
-            ? "Un."
-            : label === "Cantidad"
-              ? "Cant."
-              : label === "IncidenciaPct"
-                ? "Incid."
-                : label.replace(/_/g, " "),
+    label: pdfHeaderLabelEs(label),
     flex: index <= 1 ? (index === 1 ? 1.4 : 0.6) : 0.7,
   }));
+}
+
+function pdfHeaderLabelEs(label: string): string {
+  switch (label) {
+    case "CodigoWBS":
+      return "Nº";
+    case "Item":
+      return "Ítem";
+    case "Unidad":
+      return "Un.";
+    case "Cantidad":
+      return "Cant.";
+    case "IncidenciaPct":
+      return "Incid.";
+    case "PUVenta":
+      return "PU venta";
+    case "TotalVenta":
+      return "Total venta";
+    case "CostoDirecto":
+      return "Costo dir.";
+    case "CostoDirecto_u":
+      return "Costo dir./u";
+    case "Materiales_u":
+      return "Mat./u";
+    case "ManoDeObra_u":
+      return "MO/u";
+    case "Equipos_u":
+      return "Eq./u";
+    case "Subcontrato_u":
+      return "Sub./u";
+    case "Materiales":
+      return "Mat.";
+    case "ManoDeObra":
+      return "MO";
+    case "Equipos":
+      return "Eq.";
+    case "Subcontrato":
+      return "Sub.";
+    default:
+      return label.replace(/_/g, " ");
+  }
 }
 
 /** Maps export table rows (incl. TOTAL GENERAL) to PDF column keys. */

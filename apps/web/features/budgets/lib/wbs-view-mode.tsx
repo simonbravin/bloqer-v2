@@ -10,14 +10,14 @@ import {
   type ReactNode,
 } from "react";
 
-/** [D-058] + [D-060] EDT table view axes. */
+/** [D-058] + [D-060] EDT table view axes. Totals always on; unitario is additive. */
 export type WbsViewBase = "cost" | "sale";
-export type WbsViewScale = "unit" | "total";
 export type WbsViewDetail = "compact" | "breakdown";
 
 export type WbsViewMode = {
   base: WbsViewBase;
-  scale: WbsViewScale;
+  /** When true, unit columns appear alongside always-visible totals. */
+  showUnit: boolean;
   detail: WbsViewDetail;
   /** Independent toggle — % of project total (cost or sale base). */
   showIncidence: boolean;
@@ -25,12 +25,17 @@ export type WbsViewMode = {
 
 const DEFAULT_VIEW: WbsViewMode = {
   base: "cost",
-  scale: "total",
+  showUnit: false,
   detail: "breakdown",
   showIncidence: false,
 };
 
 export function wbsViewModeStorageKey(budgetId: string): string {
+  return `wbs-view-mode-v4-${budgetId}`;
+}
+
+/** Previous key — read once to migrate preferences after Unitario became additive. */
+function wbsViewModeLegacyStorageKey(budgetId: string): string {
   return `wbs-view-mode-v3-${budgetId}`;
 }
 
@@ -44,10 +49,13 @@ function parseStored(raw: string | null): WbsViewMode {
     return { ...DEFAULT_VIEW, detail: "compact" };
   }
   try {
-    const parsed = JSON.parse(raw) as Partial<WbsViewMode>;
+    const parsed = JSON.parse(raw) as Partial<WbsViewMode> & { scale?: string };
+    const showUnit =
+      parsed.showUnit === true ||
+      parsed.scale === "unit";
     return {
       base: parsed.base === "sale" ? "sale" : "cost",
-      scale: parsed.scale === "unit" ? "unit" : "total",
+      showUnit,
       detail: parsed.detail === "compact" ? "compact" : "breakdown",
       showIncidence: parsed.showIncidence === true,
     };
@@ -61,13 +69,23 @@ function normalizeMode(mode: WbsViewMode): WbsViewMode {
     ...mode,
     // Desglose solo aplica a costo ([D-058])
     detail: mode.base === "sale" ? "compact" : mode.detail,
+    showUnit: Boolean(mode.showUnit),
     showIncidence: Boolean(mode.showIncidence),
   };
 }
 
-function readStoredViewMode(storageKey: string): WbsViewMode {
+function readStoredViewMode(budgetId: string, storageKey: string): WbsViewMode {
   if (typeof window === "undefined") return DEFAULT_VIEW;
-  return normalizeMode(parseStored(sessionStorage.getItem(storageKey)));
+  const legacyKey = wbsViewModeLegacyStorageKey(budgetId);
+  const current = sessionStorage.getItem(storageKey);
+  const legacy = sessionStorage.getItem(legacyKey);
+  // Prefer v3 when both exist (avoids discarding richer prefs behind a stale DEFAULT v4).
+  const mode = normalizeMode(parseStored(legacy ?? current));
+  if (legacy != null) {
+    sessionStorage.setItem(storageKey, JSON.stringify(mode));
+    sessionStorage.removeItem(legacyKey);
+  }
+  return mode;
 }
 
 type BudgetWbsViewContextValue = {
@@ -90,8 +108,8 @@ export function BudgetWbsViewProvider({
   const [viewMode, setViewModeState] = useState<WbsViewMode>(DEFAULT_VIEW);
 
   useEffect(() => {
-    setViewModeState(readStoredViewMode(storageKey));
-  }, [storageKey]);
+    setViewModeState(readStoredViewMode(budgetId, storageKey));
+  }, [budgetId, storageKey]);
 
   const setViewMode = useCallback(
     (mode: WbsViewMode) => {

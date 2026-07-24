@@ -22,7 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { CATEGORY_LABELS, VISIBLE_COST_CATEGORIES, type VisibleCostCategory } from "@/lib/budget-categories";
 import { budgetUnitLabel } from "@/lib/budget-units";
@@ -445,52 +444,66 @@ export function CostItemApuDialog({
     <>
       <Dialog open={open} onOpenChange={requestClose}>
         <DialogContent className="flex max-h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0 pr-12">
-          <div className="border-b px-6 py-4">
-            <DialogTitle className="text-lg pr-6">
+          <div className="border-b px-5 py-3">
+            <DialogTitle className="pr-6 text-base">
               APU — Análisis de precio unitario
             </DialogTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-0.5 text-sm text-muted-foreground">
               <span className="font-mono">{node.code}</span> — {node.name}
             </p>
             {node.description?.trim() ? (
-              <p className="mt-2 text-sm leading-relaxed text-foreground">{node.description.trim()}</p>
+              <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                {node.description.trim()}
+              </p>
             ) : null}
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <div className="flex-1 space-y-3 overflow-y-auto px-5 py-3">
+            {/* Resumen costo por categoría (unitario) */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               {VISIBLE_COST_CATEGORIES.map((cat) => (
-                <div key={cat} className="rounded-lg border bg-card p-3 text-center">
-                  <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[cat]} / und.</p>
-                  <p className="font-mono text-sm font-semibold tabular-nums">
+                <div key={cat} className="rounded-md border bg-card px-2 py-1.5 text-center">
+                  <p className="text-[10px] leading-tight text-muted-foreground">
+                    {CATEGORY_LABELS[cat]} /u
+                  </p>
+                  <p className="font-mono text-xs font-semibold tabular-nums">
                     {fmtMoney(String(unitByCategory[cat]), currency)}
                   </p>
                 </div>
               ))}
-              <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-3 text-center col-span-2 sm:col-span-1">
-                <p className="text-xs text-muted-foreground">Costo directo unit.</p>
-                <p className="font-mono text-sm font-bold tabular-nums">
+              <div className="col-span-2 rounded-md border border-primary/25 bg-primary/5 px-2 py-1.5 text-center sm:col-span-1">
+                <p className="text-[10px] leading-tight text-muted-foreground">Costo dir. /u</p>
+                <p className="font-mono text-xs font-bold tabular-nums">
                   {fmtMoney(String(unitCostDirect), currency)}
                 </p>
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  CD total: {fmtMoney(String(totalProjectCost), currency)} ({fmtNum(quantity)} {itemUnitLabel})
+                <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+                  Total: {fmtMoney(String(totalProjectCost), currency)} · {fmtNum(quantity)}{" "}
+                  {itemUnitLabel}
                 </p>
               </div>
             </div>
 
-            <div className="rounded-lg border p-4 space-y-3">
-              <h3 className="text-sm font-semibold">Datos del ítem</h3>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="space-y-1">
-                  <Label className="text-xs">Unidad</Label>
+            {/* Datos del ítem */}
+            <section className="space-y-2 rounded-md border p-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Datos del ítem
+                </h3>
+                <p className="text-[10px] text-muted-foreground">
+                  Venta y márgenes se editan en la EDT
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="space-y-0.5">
+                  <Label className="text-[11px]">Unidad</Label>
                   {editable ? (
-                    <UnitSelect value={unit} onChange={setUnit} className="h-9" />
+                    <UnitSelect value={unit} onChange={setUnit} className="h-8" />
                   ) : (
                     <p className="text-sm font-medium">{unit || "—"}</p>
                   )}
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Cantidad</Label>
+                <div className="space-y-0.5">
+                  <Label className="text-[11px]">Cantidad</Label>
                   {editable ? (
                     <Input
                       type="number"
@@ -502,38 +515,44 @@ export function CostItemApuDialog({
                         const next = parseFloat(quantity) || 0;
                         if (next > 0) syncLinesToQuantity(next);
                       }}
-                      className="h-9 font-mono"
+                      className="h-8 font-mono"
                     />
                   ) : (
-                    <p className="text-sm font-mono font-medium">{fmtNum(quantity)}</p>
+                    <p className="font-mono text-sm font-medium">{fmtNum(quantity)}</p>
                   )}
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">CD unitario</Label>
-                  <p className="text-sm font-mono font-medium">{fmtMoney(String(unitCostDirect), currency)}</p>
+                <div className="space-y-0.5">
+                  <Label className="text-[11px]">Costo dir. /u</Label>
+                  <p className="font-mono text-sm font-medium">
+                    {fmtMoney(String(unitCostDirect), currency)}
+                  </p>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">CD total</Label>
-                  <p className="text-sm font-mono font-semibold">{fmtMoney(String(totalProjectCost), currency)}</p>
+                <div className="space-y-0.5">
+                  <Label className="text-[11px]">Costo directo</Label>
+                  <p className="font-mono text-sm font-semibold">
+                    {fmtMoney(String(totalProjectCost), currency)}
+                  </p>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                El precio de venta se ve y calcula en la tabla EDT (márgenes del presupuesto).
-              </p>
-              {editable && (
-                <div className="space-y-1">
-                  <Label className="text-xs">Notas</Label>
+              {editable ? (
+                <div className="space-y-0.5">
+                  <Label className="text-[11px]">Notas</Label>
                   <Textarea
                     rows={1}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="min-h-8 resize-y text-sm"
+                    className="min-h-7 resize-y text-xs"
+                    placeholder="Opcional"
                   />
                 </div>
-              )}
-            </div>
+              ) : null}
+            </section>
 
-            <div className="space-y-3">
+            {/* Insumos por categoría */}
+            <section className="space-y-2 rounded-md border p-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Insumos APU
+              </h3>
               <div className="flex flex-wrap gap-1">
                 {VISIBLE_COST_CATEGORIES.map((cat) => {
                   const count = lines.filter((l) => !l._deleted && l.category === cat).length;
@@ -543,7 +562,7 @@ export function CostItemApuDialog({
                       type="button"
                       size="sm"
                       variant={activeTab === cat ? "default" : "outline"}
-                      className="text-xs"
+                      className="h-7 text-xs"
                       onClick={() => setActiveTab(cat)}
                     >
                       {CATEGORY_LABELS[cat]} ({count})
@@ -553,41 +572,47 @@ export function CostItemApuDialog({
               </div>
 
               {visibleLines.length === 0 ? (
-                <ListEmptyState
-                  className="border border-dashed py-8"
-                  message="Ej.: Zapata corrida — cargá 500 un de hierro en Total partida → Cant. recurso. Los insumos van acá, no como ítems hijos del WBS."
-                />
+                <p className="rounded border border-dashed px-2.5 py-1.5 text-[10px] leading-snug text-muted-foreground">
+                  Tip: los insumos van acá (no como hijos WBS). Ej.: 500 un de hierro con{" "}
+                  <span className="font-medium text-foreground/80">Total partida</span>.
+                </p>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Descripción</TableHead>
-                      <TableHead>Un.</TableHead>
-                      <TableHead className="text-right">Cant. recurso</TableHead>
-                      <TableHead className="text-right">Precio</TableHead>
-                      <TableHead className="text-right">Aporte / und.</TableHead>
-                      <TableHead className="text-right">Total partida</TableHead>
-                      {editable && <TableHead />}
+                    <TableRow className="h-8">
+                      <TableHead className="h-8 text-xs">Descripción</TableHead>
+                      <TableHead className="h-8 text-xs">Un.</TableHead>
+                      <TableHead className="h-8 text-right text-xs">Cant. recurso</TableHead>
+                      <TableHead className="h-8 text-right text-xs">Precio</TableHead>
+                      <TableHead className="h-8 text-right text-xs">Aporte /u</TableHead>
+                      <TableHead className="h-8 text-right text-xs">Total partida</TableHead>
+                      {editable && <TableHead className="h-8" />}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {visibleLines.map((line) => {
                       const partidaLineTotal = displayPartidaLineTotal(line, qtyN);
                       return (
-                        <TableRow key={line.id}>
-                          <TableCell className="text-sm">{line.description}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{line.unit}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">
+                        <TableRow key={line.id} className="h-8">
+                          <TableCell className="py-1 text-sm">{line.description}</TableCell>
+                          <TableCell className="py-1 text-xs text-muted-foreground">
+                            {line.unit}
+                          </TableCell>
+                          <TableCell className="py-1 text-right font-mono text-xs">
                             {displayResourceQtyLabel(line, qtyN)}
                           </TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmtNum(line.unitCost)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmtNum(line.totalCost)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm font-medium">
+                          <TableCell className="py-1 text-right font-mono text-xs">
+                            {fmtNum(line.unitCost)}
+                          </TableCell>
+                          <TableCell className="py-1 text-right font-mono text-xs">
+                            {fmtNum(line.totalCost)}
+                          </TableCell>
+                          <TableCell className="py-1 text-right font-mono text-xs font-medium">
                             {fmtNum(String(partidaLineTotal))}
                           </TableCell>
                           {editable && (
-                            <TableCell>
-                              <div className="flex gap-1">
+                            <TableCell className="py-1">
+                              <div className="flex gap-0.5">
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -615,10 +640,12 @@ export function CostItemApuDialog({
               )}
 
               {editable && (
-                <div className="rounded-lg border border-dashed shell-surface-inset p-4 space-y-3">
+                <div className="space-y-2 rounded-md border border-dashed bg-muted/20 p-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium">Agregar {CATEGORY_LABELS[activeTab]}</p>
-                    <div className="flex flex-wrap gap-2">
+                    <p className="text-xs font-semibold">
+                      Agregar {CATEGORY_LABELS[activeTab]}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
                       <ApuEntryModeToggle
                         value={entryMode}
                         onChange={handleEntryModeChange}
@@ -629,66 +656,85 @@ export function CostItemApuDialog({
                       )}
                     </div>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[10px] leading-snug text-muted-foreground">
                     {entryMode === "total"
                       ? totalKind === "resource"
-                        ? "Cant. recurso = necesidad de toda la partida (ej. 500 un). No se vuelve a multiplicar por la cantidad del ítem."
-                        : "Monto global = importe total de la partida; se prorratea al costo unitario del ítem."
-                      : `Por unidad = consumo por 1 ${itemUnitLabel} del ítem; el total de partida = aporte × cantidad.`}
+                        ? `Cant. recurso = necesidad total del recurso para la partida (ej. 500 un). No se multiplica de nuevo por la cantidad del ítem (${fmtNum(quantity)} ${itemUnitLabel}).`
+                        : `Monto global = importe total de la partida; se prorratea al costo /u según la cantidad del ítem (${fmtNum(quantity)} ${itemUnitLabel}).`
+                      : `Por unidad = consumo por cada 1 ${itemUnitLabel} (unidad del ítem). Cantidad del ítem: ${fmtNum(quantity)} ${itemUnitLabel} → Total partida = aporte × ${fmtNum(quantity)}.`}
                   </p>
-                  <div className="grid gap-3 sm:grid-cols-[1fr_6rem_5rem_6rem_auto] sm:items-end">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Descripción</Label>
-                      <Input value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Nombre" />
+                  <div className="grid gap-2 sm:grid-cols-[1fr_6rem_5rem_6rem_auto] sm:items-end">
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px]">Descripción</Label>
+                      <Input
+                        value={newDesc}
+                        onChange={(e) => setNewDesc(e.target.value)}
+                        placeholder="Nombre"
+                        className="h-8"
+                      />
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Unidad</Label>
-                      <UnitSelect value={newUnit} onChange={setNewUnit} className="h-9" />
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px]">Unidad</Label>
+                      <UnitSelect value={newUnit} onChange={setNewUnit} className="h-8" />
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">
-                        {entryMode === "total" && totalKind === "lump" ? "Cant." : entryMode === "total" ? "Cant. recurso" : "Rendim."}
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px]">
+                        {entryMode === "total" && totalKind === "lump"
+                          ? "Cant."
+                          : entryMode === "total"
+                            ? "Cant. recurso"
+                            : "Rendim."}
                       </Label>
-                      <Input value={newCoef} onChange={(e) => setNewCoef(e.target.value)} className="font-mono" />
+                      <Input
+                        value={newCoef}
+                        onChange={(e) => setNewCoef(e.target.value)}
+                        className="h-8 font-mono"
+                      />
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px]">
                         {entryMode === "total" && totalKind === "lump" ? "Monto" : "Precio"}
                       </Label>
-                      <Input value={newUnitCost} onChange={(e) => setNewUnitCost(e.target.value)} className="font-mono" />
+                      <Input
+                        value={newUnitCost}
+                        onChange={(e) => setNewUnitCost(e.target.value)}
+                        className="h-8 font-mono"
+                      />
                     </div>
-                    <Button type="button" size="sm" onClick={addInlineLine}>
-                      <Plus className="h-3 w-3 mr-1" /> Agregar
+                    <Button type="button" size="sm" className="h-8" onClick={addInlineLine}>
+                      <Plus className="mr-1 h-3 w-3" /> Agregar
                     </Button>
                   </div>
-                  <p className="font-mono text-[11px] text-muted-foreground space-x-3">
+                  <p className="space-x-2.5 font-mono text-[10px] text-muted-foreground">
                     <span>Necesidad: {fmtNum(String(entryPreview.resourceNeed))}</span>
                     {entryPreview.yieldPerItemUnit != null && (
                       <span>
-                        Rendimiento / {itemUnitLabel}: {fmtNum(String(entryPreview.yieldPerItemUnit))}
+                        Rendim. / {itemUnitLabel}: {fmtNum(String(entryPreview.yieldPerItemUnit))}
                       </span>
                     )}
-                    <span>Aporte / und.: {fmtNum(String(entryPreview.unitTotal))}</span>
-                    <span>Total partida: {fmtNum(String(entryPreview.partidaTotal))}</span>
+                    <span>Aporte /u: {fmtNum(String(entryPreview.unitTotal))}</span>
+                    <span className="font-medium text-foreground/80">
+                      Total partida: {fmtNum(String(entryPreview.partidaTotal))}
+                    </span>
                   </p>
                 </div>
               )}
 
               {legacyOtherLines.length > 0 && (
-                <div className="rounded-md border border-amber-200 bg-amber-50/50 p-3 space-y-2">
-                  <p className="text-xs font-medium text-amber-900">Líneas legacy (Otros)</p>
+                <div className="space-y-1.5 rounded-md border border-amber-200 bg-amber-50/50 p-2">
+                  <p className="text-[11px] font-medium text-amber-900">Líneas legacy (Otros)</p>
                   {legacyOtherLines.map((line) => (
-                    <div key={line.id} className="flex items-center justify-between text-sm">
+                    <div key={line.id} className="flex items-center justify-between text-xs">
                       <span>{line.description}</span>
                       <Badge variant="secondary">{CATEGORY_LABELS.OTHER}</Badge>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </section>
           </div>
 
-          <div className="flex justify-end gap-2 border-t px-6 py-4">
+          <div className="flex justify-end gap-2 border-t px-5 py-2.5">
             <Button type="button" variant="outline" onClick={() => requestClose(false)} disabled={isPending}>
               Cancelar
             </Button>

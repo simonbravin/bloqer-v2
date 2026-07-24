@@ -586,38 +586,144 @@ export function WbsTree({
   function renderApuMoneyCells(line: CostAnalysisLineView, itemQty: number): ReactNode {
     const unitContribution = apuLineUnitContribution(line);
     const partidaMoney = apuLinePartidaMoney(line, itemQty);
-    const value = viewMode.scale === "unit" ? unitContribution : partidaMoney;
+    const showUnit = viewMode.showUnit;
 
     if (viewMode.base === "sale") {
       return (
-        <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-32">
-          —
-        </TableCell>
+        <>
+          {showUnit ? (
+            <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-28">
+              —
+            </TableCell>
+          ) : null}
+          <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-32">
+            —
+          </TableCell>
+        </>
       );
     }
 
     if (viewMode.detail === "breakdown") {
       return (
         <>
+          {showUnit
+            ? VISIBLE_COST_CATEGORIES.map((cat) => (
+                <TableCell
+                  key={`u-${cat}`}
+                  className="py-0.5 text-right font-mono text-xs text-muted-foreground w-28"
+                >
+                  {line.category === cat ? fmt(unitContribution, currency) : "—"}
+                </TableCell>
+              ))
+            : null}
+          {showUnit ? (
+            <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-28">
+              {fmt(unitContribution, currency)}
+            </TableCell>
+          ) : null}
           {VISIBLE_COST_CATEGORIES.map((cat) => (
             <TableCell
               key={cat}
               className="py-0.5 text-right font-mono text-xs text-muted-foreground w-28"
             >
-              {line.category === cat ? fmt(value, currency) : "—"}
+              {line.category === cat ? fmt(partidaMoney, currency) : "—"}
             </TableCell>
           ))}
           <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-28">
-            {fmt(value, currency)}
+            {fmt(partidaMoney, currency)}
           </TableCell>
         </>
       );
     }
 
     return (
-      <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-32">
-        {fmt(value, currency)}
-      </TableCell>
+      <>
+        {showUnit ? (
+          <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-28">
+            {fmt(unitContribution, currency)}
+          </TableCell>
+        ) : null}
+        <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-32">
+          {fmt(partidaMoney, currency)}
+        </TableCell>
+      </>
+    );
+  }
+
+  function renderNodeMoneyCells(node: WbsViewNode, metrics: ReturnType<typeof computeWbsRowMetrics>): ReactNode {
+    const isLeaf = node.children.length === 0 && !!node.costItem;
+    const unitCats = isLeaf ? computeUnitCategoryCosts(node) : null;
+    const unitCd = isLeaf ? parseFloat(node.costItem!.unitCostDirect) || 0 : null;
+    const unitSale = isLeaf ? parseFloat(node.costItem!.unitSalePrice) || 0 : null;
+    const showUnit = viewMode.showUnit;
+
+    if (viewMode.base === "sale") {
+      return (
+        <>
+          {showUnit ? (
+            <TableCell className="py-0.5 text-right font-mono text-sm w-28">
+              {unitSale != null ? fmt(unitSale, currency) : "—"}
+            </TableCell>
+          ) : null}
+          <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-32">
+            {fmt(metrics.totalSalePrice, currency)}
+          </TableCell>
+        </>
+      );
+    }
+
+    if (viewMode.detail === "breakdown") {
+      return (
+        <>
+          {showUnit ? (
+            <>
+              <TableCell className="py-0.5 text-right font-mono text-xs w-28">
+                {unitCats ? fmt(unitCats.MATERIAL, currency) : "—"}
+              </TableCell>
+              <TableCell className="py-0.5 text-right font-mono text-xs w-28">
+                {unitCats ? fmt(unitCats.LABOR, currency) : "—"}
+              </TableCell>
+              <TableCell className="py-0.5 text-right font-mono text-xs w-28">
+                {unitCats ? fmt(unitCats.EQUIPMENT, currency) : "—"}
+              </TableCell>
+              <TableCell className="py-0.5 text-right font-mono text-xs w-28">
+                {unitCats ? fmt(unitCats.SUBCONTRACT, currency) : "—"}
+              </TableCell>
+              <TableCell className="py-0.5 text-right font-mono text-sm w-28">
+                {unitCd != null ? fmt(unitCd, currency) : "—"}
+              </TableCell>
+            </>
+          ) : null}
+          <TableCell className="py-0.5 text-right font-mono text-xs w-28">
+            {fmt(metrics.byCategory.MATERIAL, currency)}
+          </TableCell>
+          <TableCell className="py-0.5 text-right font-mono text-xs w-28">
+            {fmt(metrics.byCategory.LABOR, currency)}
+          </TableCell>
+          <TableCell className="py-0.5 text-right font-mono text-xs w-28">
+            {fmt(metrics.byCategory.EQUIPMENT, currency)}
+          </TableCell>
+          <TableCell className="py-0.5 text-right font-mono text-xs w-28">
+            {fmt(metrics.byCategory.SUBCONTRACT, currency)}
+          </TableCell>
+          <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-28">
+            {fmt(metrics.totalCostDirect, currency)}
+          </TableCell>
+        </>
+      );
+    }
+
+    return (
+      <>
+        {showUnit ? (
+          <TableCell className="py-0.5 text-right font-mono text-sm w-28">
+            {unitCd != null ? fmt(unitCd, currency) : "—"}
+          </TableCell>
+        ) : null}
+        <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-32">
+          {fmt(metrics.totalCostDirect, currency)}
+        </TableCell>
+      </>
     );
   }
 
@@ -701,62 +807,7 @@ export function WbsTree({
             {metrics.quantity != null ? metrics.quantity.toLocaleString("es-AR") : "—"}
           </TableCell>
 
-          {(() => {
-            const isLeaf = node.children.length === 0 && !!node.costItem;
-            const unitCats = isLeaf ? computeUnitCategoryCosts(node) : null;
-            const unitCd = isLeaf ? parseFloat(node.costItem!.unitCostDirect) || 0 : null;
-            const unitSale = isLeaf ? parseFloat(node.costItem!.unitSalePrice) || 0 : null;
-
-            if (viewMode.base === "sale") {
-              const saleVal =
-                viewMode.scale === "unit" ? unitSale : metrics.totalSalePrice;
-              return (
-                <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-32">
-                  {viewMode.scale === "unit"
-                    ? unitSale != null
-                      ? fmt(unitSale, currency)
-                      : "—"
-                    : fmt(saleVal as number, currency)}
-                </TableCell>
-              );
-            }
-
-            if (viewMode.detail === "breakdown") {
-              const cats =
-                viewMode.scale === "unit" && unitCats
-                  ? unitCats
-                  : metrics.byCategory;
-              const cd =
-                viewMode.scale === "unit" ? unitCd : metrics.totalCostDirect;
-              return (
-                <>
-                  <TableCell className="py-0.5 text-right font-mono text-xs w-28">
-                    {viewMode.scale === "unit" && !unitCats ? "—" : fmt(cats.MATERIAL, currency)}
-                  </TableCell>
-                  <TableCell className="py-0.5 text-right font-mono text-xs w-28">
-                    {viewMode.scale === "unit" && !unitCats ? "—" : fmt(cats.LABOR, currency)}
-                  </TableCell>
-                  <TableCell className="py-0.5 text-right font-mono text-xs w-28">
-                    {viewMode.scale === "unit" && !unitCats ? "—" : fmt(cats.EQUIPMENT, currency)}
-                  </TableCell>
-                  <TableCell className="py-0.5 text-right font-mono text-xs w-28">
-                    {viewMode.scale === "unit" && !unitCats ? "—" : fmt(cats.SUBCONTRACT, currency)}
-                  </TableCell>
-                  <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-28">
-                    {cd != null ? fmt(cd, currency) : "—"}
-                  </TableCell>
-                </>
-              );
-            }
-
-            const compact =
-              viewMode.scale === "unit" ? unitCd : metrics.totalCostDirect;
-            return (
-              <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-32">
-                {compact != null ? fmt(compact, currency) : "—"}
-              </TableCell>
-            );
-          })()}
+          {renderNodeMoneyCells(node, metrics)}
 
           {incidenceCell(metrics)}
 
@@ -922,11 +973,33 @@ export function WbsTree({
                 <TableHead className="w-20">Unidad</TableHead>
                 <TableHead className="text-right w-24">Cantidad</TableHead>
                 {viewMode.base === "sale" ? (
-                  <TableHead className="text-right whitespace-nowrap">
-                    {viewMode.scale === "unit" ? "PU venta" : "Total venta"}
-                  </TableHead>
+                  <>
+                    {viewMode.showUnit ? (
+                      <TableHead className="text-right whitespace-nowrap">PU venta</TableHead>
+                    ) : null}
+                    <TableHead className="text-right whitespace-nowrap">Total venta</TableHead>
+                  </>
                 ) : viewMode.detail === "breakdown" ? (
                   <>
+                    {viewMode.showUnit
+                      ? VISIBLE_COST_CATEGORIES.map((cat) => (
+                          <TableHead
+                            key={`u-${cat}`}
+                            className={cn(
+                              "text-right whitespace-nowrap",
+                              cat === "LABOR" && "min-w-[7.5rem]",
+                            )}
+                            title={`${WBS_EDT_BREAKDOWN_HEADERS[cat]} unitario`}
+                          >
+                            {`${WBS_EDT_BREAKDOWN_HEADERS[cat]} /u`}
+                          </TableHead>
+                        ))
+                      : null}
+                    {viewMode.showUnit ? (
+                      <TableHead className="text-right whitespace-nowrap" title="Costo directo unitario">
+                        Costo dir. /u
+                      </TableHead>
+                    ) : null}
                     {VISIBLE_COST_CATEGORIES.map((cat) => (
                       <TableHead
                         key={cat}
@@ -936,19 +1009,18 @@ export function WbsTree({
                         )}
                         title={WBS_EDT_BREAKDOWN_HEADERS[cat]}
                       >
-                        {viewMode.scale === "unit"
-                          ? `${WBS_EDT_BREAKDOWN_HEADERS[cat]} /u`
-                          : WBS_EDT_BREAKDOWN_HEADERS[cat]}
+                        {WBS_EDT_BREAKDOWN_HEADERS[cat]}
                       </TableHead>
                     ))}
-                    <TableHead className="text-right whitespace-nowrap">
-                      {viewMode.scale === "unit" ? "CD unit." : "CD total"}
-                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Costo directo</TableHead>
                   </>
                 ) : (
-                  <TableHead className="text-right whitespace-nowrap">
-                    {viewMode.scale === "unit" ? "CD unitario" : "Costo directo"}
-                  </TableHead>
+                  <>
+                    {viewMode.showUnit ? (
+                      <TableHead className="text-right whitespace-nowrap">Costo dir. /u</TableHead>
+                    ) : null}
+                    <TableHead className="text-right whitespace-nowrap">Costo directo</TableHead>
+                  </>
                 )}
                 {viewMode.showIncidence ? (
                   <TableHead
@@ -983,31 +1055,51 @@ export function WbsTree({
               <TableRow className="bg-muted/50 font-semibold hover:bg-muted/50">
                 <TableCell colSpan={4}>TOTAL GENERAL</TableCell>
                 {viewMode.base === "sale" ? (
-                  <TableCell className="text-right font-mono text-sm">
-                    {viewMode.scale === "unit" ? "—" : fmt(grandTotals.totalSalePrice, currency)}
-                  </TableCell>
+                  <>
+                    {viewMode.showUnit ? (
+                      <TableCell className="text-right font-mono text-sm">—</TableCell>
+                    ) : null}
+                    <TableCell className="text-right font-mono text-sm">
+                      {fmt(grandTotals.totalSalePrice, currency)}
+                    </TableCell>
+                  </>
                 ) : viewMode.detail === "breakdown" ? (
                   <>
+                    {viewMode.showUnit
+                      ? Array.from(
+                          { length: VISIBLE_COST_CATEGORIES.length + 1 },
+                          (_, i) => (
+                            <TableCell key={`u-grand-${i}`} className="text-right font-mono text-sm">
+                              —
+                            </TableCell>
+                          ),
+                        )
+                      : null}
                     <TableCell className="text-right font-mono text-sm">
-                      {viewMode.scale === "unit" ? "—" : fmt(grandTotals.byCategory.MATERIAL, currency)}
+                      {fmt(grandTotals.byCategory.MATERIAL, currency)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {viewMode.scale === "unit" ? "—" : fmt(grandTotals.byCategory.LABOR, currency)}
+                      {fmt(grandTotals.byCategory.LABOR, currency)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {viewMode.scale === "unit" ? "—" : fmt(grandTotals.byCategory.EQUIPMENT, currency)}
+                      {fmt(grandTotals.byCategory.EQUIPMENT, currency)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {viewMode.scale === "unit" ? "—" : fmt(grandTotals.byCategory.SUBCONTRACT, currency)}
+                      {fmt(grandTotals.byCategory.SUBCONTRACT, currency)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {viewMode.scale === "unit" ? "—" : fmt(grandTotals.totalCostDirect, currency)}
+                      {fmt(grandTotals.totalCostDirect, currency)}
                     </TableCell>
                   </>
                 ) : (
-                  <TableCell className="text-right font-mono text-sm">
-                    {viewMode.scale === "unit" ? "—" : fmt(grandTotals.totalCostDirect, currency)}
-                  </TableCell>
+                  <>
+                    {viewMode.showUnit ? (
+                      <TableCell className="text-right font-mono text-sm">—</TableCell>
+                    ) : null}
+                    <TableCell className="text-right font-mono text-sm">
+                      {fmt(grandTotals.totalCostDirect, currency)}
+                    </TableCell>
+                  </>
                 )}
                 {viewMode.showIncidence ? (
                   <TableCell className="text-right font-mono text-sm">

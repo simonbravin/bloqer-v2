@@ -1,9 +1,12 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { PermissionModule } from "@bloqer/domain";
 import { can } from "@bloqer/domain";
+import { formatWbsIncidencePercent } from "@bloqer/domain";
 import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
-import { pushMoneyRowsKpi } from "../dashboard/kpi-helpers";
+import { fmtDecimalEs, pushMoneyRowsKpi } from "../dashboard/kpi-helpers";
 import { listBudgetsByProject } from "../budget/budget.service";
+import { computeBudgetSummaryKpis } from "../budget/budget-summary-kpis";
+import { getWbsTree } from "../budget/wbs.service";
 import { summarizeProjectBillingVsCollections } from "../ar/project-ar-summary.service";
 import { getProjectFinanceOverview } from "../project-finance/project-finance-overview.service";
 import { getProjectById, getProjectShellInfo } from "./project.service";
@@ -123,6 +126,8 @@ export type ProjectOverviewDashboard = {
     estimatedEndDate: string | null;
   };
   compactKpis: DashboardKpi[];
+  /** Second KPI row: presupuesto composition (cost/sale, top leaves, category). */
+  budgetInsightKpis: DashboardKpi[];
   kpis: {
     budget: ProjectOverviewBudgetKpi | null;
     receivables: ProjectOverviewReceivablesKpi | null;
@@ -215,6 +220,8 @@ export async function getProjectOverviewDashboard(
   const finance = await getProjectFinanceOverview(ctx, projectId, { gate });
 
   let budget: ProjectOverviewBudgetKpi | null = null;
+  let budgetPickId: string | null = null;
+  let budgetPickCurrency: string | null = null;
   const budgetsGate = gate.isEnabled("BUDGETS") && gate.isEnabled("PROJECTS");
   if (!gate.isEnabled("BUDGETS")) {
     sectionsExcluded.push({ module: "BUDGETS", section: "budget", reason: "TENANT_MODULE_DISABLED" });
@@ -231,10 +238,12 @@ export async function getProjectOverviewDashboard(
       const amountByCurrency: ProjectOverviewMoneyRow[] = pick
         ? [{ currency: pick.currency, amount: pick.totalSalePrice.toString() }]
         : [];
+      budgetPickId = pick?.id ?? null;
+      budgetPickCurrency = pick?.currency ?? null;
       budget = {
         amountByCurrency,
         status: pick?.status ?? null,
-        href: `${base}/presupuestos`,
+        href: pick ? `${base}/presupuestos/${pick.id}` : `${base}/presupuestos`,
       };
     } catch {
       sectionsExcluded.push({ module: "BUDGETS", section: "budget", reason: "MISSING_PERMISSION" });
@@ -596,6 +605,18 @@ export async function getProjectOverviewDashboard(
     }
   }
 
+  const canBudgetInsights =
+    budgetsGate && canViewBudgetsArea(ctx.roles);
+  const budgetHref = budget?.href ?? `${base}/presupuestos`;
+  const budgetInsightKpis = canBudgetInsights
+    ? await buildBudgetInsightKpis({
+        budgetId: budgetPickId,
+        currency: budgetPickCurrency,
+        href: budgetHref,
+        ctx,
+      })
+    : [];
+
   return {
     project: {
       id: shell.id,
@@ -607,6 +628,7 @@ export async function getProjectOverviewDashboard(
       estimatedEndDate,
     },
     compactKpis,
+    budgetInsightKpis,
     kpis: {
       budget,
       receivables,
@@ -622,4 +644,101 @@ export async function getProjectOverviewDashboard(
     alerts,
     sectionsExcluded,
   };
+}
+
+async function buildBudgetInsightKpis(args: {
+  budgetId: string | null;
+  currency: string | null;
+  href: string;
+  ctx: ServiceContext;
+}): Promise<DashboardKpi[]> {
+  const empty: DashboardKpi[] = [
+    {
+      key: "budget_cost_to_sale",
+      label: "Costo / venta",
+      value: "—",
+      helper: "Presupuesto aprobado o cerrado",
+      href: args.href,
+      tone: "muted",
+    },
+    {
+      key: "budget_costliest_item",
+      label: "Partida más costosa",
+      value: "—",
+      href: args.href,
+      tone: "muted",
+    },
+    {
+      key: "budget_top_incidence",
+      label: "Capítulo mayor incidencia",
+      value: "—",
+      href: args.href,
+      tone: "muted",
+    },
+    {
+      key: "budget_dominant_category",
+      label: "Categoría dominante",
+      value: "—",
+      href: args.href,
+      tone: "muted",
+    },
+  ];
+
+  if (!args.budgetId || !args.currency) return empty;
+
+  try {
+    const tree = await getWbsTree(args.budgetId, args.ctx);
+    const k = computeBudgetSummaryKpis(tree);
+    const currency = args.currency;
+
+    return [
+      {
+        key: "budget_cost_to_sale",
+        label: "Costo / venta",
+        value:
+          k.costToSalePct != null ? formatWbsIncidencePercent(k.costToSalePct) : "—",
+        helper: "Costo directo sobre precio de venta",
+        href: args.href,
+        tone: k.costToSalePct == null ? "muted" : "default",
+      },
+      {
+        key: "budget_costliest_item",
+        label: "Partida más costosa",
+        value: k.costliestLeaf
+          ? fmtDecimalEs(k.costliestLeaf.amountDisplay, currency)
+          : "—",
+        helper: k.costliestLeaf
+          ? `${k.costliestLeaf.code} · ${k.costliestLeaf.name}`
+          : undefined,
+        href: args.href,
+        tone: k.costliestLeaf ? "default" : "muted",
+      },
+      {
+        key: "budget_top_incidence",
+        label: "Capítulo mayor incidencia",
+        value: k.topIncidenceGroup
+          ? formatWbsIncidencePercent(k.topIncidenceGroup.incidencePct)
+          : "—",
+        helper: k.topIncidenceGroup
+          ? `${k.topIncidenceGroup.code} · ${k.topIncidenceGroup.name}`
+          : "Sin capítulos en la EDT",
+        href: args.href,
+        tone: k.topIncidenceGroup ? "default" : "muted",
+      },
+      {
+        key: "budget_dominant_category",
+        label: "Categoría dominante",
+        value: k.dominantCategory
+          ? formatWbsIncidencePercent(k.dominantCategory.sharePct)
+          : "—",
+        helper: k.dominantCategory
+          ? `${k.dominantCategory.label} · ${fmtDecimalEs(k.dominantCategory.amountDisplay, currency)}`
+          : undefined,
+        href: args.href,
+        tone: k.dominantCategory ? "default" : "muted",
+      },
+    ];
+  } catch {
+    return empty;
+  }
 }

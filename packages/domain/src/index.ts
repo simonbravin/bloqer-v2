@@ -72,6 +72,7 @@ export {
   WBS_FIXED_COLUMN_COUNT,
   wbsIncidenceColumnCount,
   wbsMoneyColumnCount,
+  wbsShowUnit,
   wbsTableColumnCount,
   type WbsTableViewMode,
 } from "./budget/wbs-table-columns";

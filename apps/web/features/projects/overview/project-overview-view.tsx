@@ -116,6 +116,14 @@ export function ProjectOverviewView({
         ))}
       </KpiStatGrid>
 
+      {dashboard.budgetInsightKpis.length > 0 ? (
+        <KpiStatGrid title="Presupuesto" columns={4}>
+          {dashboard.budgetInsightKpis.map((k) => (
+            <DashboardKpiCard key={k.key} kpi={k} />
+          ))}
+        </KpiStatGrid>
+      ) : null}
+
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Evolución</h2>
         <ProjectOverviewCharts

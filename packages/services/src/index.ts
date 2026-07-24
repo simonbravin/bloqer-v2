@@ -22,6 +22,7 @@ export * from "./budget/cost-item.service";
 export * from "./budget/cost-analysis.service";
 export * from "./budget/budget-import.service";
 export * from "./budget/wbs-metrics";
+export * from "./budget/budget-summary-kpis";
 export * from "./budget/budget-wbs-export.service";
 export * from "./budget/wbs-spreadsheet-parser";
 export {

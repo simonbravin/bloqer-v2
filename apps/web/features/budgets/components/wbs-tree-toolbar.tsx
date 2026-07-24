@@ -4,7 +4,7 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { WbsViewBase, WbsViewDetail, WbsViewMode, WbsViewScale } from "../lib/wbs-view-mode";
+import type { WbsViewBase, WbsViewDetail, WbsViewMode } from "../lib/wbs-view-mode";
 
 export type { WbsViewMode } from "../lib/wbs-view-mode";
 
@@ -40,6 +40,36 @@ function Segment<T extends string>({
   );
 }
 
+function ToggleChip({
+  pressed,
+  label,
+  title,
+  onClick,
+}: {
+  pressed: boolean;
+  label: string;
+  title: string;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      title={title}
+      className={cn(
+        "h-8 rounded-md border px-2.5 text-xs font-medium",
+        pressed &&
+          "border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground",
+      )}
+      onClick={onClick}
+      aria-pressed={pressed}
+    >
+      {label}
+    </Button>
+  );
+}
+
 interface WbsTreeToolbarProps {
   viewMode: WbsViewMode;
   onPatchViewMode: (patch: Partial<WbsViewMode>) => void;
@@ -64,14 +94,6 @@ export function WbsTreeToolbar({
             { id: "sale", label: "Venta" },
           ]}
         />
-        <Segment<WbsViewScale>
-          value={viewMode.scale}
-          onChange={(scale) => onPatchViewMode({ scale })}
-          options={[
-            { id: "unit", label: "Unitario" },
-            { id: "total", label: "Total" },
-          ]}
-        />
         <Segment<WbsViewDetail>
           value={viewMode.base === "sale" ? "compact" : viewMode.detail}
           onChange={(detail) => onPatchViewMode({ detail })}
@@ -84,25 +106,22 @@ export function WbsTreeToolbar({
             },
           ]}
         />
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
+        <ToggleChip
+          pressed={viewMode.showUnit}
+          label="Unitario"
+          title="Mostrar columnas unitarias además de los totales (siempre visibles)"
+          onClick={() => onPatchViewMode({ showUnit: !viewMode.showUnit })}
+        />
+        <ToggleChip
+          pressed={viewMode.showIncidence}
+          label="Incidencia"
           title={
             viewMode.base === "sale"
               ? "Mostrar % de incidencia sobre el total de venta"
               : "Mostrar % de incidencia sobre el costo directo total"
           }
-          className={cn(
-            "h-8 rounded-md border px-2.5 text-xs font-medium",
-            viewMode.showIncidence &&
-              "border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground",
-          )}
           onClick={() => onPatchViewMode({ showIncidence: !viewMode.showIncidence })}
-          aria-pressed={viewMode.showIncidence}
-        >
-          Incidencia
-        </Button>
+        />
       </div>
 
       <div className="relative w-full sm:max-w-md">

@@ -804,10 +804,12 @@
 - **Decidido por:** Owner
 - **Contexto:** El modal APU mezclaba PU/total de venta con el desglose de costo, confundiendo dónde se edita cada capa.
 - **Decisión:**
-  1. Modal APU: unidad, cantidad, CD unitario, CD total, desglose MAT/MO/EQ/SUB. Sin PU venta ni total venta.
-  2. Tabla EDT: vistas Costo|Venta × Unitario|Total × Compacto|Desglose (desglose por categoría solo en base Costo; markups de venta son del ítem completo).
+  1. Modal APU: unidad, cantidad, costo directo unitario, costo directo total, desglose MAT/MO/EQ/SUB. Sin PU venta ni total venta.
+  2. Tabla EDT: Costo|Venta × Compacto|Desglose; toggle **Unitario** (aditivo) e **Incidencia** independientes. Los **totales siempre se muestran**; Unitario agrega columnas `/u` al lado (no reemplaza). Desglose por categoría solo en base Costo.
+  3. Etiquetas de dinero en EDT/APU: **Costo directo** / **Costo dir. /u** (no “CD total”).
 - **Implicancias:** UX de `cost-item-apu-dialog` y toolbar `wbs-tree`.
 - **Documentos afectados:** [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md).
+- **Amend (2026-07-24):** Unitario dejó de ser exclusivo vs Total; totales permanentes + unitario opcional.
 
 ---
 
@@ -836,9 +838,9 @@
 - **Decidido por:** Owner
 - **Contexto:** Hace falta ver el peso de cada capítulo/partida sobre el presupuesto sin mezclarlo con desglose MAT/MO ni con unitario/total.
 - **Decisión:**
-  1. Toggle **Incidencia** en la toolbar EDT, **independiente** de Costo|Venta × Unitario|Total × Compacto|Desglose.
+  1. Toggle **Incidencia** en la toolbar EDT, **independiente** de Costo|Venta × Compacto|Desglose × Unitario.
   2. Columna al final (antes de acciones): `% = total_fila / TOTAL_GENERAL × 100`.
-  3. Base Costo → usa `totalCostDirect` (CD); base Venta → usa `totalSalePrice`. Siempre totales de fila (nunca PU), también si la escala de la tabla es Unitario.
+  3. Base Costo → usa `totalCostDirect` (costo directo); base Venta → usa `totalSalePrice`. Siempre totales de fila (nunca PU), también con Unitario activo.
   4. GROUPs usan el roll-up de hijos; hojas usan su CD/venta; filas detalle APU → "—"; TOTAL GENERAL → 100% (si el total > 0).
   5. Export CSV/XLSX/PDF respeta el modo EDT activo (incl. incidencia) vía query `base`, `scale`, `detail`, `incidence`.
 - **Implicancias:** `wbs-view-mode`, `wbs-tree`, export presupuesto.

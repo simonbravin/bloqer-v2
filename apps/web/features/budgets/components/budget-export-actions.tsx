@@ -26,7 +26,8 @@ function buildExportHref(
   const params = new URLSearchParams({
     format,
     base: view.base,
-    scale: view.scale,
+    // scale=unit → add unit columns alongside totals (always exported)
+    scale: view.showUnit ? "unit" : "total",
     detail: view.base === "sale" ? "compact" : view.detail,
     incidence: view.showIncidence ? "1" : "0",
   });
