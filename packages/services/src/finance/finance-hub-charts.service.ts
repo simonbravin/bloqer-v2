@@ -1,6 +1,3 @@
-import { can } from "@bloqer/domain";
-import { canViewProjectCostControlReport } from "../cost-control/cost-control.service";
-import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import { fmtDecimalEs } from "../dashboard/kpi-helpers";
 import { defaultReportDateRange } from "../reports/report-month";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
@@ -14,6 +11,9 @@ import {
   type CompanyIncomeExpenseReport,
 } from "../reports/company-income-expense.service";
 import { monthKey } from "../reports/report-month";
+import { canViewCompanyFinanceHub, canViewCompanyTreasury } from "./finance-access";
+import { canViewCompanyAp } from "../ap/ap-access";
+import { canViewCompanyAr } from "../ar/ar-access";
 
 export type FinanceHubMonthlyNetCash = {
   currency: string;
@@ -47,7 +47,7 @@ export async function getFinanceHubCharts(
   let cashMulticurrency = false;
   let currentMonthNetCash: FinanceHubMonthlyNetCash | null = null;
 
-  if (gate.isEnabled("TREASURY") && can(ctx.roles, "VIEW", "TREASURY")) {
+  if (gate.isEnabled("TREASURY") && canViewCompanyTreasury(ctx.roles)) {
     try {
       const report = await getCashFlowReport(
         { dateFrom: range.dateFrom, dateTo: range.dateTo, period: "month" },
@@ -73,12 +73,13 @@ export async function getFinanceHubCharts(
   }
 
   let economic: CompanyIncomeExpenseReport | null = null;
+  // Company economic rollup — company-finance roles only (D-056).
   const canEconomic =
-    (canViewProjectCostControlReport(ctx.roles) || canViewProjectCashFlowReport(ctx.roles))
+    canViewCompanyFinanceHub(ctx.roles)
     && (
-      (gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS"))
-      || (gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR"))
-      || (gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP"))
+      (gate.isEnabled("AR") && canViewCompanyAr(ctx.roles))
+      || (gate.isEnabled("AP") && canViewCompanyAp(ctx.roles))
+      || (gate.isEnabled("TREASURY") && canViewCompanyTreasury(ctx.roles))
     );
 
   if (canEconomic) {

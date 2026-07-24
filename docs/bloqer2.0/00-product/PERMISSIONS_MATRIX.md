@@ -57,19 +57,22 @@ Códigos: `V`=VIEW, `E`=EDIT (incluye VIEW), `A`=APPROVE (incluye EDIT y VIEW), 
 
 ### 2.2 Financieros
 
-| Módulo | OWNER | ADMIN | PM | FINANCE | PROCUREMENT | SALES | VIEWER |
-|---|---|---|---|---|---|---|---|
-| Tesorería | A | A | V (su proyecto) | A | V | V | V |
-| Cuentas Bancarias | A | A | ⛔ | A | ⛔ | ⛔ | V |
-| Conciliación Bancaria | A | A | ⛔ | A | ⛔ | ⛔ | V |
-| Ventas / Cobranzas | A | A | E (su proyecto) | A | ⛔ | E | V |
-| Gastos / Pagos | A | A | E (su proyecto) | A | E (compras) | ⛔ | V |
-| Transferencias internas | A | A | ⛔ | A | ⛔ | ⛔ | V |
-| Cuentas por Cobrar | A | A | E (su proyecto) | A | ⛔ | E | V |
-| Cuentas por Pagar | A | A | V (su proyecto) | A | E | ⛔ | V |
-| Impuestos / Retenciones | A | A | V (su proyecto) | A | E | E | V |
-| Contabilidad (libro mayor) | A | A | V | A | V | V | V |
-| Cierre de Periodo | A | A | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ |
+> **Company vs project ([D-056](./DECISION_LOG.md)):** tesorería de empresa, cuentas bancarias, transferencias, GL y hub `/finanzas` son **company tools** (`OWNER` / `ADMIN` / `FINANCE` / `VIEWER` lectura). PM, `PROJECT_FINANCE`, PROCUREMENT y SALES operan finanzas en **project tools** (sin caja empresa).
+
+| Módulo | OWNER | ADMIN | PM | PROJECT_FINANCE | FINANCE | PROCUREMENT | SALES | VIEWER |
+|---|---|---|---|---|---|---|---|---|
+| Tesorería | A | A | ⛔ | ⛔ | A | ⛔ | ⛔ | V |
+| Cuentas Bancarias | A | A | ⛔ | ⛔ | A | ⛔ | ⛔ | V |
+| Conciliación Bancaria | A | A | ⛔ | ⛔ | A | ⛔ | ⛔ | V |
+| Ventas / Cobranzas | A | A | E (su proyecto) | E (su proyecto) | A | ⛔ | E (su proyecto) | V |
+| Gastos / Pagos | A | A | E (su proyecto) | E (su proyecto) | A | E (compras / su proyecto) | ⛔ | V |
+| Transferencias internas | A | A | ⛔ | ⛔ | A | ⛔ | ⛔ | V |
+| Cuentas por Cobrar | A | A | E (su proyecto) | E (su proyecto) | A | ⛔ | E (su proyecto) | V |
+| Cuentas por Pagar | A | A | V (su proyecto) | V (su proyecto) | A | E (su proyecto / compras) | ⛔ | V |
+| Impuestos / Retenciones | A | A | V (su proyecto) | V (su proyecto) | A | E | E | V |
+| Contabilidad (libro mayor) | A | A | ⛔ | ⛔ | A | ⛔ | ⛔ | V |
+| Cierre de Periodo | A | A | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ |
+| Hub `/finanzas` empresa | ✅ | ✅ | ⛔ | ⛔ | ✅ | ⛔ | ⛔ | ✅ (lectura) |
 
 ### 2.2.1 `PermissionModule` en código (Phase 7C; audit Phase 12A)
 
@@ -209,9 +212,10 @@ Esta sección **no** cambia reglas de código; documenta huecos entre matriz doc
 
 - La matriz otorga `VIEW NOTIFICATIONS` a roles típicos; la ruta **`/notificaciones`** permanece accesible a **cualquier** usuario con membresía activa en el tenant (**sin** exigir `VIEW NOTIFICATIONS`) para bandeja personal. Alertas operativas (`/notificaciones/alertas`) y log de emails siguen restringidas a **OWNER**/**ADMIN**. Si en el futuro se exige el permiso para la bandeja, es cambio de producto explícito.
 
-### 9.3 Aging global y `PROJECT_MANAGER`
+### 9.3 Aging global y `PROJECT_MANAGER` — cerrado [D-056]
 
-- Con la matriz actual, PM tiene **`EDIT AR`** ⇒ **`VIEW AR`** ⇒ puede usar aging CxC tenant-wide. Restringir aging global a financiero/admin es una **decisión de producto** pendiente (alternativas: nuevo permiso, rol de reporte, o filtros obligatorios por proyecto).
+- **Antes:** PM con `EDIT AR` ⇒ `VIEW AR` ⇒ aging CxC tenant-wide.
+- **Ahora:** listados/hub company AR/AP requieren rol de company finance (`OWNER`/`ADMIN`/`FINANCE`/`VIEWER`). PM y `PROJECT_FINANCE` usan rutas de proyecto.
 
 ### 9.4 Certificaciones vs atajo `VIEW PROJECTS`
 
@@ -231,7 +235,7 @@ Decisiones **confirmadas** como coherentes con docs existentes (no se modificó 
 
 | Tema | Resultado |
 |------|-----------|
-| **PM + aging CxC/CxP global** | Con la matriz actual, `PROJECT_MANAGER` tiene **`EDIT AR`** ⇒ **`VIEW AR`** ⇒ puede aging tenant-wide. Restringir a finanzas/admin sigue como **decisión de producto** abierta (§9.3). |
+| **PM + aging CxC/CxP global** | **Cerrado [D-056]:** company AR/AP requieren rol company-finance; PM/`PROJECT_FINANCE` solo project tools. |
 | **`/notificaciones` sin `VIEW NOTIFICATIONS`** | Se mantiene: bandeja personal para cualquier miembro activo; §9.2. |
 | **Certificaciones vs `VIEW PROJECTS`** | Se mantiene módulo fuerte `CERTIFICATIONS` en `certification.service`; sin atajo `VIEW PROJECTS` en el mismo guard. |
 | **Platform vs tenant OWNER/ADMIN** | Independientes: `/platform` vía `isPlatformSuperadmin`; tenant RBAC no otorga plataforma ni al revés. |

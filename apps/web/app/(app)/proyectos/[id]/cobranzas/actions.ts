@@ -37,7 +37,7 @@ export async function createCollectionAction(
   const parsed = createCollectionSchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
-    const collection = await createCollection(parsed.data, ctx);
+    const collection = await createCollection(parsed.data, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/cobranzas`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
     return { id: collection.id };
@@ -52,7 +52,7 @@ export async function cancelCollectionAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await cancelCollection(collectionId, ctx);
+    await cancelCollection(collectionId, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/cobranzas`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
     return { ok: true };

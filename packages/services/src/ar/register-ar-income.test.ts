@@ -82,13 +82,17 @@ describe("registerArIncomeSchema (D-051)", () => {
 });
 
 describe("company AR access", () => {
-  it("canEditCompanyAr requires EDIT AR", () => {
-    assert.equal(canEditCompanyAr(["SALES"]), true);
+  it("canEditCompanyAr requires company-finance role + EDIT AR (D-056)", () => {
+    assert.equal(canEditCompanyAr(["FINANCE"]), true);
+    assert.equal(canEditCompanyAr(["SALES"]), false);
+    assert.equal(canEditCompanyAr(["PROJECT_MANAGER"]), false);
     assert.equal(canEditCompanyAr(["SITE_FOREMAN"]), false);
   });
 
-  it("canViewCompanyAr requires VIEW AR", () => {
+  it("canViewCompanyAr requires company-finance role + VIEW AR (D-056)", () => {
     assert.equal(canViewCompanyAr(["VIEWER"]), true);
+    assert.equal(canViewCompanyAr(["SALES"]), false);
+    assert.equal(canViewCompanyAr(["PROJECT_MANAGER"]), false);
     assert.equal(canViewCompanyAr(["SITE_FOREMAN"]), false);
   });
 });

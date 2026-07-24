@@ -24,7 +24,7 @@ import {
   listLinkablePurchaseOrders,
   listProcurementWbsOptions,
   listSupplierInvoicesByProject,
-  listTreasuryAccounts,
+  listSelectableTreasuryAccounts,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -135,8 +135,8 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
 
     if (canPayNow) {
       try {
-        const accountsResult = await listTreasuryAccounts(ctx, { page: 1, pageSize: 200 });
-        treasuryAccounts = accountsResult.data
+        const accountsResult = await listSelectableTreasuryAccounts(ctx);
+        treasuryAccounts = accountsResult
           .filter(
             (a) =>
               a.status === "ACTIVE" &&

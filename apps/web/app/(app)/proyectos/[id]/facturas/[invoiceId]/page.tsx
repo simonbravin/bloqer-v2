@@ -59,10 +59,10 @@ export default async function FacturaDetailPage({ params }: PageProps) {
   let invoice;
   let receivable = null;
   try {
-    invoice = await getSalesInvoiceById(invoiceId, ctx);
-    receivable = await getReceivableBySalesInvoiceId(invoiceId, ctx);
+    invoice = await getSalesInvoiceById(invoiceId, ctx, id);
+    receivable = await getReceivableBySalesInvoiceId(invoiceId, ctx, id);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
   if (invoice.projectId !== id || (receivable && receivable.projectId !== id)) notFound();

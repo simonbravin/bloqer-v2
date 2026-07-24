@@ -1,5 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { canViewApProjectArea, canViewCompanyAp } from "../ap/ap-access";
+import { canViewArProjectArea, canViewCompanyAr } from "../ar/ar-access";
 import { assertApTenantModule, assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { deriveObligationDisplayStatus, hasOpenObligationBalance, obligationDaysOverdue, parseObligationAsOfDate, startOfDayUtc } from "../finance/obligation-date";
@@ -144,8 +145,13 @@ export async function getReceivableAgingReport(
   ctx: ServiceContext,
 ): Promise<AgingReport> {
   await assertArTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "AR")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver el aging de cuentas por cobrar");
+  // D-056: tenant-wide / company aging = company-finance roles; project filter = project area.
+  if (filters.projectId) {
+    if (!canViewArProjectArea(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver el aging de cuentas por cobrar");
+    }
+  } else if (!canViewCompanyAr(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver el aging de cuentas por cobrar a nivel empresa");
   }
 
   const asOf = parseObligationAsOfDate(filters.asOfDate);
@@ -232,8 +238,13 @@ export async function getPayableAgingReport(
   ctx: ServiceContext,
 ): Promise<AgingReport> {
   await assertApTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "AP")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver el aging de cuentas por pagar");
+  // D-056: tenant-wide / corporate aging = company-finance roles; project filter = project area.
+  if (filters.projectId) {
+    if (!canViewApProjectArea(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver el aging de cuentas por pagar");
+    }
+  } else if (!canViewCompanyAp(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver el aging de cuentas por pagar a nivel empresa");
   }
 
   const asOf = parseObligationAsOfDate(filters.asOfDate);

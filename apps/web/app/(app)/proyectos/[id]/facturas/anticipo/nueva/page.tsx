@@ -6,7 +6,7 @@ import {
   getProjectClientContactId,
   getProjectShellInfo,
   listContacts,
-  listTreasuryAccounts,
+  listSelectableTreasuryAccounts,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -47,9 +47,9 @@ export default async function NuevaAnticipoPage({ params }: PageProps) {
     throw err;
   }
 
-  const [{ data: contacts }, { data: accounts }] = await Promise.all([
+  const [{ data: contacts }, accounts] = await Promise.all([
     listContacts({ role: "CLIENT", status: "ACTIVE" }, ctx),
-    listTreasuryAccounts(ctx),
+    listSelectableTreasuryAccounts(ctx),
   ]);
 
   const clients = contacts.map((c) => ({

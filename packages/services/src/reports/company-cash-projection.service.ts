@@ -1,8 +1,8 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import { canViewCompanyAp } from "../ap/ap-access";
 import type { CorporatePayableSnapshotRow } from "../ap/corporate-ap-snapshot";
 import { aggregateCorporateProjectionOutflows } from "../ap/corporate-ap-snapshot";
+import { canViewCompanyTreasury } from "../finance/finance-access";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
@@ -49,7 +49,7 @@ export async function getCompanyCashProjectionReport(
   const outflowsByCurrency = new Map<string, Prisma.Decimal>();
   const payCountByCurrency = new Map<string, number>();
 
-  if (gate.isEnabled("TREASURY") && can(ctx.roles, "VIEW", "TREASURY")) {
+  if (gate.isEnabled("TREASURY") && canViewCompanyTreasury(ctx.roles)) {
     await assertTreasuryTenantModule(ctx);
     const accounts = await getTreasurySummaryByTenant(ctx);
     for (const acc of accounts) {

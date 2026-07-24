@@ -33,7 +33,12 @@ export type ReceivableView = Omit<Receivable, "originalAmount" | "paidAmount"> &
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
-export async function getReceivableById(id: string, ctx: ServiceContext): Promise<ReceivableView> {
+export async function getReceivableById(
+  id: string,
+  ctx: ServiceContext,
+  /** When set (project workspace routes), corporate receivables and cross-project IDs are rejected. */
+  projectScopeId?: string,
+): Promise<ReceivableView> {
   await assertArTenantModule(ctx);
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
@@ -44,6 +49,9 @@ export async function getReceivableById(id: string, ctx: ServiceContext): Promis
   });
   if (!r) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
   if (r.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && r.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por cobrar no pertenece a este proyecto");
+  }
   const reconciled = await reconcileReceivableStatusIfSettled(r, ctx);
   return serializeReceivable({ ...r, ...reconciled });
 }
@@ -51,6 +59,7 @@ export async function getReceivableById(id: string, ctx: ServiceContext): Promis
 export async function getReceivableBySalesInvoiceId(
   salesInvoiceId: string,
   ctx: ServiceContext,
+  projectScopeId?: string,
 ): Promise<ReceivableView | null> {
   await assertArTenantModule(ctx);
   if (!canViewArProjectArea(ctx.roles)) {
@@ -62,6 +71,9 @@ export async function getReceivableBySalesInvoiceId(
   });
   if (!r) return null;
   if (r.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && r.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por cobrar no pertenece a este proyecto");
+  }
   const reconciled = await reconcileReceivableStatusIfSettled(r, ctx);
   return serializeReceivable({ ...r, ...reconciled });
 }

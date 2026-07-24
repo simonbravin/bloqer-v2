@@ -2,7 +2,7 @@ import { prisma } from "@bloqer/database";
 import type { JournalEntrySourceType } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { canViewApProjectArea, canViewCompanyAp } from "../ap/ap-access";
-import { canViewArProjectArea } from "../ar/ar-access";
+import { canViewArProjectArea, canViewCompanyAr } from "../ar/ar-access";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext } from "../types";
 
@@ -85,12 +85,17 @@ export async function getJournalEntrySourceLink(
         };
       }
       const detail = `${fmtDate(c.collectionDate)} · ${fmtMoneyAr(c.amount, c.currency)}`;
-      const canLink = canViewArProjectArea(ctx.roles);
+      const href =
+        c.projectId && canViewArProjectArea(ctx.roles)
+          ? `/proyectos/${c.projectId}/cobranzas/${c.id}`
+          : !c.projectId && canViewCompanyAr(ctx.roles)
+            ? `/finanzas/cuentas-por-cobrar/${c.receivableId}`
+            : null;
       return {
         kindLabel: "Cobranza",
         detail,
-        href:      canLink ? `/proyectos/${c.projectId}/cobranzas/${c.id}` : null,
-        noAccessHint: canLink ? null : noAr,
+        href,
+        noAccessHint: href ? null : noAr,
       };
     }
     case "PAYMENT": {
@@ -233,12 +238,17 @@ export async function getJournalEntrySourceLink(
         return { kindLabel: "Factura de venta", detail: "Factura no encontrada.", href: null, noAccessHint: null };
       }
       const detail = `Factura #${inv.number} · ${fmtDate(inv.issueDate)}`;
-      const canLink = canViewArProjectArea(ctx.roles);
+      const href =
+        inv.projectId && canViewArProjectArea(ctx.roles)
+          ? `/proyectos/${inv.projectId}/facturas/${inv.id}`
+          : !inv.projectId && canViewCompanyAr(ctx.roles)
+            ? `/finanzas/cuentas-por-cobrar`
+            : null;
       return {
         kindLabel: "Factura de venta",
         detail,
-        href:      canLink ? `/proyectos/${inv.projectId}/facturas/${inv.id}` : null,
-        noAccessHint: canLink ? null : noAr,
+        href,
+        noAccessHint: href ? null : noAr,
       };
     }
     case "SUPPLIER_INVOICE": {

@@ -47,11 +47,11 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
   let collections;
   try {
     [receivable, collections] = await Promise.all([
-      getReceivableById(receivableId, ctx),
-      listCollectionsByReceivable(receivableId, ctx),
+      getReceivableById(receivableId, ctx, id),
+      listCollectionsByReceivable(receivableId, ctx, id),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
   if (receivable.projectId !== id) notFound();

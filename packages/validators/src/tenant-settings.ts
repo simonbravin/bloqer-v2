@@ -26,6 +26,7 @@ const userRoleEnum = z.enum([
   "OWNER",
   "ADMIN",
   "FINANCE",
+  "PROJECT_FINANCE",
   "PROCUREMENT",
   "WAREHOUSE",
   "SALES",

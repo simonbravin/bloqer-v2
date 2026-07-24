@@ -26,9 +26,9 @@ export default async function EditarFacturaPage({ params }: PageProps) {
 
   let invoice;
   try {
-    invoice = await getSalesInvoiceById(invoiceId, ctx);
+    invoice = await getSalesInvoiceById(invoiceId, ctx, id);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 

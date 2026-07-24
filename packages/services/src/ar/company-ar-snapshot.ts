@@ -1,11 +1,11 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import { hasOpenObligationBalance, isObligationOverdue, OBLIGATION_OPEN_BALANCE_EPSILON } from "../finance/obligation-date";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import type { ReceivablesProjectSummary } from "./receivable.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { canViewCompanyAr } from "./ar-access";
 
 export type CompanyReceivableSnapshotRow = {
   currency: string;
@@ -21,8 +21,8 @@ export async function fetchCompanyReceivableSnapshotRows(
   ctx: ServiceContext,
 ): Promise<CompanyReceivableSnapshotRow[]> {
   await assertArTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "AR")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
+  if (!canViewCompanyAr(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar a nivel empresa");
   }
 
   return prisma.receivable.findMany({

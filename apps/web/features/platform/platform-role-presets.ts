@@ -36,8 +36,14 @@ export const PLATFORM_ROLE_PRESETS: readonly PlatformRolePreset[] = [
   {
     id: "finanzas",
     labelEs: "Finanzas",
-    descriptionEs: "Tesorería, CxC/CxP, gastos y contabilidad.",
+    descriptionEs: "Tesorería, CxC/CxP, gastos y contabilidad de empresa.",
     roles: ["FINANCE"],
+  },
+  {
+    id: "finanzas-obra",
+    labelEs: "Finanzas de obra",
+    descriptionEs: "CxC/CxP y cobranzas de proyecto; sin caja de empresa.",
+    roles: ["PROJECT_FINANCE"],
   },
 ] as const;
 
@@ -45,6 +51,7 @@ export const PLATFORM_ROLE_LABEL_ES: Record<UserRole, string> = {
   OWNER: "Propietario",
   ADMIN: "Administrador",
   FINANCE: "Finanzas",
+  PROJECT_FINANCE: "Finanzas de obra",
   PROCUREMENT: "Compras",
   WAREHOUSE: "Depósito",
   SALES: "Ventas",

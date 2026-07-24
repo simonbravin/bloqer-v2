@@ -26,6 +26,10 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
     getFinanceHubCharts(ctx, { months }),
   ]);
 
+  if (!overview.canSeeAnything) {
+    redirect("/dashboard");
+  }
+
   const hasCash = charts.cash != null && charts.cash.buckets.length > 0;
   const hasEconomic = charts.economic != null && charts.economic.series.length > 0;
   const defaultTab =

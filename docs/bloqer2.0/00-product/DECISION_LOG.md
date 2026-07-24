@@ -760,6 +760,24 @@
 
 ---
 
+### D-056 — Company tools vs project tools en finanzas (RBAC)
+
+- **Fecha:** 2026-07-24
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Usuarios con roles operativos (PROCUREMENT, SALES, PROJECT_MANAGER, etc.) veían hub `/finanzas`, tesorería y saldos de empresa por unión OR de `VIEW TREASURY`/`AR`/`AP`. Se buscó un modelo alineado a Procore (company tools ≠ project tools) sin partir KPIs de caja fuera de `FINANCE`.
+- **Decisión:**
+  1. **Company finance** (`/finanzas`, `/tesoreria`, `/contabilidad`, listados CxC/CxP/GG corporativos, saldos): solo `OWNER`, `ADMIN`, `FINANCE`, y `VIEWER` (lectura auditor).
+  2. **`FINANCE` conserva caja/saldos** (KPIs de cuentas incluidos). No se crea rol `TREASURER` en esta iteración.
+  3. Nuevo rol **`PROJECT_FINANCE`**: contador de obra — AR/AP/gastos de **proyecto**; sin company hub ni tesorería/GL de empresa.
+  4. `PROJECT_MANAGER`, `PROCUREMENT`, `SALES` (y `PROJECT_FINANCE`): finanzas vía **proyecto** + módulos operativos; sin `VIEW TREASURY` / `VIEW ACCOUNTING` de empresa.
+  5. GG corporativo y CxC/CxP **sin proyecto** quedan en company tools (`FINANCE` / admin).
+  6. Techos “su proyecto” siguen sin `ProjectMembership` (deuda conocida); este cambio es company-tool vs project-tool.
+- **Implicancias:** enum Prisma `PROJECT_FINANCE`; recorte `matrix.ts`; helpers `canViewCompany*`; gates nav/páginas; `BANK_ACCOUNTS` / `INTERNAL_TRANSFERS` no colapsan solo a `TREASURY`.
+- **Documentos afectados:** [`USER_ROLES.md`](./USER_ROLES.md), [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md), [`08-architecture/PERMISSIONS_ROUTE_MATRIX.md`](../08-architecture/PERMISSIONS_ROUTE_MATRIX.md), [`08-architecture/ARCHITECTURE_DECISION_RECORDS.md`](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

@@ -30,8 +30,11 @@ Cada ítem tiene: **Ruta** · **Acción** · **Criterio de éxito**. Los bloques
 | `WAREHOUSE` | §6 |
 | `VIEWER` | §7 |
 | `SALES` (opcional) | §8 |
+| `PROJECT_FINANCE` | §9 |
 
 Roles de proyecto `PROJECT_VIEWER`: fuera de alcance Fase 1 (portal externo).
+
+> **D-056:** company tools (`/finanzas`, `/tesoreria`, `/contabilidad`) solo `OWNER`/`ADMIN`/`FINANCE`/`VIEWER`. PM, PROCUREMENT, SALES y `PROJECT_FINANCE` usan finanzas de **proyecto**.
 
 ---
 
@@ -83,6 +86,8 @@ Usar un usuario con rol de proyecto `PROJECT_MANAGER` (y sin roles globales que 
 | # | Acción | Criterio de éxito |
 |---|--------|-------------------|
 | PN1 | Mutación financiera fuera de su matriz (p. ej. anular pago `CONFIRMED` si no es ADMIN) | Forbidden / sin CTA |
+| PN2 | Abrir `/finanzas`, `/tesoreria` o `/contabilidad` (D-056) | Redirect a dashboard / sin sección en sidebar |
+| PN3 | Ver saldos de cuentas bancarias en hub empresa | No visible |
 
 ---
 
@@ -104,6 +109,7 @@ Usar un usuario con rol de proyecto `PROJECT_MANAGER` (y sin roles globales que 
 |---|--------|-------------------|
 | CN1 | Buscar rentabilidad neta / precios de venta | No visibles (o sin acceso) |
 | CN2 | Anticipo a proveedor | **Sin** CTA que llame al stub (limitación ADR-013) |
+| CN3 | Abrir `/finanzas` o `/tesoreria` (D-056) | Sin acceso company finance / caja |
 
 ---
 
@@ -184,10 +190,21 @@ Usar un usuario con rol de proyecto `PROJECT_MANAGER` (y sin roles globales que 
 |---|------|--------|-------------------|
 | SA1 | Clientes / facturas / cobranzas de proyecto | Operar AR de venta | Flujo emisión + cobranza |
 | SA2 | Costos / rentabilidad | Consultar | Costos no visibles |
+| SA3 | `/finanzas` o `/tesoreria` (D-056) | Abrir | Sin acceso company finance |
 
 ---
 
-## 9. Circuitos transversales (cualquier rol con permiso)
+## 9. PROJECT_FINANCE
+
+| # | Ruta | Acción | Criterio de éxito |
+|---|------|--------|-------------------|
+| PF1 | `/proyectos/[id]/finanzas` | Abrir hub de obra | Visible CxC/CxP de proyecto |
+| PF2 | Cobranza / factura de obra | Registrar | OK sin ver saldos de caja empresa |
+| PF3 | `/finanzas`, `/tesoreria`, `/contabilidad` | Abrir | Redirect / sin sidebar company |
+
+---
+
+## 10. Circuitos transversales (cualquier rol con permiso)
 
 Validar al menos una vez por tenant de capacitación (pueden repartirse entre roles):
 
@@ -202,7 +219,7 @@ Validar al menos una vez por tenant de capacitación (pueden repartirse entre ro
 
 ---
 
-## 10. Relación con otros docs
+## 11. Relación con otros docs
 
 | Documento | Uso |
 |-----------|-----|

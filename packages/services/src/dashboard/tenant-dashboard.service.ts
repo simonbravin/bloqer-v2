@@ -1,6 +1,9 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { getPayableAgingReport, getReceivableAgingReport, type AgingReport } from "../aging/aging.service";
+import { canViewCompanyAp } from "../ap/ap-access";
+import { canViewCompanyAr } from "../ar/ar-access";
+import { canViewCompanyTreasury } from "../finance/finance-access";
 import { getUnreadNotificationCount } from "../notifications/notification.service";
 import { canRunOperationalAlerts } from "../notifications/operational-alerts-runner.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
@@ -472,9 +475,9 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
   let financeSummary: DashboardFinanceSummary | undefined;
   let cashFlowChart: DashboardCashFlowChart | undefined;
 
-  const arAllowed = gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR");
-  const apAllowed = gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP");
-  const trAllowed = gate.isEnabled("TREASURY") && can(ctx.roles, "VIEW", "TREASURY");
+  const arAllowed = gate.isEnabled("AR") && canViewCompanyAr(ctx.roles);
+  const apAllowed = gate.isEnabled("AP") && canViewCompanyAp(ctx.roles);
+  const trAllowed = gate.isEnabled("TREASURY") && canViewCompanyTreasury(ctx.roles);
 
   if (arAllowed || apAllowed || trAllowed) {
     financeSummary = {};

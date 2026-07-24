@@ -2,6 +2,7 @@
 // Product source of truth: docs/bloqer2.0/00-product/PERMISSIONS_MATRIX.md
 // Phase 7C: `SALES_COLLECTIONS` removed from `PermissionModule` (unused in `can()` gates; AR covers invoices / receivables / collections).
 // Phase 12A: Full role set matches `USER_ROLES.md` + `roles.ts`; service `can()` gates audited against this MATRIX — see PERMISSIONS_ROUTE_MATRIX.md.
+// D-056: Company treasury/GL/hub only OWNER|ADMIN|FINANCE|VIEWER; PROJECT_FINANCE = project finance tools; no TREASURY/ACCOUNTING on PM/PROCUREMENT/SALES.
 //
 // Project-scoped qualifications ("su proyecto") are enforced at the query/service
 // layer, not here. This function resolves the role-level ceiling.
@@ -115,8 +116,8 @@ const MATRIX: Record<UserRole, Partial<Record<PermissionModule, PermissionAction
     PURCHASE_REQUESTS: "APPROVE",
     SUBCONTRACTS: "EDIT", INVENTORY: "VIEW", WAREHOUSES: "VIEW",
     DOCUMENTS: "EDIT", NOTIFICATIONS: "VIEW",
-    TREASURY: "VIEW", EXPENSES_PAYMENTS: "EDIT", AP: "EDIT",
-    TAXES: "EDIT", ACCOUNTING: "VIEW", MASTER_DATA: "VIEW",
+    EXPENSES_PAYMENTS: "EDIT", AP: "EDIT",
+    TAXES: "EDIT", MASTER_DATA: "VIEW",
   },
   WAREHOUSE: {
     PROJECTS: "VIEW", SUPPLIERS: "VIEW",
@@ -129,8 +130,7 @@ const MATRIX: Record<UserRole, Partial<Record<PermissionModule, PermissionAction
     PROJECTS: "VIEW", BUDGETS: "VIEW", CONTRACTS: "EDIT",
     CERTIFICATIONS: "VIEW",
     DOCUMENTS: "EDIT", NOTIFICATIONS: "VIEW",
-    TREASURY: "VIEW",
-    AR: "EDIT", TAXES: "EDIT", ACCOUNTING: "VIEW",
+    AR: "EDIT", TAXES: "EDIT",
     MASTER_DATA: "VIEW",
   },
   VIEWER: {
@@ -154,8 +154,13 @@ const MATRIX: Record<UserRole, Partial<Record<PermissionModule, PermissionAction
     PROCUREMENT: "EDIT", PURCHASE_ORDERS: "EDIT", PURCHASE_REQUESTS: "EDIT",
     SUBCONTRACTS: "EDIT",
     INVENTORY: "VIEW", DOCUMENTS: "EDIT", NOTIFICATIONS: "VIEW",
-    TREASURY: "VIEW",
-    EXPENSES_PAYMENTS: "EDIT", AR: "EDIT", AP: "VIEW", TAXES: "VIEW", ACCOUNTING: "VIEW",
+    EXPENSES_PAYMENTS: "EDIT", AR: "EDIT", AP: "VIEW", TAXES: "VIEW",
+  },
+  PROJECT_FINANCE: {
+    PROJECTS: "VIEW", BUDGETS: "VIEW", WBS: "VIEW", CONTRACTS: "VIEW",
+    CERTIFICATIONS: "VIEW", DOCUMENTS: "EDIT", NOTIFICATIONS: "VIEW",
+    EXPENSES_PAYMENTS: "EDIT", AR: "EDIT", AP: "VIEW", TAXES: "VIEW",
+    MASTER_DATA: "VIEW",
   },
   SITE_FOREMAN: {
     PROJECTS: "VIEW", BUDGETS: "VIEW", RFIS: "EDIT", JOBSITE_LOG: "EDIT",

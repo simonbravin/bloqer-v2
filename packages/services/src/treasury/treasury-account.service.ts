@@ -12,6 +12,27 @@ export type TreasuryAccountView = Omit<TreasuryAccount, "openingBalance"> & {
   balance: string;
 };
 
+/** Account picker for cobranzas/pagos — no balances (D-056). */
+export type TreasuryAccountOption = {
+  id: string;
+  name: string;
+  currency: string;
+  status: TreasuryAccount["status"];
+  companyId: string | null;
+};
+
+function assertCanViewBankAccounts(roles: ServiceContext["roles"]): void {
+  if (!can(roles, "VIEW", "BANK_ACCOUNTS") && !can(roles, "VIEW", "TREASURY")) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas de tesorería");
+  }
+}
+
+function assertCanEditBankAccounts(roles: ServiceContext["roles"]): void {
+  if (!can(roles, "EDIT", "BANK_ACCOUNTS") && !can(roles, "EDIT", "TREASURY")) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para gestionar cuentas de tesorería");
+  }
+}
+
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 export async function getTreasuryAccountById(
@@ -19,9 +40,7 @@ export async function getTreasuryAccountById(
   ctx: ServiceContext,
 ): Promise<TreasuryAccountView> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "TREASURY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas de tesorería");
-  }
+  assertCanViewBankAccounts(ctx.roles);
   const acc = await prisma.treasuryAccount.findUnique({ where: { id } });
   if (!acc) throw new ServiceError("NOT_FOUND", "Cuenta no encontrada");
   if (acc.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -34,9 +53,7 @@ export async function listTreasuryAccounts(
   opts?: { page?: number; pageSize?: number },
 ): Promise<{ data: TreasuryAccountView[]; total: number }> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "TREASURY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas de tesorería");
-  }
+  assertCanViewBankAccounts(ctx.roles);
 
   const where = { tenantId: ctx.tenantId };
   const paginate = opts?.page !== undefined || opts?.pageSize !== undefined;
@@ -60,6 +77,31 @@ export async function listTreasuryAccounts(
   return { data, total };
 }
 
+/**
+ * Active accounts for payment/collection forms (project finance).
+ * Does not expose balances — D-056.
+ */
+export async function listSelectableTreasuryAccounts(
+  ctx: ServiceContext,
+): Promise<TreasuryAccountOption[]> {
+  await assertTreasuryTenantModule(ctx);
+  const canPick =
+    can(ctx.roles, "EDIT", "AR")
+    || can(ctx.roles, "EDIT", "AP")
+    || can(ctx.roles, "VIEW", "TREASURY")
+    || can(ctx.roles, "VIEW", "BANK_ACCOUNTS");
+  if (!canPick) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para seleccionar cuentas de tesorería");
+  }
+
+  const accounts = await prisma.treasuryAccount.findMany({
+    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+    select: { id: true, name: true, currency: true, status: true, companyId: true },
+    orderBy: { name: "asc" },
+  });
+  return accounts;
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export async function createTreasuryAccount(
@@ -67,9 +109,7 @@ export async function createTreasuryAccount(
   ctx: ServiceContext,
 ): Promise<TreasuryAccountView> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "TREASURY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para crear cuentas");
-  }
+  assertCanEditBankAccounts(ctx.roles);
 
   const openingBalance = new Prisma.Decimal(input.openingBalance ?? "0");
   const companyId = input.companyId ?? ctx.companyId ?? null;
@@ -134,9 +174,7 @@ export async function updateTreasuryAccount(
   ctx: ServiceContext,
 ): Promise<TreasuryAccountView> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "TREASURY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para editar cuentas");
-  }
+  assertCanEditBankAccounts(ctx.roles);
   const acc = await prisma.treasuryAccount.findUnique({ where: { id } });
   if (!acc) throw new ServiceError("NOT_FOUND", "Cuenta no encontrada");
   if (acc.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -186,9 +224,7 @@ async function _setStatus(
   action: string,
 ): Promise<TreasuryAccount> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "TREASURY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para modificar cuentas");
-  }
+  assertCanEditBankAccounts(ctx.roles);
   const acc = await prisma.treasuryAccount.findUnique({ where: { id } });
   if (!acc) throw new ServiceError("NOT_FOUND", "Cuenta no encontrada");
   if (acc.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");

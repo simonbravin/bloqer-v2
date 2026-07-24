@@ -7,6 +7,7 @@ export const OVERVIEW_ROLES: readonly UserRole[] = [
   "OWNER",
   "ADMIN",
   "FINANCE",
+  "PROJECT_FINANCE",
   "PROCUREMENT",
   "WAREHOUSE",
   "SALES",

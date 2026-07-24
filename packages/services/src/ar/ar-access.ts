@@ -1,4 +1,4 @@
-import { can } from "@bloqer/domain";
+import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import type { ServiceContext } from "../types";
 
 /**
@@ -17,12 +17,15 @@ export function canEditArArea(roles: ServiceContext["roles"]): boolean {
   return can(roles, "EDIT", "AR");
 }
 
-/** Company-level Finanzas AR routes: VIEW AR only (not VIEW PROJECTS). */
+/**
+ * Company-level Finanzas AR routes — D-056: company-finance roles only
+ * (not SALES/PM/PROJECT_FINANCE alone via VIEW AR).
+ */
 export function canViewCompanyAr(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "VIEW", "AR");
+  return hasCompanyFinanceRole(roles) && can(roles, "VIEW", "AR");
 }
 
-/** Company-level Finanzas AR mutations (corporate SalesInvoice / Receivable) — D-051. */
+/** Company-level Finanzas AR mutations (corporate SalesInvoice / Receivable) — D-051 + D-056. */
 export function canEditCompanyAr(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "EDIT", "AR");
+  return hasCompanyFinanceRole(roles) && can(roles, "EDIT", "AR");
 }

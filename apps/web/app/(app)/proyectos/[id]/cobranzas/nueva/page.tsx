@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   listCollectibleReceivablesByProject,
-  listTreasuryAccounts,
+  listSelectableTreasuryAccounts,
   ServiceError,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
@@ -34,12 +34,12 @@ export default async function NuevaCobranzaPage({ params, searchParams }: PagePr
   try {
     const [receivablesResult, accountsResult] = await Promise.all([
       listCollectibleReceivablesByProject(id, ctx),
-      listTreasuryAccounts(ctx),
+      listSelectableTreasuryAccounts(ctx),
     ]);
     openReceivables = receivablesResult;
-    allAccounts = accountsResult.data;
+    allAccounts = accountsResult;
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 

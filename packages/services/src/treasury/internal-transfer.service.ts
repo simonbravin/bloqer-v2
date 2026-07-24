@@ -20,7 +20,7 @@ export async function getInternalTransferById(
   ctx: ServiceContext,
 ): Promise<InternalTransferView> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "TREASURY")) {
+  if (!can(ctx.roles, "VIEW", "INTERNAL_TRANSFERS") && !can(ctx.roles, "VIEW", "TREASURY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver transferencias");
   }
   const t = await prisma.internalTransfer.findUnique({
@@ -40,7 +40,7 @@ export async function listInternalTransfers(
   opts?: { page?: number; pageSize?: number },
 ): Promise<{ data: InternalTransferView[]; total: number }> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "TREASURY")) {
+  if (!can(ctx.roles, "VIEW", "INTERNAL_TRANSFERS") && !can(ctx.roles, "VIEW", "TREASURY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver transferencias");
   }
 
@@ -72,7 +72,7 @@ export async function createInternalTransfer(
   ctx: ServiceContext,
 ): Promise<InternalTransferView> {
   await assertTreasuryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "TREASURY")) {
+  if (!can(ctx.roles, "EDIT", "INTERNAL_TRANSFERS") && !can(ctx.roles, "EDIT", "TREASURY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear transferencias");
   }
 

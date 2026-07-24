@@ -1,4 +1,3 @@
-import { can } from "@bloqer/domain";
 import { canViewCompanyAp } from "../ap/ap-access";
 import { listCompanyPayables, type CompanyPayableListRow } from "../ap/payable.service";
 import {
@@ -11,6 +10,7 @@ import {
   type MovementReportRow,
 } from "../treasury-reports/treasury-reports.service";
 import { ServiceContext, ServiceError } from "../types";
+import { canViewCompanyTreasury } from "./finance-access";
 
 export type FinancialActivityGrain = "CASH" | "OPERATIONS" | "OBLIGATIONS";
 
@@ -58,7 +58,7 @@ export async function listFinancialActivity(
   switch (filters.grain) {
     case "CASH": {
       await assertTreasuryTenantModule(ctx);
-      if (!can(ctx.roles, "VIEW", "TREASURY")) {
+      if (!canViewCompanyTreasury(ctx.roles)) {
         throw new ServiceError("FORBIDDEN", "Sin permisos para ver movimientos");
       }
       const { rows, total } = await getAccountMovementReport(

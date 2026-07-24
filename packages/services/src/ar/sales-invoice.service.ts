@@ -56,6 +56,8 @@ export function assertInvoiceEditable(invoice: SalesInvoice): void {
 export async function getSalesInvoiceById(
   id: string,
   ctx: ServiceContext,
+  /** When set (project workspace routes), corporate invoices and cross-project IDs are rejected. */
+  projectScopeId?: string,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
   if (!canViewArProjectArea(ctx.roles)) {
@@ -70,6 +72,9 @@ export async function getSalesInvoiceById(
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && inv.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+  }
   return serializeInvoice(inv);
 }
 

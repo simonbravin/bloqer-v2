@@ -1,6 +1,6 @@
 import { can } from "@bloqer/domain";
 import type { ServiceContext } from "@bloqer/services";
-import { getTenantModuleGate } from "@bloqer/services";
+import { canViewCompanyFinanceHub, getTenantModuleGate } from "@bloqer/services";
 
 export type FinanceSubnavLinkDTO = {
   href: string;
@@ -10,10 +10,15 @@ export type FinanceSubnavLinkDTO = {
 };
 
 /**
- * Real routes only; each item requires tenant module + VIEW permission (except Resumen).
+ * Real routes only; each item requires tenant module + VIEW permission.
+ * Resumen only for company-finance roles (D-056).
  */
 export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<FinanceSubnavLinkDTO[]> {
   const gate = await getTenantModuleGate(ctx);
+  if (!canViewCompanyFinanceHub(ctx.roles)) {
+    return [];
+  }
+
   const links: FinanceSubnavLinkDTO[] = [{ href: "/finanzas", label: "Resumen" }];
 
   if (

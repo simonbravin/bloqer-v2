@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { CollectionForm } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
-import { getReceivableById, listTreasuryAccounts, ServiceError } from "@bloqer/services";
+import { getReceivableById, listSelectableTreasuryAccounts, ServiceError } from "@bloqer/services";
 
 interface PageProps {
   params: Promise<{ id: string; receivableId: string }>;
@@ -25,13 +25,13 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
   let allAccounts;
   try {
     const [receivableResult, accountsResult] = await Promise.all([
-      getReceivableById(receivableId, ctx),
-      listTreasuryAccounts(ctx),
+      getReceivableById(receivableId, ctx, id),
+      listSelectableTreasuryAccounts(ctx),
     ]);
     receivable = receivableResult;
-    allAccounts = accountsResult.data;
+    allAccounts = accountsResult;
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 

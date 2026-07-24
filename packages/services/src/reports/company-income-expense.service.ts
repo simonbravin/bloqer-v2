@@ -1,5 +1,3 @@
-import { Prisma, prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { companyScopeFilter, companyScopeRelationFilter } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
@@ -8,6 +6,10 @@ import {
   getProjectIncomeExpenseReport,
   type IncomeExpensePoint,
 } from "./project-income-expense.service";
+import { canViewCompanyFinanceHub, canViewCompanyTreasury } from "../finance/finance-access";
+import { canViewCompanyAp } from "../ap/ap-access";
+import { canViewCompanyAr } from "../ar/ar-access";
+import { Prisma, prisma } from "@bloqer/database";
 
 export type CompanyIncomeExpenseFilters = {
   dateFrom?: string;
@@ -69,6 +71,10 @@ export async function getCompanyIncomeExpenseReport(
   ctx: ServiceContext,
 ): Promise<CompanyIncomeExpenseReport> {
   const gate = await getTenantModuleGate(ctx);
+  if (!canViewCompanyFinanceHub(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para reporte económico consolidado");
+  }
+
   if (
     !gate.isEnabled("PROJECTS")
     && !gate.isEnabled("AR")
@@ -97,7 +103,7 @@ export async function getCompanyIncomeExpenseReport(
 
   const monthlyMap = new Map<string, IncomeExpensePoint>();
 
-  if (can(ctx.roles, "VIEW", "PROJECTS") || can(ctx.roles, "VIEW", "AR") || can(ctx.roles, "VIEW", "AP")) {
+  if (canViewCompanyAr(ctx.roles) || canViewCompanyAp(ctx.roles) || canViewCompanyTreasury(ctx.roles)) {
     const reports = await Promise.all(
       projects.map((p) =>
         getProjectIncomeExpenseReport(
@@ -118,7 +124,7 @@ export async function getCompanyIncomeExpenseReport(
   const dateFrom = new Date(range.dateFrom);
   const dateTo = new Date(range.dateTo);
 
-  if (gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP")) {
+  if (gate.isEnabled("AP") && canViewCompanyAp(ctx.roles)) {
     const corpPayments = await prisma.payment.findMany({
       where: {
         tenantId: ctx.tenantId,

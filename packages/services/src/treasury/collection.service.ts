@@ -1,5 +1,5 @@
 import { Prisma, prisma, Collection } from "@bloqer/database";
-import { canEditArArea, canViewArProjectArea } from "../ar/ar-access";
+import { canEditArArea, canViewArProjectArea, canViewCompanyAr } from "../ar/ar-access";
 import type { CreateCollectionInput } from "@bloqer/validators";
 import { auditAr } from "../ar/ar-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
@@ -25,6 +25,8 @@ export type CollectionView = Omit<Collection, "amount"> & {
 export async function getCollectionById(
   id: string,
   ctx: ServiceContext,
+  /** When set (project workspace routes), corporate collections and cross-project IDs are rejected. */
+  projectScopeId?: string,
 ): Promise<CollectionView> {
   await assertArTenantModule(ctx);
   if (!canViewArProjectArea(ctx.roles)) {
@@ -36,6 +38,9 @@ export async function getCollectionById(
   });
   if (!c) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
   if (c.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && c.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a este proyecto");
+  }
   return serialize(c);
 }
 
@@ -80,11 +85,34 @@ export async function listCollectionsByProject(
 export async function listCollectionsByReceivable(
   receivableId: string,
   ctx: ServiceContext,
+  projectScopeId?: string,
 ): Promise<CollectionView[]> {
   await assertArTenantModule(ctx);
-  if (!canViewArProjectArea(ctx.roles)) {
+
+  const receivable = await prisma.receivable.findUnique({
+    where: { id: receivableId },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!receivable) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
+  if (receivable.tenantId !== ctx.tenantId) {
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  }
+
+  if (projectScopeId !== undefined) {
+    if (!canViewArProjectArea(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver cobranzas");
+    }
+    if (receivable.projectId !== projectScopeId) {
+      throw new ServiceError("FORBIDDEN", "La cuenta por cobrar no pertenece a este proyecto");
+    }
+  } else if (receivable.projectId === null) {
+    if (!canViewCompanyAr(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver cobranzas a nivel empresa");
+    }
+  } else if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cobranzas");
   }
+
   const rows = await prisma.collection.findMany({
     where: { receivableId, tenantId: ctx.tenantId },
     include: { account: { select: { name: true } } },
@@ -98,6 +126,7 @@ export async function listCollectionsByReceivable(
 export async function createCollection(
   input: CreateCollectionInput,
   ctx: ServiceContext,
+  projectScopeId?: string,
 ): Promise<CollectionView> {
   await assertArTenantModule(ctx);
   if (!canEditArArea(ctx.roles)) {
@@ -112,6 +141,9 @@ export async function createCollection(
   if (receivablePreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (isCrossCompany(receivablePreview.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
+  }
+  if (projectScopeId !== undefined && receivablePreview.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por cobrar no pertenece a este proyecto");
   }
   if (receivablePreview.projectId) {
     await assertProjectAllowsOperationalMutation(receivablePreview.projectId, ctx.tenantId);
@@ -264,6 +296,7 @@ export async function createCollection(
 export async function cancelCollection(
   id: string,
   ctx: ServiceContext,
+  projectScopeId?: string,
 ): Promise<Collection> {
   await assertArTenantModule(ctx);
   if (!canEditArArea(ctx.roles)) {
@@ -274,6 +307,9 @@ export async function cancelCollection(
     const c = await tx.collection.findUnique({ where: { id } });
     if (!c) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
     if (c.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    if (projectScopeId !== undefined && c.projectId !== projectScopeId) {
+      throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a este proyecto");
+    }
     if (c.status === "CANCELLED") {
       throw new ServiceError("CONFLICT", "La cobranza ya está cancelada");
     }

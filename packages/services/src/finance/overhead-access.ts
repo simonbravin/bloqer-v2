@@ -1,6 +1,7 @@
 import { can } from "@bloqer/domain";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
+import { canViewCompanyAp } from "../ap/ap-access";
 
 export function assertOverheadEdit(ctx: ServiceContext): void {
   if (!can(ctx.roles, "EDIT", "AP") && !can(ctx.roles, "APPROVE", "TENANT_SETTINGS")) {
@@ -8,8 +9,9 @@ export function assertOverheadEdit(ctx: ServiceContext): void {
   }
 }
 
+/** Company GG reads require company AP (not VIEW PROJECTS alone). */
 export function assertOverheadView(ctx: ServiceContext): void {
-  if (!can(ctx.roles, "VIEW", "AP") && !can(ctx.roles, "VIEW", "PROJECTS")) {
+  if (!canViewCompanyAp(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver imputaciones de gastos generales");
   }
 }

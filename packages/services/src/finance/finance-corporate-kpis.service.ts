@@ -1,5 +1,4 @@
 import { Prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import {
   aggregateCorporatePayableBalances,
   countCorporateDraftInvoices,
@@ -7,6 +6,8 @@ import {
   type CorporatePayableSnapshotRow,
 } from "../ap/corporate-ap-snapshot";
 import { canViewCompanyAp } from "../ap/ap-access";
+import { canViewCompanyAr } from "../ar/ar-access";
+import { canViewCompanyTreasury } from "./finance-access";
 import {
   aggregateCompanyReceivableBalances,
   fetchCompanyReceivableSnapshotRows,
@@ -299,8 +300,8 @@ export async function buildFinanceProjection(
 export async function resolveFinanceCorporateAccess(ctx: ServiceContext): Promise<FinanceCorporateKpiInput> {
   const gate = await getTenantModuleGate(ctx);
   return {
-    canTreasury: gate.isEnabled("TREASURY") && can(ctx.roles, "VIEW", "TREASURY"),
+    canTreasury: gate.isEnabled("TREASURY") && canViewCompanyTreasury(ctx.roles),
     canAp: gate.isEnabled("AP") && canViewCompanyAp(ctx.roles),
-    canAr: gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR"),
+    canAr: gate.isEnabled("AR") && canViewCompanyAr(ctx.roles),
   };
 }

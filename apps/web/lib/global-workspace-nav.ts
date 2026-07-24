@@ -1,4 +1,4 @@
-import { can, type UserRole } from "@bloqer/domain";
+import { can, hasCompanyFinanceRole, type UserRole } from "@bloqer/domain";
 import type { PermissionModule } from "@bloqer/domain";
 import { satisfiesNavRequirement, type NavRequirement } from "./nav-config";
 import { canAccessScheduledReportsNav } from "./configuracion-subnav";
@@ -33,7 +33,11 @@ const FINANCE_AREA: NavRequirement = {
   ],
 };
 
+const COMPANY_FINANCE_SECTION_TITLES = new Set(["Finanzas", "Tesorería", "Contabilidad"]);
+
 function canReadConfigNav(roles: UserRole[]): boolean {
+  // Equipo + Permisos share this OR today: only OWNER/ADMIN have either leaf (PERM-005).
+  // If a future role gains TENANT_SETTINGS without USERS_PERMISSIONS, split the nav leaves.
   return can(roles, "VIEW", "TENANT_SETTINGS") || can(roles, "VIEW", "USERS_PERMISSIONS");
 }
 
@@ -76,7 +80,7 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
     title: "Tesorería",
     items: [
       { label: "Resumen", href: "/tesoreria", matchExact: true, require: { action: "VIEW", module: "TREASURY" } },
-      { label: "Cuentas", href: "/tesoreria/cuentas", require: { action: "VIEW", module: "TREASURY" } },
+      { label: "Cuentas", href: "/tesoreria/cuentas", require: { action: "VIEW", module: "BANK_ACCOUNTS" } },
       {
         label: "Movimientos",
         href: "/tesoreria/movimientos",
@@ -90,7 +94,7 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
       {
         label: "Transferencias",
         href: "/tesoreria/transferencias",
-        require: { action: "VIEW", module: "TREASURY" },
+        require: { action: "VIEW", module: "INTERNAL_TRANSFERS" },
       },
     ],
   },
@@ -118,14 +122,20 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
 
 /**
  * Global shell sidebar (outside a project). Same permission + module gates as route handlers.
+ * Company finance sections require a company-finance role (D-056).
  */
 export function buildGlobalNavSections(
   roles: UserRole[],
   isTenantModuleEnabled: (module: PermissionModule) => boolean,
 ): GlobalNavSection[] {
   const sections: GlobalNavSection[] = [];
+  const companyFinance = hasCompanyFinanceRole(roles);
 
   for (const def of GLOBAL_NAV_SECTION_DEFS) {
+    if (COMPANY_FINANCE_SECTION_TITLES.has(def.title) && !companyFinance) {
+      continue;
+    }
+
     const items: GlobalNavSection["items"] = [];
 
     for (const item of def.items) {

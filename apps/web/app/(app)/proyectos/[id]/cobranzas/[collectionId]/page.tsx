@@ -1,3 +1,5 @@
+import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { CollectionStatusBadge } from "@/features/collections";
@@ -6,24 +8,12 @@ import { generateJournalFromCollectionAction } from "@/app/(app)/contabilidad/so
 import { getCollectionById, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { cancelCollectionAction } from "../actions";
-import { formatDate } from "@/lib/format";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; collectionId: string }>;
   searchParams: Promise<{ contabilidad?: string }>;
-}
-
-function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(parseFloat(value)) +
-    " " +
-    currency
-  );
 }
 
 export default async function CollectionDetailPage({ params, searchParams }: PageProps) {
@@ -42,9 +32,9 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
 
   let collection;
   try {
-    collection = await getCollectionById(collectionId, ctx);
+    collection = await getCollectionById(collectionId, ctx, id);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 
@@ -95,7 +85,7 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
           <div>
             <dt className="text-muted-foreground">Monto</dt>
             <dd className="font-bold font-mono">
-              {fmtMoney(collection.amount, collection.currency)}
+              {formatMoneyAmount(collection.amount, collection.currency)}
             </dd>
           </div>
           <div>

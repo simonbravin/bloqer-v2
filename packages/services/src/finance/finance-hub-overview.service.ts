@@ -20,6 +20,9 @@ import {
   resolveFinanceCorporateAccess,
   type FinanceProjectionSummary,
 } from "./finance-corporate-kpis.service";
+import { canViewCompanyFinanceHub, canViewCompanyTreasury } from "./finance-access";
+import { canViewCompanyAp } from "../ap/ap-access";
+import { canViewCompanyAr } from "../ar/ar-access";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -326,15 +329,16 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
   const apMod    = gate.isEnabled("AP");
   const trMod    = gate.isEnabled("TREASURY");
   const acctMod  = gate.isEnabled("ACCOUNTING");
-  const arPerm   = can(ctx.roles, "VIEW", "AR");
-  const apPerm   = can(ctx.roles, "VIEW", "AP");
-  const trPerm   = can(ctx.roles, "VIEW", "TREASURY");
-  const acctPerm = can(ctx.roles, "VIEW", "ACCOUNTING");
+  const arPerm   = canViewCompanyAr(ctx.roles);
+  const apPerm   = canViewCompanyAp(ctx.roles);
+  const trPerm   = canViewCompanyTreasury(ctx.roles);
+  const acctPerm = can(ctx.roles, "VIEW", "ACCOUNTING") && canViewCompanyFinanceHub(ctx.roles);
 
   const hasFinanceModules = arMod || apMod || trMod || acctMod;
 
   const canSeeAnything =
     hasFinanceModules
+    && canViewCompanyFinanceHub(ctx.roles)
     && ((arMod && arPerm) || (apMod && apPerm) || (trMod && trPerm) || (acctMod && acctPerm));
 
   const [arReport, apReport, apCorporateReport] = await Promise.all([

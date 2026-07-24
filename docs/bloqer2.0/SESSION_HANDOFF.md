@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
-Last updated: 2026-05-13  
-Status: Phase **16E** — UX **`/finanzas`**: jerarquía visual, empty states, barras vencido/al día, accesos rápidos en card; **subnav** en `app/(app)/finanzas/layout.tsx` (`getFinanceSubnavLinks` + `FinanceSubnav`) con rutas reales y gates módulo + `can()` (incl. Facturas y gastos, CxC, CxP, Imputación GG). Ver [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) §16E.
+Last updated: 2026-07-24  
+Status: **D-056** company vs project finance RBAC — hub `/finanzas` + tesorería/GL solo `OWNER|ADMIN|FINANCE|VIEWER`; rol `PROJECT_FINANCE`; PM/SALES/PROCUREMENT sin caja empresa; hardening IDOR/scope AR-AP (Fase 0). Ver [`PERMISSIONS_MATRIX.md`](./00-product/PERMISSIONS_MATRIX.md) §2.2 + [D-056](./00-product/DECISION_LOG.md).
 
 ---
 

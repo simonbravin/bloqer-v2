@@ -29,10 +29,16 @@
 - **Cuántos hay:** típicamente 1-3.
 
 ### 2.3 `FINANCE`
-- **Quién es:** responsable financiero / tesorero.
-- **Acceso:** completo en tesorería, AR, AP, conciliación bancaria, reportes financieros.
-- **Acciones típicas:** registrar pagos, cobranzas, transferencias internas, conciliar cuentas, emitir reportes.
+- **Quién es:** responsable financiero / tesorero de la **empresa**.
+- **Acceso:** completo en tesorería (incl. saldos/caja), AR, AP, conciliación bancaria, contabilidad, hub `/finanzas`, reportes financieros de empresa ([D-056](./DECISION_LOG.md)).
+- **Acciones típicas:** registrar pagos, cobranzas, transferencias internas, conciliar cuentas, emitir reportes, GG corporativo.
 - **Vista limitada:** sí ve rentabilidad bruta; rentabilidad neta solo si Admin lo habilita.
+
+### 2.3.1 `PROJECT_FINANCE`
+- **Quién es:** contador / analista financiero de **obra** (no de caja empresa).
+- **Acceso:** CxC, CxP, cobranzas y gastos **en el contexto de proyecto** (`/proyectos/[id]/finanzas` y rutas hermanas). Sin hub `/finanzas` de empresa, sin `/tesoreria`, sin `/contabilidad` GL ([D-056](./DECISION_LOG.md)).
+- **Acciones típicas:** emitir/gestionar facturas de venta de obra, registrar cobranzas de obra, consultar CxP de obra.
+- **Vista limitada:** no ve saldos de cuentas bancarias ni posición de caja consolidada.
 
 ### 2.4 `PROCUREMENT`
 - **Quién es:** responsable de compras.
@@ -48,13 +54,13 @@
 
 ### 2.6 `SALES`
 - **Quién es:** responsable comercial / ventas directas.
-- **Acceso:** completo en clientes, ventas directas, cobranzas.
-- **Acciones típicas:** registrar venta directa, emitir factura, cargar cobranza.
-- **Vista limitada:** no ve costos.
+- **Acceso:** clientes, contratos, facturación y cobranzas **de proyecto** (project tools). Sin hub `/finanzas` ni tesorería de empresa ([D-056](./DECISION_LOG.md)).
+- **Acciones típicas:** registrar venta de obra, emitir factura, cargar cobranza en contexto de proyecto.
+- **Vista limitada:** no ve costos; no ve saldos de caja empresa.
 
 ### 2.7 `VIEWER`
 - **Quién es:** stakeholder solo lectura (auditor externo, contador, asesor).
-- **Acceso:** todos los módulos en modo solo lectura, sin ver rentabilidad neta por defecto.
+- **Acceso:** lectura de módulos operativos **y** company finance (hub, tesorería, GL) sin mutar ([D-056](./DECISION_LOG.md)).
 - **Acciones:** ninguna que modifique datos.
 
 ---
@@ -65,10 +71,10 @@ Estos roles **solo aplican a un proyecto** asignado. Una persona puede ser PM de
 
 ### 3.1 `PROJECT_MANAGER` (PM)
 - **Quién es:** jefe de obra responsable del proyecto.
-- **Acceso:** total dentro del proyecto asignado: presupuesto, certificaciones, compras imputadas a la obra, libro de obra, cronograma, RFIs, change orders.
-- **Facturación / cobranzas en obra:** en código, mutaciones sobre facturas de venta, CXC y cobranzas requieren `EDIT AR` (`packages/domain`); el PM tiene techo `AR` **editar** en la matriz TypeScript (Phase 7C).
+- **Acceso:** total dentro del proyecto asignado: presupuesto, certificaciones, compras imputadas a la obra, libro de obra, cronograma, RFIs, change orders; finanzas de **obra** (no company hub / caja) ([D-056](./DECISION_LOG.md)).
+- **Facturación / cobranzas en obra:** mutaciones requieren `EDIT AR`; el PM tiene techo `AR` editar en la matriz TypeScript.
 - **Acciones críticas:** emitir certificaciones, cerrar partes diarios, solicitar OCs, aprobar recepciones de obra.
-- **Vista limitada:** rentabilidad bruta de su obra; neta solo si Admin lo habilita.
+- **Vista limitada:** rentabilidad bruta de su obra; neta solo si Admin lo habilita; **sin** saldos de cuentas empresa.
 
 ### 3.2 `SITE_FOREMAN` (capataz)
 - **Quién es:** referente operativo en obra.

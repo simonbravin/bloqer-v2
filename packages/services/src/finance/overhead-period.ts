@@ -1,3 +1,4 @@
+import { divideDecimal, multiplyDecimal, roundToDecimals } from "@bloqer/utils";
 import { ServiceError } from "../types";
 
 export function currentOverheadPeriod(): string {
@@ -74,10 +75,14 @@ export function resolvePeriodKeysForFilter(filter?: OverheadPeriodFilter): strin
   return keys;
 }
 
-/** Peso = parte / total; 0 si total es 0. */
+/** Peso = (parte / total) * 100; 0 si total es 0. Percent at 2 dp half-up (no float). */
 export function computeWeightShare(part: string, total: string): string {
-  const p = Number.parseFloat(part);
-  const t = Number.parseFloat(total);
-  if (!Number.isFinite(p) || !Number.isFinite(t) || t <= 0) return "0.00";
-  return ((p / t) * 100).toFixed(2);
+  try {
+    const t = total.trim();
+    if (!t || t === "0" || t === "0.0" || t === "0.00") return "0.00";
+    const ratio = divideDecimal(part, total, 8);
+    return roundToDecimals(multiplyDecimal(ratio, "100"), 2);
+  } catch {
+    return "0.00";
+  }
 }
