@@ -100,6 +100,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     supplierName: r.supplierName,
     receiptDate: r.receiptDate,
     status: r.status,
+    receivedByName: r.receivedByName,
   }));
 
   const invoiceItems: SupplierInvoiceListItem[] = linkedInvoices.map((inv) => ({

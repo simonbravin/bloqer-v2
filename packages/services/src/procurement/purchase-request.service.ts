@@ -11,6 +11,10 @@ import {
   budgetBaselineForWbs,
 } from "./procurement-budget-baseline";
 import { notifyPurchaseRequestSubmitted } from "./procurement-notifications.service";
+import {
+  resolveUserDisplayNames,
+  userDisplayNameFromMap,
+} from "../user/resolve-user-display-names";
 
 export type PurchaseRequestLineView = {
   id: string;
@@ -25,6 +29,7 @@ export type PurchaseRequestLineView = {
 
 export type PurchaseRequestView = Omit<PurchaseRequest, never> & {
   code: string;
+  requestedByName: string | null;
   lines: PurchaseRequestLineView[];
 };
 
@@ -54,10 +59,14 @@ async function nextDocumentNumber(
   return (max._max.number ?? 0) + 1;
 }
 
-function serialize(pr: PurchaseRequest & { lines: PurchaseRequestLineView[] }): PurchaseRequestView {
+function serialize(
+  pr: PurchaseRequest & { lines: PurchaseRequestLineView[] },
+  requestedByName: string | null = null,
+): PurchaseRequestView {
   return {
     ...pr,
     code: `SC-${String(pr.number).padStart(3, "0")}`,
+    requestedByName,
     lines: pr.lines,
   };
 }
@@ -81,20 +90,24 @@ export async function listPurchaseRequestsByProject(
     include: { lines: { orderBy: { sortOrder: "asc" } } },
     orderBy: { number: "desc" },
   });
+  const nameById = await resolveUserDisplayNames(rows.map((r) => r.requestedByUserId));
   return rows.map((r) =>
-    serialize({
-      ...r,
-      lines: r.lines.map((l) => ({
-        id: l.id,
-        wbsNodeId: l.wbsNodeId,
-        productId: l.productId,
-        lineType: l.lineType,
-        description: l.description,
-        unit: l.unit,
-        quantity: l.quantity.toString(),
-        budgetUnitCostSnapshot: l.budgetUnitCostSnapshot?.toString() ?? null,
-      })),
-    }),
+    serialize(
+      {
+        ...r,
+        lines: r.lines.map((l) => ({
+          id: l.id,
+          wbsNodeId: l.wbsNodeId,
+          productId: l.productId,
+          lineType: l.lineType,
+          description: l.description,
+          unit: l.unit,
+          quantity: l.quantity.toString(),
+          budgetUnitCostSnapshot: l.budgetUnitCostSnapshot?.toString() ?? null,
+        })),
+      },
+      userDisplayNameFromMap(nameById, r.requestedByUserId),
+    ),
   );
 }
 
@@ -108,19 +121,23 @@ export async function getPurchaseRequestById(id: string, ctx: ServiceContext): P
     include: { lines: { orderBy: { sortOrder: "asc" } } },
   });
   if (!pr || pr.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
-  return serialize({
-    ...pr,
-    lines: pr.lines.map((l) => ({
-      id: l.id,
-      wbsNodeId: l.wbsNodeId,
-      productId: l.productId,
-      lineType: l.lineType,
-      description: l.description,
-      unit: l.unit,
-      quantity: l.quantity.toString(),
-      budgetUnitCostSnapshot: l.budgetUnitCostSnapshot?.toString() ?? null,
-    })),
-  });
+  const nameById = await resolveUserDisplayNames([pr.requestedByUserId]);
+  return serialize(
+    {
+      ...pr,
+      lines: pr.lines.map((l) => ({
+        id: l.id,
+        wbsNodeId: l.wbsNodeId,
+        productId: l.productId,
+        lineType: l.lineType,
+        description: l.description,
+        unit: l.unit,
+        quantity: l.quantity.toString(),
+        budgetUnitCostSnapshot: l.budgetUnitCostSnapshot?.toString() ?? null,
+      })),
+    },
+    userDisplayNameFromMap(nameById, pr.requestedByUserId),
+  );
 }
 
 export async function createPurchaseRequest(

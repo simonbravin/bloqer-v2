@@ -33,6 +33,11 @@ export function PurchaseReceiptCards({
           <p className="mt-3 text-sm text-muted-foreground">
             {formatDate(r.receiptDate)}
           </p>
+          {r.receivedByName ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Recibido por {r.receivedByName}
+            </p>
+          ) : null}
         </Link>
       ))}
     </div>

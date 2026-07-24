@@ -49,6 +49,7 @@ export default async function RecepcionesPage({ params }: PageProps) {
     supplierName: r.supplierName,
     receiptDate: r.receiptDate,
     status: r.status,
+    receivedByName: r.receivedByName,
   }));
 
   return (

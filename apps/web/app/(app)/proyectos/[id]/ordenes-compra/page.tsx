@@ -143,6 +143,7 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
     totalAmount: o.totalAmount,
     currency: o.currency,
     status: o.status,
+    approvedByName: o.approvedByName,
   }));
 
   const filtered = statusFilter ? items.filter((o) => o.status === statusFilter) : items;

@@ -1,13 +1,31 @@
 import { Prisma, prisma, PurchaseReceipt, PurchaseReceiptStatus, PurchaseOrderStatus } from "@bloqer/database";
-import { canEditPurchaseReceipts } from "./procurement-access";
 import type { CreatePurchaseReceiptInput } from "@bloqer/validators";
 import { auditProcurement } from "./procurement-audit";
 import { assertPoEligibleForReceipt, assertReceiptQtyWithinRemaining } from "./purchase-receipt-guards";
 import { createReceiptStockMovement, cancelReceiptStockMovements } from "../inventory/stock-movement.service";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { canViewProcurementProjectArea } from "./procurement-access";
+import {
+  canEditPurchaseReceipts,
+  canViewProcurementProjectArea,
+} from "./procurement-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import {
+  resolveUserDisplayNames,
+  userDisplayNameFromMap,
+} from "../user/resolve-user-display-names";
+
+/** Confirmer is stored on confirm as `updatedBy`; after cancel that field is the canceller. */
+function receiptActorUserId(r: {
+  status: string;
+  createdBy: string | null;
+  updatedBy: string | null;
+}): string | null {
+  if (r.status === PurchaseReceiptStatus.CONFIRMED) {
+    return r.updatedBy ?? r.createdBy;
+  }
+  return r.createdBy;
+}
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -23,6 +41,7 @@ export type PurchaseReceiptLineView = {
 export type PurchaseReceiptView = Omit<PurchaseReceipt, never> & {
   supplierName: string;
   purchaseOrderCode: string;
+  receivedByName: string | null;
   lines: PurchaseReceiptLineView[];
 };
 
@@ -38,11 +57,13 @@ function serializeReceipt(
       purchaseOrderLine: { description: string };
     }>;
   },
+  receivedByName: string | null = null,
 ): PurchaseReceiptView {
   return {
     ...r,
     supplierName:      r.supplierContact.fantasyName ?? r.supplierContact.legalName,
     purchaseOrderCode: `OC-${String(r.purchaseOrder.number).padStart(3, "0")}`,
+    receivedByName,
     lines: r.lines.map((l) => ({
       id:                  l.id,
       purchaseReceiptId:   l.purchaseReceiptId,
@@ -52,6 +73,14 @@ function serializeReceipt(
       notes:               l.notes,
     })),
   };
+}
+
+async function toPurchaseReceiptView(
+  r: Parameters<typeof serializeReceipt>[0],
+): Promise<PurchaseReceiptView> {
+  const actorId = receiptActorUserId(r);
+  const nameById = await resolveUserDisplayNames([actorId]);
+  return serializeReceipt(r, userDisplayNameFromMap(nameById, actorId));
 }
 
 const receiptInclude = {
@@ -94,7 +123,7 @@ export async function getPurchaseReceiptById(id: string, ctx: ServiceContext): P
   const r = await prisma.purchaseReceipt.findUnique({ where: { id }, include: receiptInclude });
   if (!r) throw new ServiceError("NOT_FOUND", "Recepción no encontrada");
   if (r.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  return serializeReceipt(r);
+  return toPurchaseReceiptView(r);
 }
 
 export async function listReceiptsByProject(
@@ -114,7 +143,11 @@ export async function listReceiptsByProject(
     include: receiptInclude,
     orderBy: { receiptDate: "desc" },
   });
-  return receipts.map(serializeReceipt);
+  const actorIds = receipts.map((row) => receiptActorUserId(row));
+  const nameById = await resolveUserDisplayNames(actorIds);
+  return receipts.map((row) =>
+    serializeReceipt(row, userDisplayNameFromMap(nameById, receiptActorUserId(row))),
+  );
 }
 
 export async function listReceiptsByPurchaseOrder(
@@ -134,7 +167,11 @@ export async function listReceiptsByPurchaseOrder(
     include: receiptInclude,
     orderBy: { receiptDate: "desc" },
   });
-  return receipts.map(serializeReceipt);
+  const actorIds = receipts.map((row) => receiptActorUserId(row));
+  const nameById = await resolveUserDisplayNames(actorIds);
+  return receipts.map((row) =>
+    serializeReceipt(row, userDisplayNameFromMap(nameById, receiptActorUserId(row))),
+  );
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -210,7 +247,7 @@ export async function createPurchaseReceipt(
     return receipt;
   });
 
-  return serializeReceipt(receipt);
+  return toPurchaseReceiptView(receipt);
 }
 
 export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): Promise<PurchaseReceiptView> {
@@ -289,7 +326,7 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
     return receipt;
   });
 
-  return serializeReceipt(receipt);
+  return toPurchaseReceiptView(receipt);
 }
 
 export async function cancelPurchaseReceipt(id: string, ctx: ServiceContext): Promise<PurchaseReceiptView> {
@@ -360,5 +397,5 @@ export async function cancelPurchaseReceipt(id: string, ctx: ServiceContext): Pr
     return receipt;
   });
 
-  return serializeReceipt(receipt);
+  return toPurchaseReceiptView(receipt);
 }

@@ -4,4 +4,5 @@ export type PurchaseReceiptListItem = {
   supplierName: string;
   receiptDate: Date;
   status: string;
+  receivedByName: string | null;
 };

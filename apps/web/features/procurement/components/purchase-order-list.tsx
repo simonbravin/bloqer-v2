@@ -7,4 +7,5 @@ export type PurchaseOrderListItem = {
   totalAmount: string;
   currency: string;
   status: string;
+  approvedByName: string | null;
 };

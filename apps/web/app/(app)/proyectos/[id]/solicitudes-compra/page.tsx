@@ -157,6 +157,7 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
             <TableRow>
               <TableHead>Código</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead>Solicitante</TableHead>
               <TableHead>Líneas</TableHead>
               <TableHead>Necesaria para</TableHead>
               <TableHead className="text-right">Ver</TableHead>
@@ -165,7 +166,7 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="p-0">
+                <TableCell colSpan={6} className="p-0">
                   <ListEmptyState
                     className="rounded-none border-0"
                     title={
@@ -207,6 +208,9 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
                   <TableCell className="font-medium">{pr.code}</TableCell>
                   <TableCell>
                     <PurchaseRequestStatusBadge status={pr.status} />
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {pr.requestedByName ?? "—"}
                   </TableCell>
                   <TableCell>{pr.lines.length}</TableCell>
                   <TableCell>

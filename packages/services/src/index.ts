@@ -3,6 +3,7 @@ export * from "./company-scope";
 export * from "./tenant/tenant.service";
 export * from "./company/company.service";
 export * from "./user/user.service";
+export * from "./user/resolve-user-display-names";
 export * from "./membership/membership.service";
 export * from "./contact/contact.service";
 export * from "./audit/audit.service";

@@ -36,6 +36,7 @@ export function PurchaseOrderTable({
             <TableHead>Entrega prevista</TableHead>
             <TableHead>Recepción</TableHead>
             <TableHead className="text-right">Total</TableHead>
+            <TableHead>Aprobado por</TableHead>
             <TableHead>Estado</TableHead>
           </TableRow>
         </TableHeader>
@@ -63,6 +64,9 @@ export function PurchaseOrderTable({
                   style: "currency",
                   currency: order.currency,
                 })}
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {order.approvedByName ?? "—"}
               </TableCell>
               <TableCell>
                 <PurchaseOrderStatusBadge status={order.status} />

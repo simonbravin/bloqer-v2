@@ -21,6 +21,10 @@ import {
   budgetUnitCostForWbs,
   getWbsBudgetReference,
 } from "./procurement-budget-baseline";
+import {
+  resolveUserDisplayNames,
+  userDisplayNameFromMap,
+} from "../user/resolve-user-display-names";
 
 export {
   submitPurchaseOrder,
@@ -61,6 +65,7 @@ export type PurchaseOrderView = Omit<PurchaseOrder, "subtotal" | "taxAmount" | "
   totalAmount: string;
   code: string;
   supplierName: string;
+  approvedByName: string | null;
   lines: PurchaseOrderLineView[];
 };
 
@@ -111,6 +116,7 @@ function serializePO(
     supplierContact: { legalName: string; fantasyName: string | null };
     lines: Array<Parameters<typeof serializeLine>[0]>;
   },
+  approvedByName: string | null = null,
 ): PurchaseOrderView {
   const supplierName = po.supplierContact.fantasyName ?? po.supplierContact.legalName;
   return {
@@ -118,6 +124,7 @@ function serializePO(
     subtotal:    po.subtotal.toString(),
     taxAmount:   po.taxAmount.toString(),
     totalAmount: po.totalAmount.toString(),
+    approvedByName,
     code:        `OC-${String(po.number).padStart(3, "0")}`,
     supplierName,
     lines:       po.lines.map(serializeLine),
@@ -258,6 +265,16 @@ function assertDraft(po: PurchaseOrder): void {
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
+async function toPurchaseOrderView(
+  po: PurchaseOrder & {
+    supplierContact: { legalName: string; fantasyName: string | null };
+    lines: Array<Parameters<typeof serializeLine>[0]>;
+  },
+): Promise<PurchaseOrderView> {
+  const nameById = await resolveUserDisplayNames([po.approvedByUserId]);
+  return serializePO(po, userDisplayNameFromMap(nameById, po.approvedByUserId));
+}
+
 export async function getPurchaseOrderById(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
   await assertProcurementTenantModule(ctx);
   if (!canViewProcurementProjectArea(ctx.roles)) {
@@ -266,7 +283,7 @@ export async function getPurchaseOrderById(id: string, ctx: ServiceContext): Pro
   const po = await prisma.purchaseOrder.findUnique({ where: { id }, include: poInclude });
   if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  return serializePO(po);
+  return toPurchaseOrderView(po);
 }
 
 export async function listPurchaseOrdersByProject(
@@ -286,7 +303,8 @@ export async function listPurchaseOrdersByProject(
     include: poInclude,
     orderBy: { number: "asc" },
   });
-  return orders.map(serializePO);
+  const nameById = await resolveUserDisplayNames(orders.map((o) => o.approvedByUserId));
+  return orders.map((o) => serializePO(o, userDisplayNameFromMap(nameById, o.approvedByUserId)));
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -402,7 +420,7 @@ export async function createPurchaseOrder(
     return po;
   });
 
-  return serializePO(po);
+  return toPurchaseOrderView(po);
 }
 
 export async function updatePurchaseOrder(
@@ -509,7 +527,7 @@ export async function updatePurchaseOrder(
     return po;
   });
 
-  return serializePO(po);
+  return toPurchaseOrderView(po);
 }
 
 export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
@@ -605,5 +623,5 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
     return cancelled;
   });
 
-  return serializePO(po);
+  return toPurchaseOrderView(po);
 }

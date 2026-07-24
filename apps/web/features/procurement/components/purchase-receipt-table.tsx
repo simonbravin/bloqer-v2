@@ -32,6 +32,7 @@ export function PurchaseReceiptTable({
             <TableHead>Orden de compra</TableHead>
             <TableHead>Proveedor</TableHead>
             <TableHead>Fecha</TableHead>
+            <TableHead>Recibido por</TableHead>
             <TableHead>Estado</TableHead>
           </TableRow>
         </TableHeader>
@@ -49,6 +50,9 @@ export function PurchaseReceiptTable({
               <TableCell className="font-medium">{r.supplierName}</TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {formatDate(r.receiptDate)}
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {r.receivedByName ?? "—"}
               </TableCell>
               <TableCell>
                 <PurchaseReceiptStatusBadge status={r.status} />

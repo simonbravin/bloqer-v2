@@ -29,6 +29,11 @@ export function PurchaseOrderCards({
             <PurchaseOrderStatusBadge status={order.status} />
           </div>
           <p className="mt-2 font-semibold">{order.supplierName}</p>
+          {order.approvedByName ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Aprobado por {order.approvedByName}
+            </p>
+          ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">Recepción</span>
             <PurchaseOrderReceiptBadge status={order.status} />
