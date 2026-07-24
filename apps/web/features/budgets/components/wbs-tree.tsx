@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useTransition, useMemo, useCallback, useEffect, type ReactNode } from "react";
+import {
+  useState,
+  useTransition,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -45,13 +53,34 @@ import { budgetUnitLabel } from "@/lib/budget-units";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { WbsNodeForm } from "./wbs-node-form";
 import { WbsTreeToolbar } from "./wbs-tree-toolbar";
-import type { WbsViewMode } from "../lib/wbs-view-mode";
 import { useBudgetWbsViewMode } from "../lib/wbs-view-mode";
 import { CostItemApuDialog } from "./cost-item-apu-dialog";
 import { WbsGroupDialog } from "./wbs-group-dialog";
 import { WbsImportDialog, type WbsImportPreview } from "./wbs-import-dialog";
-import type { BudgetImportRow } from "@bloqer/validators";
-import { computeWbsRowMetrics, computeTreeGrandTotals } from "@bloqer/services/wbs-metrics";
+import {
+  formatWbsIncidencePercent,
+  wbsIncidencePercent,
+  wbsTableColumnCount,
+} from "@bloqer/domain";
+import type { CostAnalysisLineView, WbsViewNode } from "@bloqer/services";
+import {
+  computeWbsRowMetrics,
+  computeTreeGrandTotals,
+  computeUnitCategoryCosts,
+} from "@bloqer/services/wbs-metrics";
+import type {
+  BudgetImportRow,
+  CreateWbsNodeInput,
+  UpdateWbsNodeInput,
+  ReorderWbsNodesInput,
+  UpdateCostItemInput,
+  CreateCostAnalysisLineInput,
+  UpdateCostAnalysisLineInput,
+  SaveCostItemApuInput,
+  SubdivideApuChoice,
+} from "@bloqer/validators";
+import { Badge } from "@/components/ui/badge";
+import { WBS_EDT_BREAKDOWN_HEADERS, VISIBLE_COST_CATEGORIES } from "@/lib/budget-categories";
 import {
   addChildButtonTitle,
   resolveAddChildPreset,
@@ -59,19 +88,17 @@ import {
   suggestRootGroupCode,
 } from "../lib/wbs-codes";
 import { isWbsStructuralLeaf, nodeHasApuData } from "../lib/wbs-apu";
+import {
+  apuCategoryShort,
+  apuLineMatchesSearch,
+  apuLinePartidaMoney,
+  apuLineUnitContribution,
+  apuResourceQtyDisplay,
+  leafHasVisibleApu,
+  visibleApuLines,
+} from "../lib/wbs-apu-detail";
 import { WbsSubdivideApuDialog } from "./wbs-subdivide-apu-dialog";
-import type { SubdivideApuChoice } from "@bloqer/validators";
-import { WBS_EDT_BREAKDOWN_HEADERS, VISIBLE_COST_CATEGORIES } from "@/lib/budget-categories";
 import type { WbsCreatePreset } from "./wbs-node-form";
-import type { WbsViewNode } from "@bloqer/services";
-import type {
-  CreateWbsNodeInput,
-  UpdateWbsNodeInput,
-  ReorderWbsNodesInput,
-  UpdateCostItemInput,
-  CreateCostAnalysisLineInput,
-  UpdateCostAnalysisLineInput,
-} from "@bloqer/validators";
 
 function fmt(value: number, currency: string) {
   return formatMoneyAmount(String(value), currency);
@@ -195,6 +222,13 @@ function nodeMatchesSearch(node: WbsViewNode, query: string): boolean {
   );
 }
 
+function nodeOrApuMatchesSearch(node: WbsViewNode, query: string): boolean {
+  if (nodeMatchesSearch(node, query)) return true;
+  const lines = node.costItem?.analysisLines;
+  if (!lines?.length) return false;
+  return lines.some((l) => apuLineMatchesSearch(l, query));
+}
+
 function collectMatchingIds(nodes: WbsViewNode[], query: string): Set<string> {
   const ids = new Set<string>();
   if (!query.trim()) return ids;
@@ -202,7 +236,7 @@ function collectMatchingIds(nodes: WbsViewNode[], query: string): Set<string> {
   function walk(ns: WbsViewNode[], ancestors: string[]): boolean {
     let subtreeMatch = false;
     for (const n of ns) {
-      const selfMatch = nodeMatchesSearch(n, query);
+      const selfMatch = nodeOrApuMatchesSearch(n, query);
       const childMatch = walk(n.children, [...ancestors, n.id]);
       if (selfMatch || childMatch) {
         ids.add(n.id);
@@ -256,6 +290,7 @@ interface WbsTreeProps {
   onAddLine: (data: CreateCostAnalysisLineInput) => Promise<{ id: string } | { error: string }>;
   onUpdateLine: (lineId: string, data: UpdateCostAnalysisLineInput) => Promise<{ ok: true } | { error: string }>;
   onRemoveLine: (lineId: string) => Promise<{ ok: true } | { error: string }>;
+  onSaveApu: (data: SaveCostItemApuInput) => Promise<{ ok: true } | { error: string }>;
   onEnsureLeafForApu?: (nodeId: string) => Promise<{ node: WbsViewNode } | { error: string }>;
 }
 
@@ -273,17 +308,20 @@ export function WbsTree({
   onUpdateNode,
   onRemoveNode,
   onReorderNodes,
-  onUpdateCostItem,
-  onAddLine,
-  onUpdateLine,
-  onRemoveLine,
+  onUpdateCostItem: _onUpdateCostItem,
+  onAddLine: _onAddLine,
+  onUpdateLine: _onUpdateLine,
+  onRemoveLine: _onRemoveLine,
+  onSaveApu,
   onEnsureLeafForApu,
 }: WbsTreeProps) {
   const router = useRouter();
-  const { viewMode, setViewMode } = useBudgetWbsViewMode();
+  const { viewMode, patchViewMode } = useBudgetWbsViewMode();
 
   const [search, setSearch] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => collectExpandableIds(nodes));
+  /** [D-059] Independent of GROUP expand — never reuse expandedIds for APU. */
+  const [apuExpandedIds, setApuExpandedIds] = useState<Set<string>>(() => new Set());
   const [itemDialogNode, setItemDialogNode] = useState<WbsViewNode | null>(null);
   const [groupDialogNode, setGroupDialogNode] = useState<WbsViewNode | null>(null);
   const [dialogState, setDialogState] = useState<DialogState>({ type: "closed" });
@@ -295,16 +333,26 @@ export function WbsTree({
   const [reorderPending, startReorderTransition] = useTransition();
   const [, startApuTransition] = useTransition();
 
-  const handleViewModeChange = (mode: WbsViewMode) => {
-    setViewMode(mode);
-  };
+  void _onUpdateCostItem;
+  void _onAddLine;
+  void _onUpdateLine;
+  void _onRemoveLine;
 
   const flatNodes = useMemo(() => flattenTree(nodes), [nodes]);
   const expandableIds = useMemo(() => collectExpandableIds(nodes), [nodes]);
   const matchingIds = useMemo(() => collectMatchingIds(nodes, search), [nodes, search]);
+  const tableColCount = wbsTableColumnCount(viewMode);
+  const lastSearchExpandKey = useRef("");
 
+  // Auto-expand matches only when the search string changes (not on every tree refresh).
   useEffect(() => {
-    if (!search.trim()) return;
+    const key = search.trim().toLowerCase();
+    if (!key) {
+      lastSearchExpandKey.current = "";
+      return;
+    }
+    if (key === lastSearchExpandKey.current) return;
+    lastSearchExpandKey.current = key;
     setExpandedIds((prev) => {
       const next = new Set(prev);
       for (const id of matchingIds) {
@@ -312,12 +360,52 @@ export function WbsTree({
       }
       return next;
     });
+    setApuExpandedIds((prev) => {
+      const next = new Set(prev);
+      for (const n of flatNodes) {
+        if (!matchingIds.has(n.id) || !n.costItem?.analysisLines?.length) continue;
+        if (n.costItem.analysisLines.some((l) => apuLineMatchesSearch(l, search))) {
+          next.add(n.id);
+        }
+      }
+      return next;
+    });
   }, [search, matchingIds, flatNodes]);
+
+  // Prune stale APU expands when tree shape / lines change (e.g. after subdivide).
+  useEffect(() => {
+    setApuExpandedIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        const n = flatNodes.find((x) => x.id === id);
+        if (
+          n &&
+          isWbsStructuralLeaf(n) &&
+          leafHasVisibleApu(n.costItem?.analysisLines)
+        ) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
+      }
+      return changed || next.size !== prev.size ? next : prev;
+    });
+  }, [flatNodes]);
 
   const grandTotals = useMemo(() => computeTreeGrandTotals(nodes), [nodes]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleApuExpand = useCallback((id: string) => {
+    setApuExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -390,6 +478,11 @@ export function WbsTree({
       setDeleteTarget(null);
       if (itemDialogNode && removedIds.has(itemDialogNode.id)) setItemDialogNode(null);
       if (groupDialogNode && removedIds.has(groupDialogNode.id)) setGroupDialogNode(null);
+      setApuExpandedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of removedIds) next.delete(id);
+        return next;
+      });
       toast.success(
         descendantCount > 0
           ? `Eliminados ${descendantCount + 1} nodos`
@@ -440,6 +533,12 @@ export function WbsTree({
     if (!subdividePrompt) return;
     const { parent, preset, suggestedCode } = subdividePrompt;
     setSubdividePrompt(null);
+    setApuExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(parent.id);
+      return next;
+    });
+    if (itemDialogNode?.id === parent.id) setItemDialogNode(null);
     setDialogState({
       type: "add",
       parentId: parent.id,
@@ -447,6 +546,79 @@ export function WbsTree({
       suggestedCode,
       subdivideApu: choice,
     });
+  }
+
+  function incidenceCell(
+    metrics: ReturnType<typeof computeWbsRowMetrics>,
+    opts?: { muted?: boolean; empty?: boolean },
+  ): ReactNode {
+    if (!viewMode.showIncidence) return null;
+    if (opts?.empty) {
+      return (
+        <TableCell
+          className={cn(
+            "py-0.5 text-right font-mono text-xs w-20",
+            opts.muted && "text-muted-foreground",
+          )}
+        >
+          —
+        </TableCell>
+      );
+    }
+    const part =
+      viewMode.base === "sale" ? metrics.totalSalePrice : metrics.totalCostDirect;
+    const whole =
+      viewMode.base === "sale" ? grandTotals.totalSalePrice : grandTotals.totalCostDirect;
+    return (
+      <TableCell
+        className="py-0.5 text-right font-mono text-xs text-muted-foreground w-20"
+        title={
+          viewMode.base === "sale"
+            ? "Incidencia sobre el total de venta"
+            : "Incidencia sobre el costo directo total"
+        }
+      >
+        {formatWbsIncidencePercent(wbsIncidencePercent(part, whole))}
+      </TableCell>
+    );
+  }
+
+  function renderApuMoneyCells(line: CostAnalysisLineView, itemQty: number): ReactNode {
+    const unitContribution = apuLineUnitContribution(line);
+    const partidaMoney = apuLinePartidaMoney(line, itemQty);
+    const value = viewMode.scale === "unit" ? unitContribution : partidaMoney;
+
+    if (viewMode.base === "sale") {
+      return (
+        <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-32">
+          —
+        </TableCell>
+      );
+    }
+
+    if (viewMode.detail === "breakdown") {
+      return (
+        <>
+          {VISIBLE_COST_CATEGORIES.map((cat) => (
+            <TableCell
+              key={cat}
+              className="py-0.5 text-right font-mono text-xs text-muted-foreground w-28"
+            >
+              {line.category === cat ? fmt(value, currency) : "—"}
+            </TableCell>
+          ))}
+          <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-28">
+            {fmt(value, currency)}
+          </TableCell>
+        </>
+      );
+    }
+
+    return (
+      <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-32">
+        {fmt(value, currency)}
+      </TableCell>
+    );
   }
 
   function renderRows(nodeList: WbsViewNode[], depth: number): ReactNode[] {
@@ -461,6 +633,9 @@ export function WbsTree({
       const idx = siblings.findIndex((s) => s.id === node.id);
       const isFirst = idx === 0;
       const isLast = idx === siblings.length - 1;
+      const showApuChevron =
+        isWbsStructuralLeaf(node) && leafHasVisibleApu(node.costItem?.analysisLines);
+      const apuExpanded = apuExpandedIds.has(node.id);
 
       rows.push(
         <TableRow
@@ -478,8 +653,28 @@ export function WbsTree({
                     e.stopPropagation();
                     toggleExpand(node.id);
                   }}
+                  aria-expanded={isExpanded}
+                  aria-label={isExpanded ? "Contraer capítulo" : "Expandir capítulo"}
                 >
                   {isExpanded ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              ) : showApuChevron ? (
+                <button
+                  type="button"
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                  title="Ver composición APU (insumos)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleApuExpand(node.id);
+                  }}
+                  aria-expanded={apuExpanded}
+                  aria-label={apuExpanded ? "Ocultar composición APU" : "Ver composición APU"}
+                >
+                  {apuExpanded ? (
                     <ChevronDown className="h-3.5 w-3.5" />
                   ) : (
                     <ChevronRight className="h-3.5 w-3.5" />
@@ -506,34 +701,64 @@ export function WbsTree({
             {metrics.quantity != null ? metrics.quantity.toLocaleString("es-AR") : "—"}
           </TableCell>
 
-          {viewMode === "breakdown" ? (
-            <>
-              <TableCell className="py-0.5 text-right font-mono text-xs w-28">
-                {fmt(metrics.byCategory.MATERIAL, currency)}
-              </TableCell>
-              <TableCell className="py-0.5 text-right font-mono text-xs w-28">
-                {fmt(metrics.byCategory.LABOR, currency)}
-              </TableCell>
-              <TableCell className="py-0.5 text-right font-mono text-xs w-28">
-                {fmt(metrics.byCategory.EQUIPMENT, currency)}
-              </TableCell>
-              <TableCell className="py-0.5 text-right font-mono text-xs w-28">
-                {fmt(metrics.byCategory.SUBCONTRACT, currency)}
-              </TableCell>
-              <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-28">
-                {fmt(metrics.totalSalePrice, currency)}
-              </TableCell>
-            </>
-          ) : (
-            <>
-              <TableCell className="py-0.5 text-right font-mono text-sm w-32">
-                {fmt(metrics.totalCostDirect, currency)}
-              </TableCell>
+          {(() => {
+            const isLeaf = node.children.length === 0 && !!node.costItem;
+            const unitCats = isLeaf ? computeUnitCategoryCosts(node) : null;
+            const unitCd = isLeaf ? parseFloat(node.costItem!.unitCostDirect) || 0 : null;
+            const unitSale = isLeaf ? parseFloat(node.costItem!.unitSalePrice) || 0 : null;
+
+            if (viewMode.base === "sale") {
+              const saleVal =
+                viewMode.scale === "unit" ? unitSale : metrics.totalSalePrice;
+              return (
+                <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-32">
+                  {viewMode.scale === "unit"
+                    ? unitSale != null
+                      ? fmt(unitSale, currency)
+                      : "—"
+                    : fmt(saleVal as number, currency)}
+                </TableCell>
+              );
+            }
+
+            if (viewMode.detail === "breakdown") {
+              const cats =
+                viewMode.scale === "unit" && unitCats
+                  ? unitCats
+                  : metrics.byCategory;
+              const cd =
+                viewMode.scale === "unit" ? unitCd : metrics.totalCostDirect;
+              return (
+                <>
+                  <TableCell className="py-0.5 text-right font-mono text-xs w-28">
+                    {viewMode.scale === "unit" && !unitCats ? "—" : fmt(cats.MATERIAL, currency)}
+                  </TableCell>
+                  <TableCell className="py-0.5 text-right font-mono text-xs w-28">
+                    {viewMode.scale === "unit" && !unitCats ? "—" : fmt(cats.LABOR, currency)}
+                  </TableCell>
+                  <TableCell className="py-0.5 text-right font-mono text-xs w-28">
+                    {viewMode.scale === "unit" && !unitCats ? "—" : fmt(cats.EQUIPMENT, currency)}
+                  </TableCell>
+                  <TableCell className="py-0.5 text-right font-mono text-xs w-28">
+                    {viewMode.scale === "unit" && !unitCats ? "—" : fmt(cats.SUBCONTRACT, currency)}
+                  </TableCell>
+                  <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-28">
+                    {cd != null ? fmt(cd, currency) : "—"}
+                  </TableCell>
+                </>
+              );
+            }
+
+            const compact =
+              viewMode.scale === "unit" ? unitCd : metrics.totalCostDirect;
+            return (
               <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-32">
-                {fmt(metrics.totalSalePrice, currency)}
+                {compact != null ? fmt(compact, currency) : "—"}
               </TableCell>
-            </>
-          )}
+            );
+          })()}
+
+          {incidenceCell(metrics)}
 
           <TableCell className="py-0.5 w-10 px-0 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
             {canEditStructure && (
@@ -556,6 +781,62 @@ export function WbsTree({
           </TableCell>
         </TableRow>,
       );
+
+      if (showApuChevron && apuExpanded && node.costItem) {
+        const itemQty = parseFloat(node.costItem.quantity) || 0;
+        const lines = visibleApuLines(node.costItem.analysisLines);
+        for (const line of lines) {
+          const qtyDisp = apuResourceQtyDisplay(line, itemQty);
+          const searchHit =
+            Boolean(search.trim()) && apuLineMatchesSearch(line, search);
+          rows.push(
+            <TableRow
+              key={`${node.id}-apu-${line.id}`}
+              className={cn(
+                "h-7 cursor-pointer bg-muted/25 hover:bg-muted/40",
+                searchHit && "bg-amber-500/10",
+              )}
+              onClick={() => setItemDialogNode(node)}
+              aria-label={`Insumo APU: ${line.description}`}
+            >
+              <TableCell className="py-0.5 px-1.5 w-0 whitespace-nowrap">
+                <div
+                  className="flex items-center gap-1 pl-0.5"
+                  style={{ paddingLeft: (depth + 1) * 12 + 14 }}
+                >
+                  <Badge
+                    variant="secondary"
+                    className="h-5 px-1.5 text-[10px] font-normal text-muted-foreground"
+                  >
+                    APU·{apuCategoryShort(line.category)}
+                  </Badge>
+                </div>
+              </TableCell>
+              <TableCell className={cn("py-0.5 px-2 text-xs text-muted-foreground", WBS_ITEM_COL_CLASS)}>
+                <div
+                  className="overflow-x-auto overscroll-x-contain [scrollbar-width:thin]"
+                  title={line.description}
+                >
+                  <span className="block truncate pr-1">{line.description}</span>
+                </div>
+              </TableCell>
+              <TableCell className="py-0.5 text-xs text-muted-foreground w-20">
+                {line.unit ? budgetUnitLabel(line.unit) : "—"}
+              </TableCell>
+              <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-24">
+                {qtyDisp.kind === "lump"
+                  ? "global"
+                  : qtyDisp.qty.toLocaleString("es-AR", {
+                      maximumFractionDigits: 4,
+                    })}
+              </TableCell>
+              {renderApuMoneyCells(line, itemQty)}
+              {incidenceCell(metrics, { empty: true, muted: true })}
+              <TableCell className="py-0.5 w-10 px-0" />
+            </TableRow>,
+          );
+        }
+      }
 
       if (node.children.length > 0 && isExpanded) {
         rows.push(...renderRows(node.children, depth + 1));
@@ -596,7 +877,7 @@ export function WbsTree({
 
       <WbsTreeToolbar
         viewMode={viewMode}
-        onViewModeChange={handleViewModeChange}
+        onPatchViewMode={patchViewMode}
         search={search}
         onSearchChange={setSearch}
       />
@@ -640,7 +921,11 @@ export function WbsTree({
                 <TableHead className={WBS_ITEM_COL_CLASS}>Ítem</TableHead>
                 <TableHead className="w-20">Unidad</TableHead>
                 <TableHead className="text-right w-24">Cantidad</TableHead>
-                {viewMode === "breakdown" ? (
+                {viewMode.base === "sale" ? (
+                  <TableHead className="text-right whitespace-nowrap">
+                    {viewMode.scale === "unit" ? "PU venta" : "Total venta"}
+                  </TableHead>
+                ) : viewMode.detail === "breakdown" ? (
                   <>
                     {VISIBLE_COST_CATEGORIES.map((cat) => (
                       <TableHead
@@ -651,54 +936,93 @@ export function WbsTree({
                         )}
                         title={WBS_EDT_BREAKDOWN_HEADERS[cat]}
                       >
-                        {WBS_EDT_BREAKDOWN_HEADERS[cat]}
+                        {viewMode.scale === "unit"
+                          ? `${WBS_EDT_BREAKDOWN_HEADERS[cat]} /u`
+                          : WBS_EDT_BREAKDOWN_HEADERS[cat]}
                       </TableHead>
                     ))}
-                    <TableHead className="text-right whitespace-nowrap">Total venta</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      {viewMode.scale === "unit" ? "CD unit." : "CD total"}
+                    </TableHead>
                   </>
                 ) : (
-                  <>
-                    <TableHead className="text-right">Costo directo</TableHead>
-                    <TableHead className="text-right">Total venta</TableHead>
-                  </>
+                  <TableHead className="text-right whitespace-nowrap">
+                    {viewMode.scale === "unit" ? "CD unitario" : "Costo directo"}
+                  </TableHead>
                 )}
+                {viewMode.showIncidence ? (
+                  <TableHead
+                    className="text-right whitespace-nowrap w-20"
+                    title={
+                      viewMode.base === "sale"
+                        ? "% sobre el total de venta del presupuesto"
+                        : "% sobre el costo directo total del presupuesto"
+                    }
+                  >
+                    Incid.
+                  </TableHead>
+                ) : null}
                 <TableHead className="w-10 px-0 text-right">
                   {canEditStructure ? <span className="sr-only">Acciones</span> : null}
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {renderRows(nodes, 0)}
+              {search.trim() && matchingIds.size === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={tableColCount}
+                    className="py-8 text-center text-sm text-muted-foreground"
+                  >
+                    Sin resultados para “{search.trim()}”
+                  </TableCell>
+                </TableRow>
+              ) : (
+                renderRows(nodes, 0)
+              )}
               <TableRow className="bg-muted/50 font-semibold hover:bg-muted/50">
                 <TableCell colSpan={4}>TOTAL GENERAL</TableCell>
-                {viewMode === "breakdown" ? (
+                {viewMode.base === "sale" ? (
+                  <TableCell className="text-right font-mono text-sm">
+                    {viewMode.scale === "unit" ? "—" : fmt(grandTotals.totalSalePrice, currency)}
+                  </TableCell>
+                ) : viewMode.detail === "breakdown" ? (
                   <>
                     <TableCell className="text-right font-mono text-sm">
-                      {fmt(grandTotals.byCategory.MATERIAL, currency)}
+                      {viewMode.scale === "unit" ? "—" : fmt(grandTotals.byCategory.MATERIAL, currency)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {fmt(grandTotals.byCategory.LABOR, currency)}
+                      {viewMode.scale === "unit" ? "—" : fmt(grandTotals.byCategory.LABOR, currency)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {fmt(grandTotals.byCategory.EQUIPMENT, currency)}
+                      {viewMode.scale === "unit" ? "—" : fmt(grandTotals.byCategory.EQUIPMENT, currency)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {fmt(grandTotals.byCategory.SUBCONTRACT, currency)}
+                      {viewMode.scale === "unit" ? "—" : fmt(grandTotals.byCategory.SUBCONTRACT, currency)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {fmt(grandTotals.totalSalePrice, currency)}
+                      {viewMode.scale === "unit" ? "—" : fmt(grandTotals.totalCostDirect, currency)}
                     </TableCell>
                   </>
                 ) : (
-                  <>
-                    <TableCell className="text-right font-mono text-sm">
-                      {fmt(grandTotals.totalCostDirect, currency)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
-                      {fmt(grandTotals.totalSalePrice, currency)}
-                    </TableCell>
-                  </>
+                  <TableCell className="text-right font-mono text-sm">
+                    {viewMode.scale === "unit" ? "—" : fmt(grandTotals.totalCostDirect, currency)}
+                  </TableCell>
                 )}
+                {viewMode.showIncidence ? (
+                  <TableCell className="text-right font-mono text-sm">
+                    {formatWbsIncidencePercent(
+                      wbsIncidencePercent(
+                        viewMode.base === "sale"
+                          ? grandTotals.totalSalePrice
+                          : grandTotals.totalCostDirect,
+                        viewMode.base === "sale"
+                          ? grandTotals.totalSalePrice
+                          : grandTotals.totalCostDirect,
+                      ),
+                    )}
+                  </TableCell>
+                ) : null}
                 <TableCell />
               </TableRow>
             </TableBody>
@@ -712,10 +1036,7 @@ export function WbsTree({
         node={itemDialogNode}
         currency={currency}
         editable={editable}
-        onUpdateCostItem={onUpdateCostItem}
-        onAddLine={onAddLine}
-        onUpdateLine={onUpdateLine}
-        onRemoveLine={onRemoveLine}
+        onSaveApu={onSaveApu}
       />
 
       <WbsGroupDialog

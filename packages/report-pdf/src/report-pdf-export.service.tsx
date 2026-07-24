@@ -158,11 +158,10 @@ export async function exportBudgetWbsPdf(
   ctx: ServiceContext,
 ): Promise<ReportPdfPayload> {
   const payload = await buildBudgetWbsExportPayload(budgetId, projectId, filters, ctx);
-  const rows = budgetWbsExportPdfRowsFromTable(filters.view, payload.rows);
-  const slug = `${payload.meta.budgetName}_v${payload.meta.versionNumber}_${payload.meta.view}`.replace(
-    /[^a-zA-Z0-9._-]+/g,
-    "_",
-  );
+  const rows = budgetWbsExportPdfRowsFromTable(filters, payload.rows);
+  const slug = `${payload.meta.budgetName}_v${payload.meta.versionNumber}_${payload.meta.viewLabel}`
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .slice(0, 80);
   return exportPdfDocument(ctx, { projectId }, `presupuesto_edt_${slug}`, (branding) => (
     <ProjectSimpleTablePdfDocument
       branding={branding}
@@ -170,7 +169,7 @@ export async function exportBudgetWbsPdf(
       subtitle={`${payload.meta.budgetName} · v${payload.meta.versionNumber}`}
       filterLine={`Moneda: ${payload.meta.currency} · Vista: ${payload.meta.viewLabel}`}
       totalsLine={`Costo directo: ${payload.meta.totalCostDirect} · Total venta: ${payload.meta.totalSalePrice}`}
-      columns={budgetWbsExportPdfColumns(filters.view)}
+      columns={budgetWbsExportPdfColumns(filters)}
       rows={rows}
     />
   ));

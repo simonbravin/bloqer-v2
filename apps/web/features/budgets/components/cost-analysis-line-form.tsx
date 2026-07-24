@@ -22,11 +22,12 @@ import {
   previewApuEntry,
   toStoredApuLine,
   type ApuEntryMode,
+  type ApuTotalKind,
 } from "@bloqer/domain";
 import { CATEGORY_LABELS, VISIBLE_COST_CATEGORIES } from "@/lib/budget-categories";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { UnitSelect } from "./unit-select";
-import { ApuEntryModeToggle } from "./apu-entry-mode-toggle";
+import { ApuEntryModeToggle, ApuTotalKindToggle } from "./apu-entry-mode-toggle";
 
 type CreateMode = {
   mode: "create";
@@ -48,6 +49,8 @@ type EditMode = {
     coefficient: string;
     unitCost: string;
     notes: string | null;
+    entryMode?: ApuEntryMode;
+    totalKind?: ApuTotalKind;
   };
   itemQuantity: number;
   itemUnit?: string;
@@ -79,7 +82,8 @@ function CreateLineForm({
   costItemId, nextSortOrder, itemQuantity, itemUnit, toastOnSuccess = true, onSubmit,
   isPending, startTransition, serverError, setServerError, onDone,
 }: CreateMode & Shared) {
-  const [entryMode, setEntryMode] = useState<ApuEntryMode>("unit");
+  const [entryMode, setEntryMode] = useState<ApuEntryMode>("total");
+  const [totalKind, setTotalKind] = useState<ApuTotalKind>("resource");
   const form = useForm<CreateCostAnalysisLineInput>({
     resolver: zodResolver(createCostAnalysisLineSchema),
     defaultValues: {
@@ -105,6 +109,7 @@ function CreateLineForm({
           unitCost: form.getValues("unitCost") ?? 0,
         },
         itemQuantity,
+        totalKind,
       );
       form.setValue("coefficient", converted.coefficient);
       form.setValue("unitCost", converted.unitCost);
@@ -120,12 +125,20 @@ function CreateLineForm({
     }
     const stored = toStoredApuLine({
       mode: entryMode,
+      totalKind,
       coefficient: data.coefficient,
       unitCost: data.unitCost,
       itemQuantity,
     });
     startTransition(async () => {
-      const result = await onSubmit({ ...data, ...stored });
+      const result = await onSubmit({
+        ...data,
+        coefficient: stored.coefficient,
+        unitCost: stored.unitCost,
+        totalCost: stored.totalCost,
+        partidaQuantity: stored.partidaQuantity,
+        isLumpSum: stored.isLumpSum,
+      });
       if ("error" in result) {
         setServerError(result.error);
         toast.error(result.error);
@@ -146,6 +159,8 @@ function CreateLineForm({
       submitLabel="Agregar línea"
       entryMode={entryMode}
       onEntryModeChange={handleEntryModeChange}
+      totalKind={totalKind}
+      onTotalKindChange={setTotalKind}
       itemQuantity={itemQuantity}
       itemUnit={itemUnit}
     />
@@ -156,7 +171,8 @@ function EditLineForm({
   defaults, itemQuantity, itemUnit, toastOnSuccess = true, onSubmit,
   isPending, startTransition, serverError, setServerError, onDone,
 }: EditMode & Shared) {
-  const [entryMode, setEntryMode] = useState<ApuEntryMode>("unit");
+  const [entryMode, setEntryMode] = useState<ApuEntryMode>(defaults.entryMode ?? "unit");
+  const [totalKind, setTotalKind] = useState<ApuTotalKind>(defaults.totalKind ?? "resource");
   const form = useForm<UpdateCostAnalysisLineInput>({
     resolver: zodResolver(updateCostAnalysisLineSchema),
     defaultValues: {
@@ -183,6 +199,7 @@ function EditLineForm({
           unitCost: form.getValues("unitCost") ?? 0,
         },
         itemQuantity,
+        totalKind,
       );
       form.setValue("coefficient", converted.coefficient);
       form.setValue("unitCost", converted.unitCost);
@@ -198,12 +215,20 @@ function EditLineForm({
     }
     const stored = toStoredApuLine({
       mode: entryMode,
+      totalKind,
       coefficient: data.coefficient ?? 0,
       unitCost: data.unitCost ?? 0,
       itemQuantity,
     });
     startTransition(async () => {
-      const result = await onSubmit({ ...data, ...stored });
+      const result = await onSubmit({
+        ...data,
+        coefficient: stored.coefficient,
+        unitCost: stored.unitCost,
+        totalCost: stored.totalCost,
+        partidaQuantity: stored.partidaQuantity,
+        isLumpSum: stored.isLumpSum,
+      });
       if ("error" in result) {
         setServerError(result.error);
         toast.error(result.error);
@@ -224,6 +249,8 @@ function EditLineForm({
       submitLabel="Guardar"
       entryMode={entryMode}
       onEntryModeChange={handleEntryModeChange}
+      totalKind={totalKind}
+      onTotalKindChange={setTotalKind}
       itemQuantity={itemQuantity}
       itemUnit={itemUnit}
     />
@@ -239,7 +266,8 @@ function formatPreview(n: number) {
 
 function LineFormFields({
   form, onDone, isPending, serverError, onSubmit, submitLabel,
-  entryMode, onEntryModeChange, itemQuantity, itemUnit,
+  entryMode, onEntryModeChange, totalKind = "resource", onTotalKindChange,
+  itemQuantity, itemUnit,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   form: any;
@@ -250,6 +278,8 @@ function LineFormFields({
   submitLabel: string;
   entryMode: ApuEntryMode;
   onEntryModeChange: (mode: ApuEntryMode) => void;
+  totalKind?: ApuTotalKind;
+  onTotalKindChange?: (kind: ApuTotalKind) => void;
   itemQuantity: number;
   itemUnit?: string;
 }) {
@@ -258,6 +288,7 @@ function LineFormFields({
   const unitCost = Number(form.watch("unitCost")) || 0;
   const preview = previewApuEntry({
     mode: entryMode,
+    totalKind,
     coefficient: coef,
     unitCost,
     itemQuantity,
@@ -267,11 +298,16 @@ function LineFormFields({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <ApuEntryModeToggle
-        value={entryMode}
-        onChange={onEntryModeChange}
-        totalDisabled={!canUseTotalPartidaMode(itemQuantity)}
-      />
+      <div className="flex flex-wrap gap-2">
+        <ApuEntryModeToggle
+          value={entryMode}
+          onChange={onEntryModeChange}
+          totalDisabled={!canUseTotalPartidaMode(itemQuantity)}
+        />
+        {entryMode === "total" && onTotalKindChange && (
+          <ApuTotalKindToggle value={totalKind} onChange={onTotalKindChange} />
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">

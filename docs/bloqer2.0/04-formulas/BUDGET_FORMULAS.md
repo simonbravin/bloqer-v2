@@ -30,16 +30,30 @@ CD_{unit} = \sum_{lines \in CostAnalysis} cost_{line}
 \text{CostBudget}_{item} = CD_{unit} \times Qty
 \]
 
-La UI puede cargar una línea en modo **Total partida**; al persistir se convierte a unitario money-safe (`coefficient = 1`, `unitCost = importe_partida / Qty`) ([D-047]).
+La UI puede cargar una línea en modo **Total partida** ([D-047] enmendada):
 
-### Ejemplo numérico
+- **Cantidad de recurso** (ej. 500 un × $6.000): `partidaQuantity = 500`, `unitCost = precio`, `coefficient = 500/Qty`, `totalCost = roundMoney((500×precio)/Qty)`. Necesidad física = `partidaQuantity`.
+- **Monto global** (ej. $1.250.000): money-safe `coefficient = 1`, `unitCost = totalCost = monto/Qty`, `isLumpSum = true`.
+
+### Ejemplo numérico — recurso
+
+| Concepto | Valor |
+|---|---|
+| Cantidad ítem | 390 ml |
+| Hierro Ø6 (Total partida) | 500 un × ARS 6.000 |
+| `partidaQuantity` | 500 |
+| `coefficient` | ≈ 1,2821 un/ml |
+| `totalCost` (aporte / ml) | ARS 7.692,31 |
+| **CostBudget línea** | **ARS 3.000.000** |
+
+### Ejemplo numérico — global + LAB
 
 | Concepto | Valor |
 |---|---|
 | Cantidad ítem | 900 m² |
-| Línea MAT (entrada total $1.250.000) | coef 1 × ARS 1.388,8889 / m² |
+| Línea MAT (monto global $1.250.000) | coef 1 × ARS 1.388,89 / m² |
 | Línea LAB (unitaria) | 1 × ARS 2.800 / m² |
-| \(CD_{unit}\) | ≈ ARS 4.188,8889 / m² |
+| \(CD_{unit}\) | ≈ ARS 4.188,89 / m² |
 | **CostBudget ítem** | ≈ **ARS 3.770.000** |
 
 | Concepto | Valor |

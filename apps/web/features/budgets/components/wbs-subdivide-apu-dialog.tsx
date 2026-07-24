@@ -45,8 +45,10 @@ export function WbsSubdivideApuDialog({
               </p>
               <p>
                 Al agregar <span className="font-mono font-medium text-foreground">{childCode}</span>,
-                ese ítem pasará a agrupar el subárbol. ¿Qué hacemos con el cómputo actual?
+                ese ítem pasará a agrupar el subárbol (capítulo). Los <strong>insumos</strong> (materiales,
+                mano de obra, etc.) deben cargarse en el APU de la partida, no como hijos del WBS.
               </p>
+              <p>¿Qué hacemos con el cómputo actual?</p>
             </div>
           </DialogDescription>
         </DialogHeader>

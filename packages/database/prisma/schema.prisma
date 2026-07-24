@@ -1255,6 +1255,10 @@ model CostAnalysisLine {
   coefficient       Decimal      @db.Decimal(18, 4)
   unitCost          Decimal      @db.Decimal(18, 4)
   totalCost         Decimal      @db.Decimal(18, 4)
+  /// Absolute resource qty for the whole CostItem partida (Total partida — recurso). Null = Por unidad (need = coefficient × item qty).
+  partidaQuantity   Decimal?     @db.Decimal(18, 4)
+  /// True when Total partida — monto global (money-safe coef=1). False when recurso or Por unidad.
+  isLumpSum         Boolean      @default(false)
   sortOrder         Int          @default(0)
   supplierContactId String?
   productId         String?

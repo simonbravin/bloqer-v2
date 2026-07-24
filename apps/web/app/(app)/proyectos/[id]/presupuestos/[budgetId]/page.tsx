@@ -29,6 +29,7 @@ import {
   previewWbsImportAction,
   executeWbsImportAction,
   updateCostItemAction,
+  saveCostItemApuAction,
   addCostAnalysisLineAction,
   updateCostAnalysisLineAction,
   removeCostAnalysisLineAction,
@@ -171,6 +172,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
           onAddLine={addCostAnalysisLineAction.bind(null, projectId, budgetId)}
           onUpdateLine={updateCostAnalysisLineAction.bind(null, projectId, budgetId)}
           onRemoveLine={removeCostAnalysisLineAction.bind(null, projectId, budgetId)}
+          onSaveApu={saveCostItemApuAction.bind(null, projectId, budgetId)}
         />
 
         {budget.settings ? (

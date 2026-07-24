@@ -70,7 +70,8 @@ export const reorderWbsNodesSchema = z.object({
 
 export const updateCostItemSchema = z.object({
   unit: z.string().max(50).optional(),
-  quantity: z.number().min(0).optional(),
+  /** Qty 0 breaks lump APU recompute (partida money); require positive when set. */
+  quantity: z.number().positive("La cantidad debe ser mayor a 0").optional(),
   notes: z.string().max(2000).optional(),
 });
 
@@ -81,6 +82,11 @@ export const createCostAnalysisLineSchema = z.object({
   unit: z.string().min(1, "La unidad es obligatoria").max(50),
   coefficient: z.number().min(0),
   unitCost: z.number().min(0),
+  /** Authoritative unit contribution; if omitted, coefficient × unitCost. */
+  totalCost: z.number().min(0).optional(),
+  /** Absolute resource qty for whole partida ([D-047]); null/omit = Por unidad. */
+  partidaQuantity: z.number().min(0).nullable().optional(),
+  isLumpSum: z.boolean().optional(),
   sortOrder: z.number().int().min(0).optional(),
   supplierContactId: z.string().uuid().optional(),
   notes: z.string().max(2000).optional(),
@@ -92,9 +98,36 @@ export const updateCostAnalysisLineSchema = z.object({
   unit: z.string().min(1).max(50).optional(),
   coefficient: z.number().min(0).optional(),
   unitCost: z.number().min(0).optional(),
+  totalCost: z.number().min(0).optional(),
+  partidaQuantity: z.number().min(0).nullable().optional(),
+  isLumpSum: z.boolean().optional(),
   sortOrder: z.number().int().min(0).optional(),
   supplierContactId: z.string().uuid().nullable().optional(),
   notes: z.string().max(2000).optional(),
+});
+
+/** Atomic APU save: cost item fields + full line sync ([D-047] C4). */
+export const saveCostItemApuSchema = z.object({
+  costItemId: z.string().uuid(),
+  unit: z.string().max(50).optional(),
+  quantity: z.number().positive("La cantidad debe ser mayor a 0").optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  lines: z.array(
+    z.object({
+      id: z.string().uuid().optional(),
+      category: costCategorySchema,
+      description: z.string().min(1).max(500),
+      unit: z.string().min(1).max(50),
+      coefficient: z.number().min(0),
+      unitCost: z.number().min(0),
+      totalCost: z.number().min(0),
+      partidaQuantity: z.number().min(0).nullable().optional(),
+      isLumpSum: z.boolean().optional(),
+      sortOrder: z.number().int().min(0).optional(),
+      notes: z.string().max(2000).nullable().optional(),
+      _delete: z.boolean().optional(),
+    }),
+  ),
 });
 
 // ─── CSV Import ───────────────────────────────────────────────────────────────
@@ -131,6 +164,7 @@ export type ReorderWbsNodesInput = z.infer<typeof reorderWbsNodesSchema>;
 export type UpdateCostItemInput = z.infer<typeof updateCostItemSchema>;
 export type CreateCostAnalysisLineInput = z.infer<typeof createCostAnalysisLineSchema>;
 export type UpdateCostAnalysisLineInput = z.infer<typeof updateCostAnalysisLineSchema>;
+export type SaveCostItemApuInput = z.infer<typeof saveCostItemApuSchema>;
 export type BudgetLifecycleCommentInput = z.infer<typeof budgetLifecycleCommentSchema>;
 export type BudgetReturnForChangesInput = z.infer<typeof budgetReturnForChangesSchema>;
 export type BudgetImportRow = z.infer<typeof budgetImportRowSchema>;

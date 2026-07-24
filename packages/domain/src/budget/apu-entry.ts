@@ -1,25 +1,39 @@
 /**
- * APU entry modes ([D-047]): lines are always stored per unit of the CostItem.
- * "total" mode lets the user enter whole-item quantities/prices; we convert on save.
- *
- * Persistence uses Decimal(18, 4) for coefficient and unitCost. Dividing a small
- * coefficient by item quantity (e.g. 1/900 → 0.0011) loses money; total mode
- * therefore stores coefficient = 1 and puts the proration on unitCost.
+ * APU entry modes ([D-047] amended):
+ * - Lines contribute money per 1 unit of the CostItem (`totalCost` is authoritative).
+ * - "total" + resource: keep partidaQuantity + resource unit price; derive coefficient.
+ * - "total" + lump: money-safe coef=1, unitCost = monto/itemQty (globals).
+ * - "unit": coefficient × unitCost as entered; partidaQuantity = null.
  */
+
 export type ApuEntryMode = "unit" | "total";
+
+/** Sub-mode when entry mode is "total". */
+export type ApuTotalKind = "resource" | "lump";
 
 export type ApuLineAmounts = {
   coefficient: number;
   unitCost: number;
 };
 
+export type ApuStoredLine = ApuLineAmounts & {
+  totalCost: number;
+  partidaQuantity: number | null;
+  isLumpSum: boolean;
+};
+
 export type ApuEntryInput = ApuLineAmounts & {
   mode: ApuEntryMode;
+  /** Default "resource" when mode is "total". Ignored for unit mode. */
+  totalKind?: ApuTotalKind;
   itemQuantity: number;
 };
 
 /** Matches Prisma `@db.Decimal(18, 4)` on cost_analysis_lines. */
 export const APU_DECIMAL_PLACES = 4;
+
+/** Operational money decimals ([D-053]). */
+export const APU_MONEY_DECIMALS = 2;
 
 export function roundApuDecimal(value: number, places: number = APU_DECIMAL_PLACES): number {
   if (!Number.isFinite(value)) return 0;
@@ -27,102 +41,282 @@ export function roundApuDecimal(value: number, places: number = APU_DECIMAL_PLAC
   return Math.round(value * f) / f;
 }
 
+/** Half-up to money decimals (domain-local; mirrors @bloqer/utils roundMoney). */
+export function roundApuMoney(value: number): number {
+  return roundApuDecimal(value, APU_MONEY_DECIMALS);
+}
+
 function finiteOrZero(n: number): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Convert UI entry amounts to stored (unitario) coefficient / unitCost. */
-export function toStoredApuLine(input: ApuEntryInput): ApuLineAmounts {
+/** Convert UI entry amounts to stored unitario fields + partidaQuantity. */
+export function toStoredApuLine(input: ApuEntryInput): ApuStoredLine {
   const coefficient = finiteOrZero(input.coefficient);
   const unitCost = finiteOrZero(input.unitCost);
   const itemQuantity = finiteOrZero(input.itemQuantity);
+  const totalKind: ApuTotalKind = input.totalKind ?? "resource";
 
   if (input.mode === "unit" || itemQuantity <= 0) {
+    const coef = roundApuDecimal(coefficient);
+    const price = roundApuDecimal(unitCost);
     return {
-      coefficient: roundApuDecimal(coefficient),
-      unitCost: roundApuDecimal(unitCost),
+      coefficient: coef,
+      unitCost: price,
+      // Keep 4 dp on line contribution so × itemQty recovers partida money ([D-047]).
+      totalCost: roundApuDecimal(coef * price),
+      partidaQuantity: null,
+      isLumpSum: false,
     };
   }
 
-  const partida = coefficient * unitCost;
+  if (totalKind === "lump") {
+    const partida = coefficient * unitCost;
+    const unitContribution = roundApuDecimal(partida / itemQuantity);
+    return {
+      coefficient: 1,
+      unitCost: unitContribution,
+      totalCost: unitContribution,
+      partidaQuantity: 1,
+      isLumpSum: true,
+    };
+  }
+
+  // Total partida — recurso: preserve physical qty + resource unit price
+  const partidaQty = roundApuDecimal(coefficient);
+  const resourcePrice = roundApuDecimal(unitCost);
+  const coefPerUnit = roundApuDecimal(partidaQty / itemQuantity);
+  const unitContribution = roundApuDecimal((partidaQty * resourcePrice) / itemQuantity);
   return {
-    coefficient: 1,
-    unitCost: roundApuDecimal(partida / itemQuantity),
+    coefficient: coefPerUnit,
+    unitCost: resourcePrice,
+    totalCost: unitContribution,
+    partidaQuantity: partidaQty,
+    isLumpSum: false,
   };
 }
 
+export type ApuEntryReverseInput = ApuStoredLine & {
+  mode: ApuEntryMode;
+  itemQuantity: number;
+};
+
 /**
- * Reverse of toStoredApuLine for editing in total mode:
- * show as 1 × (unitario × qty) so the partida total is editable as a single price.
+ * Reverse of toStoredApuLine for editing.
+ * - unit: stored coef/price
+ * - total + lump: 1 × (unitCost × itemQty)
+ * - total + resource: partidaQuantity × unitCost (resource price)
  */
-export function toEntryApuLine(input: ApuEntryInput): ApuLineAmounts {
+export function toEntryApuLine(input: ApuEntryReverseInput): ApuLineAmounts & { totalKind: ApuTotalKind } {
+  const itemQuantity = finiteOrZero(input.itemQuantity);
   const coefficient = finiteOrZero(input.coefficient);
   const unitCost = finiteOrZero(input.unitCost);
-  const itemQuantity = finiteOrZero(input.itemQuantity);
 
   if (input.mode === "unit" || itemQuantity <= 0) {
-    return { coefficient, unitCost };
+    return { coefficient, unitCost, totalKind: "resource" };
   }
 
+  // Only explicit lump (or legacy flagged rows). Do NOT treat unit-mode coef=1 as lump.
+  if (input.isLumpSum) {
+    return {
+      coefficient: 1,
+      unitCost: roundApuDecimal(unitCost * itemQuantity),
+      totalKind: "lump",
+    };
+  }
+
+  const partidaQty =
+    input.partidaQuantity != null ? finiteOrZero(input.partidaQuantity) : roundApuDecimal(coefficient * itemQuantity);
   return {
-    coefficient: 1,
-    unitCost: roundApuDecimal(coefficient * unitCost * itemQuantity),
+    coefficient: partidaQty,
+    unitCost,
+    totalKind: "resource",
   };
 }
 
 /**
  * Convert amounts between entry modes in the form (display only).
- * Keeps the implied partida total stable when quantity &gt; 0.
+ * Preserves implied partida money; for total→unit uses resource-style coef=1 collapse
+ * only when switching without knowing partidaQuantity (form fields only).
  */
 export function convertApuEntryMode(
   from: ApuEntryMode,
   to: ApuEntryMode,
   amounts: ApuLineAmounts,
   itemQuantity: number,
+  totalKind: ApuTotalKind = "resource",
 ): ApuLineAmounts {
   if (from === to) return amounts;
   const qty = finiteOrZero(itemQuantity);
   if (qty <= 0) return amounts;
 
-  const product = finiteOrZero(amounts.coefficient) * finiteOrZero(amounts.unitCost);
+  const coef = finiteOrZero(amounts.coefficient);
+  const price = finiteOrZero(amounts.unitCost);
 
   if (to === "total") {
-    return { coefficient: 1, unitCost: roundApuDecimal(product * qty) };
+    if (from === "unit") {
+      // Show as total resource: need = coef × qty, same unit price
+      return {
+        coefficient: roundApuDecimal(coef * qty),
+        unitCost: price,
+      };
+    }
   }
 
-  return { coefficient: 1, unitCost: roundApuDecimal(product / qty) };
+  // total → unit
+  if (totalKind === "lump") {
+    const partida = coef * price;
+    return {
+      coefficient: 1,
+      unitCost: roundApuDecimal(partida / qty),
+    };
+  }
+  // resource: cant/qty per unit, keep resource price
+  return {
+    coefficient: roundApuDecimal(coef / qty),
+    unitCost: price,
+  };
 }
 
-/** Line total as stored (per 1 unit of the item). */
-export function lineUnitTotal(amounts: ApuLineAmounts): number {
+/** Line total as stored (per 1 unit of the item). Prefer stored totalCost when available. */
+export function lineUnitTotal(amounts: ApuLineAmounts, totalCost?: number): number {
+  if (totalCost !== undefined && Number.isFinite(totalCost)) return totalCost;
   return finiteOrZero(amounts.coefficient) * finiteOrZero(amounts.unitCost);
 }
 
-/**
- * Live preview for the entry form.
- * - unit mode: partida = (coef×precio)×qtyÍtem; unitario = coef×precio
- * - total mode: partida = coef×precio; unitario = (coef×precio)/qtyÍtem
- */
-export function previewApuEntry(input: ApuEntryInput): {
+export type ApuEntryPreview = {
   unitTotal: number;
   partidaTotal: number;
-} {
-  const product = finiteOrZero(input.coefficient) * finiteOrZero(input.unitCost);
+  /** Physical resource need for the partida (total resource mode) or coef×qty (unit). */
+  resourceNeed: number;
+  /** Yield per 1 unit of the CostItem (resource mode). */
+  yieldPerItemUnit: number | null;
+};
+
+/**
+ * Live preview for the entry form.
+ */
+export function previewApuEntry(input: ApuEntryInput): ApuEntryPreview {
+  const coef = finiteOrZero(input.coefficient);
+  const price = finiteOrZero(input.unitCost);
   const qty = finiteOrZero(input.itemQuantity);
+  const totalKind: ApuTotalKind = input.totalKind ?? "resource";
 
   if (input.mode === "total") {
+    const partidaTotal = coef * price;
     return {
-      partidaTotal: product,
-      unitTotal: qty <= 0 ? 0 : product / qty,
+      partidaTotal,
+      unitTotal: qty <= 0 ? 0 : partidaTotal / qty,
+      resourceNeed: coef,
+      yieldPerItemUnit: qty <= 0 || totalKind === "lump" ? null : coef / qty,
     };
   }
 
   return {
-    unitTotal: product,
-    partidaTotal: product * qty,
+    unitTotal: coef * price,
+    partidaTotal: coef * price * qty,
+    resourceNeed: coef * qty,
+    yieldPerItemUnit: coef,
   };
 }
 
 export function canUseTotalPartidaMode(itemQuantity: number): boolean {
   return Number.isFinite(itemQuantity) && itemQuantity > 0;
+}
+
+/** Physical need for materials board / OC. */
+export function physicalNeedQty(
+  partidaQuantity: number | null | undefined,
+  coefficient: number,
+  itemQuantity: number,
+): number {
+  if (partidaQuantity != null && Number.isFinite(partidaQuantity)) {
+    return finiteOrZero(partidaQuantity);
+  }
+  return finiteOrZero(coefficient) * finiteOrZero(itemQuantity);
+}
+
+/**
+ * Recompute resource line when CostItem.quantity changes (partidaQuantity + unitCost fixed).
+ */
+export function recomputeResourceForItemQuantity(
+  stored: ApuStoredLine,
+  newItemQuantity: number,
+): ApuStoredLine {
+  const qty = finiteOrZero(newItemQuantity);
+  if (qty <= 0 || stored.partidaQuantity == null || stored.isLumpSum) return stored;
+
+  const partidaQty = finiteOrZero(stored.partidaQuantity);
+  const resourcePrice = finiteOrZero(stored.unitCost);
+  return {
+    coefficient: roundApuDecimal(partidaQty / qty),
+    unitCost: resourcePrice,
+    totalCost: roundApuDecimal((partidaQty * resourcePrice) / qty),
+    partidaQuantity: partidaQty,
+    isLumpSum: false,
+  };
+}
+
+/**
+ * Recompute lump-sum line when item quantity changes (partida money constant).
+ * `partidaMoney` = previous totalCost × previous item quantity.
+ */
+export function recomputeLumpForItemQuantity(
+  partidaMoney: number,
+  newItemQuantity: number,
+): ApuStoredLine {
+  const qty = finiteOrZero(newItemQuantity);
+  const money = finiteOrZero(partidaMoney);
+  if (qty <= 0) {
+    return {
+      coefficient: 1,
+      unitCost: roundApuDecimal(money),
+      totalCost: roundApuDecimal(money),
+      partidaQuantity: 1,
+      isLumpSum: true,
+    };
+  }
+  const unitContribution = roundApuDecimal(money / qty);
+  return {
+    coefficient: 1,
+    unitCost: unitContribution,
+    totalCost: unitContribution,
+    partidaQuantity: 1,
+    isLumpSum: true,
+  };
+}
+
+/**
+ * Normalize a stored/payload line against the CostItem quantity that will be persisted.
+ * - resource (partidaQuantity set): derive coef/totalCost from qty + resource price (idempotent).
+ * - lump: treat `totalCost` as unit contribution for `itemQuantity` (money = totalCost × qty).
+ * - unit mode: totalCost = coef × unitCost.
+ */
+export function normalizeStoredApuLineForItemQuantity(
+  line: ApuStoredLine,
+  itemQuantity: number,
+): ApuStoredLine {
+  if (line.isLumpSum) {
+    const qty = finiteOrZero(itemQuantity);
+    // Never invent/collapse lump money when qty is not positive — caller must reject qty ≤ 0.
+    if (qty <= 0) return line;
+    const unitContribution = finiteOrZero(line.totalCost);
+    return recomputeLumpForItemQuantity(unitContribution * qty, qty);
+  }
+  if (line.partidaQuantity != null) {
+    if (!(finiteOrZero(itemQuantity) > 0)) return line;
+    return recomputeResourceForItemQuantity(
+      { ...line, isLumpSum: false },
+      itemQuantity,
+    );
+  }
+  const coef = roundApuDecimal(finiteOrZero(line.coefficient));
+  const price = roundApuDecimal(finiteOrZero(line.unitCost));
+  return {
+    coefficient: coef,
+    unitCost: price,
+    totalCost: roundApuDecimal(coef * price),
+    partidaQuantity: null,
+    isLumpSum: false,
+  };
 }

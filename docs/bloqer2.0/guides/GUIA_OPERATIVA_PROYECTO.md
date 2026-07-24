@@ -138,6 +138,8 @@ Opciones típicas:
 **Reglas de estructura:**
 
 - Solo los **ítems hoja** (sin hijos) llevan **APU** / `CostItem`.
+- **Insumos ≠ hijos WBS** ([D-057]): hierros, mallas, cuadrillas, etc. se cargan en el APU de la partida (ej. Zapata corrida ml × 390), no como `4.1.1` / `4.1.2` en el árbol. Si el Excel trae materiales como filas hijas, conviene fusionarlos en el APU de la partida medible.
+- **Ver insumos en la EDT** ([D-059]): en una partida hoja con APU, el chevron muestra filas de detalle (badge `APU·MAT` / etc.). Son solo lectura; el click abre el modal APU. No se certifican ni se imputan compras contra esas filas — siempre contra la partida (ej. `4.1`). El listado **Materiales** del proyecto lista solo líneas `MATERIAL` de esas partidas (necesidad = `partidaQuantity` o coef×cant.).
 - Capítulos intermedios agregan totales; no se certifican directamente.
 - Código único por presupuesto.
 
@@ -153,9 +155,14 @@ Por cada ítem hoja:
 | Subcontratos | SUB | partida subcontratada |
 | Otros | OTHER | fletes, gastos varios |
 
-Completar **cantidad**, **unidad** y **precio** por línea. El APU se guarda **por unidad** del ítem (p. ej. por m²); el total de partida = suma unitaria × cantidad del ítem ([D-047]).
+Completar **cantidad**, **unidad** y **precio** por línea. El APU persiste el aporte **por unidad** del ítem; el total de partida = suma unitaria × cantidad del ítem ([D-047]).
 
-Al agregar una línea podés elegir **Por unidad** o **Total partida**: si tenés un importe o consumo del total de obra, usá Total partida y Bloqer lo prorratea a unitario.
+Al agregar una línea el default es **Total partida**:
+- **Cant. recurso** — “necesito 500 un a $6.000” (Bloqer calcula el rendimiento por und. del ítem y guarda `partidaQuantity` para compras).
+- **Monto global** — importe único de obra (prorrateo money-safe).
+- **Por unidad** — consumo ya expresado por 1 und. del ítem.
+
+El modal APU muestra solo **costo**; PU/total de venta viven en la tabla EDT ([D-058]).
 
 ### 3.4 Parámetros de venta
 

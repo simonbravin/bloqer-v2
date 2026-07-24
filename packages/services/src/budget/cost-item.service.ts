@@ -1,4 +1,4 @@
-import { prisma } from "@bloqer/database";
+import { Prisma, prisma } from "@bloqer/database";
 import type { CostItem } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { UpdateCostItemInput } from "@bloqer/validators";
@@ -6,6 +6,7 @@ import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertBudgetEditable } from "./budget.service";
 import { _recalcCostItemTotals, _recalcBudgetSummary } from "./budget-calc.service";
+import { _recomputePartidaLinesForQuantity } from "./cost-analysis.service";
 
 export async function updateCostItem(
   id: string,
@@ -22,8 +23,16 @@ export async function updateCostItem(
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   assertBudgetEditable(budget);
 
+  if (input.quantity !== undefined && !(input.quantity > 0)) {
+    throw new ServiceError("VALIDATION", "La cantidad del ítem debe ser mayor a 0");
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
-    const u = await tx.costItem.update({
+    const oldQty = costItem.quantity;
+    const newQty =
+      input.quantity !== undefined ? new Prisma.Decimal(input.quantity) : oldQty;
+
+    await tx.costItem.update({
       where: { id },
       data: {
         unit: input.unit ?? undefined,
@@ -31,6 +40,11 @@ export async function updateCostItem(
         notes: input.notes ?? undefined,
       },
     });
+
+    if (input.quantity !== undefined && !oldQty.equals(newQty)) {
+      await _recomputePartidaLinesForQuantity(tx, id, oldQty, newQty);
+    }
+
     const settings = await tx.budgetSettings.findUniqueOrThrow({ where: { budgetId: costItem.budgetId } });
     await _recalcCostItemTotals(tx, id, settings);
     await _recalcBudgetSummary(tx, costItem.budgetId);

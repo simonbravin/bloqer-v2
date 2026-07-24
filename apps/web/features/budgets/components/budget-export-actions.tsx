@@ -16,13 +16,20 @@ type Props = {
   budgetId: string;
 };
 
+/** Encode current EDT view axes into export query params ([D-058], [D-060]). */
 function buildExportHref(
   projectId: string,
   budgetId: string,
   view: WbsViewMode,
   format: "csv" | "xlsx" | "pdf",
 ): string {
-  const params = new URLSearchParams({ view, format });
+  const params = new URLSearchParams({
+    format,
+    base: view.base,
+    scale: view.scale,
+    detail: view.base === "sale" ? "compact" : view.detail,
+    incidence: view.showIncidence ? "1" : "0",
+  });
   return `/api/reports/proyectos/${projectId}/presupuestos/${budgetId}/export?${params.toString()}`;
 }
 

@@ -48,10 +48,13 @@ Los ítems siguen el estado del Budget padre; no tienen máquina propia salvo l�
 - Árbol expandible con totales por nivel.
 - Ficha ítem: cómputo, análisis de costos, precio de venta del ítem.
 - Vista tabla para edición masiva de cantidades/precios.
+- **Detalle APU bajo hoja** ([D-059]): filas solo lectura de insumos (MAT/LAB/EQ/SUB) expandibles bajo la partida; sin código WBS; edición vía modal APU. No aparecen en export ni en TOTAL GENERAL.
+- **Incidencia %** ([D-060]): toggle independiente; columna `%` sobre TOTAL GENERAL (CD o venta según base). Export incluye la columna si el toggle está activo.
 
 ## 10. Reglas de negocio
 - **BR-WBS-001**: solo **CostItem** (hoja) recibe certificación económica por línea; nodos intermedios agregan ([BR-BUD-005] implícito).
 - **BR-WBS-002**: código de ítem único dentro del budget.
+- **BR-WBS-003** ([D-057]): materiales, MO, equipos y subcontratos de **composición** son `CostAnalysisLine` (APU). **No** se modelan como hijos WBS. Subdividir un `ITEM` parte alcance de obra, no el BOM.
 
 ## 11. Validaciones
 - Cantidades > 0 para ítems activos.

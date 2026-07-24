@@ -62,6 +62,8 @@ export type CostAnalysisLineView = {
   coefficient: string;
   unitCost: string;
   totalCost: string;
+  partidaQuantity: string | null;
+  isLumpSum: boolean;
   sortOrder: number;
   supplierContactId: string | null;
   notes: string | null;
@@ -120,6 +122,8 @@ type InternalNode = {
       coefficient: Prisma.Decimal;
       unitCost: Prisma.Decimal;
       totalCost: Prisma.Decimal;
+      partidaQuantity: Prisma.Decimal | null;
+      isLumpSum: boolean;
       sortOrder: number;
       supplierContactId: string | null;
       notes: string | null;
@@ -223,6 +227,8 @@ export async function getWbsTree(budgetId: string, ctx: ServiceContext): Promise
               coefficient: l.coefficient.toString(),
               unitCost: l.unitCost.toString(),
               totalCost: l.totalCost.toString(),
+              partidaQuantity: l.partidaQuantity?.toString() ?? null,
+              isLumpSum: l.isLumpSum,
               sortOrder: l.sortOrder,
               supplierContactId: l.supplierContactId,
               notes: l.notes,

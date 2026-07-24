@@ -4,49 +4,104 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { WbsViewMode } from "../lib/wbs-view-mode";
+import type { WbsViewBase, WbsViewDetail, WbsViewMode, WbsViewScale } from "../lib/wbs-view-mode";
 
 export type { WbsViewMode } from "../lib/wbs-view-mode";
 
+function Segment<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { id: T; label: string; disabled?: boolean }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-lg border bg-muted/40 p-0.5">
+      {options.map((opt) => (
+        <Button
+          key={opt.id}
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={opt.disabled}
+          className={cn(
+            "h-8 rounded-md px-2.5 text-xs font-medium",
+            value === opt.id &&
+              "bg-primary text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground",
+          )}
+          onClick={() => onChange(opt.id)}
+        >
+          {opt.label}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 interface WbsTreeToolbarProps {
   viewMode: WbsViewMode;
-  onViewModeChange: (mode: WbsViewMode) => void;
+  onPatchViewMode: (patch: Partial<WbsViewMode>) => void;
   search: string;
   onSearchChange: (value: string) => void;
 }
 
 export function WbsTreeToolbar({
   viewMode,
-  onViewModeChange,
+  onPatchViewMode,
   search,
   onSearchChange,
 }: WbsTreeToolbarProps) {
   return (
-    <div className="flex flex-col gap-3 border-b border-border/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="inline-flex rounded-lg border bg-muted/40 p-0.5">
+    <div className="flex flex-col gap-3 border-b border-border/60 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Segment<WbsViewBase>
+          value={viewMode.base}
+          onChange={(base) => onPatchViewMode({ base })}
+          options={[
+            { id: "cost", label: "Costo" },
+            { id: "sale", label: "Venta" },
+          ]}
+        />
+        <Segment<WbsViewScale>
+          value={viewMode.scale}
+          onChange={(scale) => onPatchViewMode({ scale })}
+          options={[
+            { id: "unit", label: "Unitario" },
+            { id: "total", label: "Total" },
+          ]}
+        />
+        <Segment<WbsViewDetail>
+          value={viewMode.base === "sale" ? "compact" : viewMode.detail}
+          onChange={(detail) => onPatchViewMode({ detail })}
+          options={[
+            { id: "compact", label: "Compacto" },
+            {
+              id: "breakdown",
+              label: "Desglose",
+              disabled: viewMode.base === "sale",
+            },
+          ]}
+        />
         <Button
           type="button"
           size="sm"
           variant="ghost"
+          title={
+            viewMode.base === "sale"
+              ? "Mostrar % de incidencia sobre el total de venta"
+              : "Mostrar % de incidencia sobre el costo directo total"
+          }
           className={cn(
-            "h-8 rounded-md px-3 text-xs font-medium",
-            viewMode === "breakdown" && "bg-primary text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground",
+            "h-8 rounded-md border px-2.5 text-xs font-medium",
+            viewMode.showIncidence &&
+              "border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground",
           )}
-          onClick={() => onViewModeChange("breakdown")}
+          onClick={() => onPatchViewMode({ showIncidence: !viewMode.showIncidence })}
+          aria-pressed={viewMode.showIncidence}
         >
-          Desglose
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className={cn(
-            "h-8 rounded-md px-3 text-xs font-medium",
-            viewMode === "totals" && "bg-primary text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground",
-          )}
-          onClick={() => onViewModeChange("totals")}
-        >
-          Totales
+          Incidencia
         </Button>
       </div>
 
@@ -54,7 +109,7 @@ export function WbsTreeToolbar({
         <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           className="pl-9"
-          placeholder="Buscar por código o descripción..."
+          placeholder="Buscar por código, nombre, descripción o insumo APU..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
         />

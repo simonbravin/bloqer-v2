@@ -51,6 +51,8 @@ function leafNode(
           coefficient: "1",
           unitCost: material,
           totalCost: material,
+          partidaQuantity: null,
+          isLumpSum: false,
           sortOrder: 0,
           supplierContactId: null,
           notes: null,
@@ -63,6 +65,8 @@ function leafNode(
           coefficient: "1",
           unitCost: labor,
           totalCost: labor,
+          partidaQuantity: null,
+          isLumpSum: false,
           sortOrder: 1,
           supplierContactId: null,
           notes: null,
@@ -93,13 +97,32 @@ function groupNode(code: string, name: string, children: WbsViewNode[]): WbsView
 }
 
 describe("parseBudgetWbsExportFilters", () => {
-  it("defaults to breakdown", () => {
-    assert.deepEqual(parseBudgetWbsExportFilters({}), { view: "breakdown" });
-    assert.deepEqual(parseBudgetWbsExportFilters({ view: "invalid" }), { view: "breakdown" });
+  it("legacy view=breakdown defaults", () => {
+    const f = parseBudgetWbsExportFilters({});
+    assert.equal(f.view, "breakdown");
+    assert.equal(f.base, "cost");
+    assert.equal(f.detail, "breakdown");
+    assert.equal(f.showIncidence, false);
   });
 
-  it("accepts totals view", () => {
-    assert.deepEqual(parseBudgetWbsExportFilters({ view: "totals" }), { view: "totals" });
+  it("legacy view=totals", () => {
+    const f = parseBudgetWbsExportFilters({ view: "totals" });
+    assert.equal(f.view, "totals");
+    assert.equal(f.detail, "compact");
+  });
+
+  it("accepts full EDT axes + incidence", () => {
+    const f = parseBudgetWbsExportFilters({
+      base: "sale",
+      scale: "unit",
+      detail: "breakdown",
+      incidence: "1",
+    });
+    assert.equal(f.base, "sale");
+    assert.equal(f.scale, "unit");
+    assert.equal(f.detail, "compact"); // sale forces compact
+    assert.equal(f.showIncidence, true);
+    assert.equal(f.view, "totals");
   });
 });
 
@@ -118,17 +141,43 @@ describe("buildBudgetWbsExportTable", () => {
     const totalRow = rows[rows.length - 1]!;
     assert.equal(totalRow[1], "TOTAL GENERAL");
     const grand = computeTreeGrandTotals(tree);
-    assert.equal(totalRow[8], grand.totalSalePrice.toFixed(2));
+    assert.equal(totalRow[8], grand.totalCostDirect.toFixed(2));
   });
 
-  it("totals columns include cost direct and sale", () => {
+  it("totals columns include cost direct", () => {
     const { headers, rows } = buildBudgetWbsExportTable(tree, "totals");
-    assert.equal(headers.length, 6);
+    assert.equal(headers.length, 5);
     assert.equal(headers[4], "CostoDirecto");
     const totalRow = rows[rows.length - 1]!;
     const grand = computeTreeGrandTotals(tree);
     assert.equal(totalRow[4], grand.totalCostDirect.toFixed(2));
-    assert.equal(totalRow[5], grand.totalSalePrice.toFixed(2));
+  });
+
+  it("sale + incidence adds IncidenciaPct and uses sale totals", () => {
+    const { headers, rows } = buildBudgetWbsExportTable(tree, {
+      base: "sale",
+      scale: "total",
+      detail: "compact",
+      showIncidence: true,
+    });
+    assert.ok(headers.includes("IncidenciaPct"));
+    assert.ok(headers.includes("TotalVenta"));
+    const leafA = rows.find((r) => r[0] === "1.1")!;
+    // 400 / 600 = 66.67% (export uses dot decimals, same as money cols)
+    assert.equal(leafA[leafA.length - 1], "66.67%");
+    const totalRow = rows[rows.length - 1]!;
+    assert.equal(totalRow[totalRow.length - 1], "100.00%");
+  });
+
+  it("group incidence is share of rolled-up total", () => {
+    const { rows } = buildBudgetWbsExportTable(tree, {
+      base: "cost",
+      scale: "total",
+      detail: "compact",
+      showIncidence: true,
+    });
+    const group = rows.find((r) => r[0] === "1")!;
+    assert.equal(group[group.length - 1], "100.00%");
   });
 
   it("flattens tree depth-first", () => {
@@ -141,21 +190,13 @@ describe("buildBudgetWbsExportTable", () => {
 });
 
 describe("budgetWbsExportPdfRowsFromTable", () => {
-  it("maps breakdown row keys for PDF", () => {
+  it("maps rows for PDF with dynamic columns", () => {
     const tree = [leafNode("1", "Item", {})];
-    const { rows } = buildBudgetWbsExportTable(tree, "breakdown");
-    const pdfRows = budgetWbsExportPdfRowsFromTable("breakdown", rows);
-    assert.equal(pdfRows.length, 2);
-    assert.ok("material" in pdfRows[0]!);
-    assert.ok("sale" in pdfRows[0]!);
-    assert.equal(pdfRows[1]!.name, "TOTAL GENERAL");
-  });
-
-  it("pdf rows from table include TOTAL GENERAL", () => {
-    const tree: WbsViewNode[] = [leafNode("1", "Item", {})];
-    const { rows } = buildBudgetWbsExportTable(tree, "totals");
-    const pdfRows = budgetWbsExportPdfRowsFromTable("totals", rows);
+    const filters = parseBudgetWbsExportFilters({ view: "breakdown" });
+    const { rows } = buildBudgetWbsExportTable(tree, filters);
+    const pdfRows = budgetWbsExportPdfRowsFromTable(filters, rows);
     assert.equal(pdfRows.length, 2);
     assert.equal(pdfRows[1]!.name, "TOTAL GENERAL");
+    assert.ok("c4" in pdfRows[0]!);
   });
 });

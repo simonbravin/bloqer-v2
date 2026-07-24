@@ -8,15 +8,18 @@ import {
   previewImport, executeImport,
   updateCostItem,
   addCostAnalysisLine, updateCostAnalysisLine, removeCostAnalysisLine,
+  saveCostItemApu,
   ServiceError,
 } from "@bloqer/services";
 import {
   createBudgetSchema, updateBudgetSchema, updateBudgetSettingsSchema,
   createWbsNodeSchema, updateWbsNodeSchema, reorderWbsNodesSchema,
   updateCostItemSchema, createCostAnalysisLineSchema, updateCostAnalysisLineSchema,
+  saveCostItemApuSchema,
   type CreateBudgetInput, type UpdateBudgetInput, type UpdateBudgetSettingsInput,
   type CreateWbsNodeInput, type UpdateWbsNodeInput, type ReorderWbsNodesInput,
-  type UpdateCostItemInput,   type CreateCostAnalysisLineInput, type UpdateCostAnalysisLineInput,
+  type UpdateCostItemInput, type CreateCostAnalysisLineInput, type UpdateCostAnalysisLineInput,
+  type SaveCostItemApuInput,
   budgetImportRowSchema,
   budgetLifecycleCommentSchema, budgetReturnForChangesSchema,
   type BudgetImportRow,
@@ -356,4 +359,21 @@ export async function removeCostAnalysisLineAction(
     revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     return { ok: true };
   } catch (err) { return handle(err); }
+}
+
+export async function saveCostItemApuAction(
+  projectId: string,
+  budgetId: string,
+  data: SaveCostItemApuInput,
+): Promise<Ok | Err> {
+  const ctx = await getCtx();
+  const parsed = saveCostItemApuSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    await saveCostItemApu(parsed.data, ctx);
+    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
 }

@@ -608,16 +608,18 @@
 ### D-047 — APU: persistencia unitaria; entrada opcional por total de partida
 
 - **Fecha:** 2026-07-16
-- **Estado:** ACTIVA
+- **Estado:** ACTIVA (enmendada 2026-07-24)
 - **Decidido por:** Owner
-- **Contexto:** Al cargar APU, materiales/MO suelen venir como totales de obra (p. ej. global $1.250.000) o consumos absolutos (500 bolsas), mientras el ítem tiene cantidad contractual (900 m²). Si se cargan esos valores como si fueran por unidad, el sistema multiplica otra vez por la cantidad del ítem y distorsiona el costo.
+- **Contexto:** Al cargar APU, materiales/MO suelen venir como totales de obra (p. ej. global $1.250.000) o consumos absolutos (500 bolsas), mientras el ítem tiene cantidad contractual (900 m²). Si se cargan esos valores como si fueran por unidad, el sistema multiplica otra vez por la cantidad del ítem y distorsiona el costo. La conversión money-safe original (`coefficient = 1`) destruía la cantidad física y rompía necesidades de materiales/OC.
 - **Decisión:**
-  1. Las líneas APU (`CostAnalysisLine`) se **persisten siempre unitarias** (por 1 unidad del `CostItem`): `unitCostDirect = Σ (coefficient × unitCost)`; `totalCostDirect = unitCostDirect × CostItem.quantity`.
-  2. La UI ofrece dos **modos de entrada** (no dos modelos de datos): **Por unidad** (default) y **Total partida**.
-  3. En **Total partida**, al confirmar se prorratea el importe de obra de forma **money-safe** frente a `Decimal(18,4)`: `coefficient_stored = 1`, `unitCost_stored = (coefficient_input × unitCost_input) / CostItem.quantity`. Reverse al editar en ese modo: `coefficient_input = 1`, `unitCost_input = unitCost_stored × quantity`.
-  4. Si `CostItem.quantity ≤ 0`, el modo Total partida no aplica.
-- **Implicancias:** sin cambio de schema; conversión en UI/helper de dominio antes de create/update. Reportes y baseline siguen leyendo unitario × qty. No usar `coefficient / quantity` para globales (p. ej. 1/900) porque el redondeo a 4 decimales distorsiona el dinero.
-- **Documentos afectados:** [`04-formulas/BUDGET_FORMULAS.md`](../04-formulas/BUDGET_FORMULAS.md), [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md).
+  1. Las líneas APU contribuyen **por 1 unidad** del `CostItem` en dinero: `unitCostDirect = Σ totalCost`; `totalCostDirect = unitCostDirect × CostItem.quantity`. `totalCost` de línea es el aporte unitario **autoritativo** (2 dp half-up, [D-053]).
+  2. La UI ofrece **Por unidad** y **Total partida** (default). Total partida tiene dos submodos: **Cantidad de recurso** y **Monto global**.
+  3. **Cantidad de recurso** (p. ej. 500 un × $6.000): persiste `partidaQuantity = cant`, `unitCost = precio_recurso`, `coefficient = cant / Qty`, `totalCost = roundMoney((cant × precio) / Qty)`, `isLumpSum = false`. Necesidad física = `partidaQuantity`.
+  4. **Monto global** (p. ej. 1 × $1.250.000): money-safe — `coefficient = 1`, `unitCost = totalCost = monto / Qty`, `partidaQuantity = 1`, `isLumpSum = true`. No usar `coefficient = 1/Qty` (pierde dinero a 4 dp).
+  5. **Por unidad:** `partidaQuantity = null`, `isLumpSum = false`; `coefficient` y `unitCost` como se cargan; necesidad = `coefficient × Qty`.
+  6. Si `CostItem.quantity ≤ 0`, el modo Total partida no aplica. Al cambiar `Qty` con `partidaQuantity` set: recomputar coef/`totalCost` (recurso) o `unitCost`/`totalCost` (global).
+- **Implicancias:** schema `partidaQuantity` + `isLumpSum` en `CostAnalysisLine`. Materials board: `needQty = partidaQuantity ?? coefficient × Qty`. Sin backfill automático de filas históricas `coef=1` ambiguas.
+- **Documentos afectados:** [`04-formulas/BUDGET_FORMULAS.md`](../04-formulas/BUDGET_FORMULAS.md), [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md), [D-057](#d-057--partida-certificable-vs-insumo-apu), [D-058](#d-058--apu-muestra-costo-venta-en-tabla-edt).
 
 ---
 
@@ -776,6 +778,72 @@
 - **Implicancias:** enum Prisma `PROJECT_FINANCE` + `TREASURER`; recorte `matrix.ts`; helpers `canViewCompany*`; gates nav/páginas; `BANK_ACCOUNTS` / `INTERNAL_TRANSFERS` no colapsan solo a `TREASURY`.
 - **Documentos afectados:** [`USER_ROLES.md`](./USER_ROLES.md), [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md), [`08-architecture/PERMISSIONS_ROUTE_MATRIX.md`](../08-architecture/PERMISSIONS_ROUTE_MATRIX.md), [`08-architecture/ARCHITECTURE_DECISION_RECORDS.md`](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md).
 - **Nota:** la primera redacción de D-056 difería `TREASURER` (YAGNI); se incorporó el mismo día a pedido del owner para listado/matriz y segregación caja vs controller.
+
+---
+
+### D-057 — Partida certificable vs insumo APU
+
+- **Fecha:** 2026-07-24
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Usuarios modelaban materiales (hierros, mallas) como hijos WBS bajo una partida medible (p. ej. zapata ml × 390), perdiendo unidad/cantidad en el padre y generando doble multiplicación o partidas certificables falsas.
+- **Decisión:**
+  1. **Capítulo** (`GROUP`): sin unidad/cantidad operativa; solo rollup de totales.
+  2. **Partida certificable/vendible** (`ITEM` hoja): lleva `CostItem` (unidad, cantidad, APU) y es el nodo de certificación, OC/SC e imputación.
+  3. **Insumos** (materiales, MO, equipos, subcontratos de composición): `CostAnalysisLine` bajo la partida — **nunca** nodos WBS hijos.
+  4. Subdividir un `ITEM` convierte al padre en `GROUP` (migrar o descartar APU); sirve para partir **alcance de obra**, no para desglosar BOM.
+- **Implicancias:** copy en UI de subdivide/import; guía operativa; [D-047](#d-047--apu-persistencia-unitaria-entrada-opcional-por-total-de-partida) para carga de cantidades de recurso.
+- **Documentos afectados:** [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md).
+
+---
+
+### D-058 — APU muestra costo; venta en tabla EDT
+
+- **Fecha:** 2026-07-24
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** El modal APU mezclaba PU/total de venta con el desglose de costo, confundiendo dónde se edita cada capa.
+- **Decisión:**
+  1. Modal APU: unidad, cantidad, CD unitario, CD total, desglose MAT/MO/EQ/SUB. Sin PU venta ni total venta.
+  2. Tabla EDT: vistas Costo|Venta × Unitario|Total × Compacto|Desglose (desglose por categoría solo en base Costo; markups de venta son del ítem completo).
+- **Implicancias:** UX de `cost-item-apu-dialog` y toolbar `wbs-tree`.
+- **Documentos afectados:** [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md).
+
+---
+
+### D-059 — Filas de detalle APU en EDT (UI-only)
+
+- **Fecha:** 2026-07-24
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** El cómputo correcto vive en APU bajo la partida hoja ([D-047]/[D-057]), pero el Excel de obra muestra insumos como filas verdes bajo la partida. Sin vista en EDT, el usuario siente que debe crear hijos WBS `4.1.1` (anti-patrón).
+- **Decisión:**
+  1. La EDT puede **expandir** una hoja con líneas APU visibles (MAT/LAB/EQ/SUB) y mostrar filas de detalle **solo lectura** bajo la partida. No crean `WbsNode`, no tienen código WBS, no tienen acciones de estructura.
+  2. Dinero de línea en detalle: `partidaMoney = totalCost × CostItem.quantity` (única fuente). Cant. recurso es columna aparte (`partidaQuantity` o `coef×qty`); solo `isLumpSum` muestra etiqueta “global”.
+  3. Estado de expand APU (`apuExpandedIds`) es **independiente** del expand de GROUPs. “Expandir/Contraer todo” solo afecta GROUPs WBS.
+  4. Mutación de composición: solo modal APU. Click en fila detalle abre el APU de la partida padre.
+  5. Totales / TOTAL GENERAL / export CSV·XLSX·PDF: **sin** filas APU (solo WBS). Board de materiales sigue siendo solo `category = MATERIAL`.
+  6. Certificaciones, OC/SC, cronograma siguen imputando al `wbsNodeId` de la partida hoja.
+- **Implicancias:** UX `wbs-tree`; helpers de presentación; docs operativas. Sin migración Prisma.
+- **Documentos afectados:** [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md).
+
+---
+
+### D-060 — Columna Incidencia % en EDT (independiente)
+
+- **Fecha:** 2026-07-24
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Hace falta ver el peso de cada capítulo/partida sobre el presupuesto sin mezclarlo con desglose MAT/MO ni con unitario/total.
+- **Decisión:**
+  1. Toggle **Incidencia** en la toolbar EDT, **independiente** de Costo|Venta × Unitario|Total × Compacto|Desglose.
+  2. Columna al final (antes de acciones): `% = total_fila / TOTAL_GENERAL × 100`.
+  3. Base Costo → usa `totalCostDirect` (CD); base Venta → usa `totalSalePrice`. Siempre totales de fila (nunca PU), también si la escala de la tabla es Unitario.
+  4. GROUPs usan el roll-up de hijos; hojas usan su CD/venta; filas detalle APU → "—"; TOTAL GENERAL → 100% (si el total > 0).
+  5. Export CSV/XLSX/PDF respeta el modo EDT activo (incl. incidencia) vía query `base`, `scale`, `detail`, `incidence`.
+- **Implicancias:** `wbs-view-mode`, `wbs-tree`, export presupuesto.
+- **Documentos afectados:** [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md).
+
 ---
 
 ## Decisiones SUPERSEDED

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { toEntryApuLine } from "@bloqer/domain";
 import { CostAnalysisLineForm } from "./cost-analysis-line-form";
 import type { CostItemView, CostAnalysisLineView } from "@bloqer/services";
 import type { CreateCostAnalysisLineInput, UpdateCostAnalysisLineInput, UpdateCostItemInput } from "@bloqer/validators";
@@ -278,7 +279,47 @@ export function CostItemPanel({
           {dialogState.type === "edit" && (
             <CostAnalysisLineForm
               mode="edit"
-              defaults={dialogState.line}
+              defaults={(() => {
+                const line = dialogState.line;
+                const itemQty = parseFloat(costItem.quantity) || 0;
+                const isTotal =
+                  line.isLumpSum ||
+                  (line.partidaQuantity != null && line.partidaQuantity !== "");
+                if (!isTotal) {
+                  return {
+                    category: line.category,
+                    description: line.description,
+                    unit: line.unit,
+                    coefficient: line.coefficient,
+                    unitCost: line.unitCost,
+                    notes: line.notes,
+                    entryMode: "unit" as const,
+                    totalKind: "resource" as const,
+                  };
+                }
+                const entry = toEntryApuLine({
+                  mode: "total",
+                  coefficient: parseFloat(line.coefficient) || 0,
+                  unitCost: parseFloat(line.unitCost) || 0,
+                  totalCost: parseFloat(line.totalCost) || 0,
+                  partidaQuantity:
+                    line.partidaQuantity != null && line.partidaQuantity !== ""
+                      ? parseFloat(line.partidaQuantity)
+                      : null,
+                  isLumpSum: line.isLumpSum,
+                  itemQuantity: itemQty,
+                });
+                return {
+                  category: line.category,
+                  description: line.description,
+                  unit: line.unit,
+                  coefficient: String(entry.coefficient),
+                  unitCost: String(entry.unitCost),
+                  notes: line.notes,
+                  entryMode: "total" as const,
+                  totalKind: entry.totalKind,
+                };
+              })()}
               itemQuantity={parseFloat(costItem.quantity) || 0}
               itemUnit={costItem.unit}
               onSubmit={(data) => onUpdateLine(dialogState.type === "edit" ? dialogState.line.id : "", data)}

@@ -40,11 +40,44 @@ export {
   canUseTotalPartidaMode,
   convertApuEntryMode,
   lineUnitTotal,
+  physicalNeedQty,
   previewApuEntry,
+  normalizeStoredApuLineForItemQuantity,
+  recomputeLumpForItemQuantity,
+  recomputeResourceForItemQuantity,
   roundApuDecimal,
+  roundApuMoney,
   toEntryApuLine,
   toStoredApuLine,
   type ApuEntryMode,
   type ApuEntryInput,
+  type ApuEntryPreview,
+  type ApuEntryReverseInput,
   type ApuLineAmounts,
+  type ApuStoredLine,
+  type ApuTotalKind,
 } from "./budget/apu-entry";
+
+export {
+  isLumpApuDisplay,
+  linePartidaMoney,
+  lineUnitContribution,
+  resourceQtyDisplay,
+  type ApuDisplayLine,
+  type ResourceQtyDisplay,
+} from "./budget/apu-display";
+
+export {
+  WBS_ACTIONS_COLUMN_COUNT,
+  WBS_FIXED_COLUMN_COUNT,
+  wbsIncidenceColumnCount,
+  wbsMoneyColumnCount,
+  wbsTableColumnCount,
+  type WbsTableViewMode,
+} from "./budget/wbs-table-columns";
+
+export {
+  formatWbsIncidencePercent,
+  formatWbsIncidencePercentExport,
+  wbsIncidencePercent,
+} from "./budget/wbs-incidence";

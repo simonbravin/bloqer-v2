@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { ApuEntryMode } from "@bloqer/domain";
+import type { ApuEntryMode, ApuTotalKind } from "@bloqer/domain";
 
 export function ApuEntryModeToggle({
   value,
@@ -35,6 +35,39 @@ export function ApuEntryModeToggle({
         onClick={() => onChange("total")}
       >
         Total partida
+      </Button>
+    </div>
+  );
+}
+
+export function ApuTotalKindToggle({
+  value,
+  onChange,
+  className,
+}: {
+  value: ApuTotalKind;
+  onChange: (kind: ApuTotalKind) => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("inline-flex rounded-md border p-0.5", className)}>
+      <Button
+        type="button"
+        size="sm"
+        variant={value === "resource" ? "default" : "ghost"}
+        className="h-7 px-2.5 text-xs"
+        onClick={() => onChange("resource")}
+      >
+        Cant. recurso
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant={value === "lump" ? "default" : "ghost"}
+        className="h-7 px-2.5 text-xs"
+        onClick={() => onChange("lump")}
+      >
+        Monto global
       </Button>
     </div>
   );

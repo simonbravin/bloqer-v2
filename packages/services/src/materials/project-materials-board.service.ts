@@ -198,6 +198,8 @@ export async function getProjectMaterialsBoard(
           description: true,
           coefficient: true,
           totalCost: true,
+          partidaQuantity: true,
+          isLumpSum: true,
         },
       },
     },
@@ -219,7 +221,12 @@ export async function getProjectMaterialsBoard(
   for (const item of costItems) {
     for (const line of item.analysisLines) {
       const key = rowKey(item.wbsNodeId, line.productId, line.description);
-      const needQty = new Prisma.Decimal(line.coefficient).mul(item.quantity);
+      // [D-047] recurso: partidaQuantity; lump: money-only (partidaQuantity=1 ≠ necesidad física)
+      const needQty = line.isLumpSum
+        ? ZERO
+        : line.partidaQuantity != null
+          ? new Prisma.Decimal(line.partidaQuantity)
+          : new Prisma.Decimal(line.coefficient).mul(item.quantity);
       const needCost = new Prisma.Decimal(line.totalCost).mul(item.quantity);
       const prev = map.get(key);
       if (prev) {

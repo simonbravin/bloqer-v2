@@ -1,3 +1,4 @@
+import { formatWbsIncidencePercentExport, wbsIncidencePercent } from "@bloqer/domain";
 import { buildCsv } from "../report-exports/csv-export.service";
 import { safeReportFilename } from "../report-exports/filename.service";
 import type { ReportCsvPayload, ReportXlsxPayload } from "../report-exports/report-export.types";
@@ -6,49 +7,86 @@ import { getBudgetById } from "./budget.service";
 import { getWbsTree, type WbsViewNode } from "./wbs.service";
 import {
   computeTreeGrandTotals,
+  computeUnitCategoryCosts,
   computeWbsRowMetrics,
   VISIBLE_WBS_COST_CATEGORIES,
+  type WbsRowMetrics,
 } from "./wbs-metrics";
 import { ServiceContext, ServiceError } from "../types";
 
+/** Legacy layout alias kept for URL/back-compat. */
 export type BudgetWbsExportView = "breakdown" | "totals";
 
-export type BudgetWbsExportFilters = {
+/** Full EDT view axes for export ([D-058], [D-060]). */
+export type BudgetWbsExportMode = {
+  base: "cost" | "sale";
+  scale: "unit" | "total";
+  detail: "compact" | "breakdown";
+  showIncidence: boolean;
+};
+
+export type BudgetWbsExportFilters = BudgetWbsExportMode & {
+  /** Derived: cost+breakdown → breakdown; otherwise totals. */
   view: BudgetWbsExportView;
 };
 
-const BREAKDOWN_HEADERS = [
-  "CodigoWBS",
-  "Item",
-  "Unidad",
-  "Cantidad",
-  "Materiales",
-  "ManoDeObra",
-  "Equipos",
-  "Subcontrato",
-  "TotalVenta",
-] as const;
+function modeToLegacyView(mode: BudgetWbsExportMode): BudgetWbsExportView {
+  return mode.base === "cost" && mode.detail === "breakdown" ? "breakdown" : "totals";
+}
 
-const TOTALS_HEADERS = [
-  "CodigoWBS",
-  "Item",
-  "Unidad",
-  "Cantidad",
-  "CostoDirecto",
-  "TotalVenta",
-] as const;
+function normalizeExportMode(partial: Partial<BudgetWbsExportMode>): BudgetWbsExportMode {
+  const base = partial.base === "sale" ? "sale" : "cost";
+  return {
+    base,
+    scale: partial.scale === "unit" ? "unit" : "total",
+    detail: base === "sale" ? "compact" : partial.detail === "compact" ? "compact" : "breakdown",
+    showIncidence: partial.showIncidence === true,
+  };
+}
 
-const VIEW_LABEL_ES: Record<BudgetWbsExportView, string> = {
-  breakdown: "Desglose",
-  totals: "Totales",
-};
+function viewLabelEs(mode: BudgetWbsExportMode): string {
+  const parts = [
+    mode.base === "sale" ? "Venta" : "Costo",
+    mode.scale === "unit" ? "Unitario" : "Total",
+  ];
+  if (mode.base === "cost") {
+    parts.push(mode.detail === "breakdown" ? "Desglose" : "Compacto");
+  }
+  if (mode.showIncidence) parts.push("Incidencia");
+  return parts.join(" · ");
+}
 
+/**
+ * Parse export query params.
+ * New: base, scale, detail, incidence=1|0|true|false
+ * Legacy: view=breakdown|totals
+ */
 export function parseBudgetWbsExportFilters(
   sp: Record<string, string | undefined>,
 ): BudgetWbsExportFilters {
-  const raw = sp.view?.toLowerCase();
-  if (raw === "totals") return { view: "totals" };
-  return { view: "breakdown" };
+  const hasNewAxes =
+    sp.base != null || sp.scale != null || sp.detail != null || sp.incidence != null;
+
+  let mode: BudgetWbsExportMode;
+  if (hasNewAxes) {
+    const incidenceRaw = (sp.incidence ?? "").toLowerCase();
+    mode = normalizeExportMode({
+      base: sp.base === "sale" ? "sale" : "cost",
+      scale: sp.scale === "unit" ? "unit" : "total",
+      detail: sp.detail === "compact" ? "compact" : "breakdown",
+      showIncidence: incidenceRaw === "1" || incidenceRaw === "true",
+    });
+  } else {
+    const raw = sp.view?.toLowerCase();
+    mode = normalizeExportMode({
+      base: "cost",
+      scale: "total",
+      detail: raw === "totals" ? "compact" : "breakdown",
+      showIncidence: false,
+    });
+  }
+
+  return { ...mode, view: modeToLegacyView(mode) };
 }
 
 function formatDecimal(value: number): string {
@@ -74,56 +112,102 @@ function flattenWbsTree(nodes: WbsViewNode[]): WbsViewNode[] {
   return result;
 }
 
-function breakdownRow(node: WbsViewNode, metrics: ReturnType<typeof computeWbsRowMetrics>): string[] {
-  return [
-    node.code,
-    node.name,
-    metrics.unit,
-    formatQuantity(metrics.quantity),
-    formatDecimal(metrics.byCategory.MATERIAL),
-    formatDecimal(metrics.byCategory.LABOR),
-    formatDecimal(metrics.byCategory.EQUIPMENT),
-    formatDecimal(metrics.byCategory.SUBCONTRACT),
-    formatDecimal(metrics.totalSalePrice),
-  ];
+function buildHeaders(mode: BudgetWbsExportMode): string[] {
+  const headers = ["CodigoWBS", "Item", "Unidad", "Cantidad"];
+  if (mode.base === "sale") {
+    headers.push(mode.scale === "unit" ? "PUVenta" : "TotalVenta");
+  } else if (mode.detail === "breakdown") {
+    headers.push(
+      mode.scale === "unit" ? "Materiales_u" : "Materiales",
+      mode.scale === "unit" ? "ManoDeObra_u" : "ManoDeObra",
+      mode.scale === "unit" ? "Equipos_u" : "Equipos",
+      mode.scale === "unit" ? "Subcontrato_u" : "Subcontrato",
+      mode.scale === "unit" ? "CD_unit" : "CostoDirecto",
+    );
+  } else {
+    headers.push(mode.scale === "unit" ? "CD_unit" : "CostoDirecto");
+  }
+  if (mode.showIncidence) headers.push("IncidenciaPct");
+  return headers;
 }
 
-function totalsRow(node: WbsViewNode, metrics: ReturnType<typeof computeWbsRowMetrics>): string[] {
-  return [
-    node.code,
-    node.name,
-    metrics.unit,
-    formatQuantity(metrics.quantity),
-    formatDecimal(metrics.totalCostDirect),
-    formatDecimal(metrics.totalSalePrice),
-  ];
-}
-
-function grandTotalRow(
-  view: BudgetWbsExportView,
-  grand: ReturnType<typeof computeTreeGrandTotals>,
+function moneyCellsForNode(
+  node: WbsViewNode,
+  metrics: WbsRowMetrics,
+  mode: BudgetWbsExportMode,
 ): string[] {
-  if (view === "breakdown") {
+  const isLeaf = node.children.length === 0 && !!node.costItem;
+  const unitCats = isLeaf ? computeUnitCategoryCosts(node) : null;
+  const unitCd = isLeaf ? parseFloat(node.costItem!.unitCostDirect) || 0 : null;
+  const unitSale = isLeaf ? parseFloat(node.costItem!.unitSalePrice) || 0 : null;
+
+  if (mode.base === "sale") {
+    if (mode.scale === "unit") {
+      return [unitSale != null ? formatDecimal(unitSale) : ""];
+    }
+    return [formatDecimal(metrics.totalSalePrice)];
+  }
+
+  if (mode.detail === "breakdown") {
+    if (mode.scale === "unit") {
+      if (!unitCats || unitCd == null) {
+        return ["", "", "", "", ""];
+      }
+      return [
+        formatDecimal(unitCats.MATERIAL),
+        formatDecimal(unitCats.LABOR),
+        formatDecimal(unitCats.EQUIPMENT),
+        formatDecimal(unitCats.SUBCONTRACT),
+        formatDecimal(unitCd),
+      ];
+    }
     return [
-      "",
-      "TOTAL GENERAL",
-      "",
-      "",
+      formatDecimal(metrics.byCategory.MATERIAL),
+      formatDecimal(metrics.byCategory.LABOR),
+      formatDecimal(metrics.byCategory.EQUIPMENT),
+      formatDecimal(metrics.byCategory.SUBCONTRACT),
+      formatDecimal(metrics.totalCostDirect),
+    ];
+  }
+
+  if (mode.scale === "unit") {
+    return [unitCd != null ? formatDecimal(unitCd) : ""];
+  }
+  return [formatDecimal(metrics.totalCostDirect)];
+}
+
+function moneyCellsForGrand(
+  grand: ReturnType<typeof computeTreeGrandTotals>,
+  mode: BudgetWbsExportMode,
+): string[] {
+  if (mode.scale === "unit") {
+    const n = mode.base === "cost" && mode.detail === "breakdown" ? 5 : 1;
+    return Array.from({ length: n }, () => "");
+  }
+  if (mode.base === "sale") {
+    return [formatDecimal(grand.totalSalePrice)];
+  }
+  if (mode.detail === "breakdown") {
+    return [
       formatDecimal(grand.byCategory.MATERIAL),
       formatDecimal(grand.byCategory.LABOR),
       formatDecimal(grand.byCategory.EQUIPMENT),
       formatDecimal(grand.byCategory.SUBCONTRACT),
-      formatDecimal(grand.totalSalePrice),
+      formatDecimal(grand.totalCostDirect),
     ];
   }
-  return [
-    "",
-    "TOTAL GENERAL",
-    "",
-    "",
-    formatDecimal(grand.totalCostDirect),
-    formatDecimal(grand.totalSalePrice),
-  ];
+  return [formatDecimal(grand.totalCostDirect)];
+}
+
+function incidenceForMetrics(
+  metrics: Pick<WbsRowMetrics, "totalCostDirect" | "totalSalePrice">,
+  grand: ReturnType<typeof computeTreeGrandTotals>,
+  mode: BudgetWbsExportMode,
+): string {
+  if (!mode.showIncidence) return "";
+  const part = mode.base === "sale" ? metrics.totalSalePrice : metrics.totalCostDirect;
+  const whole = mode.base === "sale" ? grand.totalSalePrice : grand.totalCostDirect;
+  return formatWbsIncidencePercentExport(wbsIncidencePercent(part, whole));
 }
 
 export type BudgetWbsExportPayload = {
@@ -137,6 +221,7 @@ export type BudgetWbsExportPayload = {
     projectId: string;
     view: BudgetWbsExportView;
     viewLabel: string;
+    mode: BudgetWbsExportMode;
     totalCostDirect: string;
     totalSalePrice: string;
   };
@@ -144,17 +229,50 @@ export type BudgetWbsExportPayload = {
 
 export function buildBudgetWbsExportTable(
   tree: WbsViewNode[],
-  view: BudgetWbsExportView,
+  modeOrView: BudgetWbsExportMode | BudgetWbsExportView,
 ): { headers: string[]; rows: string[][]; grand: ReturnType<typeof computeTreeGrandTotals> } {
-  const headers = view === "breakdown" ? [...BREAKDOWN_HEADERS] : [...TOTALS_HEADERS];
+  const mode: BudgetWbsExportMode =
+    typeof modeOrView === "string"
+      ? normalizeExportMode({
+          base: "cost",
+          scale: "total",
+          detail: modeOrView === "totals" ? "compact" : "breakdown",
+          showIncidence: false,
+        })
+      : normalizeExportMode(modeOrView);
+
+  const headers = buildHeaders(mode);
   const flat = flattenWbsTree(tree);
+  const grand = computeTreeGrandTotals(tree);
   const rows: string[][] = [];
+
   for (const node of flat) {
     const metrics = computeWbsRowMetrics(node);
-    rows.push(view === "breakdown" ? breakdownRow(node, metrics) : totalsRow(node, metrics));
+    const row = [
+      node.code,
+      node.name,
+      metrics.unit,
+      formatQuantity(metrics.quantity),
+      ...moneyCellsForNode(node, metrics, mode),
+    ];
+    if (mode.showIncidence) {
+      row.push(incidenceForMetrics(metrics, grand, mode));
+    }
+    rows.push(row);
   }
-  const grand = computeTreeGrandTotals(tree);
-  rows.push(grandTotalRow(view, grand));
+
+  const totalRow = [
+    "",
+    "TOTAL GENERAL",
+    "",
+    "",
+    ...moneyCellsForGrand(grand, mode),
+  ];
+  if (mode.showIncidence) {
+    totalRow.push(incidenceForMetrics(grand, grand, mode));
+  }
+  rows.push(totalRow);
+
   return { headers, rows, grand };
 }
 
@@ -172,7 +290,9 @@ async function loadBudgetWbsExportPayload(
     throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   }
 
-  const { headers, rows, grand } = buildBudgetWbsExportTable(tree, filters.view);
+  const mode = normalizeExportMode(filters);
+  const { headers, rows, grand } = buildBudgetWbsExportTable(tree, mode);
+  const view = modeToLegacyView(mode);
 
   return {
     headers,
@@ -183,8 +303,9 @@ async function loadBudgetWbsExportPayload(
       versionNumber: budget.versionNumber,
       currency: budget.currency,
       projectId: budget.projectId,
-      view: filters.view,
-      viewLabel: VIEW_LABEL_ES[filters.view],
+      view,
+      viewLabel: viewLabelEs(mode),
+      mode,
       totalCostDirect: formatDecimal(grand.totalCostDirect),
       totalSalePrice: formatDecimal(grand.totalSalePrice),
     },
@@ -193,7 +314,16 @@ async function loadBudgetWbsExportPayload(
 
 function exportFilenameBase(meta: BudgetWbsExportPayload["meta"]): string {
   const name = meta.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_");
-  return `presupuesto_${name}_v${meta.versionNumber}_${meta.view}`;
+  const m = meta.mode;
+  const slug = [
+    m.base,
+    m.scale,
+    m.base === "cost" ? m.detail : "compact",
+    m.showIncidence ? "inc" : null,
+  ]
+    .filter(Boolean)
+    .join("_");
+  return `presupuesto_${name}_v${meta.versionNumber}_${slug}`;
 }
 
 function xlsxPreamble(meta: BudgetWbsExportPayload["meta"]): string[][] {
@@ -244,55 +374,54 @@ export async function exportBudgetWbsXlsx(
   };
 }
 
-/** Column keys for PDF row mapping (breakdown vs totals). */
-export function budgetWbsExportPdfColumns(view: BudgetWbsExportView): { key: string; label: string; flex?: number }[] {
-  if (view === "breakdown") {
-    return [
-      { key: "code", label: "Nº", flex: 0.6 },
-      { key: "name", label: "Ítem", flex: 1.4 },
-      { key: "unit", label: "Un.", flex: 0.5 },
-      { key: "qty", label: "Cant.", flex: 0.5 },
-      ...VISIBLE_WBS_COST_CATEGORIES.map((cat) => ({
-        key: cat.toLowerCase(),
-        label:
-          cat === "MATERIAL"
-            ? "Mat."
-            : cat === "LABOR"
-              ? "M.O."
-              : cat === "EQUIPMENT"
-                ? "Eq."
-                : "Subc.",
-        flex: 0.6,
-      })),
-      { key: "sale", label: "Venta", flex: 0.8 },
-    ];
-  }
-  return [
-    { key: "code", label: "Nº", flex: 0.7 },
-    { key: "name", label: "Ítem", flex: 1.6 },
-    { key: "unit", label: "Un.", flex: 0.5 },
-    { key: "qty", label: "Cant.", flex: 0.5 },
-    { key: "cost", label: "Costo dir.", flex: 0.9 },
-    { key: "sale", label: "Venta", flex: 0.9 },
-  ];
+/** Column keys/labels for PDF from export headers. */
+export function budgetWbsExportPdfColumns(
+  filters: BudgetWbsExportFilters | BudgetWbsExportView,
+): { key: string; label: string; flex?: number }[] {
+  const mode =
+    typeof filters === "string"
+      ? parseBudgetWbsExportFilters({ view: filters })
+      : normalizeExportMode(filters);
+  const headers = buildHeaders(mode);
+  return headers.map((label, index) => ({
+    key: `c${index}`,
+    label:
+      label === "CodigoWBS"
+        ? "Nº"
+        : label === "Item"
+          ? "Ítem"
+          : label === "Unidad"
+            ? "Un."
+            : label === "Cantidad"
+              ? "Cant."
+              : label === "IncidenciaPct"
+                ? "Incid."
+                : label.replace(/_/g, " "),
+    flex: index <= 1 ? (index === 1 ? 1.4 : 0.6) : 0.7,
+  }));
 }
-
-const PDF_ROW_KEYS: Record<BudgetWbsExportView, readonly string[]> = {
-  breakdown: ["code", "name", "unit", "qty", "material", "labor", "equipment", "subcontract", "sale"],
-  totals: ["code", "name", "unit", "qty", "cost", "sale"],
-};
 
 /** Maps export table rows (incl. TOTAL GENERAL) to PDF column keys. */
 export function budgetWbsExportPdfRowsFromTable(
-  view: BudgetWbsExportView,
+  filters: BudgetWbsExportFilters | BudgetWbsExportView,
   rows: string[][],
 ): Record<string, string>[] {
-  const keys = PDF_ROW_KEYS[view];
+  const mode =
+    typeof filters === "string"
+      ? parseBudgetWbsExportFilters({ view: filters })
+      : normalizeExportMode(filters);
+  const colCount = buildHeaders(mode).length;
   return rows.map((row) => {
     const record: Record<string, string> = {};
-    keys.forEach((key, index) => {
-      record[key] = row[index] ?? "";
-    });
+    for (let i = 0; i < colCount; i++) {
+      record[`c${i}`] = row[i] ?? "";
+    }
+    // Convenience aliases used by older tests / consumers
+    record.code = row[0] ?? "";
+    record.name = row[1] ?? "";
     return record;
   });
 }
+
+// Re-export category list for callers that imported from here historically
+export { VISIBLE_WBS_COST_CATEGORIES };
