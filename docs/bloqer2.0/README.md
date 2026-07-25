@@ -126,6 +126,7 @@ Leer en este orden:
 | [`USERS_AND_PERMISSIONS.md`](./02-modules/USERS_AND_PERMISSIONS.md) | Usuarios y permisos |
 | [`AUDIT_LOG.md`](./02-modules/AUDIT_LOG.md) | Auditoría |
 | [`NOTIFICATIONS.md`](./02-modules/NOTIFICATIONS.md) | Notificaciones y alertas |
+| [`ACCOUNTING.md`](./02-modules/ACCOUNTING.md) | Contabilidad GL (plan de cuentas, asientos, auto-DRAFT) |
 
 ### `03-finance/` — Finanzas
 

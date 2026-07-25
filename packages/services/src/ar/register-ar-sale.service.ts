@@ -16,6 +16,10 @@ import { canEditArArea } from "./ar-access";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { toMoneyDecimal } from "../finance/money-decimal";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import {
+  ensureDraftJournalFromCollection,
+  ensureDraftJournalFromSalesInvoice,
+} from "../accounting/accounting-auto-draft.service";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
@@ -377,6 +381,11 @@ export async function registerArSale(
   }
   if (!outcome) {
     throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
+  }
+
+  await ensureDraftJournalFromSalesInvoice(outcome.invoiceId, ctx);
+  if (outcome.collectionId) {
+    await ensureDraftJournalFromCollection(outcome.collectionId, ctx);
   }
 
   const traceChain = buildArSaleTraceChain(outcome);

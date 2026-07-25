@@ -134,10 +134,18 @@ export default async function AsientoDetallePage({
         </TableScroll>
       </DataTableSection>
 
-      {canEdit && entry.status === "DRAFT" && (
+      {canEdit &&
+        (entry.status === "DRAFT" ||
+          (entry.status === "POSTED" && !entry.reversesEntryId && !entry.reversedByEntryId)) && (
         <div className="rounded-lg border bg-card p-6 space-y-3">
           <h2 className="font-semibold">Acciones</h2>
-          <JournalEntryDetailActions entryId={entry.id} status={entry.status} />
+          <JournalEntryDetailActions
+            entryId={entry.id}
+            status={entry.status}
+            canReverse={
+              entry.status === "POSTED" && !entry.reversesEntryId && !entry.reversedByEntryId
+            }
+          />
         </div>
       )}
     </PageShell>

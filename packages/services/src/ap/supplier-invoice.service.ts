@@ -15,6 +15,8 @@ import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
 import { assertWbsLineForProject } from "../procurement/procurement-wbs";
+import { ensureDraftJournalFromSupplierInvoice } from "../accounting/accounting-auto-draft.service";
+import { syncJournalOnOperationalCancel } from "../accounting/accounting-cancel-sync.service";
 
 const PO_AP_LINKABLE_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
 
@@ -724,6 +726,7 @@ export async function issueSupplierInvoice(
     return result;
   });
 
+  await ensureDraftJournalFromSupplierInvoice(result.id, ctx);
   return serializeInvoice(result);
 }
 
@@ -737,7 +740,7 @@ export async function cancelSupplierInvoice(
 
   const invPreview = await prisma.supplierInvoice.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true, status: true },
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -746,6 +749,15 @@ export async function cancelSupplierInvoice(
   }
   if (projectScopeId !== undefined && invPreview.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+  }
+
+  if (invPreview.status === "ISSUED") {
+    await syncJournalOnOperationalCancel(ctx, {
+      companyId: invPreview.companyId,
+      sourceType: "SUPPLIER_INVOICE",
+      sourceId: id,
+      sourceLabel: "la factura de proveedor",
+    });
   }
 
   const result = await prisma.$transaction(async (tx) => {

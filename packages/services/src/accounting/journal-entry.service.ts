@@ -13,6 +13,12 @@ import { isCrossCompany } from "../company-scope";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { resolveAccountingCompanyId } from "./accounting-company-context";
+import {
+  applyNaturalRunningBalance,
+  naturalBalance,
+  naturalBalanceSignedString,
+} from "./accounting-natural-balance";
+import { entryDateGte, entryDateLte, sanitizeIsoDate } from "./accounting-date";
 
 export type JournalEntryLineView = Omit<JournalEntryLine, "debit" | "credit"> & {
   debit:  string;
@@ -32,6 +38,7 @@ export type JournalEntryView = Pick<
   | "sourceId"
   | "description"
   | "reference"
+  | "reversesEntryId"
   | "createdByUserId"
   | "updatedByUserId"
   | "postedAt"
@@ -40,6 +47,7 @@ export type JournalEntryView = Pick<
   | "updatedAt"
 > & {
   lines: (JournalEntryLineView & { accountCode: string; accountName: string })[];
+  reversedByEntryId: string | null;
 };
 
 export type AccountLedgerRowView = {
@@ -52,6 +60,28 @@ export type AccountLedgerRowView = {
   debit:          string;
   credit:         string;
   currency:       string;
+  runningBalance: string;
+  /** Synthetic opening-balance row when a dateFrom filter is applied [D-062]. */
+  isOpening?:     boolean;
+};
+
+export type AccountLedgerResult = {
+  rows: AccountLedgerRowView[];
+  truncated: boolean;
+  dateFrom: string | null;
+  dateTo: string | null;
+};
+
+export type TrialBalanceRowView = {
+  accountId:   string;
+  accountCode: string;
+  accountName: string;
+  accountType: string;
+  currency:    string;
+  debit:       string;
+  credit:      string;
+  /** Natural balance by AccountType [D-062]. */
+  balance:     string;
 };
 
 async function assertView(ctx: ServiceContext): Promise<void> {
@@ -137,14 +167,38 @@ async function loadJournalEntryView(
     where: { id, tenantId, companyId },
     include: {
       lines: { include: { account: true }, orderBy: { id: "asc" } },
+      reversedByEntry: { select: { id: true } },
     },
   });
   if (!entry) throw new ServiceError("NOT_FOUND", "Asiento no encontrado");
-  const { lines: rawLines, ...rest } = entry;
+  const { lines: rawLines, reversedByEntry, ...rest } = entry;
   return {
     ...rest,
+    reversedByEntryId: reversedByEntry?.id ?? null,
     lines: rawLines.map(serializeLine),
   };
+}
+
+/**
+ * Lookup without RBAC/module gates — used by soft automation (ensureDraftJournal*).
+ * Callers must already trust tenantId/companyId from the operational document.
+ */
+export async function lookupNonCancelledJournalEntryIdBySource(
+  ctx: ServiceContext,
+  params: { companyId: string; sourceType: JournalEntrySourceType; sourceId: string },
+): Promise<string | null> {
+  const row = await prisma.journalEntry.findFirst({
+    where: {
+      tenantId:   ctx.tenantId,
+      companyId:  params.companyId,
+      sourceType: params.sourceType,
+      sourceId:   params.sourceId,
+      status:     { not: "CANCELLED" },
+    },
+    select:    { id: true },
+    orderBy:   [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  return row?.id ?? null;
 }
 
 /**
@@ -159,18 +213,16 @@ export async function findNonCancelledJournalEntryIdBySource(
   if (isCrossCompany(params.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "El asiento pertenece a otra empresa");
   }
-  const row = await prisma.journalEntry.findFirst({
-    where: {
-      tenantId:   ctx.tenantId,
-      companyId:  params.companyId,
-      sourceType: params.sourceType,
-      sourceId:   params.sourceId,
-      status:     { not: "CANCELLED" },
-    },
-    select:    { id: true },
-    orderBy:   [{ createdAt: "asc" }, { id: "asc" }],
-  });
-  return row?.id ?? null;
+  return lookupNonCancelledJournalEntryIdBySource(ctx, params);
+}
+
+/** Load journal without VIEW ACCOUNTING — automation / cancel-sync only. */
+export async function getJournalEntryByIdUnchecked(
+  id: string,
+  tenantId: string,
+  companyId: string,
+): Promise<JournalEntryView> {
+  return loadJournalEntryView(id, tenantId, companyId);
 }
 
 async function validateAccountsAndProjects(
@@ -249,7 +301,7 @@ export async function listJournalEntries(
 
   const data = rows.map((entry) => {
     const { lines: rawLines, ...rest } = entry;
-    return { ...rest, lines: rawLines.map(serializeLine) };
+    return { ...rest, reversedByEntryId: null, lines: rawLines.map(serializeLine) };
   });
 
   return { data, total };
@@ -276,10 +328,45 @@ export async function getJournalEntryBySourceIfNotCancelled(
   return getJournalEntryById(id, ctx, { companyId: params.companyId });
 }
 
+async function loadOpeningBalancesByCurrency(
+  ctx: ServiceContext,
+  companyId: string,
+  accountId: string,
+  accountType: string,
+  beforeDate: string,
+): Promise<Map<string, Prisma.Decimal>> {
+  const prior = await prisma.journalEntryLine.findMany({
+    where: {
+      accountId,
+      journalEntry: {
+        tenantId: ctx.tenantId,
+        companyId,
+        status: "POSTED",
+        entryDate: { lt: entryDateGte(beforeDate) },
+      },
+    },
+    select: { currency: true, debit: true, credit: true },
+  });
+  const map = new Map<string, { debit: Prisma.Decimal; credit: Prisma.Decimal }>();
+  for (const l of prior) {
+    const cur = map.get(l.currency);
+    if (!cur) map.set(l.currency, { debit: l.debit, credit: l.credit });
+    else {
+      cur.debit = cur.debit.plus(l.debit);
+      cur.credit = cur.credit.plus(l.credit);
+    }
+  }
+  const out = new Map<string, Prisma.Decimal>();
+  for (const [currency, agg] of map) {
+    out.set(currency, naturalBalance(accountType, agg.debit, agg.credit));
+  }
+  return out;
+}
+
 export async function getAccountLedger(
   ctx: ServiceContext,
   input: ListAccountLedgerInput,
-): Promise<AccountLedgerRowView[]> {
+): Promise<AccountLedgerResult> {
   await assertView(ctx);
   const companyId = await resolveAccountingCompanyId(ctx, input.companyId ?? null);
 
@@ -288,6 +375,20 @@ export async function getAccountLedger(
   });
   if (!account) throw new ServiceError("NOT_FOUND", "Cuenta contable no encontrada");
 
+  const dateFrom = sanitizeIsoDate(input.dateFrom) ?? null;
+  const dateTo = sanitizeIsoDate(input.dateTo) ?? null;
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    throw new ServiceError(
+      "VALIDATION",
+      "La fecha desde no puede ser posterior a la fecha hasta.",
+    );
+  }
+
+  const entryDateFilter: Prisma.DateTimeFilter = {};
+  if (dateFrom) entryDateFilter.gte = entryDateGte(dateFrom);
+  if (dateTo) entryDateFilter.lte = entryDateLte(dateTo);
+
+  const limit = input.limit ?? 200;
   const lines = await prisma.journalEntryLine.findMany({
     where: {
       accountId: input.accountId,
@@ -295,32 +396,73 @@ export async function getAccountLedger(
         tenantId: ctx.tenantId,
         companyId,
         status: "POSTED",
+        ...(Object.keys(entryDateFilter).length > 0 ? { entryDate: entryDateFilter } : {}),
       },
     },
     include: { journalEntry: true },
     orderBy: [{ journalEntry: { entryDate: "asc" } }, { journalEntry: { id: "asc" } }, { id: "asc" }],
-    take: input.limit ?? 200,
+    take: limit + 1,
+  });
+  const truncated = lines.length > limit;
+  const slice = truncated ? lines.slice(0, limit) : lines;
+
+  const byCurrency = dateFrom
+    ? await loadOpeningBalancesByCurrency(ctx, companyId, account.id, account.type, dateFrom)
+    : new Map<string, Prisma.Decimal>();
+
+  const openingRows: AccountLedgerRowView[] = [];
+  if (dateFrom) {
+    for (const currency of [...byCurrency.keys()].sort()) {
+      const bal = byCurrency.get(currency)!;
+      if (bal.isZero()) continue;
+      openingRows.push({
+        id: `opening-${currency}`,
+        entryId: "",
+        entryDate: dateFrom,
+        entryReference: null,
+        entryDescription: "Saldo inicial",
+        lineDescription: null,
+        debit: "0",
+        credit: "0",
+        currency,
+        runningBalance: bal.toString(),
+        isOpening: true,
+      });
+    }
+  }
+
+  const movementRows = slice.map((l) => {
+    const cur = l.currency;
+    const prev = byCurrency.get(cur) ?? new Prisma.Decimal(0);
+    const next = applyNaturalRunningBalance(account.type, prev, l.debit, l.credit);
+    byCurrency.set(cur, next);
+    return {
+      id:               l.id,
+      entryId:          l.journalEntryId,
+      entryDate:        l.journalEntry.entryDate.toISOString().slice(0, 10),
+      entryReference:   l.journalEntry.reference,
+      entryDescription: l.journalEntry.description,
+      lineDescription:  l.description,
+      debit:            l.debit.toString(),
+      credit:           l.credit.toString(),
+      currency:         l.currency,
+      runningBalance:   next.toString(),
+    };
   });
 
-  return lines.map((l) => ({
-    id:               l.id,
-    entryId:          l.journalEntryId,
-    entryDate:        l.journalEntry.entryDate.toISOString().slice(0, 10),
-    entryReference:   l.journalEntry.reference,
-    entryDescription: l.journalEntry.description,
-    lineDescription:  l.description,
-    debit:            l.debit.toString(),
-    credit:           l.credit.toString(),
-    currency:         l.currency,
-  }));
+  return {
+    rows: [...openingRows, ...movementRows],
+    truncated,
+    dateFrom,
+    dateTo,
+  };
 }
 
-export async function createJournalEntry(
+async function persistJournalEntryCreate(
   input: CreateJournalEntryInput,
   ctx: ServiceContext,
+  companyId: string,
 ): Promise<JournalEntryView> {
-  await assertEdit(ctx);
-  const companyId = await resolveAccountingCompanyId(ctx, input.companyId ?? null);
   const parsed = parseJournalLinesFromInput(input.lines);
   assertBalancedJournalEntry(parsed);
   const headerProjectId = input.projectId ?? null;
@@ -330,48 +472,116 @@ export async function createJournalEntry(
   const sourceType = input.sourceType ?? "MANUAL";
   const sourceId = input.sourceId ?? null;
 
-  const created = await prisma.$transaction(async (tx) => {
-    const entry = await tx.journalEntry.create({
-      data: {
-        tenantId:        ctx.tenantId,
+  try {
+    const { entry: created, wasExisting } = await prisma.$transaction(async (tx) => {
+      if (sourceId) {
+        const existing = await tx.journalEntry.findFirst({
+          where: {
+            tenantId: ctx.tenantId,
+            companyId,
+            sourceType,
+            sourceId,
+            status: { not: "CANCELLED" },
+          },
+          select: { id: true },
+        });
+        if (existing) {
+          const row = await tx.journalEntry.findFirstOrThrow({
+            where: { id: existing.id },
+            include: { lines: { include: { account: true }, orderBy: { id: "asc" } } },
+          });
+          return { entry: row, wasExisting: true };
+        }
+      }
+      const row = await tx.journalEntry.create({
+        data: {
+          tenantId:        ctx.tenantId,
+          companyId,
+          projectId:       headerProjectId,
+          entryDate,
+          status:          "DRAFT",
+          sourceType,
+          sourceId,
+          description:     input.description.trim(),
+          reference:       input.reference?.trim() ?? null,
+          createdByUserId: ctx.actorUserId,
+          updatedByUserId: ctx.actorUserId,
+          lines: {
+            create: parsed.map((l) => ({
+              accountId:   l.accountId,
+              projectId:   l.projectId,
+              description: l.description,
+              debit:       l.debit,
+              credit:      l.credit,
+              currency:    l.currency,
+            })),
+          },
+        },
+        include: { lines: { include: { account: true }, orderBy: { id: "asc" } } },
+      });
+      return { entry: row, wasExisting: false };
+    });
+
+    if (!wasExisting) {
+      await log({
+        tenantId:    ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        action:      "journal_entry.created",
+        entityType:  "JournalEntry",
+        entityId:    created.id,
+        after:       {
+          status: created.status,
+          sourceType: created.sourceType,
+          sourceId: created.sourceId,
+          lineCount: created.lines.length,
+        },
+        ipAddress:   ctx.ipAddress,
+      });
+    }
+
+    const { lines: rawLines, ...rest } = created;
+    return { ...rest, reversedByEntryId: null, lines: rawLines.map(serializeLine) };
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002" && sourceId) {
+      const existingId = await lookupNonCancelledJournalEntryIdBySource(ctx, {
         companyId,
-        projectId:       headerProjectId,
-        entryDate,
-        status:          "DRAFT",
         sourceType,
         sourceId,
-        description:     input.description.trim(),
-        reference:       input.reference?.trim() ?? null,
-        createdByUserId: ctx.actorUserId,
-        updatedByUserId: ctx.actorUserId,
-        lines: {
-          create: parsed.map((l) => ({
-            accountId:   l.accountId,
-            projectId:   l.projectId,
-            description: l.description,
-            debit:       l.debit,
-            credit:      l.credit,
-            currency:    l.currency,
-          })),
-        },
-      },
-      include: { lines: { include: { account: true }, orderBy: { id: "asc" } } },
-    });
-    return entry;
-  });
+      });
+      if (existingId) {
+        return loadJournalEntryView(existingId, ctx.tenantId, companyId);
+      }
+    }
+    throw e;
+  }
+}
 
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "journal_entry.created",
-    entityType:  "JournalEntry",
-    entityId:    created.id,
-    after:       { status: created.status, sourceType: created.sourceType, sourceId: created.sourceId, lineCount: created.lines.length },
-    ipAddress:   ctx.ipAddress,
-  });
+export async function createJournalEntry(
+  input: CreateJournalEntryInput,
+  ctx: ServiceContext,
+): Promise<JournalEntryView> {
+  await assertEdit(ctx);
+  const companyId = await resolveAccountingCompanyId(ctx, input.companyId ?? null);
+  return persistJournalEntryCreate(input, ctx, companyId);
+}
 
-  const { lines: rawLines, ...rest } = created;
-  return { ...rest, lines: rawLines.map(serializeLine) };
+/**
+ * Soft automation path: no EDIT ACCOUNTING / no first-company fallback.
+ * `documentCompanyId` must come from the operational document.
+ */
+export async function createJournalEntryAsAutomation(
+  input: CreateJournalEntryInput,
+  ctx: ServiceContext,
+  documentCompanyId: string,
+): Promise<JournalEntryView> {
+  const company = await prisma.company.findFirst({
+    where: { id: documentCompanyId, tenantId: ctx.tenantId, status: "ACTIVE" },
+    select: { id: true },
+  });
+  if (!company) {
+    throw new ServiceError("VALIDATION", "Empresa del documento inválida o inactiva");
+  }
+  return persistJournalEntryCreate({ ...input, companyId: documentCompanyId }, ctx, documentCompanyId);
 }
 
 export async function updateJournalEntry(
@@ -496,16 +706,13 @@ export async function postJournalEntry(id: string, ctx: ServiceContext): Promise
   return loadJournalEntryView(id, ctx.tenantId, existing.companyId);
 }
 
-export async function cancelJournalEntry(id: string, ctx: ServiceContext): Promise<JournalEntryView> {
-  await assertEdit(ctx);
-  const existing = await prisma.journalEntry.findFirst({ where: { id, tenantId: ctx.tenantId } });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Asiento no encontrado");
-  await resolveAccountingCompanyId(ctx, existing.companyId);
-  if (isCrossCompany(existing.companyId, ctx)) {
-    throw new ServiceError("FORBIDDEN", "Asiento fuera del alcance de empresa");
-  }
+async function cancelDraftJournalEntryCore(
+  id: string,
+  ctx: ServiceContext,
+  existing: JournalEntry,
+): Promise<JournalEntryView> {
   if (existing.status !== "DRAFT") {
-    throw new ServiceError("CONFLICT", "Solo se pueden anular borradores (fase 11A)");
+    throw new ServiceError("CONFLICT", "Solo se pueden anular borradores");
   }
 
   await prisma.journalEntry.update({
@@ -528,4 +735,190 @@ export async function cancelJournalEntry(id: string, ctx: ServiceContext): Promi
   });
 
   return loadJournalEntryView(id, ctx.tenantId, existing.companyId);
+}
+
+export async function cancelJournalEntry(id: string, ctx: ServiceContext): Promise<JournalEntryView> {
+  await assertEdit(ctx);
+  const existing = await prisma.journalEntry.findFirst({ where: { id, tenantId: ctx.tenantId } });
+  if (!existing) throw new ServiceError("NOT_FOUND", "Asiento no encontrado");
+  await resolveAccountingCompanyId(ctx, existing.companyId);
+  if (isCrossCompany(existing.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "Asiento fuera del alcance de empresa");
+  }
+  return cancelDraftJournalEntryCore(id, ctx, existing);
+}
+
+/** Cancel DRAFT without EDIT ACCOUNTING — used when operational source is cancelled [D-061]. */
+export async function cancelJournalEntryAsAutomation(
+  id: string,
+  ctx: ServiceContext,
+): Promise<JournalEntryView> {
+  const existing = await prisma.journalEntry.findFirst({ where: { id, tenantId: ctx.tenantId } });
+  if (!existing) throw new ServiceError("NOT_FOUND", "Asiento no encontrado");
+  return cancelDraftJournalEntryCore(id, ctx, existing);
+}
+
+/**
+ * Creates a POSTED counter-entry that reverses a POSTED journal (does not delete/cancel the original).
+ */
+export async function reversePostedJournalEntry(
+  id: string,
+  ctx: ServiceContext,
+  opts?: { entryDate?: string },
+): Promise<JournalEntryView> {
+  await assertEdit(ctx);
+  const existing = await prisma.journalEntry.findFirst({
+    where: { id, tenantId: ctx.tenantId },
+    include: {
+      lines: { orderBy: { id: "asc" } },
+      reversedByEntry: { select: { id: true } },
+    },
+  });
+  if (!existing) throw new ServiceError("NOT_FOUND", "Asiento no encontrado");
+  await resolveAccountingCompanyId(ctx, existing.companyId);
+  if (isCrossCompany(existing.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "Asiento fuera del alcance de empresa");
+  }
+  if (existing.status !== "POSTED") {
+    throw new ServiceError("CONFLICT", "Solo se pueden revertir asientos contabilizados");
+  }
+  if (existing.reversedByEntry) {
+    throw new ServiceError("CONFLICT", "Este asiento ya tiene una reversa");
+  }
+  if (existing.reversesEntryId) {
+    throw new ServiceError("CONFLICT", "No se puede revertir un asiento que ya es una reversa");
+  }
+
+  const entryDateStr =
+    opts?.entryDate ?? new Date().toISOString().slice(0, 10);
+  const entryDate = new Date(`${entryDateStr}T00:00:00.000Z`);
+
+  const reverse = await prisma.$transaction(async (tx) => {
+    const created = await tx.journalEntry.create({
+      data: {
+        tenantId:        ctx.tenantId,
+        companyId:       existing.companyId,
+        projectId:       existing.projectId,
+        entryDate,
+        status:          "POSTED",
+        sourceType:      "ADJUSTMENT",
+        sourceId:        existing.id,
+        description:     `Reversa de asiento ${existing.reference ?? existing.id.slice(0, 8)}`,
+        reference:       existing.reference ? `REV-${existing.reference}` : `REV-${existing.id.slice(0, 8)}`,
+        reversesEntryId: existing.id,
+        postedAt:        new Date(),
+        createdByUserId: ctx.actorUserId,
+        updatedByUserId: ctx.actorUserId,
+        lines: {
+          create: existing.lines.map((l) => ({
+            accountId:   l.accountId,
+            projectId:   l.projectId,
+            description: l.description ? `Reversa — ${l.description}` : "Reversa",
+            debit:       l.credit,
+            credit:      l.debit,
+            currency:    l.currency,
+          })),
+        },
+      },
+      include: { lines: { include: { account: true }, orderBy: { id: "asc" } } },
+    });
+    return created;
+  });
+
+  await log({
+    tenantId:    ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    action:      "journal_entry.reversed",
+    entityType:  "JournalEntry",
+    entityId:    existing.id,
+    after:       { reverseEntryId: reverse.id },
+    ipAddress:   ctx.ipAddress,
+  });
+
+  const { lines: rawLines, ...rest } = reverse;
+  return { ...rest, reversedByEntryId: null, lines: rawLines.map(serializeLine) };
+}
+
+export async function getTrialBalance(
+  ctx: ServiceContext,
+  input: {
+    companyId?: string | null;
+    dateFrom?: string;
+    dateTo?: string;
+    /** @deprecated use dateFrom */
+    fromDate?: string;
+    /** @deprecated use dateTo */
+    toDate?: string;
+  },
+): Promise<TrialBalanceRowView[]> {
+  await assertView(ctx);
+  const companyId = await resolveAccountingCompanyId(ctx, input.companyId ?? null);
+  const dateFrom = sanitizeIsoDate(input.dateFrom ?? input.fromDate);
+  const dateTo = sanitizeIsoDate(input.dateTo ?? input.toDate);
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    throw new ServiceError(
+      "VALIDATION",
+      "La fecha desde no puede ser posterior a la fecha hasta.",
+    );
+  }
+
+  const entryDateFilter: Prisma.DateTimeFilter = {};
+  if (dateFrom) entryDateFilter.gte = entryDateGte(dateFrom);
+  if (dateTo) entryDateFilter.lte = entryDateLte(dateTo);
+
+  const lines = await prisma.journalEntryLine.findMany({
+    where: {
+      journalEntry: {
+        tenantId: ctx.tenantId,
+        companyId,
+        status: "POSTED",
+        ...(Object.keys(entryDateFilter).length > 0 ? { entryDate: entryDateFilter } : {}),
+      },
+    },
+    include: {
+      account: { select: { id: true, code: true, name: true, type: true } },
+    },
+  });
+
+  type Agg = {
+    accountId: string;
+    accountCode: string;
+    accountName: string;
+    accountType: string;
+    currency: string;
+    debit: Prisma.Decimal;
+    credit: Prisma.Decimal;
+  };
+  const map = new Map<string, Agg>();
+  for (const l of lines) {
+    const key = `${l.accountId}|${l.currency}`;
+    const cur = map.get(key);
+    if (!cur) {
+      map.set(key, {
+        accountId: l.account.id,
+        accountCode: l.account.code,
+        accountName: l.account.name,
+        accountType: l.account.type,
+        currency: l.currency,
+        debit: l.debit,
+        credit: l.credit,
+      });
+    } else {
+      cur.debit = cur.debit.plus(l.debit);
+      cur.credit = cur.credit.plus(l.credit);
+    }
+  }
+
+  return [...map.values()]
+    .sort((a, b) => a.accountCode.localeCompare(b.accountCode) || a.currency.localeCompare(b.currency))
+    .map((r) => ({
+      accountId: r.accountId,
+      accountCode: r.accountCode,
+      accountName: r.accountName,
+      accountType: r.accountType,
+      currency: r.currency,
+      debit: r.debit.toString(),
+      credit: r.credit.toString(),
+      balance: naturalBalanceSignedString(r.accountType, r.debit, r.credit),
+    }));
 }

@@ -4,11 +4,13 @@ import { AUDIT_UI_MODULE_LABEL_ES } from "@bloqer/domain";
 import {
   fetchTenantAuditLogForExport,
   formatAuditLogExportFilterLine,
+  getAccountLedgerReport,
   getAccountMovementReport,
   getBudgetVarianceReport,
   getCashFlowReport,
   getCashPositionReport,
   getCertificationEvolutionReport,
+  getIncomeStatement,
   getMaterialVarianceReport,
   getPayableAgingReport,
   getProcurementDeviationReport,
@@ -17,13 +19,17 @@ import {
   getProjectIncomeExpenseReport,
   getProjectProfitabilityReport,
   getReceivableAgingReport,
+  getStatementOfFinancialPosition,
   getStockBalanceReport,
   getStockMovementReport,
   getSubcontractVarianceReport,
+  getTrialBalanceReport,
   listCompanyPayables,
   listCompanySupplierInvoices,
+  listPostedJournalBookForExport,
   MAX_EXPORT_ROWS,
   ServiceError,
+  type AccountingReportDateRange,
   type AgingFilters,
   type BudgetVarianceFilters,
   type BudgetWbsExportFilters,
@@ -782,5 +788,257 @@ export async function exportJobsiteLogPdf(
     { projectId },
     `libro_obra_parte_${payload.meta.logDateIso}_${payload.meta.status.toLowerCase()}`,
     (branding) => <JobsiteLogPdfDocument payload={payload} branding={branding} />,
+  );
+}
+
+export async function exportTrialBalancePdf(
+  input: AccountingReportDateRange,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const report = await getTrialBalanceReport(ctx, input);
+  return exportPdfDocument(
+    ctx,
+    {},
+    `contabilidad_sumas_y_saldos_${report.dateFrom}_${report.dateTo}`,
+    (branding) => (
+      <ProjectSimpleTablePdfDocument
+        branding={branding}
+        title="Sumas y saldos"
+        subtitle="Información gerencial interna. Solo asientos contabilizados."
+        filterLine={`Período ${report.dateFrom} — ${report.dateTo}`}
+        columns={[
+          { key: "code", label: "Código", flex: 0.7 },
+          { key: "name", label: "Cuenta", flex: 1.4 },
+          { key: "type", label: "Tipo", flex: 0.7 },
+          { key: "currency", label: "Mon.", flex: 0.45 },
+          { key: "debit", label: "Debe", flex: 0.8 },
+          { key: "credit", label: "Haber", flex: 0.8 },
+          { key: "balance", label: "Saldo", flex: 0.8 },
+        ]}
+        rows={report.rows.map((r) => ({
+          code: r.accountCode,
+          name: r.accountName,
+          type: r.accountType,
+          currency: r.currency,
+          debit: r.debit,
+          credit: r.credit,
+          balance: r.balance,
+        }))}
+        footerNote="Saldo natural por tipo de cuenta. No sustituye estados oficiales."
+      />
+    ),
+  );
+}
+
+export async function exportJournalBookPdf(
+  input: AccountingReportDateRange,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const book = await listPostedJournalBookForExport(ctx, input, MAX_EXPORT_ROWS);
+  if (book.total > MAX_EXPORT_ROWS) {
+    throw new ServiceError(
+      "VALIDATION",
+      `El export supera ${MAX_EXPORT_ROWS} asientos. Acotá el rango de fechas.`,
+    );
+  }
+  const rows: Record<string, string>[] = [];
+  for (const e of book.data) {
+    for (const l of e.lines) {
+      rows.push({
+        date: e.entryDate,
+        ref: e.reference ?? e.id.slice(0, 8),
+        account: `${l.accountCode} ${l.accountName}`,
+        debit: l.debit,
+        credit: l.credit,
+        currency: l.currency,
+        desc: l.description ?? e.description,
+      });
+    }
+  }
+  return exportPdfDocument(
+    ctx,
+    {},
+    `contabilidad_libro_diario_${book.dateFrom}_${book.dateTo}`,
+    (branding) => (
+      <ProjectSimpleTablePdfDocument
+        branding={branding}
+        title="Libro diario"
+        subtitle="Información gerencial interna. Solo asientos contabilizados."
+        filterLine={`Período ${book.dateFrom} — ${book.dateTo}`}
+        columns={[
+          { key: "date", label: "Fecha", flex: 0.75 },
+          { key: "ref", label: "Ref.", flex: 0.7 },
+          { key: "account", label: "Cuenta", flex: 1.4 },
+          { key: "debit", label: "Debe", flex: 0.7 },
+          { key: "credit", label: "Haber", flex: 0.7 },
+          { key: "currency", label: "Mon.", flex: 0.45 },
+          { key: "desc", label: "Descripción", flex: 1.2 },
+        ]}
+        rows={rows}
+      />
+    ),
+  );
+}
+
+export async function exportAccountLedgerPdf(
+  input: AccountingReportDateRange & { accountId: string },
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const report = await getAccountLedgerReport(ctx, { ...input, limit: MAX_EXPORT_ROWS });
+  return exportPdfDocument(
+    ctx,
+    {},
+    `contabilidad_mayor_${report.accountCode}_${report.dateFrom}_${report.dateTo}`,
+    (branding) => (
+      <ProjectSimpleTablePdfDocument
+        branding={branding}
+        title={`Mayor — ${report.accountCode} ${report.accountName}`}
+        subtitle="Saldo corrido natural. Solo asientos contabilizados."
+        filterLine={`Período ${report.dateFrom} — ${report.dateTo}`}
+        columns={[
+          { key: "date", label: "Fecha", flex: 0.75 },
+          { key: "ref", label: "Ref.", flex: 0.7 },
+          { key: "desc", label: "Descripción", flex: 1.4 },
+          { key: "debit", label: "Debe", flex: 0.7 },
+          { key: "credit", label: "Haber", flex: 0.7 },
+          { key: "balance", label: "Saldo", flex: 0.75 },
+          { key: "currency", label: "Mon.", flex: 0.45 },
+        ]}
+        rows={report.rows.map((r) => ({
+          date: r.entryDate,
+          ref: r.isOpening ? "Saldo inicial" : (r.entryReference ?? (r.entryId ? r.entryId.slice(0, 8) : "—")),
+          desc: r.lineDescription ? `${r.entryDescription} — ${r.lineDescription}` : r.entryDescription,
+          debit: r.isOpening ? "—" : r.debit,
+          credit: r.isOpening ? "—" : r.credit,
+          balance: r.runningBalance,
+          currency: r.currency,
+        }))}
+      />
+    ),
+  );
+}
+
+export async function exportStatementOfFinancialPositionPdf(
+  input: { companyId?: string | null; asOfDate?: string },
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const report = await getStatementOfFinancialPosition(ctx, input);
+  const rows: Record<string, string>[] = [];
+  for (const currency of report.currencies) {
+    const block = report.byCurrency[currency]!;
+    for (const r of block.assets) {
+      rows.push({
+        currency,
+        section: "Activo",
+        code: r.accountCode,
+        name: r.accountName,
+        balance: r.balance,
+      });
+    }
+    for (const r of block.liabilities) {
+      rows.push({
+        currency,
+        section: "Pasivo",
+        code: r.accountCode,
+        name: r.accountName,
+        balance: r.balance,
+      });
+    }
+    for (const r of block.equity) {
+      rows.push({
+        currency,
+        section: "Patrimonio",
+        code: r.accountCode,
+        name: r.accountName,
+        balance: r.balance,
+      });
+    }
+    rows.push({
+      currency,
+      section: "Totales",
+      code: "",
+      name: `A ${block.totalAssets} · P ${block.totalLiabilities} · PN ${block.totalEquity}`,
+      balance: block.balanced ? "Cuadra" : "Desvío",
+    });
+  }
+  return exportPdfDocument(
+    ctx,
+    {},
+    `contabilidad_situacion_patrimonial_${report.asOfDate}`,
+    (branding) => (
+      <ProjectSimpleTablePdfDocument
+        branding={branding}
+        title="Estado de situación patrimonial"
+        subtitle="Gerencial interno. Incluye Resultado del ejercicio (no cerrado)."
+        filterLine={`Al ${report.asOfDate}`}
+        columns={[
+          { key: "currency", label: "Mon.", flex: 0.45 },
+          { key: "section", label: "Sección", flex: 0.8 },
+          { key: "code", label: "Código", flex: 0.65 },
+          { key: "name", label: "Cuenta", flex: 1.6 },
+          { key: "balance", label: "Saldo", flex: 0.85 },
+        ]}
+        rows={rows}
+        footerNote="No sustituye estados contables oficiales ni ajuste por inflación."
+      />
+    ),
+  );
+}
+
+export async function exportIncomeStatementPdf(
+  input: AccountingReportDateRange,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const report = await getIncomeStatement(ctx, input);
+  const rows: Record<string, string>[] = [];
+  for (const currency of report.currencies) {
+    const block = report.byCurrency[currency]!;
+    for (const r of block.income) {
+      rows.push({
+        currency,
+        section: "Ingresos",
+        code: r.accountCode,
+        name: r.accountName,
+        balance: r.balance,
+      });
+    }
+    for (const r of block.expenses) {
+      rows.push({
+        currency,
+        section: "Gastos",
+        code: r.accountCode,
+        name: r.accountName,
+        balance: r.balance,
+      });
+    }
+    rows.push({
+      currency,
+      section: "Resultado",
+      code: "",
+      name: `Ingresos ${block.totalIncome} − Gastos ${block.totalExpenses}`,
+      balance: block.netResult,
+    });
+  }
+  return exportPdfDocument(
+    ctx,
+    {},
+    `contabilidad_estado_resultados_${report.dateFrom}_${report.dateTo}`,
+    (branding) => (
+      <ProjectSimpleTablePdfDocument
+        branding={branding}
+        title="Estado de resultados"
+        subtitle="Información gerencial interna. Solo asientos contabilizados."
+        filterLine={`Período ${report.dateFrom} — ${report.dateTo}`}
+        columns={[
+          { key: "currency", label: "Mon.", flex: 0.45 },
+          { key: "section", label: "Sección", flex: 0.8 },
+          { key: "code", label: "Código", flex: 0.65 },
+          { key: "name", label: "Cuenta", flex: 1.6 },
+          { key: "balance", label: "Saldo", flex: 0.85 },
+        ]}
+        rows={rows}
+        footerNote="No sustituye estados contables oficiales ni ajuste por inflación."
+      />
+    ),
   );
 }

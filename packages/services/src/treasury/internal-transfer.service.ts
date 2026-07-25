@@ -6,6 +6,8 @@ import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enfo
 import { ServiceContext, ServiceError } from "../types";
 import { getAccountBalance } from "./balance.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { ensureDraftJournalFromInternalTransfer } from "../accounting/accounting-auto-draft.service";
+import { syncJournalOnOperationalCancel } from "../accounting/accounting-cancel-sync.service";
 
 export type InternalTransferView = Omit<InternalTransfer, "amount"> & {
   amount: string;
@@ -206,6 +208,7 @@ export async function createInternalTransfer(
     return result;
   });
 
+  await ensureDraftJournalFromInternalTransfer(result.id, ctx);
   return serialize(result);
 }
 
@@ -215,6 +218,21 @@ export async function cancelInternalTransfer(
 ): Promise<InternalTransfer> {
   await assertTreasuryTenantModule(ctx);
   assertCanEditInternalTransfers(ctx.roles);
+
+  const preview = await prisma.internalTransfer.findUnique({
+    where: { id },
+    select: { tenantId: true, companyId: true, status: true },
+  });
+  if (!preview) throw new ServiceError("NOT_FOUND", "Transferencia no encontrada");
+  if (preview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (preview.status !== "CANCELLED") {
+    await syncJournalOnOperationalCancel(ctx, {
+      companyId: preview.companyId,
+      sourceType: "INTERNAL_TRANSFER",
+      sourceId: id,
+      sourceLabel: "la transferencia",
+    });
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     const t = await tx.internalTransfer.findUnique({ where: { id } });

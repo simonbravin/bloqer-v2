@@ -36,9 +36,11 @@ function buildQuery(params: SearchParamsLike, extra?: Record<string, string>): s
 type Props = {
   exportPath: string;
   params: SearchParamsLike;
-  /** When true, shows a single Exportar menu with CSV + PDF. Use `pdfOnly` when the route only supports PDF. */
+  /** When true, shows Exportar menu with CSV + PDF. Use `pdfOnly` when the route only supports PDF. */
   pdf?: boolean;
   pdfOnly?: boolean;
+  /** When true, adds XLSX to the export menu (requires route support). */
+  xlsx?: boolean;
   /** Button / menu label. Defaults: "Exportar CSV" | "Exportar PDF" | "Exportar". */
   label?: string;
 };
@@ -48,12 +50,14 @@ export function ReportExportActions({
   params,
   pdf = false,
   pdfOnly = false,
+  xlsx = false,
   label,
 }: Props) {
   const [downloading, setDownloading] = useState(false);
   const qs = buildQuery(params);
   const csvHref = qs ? `${exportPath}?${qs}` : exportPath;
   const pdfHref = `${exportPath}?${buildQuery(params, { format: "pdf" })}`;
+  const xlsxHref = `${exportPath}?${buildQuery(params, { format: "xlsx" })}`;
 
   async function downloadExport(href: string) {
     setDownloading(true);
@@ -99,7 +103,8 @@ export function ReportExportActions({
     );
   }
 
-  if (!pdf) {
+  const useMenu = pdf || xlsx;
+  if (!useMenu) {
     return (
       <Button
         type="button"
@@ -130,13 +135,24 @@ export function ReportExportActions({
           <FileSpreadsheet className="h-4 w-4" aria-hidden />
           CSV
         </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => void downloadExport(pdfHref)}
-          className="flex cursor-pointer items-center gap-2"
-        >
-          <FileText className="h-4 w-4" aria-hidden />
-          PDF
-        </DropdownMenuItem>
+        {xlsx ? (
+          <DropdownMenuItem
+            onSelect={() => void downloadExport(xlsxHref)}
+            className="flex cursor-pointer items-center gap-2"
+          >
+            <FileSpreadsheet className="h-4 w-4" aria-hidden />
+            Excel
+          </DropdownMenuItem>
+        ) : null}
+        {pdf ? (
+          <DropdownMenuItem
+            onSelect={() => void downloadExport(pdfHref)}
+            className="flex cursor-pointer items-center gap-2"
+          >
+            <FileText className="h-4 w-4" aria-hidden />
+            PDF
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

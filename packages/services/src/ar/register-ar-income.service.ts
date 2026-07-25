@@ -16,6 +16,10 @@ import { ServiceContext, ServiceError } from "../types";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { toMoneyDecimal } from "../finance/money-decimal";
 import { resolveCompanyIdForAr } from "./sales-invoice.service";
+import {
+  ensureDraftJournalFromCollection,
+  ensureDraftJournalFromSalesInvoice,
+} from "../accounting/accounting-auto-draft.service";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
@@ -363,6 +367,11 @@ export async function registerArIncome(
   }
   if (!outcome) {
     throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
+  }
+
+  await ensureDraftJournalFromSalesInvoice(outcome.invoiceId, ctx);
+  if (outcome.collectionId) {
+    await ensureDraftJournalFromCollection(outcome.collectionId, ctx);
   }
 
   const traceChain = buildArIncomeTraceChain(outcome);

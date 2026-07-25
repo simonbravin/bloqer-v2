@@ -8,6 +8,7 @@ import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/r
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
+import { ensureDraftJournalFromTreasuryMovement } from "../accounting/accounting-auto-draft.service";
 
 export async function registerCorporateTreasuryInflow(
   input: CreateCorporateTreasuryInflowInput,
@@ -114,6 +115,8 @@ export async function registerCorporateTreasuryInflow(
       },
     );
   });
+
+  await ensureDraftJournalFromTreasuryMovement(movementId, ctx);
 
   const href = buildFinancialHref("AccountMovement", movementId, { accountId: input.accountId });
   const traceChain: FinancialTraceLink[] = [

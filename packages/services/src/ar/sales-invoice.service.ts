@@ -14,6 +14,8 @@ import { resolvePagination } from "../finance/pagination";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { ensureDraftJournalFromSalesInvoice } from "../accounting/accounting-auto-draft.service";
+import { syncJournalOnOperationalCancel } from "../accounting/accounting-cancel-sync.service";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -515,6 +517,7 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
     return issued;
   });
 
+  await ensureDraftJournalFromSalesInvoice(result.id, ctx);
   return serializeInvoice(result);
 }
 
@@ -523,12 +526,21 @@ export async function cancelSalesInvoice(id: string, ctx: ServiceContext): Promi
 
   const invPreview = await prisma.salesInvoice.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true, status: true },
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (!canMutateArForScope(ctx.roles, invPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para anular facturas");
+  }
+
+  if (invPreview.status === "ISSUED") {
+    await syncJournalOnOperationalCancel(ctx, {
+      companyId: invPreview.companyId,
+      sourceType: "SALES_INVOICE",
+      sourceId: id,
+      sourceLabel: "la factura de venta",
+    });
   }
 
   const updated = await prisma.$transaction(async (tx) => {

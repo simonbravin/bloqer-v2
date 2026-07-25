@@ -20,6 +20,10 @@ import {
 } from "./supplier-invoice.service";
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
+import {
+  ensureDraftJournalFromPayment,
+  ensureDraftJournalFromSupplierInvoice,
+} from "../accounting/accounting-auto-draft.service";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
@@ -314,6 +318,11 @@ export async function registerApExpense(
   }
   if (!outcome) {
     throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
+  }
+
+  await ensureDraftJournalFromSupplierInvoice(outcome.invoiceId, ctx);
+  if (outcome.paymentId) {
+    await ensureDraftJournalFromPayment(outcome.paymentId, ctx);
   }
 
   const traceChain = buildApExpenseTraceChain(outcome);

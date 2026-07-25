@@ -19,7 +19,7 @@ const PAGE_SIZE = 20;
 export default async function AsientosPage({
   searchParams,
 }: {
-  searchParams: Promise<EmpresaSearch & { page?: string }>;
+  searchParams: Promise<EmpresaSearch & { page?: string; status?: string }>;
 }) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -29,8 +29,13 @@ export default async function AsientosPage({
   const ctx = (await buildTenantServiceContext())!;
   const cf = companyQueryFilter(sp);
   const page = Math.max(1, Number(sp.page ?? 1));
+  const status =
+    sp.status === "DRAFT" || sp.status === "POSTED" || sp.status === "CANCELLED"
+      ? sp.status
+      : undefined;
   const { data: entries, total } = await listJournalEntries(ctx, {
     companyId: cf.companyId ?? null,
+    status,
     page,
     pageSize: PAGE_SIZE,
   });

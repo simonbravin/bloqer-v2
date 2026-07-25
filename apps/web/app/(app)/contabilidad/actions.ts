@@ -1,22 +1,26 @@
 "use server";
 
 import {
+  applyArgentineChartOfAccountsTemplate,
   cancelJournalEntry,
   createAccountingAccount,
   createAccountingMappingRule,
   createJournalEntry,
   deactivateAccountingMappingRule,
   postJournalEntry,
+  reversePostedJournalEntry,
   ServiceError,
   updateAccountingMappingRule,
   updateJournalEntry,
 } from "@bloqer/services";
 import {
+  applyArgentineCoaTemplateSchema,
   cancelJournalEntrySchema,
   createAccountingAccountSchema,
   createAccountingMappingRuleSchema,
   createJournalEntrySchema,
   postJournalEntrySchema,
+  reverseJournalEntrySchema,
   updateAccountingMappingRuleSchema,
   updateJournalEntrySchema,
   type CreateAccountingAccountInput,
@@ -173,6 +177,47 @@ export async function deactivateAccountingMappingRuleAction(
     revalidatePath("/contabilidad/reglas");
     revalidatePath(`/contabilidad/reglas/${ruleId}`);
     return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function reverseJournalEntryAction(
+  data: unknown,
+): Promise<{ reverseId: string } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = reverseJournalEntrySchema.safeParse(data);
+  if (!parsed.success) return { error: "Datos inválidos" };
+  try {
+    const reverse = await reversePostedJournalEntry(parsed.data.id, ctx, {
+      entryDate: parsed.data.entryDate,
+    });
+    revalidatePath("/contabilidad/asientos");
+    revalidatePath(`/contabilidad/asientos/${parsed.data.id}`);
+    revalidatePath(`/contabilidad/asientos/${reverse.id}`);
+    return { reverseId: reverse.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function applyArgentineCoaTemplateAction(
+  data: unknown,
+): Promise<
+  | { accountsCreated: number; rulesCreated: number }
+  | { error: string }
+> {
+  const ctx = await getCtx();
+  const parsed = applyArgentineCoaTemplateSchema.safeParse(data ?? {});
+  if (!parsed.success) return { error: "Datos inválidos" };
+  try {
+    const result = await applyArgentineChartOfAccountsTemplate(parsed.data, ctx);
+    revalidatePath("/contabilidad/cuentas");
+    revalidatePath("/contabilidad/reglas");
+    return {
+      accountsCreated: result.accountsCreated,
+      rulesCreated: result.rulesCreated,
+    };
   } catch (err) {
     return handle(err);
   }

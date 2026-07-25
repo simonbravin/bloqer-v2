@@ -3,21 +3,27 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { cancelJournalEntryAction, postJournalEntryAction } from "@/app/(app)/contabilidad/actions";
+import {
+  cancelJournalEntryAction,
+  postJournalEntryAction,
+  reverseJournalEntryAction,
+} from "@/app/(app)/contabilidad/actions";
 import type { JournalEntryStatus } from "@bloqer/database";
 
 export function JournalEntryDetailActions({
   entryId,
   status,
+  canReverse = false,
 }: {
   entryId: string;
-  status:  JournalEntryStatus;
+  status: JournalEntryStatus;
+  canReverse?: boolean;
 }) {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  if (status !== "DRAFT") return null;
+  if (status !== "DRAFT" && !(status === "POSTED" && canReverse)) return null;
 
   function runPost() {
     setErr(null);
@@ -37,11 +43,33 @@ export function JournalEntryDetailActions({
     });
   }
 
+  function runReverse() {
+    setErr(null);
+    start(async () => {
+      const res = await reverseJournalEntryAction({ id: entryId });
+      if ("error" in res) setErr(res.error);
+      else if ("reverseId" in res) router.push(`/contabilidad/asientos/${res.reverseId}`);
+    });
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-3">
       {err && <p className="text-sm text-destructive">{err}</p>}
-      <Button type="button" disabled={pending} onClick={runPost}>Contabilizar</Button>
-      <Button type="button" variant="outline" disabled={pending} onClick={runCancel}>Anular borrador</Button>
+      {status === "DRAFT" ? (
+        <>
+          <Button type="button" disabled={pending} onClick={runPost}>
+            Contabilizar
+          </Button>
+          <Button type="button" variant="outline" disabled={pending} onClick={runCancel}>
+            Anular borrador
+          </Button>
+        </>
+      ) : null}
+      {status === "POSTED" && canReverse ? (
+        <Button type="button" variant="outline" disabled={pending} onClick={runReverse}>
+          Revertir asiento
+        </Button>
+      ) : null}
     </div>
   );
 }

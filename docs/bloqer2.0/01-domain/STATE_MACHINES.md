@@ -467,10 +467,42 @@ stateDiagram-v2
 
 ## 14. Payment (Pago) y Collection (Cobranza)
 
-> Pago y cobranza son entidades sintéticas que generan `AccountMovement`. Su máquina de estados sigue al `AccountMovement` asociado:
+> Implementación vigente: **create-as-CONFIRMED** (no existe estado `DRAFT` ni servicio `confirm*`). Prisma: `CONFIRMED | CANCELLED`.
 
-- `DRAFT` → `CONFIRMED` (genera AccountMovement, descuenta de Payables/Receivables) → `CANCELLED` (revierte).
-- No hay estado `PARTIAL` propio del Payment/Collection — es la suma de Payments lo que deja la Payable parcial.
+```mermaid
+stateDiagram-v2
+  [*] --> CONFIRMED : createCollection / createPayment
+  CONFIRMED --> CANCELLED : cancel
+  CANCELLED --> [*]
+```
+
+### Reglas
+
+- Al crear: genera `AccountMovement` y actualiza Payable/Receivable.
+- Al cancelar: revierte movimiento y obligación; sync GL [D-061] (cancela DRAFT; bloquea si hay POSTED sin reverse).
+- No hay estado `PARTIAL` propio — el parcial vive en Payable/Receivable.
+
+---
+
+## 14b. JournalEntry (Asiento contable)
+
+> Módulo: [`02-modules/ACCOUNTING.md`](../02-modules/ACCOUNTING.md). [D-061].
+
+```mermaid
+stateDiagram-v2
+  [*] --> DRAFT : create / auto-draft
+  DRAFT --> POSTED : post
+  DRAFT --> CANCELLED : cancel
+  POSTED --> [*] : reverse crea nuevo POSTED
+  CANCELLED --> [*]
+```
+
+| Desde | Hacia | Notas |
+|---|---|---|
+| (create) | `DRAFT` | Manual, sugerencia UI o `ensureDraftJournal*` |
+| `DRAFT` | `POSTED` | Contabilizar; entra al mayor |
+| `DRAFT` | `CANCELLED` | Anular borrador (también al cancelar origen) |
+| `POSTED` | — | No se anula; se crea asiento de reversa (`reversesEntryId`) |
 
 ---
 
@@ -916,6 +948,8 @@ stateDiagram-v2
 | Receivable | OPEN, PARTIAL, PAID, OVERDUE, CANCELLED |
 | Payable | OPEN, PARTIAL, PAID, OVERDUE, CANCELLED |
 | AccountMovement | DRAFT, CONFIRMED, RECONCILED, CANCELLED |
+| Collection / Payment | CONFIRMED, CANCELLED (create-as-CONFIRMED) |
+| JournalEntry | DRAFT, POSTED, CANCELLED (+ reverse = nuevo POSTED) |
 | ChangeOrder | DRAFT, SUBMITTED, APPROVED, REJECTED, APPLIED, CANCELLED |
 | Rfi | DRAFT, SUBMITTED, ANSWERED, CLOSED, CANCELLED (+ `is_overdue` derivado) |
 | JobsiteLogEntry | DRAFT, SUBMITTED, APPROVED, CANCELLED |

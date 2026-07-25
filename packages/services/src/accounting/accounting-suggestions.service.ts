@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { JournalEntrySourceType, AccountingMappingEventType } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { roundMoney } from "@bloqer/utils";
 import type { CreateJournalEntryInput, GenerateJournalSuggestionInput } from "@bloqer/validators";
 import { ServiceContext, ServiceError } from "../types";
 import { isCrossCompany } from "../company-scope";
@@ -12,6 +13,15 @@ import {
   type JournalEntryView,
 } from "./journal-entry.service";
 import { resolveAccountingCompanyId } from "./accounting-company-context";
+import {
+  treasuryMovementSupportsAccountingDraft,
+  treasuryMovementTypeSupportsAccountingDraft,
+} from "./accounting-treasury-gl-eligibility";
+
+export {
+  treasuryMovementSupportsAccountingDraft,
+  treasuryMovementTypeSupportsAccountingDraft,
+} from "./accounting-treasury-gl-eligibility";
 
 async function assertOptionalCompanyFilter(
   ctx: ServiceContext,
@@ -39,9 +49,7 @@ function assertCompanyScope(ctx: ServiceContext, entityCompanyId: string) {
 }
 
 function decimalToAmountString(d: Prisma.Decimal): string {
-  const fixed = d.toDecimalPlaces(4).toFixed(4);
-  const trimmed = fixed.replace(/0+$/, "").replace(/\.$/, "");
-  return trimmed === "" ? "0" : trimmed;
+  return roundMoney(d.toString());
 }
 
 function noRuleError(label: string): ServiceError {
@@ -107,11 +115,6 @@ function movementToJournalSourceType(m: { type: string }): JournalEntrySourceTyp
   if (m.type === "OUTFLOW") return "TREASURY_OUTFLOW";
   if (m.type === "TRANSFER_IN" || m.type === "TRANSFER_OUT") return "INTERNAL_TRANSFER";
   return "ADJUSTMENT";
-}
-
-/** Movement ledger rows that map to `AccountingMappingEventType` / `movementToEventType`. */
-export function treasuryMovementTypeSupportsAccountingDraft(type: string): boolean {
-  return type === "INFLOW" || type === "OUTFLOW" || type === "TRANSFER_IN" || type === "TRANSFER_OUT";
 }
 
 export async function suggestJournalFromCollection(
@@ -216,6 +219,12 @@ export async function suggestJournalFromTreasuryMovement(
   if (!mov) throw new ServiceError("NOT_FOUND", "Movimiento de tesorería no encontrado");
   if (mov.status !== "CONFIRMED") {
     throw new ServiceError("CONFLICT", "Solo se pueden sugerir asientos para movimientos confirmados");
+  }
+  if (!treasuryMovementSupportsAccountingDraft({ type: mov.type, sourceType: mov.sourceType })) {
+    throw new ServiceError(
+      "CONFLICT",
+      "Este movimiento ya está cubierto por el asiento de cobranza/pago (o es saldo inicial). Generá el asiento desde el documento origen.",
+    );
   }
 
   const companyId = mov.companyId ?? mov.account.companyId ?? null;
@@ -325,6 +334,92 @@ export async function suggestJournalFromStockMovement(
   return createJournalEntry(input, ctx);
 }
 
+export async function suggestJournalFromSalesInvoice(
+  salesInvoiceId: string,
+  ctx: ServiceContext,
+): Promise<JournalEntryView> {
+  await assertEdit(ctx);
+  const inv = await prisma.salesInvoice.findFirst({
+    where: { id: salesInvoiceId, tenantId: ctx.tenantId },
+  });
+  if (!inv) throw new ServiceError("NOT_FOUND", "Factura de venta no encontrada");
+  if (inv.status !== "ISSUED") {
+    throw new ServiceError("CONFLICT", "Solo se pueden sugerir asientos para facturas emitidas");
+  }
+  assertCompanyScope(ctx, inv.companyId);
+  await resolveAccountingCompanyId(ctx, inv.companyId);
+
+  const existing = await getJournalEntryBySourceIfNotCancelled(ctx, {
+    companyId: inv.companyId,
+    sourceType: "SALES_INVOICE",
+    sourceId: inv.id,
+  });
+  if (existing) return existing;
+
+  const rule = await findActiveMappingRule(ctx.tenantId, inv.companyId, "SALES_INVOICE_ISSUED");
+  if (!rule) throw noRuleError("factura de venta emitida");
+
+  const input = buildTwoLineDraftInput({
+    companyId: inv.companyId,
+    projectId: inv.projectId,
+    entryDate: inv.issueDate.toISOString().slice(0, 10),
+    description: `Asiento sugerido — factura venta ${inv.number}`,
+    reference: String(inv.number),
+    currency: inv.currency,
+    amountStr: decimalToAmountString(inv.totalAmount),
+    debitAccountId: rule.debitAccountId,
+    creditAccountId: rule.creditAccountId,
+    lineDescriptionDebit: "Debe — clientes",
+    lineDescriptionCredit: "Haber — ingresos",
+    sourceType: "SALES_INVOICE",
+    sourceId: inv.id,
+  });
+  return createJournalEntry(input, ctx);
+}
+
+export async function suggestJournalFromSupplierInvoice(
+  supplierInvoiceId: string,
+  ctx: ServiceContext,
+): Promise<JournalEntryView> {
+  await assertEdit(ctx);
+  const inv = await prisma.supplierInvoice.findFirst({
+    where: { id: supplierInvoiceId, tenantId: ctx.tenantId },
+  });
+  if (!inv) throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
+  if (inv.status !== "ISSUED") {
+    throw new ServiceError("CONFLICT", "Solo se pueden sugerir asientos para facturas emitidas");
+  }
+  assertCompanyScope(ctx, inv.companyId);
+  await resolveAccountingCompanyId(ctx, inv.companyId);
+
+  const existing = await getJournalEntryBySourceIfNotCancelled(ctx, {
+    companyId: inv.companyId,
+    sourceType: "SUPPLIER_INVOICE",
+    sourceId: inv.id,
+  });
+  if (existing) return existing;
+
+  const rule = await findActiveMappingRule(ctx.tenantId, inv.companyId, "SUPPLIER_INVOICE_ISSUED");
+  if (!rule) throw noRuleError("factura de proveedor emitida");
+
+  const input = buildTwoLineDraftInput({
+    companyId: inv.companyId,
+    projectId: inv.projectId,
+    entryDate: inv.issueDate.toISOString().slice(0, 10),
+    description: `Asiento sugerido — factura proveedor ${inv.number}`,
+    reference: String(inv.number),
+    currency: inv.currency,
+    amountStr: decimalToAmountString(inv.totalAmount),
+    debitAccountId: rule.debitAccountId,
+    creditAccountId: rule.creditAccountId,
+    lineDescriptionDebit: "Debe — gasto/costo",
+    lineDescriptionCredit: "Haber — proveedores",
+    sourceType: "SUPPLIER_INVOICE",
+    sourceId: inv.id,
+  });
+  return createJournalEntry(input, ctx);
+}
+
 /** Router for optional tooling / future UI; validates treasury event vs movement type. */
 export async function generateDraftJournalFromSuggestion(
   input: GenerateJournalSuggestionInput,
@@ -373,6 +468,22 @@ export async function generateDraftJournalFromSuggestion(
       if (!sm) throw new ServiceError("NOT_FOUND", "Movimiento de stock no encontrado");
       await assertOptionalCompanyFilter(ctx, input.companyId, sm.companyId);
       return suggestJournalFromStockMovement(input.sourceId, ctx);
+    }
+    case "SALES_INVOICE_ISSUED": {
+      const inv = await prisma.salesInvoice.findFirst({
+        where: { id: input.sourceId, tenantId: ctx.tenantId },
+      });
+      if (!inv) throw new ServiceError("NOT_FOUND", "Factura de venta no encontrada");
+      await assertOptionalCompanyFilter(ctx, input.companyId, inv.companyId);
+      return suggestJournalFromSalesInvoice(input.sourceId, ctx);
+    }
+    case "SUPPLIER_INVOICE_ISSUED": {
+      const inv = await prisma.supplierInvoice.findFirst({
+        where: { id: input.sourceId, tenantId: ctx.tenantId },
+      });
+      if (!inv) throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
+      await assertOptionalCompanyFilter(ctx, input.companyId, inv.companyId);
+      return suggestJournalFromSupplierInvoice(input.sourceId, ctx);
     }
     case "MANUAL_CAPITAL_CONTRIBUTION":
     case "MANUAL_OWNER_LOAN":

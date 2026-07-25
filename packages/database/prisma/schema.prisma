@@ -109,6 +109,10 @@ enum AccountingMappingEventType {
   STOCK_CONSUMPTION
   MANUAL_CAPITAL_CONTRIBUTION
   MANUAL_OWNER_LOAN
+  /// Phase 11E — sales invoice issued (accrual on totalAmount).
+  SALES_INVOICE_ISSUED
+  /// Phase 11E — supplier invoice issued (accrual on totalAmount).
+  SUPPLIER_INVOICE_ISSUED
 }
 
 enum UserRole {
@@ -1491,6 +1495,8 @@ model JournalEntry {
   sourceId        String?                @db.VarChar(128)
   description     String                 @db.VarChar(1024)
   reference       String?                @db.VarChar(256)
+  /// Phase 11E — when this entry reverses a POSTED journal, points at the original (1:1).
+  reversesEntryId String?                @unique
   createdByUserId String
   updatedByUserId String
   postedAt        DateTime?
@@ -1498,16 +1504,21 @@ model JournalEntry {
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
 
-  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  project   Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  lines     JournalEntryLine[]
-  createdBy User               @relation("JournalEntryCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  updatedBy User               @relation("JournalEntryUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company        Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  project        Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  lines          JournalEntryLine[]
+  createdBy      User               @relation("JournalEntryCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedBy      User               @relation("JournalEntryUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  reversesEntry  JournalEntry?      @relation("JournalEntryReversal", fields: [reversesEntryId], references: [id], onDelete: Restrict)
+  reversedByEntry JournalEntry?     @relation("JournalEntryReversal")
 
   @@index([tenantId, companyId, entryDate])
   @@index([tenantId, sourceType, sourceId])
   @@index([tenantId, status])
+  /// Partial unique (non-CANCELLED + sourceId not null) is enforced in SQL migration
+  /// `20260725010000_phase_11e_accounting_automation` — Prisma cannot express it as @@unique.
+  /// `reversesEntryId` uniqueness is via field `@unique` (no extra @@index).
   @@map("journal_entries")
 }
 

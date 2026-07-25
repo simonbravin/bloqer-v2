@@ -11,6 +11,8 @@ import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { ensureDraftJournalFromPayment } from "../accounting/accounting-auto-draft.service";
+import { syncJournalOnOperationalCancel } from "../accounting/accounting-cancel-sync.service";
 
 export type PaymentView = Omit<Payment, "amount"> & {
   amount: string;
@@ -274,6 +276,7 @@ export async function createPayment(
     return result;
   });
 
+  await ensureDraftJournalFromPayment(result.id, ctx);
   return serialize(result);
 }
 
@@ -287,7 +290,7 @@ export async function cancelPayment(
 
   const paymentPreview = await prisma.payment.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!paymentPreview) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
   if (paymentPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -297,6 +300,13 @@ export async function cancelPayment(
   if (projectScopeId !== undefined && paymentPreview.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");
   }
+
+  await syncJournalOnOperationalCancel(ctx, {
+    companyId: paymentPreview.companyId,
+    sourceType: "PAYMENT",
+    sourceId: id,
+    sourceLabel: "el pago",
+  });
 
   const updated = await prisma.$transaction(async (tx) => {
     const p = await tx.payment.findUnique({ where: { id } });

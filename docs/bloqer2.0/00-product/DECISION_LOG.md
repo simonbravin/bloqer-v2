@@ -848,6 +848,45 @@
 
 ---
 
+### D-061 — Contabilidad Phase 11E: plantilla AR, auto-DRAFT soft, anti-doble-conteo
+
+- **Fecha:** 2026-07-24
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** El GL 11A–11D existía solo con sugerencias manuales. Hacía falta automatizar borradores sin auto-postear ni romper cobros/pagos de roles sin EDIT ACCOUNTING.
+- **Decisión:**
+  1. **Auto-crear `JournalEntry` en `DRAFT` post-commit** vía `ensureDraftJournal*` (soft): no falla la operación operativa; no exige `EDIT ACCOUNTING`; si el módulo ACCOUNTING está off o no hay regla → audit `journal_entry.auto_draft_skipped`.
+  2. **Nunca auto-`POST`** en esta etapa.
+  3. **Anti-doble-conteo:** no generar asiento `TREASURY_*` si `AccountMovement.sourceType ∈ {COLLECTION, PAYMENT, OPENING_BALANCE}`; el canónico es cobro/pago/factura.
+  4. **Accrual** sobre `invoice.totalAmount` (mismo valor que CxC/CxP), 2 líneas; IVA/retenciones solo cuentas del plan (sin motor fiscal).
+  5. **Cancel sync:** al anular origen, auto-cancelar DRAFT vinculado; si hay POSTED sin reverse → bloquear anulación del origen.
+  6. **Plantilla CoA AR** (27 cuentas + reglas default) aplicable por empresa, idempotente.
+  7. **Unique parcial** DB: un solo asiento no-`CANCELLED` por `(tenantId, companyId, sourceType, sourceId)`.
+  8. Stock consumo **sin auto-DRAFT** hasta costing (D-007).
+- **Implicancias:** services accounting + hooks en create Collection/Payment/Invoice/Transfer/corporate inflow; UI plantilla, reverse, sumas y saldos.
+- **Documentos afectados:** [`02-modules/ACCOUNTING.md`](../02-modules/ACCOUNTING.md), [`08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md`](../08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md), [`01-domain/STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md).
+
+---
+
+### D-062 — Contabilidad Phase 11F: reportes gerenciales, estados y exports
+
+- **Fecha:** 2026-07-24
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Tras 11E (auto-DRAFT + trial balance básico) faltaban libros, estados gerenciales y exports alineados al stack de reportes, sin inventar ejercicio fiscal ni RT 54.
+- **Decisión:**
+  1. Reportes **gerenciales on-the-fly** solo con líneas de asientos `POSTED`. No sustituyen estados oficiales, AFIP ni ajuste por inflación.
+  2. **Saldo natural:** `ASSET`/`EXPENSE` = Debe − Haber; `LIABILITY`/`EQUITY`/`INCOME` = Haber − Debe. Aplica a sumas y saldos, mayor (saldo corrido) y estados.
+  3. **Sumas y saldos / libro diario / mayor / EERR:** filtro `dateFrom`/`dateTo` (inclusive, `entryDate`). Default UI: mes corriente.
+  4. **ESP (situación patrimonial):** corte `asOfDate` (`entryDate ≤ asOfDate`). Patrimonio incluye línea sintética **“Resultado del ejercicio (no cerrado)”** = resultado INCOME−EXPENSE acumulado al corte (sin cierre de ejercicio ni cuenta de cierre).
+  5. **Multi-moneda:** bloques por moneda; sin consolidación FX.
+  6. **Exports** CSV/PDF; XLSX en sumas, diario, ESP y EERR. Rutas `/api/reports/contabilidad/*` con `VIEW ACCOUNTING` + módulo ACCOUNTING.
+  7. **Sin tablas Prisma nuevas**, sin numeración correlativa de libro, sin cierre de período GL.
+- **Implicancias:** services `accounting-reports` + export; UI libros/estados; subnav; hub KPIs; disclaimer gerencial.
+- **Documentos afectados:** [`02-modules/ACCOUNTING.md`](../02-modules/ACCOUNTING.md), [`08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md`](../08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md), [`06-reports/REPORT_CATALOG.md`](../06-reports/REPORT_CATALOG.md), [`08-architecture/PERMISSIONS_ROUTE_MATRIX.md`](../08-architecture/PERMISSIONS_ROUTE_MATRIX.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -856,7 +895,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-035`, `D-036`...).
+1. Tomar el siguiente ID disponible (`D-062`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

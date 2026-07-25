@@ -38,10 +38,30 @@ Neither replaces the other in 11A–11D.
 - **Enlaces soportados** (alineados a `JournalEntrySourceType` en schema): `COLLECTION`, `PAYMENT`, `TREASURY_INFLOW`, `TREASURY_OUTFLOW`, `ADJUSTMENT` (movimiento tesorería), `INTERNAL_TRANSFER`, `STOCK_MOVEMENT`, `SALES_INVOICE`, `SUPPLIER_INVOICE`; gates: `canViewArProjectArea` / `canViewApProjectArea` / `VIEW TREASURY` / `VIEW INVENTORY` según destino. Requiere **`VIEW ACCOUNTING`** (re-chequeo defensivo en el servicio).
 - **Sin schema nuevo** en 11D.
 
-## Phase 11C+ (not implemented)
+## Phase 11E (implemented — automation soft drafts) — [D-061]
 
-- Automatic posting from AR, AP, Treasury, inventory, etc., driven by mapping rules without human review.
-- Reversals, period close, trial balance / financial statements, FX and tax subledgers.
+- Argentine CoA template (27 accounts + default mapping rules), idempotent per company.
+- **`ensureDraftJournal*`** after successful operational create (Collection, Payment, SalesInvoice issue, SupplierInvoice issue, InternalTransfer, corporate treasury inflow / MANUAL_ADJUSTMENT). Always `DRAFT`. Soft-fail (module off / no rule / errors → `journal_entry.auto_draft_skipped`). Does **not** require `EDIT ACCOUNTING`.
+- **Never** auto-`POST`.
+- Anti-double-count: skip treasury GL when `AccountMovement.sourceType ∈ {COLLECTION, PAYMENT, OPENING_BALANCE}`.
+- Accrual events `SALES_INVOICE_ISSUED` / `SUPPLIER_INVOICE_ISSUED` on **`totalAmount`**.
+- Cancel sync: cancel linked DRAFT; block operational cancel if POSTED without reverse.
+- Partial unique index: one non-cancelled journal per `(tenantId, companyId, sourceType, sourceId)`.
+- `reversePostedJournalEntry` (counter-entry + `reversesEntryId`); trial balance; running balance on account ledger.
+- Stock consumption auto-DRAFT **deferred** (no unit cost on create yet).
+
+## Phase 11F (implemented — managerial reports & exports) — [D-062]
+
+- On-the-fly reports from **`POSTED`** lines only: trial balance (natural saldo), journal book, account ledger (date range + natural running balance), statement of financial position (`asOfDate` + synthetic YTD result equity bridge), income statement (period).
+- Multi-currency: **per-currency blocks**, no FX consolidation.
+- Exports: CSV/PDF (+ XLSX for main reports) via `/api/reports/contabilidad/*`.
+- UI: `/contabilidad/libro-diario`, `sumas-y-saldos`, `situacion-patrimonial`, `estado-resultados`; account mayor with date filters.
+- **Not** official RT 54 / AFIP / inflation statements.
+
+## Phase 11C+ / L remaining (not implemented)
+
+- Automatic **POST** without human review.
+- GL period close, AFIP / tax multi-line engine, bank reconciliation as GL, FX revaluation.
 
 ## Balancing rules (enforced in `journal-entry.service.ts`)
 
@@ -54,11 +74,11 @@ Neither replaces the other in 11A–11D.
 - Lines carry their own `currency` string; balancing is **per currency**, not converted.
 - No implicit exchange rates or revaluation in services or UI in 11A.
 
-## Ledger / mayor (11A)
+## Ledger / mayor
 
-- **`getAccountLedger`** includes **`POSTED`** journal lines only (draft/cancelled excluded from the account movement view).
-- Rows are ordered **chronologically ascending** by `(journalEntry.entryDate, journalEntry.id, line.id)` for a stable, deterministic sequence (basis for a future running-balance column).
-- **No running balance** and **no normal debit/credit by account type** in 11A UI or API: amounts are stored as **raw debit and credit**; interpretation by `AccountType` (natural balance) is a later reporting concern. Documented here to avoid implying signed balances exist in 11A.
+- **`getAccountLedger`** includes **`POSTED`** journal lines only (draft/cancelled excluded). Optional `dateFrom`/`dateTo` on `entryDate`.
+- Rows ordered by `(journalEntry.entryDate, journalEntry.id, line.id)`.
+- **Running balance (11F):** natural balance by `AccountType` — ASSET/EXPENSE debit-normal; LIABILITY/EQUITY/INCOME credit-normal ([D-062]).
 
 ## Permissions
 

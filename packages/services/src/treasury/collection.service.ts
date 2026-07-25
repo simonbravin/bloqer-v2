@@ -14,6 +14,8 @@ import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal"
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { ensureDraftJournalFromCollection } from "../accounting/accounting-auto-draft.service";
+import { syncJournalOnOperationalCancel } from "../accounting/accounting-cancel-sync.service";
 
 export type CollectionView = Omit<Collection, "amount"> & {
   amount: string;
@@ -290,6 +292,7 @@ export async function createCollection(
     return result;
   });
 
+  await ensureDraftJournalFromCollection(result.id, ctx);
   return serialize(result);
 }
 
@@ -302,7 +305,7 @@ export async function cancelCollection(
 
   const collectionPreview = await prisma.collection.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!collectionPreview) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
   if (collectionPreview.tenantId !== ctx.tenantId) {
@@ -314,6 +317,13 @@ export async function cancelCollection(
   if (projectScopeId !== undefined && collectionPreview.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a este proyecto");
   }
+
+  await syncJournalOnOperationalCancel(ctx, {
+    companyId: collectionPreview.companyId,
+    sourceType: "COLLECTION",
+    sourceId: id,
+    sourceLabel: "la cobranza",
+  });
 
   const updated = await prisma.$transaction(async (tx) => {
     const c = await tx.collection.findUnique({ where: { id } });

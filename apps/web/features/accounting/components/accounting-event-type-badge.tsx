@@ -10,6 +10,8 @@ const LABELS: Record<AccountingMappingEventType, string> = {
   STOCK_CONSUMPTION:             "Inventario — consumo",
   MANUAL_CAPITAL_CONTRIBUTION:   "Aporte de capital (manual)",
   MANUAL_OWNER_LOAN:             "Préstamo de socio (manual)",
+  SALES_INVOICE_ISSUED:          "Factura de venta emitida",
+  SUPPLIER_INVOICE_ISSUED:       "Factura de proveedor emitida",
 };
 
 export function AccountingEventTypeBadge({ eventType }: { eventType: AccountingMappingEventType }) {

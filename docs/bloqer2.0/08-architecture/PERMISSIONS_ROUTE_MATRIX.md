@@ -163,7 +163,9 @@ See [`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md).
 - `/finanzas` y subrutas bajo el mismo layout: hub **`getFinanceHubOverview`** (**16D**) + subnav (**16E**) con enlaces filtrados por módulo + `VIEW AR` / `VIEW AP` / `VIEW TREASURY` / `VIEW ACCOUNTING`; rutas corporativas AP (**16C**).
 - `/tesoreria` y vistas de caja (`/tesoreria/movimientos`, `/tesoreria/flujo-caja`): redirect si no `VIEW TREASURY` (deep links).
 - `/contabilidad` y subrutas: redirect si no `VIEW ACCOUNTING` (hub, cuentas, asientos, **reglas contables**, detalle). Mutaciones en UI (crear/editar/contabilizar/anular borrador; crear/editar/desactivar reglas) requieren `EDIT ACCOUNTING` (botones condicionales + Server Actions; servicios validan igual).
-- **Fase 11C — borrador GL desde documentos:** los botones “Generar asiento contable” / columna Contabilidad en tesorería–movimientos e inventario–movimientos requieren **`EDIT ACCOUNTING`** (además de poder ver la pantalla operativa: proyecto/cobranza, proyecto/pago, `VIEW TREASURY` en reporte movimientos, `VIEW INVENTORY` en movimientos de stock). No crean asientos al confirmar cobranzas/pagos/movimientos; solo bajo acción explícita del usuario. Errores de servicio vuelven con `?contabilidad=` en la URL de origen (solo mensaje de `ServiceError`, sin stack). En **`/contabilidad/**`**, `?empresa=` es **filtro de alcance contable** (UUID validado), no reemplaza la sesión ni el tenant; la autorización sigue siendo membresía + `can()`.
+- **Fase 11C — borrador GL desde documentos (UI):** los botones “Generar asiento contable” / columna Contabilidad requieren **`EDIT ACCOUNTING`**. En tesorería se ocultan filas con origen COLLECTION/PAYMENT/OPENING_BALANCE ([D-061]).
+- **Fase 11E — auto-DRAFT soft [D-061]:** tras create de cobro/pago/factura/transferencia/ingreso puro, `ensureDraftJournal*` puede crear DRAFT sin `EDIT ACCOUNTING`. No auto-POST. `/contabilidad/sumas-y-saldos` = `VIEW ACCOUNTING`.
+- **Fase 11F — reportes gerenciales [D-062]:** `/contabilidad/libro-diario`, `sumas-y-saldos`, `situacion-patrimonial`, `estado-resultados` y mayor con fechas = `VIEW ACCOUNTING`. Exports `/api/reports/contabilidad/*` = mismo gate + módulo ACCOUNTING.
 - **Fase 11D — panel “Documento origen” en `/contabilidad/asientos/[journalEntryId]`:** el usuario ya pasó `VIEW ACCOUNTING` para ver el asiento; el enlace profundo al documento operativo (cobranza, pago, movimiento tesorería, transferencia, stock, facturas) solo se muestra si `getJournalEntrySourceLink` confirma el mismo `companyId` del asiento y el rol tiene el **`VIEW`** del módulo destino (AR/AP vía `canViewArProjectArea` / `canViewApProjectArea`, tesorería `VIEW TREASURY`, inventario `VIEW INVENTORY`). Sin mutaciones en el documento origen.
 - Detalle de proyecto: botones **Control de costos** / **Flujo de caja** solo si pasan los mismos `can*` exportados por servicios.
 
@@ -182,10 +184,15 @@ See [`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md).
 | `GET /api/reports/inventario/movimientos.csv` | Required | Same as `getStockMovementReport` — **`VIEW INVENTORY`** |
 | `GET /api/reports/proyectos/[projectId]/control-costos.csv` | Required | Same as `getProjectCostControl` — `canViewProjectCostControlReport` |
 | `GET /api/reports/proyectos/[projectId]/flujo-caja.csv` | Required | Same as `getProjectCashFlowReport` — `canViewProjectCashFlowReport` |
+| `GET /api/reports/contabilidad/sumas-y-saldos` | Required | `VIEW ACCOUNTING` + módulo ACCOUNTING ([D-062]) |
+| `GET /api/reports/contabilidad/libro-diario` | Required | idem |
+| `GET /api/reports/contabilidad/mayor` | Required | idem (+ `accountId`) |
+| `GET /api/reports/contabilidad/estado-situacion` | Required | idem |
+| `GET /api/reports/contabilidad/estado-resultados` | Required | idem |
 
 - **No** `tenantId` (nor impersonation) via query string; tenant is taken only from the authenticated session.
 - **`?format=json`** — mismo payload que la página (donde aplica).
-- **`?format=pdf`** — **solo** aging CxC, aging CxP y control de costos (mismos gates que CSV). Resto de rutas bajo `/api/reports/**`: error `VALIDATION` claro (no implementado).
+- **`?format=pdf`** / **`xlsx`** — donde la ruta lo implementa (incl. reportes contabilidad 11F); si no, error `VALIDATION` claro.
 - **`?format` omitido o `csv`** — CSV (9A).
 
 ## Report email — Server Action (Phase 9C)

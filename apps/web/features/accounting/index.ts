@@ -19,3 +19,6 @@ export { AccountingMappingRuleForm } from "./components/accounting-mapping-rule-
 export { DeactivateMappingRuleButton } from "./components/deactivate-mapping-rule-button";
 export { TreasuryMovementAccountingButton } from "./components/treasury-movement-accounting-button";
 export { StockMovementAccountingButton } from "./components/stock-movement-accounting-button";
+export { ApplyCoaTemplateButton } from "./components/apply-coa-template-button";
+export { AccountingReportFilters } from "./components/accounting-report-filters";
+export { AccountingGerencialDisclaimer } from "./components/accounting-gerencial-disclaimer";

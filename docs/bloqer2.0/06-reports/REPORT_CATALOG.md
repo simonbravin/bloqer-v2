@@ -59,6 +59,18 @@
 
 **R-001 (hub):** página *Presupuesto vs real* — capas de costo, composición APU, CSV `presupuesto-vs-real.csv`. Reutiliza agregados de control de costos.
 
+### Contabilidad GL (Phase 11F) — [D-062]
+
+| ID | Nombre | Impl. | Ruta UI | API export |
+|----|--------|-------|---------|------------|
+| R-GL-01 | Sumas y saldos | Sí | `/contabilidad/sumas-y-saldos` | `/api/reports/contabilidad/sumas-y-saldos` |
+| R-GL-02 | Libro diario | Sí | `/contabilidad/libro-diario` | `/api/reports/contabilidad/libro-diario` |
+| R-GL-03 | Mayor por cuenta | Sí | `/contabilidad/cuentas/[accountId]` | `/api/reports/contabilidad/mayor` |
+| R-GL-04 | Situación patrimonial (ESP) | Sí | `/contabilidad/situacion-patrimonial` | `/api/reports/contabilidad/estado-situacion` |
+| R-GL-05 | Estado de resultados (EERR) | Sí | `/contabilidad/estado-resultados` | `/api/reports/contabilidad/estado-resultados` |
+
+Solo asientos `POSTED`; saldos naturales; multi-moneda por bloque; gerencial (no AFIP/inflación). Gate: `VIEW ACCOUNTING` + módulo ACCOUNTING.
+
 ## Filtros globales estándar
 `date_from`, `date_to`, `project_id`, `currency_view` (original | ARS), `company_id` (futuro [Q-001]).
 

@@ -37,6 +37,8 @@ export const accountingMappingEventTypeSchema = z.enum([
   "STOCK_CONSUMPTION",
   "MANUAL_CAPITAL_CONTRIBUTION",
   "MANUAL_OWNER_LOAN",
+  "SALES_INVOICE_ISSUED",
+  "SUPPLIER_INVOICE_ISSUED",
 ]);
 
 export const journalLineInputSchema = z.object({
@@ -97,7 +99,9 @@ export const listJournalEntriesSchema = z.object({
 export const listAccountLedgerSchema = z.object({
   companyId: z.string().uuid().optional().nullable(),
   accountId: z.string().uuid(),
-  limit:     z.coerce.number().int().min(1).max(500).optional().default(200),
+  dateFrom:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dateTo:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  limit:     z.coerce.number().int().min(1).max(5000).optional().default(200),
 });
 
 export const postJournalEntrySchema = z.object({
@@ -106,6 +110,43 @@ export const postJournalEntrySchema = z.object({
 
 export const cancelJournalEntrySchema = z.object({
   id: z.string().uuid(),
+});
+
+export const reverseJournalEntrySchema = z.object({
+  id: z.string().uuid(),
+  entryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+export const trialBalanceSchema = z.object({
+  companyId: z.string().uuid().optional().nullable(),
+  dateFrom:  isoDate.optional(),
+  dateTo:    isoDate.optional(),
+  /** @deprecated use dateFrom */
+  fromDate:  isoDate.optional(),
+  /** @deprecated use dateTo */
+  toDate:    isoDate.optional(),
+});
+
+export const accountingReportRangeSchema = z.object({
+  companyId: z.string().uuid().optional().nullable(),
+  dateFrom:  isoDate.optional(),
+  dateTo:    isoDate.optional(),
+});
+
+export const accountingAsOfSchema = z.object({
+  companyId: z.string().uuid().optional().nullable(),
+  asOfDate:  isoDate.optional(),
+});
+
+export const accountingLedgerReportSchema = accountingReportRangeSchema.extend({
+  accountId: z.string().uuid(),
+  limit:     z.coerce.number().int().min(1).max(5000).optional(),
+});
+
+export const applyArgentineCoaTemplateSchema = z.object({
+  companyId: z.string().uuid().optional().nullable(),
 });
 
 export type CreateAccountingAccountInput = z.infer<typeof createAccountingAccountSchema>;
@@ -117,3 +158,9 @@ export type ListAccountLedgerInput = z.infer<typeof listAccountLedgerSchema>;
 export type JournalLineInput = z.infer<typeof journalLineInputSchema>;
 export type JournalEntrySourceTypeInput = z.infer<typeof journalEntrySourceTypeSchema>;
 export type AccountingMappingEventTypeInput = z.infer<typeof accountingMappingEventTypeSchema>;
+export type ReverseJournalEntryInput = z.infer<typeof reverseJournalEntrySchema>;
+export type TrialBalanceInput = z.infer<typeof trialBalanceSchema>;
+export type AccountingReportRangeInput = z.infer<typeof accountingReportRangeSchema>;
+export type AccountingAsOfInput = z.infer<typeof accountingAsOfSchema>;
+export type AccountingLedgerReportInput = z.infer<typeof accountingLedgerReportSchema>;
+export type ApplyArgentineCoaTemplateInput = z.infer<typeof applyArgentineCoaTemplateSchema>;

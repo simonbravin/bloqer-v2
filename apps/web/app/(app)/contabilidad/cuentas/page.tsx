@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
-import { AccountingAccountListSection } from "@/features/accounting";
+import { AccountingAccountListSection, ApplyCoaTemplateButton } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { listAccountingAccounts } from "@bloqer/services";
@@ -39,9 +39,12 @@ export default async function ContabilidadCuentasPage({
             <ListViewToggle />
           </Suspense>
           {can(current.tenantCtx.roles, "EDIT", "ACCOUNTING") && (
-            <Button asChild>
-              <Link href={`/contabilidad/cuentas/nueva${q}`}>+ Nueva cuenta</Link>
-            </Button>
+            <>
+              <ApplyCoaTemplateButton companyId={empresa} />
+              <Button asChild>
+                <Link href={`/contabilidad/cuentas/nueva${q}`}>+ Nueva cuenta</Link>
+              </Button>
+            </>
           )}
         </div>
       </div>
