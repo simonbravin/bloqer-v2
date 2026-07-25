@@ -204,7 +204,13 @@ export async function reverseJournalEntryAction(
 export async function applyArgentineCoaTemplateAction(
   data: unknown,
 ): Promise<
-  | { accountsCreated: number; rulesCreated: number }
+  | {
+      accountsCreated: number;
+      accountsSkipped: number;
+      accountsReactivated: number;
+      rulesCreated: number;
+      rulesSkipped: number;
+    }
   | { error: string }
 > {
   const ctx = await getCtx();
@@ -216,7 +222,10 @@ export async function applyArgentineCoaTemplateAction(
     revalidatePath("/contabilidad/reglas");
     return {
       accountsCreated: result.accountsCreated,
+      accountsSkipped: result.accountsSkipped,
+      accountsReactivated: result.accountsReactivated,
       rulesCreated: result.rulesCreated,
+      rulesSkipped: result.rulesSkipped,
     };
   } catch (err) {
     return handle(err);

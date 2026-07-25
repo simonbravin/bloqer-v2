@@ -40,7 +40,7 @@ Neither replaces the other in 11A–11D.
 
 ## Phase 11E (implemented — automation soft drafts) — [D-061]
 
-- Argentine CoA template (27 accounts + default mapping rules), idempotent per company.
+- Argentine CoA template (~40 accounts + default mapping rules), idempotent per company by account `code` (re-apply skips existing).
 - **`ensureDraftJournal*`** after successful operational create (Collection, Payment, SalesInvoice issue, SupplierInvoice issue, InternalTransfer, corporate treasury inflow / MANUAL_ADJUSTMENT). Always `DRAFT`. Soft-fail (module off / no rule / errors → `journal_entry.auto_draft_skipped`). Does **not** require `EDIT ACCOUNTING`.
 - **Never** auto-`POST`.
 - Anti-double-count: skip treasury GL when `AccountMovement.sourceType ∈ {COLLECTION, PAYMENT, OPENING_BALANCE}`.

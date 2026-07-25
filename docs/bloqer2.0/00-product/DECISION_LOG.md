@@ -860,7 +860,7 @@
   3. **Anti-doble-conteo:** no generar asiento `TREASURY_*` si `AccountMovement.sourceType ∈ {COLLECTION, PAYMENT, OPENING_BALANCE}`; el canónico es cobro/pago/factura.
   4. **Accrual** sobre `invoice.totalAmount` (mismo valor que CxC/CxP), 2 líneas; IVA/retenciones solo cuentas del plan (sin motor fiscal).
   5. **Cancel sync:** al anular origen, auto-cancelar DRAFT vinculado; si hay POSTED sin reverse → bloquear anulación del origen.
-  6. **Plantilla CoA AR** (27 cuentas + reglas default) aplicable por empresa, idempotente.
+  6. **Plantilla CoA AR** (~40 cuentas + reglas default) aplicable por empresa, **idempotente por código** (reaplicar no duplica).
   7. **Unique parcial** DB: un solo asiento no-`CANCELLED` por `(tenantId, companyId, sourceType, sourceId)`.
   8. Stock consumo **sin auto-DRAFT** hasta costing (D-007).
 - **Implicancias:** services accounting + hooks en create Collection/Payment/Invoice/Transfer/corporate inflow; UI plantilla, reverse, sumas y saldos.

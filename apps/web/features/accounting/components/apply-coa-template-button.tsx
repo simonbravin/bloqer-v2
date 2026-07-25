@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { applyArgentineCoaTemplateAction } from "@/app/(app)/contabilidad/actions";
 
-export function ApplyCoaTemplateButton({ companyId }: { companyId?: string | null }) {
+export function ApplyCoaTemplateButton({
+  companyId,
+  companyLabel,
+}: {
+  companyId?: string | null;
+  /** Shown when multi-company fallback may surprise the user. */
+  companyLabel?: string | null;
+}) {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -20,9 +27,18 @@ export function ApplyCoaTemplateButton({ companyId }: { companyId?: string | nul
         setErr(res.error);
         return;
       }
-      setMsg(
-        `Plantilla aplicada: ${res.accountsCreated} cuentas nuevas, ${res.rulesCreated} reglas nuevas.`,
+      const parts = [`Plantilla aplicada: ${res.accountsCreated} cuentas nuevas`];
+      if (res.accountsReactivated) {
+        parts.push(`${res.accountsReactivated} reactivadas`);
+      }
+      if (res.accountsSkipped) {
+        parts.push(`${res.accountsSkipped} ya existían (sin duplicar)`);
+      }
+      parts.push(
+        `${res.rulesCreated} reglas nuevas` +
+          (res.rulesSkipped ? ` (${res.rulesSkipped} ya activas)` : ""),
       );
+      setMsg(parts.join("; ") + ".");
       router.refresh();
     });
   }
@@ -32,8 +48,11 @@ export function ApplyCoaTemplateButton({ companyId }: { companyId?: string | nul
       <Button type="button" variant="outline" disabled={pending} onClick={run}>
         Aplicar plantilla AR
       </Button>
+      {companyLabel ? (
+        <p className="text-xs text-muted-foreground">Se aplica a: {companyLabel}</p>
+      ) : null}
       {err ? <p className="text-xs text-destructive">{err}</p> : null}
-      {msg ? <p className="text-xs text-muted-foreground">{msg}</p> : null}
+      {msg ? <p className="text-xs text-muted-foreground max-w-sm text-right">{msg}</p> : null}
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { AccountingAccountListSection, ApplyCoaTemplateButton } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import { listAccountingAccounts } from "@bloqer/services";
+import { getCompanies, listAccountingAccounts } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
@@ -23,10 +23,21 @@ export default async function ContabilidadCuentasPage({
   const sp = await searchParams;
   const ctx = (await buildTenantServiceContext())!;
   const cf = companyQueryFilter(sp);
-  const { data: accounts } = await listAccountingAccounts(ctx, cf);
+  const [{ data: accounts }, companies] = await Promise.all([
+    listAccountingAccounts(ctx, cf),
+    getCompanies(ctx),
+  ]);
 
   const empresa = cf.companyId;
   const q = empresa ? `?empresa=${encodeURIComponent(empresa)}` : "";
+  const canEdit = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
+
+  // Same resolution order as services: query → membership → first ACTIVE by name.
+  const applyCompanyId =
+    empresa ?? current.tenantCtx.companyId ?? companies[0]?.id ?? null;
+  const applyCompany = companies.find((c) => c.id === applyCompanyId) ?? null;
+  const showCompanyHint =
+    !empresa && !current.tenantCtx.companyId && companies.length > 1 && !!applyCompany;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -38,9 +49,12 @@ export default async function ContabilidadCuentasPage({
           <Suspense fallback={null}>
             <ListViewToggle />
           </Suspense>
-          {can(current.tenantCtx.roles, "EDIT", "ACCOUNTING") && (
+          {canEdit && (
             <>
-              <ApplyCoaTemplateButton companyId={empresa} />
+              <ApplyCoaTemplateButton
+                companyId={applyCompanyId}
+                companyLabel={showCompanyHint ? applyCompany?.name : null}
+              />
               <Button asChild>
                 <Link href={`/contabilidad/cuentas/nueva${q}`}>+ Nueva cuenta</Link>
               </Button>
@@ -49,9 +63,25 @@ export default async function ContabilidadCuentasPage({
         </div>
       </div>
 
-      <Suspense fallback={null}>
-        <AccountingAccountListSection accounts={accounts} empresa={empresa} />
-      </Suspense>
+      {accounts.length === 0 ? (
+        <div className="rounded-md border border-dashed p-6 text-sm space-y-2">
+          <p className="font-medium">Todavía no hay cuentas en esta empresa.</p>
+          <p className="text-muted-foreground">
+            Aplicá la plantilla AR (~40 cuentas + reglas default) o creá la primera cuenta a mano.
+            Reaplicar la plantilla no duplica códigos existentes.
+          </p>
+          {canEdit ? (
+            <p className="text-muted-foreground">
+              Usá <span className="font-medium text-foreground">Aplicar plantilla AR</span> arriba a
+              la derecha.
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <Suspense fallback={null}>
+          <AccountingAccountListSection accounts={accounts} empresa={empresa} />
+        </Suspense>
+      )}
     </PageShell>
   );
 }
