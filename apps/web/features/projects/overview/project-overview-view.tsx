@@ -10,6 +10,12 @@ import { ProjectOverviewAlerts } from "./project-overview-alerts";
 import { ProjectOverviewCharts } from "./project-overview-charts";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  resolveDetailFieldIcon,
+  type DetailFieldIconAccent,
+  type DetailFieldIconKey,
+} from "@/lib/detail-field-icon";
+import { cn } from "@/lib/utils";
 
 const TYPE_LABELS = { PUBLIC: "Público", PRIVATE: "Privado" } as const;
 
@@ -24,15 +30,43 @@ function projectAddress(project: ProjectWithClient): string {
 
 function MetaItem({
   label,
+  iconKey,
+  iconAccent,
   children,
+  className,
+  truncate = true,
 }: {
   label: string;
+  iconKey: DetailFieldIconKey;
+  iconAccent?: DetailFieldIconAccent;
   children: React.ReactNode;
+  className?: string;
+  /** Short meta values stay on one line; turn off for description/address. */
+  truncate?: boolean;
 }) {
+  const { Icon, accentClass } = resolveDetailFieldIcon(iconKey, iconAccent);
   return (
-    <div className="min-w-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 truncate text-sm font-medium">{children}</dd>
+    <div className={cn("min-w-0", className)}>
+      <dt className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span
+          className={cn(
+            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+            accentClass.container,
+          )}
+          aria-hidden
+        >
+          <Icon className={cn("h-3.5 w-3.5", accentClass.icon)} />
+        </span>
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          "mt-0.5 pl-8 text-sm font-medium leading-snug",
+          truncate ? "truncate" : "break-words",
+        )}
+      >
+        {children}
+      </dd>
     </div>
   );
 }
@@ -69,8 +103,13 @@ export function ProjectOverviewView({
             <CardTitle className="text-base">Datos del proyecto</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-              <MetaItem label="Cliente">
+            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <MetaItem
+                label="Cliente"
+                iconKey="client"
+                iconAccent={fullProject.client ? undefined : "muted"}
+                className="sm:col-span-1"
+              >
                 {fullProject.client ? (
                   <Link
                     href={`/directorio/${fullProject.client.id}`}
@@ -82,36 +121,56 @@ export function ProjectOverviewView({
                   "—"
                 )}
               </MetaItem>
-              <MetaItem label="Tipo">{TYPE_LABELS[fullProject.type]}</MetaItem>
-              <MetaItem label="Inicio">{locDate(fullProject.startDate)}</MetaItem>
-              <MetaItem label={fullProject.actualEndDate ? "Fin" : "Fin estimado"}>
-                {fullProject.actualEndDate ? (
-                  <>
-                    {locDate(fullProject.actualEndDate)}
-                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                      Est. {locDate(fullProject.expectedEndDate)}
-                    </span>
-                  </>
-                ) : (
-                  locDate(fullProject.expectedEndDate)
-                )}
-              </MetaItem>
+              <div className="grid grid-cols-3 gap-3 sm:col-span-2">
+                <MetaItem label="Tipo" iconKey="type">
+                  {TYPE_LABELS[fullProject.type]}
+                </MetaItem>
+                <MetaItem
+                  label="Inicio"
+                  iconKey="start_date"
+                  iconAccent={fullProject.startDate ? undefined : "muted"}
+                >
+                  {locDate(fullProject.startDate)}
+                </MetaItem>
+                <MetaItem
+                  label={fullProject.actualEndDate ? "Fin" : "Fin estimado"}
+                  iconKey={fullProject.actualEndDate ? "actual_end" : "expected_end"}
+                  iconAccent={
+                    fullProject.actualEndDate || fullProject.expectedEndDate ? undefined : "muted"
+                  }
+                >
+                  {fullProject.actualEndDate ? (
+                    <>
+                      {locDate(fullProject.actualEndDate)}
+                      <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                        Est. {locDate(fullProject.expectedEndDate)}
+                      </span>
+                    </>
+                  ) : (
+                    locDate(fullProject.expectedEndDate)
+                  )}
+                </MetaItem>
+              </div>
             </dl>
 
             {(fullProject.description || projectAddress(fullProject)) && (
               <dl className="grid gap-3 border-t border-border/60 pt-3 sm:grid-cols-2">
-                <div className="min-w-0">
-                  <dt className="text-xs text-muted-foreground">Descripción</dt>
-                  <dd className="mt-0.5 text-sm leading-snug text-foreground/90 break-words">
-                    {fullProject.description?.trim() || "—"}
-                  </dd>
-                </div>
-                <div className="min-w-0">
-                  <dt className="text-xs text-muted-foreground">Dirección</dt>
-                  <dd className="mt-0.5 text-sm leading-snug text-foreground/90 break-words">
-                    {projectAddress(fullProject) || "—"}
-                  </dd>
-                </div>
+                <MetaItem
+                  label="Descripción"
+                  iconKey="description"
+                  iconAccent={fullProject.description?.trim() ? undefined : "muted"}
+                  truncate={false}
+                >
+                  {fullProject.description?.trim() || "—"}
+                </MetaItem>
+                <MetaItem
+                  label="Dirección"
+                  iconKey="address"
+                  iconAccent={projectAddress(fullProject) ? undefined : "muted"}
+                  truncate={false}
+                >
+                  {projectAddress(fullProject) || "—"}
+                </MetaItem>
               </dl>
             )}
           </CardContent>
