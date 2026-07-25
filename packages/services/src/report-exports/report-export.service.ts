@@ -46,7 +46,11 @@ import {
 import { ServiceContext, ServiceError } from "../types";
 import { buildCsv } from "./csv-export.service";
 import { safeReportFilename } from "./filename.service";
-import type { ReportCsvPayload } from "./report-export.types";
+import {
+  TREASURY_MOVEMENTS_EXPORT_LABELS,
+  type MovementExportLabels,
+  type ReportCsvPayload,
+} from "./report-export.types";
 
 function padCsvRow(cells: string[], columnCount: number): string[] {
   const r = [...cells];
@@ -359,6 +363,7 @@ export async function exportCashPositionCsv(
 export async function exportTreasuryMovementsCsv(
   filters: MovementReportFilters,
   ctx: ServiceContext,
+  labels: MovementExportLabels = TREASURY_MOVEMENTS_EXPORT_LABELS,
 ): Promise<ReportCsvPayload> {
   if (!filters.accountId && (!filters.dateFrom || !filters.dateTo)) {
     throw new ServiceError(
@@ -408,7 +413,7 @@ export async function exportTreasuryMovementsCsv(
   ]);
   return {
     content: buildCsv(headers, data),
-    filename: safeReportFilename("tesoreria_movimientos", "csv"),
+    filename: safeReportFilename(labels.filenameBase, "csv"),
   };
 }
 

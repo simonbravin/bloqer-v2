@@ -235,7 +235,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
           )}
           {canTreasury ? (
             <ReportExportActions
-              exportPath="/api/reports/tesoreria/movimientos.csv"
+              exportPath="/api/reports/finanzas/transacciones.csv"
               params={movementExportParams(sp)}
               pdf
             />

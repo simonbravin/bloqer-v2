@@ -274,7 +274,7 @@ export async function exportStatementOfFinancialPositionXlsx(
     buffer: buildXlsxSheet(headers, rows, {
       sheetName: "Situacion patrimonial",
       preamble: [
-        ["Estado de situación patrimonial (gerencial)"],
+        ["Situación patrimonial"],
         ["Al", report.asOfDate],
         ["Incluye Resultado del ejercicio (no cerrado). No es estado oficial."],
       ],

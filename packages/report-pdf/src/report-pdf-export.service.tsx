@@ -46,8 +46,10 @@ import {
   type IncomeExpenseFilters,
   type ListTenantAuditLogFilters,
   type MaterialReportFilters,
+  type MovementExportLabels,
   type MovementReportFilters,
   type ProcurementReportFilters,
+  TREASURY_MOVEMENTS_EXPORT_LABELS,
   type ProfitabilityFilters,
   type ProjectCashFlowFilters,
   type ServiceContext,
@@ -193,7 +195,7 @@ export async function exportCertificationEvolutionPdf(
   return exportPdfDocument(ctx, { projectId }, `certificaciones_${report.budgetName}`, (branding) => (
     <ProjectSimpleTablePdfDocument
       branding={branding}
-      title="Certificaciones — evolución"
+      title="Certificaciones — evolución y estado"
       subtitle={report.budgetName}
       filterLine={buildPdfFilterLine({ dateFrom: filters.dateFrom, dateTo: filters.dateTo })}
       columns={[
@@ -225,7 +227,7 @@ export async function exportSubcontractVariancePdf(
   return exportPdfDocument(ctx, { projectId }, `subcontratos_${report.budgetName}`, (branding) => (
     <ProjectSimpleTablePdfDocument
       branding={branding}
-      title="Subcontratos — varianza"
+      title="Subcontratos — varianza y certificaciones"
       subtitle={`${report.budgetName} · ${report.pendingContractCount} sin contrato`}
       filterLine={buildPdfFilterLine({ dateFrom: filters.dateFrom, dateTo: filters.dateTo })}
       columns={[
@@ -377,7 +379,7 @@ export async function exportMaterialVariancePdf(
   return exportPdfDocument(ctx, { projectId }, `materiales_${result.budgetName}`, (branding) => (
     <ProjectSimpleTablePdfDocument
       branding={branding}
-      title="Materiales — varianza"
+      title="Materiales del proyecto"
       subtitle={result.budgetName}
       totalsLine={`Presupuesto: ${result.totals.budgetMaterial} · Consumo: ${result.totals.consumedCost} · Var.: ${result.totals.variance}`}
       columns={[
@@ -527,6 +529,7 @@ export async function exportTreasuryCashFlowPdf(
 export async function exportTreasuryMovementsPdf(
   filters: MovementReportFilters,
   ctx: ServiceContext,
+  labels: MovementExportLabels = TREASURY_MOVEMENTS_EXPORT_LABELS,
 ): Promise<ReportPdfPayload> {
   if (!filters.accountId && (!filters.dateFrom || !filters.dateTo)) {
     throw new ServiceError(
@@ -544,10 +547,10 @@ export async function exportTreasuryMovementsPdf(
       `El export supera ${MAX_EXPORT_ROWS} filas. Acotá el rango de fechas.`,
     );
   }
-  return exportPdfDocument(ctx, {}, "tesoreria_movimientos", (branding) => (
+  return exportPdfDocument(ctx, {}, labels.filenameBase, (branding) => (
     <ProjectSimpleTablePdfDocument
       branding={branding}
-      title="Movimientos de tesorería"
+      title={labels.title}
       filterLine={buildPdfFilterLine({
         accountId: filters.accountId,
         dateFrom: filters.dateFrom,
@@ -696,7 +699,7 @@ export async function exportCompanyPayablesPdf(
   return exportPdfDocument(ctx, {}, "finanzas_cxp_corporativo", (branding) => (
     <ProjectSimpleTablePdfDocument
       branding={branding}
-      title="Cuentas por pagar — corporativo"
+      title="Cuentas por pagar"
       filterLine={buildPdfFilterLine({
         status: filters.status,
         dueDateFrom: filters.dueDateFrom,
@@ -743,7 +746,7 @@ export async function exportCompanySupplierInvoicesPdf(
   return exportPdfDocument(ctx, {}, "finanzas_facturas_proveedor_corporativo", (branding) => (
     <ProjectSimpleTablePdfDocument
       branding={branding}
-      title="Facturas de proveedor — corporativo"
+      title="Facturas y gastos"
       filterLine={buildPdfFilterLine({
         status: filters.status,
         issueDateFrom: filters.issueDateFrom,
@@ -968,7 +971,7 @@ export async function exportStatementOfFinancialPositionPdf(
     (branding) => (
       <ProjectSimpleTablePdfDocument
         branding={branding}
-        title="Estado de situación patrimonial"
+        title="Situación patrimonial"
         subtitle="Gerencial interno. Incluye Resultado del ejercicio (no cerrado)."
         filterLine={`Al ${report.asOfDate}`}
         columns={[
