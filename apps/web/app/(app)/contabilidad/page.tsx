@@ -12,6 +12,8 @@ import {
 } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { PageShell } from "@/components/layout/page-shell";
+import { KpiStatCard } from "@/components/ui/kpi-stat-card";
+import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { AccountingGerencialDisclaimer } from "@/features/accounting/components/accounting-gerencial-disclaimer";
 
 export default async function ContabilidadPage() {
@@ -53,6 +55,8 @@ export default async function ContabilidadPage() {
     income?.currencies[0] ?? esp?.currencies[0] ?? "ARS";
   const monthResult = income?.byCurrency[primaryCurrency]?.netResult ?? "—";
   const assetsToday = esp?.byCurrency[primaryCurrency]?.totalAssets ?? "—";
+  const monthResultTone =
+    monthResult !== "—" && monthResult.trimStart().startsWith("-") ? "danger" : "default";
 
   const base = "/contabilidad";
   const q = (id: string) => (current.tenantCtx!.companyId ? "" : `?empresa=${encodeURIComponent(id)}`);
@@ -81,48 +85,40 @@ export default async function ContabilidadPage() {
 
       <AccountingGerencialDisclaimer />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-md border p-4 text-sm space-y-1">
-          <p className="text-muted-foreground">Borradores</p>
-          <p className="text-2xl font-semibold tabular-nums">{drafts.total}</p>
-          <Link
-            href={`${base}/asientos?status=DRAFT`}
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            Ver bandeja
-          </Link>
-        </div>
-        <div className="rounded-md border p-4 text-sm space-y-1">
-          <p className="text-muted-foreground">Contabilizados del mes</p>
-          <p className="text-2xl font-semibold tabular-nums">{postedMonth.total}</p>
-          <Link
-            href={`${base}/libro-diario?dateFrom=${month.dateFrom}&dateTo=${month.dateTo}`}
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            Libro diario
-          </Link>
-        </div>
-        <div className="rounded-md border p-4 text-sm space-y-1">
-          <p className="text-muted-foreground">Resultado del mes ({primaryCurrency})</p>
-          <p className="text-2xl font-semibold tabular-nums font-mono">{monthResult}</p>
-          <Link
-            href={`${base}/estado-resultados?dateFrom=${month.dateFrom}&dateTo=${month.dateTo}`}
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            Ver resultados
-          </Link>
-        </div>
-        <div className="rounded-md border p-4 text-sm space-y-1">
-          <p className="text-muted-foreground">Activo a hoy ({primaryCurrency})</p>
-          <p className="text-2xl font-semibold tabular-nums font-mono">{assetsToday}</p>
-          <Link
-            href={`${base}/situacion-patrimonial`}
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            Situación patrimonial
-          </Link>
-        </div>
-      </div>
+      <KpiStatGrid title="Indicadores" columns={4}>
+        <KpiStatCard
+          label="Borradores"
+          value={String(drafts.total)}
+          href={`${base}/asientos?status=DRAFT`}
+          iconKey="gl_drafts"
+          tone={drafts.total > 0 ? "warning" : "muted"}
+          helper="Asientos pendientes de postear"
+        />
+        <KpiStatCard
+          label="Contabilizados del mes"
+          value={String(postedMonth.total)}
+          href={`${base}/libro-diario?dateFrom=${month.dateFrom}&dateTo=${month.dateTo}`}
+          iconKey="gl_posted_month"
+          helper="Asientos POSTED del mes en curso"
+        />
+        <KpiStatCard
+          label="Resultado del mes"
+          value={monthResult}
+          subtitle={primaryCurrency}
+          href={`${base}/estado-resultados?dateFrom=${month.dateFrom}&dateTo=${month.dateTo}`}
+          iconKey="gl_month_result"
+          tone={monthResultTone}
+          helper="Estado de resultados del mes"
+        />
+        <KpiStatCard
+          label="Activo a hoy"
+          value={assetsToday}
+          subtitle={primaryCurrency}
+          href={`${base}/situacion-patrimonial`}
+          iconKey="gl_assets"
+          helper="Situación patrimonial"
+        />
+      </KpiStatGrid>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Link className="rounded-md border p-4 text-sm hover:bg-muted/40" href={`${base}/cuentas`}>
