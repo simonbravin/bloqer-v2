@@ -2655,6 +2655,8 @@ enum NotificationType {
   PURCHASE_ORDER_RETURNED
   PURCHASE_ORDER_CONFIRMED
   PROCUREMENT_SLA_REMINDER
+  /// Soft nudge: sourced journal drafts awaiting post [D-063].
+  ACCOUNTING_DRAFTS_PENDING
 }
 
 enum NotificationSeverity {

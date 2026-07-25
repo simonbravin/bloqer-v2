@@ -56,6 +56,18 @@
 | D-051 | AR corporativo con CxC | §12.1 |
 | D-052 | AP proyecto “Emitir y pagar ahora”, adjuntos, fondos | §12.2 |
 | D-053 | Decimales dinero 2 / FX 6 / qty 4 | §4.1 |
+| D-054 | Campana, polling 30s, CC OWNER/ADMIN, alertas | §1.5 |
+| D-055 | WBS en factura proveedor de obra y consumo JL | §8.2 · §9 · §12.2 · §13.1 |
+| D-056 | Company tools vs project tools (FINANCE / TREASURER / PROJECT_FINANCE) | §1.2 · §2.5 |
+| D-057 | Partida certificable vs insumo APU (no hijos WBS) | §6.1 |
+| D-058 | APU = costo; venta en tabla EDT; toolbar | §6.1b |
+| D-059 | Filas detalle APU expandibles en EDT | §6.1b |
+| D-060 | Columna Incidencia % | §6.1b |
+| D-061 | Plantilla CoA AR + auto-DRAFT soft + reverse | §15 · §16 · §19 |
+| D-062 | Libros/estados gerenciales + exports contabilidad | §1.2 · §15 |
+| D-063 | Lock montos DRAFT sourced + notif cola EDIT ACCOUNTING | §15.3 |
+
+**También alineado en guía (julio 2026):** menú proyecto (Tablero de compras, EDT y costos, Recepciones bajo Compras), tablero Materiales §9.0, checklists §18.
 
 ---
 

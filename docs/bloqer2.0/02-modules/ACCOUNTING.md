@@ -1,6 +1,6 @@
 # Contabilidad (GL interno)
 
-> Ver [D-061](../00-product/DECISION_LOG.md#d-061--contabilidad-phase-11e-plantilla-ar-auto-draft-soft-anti-doble-conteo), [D-062](../00-product/DECISION_LOG.md#d-062--contabilidad-phase-11f-reportes-gerenciales-estados-y-exports). Arquitectura: [`../08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md`](../08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md).
+> Ver [D-061](../00-product/DECISION_LOG.md#d-061--contabilidad-phase-11e-plantilla-ar-auto-draft-soft-anti-doble-conteo), [D-062](../00-product/DECISION_LOG.md#d-062--contabilidad-phase-11f-reportes-gerenciales-estados-y-exports), [D-063](../00-product/DECISION_LOG.md#d-063--contabilidad-lock-de-montos-en-draft-con-origen--aviso-anti-spam). Arquitectura: [`../08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md`](../08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md).
 
 ## 1. Objetivo
 
@@ -48,6 +48,8 @@ Aplicar plantilla AR; CRUD cuentas/reglas/asientos; postear; anular borrador; re
 - Auto-DRAFT nunca aborta la operación operativa.
 - No doble conteo Collection/Payment + Treasury del mismo efectivo.
 - Accrual = `totalAmount` del comprobante.
+- DRAFT **sourced** ([D-063](../00-product/DECISION_LOG.md#d-063--contabilidad-lock-de-montos-en-draft-con-origen--aviso-anti-spam)): montos/moneda/estructura inmutables; cuentas y textos editables. MANUAL libre.
+- Aviso in-app `ACCOUNTING_DRAFTS_PENDING` a `EDIT ACCOUNTING` con dedupe 24h (soft).
 
 ## 11. Validaciones
 
@@ -75,12 +77,12 @@ AR, AP, Tesorería, Inventario (sugerencia manual stock; auto diferido).
 
 ## 17. Eventos disparados / consumidos
 
-`journal_entry.created|updated|posted|cancelled|reversed|auto_draft_created|auto_draft_skipped`; `accounting_coa_template.applied`.
+`journal_entry.created|updated|posted|cancelled|reversed|auto_draft_created|auto_draft_skipped`; `accounting_coa_template.applied`; notif `ACCOUNTING_DRAFTS_PENDING` ([D-063](../00-product/DECISION_LOG.md#d-063--contabilidad-lock-de-montos-en-draft-con-origen--aviso-anti-spam)).
 
 ## 18. Fase de implementación
 
-Phase 11A–11D (manual + sugerencias) + **11E** (plantilla, auto-DRAFT, reverse) — [D-061] + **11F** (reportes/estados/exports) — [D-062].
+Phase 11A–11D (manual + sugerencias) + **11E** (plantilla, auto-DRAFT, reverse) — [D-061] + **11F** (reportes/estados/exports) — [D-062] + **lock sourced + notif cola** — [D-063](../00-product/DECISION_LOG.md#d-063--contabilidad-lock-de-montos-en-draft-con-origen--aviso-anti-spam).
 
 ## 19. Preguntas abiertas
 
-Motor IVA multi-línea; auto-POST; cierre de período GL; costing consumo stock para auto-DRAFT.
+Motor IVA multi-línea; auto-POST; cierre de período GL; costing consumo stock para auto-DRAFT; email para cola DRAFT.

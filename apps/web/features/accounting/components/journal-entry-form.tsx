@@ -12,7 +12,7 @@ import {
   createJournalEntryAction,
   updateJournalEntryAction,
 } from "@/app/(app)/contabilidad/actions";
-import type { JournalEntryView } from "@bloqer/services";
+import { isSourcedJournalEntry, type JournalEntryView } from "@bloqer/services";
 import type { CompanyOption } from "./accounting-account-form";
 import {
   JournalEntryLinesEditor,
@@ -51,7 +51,14 @@ export function JournalEntryForm({
       : initialJournalLines(),
   );
 
-  const showCompany = (companies?.length ?? 0) > 1;
+  const showCompany = (companies?.length ?? 0) > 1 && mode === "create";
+  const sourcedLock =
+    mode === "edit" &&
+    !!initial &&
+    isSourcedJournalEntry({
+      sourceType: initial.sourceType,
+      sourceId: initial.sourceId,
+    });
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -80,7 +87,10 @@ export function JournalEntryForm({
           lines:       payloadLines,
         });
         if ("error" in res) setError(res.error);
-        else router.push(`/contabilidad/asientos/${res.id}`);
+        else {
+          const qs = companyId ? `?empresa=${encodeURIComponent(companyId)}` : "";
+          router.push(`/contabilidad/asientos/${res.id}${qs}`);
+        }
       } else if (entryId) {
         const res = await updateJournalEntryAction(entryId, {
           companyId:   companyId || null,
@@ -91,7 +101,13 @@ export function JournalEntryForm({
           lines:       payloadLines,
         });
         if ("error" in res) setError(res.error);
-        else router.push(`/contabilidad/asientos/${entryId}`);
+        else {
+          const qs =
+            (initial?.companyId ?? companyId)
+              ? `?empresa=${encodeURIComponent(initial?.companyId ?? companyId)}`
+              : "";
+          router.push(`/contabilidad/asientos/${entryId}${qs}`);
+        }
       }
     });
   }
@@ -138,7 +154,12 @@ export function JournalEntryForm({
           </div>
         </div>
 
-        <JournalEntryLinesEditor accounts={accounts} lines={lines} onChange={setLines} />
+        <JournalEntryLinesEditor
+          accounts={accounts}
+          lines={lines}
+          onChange={setLines}
+          sourcedLock={sourcedLock}
+        />
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>

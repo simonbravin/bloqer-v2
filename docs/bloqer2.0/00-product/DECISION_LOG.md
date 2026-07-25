@@ -887,6 +887,23 @@
 
 ---
 
+### D-063 — Contabilidad: lock de montos en DRAFT con origen + aviso anti-spam
+
+- **Fecha:** 2026-07-25
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Auto-DRAFT (D-061) ya crea borradores desde operaciones, pero la edición permitía cambiar montos (desalineado vs documento) y no había señal in-app de cola de revisión sin spam.
+- **Decisión:**
+  1. Mantener **auto-DRAFT** y **nunca auto-POST** (D-061).
+  2. Asiento **sourced** (`sourceType !== MANUAL` y `sourceId` set) en `DRAFT`: **no** editar `debit`/`credit`/`currency` ni agregar/quitar líneas. **Sí** editar `description`, `reference`, `entryDate` y `accountId` / descripción de línea (corregir mapeo). Enforce en service layer (no solo UI).
+  3. Asientos `MANUAL`: edición completa como hoy.
+  4. Notificación in-app `ACCOUNTING_DRAFTS_PENDING` a audiencia con `EDIT ACCOUNTING` (OWNER/ADMIN/FINANCE), módulo ACCOUNTING on; **dedupe 24h** por `(tenant, type, recipient, company)`; soft-fail (nunca tumba la operación). Sin email en esta iteración.
+  5. `actionUrl` → `/contabilidad/asientos?status=DRAFT` (con `empresa` si aplica). `LinkedEntityType.OTHER` + `linkedEntityId = companyId`.
+- **Implicancias:** `updateJournalEntry` + UI form; helper notif + hook post-`ensureFromRule`; migración enum `NotificationType`.
+- **Documentos afectados:** [`02-modules/ACCOUNTING.md`](../02-modules/ACCOUNTING.md), [`08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md`](../08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md), [`08-architecture/NOTIFICATIONS_ARCHITECTURE.md`](../08-architecture/NOTIFICATIONS_ARCHITECTURE.md), [`08-architecture/PERMISSIONS_ROUTE_MATRIX.md`](../08-architecture/PERMISSIONS_ROUTE_MATRIX.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -895,7 +912,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-062`…).
+1. Tomar el siguiente ID disponible (`D-064`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

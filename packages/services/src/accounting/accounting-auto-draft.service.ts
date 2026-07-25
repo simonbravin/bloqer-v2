@@ -13,6 +13,7 @@ import {
   type JournalEntryView,
 } from "./journal-entry.service";
 import { treasuryMovementSupportsAccountingDraft } from "./accounting-treasury-gl-eligibility";
+import { notifyAccountingDraftsPendingSoft } from "./accounting-draft-notifications.service";
 
 type EnsureResult =
   | { status: "created" | "existing"; entry: JournalEntryView }
@@ -188,6 +189,7 @@ async function ensureFromRule(params: {
     } catch {
       // ignore
     }
+    await notifyAccountingDraftsPendingSoft(ctx, { companyId: params.companyId });
     return { status: "created", entry };
   } catch (err) {
     const existingAfterRace = await lookupNonCancelledJournalEntryIdBySource(ctx, {

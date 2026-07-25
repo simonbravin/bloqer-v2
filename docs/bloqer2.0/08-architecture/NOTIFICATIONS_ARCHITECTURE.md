@@ -27,6 +27,8 @@ Indexes: `[tenantId, recipientUserId, status, createdAt]`, `[tenantId, projectId
 
 **Phase 8B (operational alerts):** `RECEIVABLE_OVERDUE`, `PAYABLE_OVERDUE`, `NEGATIVE_STOCK`, `CERTIFICATION_APPROVED_WITHOUT_INVOICE`, `STALE_DOCUMENT_UPLOAD`.
 
+**Accounting queue (D-063):** `ACCOUNTING_DRAFTS_PENDING` — in-app only; audience `EDIT ACCOUNTING`; **24h dedupe** per `(tenant, type, recipient, company)`; `LinkedEntityType.OTHER` + `linkedEntityId = companyId`; soft-fail from `ensureDraftJournal*` after create.
+
 ## Recipient strategy (Phase 8A + audience helper)
 
 - **Only** `recipientUserId` with an **ACTIVE** `UserMembership` for the same `tenantId`.

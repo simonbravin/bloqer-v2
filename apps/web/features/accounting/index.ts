@@ -4,8 +4,12 @@ export type { AccountingAccountListItem } from "./components/accounting-account-
 export { AccountingAccountTable } from "./components/accounting-account-table";
 export { AccountingAccountCards } from "./components/accounting-account-cards";
 export { AccountingAccountListSection } from "./components/accounting-account-list-section";
+export { AccountingAccountListFilters } from "./components/accounting-account-list-filters";
 export { AccountingAccountForm } from "./components/accounting-account-form";
-export type { CompanyOption } from "./components/accounting-account-form";
+export type {
+  CompanyOption,
+  ExistingAccountOption,
+} from "./components/accounting-account-form";
 export { JournalEntryTable } from "./components/journal-entry-table";
 export { JournalEntryForm } from "./components/journal-entry-form";
 export { JournalEntryLinesEditor, initialJournalLines, linesFromJournalEntry } from "./components/journal-entry-lines-editor";

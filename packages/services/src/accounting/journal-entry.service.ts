@@ -8,6 +8,7 @@ import type {
   ListJournalEntriesInput,
   UpdateJournalEntryInput,
 } from "@bloqer/validators";
+import { roundMoney } from "@bloqer/utils";
 import { log } from "../audit/audit.service";
 import { isCrossCompany } from "../company-scope";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
@@ -19,6 +20,44 @@ import {
   naturalBalanceSignedString,
 } from "./accounting-natural-balance";
 import { entryDateGte, entryDateLte, sanitizeIsoDate } from "./accounting-date";
+
+/** Sourced journals mirror an operational document [D-063]. */
+export function isSourcedJournalEntry(entry: {
+  sourceType: JournalEntrySourceType;
+  sourceId: string | null;
+}): boolean {
+  return entry.sourceType !== "MANUAL" && entry.sourceId != null;
+}
+
+/**
+ * Sourced DRAFT lines: structure + money/currency immutable; accounts/descriptions may change [D-063].
+ * Pure helper for unit tests + `updateJournalEntry`.
+ */
+export function assertSourcedLineMoneyUnchanged(
+  existing: Array<{ debit: Prisma.Decimal | string; credit: Prisma.Decimal | string; currency: string }>,
+  incoming: ParsedJournalLine[],
+): void {
+  if (existing.length !== incoming.length) {
+    throw new ServiceError(
+      "VALIDATION",
+      "No se puede cambiar la estructura de un asiento con origen operativo",
+    );
+  }
+  for (let i = 0; i < existing.length; i++) {
+    const ex = existing[i]!;
+    const nw = incoming[i]!;
+    const exDebit = roundMoney(typeof ex.debit === "string" ? ex.debit : ex.debit.toString());
+    const exCredit = roundMoney(typeof ex.credit === "string" ? ex.credit : ex.credit.toString());
+    const nwDebit = roundMoney(nw.debit.toString());
+    const nwCredit = roundMoney(nw.credit.toString());
+    if (exDebit !== nwDebit || exCredit !== nwCredit || ex.currency !== nw.currency) {
+      throw new ServiceError(
+        "VALIDATION",
+        "Los montos y la moneda de un asiento con origen operativo no se pueden editar",
+      );
+    }
+  }
+}
 
 export type JournalEntryLineView = Omit<JournalEntryLine, "debit" | "credit"> & {
   debit:  string;
@@ -610,29 +649,77 @@ export async function updateJournalEntry(
     : existing.entryDate;
   const description = input.description?.trim() ?? existing.description;
   const reference = input.reference === undefined ? existing.reference : input.reference?.trim() ?? null;
-  const projectId = input.projectId === undefined ? existing.projectId : input.projectId;
+  // Sourced journals keep header project from the operational document [D-063].
+  const projectId = isSourcedJournalEntry(existing)
+    ? existing.projectId
+    : input.projectId === undefined
+      ? existing.projectId
+      : input.projectId;
 
   let parsed: ParsedJournalLine[] | null = null;
+  let sourcedExistingLines: Array<{
+    id: string;
+    debit: Prisma.Decimal;
+    credit: Prisma.Decimal;
+    currency: string;
+    projectId: string | null;
+  }> | null = null;
+  const sourced = isSourcedJournalEntry(existing);
+
   if (input.lines) {
     parsed = parseJournalLinesFromInput(input.lines);
     assertBalancedJournalEntry(parsed);
+    if (sourced) {
+      sourcedExistingLines = await prisma.journalEntryLine.findMany({
+        where: { journalEntryId: id },
+        orderBy: { id: "asc" },
+        select: { id: true, debit: true, credit: true, currency: true, projectId: true },
+      });
+      assertSourcedLineMoneyUnchanged(sourcedExistingLines, parsed);
+      // Defense in depth: never persist client money/project on sourced lines.
+      parsed = parsed.map((l, i) => {
+        const ex = sourcedExistingLines![i]!;
+        return {
+          ...l,
+          debit: ex.debit,
+          credit: ex.credit,
+          currency: ex.currency,
+          projectId: ex.projectId,
+        };
+      });
+    }
     await validateAccountsAndProjects(companyId, ctx.tenantId, parsed, projectId ?? null);
   }
 
   await prisma.$transaction(async (tx) => {
     if (parsed) {
-      await tx.journalEntryLine.deleteMany({ where: { journalEntryId: id } });
-      await tx.journalEntryLine.createMany({
-        data: parsed.map((l) => ({
-          journalEntryId: id,
-          accountId:      l.accountId,
-          projectId:      l.projectId,
-          description:    l.description,
-          debit:          l.debit,
-          credit:         l.credit,
-          currency:       l.currency,
-        })),
-      });
+      if (sourced && sourcedExistingLines) {
+        // In-place updates keep line ids/order stable (delete+create reshuffles UUID order).
+        for (let i = 0; i < sourcedExistingLines.length; i++) {
+          const ex = sourcedExistingLines[i]!;
+          const nw = parsed[i]!;
+          await tx.journalEntryLine.update({
+            where: { id: ex.id },
+            data: {
+              accountId: nw.accountId,
+              description: nw.description,
+            },
+          });
+        }
+      } else {
+        await tx.journalEntryLine.deleteMany({ where: { journalEntryId: id } });
+        await tx.journalEntryLine.createMany({
+          data: parsed.map((l) => ({
+            journalEntryId: id,
+            accountId:      l.accountId,
+            projectId:      l.projectId,
+            description:    l.description,
+            debit:          l.debit,
+            credit:         l.credit,
+            currency:       l.currency,
+          })),
+        });
+      }
     }
     await tx.journalEntry.update({
       where: { id },

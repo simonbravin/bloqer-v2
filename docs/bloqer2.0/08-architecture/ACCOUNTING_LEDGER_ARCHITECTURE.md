@@ -58,6 +58,11 @@ Neither replaces the other in 11A–11D.
 - UI: `/contabilidad/libro-diario`, `sumas-y-saldos`, `situacion-patrimonial`, `estado-resultados`; account mayor with date filters.
 - **Not** official RT 54 / AFIP / inflation statements.
 
+## Phase 11E+ review hardening — [D-063]
+
+- Sourced DRAFT (`sourceType !== MANUAL` + `sourceId`): lock debit/credit/currency and line count on `updateJournalEntry`; allow header metadata + account remapping.
+- Soft in-app `ACCOUNTING_DRAFTS_PENDING` to `EDIT ACCOUNTING` audience with **24h dedupe** (no email).
+
 ## Phase 11C+ / L remaining (not implemented)
 
 - Automatic **POST** without human review.

@@ -188,6 +188,7 @@ export * from "./accounting/accounting-mapping.service";
 export * from "./accounting/accounting-suggestions.service";
 export * from "./accounting/accounting-coa-template.service";
 export * from "./accounting/accounting-auto-draft.service";
+export * from "./accounting/accounting-draft-notifications.service";
 export * from "./accounting/accounting-cancel-sync.service";
 export * from "./accounting/accounting-treasury-gl-eligibility";
 export * from "./accounting/accounting-natural-balance";

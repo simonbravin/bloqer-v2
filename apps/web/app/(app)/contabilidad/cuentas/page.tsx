@@ -2,7 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
-import { AccountingAccountListSection, ApplyCoaTemplateButton } from "@/features/accounting";
+import {
+  AccountingAccountListFilters,
+  AccountingAccountListSection,
+  ApplyCoaTemplateButton,
+} from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { getCompanies, listAccountingAccounts } from "@bloqer/services";
@@ -10,11 +14,12 @@ import { can } from "@bloqer/domain";
 import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
 
 export default async function ContabilidadCuentasPage({
   searchParams,
 }: {
-  searchParams: Promise<EmpresaSearch>;
+  searchParams: Promise<EmpresaSearch & { q?: string }>;
 }) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -31,6 +36,13 @@ export default async function ContabilidadCuentasPage({
   const empresa = cf.companyId;
   const q = empresa ? `?empresa=${encodeURIComponent(empresa)}` : "";
   const canEdit = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
+  const search = sp.q?.trim().toLowerCase() ?? "";
+  const filtered = search
+    ? accounts.filter(
+        (a) =>
+          a.code.toLowerCase().includes(search) || a.name.toLowerCase().includes(search),
+      )
+    : accounts;
 
   // Same resolution order as services: query → membership → first ACTIVE by name.
   const applyCompanyId =
@@ -78,9 +90,20 @@ export default async function ContabilidadCuentasPage({
           ) : null}
         </div>
       ) : (
-        <Suspense fallback={null}>
-          <AccountingAccountListSection accounts={accounts} empresa={empresa} />
-        </Suspense>
+        <>
+          <Suspense fallback={null}>
+            <AccountingAccountListFilters />
+          </Suspense>
+          {filtered.length === 0 ? (
+            <ListEmptyState
+              message={`Ninguna cuenta coincide con “${(sp.q ?? "").trim().slice(0, 64)}”.`}
+            />
+          ) : (
+            <Suspense fallback={null}>
+              <AccountingAccountListSection accounts={filtered} empresa={empresa} />
+            </Suspense>
+          )}
+        </>
       )}
     </PageShell>
   );
