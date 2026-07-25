@@ -12,7 +12,7 @@ import {
   createJournalEntryAction,
   updateJournalEntryAction,
 } from "@/app/(app)/contabilidad/actions";
-import { isSourcedJournalEntry, type JournalEntryView } from "@bloqer/services";
+import type { JournalEntryView } from "@bloqer/services";
 import type { CompanyOption } from "./accounting-account-form";
 import {
   JournalEntryLinesEditor,
@@ -29,6 +29,14 @@ interface Props {
   defaultCompanyId?: string | null;
   entryId?: string;
   initial?: JournalEntryView;
+}
+
+/** Mirrors `isSourcedJournalEntry` [D-063] — keep client-local to avoid `@bloqer/services` runtime imports. */
+function isSourcedJournalEntry(entry: {
+  sourceType: JournalEntryView["sourceType"];
+  sourceId: string | null;
+}): boolean {
+  return entry.sourceType !== "MANUAL" && entry.sourceId != null;
 }
 
 export function JournalEntryForm({
