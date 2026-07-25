@@ -12,9 +12,11 @@ import {
 } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { PageShell } from "@/components/layout/page-shell";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { AccountingGerencialDisclaimer } from "@/features/accounting/components/accounting-gerencial-disclaimer";
+import { formatDate } from "@/lib/format";
 
 export default async function ContabilidadPage() {
   const current = await getCurrentUser();
@@ -120,72 +122,73 @@ export default async function ContabilidadPage() {
         />
       </KpiStatGrid>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Link className="rounded-md border p-4 text-sm hover:bg-muted/40" href={`${base}/cuentas`}>
-          Plan de cuentas
-        </Link>
-        <Link className="rounded-md border p-4 text-sm hover:bg-muted/40" href={`${base}/asientos`}>
-          Asientos
-        </Link>
-        <Link className="rounded-md border p-4 text-sm hover:bg-muted/40" href={`${base}/reglas`}>
-          Reglas contables
-        </Link>
-        <Link
-          className="rounded-md border p-4 text-sm hover:bg-muted/40"
-          href={`${base}/sumas-y-saldos`}
-        >
-          Sumas y saldos
-        </Link>
-      </div>
+      <Card className="rounded-xl border bg-card shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Borradores pendientes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {drafts.data.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay asientos en borrador.</p>
+          ) : (
+            <ul className="divide-y">
+              {drafts.data.map((e) => (
+                <li key={e.id} className="py-2.5 first:pt-0 last:pb-0">
+                  <Link
+                    href={`${base}/asientos/${e.id}`}
+                    className="group flex items-baseline justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground group-hover:underline">
+                        {e.reference ?? e.description.slice(0, 60)}
+                      </p>
+                      {e.reference ? (
+                        <p className="truncate text-xs text-muted-foreground">
+                          {e.description.slice(0, 80)}
+                        </p>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                      {formatDate(e.entryDate)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+        <CardFooter>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`${base}/asientos?status=DRAFT`}>Ver todos ({drafts.total})</Link>
+          </Button>
+        </CardFooter>
+      </Card>
 
-      <div className="rounded-md border p-4 text-sm space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <p className="font-medium">Borradores pendientes</p>
-          <Link
-            href={`${base}/asientos?status=DRAFT`}
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            Ver todos ({drafts.total})
-          </Link>
-        </div>
-        {drafts.data.length === 0 ? (
-          <p className="text-muted-foreground">No hay asientos en borrador.</p>
-        ) : (
-          <ul className="space-y-1">
-            {drafts.data.map((e) => (
-              <li key={e.id}>
-                <Link
-                  href={`${base}/asientos/${e.id}`}
-                  className="text-primary underline-offset-4 hover:underline"
-                >
-                  {e.reference ?? e.description.slice(0, 60)}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {!current.tenantCtx.companyId && companies.length > 1 && (
-        <div className="rounded-md border bg-muted/30 p-4 text-sm">
-          <p className="font-medium">Varias empresas</p>
-          <p className="text-muted-foreground mt-1">Elegí empresa para enlaces con contexto:</p>
+      {!current.tenantCtx.companyId && companies.length > 1 ? (
+        <div className="rounded-xl border border-border/80 bg-muted/30 px-4 py-3 text-sm">
+          <p className="font-medium text-foreground">Varias empresas</p>
+          <p className="mt-1 text-muted-foreground">Elegí empresa para enlaces con contexto:</p>
           <ul className="mt-2 space-y-1">
             {companies.map((c) => (
               <li key={c.id}>
                 <span className="text-muted-foreground">{c.name}:</span>{" "}
-                <Link className="text-primary underline-offset-4 hover:underline" href={`${base}/cuentas${q(c.id)}`}>
+                <Link
+                  className="font-medium text-foreground underline-offset-4 hover:underline"
+                  href={`${base}/cuentas${q(c.id)}`}
+                >
                   Cuentas
                 </Link>
                 {" · "}
-                <Link className="text-primary underline-offset-4 hover:underline" href={`${base}/reglas${q(c.id)}`}>
+                <Link
+                  className="font-medium text-foreground underline-offset-4 hover:underline"
+                  href={`${base}/reglas${q(c.id)}`}
+                >
                   Reglas
                 </Link>
               </li>
             ))}
           </ul>
         </div>
-      )}
+      ) : null}
     </PageShell>
   );
 }
