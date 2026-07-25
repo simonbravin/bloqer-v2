@@ -312,10 +312,13 @@ export async function cancelPayable(id: string, ctx: ServiceContext): Promise<Pa
 
   const preview = await prisma.payable.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!preview) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
   if (preview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(preview.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
+  }
   if (!canMutateApForScope(ctx.roles, preview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar cuentas por pagar");
   }

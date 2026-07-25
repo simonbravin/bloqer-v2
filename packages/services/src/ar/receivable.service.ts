@@ -367,10 +367,13 @@ export async function cancelReceivable(id: string, ctx: ServiceContext): Promise
 
   const preview = await prisma.receivable.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!preview) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
   if (preview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(preview.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
+  }
   if (!canMutateArForScope(ctx.roles, preview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar cuentas por cobrar");
   }

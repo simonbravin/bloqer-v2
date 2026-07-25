@@ -97,6 +97,10 @@ where: { tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId 
 
 ## 5. Escrituras (create/update)
 
+Antes de mutar (emitir/cancelar) entidades §2.3 que disparan sync GL (`syncJournalOnOperationalCancel` /
+`ensureDraftJournal*`), **exigir** `isCrossCompany` en el preview. El sync también valida
+`enforceCompanyScope` (default `true`); transferencias internas pasan `false` (§2.1).
+
 Al persistir `companyId` en registros nuevos se puede seguir derivando el valor
 (`companyId = input.companyId ?? ctx.companyId ?? <default>`). Este estándar **no** cambia
 la derivación de escritura; sólo cubre lecturas y guards de acceso.

@@ -72,8 +72,10 @@ export async function createAccountingAccount(
   const companyId = await resolveAccountingCompanyId(ctx, input.companyId ?? null);
 
   if (input.parentId) {
-    const parent = await prisma.accountingAccount.findUnique({ where: { id: input.parentId } });
-    if (!parent || parent.tenantId !== ctx.tenantId || parent.companyId !== companyId) {
+    const parent = await prisma.accountingAccount.findFirst({
+      where: { id: input.parentId, tenantId: ctx.tenantId, companyId },
+    });
+    if (!parent) {
       throw new ServiceError("VALIDATION", "Cuenta superior inválida");
     }
   }
@@ -117,9 +119,10 @@ export async function updateAccountingAccount(
   ctx: ServiceContext,
 ): Promise<AccountingAccountView> {
   await assertEdit(ctx);
-  const existing = await prisma.accountingAccount.findUnique({ where: { id } });
+  const existing = await prisma.accountingAccount.findFirst({
+    where: { id, tenantId: ctx.tenantId },
+  });
   if (!existing) throw new ServiceError("NOT_FOUND", "Cuenta contable no encontrada");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Acceso denegado");
   if (isCrossCompany(existing.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "Cuenta fuera del alcance de empresa");
   }
@@ -153,8 +156,10 @@ export async function updateAccountingAccount(
     if (input.parentId === id) {
       throw new ServiceError("VALIDATION", "La cuenta no puede ser su propia superior");
     }
-    const parent = await prisma.accountingAccount.findUnique({ where: { id: input.parentId } });
-    if (!parent || parent.tenantId !== ctx.tenantId || parent.companyId !== existing.companyId) {
+    const parent = await prisma.accountingAccount.findFirst({
+      where: { id: input.parentId, tenantId: ctx.tenantId, companyId: existing.companyId },
+    });
+    if (!parent) {
       throw new ServiceError("VALIDATION", "Cuenta superior inválida");
     }
   }

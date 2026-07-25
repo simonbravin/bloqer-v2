@@ -40,6 +40,9 @@ export async function getCollectionById(
   });
   if (!c) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
   if (c.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(c.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a la empresa activa");
+  }
   if (projectScopeId !== undefined && c.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a este proyecto");
   }
@@ -310,6 +313,9 @@ export async function cancelCollection(
   if (!collectionPreview) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
   if (collectionPreview.tenantId !== ctx.tenantId) {
     throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  }
+  if (isCrossCompany(collectionPreview.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a la empresa activa");
   }
   if (!canMutateArForScope(ctx.roles, collectionPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar cobranzas");

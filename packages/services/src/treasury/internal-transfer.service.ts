@@ -231,6 +231,8 @@ export async function cancelInternalTransfer(
       sourceType: "INTERNAL_TRANSFER",
       sourceId: id,
       sourceLabel: "la transferencia",
+      // Tesorería / transferencias son tenant-wide (TENANT_COMPANY_SCOPING §2.1).
+      enforceCompanyScope: false,
     });
   }
 

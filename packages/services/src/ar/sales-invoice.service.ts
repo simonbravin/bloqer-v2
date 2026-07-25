@@ -13,6 +13,7 @@ import { canEditArArea, canMutateArForScope, canViewArProjectArea } from "./ar-a
 import { resolvePagination } from "../finance/pagination";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { isCrossCompany } from "../company-scope";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { ensureDraftJournalFromSalesInvoice } from "../accounting/accounting-auto-draft.service";
 import { syncJournalOnOperationalCancel } from "../accounting/accounting-cancel-sync.service";
@@ -74,6 +75,9 @@ export async function getSalesInvoiceById(
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(inv.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
   if (projectScopeId !== undefined && inv.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
@@ -445,10 +449,13 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
 
   const invPreview = await prisma.salesInvoice.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(invPreview.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
   if (!canMutateArForScope(ctx.roles, invPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para emitir facturas");
   }
@@ -530,6 +537,9 @@ export async function cancelSalesInvoice(id: string, ctx: ServiceContext): Promi
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(invPreview.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
   if (!canMutateArForScope(ctx.roles, invPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para anular facturas");
   }

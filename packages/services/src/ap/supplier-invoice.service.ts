@@ -636,10 +636,13 @@ export async function issueSupplierInvoice(
 
   const invPreview = await prisma.supplierInvoice.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(invPreview.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
   if (!canMutateApForScope(ctx.roles, invPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para emitir facturas de proveedor");
   }
@@ -744,6 +747,9 @@ export async function cancelSupplierInvoice(
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(invPreview.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
   if (!canMutateApForScope(ctx.roles, invPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar facturas de proveedor");
   }

@@ -37,6 +37,9 @@ export async function getPaymentById(
   });
   if (!p) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(p.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "El pago no pertenece a la empresa activa");
+  }
   if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");
   }
@@ -185,10 +188,13 @@ export async function createPayment(
 
   const payablePreview = await prisma.payable.findUnique({
     where: { id: input.payableId },
-    select: { tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!payablePreview) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
   if (payablePreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(payablePreview.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a la empresa activa");
+  }
   if (!canMutateApForScope(ctx.roles, payablePreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para registrar pagos");
   }
@@ -294,6 +300,9 @@ export async function cancelPayment(
   });
   if (!paymentPreview) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
   if (paymentPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(paymentPreview.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "El pago no pertenece a la empresa activa");
+  }
   if (!canMutateApForScope(ctx.roles, paymentPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar pagos");
   }
