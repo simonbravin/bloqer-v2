@@ -9,8 +9,8 @@ import { ProjectOverviewActivityCard } from "./project-overview-activity-card";
 import { ProjectOverviewAlerts } from "./project-overview-alerts";
 import { ProjectOverviewCharts } from "./project-overview-charts";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
-import { DetailField, DetailFieldGrid } from "@/components/ui/detail-field-grid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 const TYPE_LABELS = { PUBLIC: "Público", PRIVATE: "Privado" } as const;
 
 function locDate(d: Date | null | undefined) {
@@ -20,6 +20,21 @@ function locDate(d: Date | null | undefined) {
 
 function projectAddress(project: ProjectWithClient): string {
   return [project.address, project.city, project.province].filter(Boolean).join(", ");
+}
+
+function MetaItem({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 truncate text-sm font-medium">{children}</dd>
+    </div>
+  );
 }
 
 export function ProjectOverviewView({
@@ -50,16 +65,12 @@ export function ProjectOverviewView({
 
       {fullProject ? (
         <Card className="rounded-xl border bg-card shadow-sm">
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-base">Datos del proyecto</CardTitle>
           </CardHeader>
-          <CardContent>
-            <DetailFieldGrid columns={3}>
-              <DetailField
-                iconKey="client"
-                label="Cliente"
-                iconAccent={fullProject.client ? undefined : "muted"}
-              >
+          <CardContent className="space-y-4">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+              <MetaItem label="Cliente">
                 {fullProject.client ? (
                   <Link
                     href={`/directorio/${fullProject.client.id}`}
@@ -70,42 +81,39 @@ export function ProjectOverviewView({
                 ) : (
                   "—"
                 )}
-              </DetailField>
-              <DetailField iconKey="type" label="Tipo">
-                {TYPE_LABELS[fullProject.type]}
-              </DetailField>
-              <DetailField
-                iconKey="start_date"
-                label="Inicio"
-                iconAccent={fullProject.startDate ? undefined : "muted"}
-              >
-                {locDate(fullProject.startDate)}
-              </DetailField>
-              <DetailField
-                iconKey="expected_end"
-                label="Fin estimado"
-                iconAccent={fullProject.expectedEndDate ? undefined : "muted"}
-              >
-                {locDate(fullProject.expectedEndDate)}
-              </DetailField>
-              {fullProject.actualEndDate ? (
-                <DetailField iconKey="actual_end" label="Fin real">
-                  {locDate(fullProject.actualEndDate)}
-                </DetailField>
-              ) : null}
-              <DetailField
-                iconKey="address"
-                label="Dirección"
-                iconAccent={projectAddress(fullProject) ? undefined : "muted"}
-              >
-                {projectAddress(fullProject) || "—"}
-              </DetailField>
-              {fullProject.description ? (
-                <DetailField iconKey="description" label="Descripción" fullWidth>
-                  {fullProject.description}
-                </DetailField>
-              ) : null}
-            </DetailFieldGrid>
+              </MetaItem>
+              <MetaItem label="Tipo">{TYPE_LABELS[fullProject.type]}</MetaItem>
+              <MetaItem label="Inicio">{locDate(fullProject.startDate)}</MetaItem>
+              <MetaItem label={fullProject.actualEndDate ? "Fin" : "Fin estimado"}>
+                {fullProject.actualEndDate ? (
+                  <>
+                    {locDate(fullProject.actualEndDate)}
+                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                      Est. {locDate(fullProject.expectedEndDate)}
+                    </span>
+                  </>
+                ) : (
+                  locDate(fullProject.expectedEndDate)
+                )}
+              </MetaItem>
+            </dl>
+
+            {(fullProject.description || projectAddress(fullProject)) && (
+              <dl className="grid gap-3 border-t border-border/60 pt-3 sm:grid-cols-2">
+                <div className="min-w-0">
+                  <dt className="text-xs text-muted-foreground">Descripción</dt>
+                  <dd className="mt-0.5 text-sm leading-snug text-foreground/90 break-words">
+                    {fullProject.description?.trim() || "—"}
+                  </dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-xs text-muted-foreground">Dirección</dt>
+                  <dd className="mt-0.5 text-sm leading-snug text-foreground/90 break-words">
+                    {projectAddress(fullProject) || "—"}
+                  </dd>
+                </div>
+              </dl>
+            )}
           </CardContent>
         </Card>
       ) : null}
