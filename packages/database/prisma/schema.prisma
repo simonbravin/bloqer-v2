@@ -467,14 +467,18 @@ enum WarehouseTransferStatus {
 // ─── Auth.js v5 adapter tables ────────────────────────────────────────────────
 
 model User {
-  id            String     @id @default(uuid())
-  name          String?
-  email         String     @unique
-  emailVerified DateTime?
-  image         String?
-  status        UserStatus @default(INVITED)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id                 String     @id @default(uuid())
+  name               String?
+  email              String     @unique
+  emailVerified      DateTime?
+  image              String?
+  /// bcrypt hash for Credentials login; null for Google-only users until they set a password.
+  passwordHash       String?
+  /// Bumped on password set/reset; JWT claim `pwdAt` compared in Node `getCurrentUser`.
+  passwordUpdatedAt  DateTime?
+  status             UserStatus @default(INVITED)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
   accounts                  Account[]
   sessions                  Session[]

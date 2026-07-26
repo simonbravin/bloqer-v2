@@ -2,15 +2,15 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@bloqer/auth";
 import { acceptTenantInvitation, peekTenantInvitationForAcceptPage, ServiceError } from "@bloqer/services";
+import { getSession } from "@/lib/auth";
 import { buildInvitationAcceptCallbackUrl, buildInvitationLoginHref } from "@/lib/invitation-auth";
 import { rethrowNextNavigationError } from "@/lib/next-errors";
 import { setActiveTenantCookie } from "@/lib/active-tenant";
 
 export async function acceptTenantInvitationAction(formData: FormData) {
   const token = String(formData.get("token") ?? "").trim();
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     if (!token) redirect("/invitaciones/aceptar");

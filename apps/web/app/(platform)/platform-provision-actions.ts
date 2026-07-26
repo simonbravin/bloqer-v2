@@ -3,13 +3,13 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { auth } from "@bloqer/auth";
 import { provisionPlatformTenant, ServiceError } from "@bloqer/services";
 import {
   PLATFORM_INVITE_LINK_FLASH_COOKIE,
   PLATFORM_INVITE_EMAIL_FLASH_COOKIE,
   platformInvitationFlashCookiePath,
 } from "@/lib/platform-invitation-flash";
+import { getSession } from "@/lib/auth";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
 import { rethrowNextNavigationError } from "@/lib/next-errors";
 
@@ -19,7 +19,7 @@ function emptyToUndefined(v: FormDataEntryValue | null): string | undefined {
 }
 
 export async function provisionPlatformTenantAction(formData: FormData) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) redirect("/login");
   const ctx = await getPlatformServiceContext(session.user.id);
 

@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { UserRole } from "@bloqer/domain";
 import { OVERVIEW_ROLES } from "@bloqer/domain";
-import { auth } from "@bloqer/auth";
 import {
   cancelPlatformTenantInvitation,
   createPlatformTenantInvitation,
@@ -16,6 +15,7 @@ import {
   PLATFORM_INVITE_EMAIL_FLASH_COOKIE,
   platformInvitationFlashCookiePath,
 } from "@/lib/platform-invitation-flash";
+import { getSession } from "@/lib/auth";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
 import { rethrowNextNavigationError } from "@/lib/next-errors";
 
@@ -28,7 +28,7 @@ function collectRolesFromForm(formData: FormData): UserRole[] {
 }
 
 async function platformCtxOrRedirect() {
-  const s = await auth();
+  const s = await getSession();
   if (!s?.user?.id) redirect("/login");
   return getPlatformServiceContext(s.user.id);
 }

@@ -151,10 +151,29 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 ## ADR-Phase1-03 — Auth.js v5 + Google OAuth; Magic Link diferido
 
 - **Fecha:** 2026-05-07
-- **Estado:** ACEPTADO
+- **Estado:** REEMPLAZADO parcialmente por [ADR-Auth-Credentials-01](#adr-auth-credentials-01--emailpassword--verificación-resend) (la cláusula “Sin Credentials”)
 - **Contexto:** Se requería autenticación federada sin credenciales propias (email/password). Se evaluaron Auth.js v4, v5 beta, y Clerk.
-- **Decisión:** Auth.js v5 (next-auth@5 beta) con Google OAuth. Adapter de Prisma (`@auth/prisma-adapter`). Sin Credentials. Magic Link con Resend diferido para Phase 2.
-- **Consecuencias:** La app puede arrancar localmente sin credenciales reales de Google (empty string fallback). El login solo funciona end-to-end con variables de entorno configuradas.
+- **Decisión:** Auth.js v5 (next-auth@5 beta) con Google OAuth. Adapter de Prisma (`@auth/prisma-adapter`). ~~Sin Credentials.~~ Magic Link con Resend diferido para Phase 2.
+- **Consecuencias:** La app puede arrancar localmente sin credenciales reales de Google (empty string fallback). El login solo funciona end-to-end con variables de entorno configuradas. Credentials email/password: ver ADR-Auth-Credentials-01.
+
+---
+
+## ADR-Auth-Credentials-01 — Email/password + verificación Resend
+
+- **Fecha:** 2026-07-25
+- **Estado:** ACEPTADO
+- **Contexto:** Usuarios sin Google (dominios no-Gmail / cuentas corporativas) necesitan acceso. ADR-Phase1-03 excluía Credentials; magic link sigue diferido. Unirse a tenant existente sigue siendo solo por invitación (sin join-request).
+- **Decisión:**
+  1. Mantener **Google OAuth** y agregar **Credentials** (email + password) en Auth.js v5.
+  2. Registro credentials crea `User` con `status=INVITED`, `emailVerified=null`, `passwordHash` (bcryptjs cost 12). **No** abre sesión hasta verificar.
+  3. Verificación y reset password vía tabla `verification_tokens` con `identifier` namespaced (`email-verify:<email>`, `password-reset:<email>`), token bearer solo en URL, en DB **sha256** (mismo espíritu que invitaciones). Email vía Resend (`@bloqer/email`).
+  4. Login credentials exige `status=ACTIVE`, `emailVerified` set, hash OK. Reset con token válido puede **establecer** password (también para users Google-only) y activa `emailVerified`+`ACTIVE` si aún no lo estaban (posesión del email).
+  5. **Takeover:** si existe stub no verificado mismo email y Google inicia sesión, se activa el User existente y se vincula `Account` Google (evita bloqueo por `email` unique).
+  6. Credentials `authorize` y Prisma **solo en Node** (`packages/auth/src/auth.ts`); middleware edge sigue con `authConfig` sin Credentials/Prisma.
+  7. Invalidación post-reset: `User.passwordUpdatedAt`; claim `pwdAt` en JWT; chequeo en `getCurrentUser` (Node). Middleware edge no valida contra DB.
+  8. Sin username-login. Sin magic-link login. Anti-enumeración en register/reset. Join a tenant = invitación only ([D-064](../00-product/DECISION_LOG.md)).
+- **Consecuencias:** Nueva dep `bcryptjs` en `@bloqer/services`. Rutas públicas `/registro`, `/verificar-email`, `/recuperar-contrasena`, `/restablecer-contrasena`. Onboarding trial / invites sin cambio de producto.
+- **Referencias:** [`AUTH_ARCHITECTURE.md`](./AUTH_ARCHITECTURE.md), [`SECURITY_ARCHITECTURE.md`](./SECURITY_ARCHITECTURE.md), [D-064](../00-product/DECISION_LOG.md).
 
 ---
 

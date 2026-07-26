@@ -61,6 +61,7 @@ Status: **D-056** company vs project finance RBAC — hub `/finanzas` + tesorer�
 | Phase 13C.1 | Normalización URLs plataforma: todo bajo `/platform/*`; filesystem `app/(platform)/platform/tenants/...` | Complete |
 | Phase 13E–13G | Auditoría ERD Prisma; permisos/módulos doc; gate servicio `JOBSITE_LOG` en libro de obra | Complete |
 | Phase 14A | Onboarding SaaS: usuario autenticado sin membresía ACTIVE → `/onboarding`; alta transaccional tenant + company + membresía OWNER + trial 30 días + `TenantModuleSetting` explícitos + `AuditLog` | Complete |
+| Auth-Credentials | Email/password + verify/reset Resend; Google linking/takeover stub; `User.passwordHash`/`passwordUpdatedAt`; ADR-Auth-Credentials-01; D-064 cierra Q-015 | Complete |
 | Phase 14A.1 | Onboarding: `pg_advisory_xact_lock` por `actorUserId` dentro de `completeTrialOnboarding` para evitar dos tenants concurrentes del mismo usuario | Complete |
 | Phase 14B | Dashboard tenant: agregados servicio + UI; sin Prisma en `apps/web`; sin schema nuevo | Complete |
 | Phase 14C | Auditoría rutas finanzas/proyecto/tesorería + modelo `projectId` + plan indicadores; doc [`FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md`](./08-architecture/FINANCE_AND_PROJECT_OVERVIEW_ARCHITECTURE.md) | Complete (doc) |

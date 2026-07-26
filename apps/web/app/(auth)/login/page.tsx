@@ -1,25 +1,28 @@
 import { Suspense } from "react";
-import { BloqerLogo } from "@/components/brand/bloqer-logo";
 import { LoginForm } from "@/features/auth/components/login-form";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthCard } from "@/features/auth/components/auth-card";
+import { AuthAlert } from "@/features/auth/components/auth-alert";
 
-export default function LoginPage() {
+type PageProps = {
+  searchParams: Promise<{ emailConfirmado?: string }>;
+};
+
+export default async function LoginPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const emailConfirmado = params.emailConfirmado === "1";
+
   return (
-    <Card className="w-full max-w-sm border-border/80 shadow-md">
-      <CardHeader className="space-y-4 text-center sm:text-left">
-        <div className="flex justify-center sm:justify-start">
-          <BloqerLogo priority className="h-12 max-w-[12.5rem] sm:h-11" />
-        </div>
-        <div className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Iniciar sesión</CardTitle>
-          <CardDescription>Accedé a tu cuenta de Bloqer</CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Suspense fallback={<div className="h-10 w-full animate-pulse rounded-md bg-muted" />}>
-          <LoginForm />
-        </Suspense>
-      </CardContent>
-    </Card>
+    <AuthCard
+      title="Iniciar sesión"
+      description="Entrá con email y contraseña, o con tu cuenta de Google."
+      logoHref={null}
+    >
+      {emailConfirmado ? (
+        <AuthAlert variant="success">Email confirmado. Ya podés iniciar sesión.</AuthAlert>
+      ) : null}
+      <Suspense fallback={<div className="h-40 w-full animate-pulse rounded-md bg-muted" />}>
+        <LoginForm />
+      </Suspense>
+    </AuthCard>
   );
 }

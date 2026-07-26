@@ -904,6 +904,22 @@
 
 ---
 
+### D-064 — Invitación por email al tenant (Q-015)
+
+- **Fecha:** 2026-07-25
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Q-015 pedía definir cómo un usuario se une a un tenant. Phase 10C ya implementó invitaciones; faltaba cerrar el log de producto. El self-signup de primer tenant (Phase 14A) es independiente.
+- **Decisión:**
+  1. Unirse a un tenant existente = **invitación por email** (`TenantInvitation` PENDING + token sha256 + aceptación con sesión cuyo email coincide).
+  2. **No** auto-registro con código de tenant.
+  3. **No** solicitud pública de unión con aprobación del OWNER (join-request).
+  4. Quien invita (tenant OWNER/ADMIN o platform superadmin) elige roles; crear la invitación *es* la aprobación.
+- **Implicancias:** onboarding muestra invites PENDING y bloquea crear otro tenant si hay invite; credentials email/password (ADR-Auth-Credentials-01) no cambian este modelo.
+- **Documentos afectados:** [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) Q-015, [`02-modules/USERS_AND_PERMISSIONS.md`](../02-modules/USERS_AND_PERMISSIONS.md), [`08-architecture/SECURITY_ARCHITECTURE.md`](../08-architecture/SECURITY_ARCHITECTURE.md), [`08-architecture/AUTH_ARCHITECTURE.md`](../08-architecture/AUTH_ARCHITECTURE.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -912,7 +928,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-064`…).
+1. Tomar el siguiente ID disponible (`D-065`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

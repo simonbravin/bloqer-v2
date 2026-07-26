@@ -205,6 +205,12 @@ export * from "./platform/platform-tenant-provision.service";
 export * from "./platform/platform-audit-read.service";
 export * from "./platform/platform-operations.service";
 export * from "./onboarding/onboarding.service";
+export * from "./auth/credentials-auth.service";
+export {
+  AUTH_TOKEN_PURPOSE,
+  authTokenIdentifier,
+  hashAuthToken,
+} from "./auth/credentials-token";
 export * from "./scheduled-reports/scheduled-report-permissions";
 export * from "./scheduled-reports/scheduled-report-registry";
 export * from "./scheduled-reports/scheduled-report.service";

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@bloqer/auth";
 import { getPlatformTenantById, ServiceError } from "@bloqer/services";
 import { PlatformTenantNavBridge } from "@/features/platform/platform-nav-context";
+import { getSession } from "@/lib/auth";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
 
 interface LayoutProps {
@@ -11,7 +11,7 @@ interface LayoutProps {
 }
 
 export default async function PlatformTenantLayout({ children, params }: LayoutProps) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) redirect("/login");
   const { tenantId } = await params;
   const ctx = await getPlatformServiceContext(session.user.id);

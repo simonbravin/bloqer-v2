@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { auth } from "@bloqer/auth";
 import {
   extendPlatformTenantTrial,
   ServiceError,
@@ -10,10 +9,11 @@ import {
   updatePlatformTenantStatus,
   updateTenantModuleSetting,
 } from "@bloqer/services";
+import { getSession } from "@/lib/auth";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
 
 async function platformCtxOrRedirect() {
-  const s = await auth();
+  const s = await getSession();
   if (!s?.user?.id) redirect("/login");
   return getPlatformServiceContext(s.user.id);
 }

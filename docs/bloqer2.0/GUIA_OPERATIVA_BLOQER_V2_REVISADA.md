@@ -59,7 +59,7 @@ flowchart TB
 
 ### 1.1 Ingreso y navegación
 
-- Acceso mediante **inicio de sesión con Google** (`/login`). No hay usuario/contraseña propios ni segundo factor (2FA) al momento de este relevamiento.
+- Acceso en `/login` con **email y contraseña** (registro en `/registro` + confirmación por email) o **Google**. No hay segundo factor (2FA) al momento de este relevamiento.
 - El **menú lateral de empresa** agrupa: **General · Finanzas · Tesorería · Contabilidad · Configuración**.
 - Al entrar a una obra, el menú lateral se reemplaza por el **menú del proyecto**.
 
@@ -892,7 +892,7 @@ flowchart LR
 | **Ajustes de stock/caja (`ADJUSTMENT`)** | Enum reservado; sin UI. |
 | **Notificaciones** | Sin Web Push / preferencias mute; polling 30 s en pestaña visible (D-054). |
 | **Permisos** | La matriz es de solo lectura; los roles son fijos. Techos “solo su proyecto” aún sin `ProjectMembership`. |
-| **Segundo factor (2FA)** | No disponible; el acceso es solo con Google. |
+| **Segundo factor (2FA)** | No disponible; acceso con Google o email/contraseña. |
 | **DOCX de guía** | Un solo entregable: `guides/Guía_Operativa_Bloqer_v2.docx`. Regenerar con `node build_guide.js` tras editar **esta** MD. |
 
 > Estas limitaciones **no impiden** el uso productivo del sistema, pero deben conocerse para no asumir capacidades que hoy son manuales o inexistentes.

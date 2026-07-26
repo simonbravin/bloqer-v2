@@ -199,13 +199,10 @@
 ### Q-015 — Flujo de invitación de usuarios
 
 - **Categoría:** Usuarios
-- **Estado:** ABIERTA
-- **Opciones:**
-  1. Solo creación por Admin (sin email de invitación).
-  2. Invitación por email con activación de cuenta.
-  3. Auto-registro con código de tenant.
-- **Recomendación:** opción 2.
-- **Bloquea:** [`02-modules/USERS_AND_PERMISSIONS.md`](../02-modules/USERS_AND_PERMISSIONS.md).
+- **Estado:** CERRADA — ver [D-064](./DECISION_LOG.md#d-064--invitación-por-email-al-tenant-q-015)
+- **Decisión:** opción 2 — invitación por email con token + aceptación en sesión (email coincidente). Sin auto-registro con código de tenant; sin join-request público.
+- **Implementación:** Phase 10C (`TenantInvitation`, `/invitaciones/aceptar`, Resend opcional).
+- **Documentos:** [`02-modules/USERS_AND_PERMISSIONS.md`](../02-modules/USERS_AND_PERMISSIONS.md), [`08-architecture/SECURITY_ARCHITECTURE.md`](../08-architecture/SECURITY_ARCHITECTURE.md).
 
 ### Q-016 — 2FA obligatorio para roles privilegiados
 

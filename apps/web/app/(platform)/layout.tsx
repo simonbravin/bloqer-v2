@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { auth } from "@bloqer/auth";
 import { isPlatformSuperadmin } from "@bloqer/services";
 import { PlatformShell } from "@/components/layout/platform-shell";
+import { getSession } from "@/lib/auth";
 
 export default async function PlatformGroupLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) redirect("/login");
   if (!(await isPlatformSuperadmin(session.user.id))) redirect("/dashboard");
 

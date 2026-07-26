@@ -15,6 +15,7 @@
     "@auth/prisma-adapter": "^2.11.2",
     "@bloqer/config": "workspace:*",
     "@bloqer/database": "workspace:*",
+    "@bloqer/services": "workspace:^",
     "next-auth": "5.0.0-beta.25"
   },
   "devDependencies": {

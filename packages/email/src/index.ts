@@ -11,3 +11,5 @@ export type {
   OperationalAlertEmailTemplateInput,
   OperationalAlertSeverityLabel,
 } from "./templates/operational-alert-email";
+export { renderAuthEmailHtml, renderAuthEmailText } from "./templates/auth-email";
+export type { AuthEmailTemplateInput } from "./templates/auth-email";

@@ -4,6 +4,14 @@
 
 Usar **Auth.js / NextAuth** como **primera opción** para autenticación en Next.js App Router: sesión segura, integración con proveedores si se requiere, y hooks del lado servidor para resolver **usuario → roles → permisos**. La **autorización de negocio** (qué módulos y acciones) se alinea a [`../00-product/PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md) y [`../00-product/USER_ROLES.md`](../00-product/USER_ROLES.md).
 
+### Proveedores (ADR-Auth-Credentials-01)
+
+- **Google OAuth** (primario histórico).
+- **Credentials** email + password con verificación de cuenta vía Resend; `passwordHash` en `User` (bcryptjs); sin username-login.
+- Magic link como método de login: **diferido**.
+- Credentials/`authorize` solo en runtime Node (`packages/auth/src/auth.ts`); middleware edge sin Prisma.
+- Unirse a tenant: solo invitación ([D-064](../00-product/DECISION_LOG.md#d-064--invitación-por-email-al-tenant-q-015)); primer tenant vía `/onboarding` (Phase 14A).
+
 ## Justificación para Bloqer 2.0
 
 - Modelo de permisos **simple** en producto (VIEW / EDIT / APPROVE por módulo, [D-012](../00-product/DECISION_LOG.md)) mapea bien a **guards** en servidor.

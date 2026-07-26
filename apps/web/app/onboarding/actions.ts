@@ -3,9 +3,9 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ZodError } from "zod";
-import { auth } from "@bloqer/auth";
 import { completeTrialOnboarding, ServiceError } from "@bloqer/services";
 import { completeTrialOnboardingInputSchema } from "@bloqer/validators";
+import { getSession } from "@/lib/auth";
 import { setActiveTenantCookie } from "@/lib/active-tenant";
 import { rethrowNextNavigationError } from "@/lib/next-errors";
 
@@ -21,7 +21,7 @@ export async function completeOnboardingAction(
   _prev: OnboardingFormState,
   formData: FormData,
 ): Promise<OnboardingFormState> {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) {
     redirect("/login");
   }

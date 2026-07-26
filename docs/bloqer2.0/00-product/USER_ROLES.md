@@ -159,5 +159,5 @@ Detalle completo en [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md).
 ## 9. Preguntas abiertas
 
 - ¿`PROJECT_VIEWER` para cliente externo entra en Fase 1 o Fase 2? — _abierto, ver `OPEN_QUESTIONS.md`_
-- ¿Hay flujo de invitación con email + activación, o solo creación por Admin? — _abierto_
+- ¿Hay flujo de invitación con email + activación, o solo creación por Admin? — _cerrado: [D-064](./DECISION_LOG.md#d-064--invitación-por-email-al-tenant-q-015)_
 - ¿2FA obligatorio para `OWNER` y `ADMIN`? — _abierto_
