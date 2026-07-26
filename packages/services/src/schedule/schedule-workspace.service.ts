@@ -74,6 +74,8 @@ export type ScheduleWorkspaceDto = {
   projectId: string;
   scheduleId: string;
   baselineBudgetId: string | null;
+  /** True when cost-control budget ≠ persisted schedule baseline (no silent rewrite). */
+  baselineBudgetMismatch: boolean;
   budgetId: string;
   budgetName: string;
   budgetStatus: string;
@@ -178,7 +180,7 @@ async function loadCostByCategoryForWbs(
     select: {
       category: true,
       totalCost: true,
-      costItem: { select: { wbsNodeId: true } },
+      costItem: { select: { wbsNodeId: true, quantity: true } },
     },
   });
 
@@ -191,9 +193,9 @@ async function loadCostByCategoryForWbs(
     const bucket = map.get(wbsId);
     if (!bucket) continue;
     const cat = line.category as keyof ScheduleCostByCategory;
-    bucket[cat] = new Prisma.Decimal(bucket[cat])
-      .add(line.totalCost)
-      .toFixed(2);
+    // [D-059] partida money = totalCost × CostItem.quantity
+    const partida = new Prisma.Decimal(line.totalCost).mul(line.costItem.quantity);
+    bucket[cat] = new Prisma.Decimal(bucket[cat]).add(partida).toFixed(2);
   }
   return map;
 }
@@ -230,12 +232,16 @@ export async function getProjectScheduleWorkspace(
 
   const schedule = await ensureScheduleForProject(projectId, ctx);
 
-  if (schedule.baselineBudgetId !== cc.budgetId) {
+  // Only seed baseline when empty — never silently rewrite (orphans WBS links).
+  let baselineBudgetId = schedule.baselineBudgetId;
+  if (!baselineBudgetId) {
     await prisma.schedule.update({
       where: { id: schedule.id },
       data: { baselineBudgetId: cc.budgetId, updatedBy: ctx.actorUserId },
     });
+    baselineBudgetId = cc.budgetId;
   }
+  const baselineBudgetMismatch = baselineBudgetId !== cc.budgetId;
 
   const costRowByWbs = new Map(cc.rows.map((r) => [r.wbsNodeId, r]));
 
@@ -259,10 +265,18 @@ export async function getProjectScheduleWorkspace(
     },
   });
 
-  /** Rollup must use the full schedule tree — status/delayed filters must not shrink it. */
+  /** Rollup / leaf detection must use the full schedule tree — filters must not shrink it. */
   const rollupSourceItems = await prisma.scheduleItem.findMany({
     where: { scheduleId: schedule.id },
-    select: { id: true, parentId: true, status: true, startDate: true, endDate: true },
+    select: {
+      id: true,
+      parentId: true,
+      status: true,
+      startDate: true,
+      endDate: true,
+      progressPct: true,
+      durationDays: true,
+    },
   });
 
   const allWbsIds = [
@@ -273,7 +287,7 @@ export async function getProjectScheduleWorkspace(
   const dtoItems: ScheduleWorkspaceItemDto[] = [];
 
   for (const item of items) {
-    const isLeaf = isScheduleLeafItem(items, item.id);
+    const isLeaf = isScheduleLeafItem(rollupSourceItems, item.id);
     const daysLate = isLeaf ? computeDaysLate(item.endDate, item.status) : null;
     if (filters.delayedOnly && daysLate === null) continue;
 
@@ -354,13 +368,22 @@ export async function getProjectScheduleWorkspace(
   );
 
   const activeItems = dtoItems.filter((i) => i.status !== "CANCELLED");
-  const leafItems = activeItems.filter((i) => isScheduleLeafItem(activeItems, i.id));
-  const completedItems = activeItems.filter((i) => i.status === "COMPLETED").length;
-  const delayedItems = leafItems.filter((i) => i.daysLate !== null).length;
+  // Leaf KPIs from full tree (D-046) — not the status-filtered list.
+  const fullActive = rollupSourceItems.filter((i) => i.status !== "CANCELLED");
+  const fullLeafIds = new Set(
+    fullActive.filter((i) => isScheduleLeafItem(fullActive, i.id)).map((i) => i.id),
+  );
+  const completedItems = fullActive.filter((i) => i.status === "COMPLETED").length;
+  let delayedItems = 0;
+  for (const i of fullActive) {
+    if (!fullLeafIds.has(i.id)) continue;
+    if (computeDaysLate(i.endDate, i.status) !== null) delayedItems += 1;
+  }
 
   let weighted = ZERO_DEC;
   let weightSum = ZERO_DEC;
-  for (const i of leafItems) {
+  for (const i of fullActive) {
+    if (!fullLeafIds.has(i.id)) continue;
     const dur = i.durationDays && i.durationDays > 0
       ? new Prisma.Decimal(i.durationDays)
       : new Prisma.Decimal(1);
@@ -375,7 +398,8 @@ export async function getProjectScheduleWorkspace(
     type: "WORKSPACE",
     projectId,
     scheduleId: schedule.id,
-    baselineBudgetId: cc.budgetId,
+    baselineBudgetId,
+    baselineBudgetMismatch,
     budgetId: cc.budgetId,
     budgetName: cc.budgetName,
     budgetStatus: cc.budgetStatus,

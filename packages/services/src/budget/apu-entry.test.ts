@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   canUseTotalPartidaMode,
   convertApuEntryMode,
+  isGlobalUnit,
   lineUnitTotal,
+  migrateLegacyLumpToGlobalResource,
   physicalNeedQty,
   normalizeStoredApuLineForItemQuantity,
   previewApuEntry,
@@ -251,5 +253,71 @@ describe("canUseTotalPartidaMode", () => {
     assert.equal(canUseTotalPartidaMode(900), true);
     assert.equal(canUseTotalPartidaMode(0), false);
     assert.equal(canUseTotalPartidaMode(-1), false);
+  });
+});
+
+describe("isGlobalUnit", () => {
+  it("detecta gl case-insensitive", () => {
+    assert.equal(isGlobalUnit("gl"), true);
+    assert.equal(isGlobalUnit("GL"), true);
+    assert.equal(isGlobalUnit(" gl "), true);
+    assert.equal(isGlobalUnit("kg"), false);
+    assert.equal(isGlobalUnit(""), false);
+  });
+});
+
+describe("resource + gl does not use isLumpSum", () => {
+  it("10 Global × precio se guarda como resource y recomputa al cambiar Qty", () => {
+    const stored = toStoredApuLine({
+      mode: "total",
+      totalKind: "resource",
+      coefficient: 10,
+      unitCost: 1000,
+      itemQuantity: 10,
+    });
+    assert.equal(stored.isLumpSum, false);
+    assert.equal(stored.partidaQuantity, 10);
+    assert.equal(stored.unitCost, 1000);
+    const next = recomputeResourceForItemQuantity(stored, 20);
+    assert.equal(next.partidaQuantity, 10);
+    assert.equal(next.unitCost, 1000);
+    assert.equal(next.totalCost, roundApuDecimal((10 * 1000) / 20));
+    assert.equal(next.isLumpSum, false);
+  });
+});
+
+describe("physicalNeedQty non-purchasable", () => {
+  it("lump y unit gl → 0; recurso kg → partidaQuantity", () => {
+    assert.equal(
+      physicalNeedQty(1, 1, 900, { isLumpSum: true, unit: "gl" }),
+      0,
+    );
+    assert.equal(
+      physicalNeedQty(10, 1, 900, { isLumpSum: false, unit: "gl" }),
+      0,
+    );
+    assert.equal(
+      physicalNeedQty(500, 500 / 390, 390, { isLumpSum: false, unit: "kg" }),
+      500,
+    );
+  });
+});
+
+describe("migrateLegacyLumpToGlobalResource", () => {
+  it("preserva dinero de partida como 1 × monto resource", () => {
+    const migrated = migrateLegacyLumpToGlobalResource(
+      {
+        coefficient: 1,
+        unitCost: 100,
+        totalCost: 100,
+        partidaQuantity: 1,
+        isLumpSum: true,
+      },
+      10,
+    );
+    assert.equal(migrated.isLumpSum, false);
+    assert.equal(migrated.partidaQuantity, 1);
+    assert.equal(migrated.unitCost, 1000);
+    assert.equal(migrated.totalCost, roundApuDecimal(1000 / 10));
   });
 });

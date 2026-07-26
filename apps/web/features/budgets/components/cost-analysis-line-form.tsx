@@ -17,17 +17,18 @@ import {
 } from "@bloqer/validators";
 import type { CostCategory } from "@bloqer/database";
 import {
+  APU_GLOBAL_UNIT,
   canUseTotalPartidaMode,
   convertApuEntryMode,
+  isGlobalUnit,
   previewApuEntry,
   toStoredApuLine,
   type ApuEntryMode,
-  type ApuTotalKind,
 } from "@bloqer/domain";
 import { CATEGORY_LABELS, VISIBLE_COST_CATEGORIES } from "@/lib/budget-categories";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { UnitSelect } from "./unit-select";
-import { ApuEntryModeToggle, ApuTotalKindToggle } from "./apu-entry-mode-toggle";
+import { ApuEntryModeToggle } from "./apu-entry-mode-toggle";
 
 type CreateMode = {
   mode: "create";
@@ -50,7 +51,8 @@ type EditMode = {
     unitCost: string;
     notes: string | null;
     entryMode?: ApuEntryMode;
-    totalKind?: ApuTotalKind;
+    /** Legacy Monto global row — save as Global + resource. */
+    wasLegacyLump?: boolean;
   };
   itemQuantity: number;
   itemUnit?: string;
@@ -83,12 +85,12 @@ function CreateLineForm({
   isPending, startTransition, serverError, setServerError, onDone,
 }: CreateMode & Shared) {
   const [entryMode, setEntryMode] = useState<ApuEntryMode>("total");
-  const [totalKind, setTotalKind] = useState<ApuTotalKind>("resource");
   const form = useForm<CreateCostAnalysisLineInput>({
     resolver: zodResolver(createCostAnalysisLineSchema),
     defaultValues: {
       costItemId,
       category: "MATERIAL",
+      unit: "un",
       coefficient: 1,
       unitCost: 0,
       sortOrder: nextSortOrder,
@@ -109,7 +111,7 @@ function CreateLineForm({
           unitCost: form.getValues("unitCost") ?? 0,
         },
         itemQuantity,
-        totalKind,
+        "resource",
       );
       form.setValue("coefficient", converted.coefficient);
       form.setValue("unitCost", converted.unitCost);
@@ -125,7 +127,7 @@ function CreateLineForm({
     }
     const stored = toStoredApuLine({
       mode: entryMode,
-      totalKind,
+      totalKind: "resource",
       coefficient: data.coefficient,
       unitCost: data.unitCost,
       itemQuantity,
@@ -137,7 +139,7 @@ function CreateLineForm({
         unitCost: stored.unitCost,
         totalCost: stored.totalCost,
         partidaQuantity: stored.partidaQuantity,
-        isLumpSum: stored.isLumpSum,
+        isLumpSum: false,
       });
       if ("error" in result) {
         setServerError(result.error);
@@ -159,8 +161,6 @@ function CreateLineForm({
       submitLabel="Agregar línea"
       entryMode={entryMode}
       onEntryModeChange={handleEntryModeChange}
-      totalKind={totalKind}
-      onTotalKindChange={setTotalKind}
       itemQuantity={itemQuantity}
       itemUnit={itemUnit}
     />
@@ -172,7 +172,7 @@ function EditLineForm({
   isPending, startTransition, serverError, setServerError, onDone,
 }: EditMode & Shared) {
   const [entryMode, setEntryMode] = useState<ApuEntryMode>(defaults.entryMode ?? "unit");
-  const [totalKind, setTotalKind] = useState<ApuTotalKind>(defaults.totalKind ?? "resource");
+  const wasLegacyLump = Boolean(defaults.wasLegacyLump);
   const form = useForm<UpdateCostAnalysisLineInput>({
     resolver: zodResolver(updateCostAnalysisLineSchema),
     defaultValues: {
@@ -199,7 +199,7 @@ function EditLineForm({
           unitCost: form.getValues("unitCost") ?? 0,
         },
         itemQuantity,
-        totalKind,
+        "resource",
       );
       form.setValue("coefficient", converted.coefficient);
       form.setValue("unitCost", converted.unitCost);
@@ -213,9 +213,13 @@ function EditLineForm({
       toast.error("Definí la cantidad del ítem para cargar por total de partida");
       return;
     }
+    // Parent pre-fills unit=gl for legacy lump; keep gl if empty, else honor user choice.
+    const unit =
+      (data.unit && data.unit.trim()) ||
+      (wasLegacyLump ? APU_GLOBAL_UNIT : defaults.unit);
     const stored = toStoredApuLine({
       mode: entryMode,
-      totalKind,
+      totalKind: "resource",
       coefficient: data.coefficient ?? 0,
       unitCost: data.unitCost ?? 0,
       itemQuantity,
@@ -223,11 +227,12 @@ function EditLineForm({
     startTransition(async () => {
       const result = await onSubmit({
         ...data,
+        unit,
         coefficient: stored.coefficient,
         unitCost: stored.unitCost,
         totalCost: stored.totalCost,
         partidaQuantity: stored.partidaQuantity,
-        isLumpSum: stored.isLumpSum,
+        isLumpSum: false,
       });
       if ("error" in result) {
         setServerError(result.error);
@@ -249,10 +254,9 @@ function EditLineForm({
       submitLabel="Guardar"
       entryMode={entryMode}
       onEntryModeChange={handleEntryModeChange}
-      totalKind={totalKind}
-      onTotalKindChange={setTotalKind}
       itemQuantity={itemQuantity}
       itemUnit={itemUnit}
+      legacyLumpHint={wasLegacyLump}
     />
   );
 }
@@ -266,8 +270,8 @@ function formatPreview(n: number) {
 
 function LineFormFields({
   form, onDone, isPending, serverError, onSubmit, submitLabel,
-  entryMode, onEntryModeChange, totalKind = "resource", onTotalKindChange,
-  itemQuantity, itemUnit,
+  entryMode, onEntryModeChange,
+  itemQuantity, itemUnit, legacyLumpHint,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   form: any;
@@ -278,36 +282,39 @@ function LineFormFields({
   submitLabel: string;
   entryMode: ApuEntryMode;
   onEntryModeChange: (mode: ApuEntryMode) => void;
-  totalKind?: ApuTotalKind;
-  onTotalKindChange?: (kind: ApuTotalKind) => void;
   itemQuantity: number;
   itemUnit?: string;
+  legacyLumpHint?: boolean;
 }) {
   const category = form.watch("category");
+  const lineUnit = form.watch("unit") ?? "";
   const coef = Number(form.watch("coefficient")) || 0;
   const unitCost = Number(form.watch("unitCost")) || 0;
   const preview = previewApuEntry({
     mode: entryMode,
-    totalKind,
+    totalKind: "resource",
     coefficient: coef,
     unitCost,
     itemQuantity,
   });
   const unitLabel = itemUnit ? budgetUnitLabel(itemUnit) : "und.";
   const entryProduct = coef * unitCost;
+  const globalUnit = isGlobalUnit(lineUnit);
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <ApuEntryModeToggle
-          value={entryMode}
-          onChange={onEntryModeChange}
-          totalDisabled={!canUseTotalPartidaMode(itemQuantity)}
-        />
-        {entryMode === "total" && onTotalKindChange && (
-          <ApuTotalKindToggle value={totalKind} onChange={onTotalKindChange} />
-        )}
-      </div>
+      <ApuEntryModeToggle
+        value={entryMode}
+        onChange={onEntryModeChange}
+        totalDisabled={!canUseTotalPartidaMode(itemQuantity)}
+        unitTooltip={`Consumo y precio por cada 1 ${unitLabel}.`}
+        totalTooltip="Cantidad total del recurso para la partida. Unidad Global = importe sin compra."
+      />
+      {legacyLumpHint ? (
+        <p className="text-[11px] text-muted-foreground">
+          Línea legacy de importe: se guardará como unidad Global (sin necesidad en Materiales).
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
@@ -327,7 +334,7 @@ function LineFormFields({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>Unidad *</Label>
+          <Label title="Global = importe sin cantidad comprable">Unidad *</Label>
           <UnitSelect
             value={form.watch("unit") ?? ""}
             onChange={(v) => form.setValue("unit", v, { shouldValidate: true })}
@@ -348,7 +355,7 @@ function LineFormFields({
 
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1.5">
-          <Label>Cant.</Label>
+          <Label>{entryMode === "total" ? "Cant. recurso" : "Rendim."}</Label>
           <Input
             type="number"
             step="0.0001"
@@ -379,6 +386,7 @@ function LineFormFields({
         {entryMode === "unit"
           ? `En partida: ${formatPreview(preview.partidaTotal)}`
           : `Por ${unitLabel}: ${formatPreview(preview.unitTotal)}`}
+        {globalUnit ? " · Sin necesidad en Materiales (Global)" : ""}
       </p>
 
       <div className="space-y-1.5">

@@ -15,13 +15,15 @@ import {
 } from "@/components/ui/table";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
-import { toEntryApuLine } from "@bloqer/domain";
+import { APU_GLOBAL_UNIT, toEntryApuLine } from "@bloqer/domain";
 import { CostAnalysisLineForm } from "./cost-analysis-line-form";
 import type { CostItemView, CostAnalysisLineView } from "@bloqer/services";
 import type { CreateCostAnalysisLineInput, UpdateCostAnalysisLineInput, UpdateCostItemInput } from "@bloqer/validators";
 import type { CostCategory } from "@bloqer/database";
 
 import { CATEGORY_LABELS } from "@/lib/budget-categories";
+import { budgetUnitLabel } from "@/lib/budget-units";
+import { apuResourceQtyDisplay } from "../lib/wbs-apu-detail";
 
 function fmt(value: string) {
   return new Intl.NumberFormat("es-AR", {
@@ -212,7 +214,12 @@ export function CostItemPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {costItem.analysisLines.map((line) => (
+              {costItem.analysisLines.map((line) => {
+                const qtyDisp = apuResourceQtyDisplay(
+                  line,
+                  parseFloat(costItem.quantity) || 0,
+                );
+                return (
                 <TableRow key={line.id}>
                   <TableCell>
                     <Badge variant="secondary" className="text-xs font-normal">
@@ -220,8 +227,14 @@ export function CostItemPanel({
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">{line.description}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{line.unit}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">{fmt(line.coefficient)}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {budgetUnitLabel(line.unit) || line.unit}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {qtyDisp.kind === "lump"
+                      ? "—"
+                      : qtyDisp.qty.toLocaleString("es-AR", { maximumFractionDigits: 4 })}
+                  </TableCell>
                   <TableCell className="text-right font-mono text-sm">{fmt2(line.unitCost)}</TableCell>
                   <TableCell className="text-right font-mono text-sm font-medium">{fmt2(line.totalCost)}</TableCell>
                   {editable && (
@@ -248,7 +261,8 @@ export function CostItemPanel({
                     </TableCell>
                   )}
                 </TableRow>
-              ))}
+              );
+              })}
             </TableBody>
           </Table>
         )}
@@ -294,7 +308,7 @@ export function CostItemPanel({
                     unitCost: line.unitCost,
                     notes: line.notes,
                     entryMode: "unit" as const,
-                    totalKind: "resource" as const,
+                    wasLegacyLump: false,
                   };
                 }
                 const entry = toEntryApuLine({
@@ -312,12 +326,12 @@ export function CostItemPanel({
                 return {
                   category: line.category,
                   description: line.description,
-                  unit: line.unit,
+                  unit: line.isLumpSum ? APU_GLOBAL_UNIT : line.unit,
                   coefficient: String(entry.coefficient),
                   unitCost: String(entry.unitCost),
                   notes: line.notes,
                   entryMode: "total" as const,
-                  totalKind: entry.totalKind,
+                  wasLegacyLump: Boolean(line.isLumpSum),
                 };
               })()}
               itemQuantity={parseFloat(costItem.quantity) || 0}

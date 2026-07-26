@@ -37,8 +37,10 @@ export {
 } from "./audit/audit-catalog";
 export {
   APU_DECIMAL_PLACES,
+  APU_GLOBAL_UNIT,
   canUseTotalPartidaMode,
   convertApuEntryMode,
+  isGlobalUnit,
   lineUnitTotal,
   physicalNeedQty,
   previewApuEntry,
@@ -47,6 +49,7 @@ export {
   recomputeResourceForItemQuantity,
   roundApuDecimal,
   roundApuMoney,
+  migrateLegacyLumpToGlobalResource,
   toEntryApuLine,
   toStoredApuLine,
   type ApuEntryMode,
@@ -56,6 +59,7 @@ export {
   type ApuLineAmounts,
   type ApuStoredLine,
   type ApuTotalKind,
+  type PhysicalNeedOpts,
 } from "./budget/apu-entry";
 
 export {

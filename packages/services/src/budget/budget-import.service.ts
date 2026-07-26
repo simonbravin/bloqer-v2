@@ -6,7 +6,7 @@ import { can } from "@bloqer/domain";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertBudgetEditable, assertBudgetWbsStructureMutable } from "./budget.service";
-import { _recalcBudgetSummary } from "./budget-calc.service";
+import { _recalcAllItems, _recalcBudgetSummary } from "./budget-calc.service";
 import {
   detectProfileFromImportRows,
   reconcileImportRowTypes,
@@ -136,7 +136,7 @@ export async function executeImport(
       createdNodes += 1;
 
       if (row.type === "ITEM") {
-        await tx.costItem.create({
+        const costItem = await tx.costItem.create({
           data: {
             budgetId,
             wbsNodeId: node.id,
@@ -146,10 +146,44 @@ export async function executeImport(
           },
         });
         createdItems += 1;
+
+        // full mode: materialize category unit costs as APU lines (unit mode, coef=1).
+        if (mode === "full") {
+          const categoryAmounts: Array<{ category: "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER"; amount: number; label: string }> = [
+            { category: "MATERIAL", amount: row.material_cost ?? 0, label: "Materiales (import)" },
+            { category: "LABOR", amount: row.labor_cost ?? 0, label: "Mano de obra (import)" },
+            { category: "EQUIPMENT", amount: row.equipment_cost ?? 0, label: "Equipos (import)" },
+            { category: "SUBCONTRACT", amount: row.subcontract_cost ?? 0, label: "Subcontratos (import)" },
+            { category: "OTHER", amount: row.other_cost ?? 0, label: "Otros (import)" },
+          ];
+          let sortOrder = 0;
+          for (const entry of categoryAmounts) {
+            if (!(entry.amount > 0)) continue;
+            await tx.costAnalysisLine.create({
+              data: {
+                costItemId: costItem.id,
+                budgetId,
+                category: entry.category,
+                description: entry.label,
+                unit: row.unit?.trim() || "un",
+                coefficient: 1,
+                unitCost: entry.amount,
+                totalCost: entry.amount,
+                partidaQuantity: null,
+                isLumpSum: false,
+                sortOrder: sortOrder++,
+              },
+            });
+          }
+        }
       }
     }
 
-    await _recalcBudgetSummary(tx, budgetId);
+    if (mode === "full") {
+      await _recalcAllItems(tx, budgetId);
+    } else {
+      await _recalcBudgetSummary(tx, budgetId);
+    }
   });
 
   await log({

@@ -27,13 +27,16 @@ import { CATEGORY_LABELS, VISIBLE_COST_CATEGORIES, type VisibleCostCategory } fr
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { UnitSelect } from "./unit-select";
 import { CostAnalysisLineForm } from "./cost-analysis-line-form";
-import { ApuEntryModeToggle, ApuTotalKindToggle } from "./apu-entry-mode-toggle";
+import { ApuEntryModeToggle } from "./apu-entry-mode-toggle";
 import type { WbsViewNode, CostAnalysisLineView, CostItemView } from "@bloqer/services";
 import type { SaveCostItemApuInput, UpdateCostAnalysisLineInput } from "@bloqer/validators";
 import type { CostCategory } from "@bloqer/database";
 import {
+  APU_GLOBAL_UNIT,
   canUseTotalPartidaMode,
   convertApuEntryMode,
+  isGlobalUnit,
+  migrateLegacyLumpToGlobalResource,
   normalizeStoredApuLineForItemQuantity,
   previewApuEntry,
   recomputeLumpForItemQuantity,
@@ -41,7 +44,6 @@ import {
   toEntryApuLine,
   toStoredApuLine,
   type ApuEntryMode,
-  type ApuTotalKind,
 } from "@bloqer/domain";
 import { apuResourceQtyDisplay } from "../lib/wbs-apu-detail";
 
@@ -86,7 +88,8 @@ function fmtMoney(value: string, currency: string) {
 
 function displayResourceQtyLabel(line: LocalLine, itemQty: number): string {
   const d = apuResourceQtyDisplay(line, itemQty);
-  if (d.kind === "lump") return "global";
+  // Legacy lump: no physical need — show em dash (not the word "global").
+  if (d.kind === "lump") return "—";
   return new Intl.NumberFormat("es-AR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
@@ -103,6 +106,45 @@ function displayPartidaLineTotal(line: LocalLine, itemQty: number): number {
     return pq * price;
   }
   return unitContribution * itemQty;
+}
+
+/**
+ * Precio de recurso en tabla. Legacy lump guarda aporte /u en unitCost — mostrar el monto
+ * de partida (1 Global × monto) para no confundir con precio unitario del ítem.
+ */
+function displayResourceUnitPrice(line: LocalLine, itemQty: number): number {
+  if (line.isLumpSum) {
+    const unitContribution = parseFloat(line.totalCost) || 0;
+    return itemQty > 0 ? unitContribution * itemQty : unitContribution;
+  }
+  return parseFloat(line.unitCost) || 0;
+}
+
+/** [D-047] Convert legacy isLumpSum → resource + gl before persist (money-preserving). */
+function migrateLegacyLumpLine(line: LocalLine, itemQty: number): LocalLine {
+  if (!line.isLumpSum || !(itemQty > 0)) return line;
+  const stored = migrateLegacyLumpToGlobalResource(
+    {
+      coefficient: parseFloat(line.coefficient) || 0,
+      unitCost: parseFloat(line.unitCost) || 0,
+      totalCost: parseFloat(line.totalCost) || 0,
+      partidaQuantity:
+        line.partidaQuantity == null || line.partidaQuantity === ""
+          ? null
+          : parseFloat(line.partidaQuantity),
+      isLumpSum: true,
+    },
+    itemQty,
+  );
+  return {
+    ...line,
+    unit: APU_GLOBAL_UNIT,
+    coefficient: String(stored.coefficient),
+    unitCost: String(stored.unitCost),
+    totalCost: String(stored.totalCost),
+    partidaQuantity: stored.partidaQuantity != null ? String(stored.partidaQuantity) : null,
+    isLumpSum: false,
+  };
 }
 
 function recomputeLocalLinesForItemQty(
@@ -203,7 +245,6 @@ export function CostItemApuDialog({
   const [newCoef, setNewCoef] = useState("1");
   const [newUnitCost, setNewUnitCost] = useState("0");
   const [entryMode, setEntryMode] = useState<ApuEntryMode>("total");
-  const [totalKind, setTotalKind] = useState<ApuTotalKind>("resource");
   /** Last item qty used to derive local line unit contributions. */
   const [linesQtyBasis, setLinesQtyBasis] = useState(0);
 
@@ -226,7 +267,6 @@ export function CostItemApuDialog({
     setNewCoef("1");
     setNewUnitCost("0");
     setEntryMode("total");
-    setTotalKind("resource");
     setEditLine(null);
     setActiveTab("MATERIAL");
   }, []);
@@ -243,11 +283,6 @@ export function CostItemApuDialog({
     loadedKeyRef.current = key;
     resetFromCostItem(costItem);
   }, [open, costItem, resetFromCostItem]);
-
-  useEffect(() => {
-    if (entryMode !== "total") return;
-    setTotalKind(activeTab === "LABOR" ? "lump" : "resource");
-  }, [activeTab, entryMode]);
 
   /** Apply qty change to local APU lines (blur / save) — not on every keystroke. */
   function syncLinesToQuantity(nextQtyRaw: number): LocalLine[] {
@@ -296,12 +331,12 @@ export function CostItemApuDialog({
     () =>
       previewApuEntry({
         mode: entryMode,
-        totalKind,
+        totalKind: "resource",
         coefficient: parseFloat(newCoef) || 0,
         unitCost: parseFloat(newUnitCost) || 0,
         itemQuantity: qtyN,
       }),
-    [entryMode, totalKind, newCoef, newUnitCost, qtyN],
+    [entryMode, newCoef, newUnitCost, qtyN],
   );
 
   const visibleLines = lines.filter((l) => !l._deleted && l.category === activeTab);
@@ -319,6 +354,10 @@ export function CostItemApuDialog({
       toast.error("Ingresá una descripción");
       return;
     }
+    if (!newUnit.trim()) {
+      toast.error("Elegí una unidad");
+      return;
+    }
     const itemQty = parseFloat(quantity) || 0;
     if (entryMode === "total" && !canUseTotalPartidaMode(itemQty)) {
       toast.error("Definí la cantidad del ítem para cargar por total de partida");
@@ -328,9 +367,10 @@ export function CostItemApuDialog({
     const baseLines = syncLinesToQuantity(itemQty);
     const coefInput = parseFloat(newCoef) || 0;
     const ucInput = parseFloat(newUnitCost) || 0;
+    // UI only exposes resource path; Global (`gl`) is non-purchasable via materials board.
     const stored = toStoredApuLine({
       mode: entryMode,
-      totalKind,
+      totalKind: "resource",
       coefficient: coefInput,
       unitCost: ucInput,
       itemQuantity: itemQty,
@@ -342,12 +382,13 @@ export function CostItemApuDialog({
         id: tempId,
         category: activeTab,
         description: newDesc.trim(),
-        unit: newUnit,
+        unit: newUnit.trim(),
         coefficient: String(stored.coefficient),
         unitCost: String(stored.unitCost),
         totalCost: String(stored.totalCost),
         partidaQuantity: stored.partidaQuantity != null ? String(stored.partidaQuantity) : null,
-        isLumpSum: stored.isLumpSum,
+        isLumpSum: false,
+        productId: null,
         sortOrder: baseLines.filter((l) => !l._deleted).length,
         supplierContactId: null,
         notes: null,
@@ -374,7 +415,7 @@ export function CostItemApuDialog({
           unitCost: parseFloat(newUnitCost) || 0,
         },
         itemQty,
-        totalKind,
+        "resource",
       );
       setNewCoef(String(converted.coefficient));
       setNewUnitCost(String(converted.unitCost));
@@ -398,12 +439,19 @@ export function CostItemApuDialog({
     startTransition(async () => {
       const qtyForLines = qty ?? (parseFloat(quantity) || linesQtyBasis);
       const syncedLines = syncLinesToQuantity(qtyForLines);
+      // [D-047] Persist-time: legacy Monto global → resource + gl (lazy if never edited).
+      const linesForSave = syncedLines.map((l) =>
+        l._deleted ? l : migrateLegacyLumpLine(l, qtyForLines),
+      );
+      if (linesForSave.some((l, i) => l !== syncedLines[i])) {
+        setLines(linesForSave);
+      }
       const payload: SaveCostItemApuInput = {
         costItemId: costItem.id,
         unit: unit || undefined,
         quantity: qty,
         notes: notes || null,
-        lines: syncedLines
+        lines: linesForSave
           .filter((l) => !(l._isNew && l._deleted))
           .map((l) => ({
             id: l._isNew ? undefined : l.id,
@@ -418,6 +466,7 @@ export function CostItemApuDialog({
                 ? null
                 : parseFloat(l.partidaQuantity),
             isLumpSum: l.isLumpSum ?? false,
+            productId: l.productId ?? null,
             sortOrder: l.sortOrder,
             notes: l.notes,
             _delete: Boolean(l._deleted && !l._isNew),
@@ -459,31 +508,7 @@ export function CostItemApuDialog({
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto px-5 py-3">
-            {/* Resumen costo por categoría (unitario) */}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-              {VISIBLE_COST_CATEGORIES.map((cat) => (
-                <div key={cat} className="rounded-md border bg-card px-2 py-1.5 text-center">
-                  <p className="text-[10px] leading-tight text-muted-foreground">
-                    {CATEGORY_LABELS[cat]} /u
-                  </p>
-                  <p className="font-mono text-xs font-semibold tabular-nums">
-                    {fmtMoney(String(unitByCategory[cat]), currency)}
-                  </p>
-                </div>
-              ))}
-              <div className="col-span-2 rounded-md border border-primary/25 bg-primary/5 px-2 py-1.5 text-center sm:col-span-1">
-                <p className="text-[10px] leading-tight text-muted-foreground">Costo dir. /u</p>
-                <p className="font-mono text-xs font-bold tabular-nums">
-                  {fmtMoney(String(unitCostDirect), currency)}
-                </p>
-                <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
-                  Total: {fmtMoney(String(totalProjectCost), currency)} · {fmtNum(quantity)}{" "}
-                  {itemUnitLabel}
-                </p>
-              </div>
-            </div>
-
-            {/* Datos del ítem */}
+            {/* 1. Datos del ítem */}
             <section className="space-y-2 rounded-md border p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -548,7 +573,36 @@ export function CostItemApuDialog({
               ) : null}
             </section>
 
-            {/* Insumos por categoría */}
+            {/* 2. Costo por categoría */}
+            <section className="space-y-1.5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Costo por categoría
+              </h3>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {VISIBLE_COST_CATEGORIES.map((cat) => (
+                  <div key={cat} className="rounded-md border bg-card px-2 py-1.5 text-center">
+                    <p className="text-[10px] leading-tight text-muted-foreground">
+                      {CATEGORY_LABELS[cat]} /u
+                    </p>
+                    <p className="font-mono text-xs font-semibold tabular-nums">
+                      {fmtMoney(String(unitByCategory[cat]), currency)}
+                    </p>
+                  </div>
+                ))}
+                <div className="col-span-2 rounded-md border border-primary/25 bg-primary/5 px-2 py-1.5 text-center sm:col-span-1">
+                  <p className="text-[10px] leading-tight text-muted-foreground">Costo dir. /u</p>
+                  <p className="font-mono text-xs font-bold tabular-nums">
+                    {fmtMoney(String(unitCostDirect), currency)}
+                  </p>
+                  <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+                    Total: {fmtMoney(String(totalProjectCost), currency)} · {fmtNum(quantity)}{" "}
+                    {itemUnitLabel}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* 3. Insumos APU — alta arriba, listado abajo */}
             <section className="space-y-2 rounded-md border p-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Insumos APU
@@ -571,10 +625,87 @@ export function CostItemApuDialog({
                 })}
               </div>
 
+              {editable && (
+                <div className="space-y-2 rounded-md border border-dashed bg-muted/20 p-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold">
+                      Agregar {CATEGORY_LABELS[activeTab]}
+                    </p>
+                    <ApuEntryModeToggle
+                      value={entryMode}
+                      onChange={handleEntryModeChange}
+                      totalDisabled={!canUseTotalPartidaMode(parseFloat(quantity) || 0)}
+                      unitTooltip={`Consumo y precio por cada 1 ${itemUnitLabel}. Total partida = aporte × ${fmtNum(quantity)} ${itemUnitLabel}.`}
+                      totalTooltip={`Cantidad total del recurso para esta partida. No se multiplica de nuevo por ${fmtNum(quantity)} ${itemUnitLabel}. Para importes sin compra usá unidad Global.`}
+                    />
+                  </div>
+                  <p className="text-[10px] leading-snug text-muted-foreground">
+                    {entryMode === "total"
+                      ? `Cant. recurso de toda la partida (ej. 500 kg). Unidad Global + cant. 1 = importe sin necesidad en Materiales.`
+                      : `Por cada 1 ${itemUnitLabel}. Cantidad del ítem: ${fmtNum(quantity)} ${itemUnitLabel}.`}
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-[1fr_6rem_5rem_6rem_auto] sm:items-end">
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px]">Descripción</Label>
+                      <Input
+                        value={newDesc}
+                        onChange={(e) => setNewDesc(e.target.value)}
+                        placeholder="Nombre"
+                        className="h-8"
+                      />
+                    </div>
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px]" title="Global = importe sin cantidad comprable">
+                        Unidad
+                      </Label>
+                      <UnitSelect value={newUnit} onChange={setNewUnit} className="h-8" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px]">
+                        {entryMode === "total" ? "Cant. recurso" : "Rendim."}
+                      </Label>
+                      <Input
+                        value={newCoef}
+                        onChange={(e) => setNewCoef(e.target.value)}
+                        className="h-8 font-mono"
+                      />
+                    </div>
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px]">Precio</Label>
+                      <Input
+                        value={newUnitCost}
+                        onChange={(e) => setNewUnitCost(e.target.value)}
+                        className="h-8 font-mono"
+                      />
+                    </div>
+                    <Button type="button" size="sm" className="h-8" onClick={addInlineLine}>
+                      <Plus className="mr-1 h-3 w-3" /> Agregar
+                    </Button>
+                  </div>
+                  <p className="space-x-2.5 font-mono text-[10px] text-muted-foreground">
+                    <span>
+                      Necesidad:{" "}
+                      {isGlobalUnit(newUnit)
+                        ? "— (Global, sin compra)"
+                        : fmtNum(String(entryPreview.resourceNeed))}
+                    </span>
+                    {!isGlobalUnit(newUnit) && entryPreview.yieldPerItemUnit != null && (
+                      <span>
+                        Rendim. / {itemUnitLabel}: {fmtNum(String(entryPreview.yieldPerItemUnit))}
+                      </span>
+                    )}
+                    <span>Aporte /u: {fmtNum(String(entryPreview.unitTotal))}</span>
+                    <span className="font-medium text-foreground/80">
+                      Total partida: {fmtNum(String(entryPreview.partidaTotal))}
+                    </span>
+                  </p>
+                </div>
+              )}
+
               {visibleLines.length === 0 ? (
                 <p className="rounded border border-dashed px-2.5 py-1.5 text-[10px] leading-snug text-muted-foreground">
-                  Tip: los insumos van acá (no como hijos WBS). Ej.: 500 un de hierro con{" "}
-                  <span className="font-medium text-foreground/80">Total partida</span>.
+                  Sin insumos en {CATEGORY_LABELS[activeTab]}. Usá Total partida (ej. 500 kg) o unidad{" "}
+                  {budgetUnitLabel(APU_GLOBAL_UNIT)} para importes.
                 </p>
               ) : (
                 <Table>
@@ -596,13 +727,13 @@ export function CostItemApuDialog({
                         <TableRow key={line.id} className="h-8">
                           <TableCell className="py-1 text-sm">{line.description}</TableCell>
                           <TableCell className="py-1 text-xs text-muted-foreground">
-                            {line.unit}
+                            {budgetUnitLabel(line.unit) || line.unit}
                           </TableCell>
                           <TableCell className="py-1 text-right font-mono text-xs">
                             {displayResourceQtyLabel(line, qtyN)}
                           </TableCell>
                           <TableCell className="py-1 text-right font-mono text-xs">
-                            {fmtNum(line.unitCost)}
+                            {fmtNum(String(displayResourceUnitPrice(line, qtyN)))}
                           </TableCell>
                           <TableCell className="py-1 text-right font-mono text-xs">
                             {fmtNum(line.totalCost)}
@@ -637,87 +768,6 @@ export function CostItemApuDialog({
                     })}
                   </TableBody>
                 </Table>
-              )}
-
-              {editable && (
-                <div className="space-y-2 rounded-md border border-dashed bg-muted/20 p-2.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-semibold">
-                      Agregar {CATEGORY_LABELS[activeTab]}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      <ApuEntryModeToggle
-                        value={entryMode}
-                        onChange={handleEntryModeChange}
-                        totalDisabled={!canUseTotalPartidaMode(parseFloat(quantity) || 0)}
-                      />
-                      {entryMode === "total" && (
-                        <ApuTotalKindToggle value={totalKind} onChange={setTotalKind} />
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-[10px] leading-snug text-muted-foreground">
-                    {entryMode === "total"
-                      ? totalKind === "resource"
-                        ? `Cant. recurso = necesidad total del recurso para la partida (ej. 500 un). No se multiplica de nuevo por la cantidad del ítem (${fmtNum(quantity)} ${itemUnitLabel}).`
-                        : `Monto global = importe total de la partida; se prorratea al costo /u según la cantidad del ítem (${fmtNum(quantity)} ${itemUnitLabel}).`
-                      : `Por unidad = consumo por cada 1 ${itemUnitLabel} (unidad del ítem). Cantidad del ítem: ${fmtNum(quantity)} ${itemUnitLabel} → Total partida = aporte × ${fmtNum(quantity)}.`}
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-[1fr_6rem_5rem_6rem_auto] sm:items-end">
-                    <div className="space-y-0.5">
-                      <Label className="text-[11px]">Descripción</Label>
-                      <Input
-                        value={newDesc}
-                        onChange={(e) => setNewDesc(e.target.value)}
-                        placeholder="Nombre"
-                        className="h-8"
-                      />
-                    </div>
-                    <div className="space-y-0.5">
-                      <Label className="text-[11px]">Unidad</Label>
-                      <UnitSelect value={newUnit} onChange={setNewUnit} className="h-8" />
-                    </div>
-                    <div className="space-y-0.5">
-                      <Label className="text-[11px]">
-                        {entryMode === "total" && totalKind === "lump"
-                          ? "Cant."
-                          : entryMode === "total"
-                            ? "Cant. recurso"
-                            : "Rendim."}
-                      </Label>
-                      <Input
-                        value={newCoef}
-                        onChange={(e) => setNewCoef(e.target.value)}
-                        className="h-8 font-mono"
-                      />
-                    </div>
-                    <div className="space-y-0.5">
-                      <Label className="text-[11px]">
-                        {entryMode === "total" && totalKind === "lump" ? "Monto" : "Precio"}
-                      </Label>
-                      <Input
-                        value={newUnitCost}
-                        onChange={(e) => setNewUnitCost(e.target.value)}
-                        className="h-8 font-mono"
-                      />
-                    </div>
-                    <Button type="button" size="sm" className="h-8" onClick={addInlineLine}>
-                      <Plus className="mr-1 h-3 w-3" /> Agregar
-                    </Button>
-                  </div>
-                  <p className="space-x-2.5 font-mono text-[10px] text-muted-foreground">
-                    <span>Necesidad: {fmtNum(String(entryPreview.resourceNeed))}</span>
-                    {entryPreview.yieldPerItemUnit != null && (
-                      <span>
-                        Rendim. / {itemUnitLabel}: {fmtNum(String(entryPreview.yieldPerItemUnit))}
-                      </span>
-                    )}
-                    <span>Aporte /u: {fmtNum(String(entryPreview.unitTotal))}</span>
-                    <span className="font-medium text-foreground/80">
-                      Total partida: {fmtNum(String(entryPreview.partidaTotal))}
-                    </span>
-                  </p>
-                </div>
               )}
 
               {legacyOtherLines.length > 0 && (
@@ -766,7 +816,7 @@ export function CostItemApuDialog({
                     unitCost: editLine.unitCost,
                     notes: editLine.notes,
                     entryMode: "unit" as const,
-                    totalKind: "resource" as const,
+                    wasLegacyLump: false,
                   };
                 }
                 const entry = toEntryApuLine({
@@ -781,22 +831,22 @@ export function CostItemApuDialog({
                   isLumpSum: editLine.isLumpSum,
                   itemQuantity: qtyN,
                 });
+                // Legacy lump opens as Total partida 1 × importe; save converts to Global resource.
                 return {
                   category: editLine.category,
                   description: editLine.description,
-                  unit: editLine.unit,
+                  unit: editLine.isLumpSum ? APU_GLOBAL_UNIT : editLine.unit,
                   coefficient: String(entry.coefficient),
                   unitCost: String(entry.unitCost),
                   notes: editLine.notes,
                   entryMode: "total" as const,
-                  totalKind: entry.totalKind,
+                  wasLegacyLump: Boolean(editLine.isLumpSum),
                 };
               })()}
               itemQuantity={qtyN}
               itemUnit={unit}
               toastOnSuccess={false}
               onSubmit={async (data: UpdateCostAnalysisLineInput) => {
-                // CostAnalysisLineForm already runs toStoredApuLine
                 setLines((prev) =>
                   prev.map((l) =>
                     l.id === editLine.id
@@ -818,7 +868,7 @@ export function CostItemApuDialog({
                               : data.partidaQuantity == null
                                 ? null
                                 : String(data.partidaQuantity),
-                          isLumpSum: data.isLumpSum ?? l.isLumpSum,
+                          isLumpSum: data.isLumpSum ?? false,
                           notes: data.notes ?? l.notes,
                         }
                       : l,

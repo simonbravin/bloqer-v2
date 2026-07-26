@@ -876,7 +876,7 @@ export function WbsTree({
               </TableCell>
               <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-24">
                 {qtyDisp.kind === "lump"
-                  ? "global"
+                  ? "—"
                   : qtyDisp.qty.toLocaleString("es-AR", {
                       maximumFractionDigits: 4,
                     })}

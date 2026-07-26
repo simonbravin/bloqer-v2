@@ -78,10 +78,23 @@ async function resolveWbsPhysicalPct(
     return approvedBase.add(incremental);
   }
 
+  // [D-045] Use schedule baseline budget qty — never latest DRAFT versionNumber.
+  const schedule = await tx.schedule.findFirst({
+    where: { projectId, tenantId: ctx.tenantId },
+    select: { baselineBudgetId: true },
+  });
   const costItem = await tx.costItem.findFirst({
     where: {
       wbsNodeId,
-      budget: { projectId, tenantId: ctx.tenantId },
+      ...(schedule?.baselineBudgetId
+        ? { budgetId: schedule.baselineBudgetId }
+        : {
+            budget: {
+              projectId,
+              tenantId: ctx.tenantId,
+              status: { in: ["APPROVED", "CLOSED"] },
+            },
+          }),
     },
     orderBy: { budget: { versionNumber: "desc" } },
     select: { quantity: true },

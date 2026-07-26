@@ -27,6 +27,7 @@ export function toApuDisplayLine(line: CostAnalysisLineView): ApuDisplayLine {
         ? null
         : parseFloat(line.partidaQuantity),
     isLumpSum: Boolean(line.isLumpSum),
+    unit: line.unit,
   };
 }
 

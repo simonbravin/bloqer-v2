@@ -64,6 +64,7 @@ export type CostAnalysisLineView = {
   totalCost: string;
   partidaQuantity: string | null;
   isLumpSum: boolean;
+  productId: string | null;
   sortOrder: number;
   supplierContactId: string | null;
   notes: string | null;
@@ -124,6 +125,7 @@ type InternalNode = {
       totalCost: Prisma.Decimal;
       partidaQuantity: Prisma.Decimal | null;
       isLumpSum: boolean;
+      productId: string | null;
       sortOrder: number;
       supplierContactId: string | null;
       notes: string | null;
@@ -229,6 +231,7 @@ export async function getWbsTree(budgetId: string, ctx: ServiceContext): Promise
               totalCost: l.totalCost.toString(),
               partidaQuantity: l.partidaQuantity?.toString() ?? null,
               isLumpSum: l.isLumpSum,
+              productId: l.productId ?? null,
               sortOrder: l.sortOrder,
               supplierContactId: l.supplierContactId,
               notes: l.notes,
@@ -560,17 +563,25 @@ function sortNodeIdsByDepthDesc(
 }
 
 async function assertWbsNodeCanSubdivide(wbsNodeId: string): Promise<void> {
-  const [certLines, poLines, jobsiteRefs, subcontractLines] = await Promise.all([
-    prisma.certificationLine.count({ where: { wbsNodeId } }),
-    prisma.purchaseOrderLine.count({ where: { wbsNodeId } }),
-    prisma.jobsiteLogProgress.count({ where: { wbsNodeId } }),
-    prisma.subcontractLine.count({ where: { wbsNodeId } }),
-  ]);
+  const [certLines, poLines, jobsiteRefs, subcontractLines, scheduleLinks] =
+    await Promise.all([
+      prisma.certificationLine.count({ where: { wbsNodeId } }),
+      prisma.purchaseOrderLine.count({ where: { wbsNodeId } }),
+      prisma.jobsiteLogProgress.count({ where: { wbsNodeId } }),
+      prisma.subcontractLine.count({ where: { wbsNodeId } }),
+      prisma.scheduleItemWbsLink.count({ where: { wbsNodeId } }),
+    ]);
 
-  if (certLines > 0 || poLines > 0 || jobsiteRefs > 0 || subcontractLines > 0) {
+  if (
+    certLines > 0 ||
+    poLines > 0 ||
+    jobsiteRefs > 0 ||
+    subcontractLines > 0 ||
+    scheduleLinks > 0
+  ) {
     throw new ServiceError(
       "CONFLICT",
-      "No se puede subdividir este ítem: tiene certificaciones, compras, subcontratos o libro de obra vinculados. Reasigná o eliminá esos vínculos antes de agregar hijos.",
+      "No se puede subdividir este ítem: tiene certificaciones, compras, subcontratos, cronograma o libro de obra vinculados. Reasigná o eliminá esos vínculos antes de agregar hijos.",
     );
   }
 }
@@ -578,17 +589,25 @@ async function assertWbsNodeCanSubdivide(wbsNodeId: string): Promise<void> {
 async function assertWbsSubtreeDeletable(nodeIds: string[]): Promise<void> {
   if (nodeIds.length === 0) return;
 
-  const [certLines, poLines, jobsiteRefs, subcontractLines] = await Promise.all([
-    prisma.certificationLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
-    prisma.purchaseOrderLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
-    prisma.jobsiteLogProgress.count({ where: { wbsNodeId: { in: nodeIds } } }),
-    prisma.subcontractLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
-  ]);
+  const [certLines, poLines, jobsiteRefs, subcontractLines, scheduleLinks] =
+    await Promise.all([
+      prisma.certificationLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+      prisma.purchaseOrderLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+      prisma.jobsiteLogProgress.count({ where: { wbsNodeId: { in: nodeIds } } }),
+      prisma.subcontractLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+      prisma.scheduleItemWbsLink.count({ where: { wbsNodeId: { in: nodeIds } } }),
+    ]);
 
-  if (certLines > 0 || poLines > 0 || jobsiteRefs > 0 || subcontractLines > 0) {
+  if (
+    certLines > 0 ||
+    poLines > 0 ||
+    jobsiteRefs > 0 ||
+    subcontractLines > 0 ||
+    scheduleLinks > 0
+  ) {
     throw new ServiceError(
       "CONFLICT",
-      "No se puede eliminar: hay certificaciones, compras, subcontratos o libro de obra vinculados a ítems del subárbol.",
+      "No se puede eliminar: hay certificaciones, compras, subcontratos, cronograma o libro de obra vinculados a ítems del subárbol.",
     );
   }
 }

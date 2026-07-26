@@ -158,11 +158,11 @@ Por cada ítem hoja:
 Completar **cantidad**, **unidad** y **precio** por línea. El APU persiste el aporte **por unidad** del ítem; el total de partida = suma unitaria × cantidad del ítem ([D-047]).
 
 Al agregar una línea el default es **Total partida**:
-- **Cant. recurso** — “necesito 500 un a $6.000” (Bloqer calcula el rendimiento por und. del ítem y guarda `partidaQuantity` para compras).
-- **Monto global** — importe único de obra (prorrateo money-safe).
+- **Total partida** — “necesito 500 un a $6.000” (Bloqer calcula el rendimiento por und. del ítem y guarda `partidaQuantity` para compras).
 - **Por unidad** — consumo ya expresado por 1 und. del ítem.
+- **Importes sin compra** — unidad **Global** (`gl`) + cant. 1 (o N) + precio = monto. No genera necesidad en Materiales ([D-047]).
 
-El modal APU muestra solo **costo**; PU/total de venta viven en la tabla EDT ([D-058]).
+El modal APU muestra solo **costo**; PU/total de venta viven en la tabla EDT ([D-058]). Orden: datos del ítem → resumen por categoría → insumos (alta arriba del listado).
 
 ### 3.4 Parámetros de venta
 

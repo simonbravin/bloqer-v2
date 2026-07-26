@@ -608,18 +608,20 @@
 ### D-047 — APU: persistencia unitaria; entrada opcional por total de partida
 
 - **Fecha:** 2026-07-16
-- **Estado:** ACTIVA (enmendada 2026-07-24)
+- **Estado:** ACTIVA (enmendada 2026-07-24; UI 2026-07-26)
 - **Decidido por:** Owner
 - **Contexto:** Al cargar APU, materiales/MO suelen venir como totales de obra (p. ej. global $1.250.000) o consumos absolutos (500 bolsas), mientras el ítem tiene cantidad contractual (900 m²). Si se cargan esos valores como si fueran por unidad, el sistema multiplica otra vez por la cantidad del ítem y distorsiona el costo. La conversión money-safe original (`coefficient = 1`) destruía la cantidad física y rompía necesidades de materiales/OC.
 - **Decisión:**
   1. Las líneas APU contribuyen **por 1 unidad** del `CostItem` en dinero: `unitCostDirect = Σ totalCost`; `totalCostDirect = unitCostDirect × CostItem.quantity`. `totalCost` de línea es el aporte unitario **autoritativo** (2 dp half-up, [D-053]).
-  2. La UI ofrece **Por unidad** y **Total partida** (default). Total partida tiene dos submodos: **Cantidad de recurso** y **Monto global**.
-  3. **Cantidad de recurso** (p. ej. 500 un × $6.000): persiste `partidaQuantity = cant`, `unitCost = precio_recurso`, `coefficient = cant / Qty`, `totalCost = roundMoney((cant × precio) / Qty)`, `isLumpSum = false`. Necesidad física = `partidaQuantity`.
-  4. **Monto global** (p. ej. 1 × $1.250.000): money-safe — `coefficient = 1`, `unitCost = totalCost = monto / Qty`, `partidaQuantity = 1`, `isLumpSum = true`. No usar `coefficient = 1/Qty` (pierde dinero a 4 dp).
-  5. **Por unidad:** `partidaQuantity = null`, `isLumpSum = false`; `coefficient` y `unitCost` como se cargan; necesidad = `coefficient × Qty`.
-  6. Si `CostItem.quantity ≤ 0`, el modo Total partida no aplica. Al cambiar `Qty` con `partidaQuantity` set: recomputar coef/`totalCost` (recurso) o `unitCost`/`totalCost` (global).
-- **Implicancias:** schema `partidaQuantity` + `isLumpSum` en `CostAnalysisLine`. Materials board: `needQty = partidaQuantity ?? coefficient × Qty`. Sin backfill automático de filas históricas `coef=1` ambiguas.
+  2. **UI (camino feliz):** solo **Por unidad** | **Total partida** (default). Sin sub-toggle Monto global. Tooltips en hover aclaran cada modo.
+  3. **Total partida** = cantidad de recurso (p. ej. 500 un × $6.000): persiste `partidaQuantity = cant`, `unitCost = precio_recurso`, `coefficient = cant / Qty`, `totalCost = roundMoney((cant × precio) / Qty)`, `isLumpSum = false`.
+  4. **Importes sin compra:** unidad canónica **`gl` (Global)** + cant. recurso (1 o N) + precio = monto. Se persiste como **resource** (`isLumpSum = false`). Materials board: `needQty = 0` si `isLumpSum` **o** `unit = gl`. **No** marcar `isLumpSum` solo por `gl` (rompería recompute al cambiar Qty del ítem).
+  5. **Por unidad:** `partidaQuantity = null`, `isLumpSum = false`; `coefficient` y `unitCost` como se cargan; necesidad = `coefficient × Qty` (salvo `gl`).
+  6. **Legacy `isLumpSum` (Monto global UI):** dominio money-safe (`coef=1`, `unitCost = monto/Qty`) se conserva al leer; al editar/guardar desde UI se convierte a resource + `unit=gl`.
+  7. Si `CostItem.quantity ≤ 0`, el modo Total partida no aplica. Al cambiar `Qty` con `partidaQuantity` set: recomputar coef/`totalCost` (resource). Lump legacy: `recomputeLumpForItemQuantity`.
+- **Implicancias:** schema `partidaQuantity` + `isLumpSum`; helper `isGlobalUnit`. Modal APU: Datos del ítem → costo por categoría → Insumos (alta arriba del listado).
 - **Documentos afectados:** [`04-formulas/BUDGET_FORMULAS.md`](../04-formulas/BUDGET_FORMULAS.md), [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md), [D-057](#d-057--partida-certificable-vs-insumo-apu), [D-058](#d-058--apu-muestra-costo-venta-en-tabla-edt).
+- **Amend (2026-07-26):** UI sin Monto global; Global (`gl`) = no comprable; `isLumpSum` solo legacy.
 
 ---
 

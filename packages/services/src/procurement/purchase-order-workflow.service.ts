@@ -25,7 +25,10 @@ import {
   notifyPurchaseOrderPendingApproval,
   notifyPurchaseOrderReturned,
 } from "./procurement-notifications.service";
-import { budgetBaselineForWbs, getWbsBudgetReference } from "./procurement-budget-baseline";
+import {
+  budgetBaselineForPurchaseLine,
+  getWbsBudgetReference,
+} from "./procurement-budget-baseline";
 import type { PurchaseOrderView } from "./purchase-order.service";
 
 async function reloadPoView(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
@@ -82,7 +85,15 @@ async function applyVarianceSnapshots(
       );
     }
 
-    const baseline = await budgetBaselineForWbs(line.wbsNodeId, tx);
+    const baseline = await budgetBaselineForPurchaseLine(
+      line.wbsNodeId,
+      {
+        productId: line.productId,
+        description: line.description,
+        unit: line.unit,
+      },
+      tx,
+    );
     let budgetUnitCost = line.budgetUnitCostSnapshot;
     if (!budgetUnitCost && baseline.unitCost) {
       budgetUnitCost = baseline.unitCost;

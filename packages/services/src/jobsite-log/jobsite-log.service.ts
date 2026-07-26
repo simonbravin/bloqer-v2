@@ -1173,14 +1173,31 @@ export async function cancelJobsiteLog(id: string, ctx: ServiceContext): Promise
 export async function listProjectWbsItemsForLog(projectId: string, ctx: ServiceContext) {
   await assertJobsiteLogTenantModule(ctx);
   if (!canViewJobsiteLogArea(ctx.roles)) throw new ServiceError("FORBIDDEN", "Sin permisos");
-  const nodes = await prisma.wbsNode.findMany({
-    where: {
-      type: "ITEM",
-      budget: {
+
+  // Scope to cost-control / schedule baseline budget — not every APPROVED+CLOSED version.
+  const schedule = await prisma.schedule.findFirst({
+    where: { projectId, tenantId: ctx.tenantId },
+    select: { baselineBudgetId: true },
+  });
+  let budgetId = schedule?.baselineBudgetId ?? null;
+  if (!budgetId) {
+    const ccBudget = await prisma.budget.findFirst({
+      where: {
         projectId,
         tenantId: ctx.tenantId,
         status: { in: ["APPROVED", "CLOSED"] },
       },
+      orderBy: [{ status: "asc" }, { versionNumber: "desc" }],
+      select: { id: true },
+    });
+    budgetId = ccBudget?.id ?? null;
+  }
+  if (!budgetId) return [];
+
+  const nodes = await prisma.wbsNode.findMany({
+    where: {
+      type: "ITEM",
+      budgetId,
     },
     select: {
       id: true,

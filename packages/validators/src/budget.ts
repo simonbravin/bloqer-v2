@@ -87,6 +87,8 @@ export const createCostAnalysisLineSchema = z.object({
   /** Absolute resource qty for whole partida ([D-047]); null/omit = Por unidad. */
   partidaQuantity: z.number().min(0).nullable().optional(),
   isLumpSum: z.boolean().optional(),
+  /** Catalog product for materials → OC / inventory traceability. */
+  productId: z.string().uuid().nullable().optional(),
   sortOrder: z.number().int().min(0).optional(),
   supplierContactId: z.string().uuid().optional(),
   notes: z.string().max(2000).optional(),
@@ -101,6 +103,7 @@ export const updateCostAnalysisLineSchema = z.object({
   totalCost: z.number().min(0).optional(),
   partidaQuantity: z.number().min(0).nullable().optional(),
   isLumpSum: z.boolean().optional(),
+  productId: z.string().uuid().nullable().optional(),
   sortOrder: z.number().int().min(0).optional(),
   supplierContactId: z.string().uuid().nullable().optional(),
   notes: z.string().max(2000).optional(),
@@ -123,6 +126,7 @@ export const saveCostItemApuSchema = z.object({
       totalCost: z.number().min(0),
       partidaQuantity: z.number().min(0).nullable().optional(),
       isLumpSum: z.boolean().optional(),
+      productId: z.string().uuid().nullable().optional(),
       sortOrder: z.number().int().min(0).optional(),
       notes: z.string().max(2000).nullable().optional(),
       _delete: z.boolean().optional(),

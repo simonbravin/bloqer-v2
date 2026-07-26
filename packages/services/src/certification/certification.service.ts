@@ -241,10 +241,24 @@ export async function issueCertification(id: string, ctx: ServiceContext): Promi
     // Re-check status inside txn — rejects if a concurrent call already issued
     assertCertificationEditable(cert);
 
+    if (cert.lines.length === 0) {
+      throw new ServiceError(
+        "VALIDATION",
+        "No se puede emitir una certificación sin líneas",
+      );
+    }
+
     // BR-CERT-002: validate + recalc using tx client exclusively (no global prisma)
     for (const line of cert.lines) {
       const livePrev = await _computePreviousQty(tx as never, line.wbsNodeId, id);
       const cumulative = livePrev.plus(line.currentQty);
+
+      // Ceiling vs presupuesto vigente (live CostItem.quantity); keep sale snapshot frozen.
+      const liveCostItem = await tx.costItem.findFirst({
+        where: { wbsNodeId: line.wbsNodeId },
+        select: { quantity: true },
+      });
+      const ceilingQty = liveCostItem?.quantity ?? line.budgetQty;
 
       // Freeze recalculated previousQty and cumulativeQty on each line
       await tx.certificationLine.update({
@@ -252,16 +266,17 @@ export async function issueCertification(id: string, ctx: ServiceContext): Promi
         data: {
           previousQty:   livePrev,
           cumulativeQty: cumulative,
+          budgetQty: ceilingQty,
           // unitSalePriceSnapshot intentionally NOT updated — frozen at line creation
         },
       });
 
-      if (cumulative.greaterThan(line.budgetQty)) {
+      if (cumulative.greaterThan(ceilingQty)) {
         assertCertificationLineWithinBudget({
           projectType: cert.project.type,
           itemCode: line.wbsNode.code,
           cumulative,
-          budgetQty: line.budgetQty,
+          budgetQty: ceilingQty,
           certificationNotes: cert.notes,
         });
       }

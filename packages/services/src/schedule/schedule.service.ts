@@ -587,6 +587,20 @@ export async function updateScheduleItemProgress(
   }
   const item = await getScheduleItemForMutation(scheduleItemId, ctx);
 
+  // [D-046] Containers are date-derived; progress is leaf-only (manual % on parents misleads).
+  const hasActiveChildren = await prisma.scheduleItem.count({
+    where: {
+      parentId: item.id,
+      status: { not: "CANCELLED" },
+    },
+  });
+  if (hasActiveChildren > 0) {
+    throw new ServiceError(
+      "VALIDATION",
+      "El avance se carga en tareas hoja. Las tareas contenedoras no aceptan % manual.",
+    );
+  }
+
   const before = { progressPct: item.progressPct.toFixed(2) };
   const updated = await prisma.scheduleItem.update({
     where: { id: item.id },

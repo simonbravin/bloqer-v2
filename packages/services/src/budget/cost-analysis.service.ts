@@ -1,7 +1,10 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { CostAnalysisLine } from "@bloqer/database";
 import {
+  APU_GLOBAL_UNIT,
   can,
+  isGlobalUnit,
+  migrateLegacyLumpToGlobalResource,
   normalizeStoredApuLineForItemQuantity,
   recomputeLumpForItemQuantity,
   recomputeResourceForItemQuantity,
@@ -116,19 +119,36 @@ export async function addCostAnalysisLine(
   }
 
   const line = await prisma.$transaction(async (tx) => {
-    const totalCost = resolveLineTotalCost(input.coefficient, input.unitCost, input.totalCost);
+    const itemQtyN = Number(costItem.quantity.toString());
+    const resolvedTotal = resolveLineTotalCost(input.coefficient, input.unitCost, input.totalCost);
+    let stored = normalizeStoredApuLineForItemQuantity(
+      {
+        coefficient: input.coefficient,
+        unitCost: input.unitCost,
+        totalCost: Number(resolvedTotal.toString()),
+        partidaQuantity: input.partidaQuantity ?? null,
+        isLumpSum: input.isLumpSum ?? false,
+      },
+      itemQtyN,
+    );
+    let unit = input.unit;
+    if (stored.isLumpSum) {
+      stored = migrateLegacyLumpToGlobalResource(stored, itemQtyN);
+      unit = isGlobalUnit(unit) ? unit : APU_GLOBAL_UNIT;
+    }
     const l = await tx.costAnalysisLine.create({
       data: {
         costItemId: input.costItemId,
         budgetId: costItem.budgetId,
         category: input.category,
         description: input.description,
-        unit: input.unit,
-        coefficient: input.coefficient,
-        unitCost: input.unitCost,
-        totalCost,
-        partidaQuantity: input.partidaQuantity ?? null,
-        isLumpSum: input.isLumpSum ?? false,
+        unit,
+        coefficient: stored.coefficient,
+        unitCost: stored.unitCost,
+        totalCost: stored.totalCost,
+        partidaQuantity: stored.partidaQuantity,
+        isLumpSum: stored.isLumpSum,
+        productId: input.productId ?? null,
         sortOrder: input.sortOrder ?? 0,
         supplierContactId: input.supplierContactId ?? null,
         notes: input.notes ?? null,
@@ -166,24 +186,61 @@ export async function updateCostAnalysisLine(
   await _guardLine(existing.costItemId, ctx);
 
   const updated = await prisma.$transaction(async (tx) => {
+    const costItemRow = await tx.costItem.findUniqueOrThrow({
+      where: { id: existing.costItemId },
+      select: { quantity: true },
+    });
+    const itemQtyN = Number(costItemRow.quantity.toString());
     const newCoefficient =
-      input.coefficient !== undefined ? new Prisma.Decimal(input.coefficient) : existing.coefficient;
+      input.coefficient !== undefined ? Number(input.coefficient) : Number(existing.coefficient.toString());
     const newUnitCost =
-      input.unitCost !== undefined ? new Prisma.Decimal(input.unitCost) : existing.unitCost;
-    const totalCost = resolveLineTotalCost(
+      input.unitCost !== undefined ? Number(input.unitCost) : Number(existing.unitCost.toString());
+    const resolvedTotal = resolveLineTotalCost(
       newCoefficient,
       newUnitCost,
-      input.totalCost,
+      input.totalCost !== undefined
+        ? input.totalCost
+        : Number(existing.totalCost.toString()),
     );
+    const partidaQuantity =
+      input.partidaQuantity !== undefined
+        ? input.partidaQuantity
+        : existing.partidaQuantity != null
+          ? Number(existing.partidaQuantity.toString())
+          : null;
+    const isLumpSum =
+      input.isLumpSum !== undefined ? input.isLumpSum : existing.isLumpSum;
+    let stored = normalizeStoredApuLineForItemQuantity(
+      {
+        coefficient: newCoefficient,
+        unitCost: newUnitCost,
+        totalCost: Number(resolvedTotal.toString()),
+        partidaQuantity,
+        isLumpSum,
+      },
+      itemQtyN,
+    );
+    let unit = input.unit !== undefined ? input.unit : existing.unit;
+    if (stored.isLumpSum) {
+      stored = migrateLegacyLumpToGlobalResource(stored, itemQtyN);
+      unit = isGlobalUnit(unit) ? unit : APU_GLOBAL_UNIT;
+    }
 
     const l = await tx.costAnalysisLine.update({
       where: { id },
       data: {
-        ...input,
-        totalCost,
-        partidaQuantity:
-          input.partidaQuantity === undefined ? undefined : input.partidaQuantity,
-        isLumpSum: input.isLumpSum,
+        category: input.category,
+        description: input.description,
+        unit,
+        coefficient: stored.coefficient,
+        unitCost: stored.unitCost,
+        totalCost: stored.totalCost,
+        partidaQuantity: stored.partidaQuantity,
+        isLumpSum: stored.isLumpSum,
+        productId: input.productId === undefined ? undefined : input.productId,
+        sortOrder: input.sortOrder,
+        supplierContactId: input.supplierContactId,
+        notes: input.notes,
       },
     });
     const settings = await tx.budgetSettings.findUniqueOrThrow({ where: { budgetId: existing.budgetId } });
@@ -295,7 +352,7 @@ export async function saveCostItemApu(
       const partidaQuantity = line.partidaQuantity === undefined ? null : line.partidaQuantity;
       const isLumpSum = line.isLumpSum ?? false;
       const resolvedTotal = resolveLineTotalCost(line.coefficient, line.unitCost, line.totalCost);
-      const normalized = normalizeStoredApuLineForItemQuantity(
+      let normalized = normalizeStoredApuLineForItemQuantity(
         {
           coefficient: line.coefficient,
           unitCost: line.unitCost,
@@ -305,6 +362,11 @@ export async function saveCostItemApu(
         },
         itemQtyN,
       );
+      let unit = line.unit;
+      if (normalized.isLumpSum) {
+        normalized = migrateLegacyLumpToGlobalResource(normalized, itemQtyN);
+        unit = isGlobalUnit(unit) ? unit : APU_GLOBAL_UNIT;
+      }
 
       if (line.id && existingIds.has(line.id)) {
         await tx.costAnalysisLine.update({
@@ -312,12 +374,13 @@ export async function saveCostItemApu(
           data: {
             category: line.category,
             description: line.description,
-            unit: line.unit,
+            unit,
             coefficient: normalized.coefficient,
             unitCost: normalized.unitCost,
             totalCost: normalized.totalCost,
             partidaQuantity: normalized.partidaQuantity,
             isLumpSum: normalized.isLumpSum,
+            productId: line.productId === undefined ? undefined : line.productId,
             sortOrder: line.sortOrder ?? 0,
             notes: line.notes ?? null,
           },
@@ -330,12 +393,13 @@ export async function saveCostItemApu(
             budgetId: costItem.budgetId,
             category: line.category,
             description: line.description,
-            unit: line.unit,
+            unit,
             coefficient: normalized.coefficient,
             unitCost: normalized.unitCost,
             totalCost: normalized.totalCost,
             partidaQuantity: normalized.partidaQuantity,
             isLumpSum: normalized.isLumpSum,
+            productId: line.productId ?? null,
             sortOrder: line.sortOrder ?? 0,
             notes: line.notes ?? null,
           },

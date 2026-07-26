@@ -2,14 +2,23 @@
  * APU entry modes ([D-047] amended):
  * - Lines contribute money per 1 unit of the CostItem (`totalCost` is authoritative).
  * - "total" + resource: keep partidaQuantity + resource unit price; derive coefficient.
- * - "total" + lump: money-safe coef=1, unitCost = monto/itemQty (globals).
+ * - "total" + lump: legacy money-safe coef=1 (UI deprecated; prefer unit `gl` + resource).
  * - "unit": coefficient × unitCost as entered; partidaQuantity = null.
+ * - Unit `gl` (Global): non-purchasable in materials; still stored as resource when cant×precio.
  */
 
 export type ApuEntryMode = "unit" | "total";
 
-/** Sub-mode when entry mode is "total". */
+/** Sub-mode when entry mode is "total". `lump` is legacy-only in UI. */
 export type ApuTotalKind = "resource" | "lump";
+
+/** Canonical budget unit value for non-purchasable globals ([D-047]). */
+export const APU_GLOBAL_UNIT = "gl";
+
+/** True when line unit is Global (`gl`) — no materials needQty. */
+export function isGlobalUnit(unit: string | null | undefined): boolean {
+  return (unit ?? "").trim().toLowerCase() === APU_GLOBAL_UNIT;
+}
 
 export type ApuLineAmounts = {
   coefficient: number;
@@ -224,12 +233,45 @@ export function canUseTotalPartidaMode(itemQuantity: number): boolean {
   return Number.isFinite(itemQuantity) && itemQuantity > 0;
 }
 
-/** Physical need for materials board / OC. */
+/**
+ * Lazy migrate legacy Monto global (`isLumpSum`) → resource amounts for 1 Global × monto.
+ * Caller must set `unit = gl` when persisting. Money-preserving for itemQuantity > 0.
+ */
+export function migrateLegacyLumpToGlobalResource(
+  line: ApuStoredLine,
+  itemQuantity: number,
+): ApuStoredLine {
+  if (!line.isLumpSum) return line;
+  const qty = finiteOrZero(itemQuantity);
+  if (qty <= 0) return line;
+  const partidaMoney = finiteOrZero(line.totalCost) * qty;
+  return toStoredApuLine({
+    mode: "total",
+    totalKind: "resource",
+    coefficient: 1,
+    unitCost: partidaMoney,
+    itemQuantity: qty,
+  });
+}
+
+export type PhysicalNeedOpts = {
+  /** Legacy Monto global — never purchasable. */
+  isLumpSum?: boolean;
+  /** Unit `gl` (Global) — non-purchasable ([D-047]). */
+  unit?: string | null;
+};
+
+/**
+ * Physical need for materials board / OC ([D-047]).
+ * Returns 0 for legacy lump and for unit Global (`gl`).
+ */
 export function physicalNeedQty(
   partidaQuantity: number | null | undefined,
   coefficient: number,
   itemQuantity: number,
+  opts?: PhysicalNeedOpts,
 ): number {
+  if (opts?.isLumpSum || isGlobalUnit(opts?.unit)) return 0;
   if (partidaQuantity != null && Number.isFinite(partidaQuantity)) {
     return finiteOrZero(partidaQuantity);
   }

@@ -18,7 +18,7 @@ import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { onPurchaseOrderDraftCancelled } from "./purchase-request-to-po.service";
 import {
   assertWbsRequiredOnLines,
-  budgetUnitCostForWbs,
+  budgetBaselineForPurchaseLine,
   getWbsBudgetReference,
 } from "./procurement-budget-baseline";
 import {
@@ -382,7 +382,15 @@ export async function createPurchaseOrder(
       const price = new Prisma.Decimal(line.unitPrice);
       const rate = new Prisma.Decimal(line.taxRate ?? "0");
       const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, rate);
-      const budgetSnapshot = await budgetUnitCostForWbs(line.wbsNodeId, tx);
+      const baseline = await budgetBaselineForPurchaseLine(
+        line.wbsNodeId,
+        {
+          productId: line.productId,
+          description: line.description,
+          unit: line.unit ?? "",
+        },
+        tx,
+      );
       await tx.purchaseOrderLine.create({
         data: {
           purchaseOrderId: created.id,
@@ -396,7 +404,7 @@ export async function createPurchaseOrder(
           lineSubtotal,
           lineTax,
           lineTotal,
-          budgetUnitCostSnapshot: budgetSnapshot,
+          budgetUnitCostSnapshot: baseline.unitCost,
           varianceJustification: line.varianceJustification?.trim() || null,
           sortOrder: line.sortOrder ?? 0,
         },
@@ -483,10 +491,21 @@ export async function updatePurchaseOrder(
         const price = new Prisma.Decimal(line.unitPrice);
         const rate  = new Prisma.Decimal(line.taxRate ?? "0");
         const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, rate);
+        const baseline = await budgetBaselineForPurchaseLine(
+          line.wbsNodeId,
+          {
+            productId: line.productId,
+            description: line.description,
+            unit: line.unit ?? "",
+          },
+          tx,
+        );
         const budgetSnapshot =
-          prev?.wbsNodeId === line.wbsNodeId && prev.budgetUnitCostSnapshot
+          prev?.wbsNodeId === line.wbsNodeId &&
+          prev.description === line.description &&
+          prev.budgetUnitCostSnapshot
             ? prev.budgetUnitCostSnapshot
-            : await budgetUnitCostForWbs(line.wbsNodeId, tx);
+            : baseline.unitCost;
         await tx.purchaseOrderLine.create({
           data: {
             purchaseOrderId: id,

@@ -9,6 +9,8 @@ export type ApuDisplayLine = {
   totalCost: number;
   partidaQuantity: number | null;
   isLumpSum: boolean;
+  /** Optional; unit `gl` still shows resource qty (1/N) — materials need is gated separately. */
+  unit?: string | null;
 };
 
 function finiteOrZero(n: number): number {
@@ -16,9 +18,8 @@ function finiteOrZero(n: number): number {
 }
 
 /**
- * Lump / global monto for qty display: only the explicit flag ([D-047] totalKind=lump).
- * Legacy rows without `isLumpSum` keep coef×qty (ambiguous); re-save as Monto global to flag them.
- * Do not treat unit-mode "1 × precio / und. ítem" as lump (coef=1 + null partidaQuantity).
+ * Legacy lump flag for qty display ([D-047] isLumpSum).
+ * New globals use unit `gl` + resource qty (not this flag). UI shows "—" for lump kind.
  */
 export function isLumpApuDisplay(line: Pick<ApuDisplayLine, "isLumpSum">): boolean {
   return line.isLumpSum === true;
@@ -28,7 +29,7 @@ export type ResourceQtyDisplay =
   | { kind: "resource"; qty: number }
   | { kind: "lump" };
 
-/** Physical resource qty for UI; lump/legacy never shows coef×itemQty as resource need. */
+/** Physical resource qty for UI; legacy lump never shows coef×itemQty as resource need. */
 export function resourceQtyDisplay(line: ApuDisplayLine, itemQuantity: number): ResourceQtyDisplay {
   if (isLumpApuDisplay(line)) {
     return { kind: "lump" };

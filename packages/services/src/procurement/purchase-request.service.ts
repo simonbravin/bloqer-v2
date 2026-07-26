@@ -8,7 +8,7 @@ import { assertProjectAllowsOperationalMutation } from "../project/project-opera
 import { assertWbsLineForProject } from "./procurement-wbs";
 import {
   assertWbsRequiredOnLines,
-  budgetBaselineForWbs,
+  budgetBaselineForPurchaseLine,
 } from "./procurement-budget-baseline";
 import { notifyPurchaseRequestSubmitted } from "./procurement-notifications.service";
 import {
@@ -218,7 +218,15 @@ export async function submitPurchaseRequest(id: string, ctx: ServiceContext): Pr
           "Todas las líneas deben tener WBS antes de enviar la solicitud",
         );
       }
-      const baseline = await budgetBaselineForWbs(line.wbsNodeId, tx);
+      const baseline = await budgetBaselineForPurchaseLine(
+        line.wbsNodeId,
+        {
+          productId: line.productId,
+          description: line.description,
+          unit: line.unit,
+        },
+        tx,
+      );
       await tx.purchaseRequestLine.update({
         where: { id: line.id },
         data: {

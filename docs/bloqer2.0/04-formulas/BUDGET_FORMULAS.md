@@ -33,7 +33,7 @@ CD_{unit} = \sum_{lines \in CostAnalysis} cost_{line}
 La UI puede cargar una línea en modo **Total partida** ([D-047] enmendada):
 
 - **Cantidad de recurso** (ej. 500 un × $6.000): `partidaQuantity = 500`, `unitCost = precio`, `coefficient = 500/Qty`, `totalCost = roundMoney((500×precio)/Qty)`. Necesidad física = `partidaQuantity`.
-- **Monto global** (ej. $1.250.000): money-safe `coefficient = 1`, `unitCost = totalCost = monto/Qty`, `isLumpSum = true`.
+- **Importe Global** (ej. 1 `gl` × $1.250.000): mismo path resource; `needQty = 0` porque `unit = gl`. Legacy `isLumpSum` (Monto global UI): money-safe `coefficient = 1`, `unitCost = monto/Qty` al leer; al re-guardar → `gl` + resource.
 
 ### Ejemplo numérico — recurso
 

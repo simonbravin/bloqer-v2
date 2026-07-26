@@ -1,5 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { can, physicalNeedQty } from "@bloqer/domain";
 import {
   addCalendarDays,
   calendarPartsInTimeZone,
@@ -200,6 +200,7 @@ export async function getProjectMaterialsBoard(
           totalCost: true,
           partidaQuantity: true,
           isLumpSum: true,
+          unit: true,
         },
       },
     },
@@ -220,13 +221,18 @@ export async function getProjectMaterialsBoard(
 
   for (const item of costItems) {
     for (const line of item.analysisLines) {
+      // [D-047] recurso: partidaQuantity; lump legacy / unit `gl`: no necesidad física
+      const needQty = new Prisma.Decimal(
+        physicalNeedQty(
+          line.partidaQuantity != null ? Number(line.partidaQuantity.toString()) : null,
+          Number(line.coefficient.toString()),
+          Number(item.quantity.toString()),
+          { isLumpSum: line.isLumpSum, unit: line.unit },
+        ),
+      );
+      // Non-purchasable lines must not appear as material need rows.
+      if (needQty.isZero()) continue;
       const key = rowKey(item.wbsNodeId, line.productId, line.description);
-      // [D-047] recurso: partidaQuantity; lump: money-only (partidaQuantity=1 ≠ necesidad física)
-      const needQty = line.isLumpSum
-        ? ZERO
-        : line.partidaQuantity != null
-          ? new Prisma.Decimal(line.partidaQuantity)
-          : new Prisma.Decimal(line.coefficient).mul(item.quantity);
       const needCost = new Prisma.Decimal(line.totalCost).mul(item.quantity);
       const prev = map.get(key);
       if (prev) {
@@ -277,6 +283,10 @@ export async function getProjectMaterialsBoard(
           projectId,
           tenantId: ctx.tenantId,
           status: { in: [...ORDERED_PR_STATUSES] },
+          // Avoid double-count when SC already spawned a CONFIRMED+ OC.
+          purchaseOrders: {
+            none: { status: { in: [...ORDERED_PO_STATUSES] } },
+          },
         },
         wbsNodeId: { not: null },
       },

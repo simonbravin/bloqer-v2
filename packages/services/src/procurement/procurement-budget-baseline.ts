@@ -1,13 +1,115 @@
 import { Prisma, prisma } from "@bloqer/database";
+import { isGlobalUnit, physicalNeedQty } from "@bloqer/domain";
 import { ServiceError } from "../types";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
-/** Material APU unit cost + CostItem.unit for a WBS ITEM. */
+function normalizeDesc(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export type BudgetLineBaseline = {
+  unitCost: Prisma.Decimal | null;
+  unit: string | null;
+  quantity: Prisma.Decimal | null;
+};
+
+type AnalysisLineRow = {
+  productId: string | null;
+  description: string;
+  unit: string;
+  unitCost: Prisma.Decimal;
+  coefficient: Prisma.Decimal;
+  totalCost: Prisma.Decimal;
+  partidaQuantity: Prisma.Decimal | null;
+  isLumpSum: boolean;
+};
+
+/**
+ * Match a purchase line to a MATERIAL APU resource line (productId → desc+unit → desc).
+ * Returns resource unit + resource unit price + physical need qty — not CostItem.unit.
+ */
+export async function budgetBaselineForPurchaseLine(
+  wbsNodeId: string,
+  match: { productId?: string | null; description: string; unit: string },
+  db: DbClient = prisma,
+): Promise<BudgetLineBaseline> {
+  const item = await db.costItem.findFirst({
+    where: { wbsNodeId },
+    select: {
+      quantity: true,
+      analysisLines: {
+        where: { category: "MATERIAL" },
+        select: {
+          productId: true,
+          description: true,
+          unit: true,
+          unitCost: true,
+          coefficient: true,
+          totalCost: true,
+          partidaQuantity: true,
+          isLumpSum: true,
+        },
+      },
+    },
+  });
+  if (!item) return { unitCost: null, unit: null, quantity: null };
+
+  const purchasable = item.analysisLines.filter(
+    (l) =>
+      !l.isLumpSum &&
+      !isGlobalUnit(l.unit) &&
+      physicalNeedQty(
+        l.partidaQuantity != null ? Number(l.partidaQuantity.toString()) : null,
+        Number(l.coefficient.toString()),
+        Number(item.quantity.toString()),
+        { isLumpSum: l.isLumpSum, unit: l.unit },
+      ) > 0,
+  );
+
+  const pick = (lines: AnalysisLineRow[]): AnalysisLineRow | null => {
+    if (match.productId) {
+      const byProduct = lines.find((l) => l.productId === match.productId);
+      if (byProduct) return byProduct;
+    }
+    const desc = normalizeDesc(match.description);
+    const unit = match.unit.trim().toLowerCase();
+    const byDescUnit = lines.find(
+      (l) => normalizeDesc(l.description) === desc && l.unit.trim().toLowerCase() === unit,
+    );
+    if (byDescUnit) return byDescUnit;
+    const byDesc = lines.find((l) => normalizeDesc(l.description) === desc);
+    return byDesc ?? null;
+  };
+
+  const line = pick(purchasable) ?? pick(item.analysisLines);
+  if (!line) {
+    return { unitCost: null, unit: null, quantity: item.quantity };
+  }
+
+  const need = physicalNeedQty(
+    line.partidaQuantity != null ? Number(line.partidaQuantity.toString()) : null,
+    Number(line.coefficient.toString()),
+    Number(item.quantity.toString()),
+    { isLumpSum: line.isLumpSum, unit: line.unit },
+  );
+
+  return {
+    unitCost: line.unitCost,
+    unit: line.unit || null,
+    quantity: new Prisma.Decimal(need),
+  };
+}
+
+/**
+ * Aggregated purchasable MATERIAL baseline for a WBS ITEM.
+ * Money = Σ totalCost×qty of purchasable lines; unitCost = money/qty when qty>0 (partida $/und ítem).
+ * Prefer {@link budgetBaselineForPurchaseLine} for OC/SC line variance (resource units).
+ */
 export async function budgetBaselineForWbs(
   wbsNodeId: string,
   db: DbClient = prisma,
-): Promise<{ unitCost: Prisma.Decimal | null; unit: string | null; quantity: Prisma.Decimal | null }> {
+): Promise<BudgetLineBaseline> {
   const item = await db.costItem.findFirst({
     where: { wbsNodeId },
     select: {
@@ -15,7 +117,14 @@ export async function budgetBaselineForWbs(
       quantity: true,
       analysisLines: {
         where: { category: "MATERIAL" },
-        select: { unitCost: true, coefficient: true },
+        select: {
+          unitCost: true,
+          coefficient: true,
+          totalCost: true,
+          partidaQuantity: true,
+          isLumpSum: true,
+          unit: true,
+        },
       },
     },
   });
@@ -23,14 +132,31 @@ export async function budgetBaselineForWbs(
   if (item.analysisLines.length === 0) {
     return { unitCost: null, unit: item.unit || null, quantity: item.quantity };
   }
-  const unitCost = item.analysisLines.reduce(
-    (s, l) => s.plus(new Prisma.Decimal(l.unitCost).times(l.coefficient)),
-    new Prisma.Decimal(0),
-  );
+
+  let partidaMoney = new Prisma.Decimal(0);
+  for (const l of item.analysisLines) {
+    const need = physicalNeedQty(
+      l.partidaQuantity != null ? Number(l.partidaQuantity.toString()) : null,
+      Number(l.coefficient.toString()),
+      Number(item.quantity.toString()),
+      { isLumpSum: l.isLumpSum, unit: l.unit },
+    );
+    if (need <= 0) continue;
+    partidaMoney = partidaMoney.plus(new Prisma.Decimal(l.totalCost).times(item.quantity));
+  }
+
+  if (partidaMoney.isZero()) {
+    return { unitCost: null, unit: item.unit || null, quantity: item.quantity };
+  }
+
+  const unitCost = item.quantity.gt(0)
+    ? partidaMoney.div(item.quantity)
+    : partidaMoney;
+
   return { unitCost, unit: item.unit || null, quantity: item.quantity };
 }
 
-/** Material APU unit cost for a WBS ITEM (sum of MATERIAL analysis lines). */
+/** Material APU unit cost for a WBS ITEM (sum of purchasable MATERIAL analysis lines). */
 export async function budgetUnitCostForWbs(
   wbsNodeId: string,
   db: DbClient = prisma,
@@ -54,7 +180,7 @@ export type WbsBudgetReference = {
   budgetUnitCost: string | null;
   budgetUnit: string | null;
   budgetQuantity: string | null;
-  /** Budgeted material total ≈ unit × qty when both present. */
+  /** Budgeted purchasable material total (excludes gl / legacy lump). */
   budgetedMaterialTotal: string | null;
   committedOnConfirmedPos: string;
   /** budgetedMaterialTotal − committed (null if no baseline). Alert-only in Fase 1. */
