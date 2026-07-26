@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@bloqer/auth";
+import { getSession } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import { CompanyOnboardingFields } from "@/features/platform";
 import { provisionPlatformTenantAction } from "@/app/(platform)/platform-provision-actions";
@@ -12,7 +12,7 @@ interface PageProps {
 }
 
 export default async function PlatformTenantsNewPage({ searchParams }: PageProps) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) redirect("/login");
   const sp = await searchParams;
   let errMsg: string | null = null;

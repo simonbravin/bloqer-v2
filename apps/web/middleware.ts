@@ -1,5 +1,5 @@
 import { auth } from "@bloqer/auth/middleware";
-import { isInvitationAcceptCallbackUrl } from "@/lib/invitation-auth";
+import { safeCallbackUrl } from "@/lib/auth-callback-url";
 import { NextResponse } from "next/server";
 
 const PUBLIC_EXACT = new Set([
@@ -17,27 +17,23 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
-/** Only bounce signed-in users away from entry screens (keep verify/reset usable). */
-function isAuthEntryPath(pathname: string): boolean {
-  return pathname === "/login" || pathname === "/registro";
-}
-
 export default auth((req) => {
   const isAuthenticated = !!req.auth;
   const pathname = req.nextUrl.pathname;
   const publicPath = isPublicPath(pathname);
 
   if (!isAuthenticated && !publicPath) {
-    return NextResponse.redirect(new URL("/login", req.nextUrl));
+    const loginUrl = new URL("/login", req.nextUrl);
+    loginUrl.searchParams.set(
+      "callbackUrl",
+      safeCallbackUrl(`${pathname}${req.nextUrl.search}`),
+    );
+    return NextResponse.redirect(loginUrl);
   }
 
-  if (isAuthenticated && isAuthEntryPath(pathname)) {
-    const callbackUrl = req.nextUrl.searchParams.get("callbackUrl");
-    if (callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//") && isInvitationAcceptCallbackUrl(callbackUrl)) {
-      return NextResponse.redirect(new URL(callbackUrl, req.nextUrl));
-    }
-    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
-  }
+  // Do NOT bounce JWT holders away from /login|/registro here.
+  // Edge auth cannot check User.status / pwdAt; RSC pages call getSession() and
+  // redirect only when the session is still valid (avoids suspend → login loops).
 
   return NextResponse.next();
 });

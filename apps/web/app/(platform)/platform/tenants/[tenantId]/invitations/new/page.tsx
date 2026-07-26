@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@bloqer/auth";
+import { getSession } from "@/lib/auth";
 import { getPlatformTenantById, listPlatformTenantCompanies, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { TenantInvitationForm } from "@/features/platform";
@@ -14,7 +14,7 @@ interface PageProps {
 }
 
 export default async function PlatformTenantInvitationsNewPage({ params, searchParams }: PageProps) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) redirect("/login");
   const { tenantId } = await params;
   const sp = await searchParams;

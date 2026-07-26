@@ -2,7 +2,7 @@ import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { platformAuditActionLabel } from "@/features/platform/platform-audit-labels";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@bloqer/auth";
+import { getSession } from "@/lib/auth";
 import {
   getPlatformTenantById,
   listPlatformAuditLogForTenant,
@@ -18,7 +18,7 @@ interface PageProps {
 }
 
 export default async function PlatformTenantDetailPage({ params }: PageProps) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) redirect("/login");
   const { tenantId } = await params;
   const ctx = await getPlatformServiceContext(session.user.id);

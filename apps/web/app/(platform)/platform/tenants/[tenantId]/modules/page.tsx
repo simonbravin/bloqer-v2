@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@bloqer/auth";
+import { getSession } from "@/lib/auth";
 import {
   listPlatformTenantModuleRows,
   summarizePlatformTenantModuleCoverage,
@@ -24,7 +24,7 @@ interface PageProps {
 }
 
 export default async function PlatformTenantModulesPage({ params }: PageProps) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) redirect("/login");
   const { tenantId } = await params;
   const ctx = await getPlatformServiceContext(session.user.id);

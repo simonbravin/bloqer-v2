@@ -10,18 +10,17 @@ import {
   isPlausibleInvitationEmail,
   normalizeInvitationEmail,
 } from "@/lib/invitation-auth";
+import {
+  authErrorMessage,
+  resolveClientPostLoginUrl,
+  safeCallbackUrl,
+} from "@/lib/auth-callback-url";
 import { AuthAlert } from "@/features/auth/components/auth-alert";
 import { GoogleIcon } from "@/features/auth/components/google-icon";
 import { PasswordField } from "@/features/auth/components/password-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-function safeCallbackUrl(raw: string | null): string {
-  if (!raw) return "/dashboard";
-  if (!raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
-  return raw;
-}
 
 export function LoginForm() {
   const searchParams = useSearchParams();
@@ -39,6 +38,11 @@ export function LoginForm() {
   }, [searchParams]);
   const [email, setEmail] = useState(invitedEmail);
 
+  const oauthError = useMemo(
+    () => authErrorMessage(searchParams.get("error")),
+    [searchParams],
+  );
+
   const selectAccount = useMemo(() => {
     if (searchParams.get("selectAccount") === "1") return true;
     return isInvitationAcceptCallbackUrl(callbackUrl);
@@ -46,25 +50,16 @@ export function LoginForm() {
 
   const googleAuthParams = selectAccount ? buildGoogleInvitationAuthParams(invitedEmail) : undefined;
   const emailValue = invitedEmail || email;
+  const shownError = error ?? oauthError;
 
   async function handleGoogleSignIn() {
     setPending("google");
     setError(null);
     try {
-      const result = await signIn("google", { callbackUrl, redirect: false }, googleAuthParams);
-      if (result?.url) {
-        window.location.assign(result.url);
-        return;
-      }
-      if (result?.error) {
-        setError("No se pudo abrir Google. Intentá de nuevo.");
-        setPending(null);
-        return;
-      }
-      setError("No se pudo iniciar sesión con Google.");
-      setPending(null);
+      // Auth.js v5: OAuth always navigates; do not use redirect:false (returns undefined + false error).
+      await signIn("google", { callbackUrl }, googleAuthParams);
     } catch {
-      setError("Error al iniciar sesión. Intentá de nuevo.");
+      setError("Error al iniciar sesión con Google. Intentá de nuevo.");
       setPending(null);
     }
   }
@@ -80,18 +75,19 @@ export function LoginForm() {
         callbackUrl,
         redirect: false,
       });
-      if (result?.error) {
+
+      // Auth.js may return nullish / throw on malformed absolute URL parsing — treat as failure.
+      if (!result || result.error || result.ok === false) {
         setError(
-          "No pudimos iniciar sesión. Verificá email y contraseña, o confirmá tu cuenta si todavía no lo hiciste.",
+          authErrorMessage(result?.error) ??
+            "No pudimos iniciar sesión. Verificá email y contraseña, o confirmá tu cuenta si todavía no lo hiciste.",
         );
         setPending(null);
         return;
       }
-      if (result?.url) {
-        window.location.assign(result.url);
-        return;
-      }
-      window.location.assign(callbackUrl);
+
+      const nextUrl = resolveClientPostLoginUrl(result.url, callbackUrl);
+      window.location.assign(nextUrl);
     } catch {
       setError("Error al iniciar sesión. Intentá de nuevo.");
       setPending(null);
@@ -106,7 +102,7 @@ export function LoginForm() {
           <span className="font-medium text-foreground">{invitedEmail}</span>.
         </AuthAlert>
       ) : null}
-      {error ? <AuthAlert variant="error">{error}</AuthAlert> : null}
+      {shownError ? <AuthAlert variant="error">{shownError}</AuthAlert> : null}
 
       <form className="space-y-3" onSubmit={(e) => void handleCredentialsSignIn(e)}>
         <div className="space-y-1.5">
@@ -165,11 +161,7 @@ export function LoginForm() {
         onClick={() => void handleGoogleSignIn()}
       >
         <GoogleIcon className="h-4 w-4 shrink-0" />
-        {pending === "google"
-          ? "Abriendo Google…"
-          : invitedEmail
-            ? "Continuar con Google"
-            : "Continuar con Google"}
+        {pending === "google" ? "Abriendo Google…" : "Continuar con Google"}
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">

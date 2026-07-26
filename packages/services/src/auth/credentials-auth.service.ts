@@ -2,7 +2,7 @@ import "server-only";
 
 import { compare, hash } from "bcryptjs";
 import { getPublicAppBaseUrl, isEmailConfigured } from "@bloqer/config";
-import { prisma } from "@bloqer/database";
+import { prisma, type UserStatus } from "@bloqer/database";
 import {
   renderAuthEmailHtml,
   renderAuthEmailText,
@@ -134,39 +134,6 @@ async function issueAuthToken(params: {
   });
 
   return { rawToken, expires };
-}
-
-/**
- * Atomically consume a purpose-scoped token and return the email.
- * Uses deleteMany count so concurrent consumers cannot both succeed.
- */
-async function consumeAuthToken(
-  purpose: AuthTokenPurpose,
-  rawToken: string,
-): Promise<{ emailNorm: string } | null> {
-  const tokenHash = hashAuthToken(rawToken);
-  const prefix = `${purpose}:`;
-
-  return prisma.$transaction(async (tx) => {
-    const row = await tx.verificationToken.findFirst({
-      where: {
-        token: tokenHash,
-        expires: { gt: new Date() },
-        identifier: { startsWith: prefix },
-      },
-    });
-    if (!row) return null;
-
-    const emailNorm = row.identifier.slice(prefix.length);
-    if (!emailNorm.includes("@")) return null;
-
-    const deleted = await tx.verificationToken.deleteMany({
-      where: { identifier: row.identifier, token: tokenHash },
-    });
-    if (deleted.count === 0) return null;
-
-    return { emailNorm };
-  });
 }
 
 async function dispatchAuthEmail(params: {
@@ -342,23 +309,50 @@ export async function verifyEmailWithToken(
   const parsed = verifyEmailTokenSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: GENERIC_VERIFY_FAIL };
 
-  const consumed = await consumeAuthToken(AUTH_TOKEN_PURPOSE.EMAIL_VERIFY, parsed.data.token);
-  if (!consumed) return { ok: false, error: GENERIC_VERIFY_FAIL };
+  const tokenHash = hashAuthToken(parsed.data.token);
+  const prefix = `${AUTH_TOKEN_PURPOSE.EMAIL_VERIFY}:`;
 
-  const user = await prisma.user.findUnique({
-    where: { email: consumed.emailNorm },
-    select: { id: true, emailVerified: true },
-  });
-  if (!user) return { ok: false, error: GENERIC_VERIFY_FAIL };
-
-  if (!user.emailVerified) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { emailVerified: new Date(), status: "ACTIVE" },
+  return prisma.$transaction(async (tx) => {
+    const row = await tx.verificationToken.findFirst({
+      where: {
+        token: tokenHash,
+        expires: { gt: new Date() },
+        identifier: { startsWith: prefix },
+      },
     });
-  }
+    if (!row) return { ok: false as const, error: GENERIC_VERIFY_FAIL };
 
-  return { ok: true };
+    const emailNorm = row.identifier.slice(prefix.length);
+    if (!emailNorm.includes("@")) return { ok: false as const, error: GENERIC_VERIFY_FAIL };
+
+    const user = await tx.user.findUnique({
+      where: { email: emailNorm },
+      select: { id: true, emailVerified: true, status: true },
+    });
+    if (!user || user.status === "SUSPENDED" || user.status === "INACTIVE") {
+      await tx.verificationToken.deleteMany({
+        where: { identifier: row.identifier, token: tokenHash },
+      });
+      return { ok: false as const, error: GENERIC_VERIFY_FAIL };
+    }
+
+    const deleted = await tx.verificationToken.deleteMany({
+      where: { identifier: row.identifier, token: tokenHash },
+    });
+    if (deleted.count === 0) return { ok: false as const, error: GENERIC_VERIFY_FAIL };
+
+    if (!user.emailVerified || user.status !== "ACTIVE") {
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerified: user.emailVerified ?? new Date(),
+          status: "ACTIVE",
+        },
+      });
+    }
+
+    return { ok: true as const };
+  });
 }
 
 export async function authenticateWithPassword(
@@ -419,10 +413,11 @@ export async function requestPasswordReset(
   const emailNorm = normalizeInvitationEmail(parsed.data.email);
   const user = await prisma.user.findUnique({
     where: { email: emailNorm },
-    select: { id: true },
+    select: { id: true, status: true },
   });
 
-  if (!user) {
+  // Do not email reset links for disabled accounts (same generic response).
+  if (!user || user.status === "SUSPENDED" || user.status === "INACTIVE") {
     return { ok: true, message, dispatch: { dispatched: false, flashLink: null } };
   }
 
@@ -457,32 +452,61 @@ export async function resetPasswordWithToken(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
   }
 
-  const consumed = await consumeAuthToken(AUTH_TOKEN_PURPOSE.PASSWORD_RESET, parsed.data.token);
-  if (!consumed) return { ok: false, error: GENERIC_VERIFY_FAIL };
-
-  const user = await prisma.user.findUnique({
-    where: { email: consumed.emailNorm },
-    select: { id: true },
-  });
-  if (!user) return { ok: false, error: GENERIC_VERIFY_FAIL };
-
+  const tokenHash = hashAuthToken(parsed.data.token);
+  const prefix = `${AUTH_TOKEN_PURPOSE.PASSWORD_RESET}:`;
   const passwordHash = await hashPassword(parsed.data.password);
   const now = new Date();
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      passwordHash,
-      passwordUpdatedAt: now,
-      emailVerified: now,
-      status: "ACTIVE",
-    },
+
+  const result = await prisma.$transaction(async (tx) => {
+    const row = await tx.verificationToken.findFirst({
+      where: {
+        token: tokenHash,
+        expires: { gt: new Date() },
+        identifier: { startsWith: prefix },
+      },
+    });
+    if (!row) return { ok: false as const, error: GENERIC_VERIFY_FAIL };
+
+    const emailNorm = row.identifier.slice(prefix.length);
+    if (!emailNorm.includes("@")) return { ok: false as const, error: GENERIC_VERIFY_FAIL };
+
+    const user = await tx.user.findUnique({
+      where: { email: emailNorm },
+      select: { id: true, status: true },
+    });
+    // Never reactivate disabled accounts via password reset.
+    if (!user || user.status === "SUSPENDED" || user.status === "INACTIVE") {
+      await tx.verificationToken.deleteMany({
+        where: { identifier: row.identifier, token: tokenHash },
+      });
+      return { ok: false as const, error: GENERIC_VERIFY_FAIL };
+    }
+
+    const deleted = await tx.verificationToken.deleteMany({
+      where: { identifier: row.identifier, token: tokenHash },
+    });
+    if (deleted.count === 0) return { ok: false as const, error: GENERIC_VERIFY_FAIL };
+
+    await tx.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordUpdatedAt: now,
+        emailVerified: now,
+        status: "ACTIVE",
+      },
+    });
+
+    await tx.verificationToken.deleteMany({
+      where: {
+        identifier: authTokenIdentifier(AUTH_TOKEN_PURPOSE.EMAIL_VERIFY, emailNorm),
+      },
+    });
+
+    return { ok: true as const };
   });
 
-  await deleteTokensForIdentifier(
-    authTokenIdentifier(AUTH_TOKEN_PURPOSE.EMAIL_VERIFY, consumed.emailNorm),
-  );
-
-  return { ok: true };
+  return result;
 }
 
 /**
@@ -498,19 +522,47 @@ export async function takeoverUnverifiedCredentialsStub(params: {
   const emailNorm = normalizeInvitationEmail(params.email);
   if (!emailNorm) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { email: emailNorm },
-    select: {
-      id: true,
-      emailVerified: true,
-      accounts: { select: { provider: true } },
-    },
-  });
+  const user =
+    (await prisma.user.findUnique({
+      where: { email: emailNorm },
+      select: {
+        id: true,
+        email: true,
+        emailVerified: true,
+        status: true,
+        accounts: { select: { provider: true } },
+      },
+    })) ??
+    (await prisma.user.findFirst({
+      where: { email: { equals: emailNorm, mode: "insensitive" } },
+      select: {
+        id: true,
+        email: true,
+        emailVerified: true,
+        status: true,
+        accounts: { select: { provider: true } },
+      },
+    }));
 
   if (!user) return null;
 
+  // Never revive a disabled account via Google linking / takeover.
+  if (user.status === "SUSPENDED" || user.status === "INACTIVE") {
+    return { userId: user.id, tookOver: false };
+  }
+
   const hasOAuth = user.accounts.some((a) => a.provider !== "credentials");
   if (user.emailVerified || hasOAuth) {
+    if (user.email !== emailNorm) {
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { email: emailNorm },
+        });
+      } catch {
+        // Unique conflict on heal — leave as-is; login still works via account link.
+      }
+    }
     return { userId: user.id, tookOver: false };
   }
 
@@ -518,6 +570,7 @@ export async function takeoverUnverifiedCredentialsStub(params: {
   await prisma.user.update({
     where: { id: user.id },
     data: {
+      email: emailNorm,
       emailVerified: now,
       status: "ACTIVE",
       // Prevent attacker who created the stub from keeping a known password after Google proves ownership.
@@ -533,12 +586,28 @@ export async function takeoverUnverifiedCredentialsStub(params: {
   return { userId: user.id, tookOver: true };
 }
 
-export async function getUserPasswordUpdatedAt(userId: string): Promise<Date | null> {
+export type UserAuthGate = {
+  passwordUpdatedAt: Date | null;
+  status: UserStatus;
+  email: string;
+};
+
+/** Session gate: password epoch + account status in one round-trip. */
+export async function getUserAuthGate(userId: string): Promise<UserAuthGate | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { passwordUpdatedAt: true },
+    select: { passwordUpdatedAt: true, status: true, email: true },
   });
-  return user?.passwordUpdatedAt ?? null;
+  return user ?? null;
+}
+
+export function isLoginEligibleStatus(status: UserAuthGate["status"]): boolean {
+  return status === "ACTIVE";
+}
+
+export async function getUserPasswordUpdatedAt(userId: string): Promise<Date | null> {
+  const gate = await getUserAuthGate(userId);
+  return gate?.passwordUpdatedAt ?? null;
 }
 
 export { GENERIC_REGISTER_OK, GENERIC_RESET_OK, GENERIC_VERIFY_FAIL };

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn, signOut } from "next-auth/react";
 import { buildGoogleInvitationAuthParams } from "@/lib/invitation-auth";
+import { AuthAlert } from "@/features/auth/components/auth-alert";
 import { Button } from "@/components/ui/button";
 
 type InvitationAccountSwitchProps = {
@@ -24,22 +25,8 @@ export function InvitationAccountSwitch({
     setError(null);
     try {
       await signOut({ redirect: false });
-      const result = await signIn(
-        "google",
-        { callbackUrl, redirect: false },
-        buildGoogleInvitationAuthParams(invitedEmail),
-      );
-      if (result?.error) {
-        setError("No se pudo abrir Google. Intentá de nuevo.");
-        setPending(false);
-        return;
-      }
-      if (result?.url) {
-        window.location.assign(result.url);
-        return;
-      }
-      setError("No se pudo iniciar sesión con Google.");
-      setPending(false);
+      // OAuth always redirects in Auth.js v5; do not interpret a void return as failure.
+      await signIn("google", { callbackUrl }, buildGoogleInvitationAuthParams(invitedEmail));
     } catch {
       setError("Error al cambiar de cuenta. Intentá de nuevo.");
       setPending(false);
@@ -58,11 +45,7 @@ export function InvitationAccountSwitch({
         Cambiá de cuenta de Google para continuar. Si tenés varias cuentas, elegí la que
         corresponde al mail invitado.
       </p>
-      {error ? (
-        <p className="text-sm text-destructive" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {error ? <AuthAlert variant="error">{error}</AuthAlert> : null}
       <Button
         type="button"
         className="w-full"
