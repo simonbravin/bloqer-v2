@@ -8,6 +8,7 @@ import { assertCanCancelSupplierInvoice } from "./supplier-invoice-cancel-guards
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
+import { notifyPayableReadyToPay } from "./ap-notifications.service";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -818,6 +819,35 @@ export async function issueSupplierInvoice(
   });
 
   await ensureDraftJournalFromSupplierInvoice(result.id, ctx);
+
+  if (result.projectId) {
+    const payable = await prisma.payable.findUnique({
+      where: { supplierInvoiceId: result.id },
+      select: { id: true },
+    });
+    let purchaseOrderCode: string | null = null;
+    if (result.purchaseOrderId) {
+      const po = await prisma.purchaseOrder.findUnique({
+        where: { id: result.purchaseOrderId },
+        select: { number: true },
+      });
+      if (po) purchaseOrderCode = `OC-${String(po.number).padStart(3, "0")}`;
+    }
+    if (payable) {
+      await notifyPayableReadyToPay({
+        ctx,
+        supplierInvoiceId: result.id,
+        payableId: payable.id,
+        projectId: result.projectId,
+        companyId: result.companyId,
+        invoiceNumber: result.number,
+        purchaseOrderId: result.purchaseOrderId,
+        purchaseOrderCode,
+        amountLabel: `${serializeMoneyDecimal(result.totalAmount)} ${result.currency}`,
+      }).catch(() => undefined);
+    }
+  }
+
   return serializeInvoice(result);
 }
 

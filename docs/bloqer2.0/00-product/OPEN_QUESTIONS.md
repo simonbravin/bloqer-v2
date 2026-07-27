@@ -470,18 +470,8 @@
 ### Q-056 — Quién elige la cuenta de tesorería al pagar CxP de proyecto
 
 - **Categoría:** AP / Tesorería / RBAC
-- **Estado:** ABIERTA
-- **Impacto si no se resuelve:** Compras (`PROCUREMENT` con `EDIT AP`) puede registrar un pago de proyecto y debitar una cuenta bancaria de la empresa sin rol de finanzas; no hay aprobación “cuatro ojos” antes del débito.
-- **Modelo actual (alineado a industria en capas, no en segregación de pago):**
-  1. PM/Compras: SC → OC → recepción → factura → **comprometido / devengado** (sin banco).
-  2. Caja: solo al **Payment** (`accountId` → `AccountMovement` OUTFLOW en cuenta de empresa; `projectId` atribuye a la obra).
-  3. “Emitir y pagar ahora” exige `EDIT TREASURY` ([D-052]); el pago normal de CxP de proyecto solo exige `EDIT AP`.
-- **Opciones:**
-  1. Mantener: quien tiene `EDIT AP` paga y elige cuenta (rápido; débil segregación).
-  2. Pago de proyecto requiere rol company-finance (`OWNER`/`ADMIN`/`FINANCE`/`TREASURER`) o `EDIT TREASURY`.
-  3. Cola de “pagos a ejecutar”: obra marca listo; finanzas confirma cuenta + paga.
-- **Recomendación inicial:** opción **2** a corto plazo (mínimo cambio); opción **3** si el cliente pide payment run formal.
-- **Bloquea:** endurecimiento RBAC de `createPayment` / UI `/cuentas-por-pagar/.../pagar`.
+- **Estado:** RESUELTA → [D-069](./DECISION_LOG.md)
+- **Resolución:** opción 2 — `canRegisterApPayment` (company-finance + `EDIT AP`, o `EDIT TREASURY`). Notificaciones in-app `PAYABLE_READY_TO_PAY` / `PAYMENT_CONFIRMED` (sin email por ahora). Compras/PM emiten factura/CxP; finanzas/tesorería eligen cuenta y pagan.
 
 ---
 

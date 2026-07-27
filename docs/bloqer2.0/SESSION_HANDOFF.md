@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
 Last updated: 2026-07-26  
-Status: **Cost board track P0→P3 cerrado** — exposición [D-065], FK línea factura→OC [D-066], matching soft + APU hint [D-067]/[D-068], copy Materiales/Compras vs EDT y costos. P-PROC-01/03 resueltos; P-PROC-02 partial (avisos soft).
+Status: **[D-069] pago CxP solo finanzas/tesorería** + notifs in-app listo-para-pagar / pago-confirmado. Cost board P0→P3 cerrado ([D-065]–[D-068]). Q-056 resuelta.
 
 ---
 

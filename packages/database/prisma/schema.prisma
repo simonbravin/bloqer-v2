@@ -2680,6 +2680,10 @@ enum NotificationType {
   PROCUREMENT_SLA_REMINDER
   /// Soft nudge: sourced journal drafts awaiting post [D-063].
   ACCOUNTING_DRAFTS_PENDING
+  /// Project payable ready for treasury payment [D-069].
+  PAYABLE_READY_TO_PAY
+  /// Confirmed AP payment [D-069] (in-app only for now).
+  PAYMENT_CONFIRMED
 }
 
 enum NotificationSeverity {

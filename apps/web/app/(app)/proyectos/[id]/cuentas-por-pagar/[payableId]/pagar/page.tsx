@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { PaymentForm } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
-import { getPayableById, listSelectableTreasuryAccounts, ServiceError } from "@bloqer/services";
+import { getPayableById, listSelectableTreasuryAccounts, canRegisterApPayment, ServiceError } from "@bloqer/services";
 
 interface PageProps {
   params: Promise<{ id: string; payableId: string }>;
@@ -12,6 +12,7 @@ interface PageProps {
 export default async function PagarPage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
+  if (!canRegisterApPayment(current.tenantCtx.roles)) redirect("/dashboard");
 
   const { id, payableId } = await params;
   const ctx = {

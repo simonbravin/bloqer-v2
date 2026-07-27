@@ -7,6 +7,7 @@ import type { PaymentListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import {
+  canRegisterApPayment,
   getPayableById,
   getPurchaseOrderCodeForApLink,
   getSupplierInvoiceById,
@@ -59,8 +60,9 @@ export default async function PayableDetailPage({ params }: PageProps) {
     supplierInvoiceId: p.supplierInvoiceId,
   }));
 
-  const canPay =
+  const canPayStatus =
     payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE";
+  const canPay = canPayStatus && canRegisterApPayment(ctx.roles);
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={payable.supplierName}>

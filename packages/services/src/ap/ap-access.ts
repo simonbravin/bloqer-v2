@@ -21,11 +21,20 @@ export function canEditCompanyAp(roles: ServiceContext["roles"]): boolean {
 
 /**
  * Mutación AP según scope: corporativo (`projectId` null) exige company-finance;
- * proyecto exige techo `EDIT AP` (D-056).
+ * proyecto exige techo `EDIT AP` (D-056) para factura/CxP (no para debitar caja).
  */
 export function canMutateApForScope(
   roles: ServiceContext["roles"],
   projectId: string | null,
 ): boolean {
   return projectId === null ? canEditCompanyAp(roles) : can(roles, "EDIT", "AP");
+}
+
+/**
+ * Registrar / cancelar pagos que debitan tesorería ([D-069] / Q-056 opción 2).
+ * Company-finance + EDIT AP, o EDIT TREASURY. PROCUREMENT/PM no eligen cuenta bancaria.
+ */
+export function canRegisterApPayment(roles: ServiceContext["roles"]): boolean {
+  if (can(roles, "EDIT", "TREASURY")) return true;
+  return hasCompanyFinanceRole(roles) && can(roles, "EDIT", "AP");
 }

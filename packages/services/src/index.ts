@@ -64,6 +64,7 @@ export {
   canViewCompanyAp,
   canEditCompanyAp,
   canMutateApForScope,
+  canRegisterApPayment,
 } from "./ap/ap-access";
 export * from "./ap/supplier-invoice.service";
 export * from "./ap/supplier-invoice-from-po.service";

@@ -988,6 +988,21 @@
 
 ---
 
+### D-069 — Pago de CxP: solo finanzas/tesorería + notificaciones in-app (Q-056)
+
+- **Fecha:** 2026-07-26
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Compras podía debitar cuentas de empresa con solo `EDIT AP`. El PM no elige banco; hace falta segregación tipo payment run y avisos cuando hay algo listo para pagar / cuando se pagó.
+- **Decisión:**
+  1. **Quién paga ([Q-056] opción 2):** `canRegisterApPayment` = company-finance + `EDIT AP`, **o** `EDIT TREASURY`. Aplica a `createPayment`, `cancelPayment` y “Emitir y pagar ahora”. PROCUREMENT/PM siguen emitiendo facturas/CxP pero **no** eligen cuenta bancaria.
+  2. **Notificación `PAYABLE_READY_TO_PAY`:** al emitir factura de **proyecto** (payable OPEN), in-app a audiencia de pago + CC OWNER/ADMIN. Menciona OC si está vinculada. **Sin email** en esta iteración.
+  3. **Notificación `PAYMENT_CONFIRMED`:** al confirmar pago, in-app a `EDIT PROCUREMENT` + CC OWNER/ADMIN. **Sin email** en esta iteración.
+- **Implicancias:** migración enum `NotificationType`; UI oculta “Registrar pago” / pay-now sin permiso; [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) Q-056 resuelta.
+- **Documentos afectados:** [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md) (nota), [`SESSION_HANDOFF.md`](../SESSION_HANDOFF.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -996,7 +1011,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-069`…).
+1. Tomar el siguiente ID disponible (`D-070`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

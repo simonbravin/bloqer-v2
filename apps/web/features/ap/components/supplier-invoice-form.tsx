@@ -35,7 +35,7 @@ interface Props {
   wbsOptions?: InvoiceWbsOption[];
   /** Active treasury accounts for “pay now” (project only). */
   treasuryAccounts?: TreasuryAccountOption[];
-  /** Show pay-now when user has EDIT TREASURY ([D-052]). */
+  /** Show pay-now when user can register AP payments ([D-069]). */
   canPayNow?: boolean;
   /** Storage ready for optional attachment on create. */
   storageConfigured?: boolean;

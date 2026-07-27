@@ -25,6 +25,7 @@ import {
   listProcurementWbsOptions,
   listSupplierInvoicesByProject,
   listSelectableTreasuryAccounts,
+  canRegisterApPayment,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -105,7 +106,7 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
 
   if (canCreateInvoice) {
     const gate = await getTenantModuleGate(ctx);
-    canPayNow = gate.isEnabled("TREASURY") && can(ctx.roles, "EDIT", "TREASURY");
+    canPayNow = gate.isEnabled("TREASURY") && canRegisterApPayment(ctx.roles);
 
     try {
       const [suppliersResult, linkablePOs, wbsNodes] = await Promise.all([

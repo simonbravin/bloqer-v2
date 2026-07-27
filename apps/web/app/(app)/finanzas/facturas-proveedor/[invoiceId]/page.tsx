@@ -21,6 +21,7 @@ import {
   getCompanySupplierInvoiceById,
   getPayableBySupplierInvoiceId,
   listEntityDocuments,
+  canRegisterApPayment,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -76,7 +77,7 @@ export default async function FinanzasFacturaProveedorDetailPage({
   const canEditAttachments = canEditAp;
   const canPay =
     Boolean(payable) &&
-    canEditAp &&
+    canRegisterApPayment(current.tenantCtx.roles) &&
     (payable!.status === "OPEN" ||
       payable!.status === "PARTIAL" ||
       payable!.status === "OVERDUE");

@@ -1,5 +1,4 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import type { RegisterApExpenseInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
 import { applyPaymentToPayable } from "./apply-payment-to-payable";
@@ -10,9 +9,10 @@ import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modu
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
-import { canMutateApForScope } from "./ap-access";
+import { canMutateApForScope, canRegisterApPayment } from "./ap-access";
+import { notifyPayableReadyToPay, notifyPaymentConfirmed } from "./ap-notifications.service";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
-import { toMoneyDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import {
   assertPurchaseOrderLinkableForAp,
   assertSupplierInvoiceLinesPoLink,
@@ -102,8 +102,11 @@ export async function registerApExpense(
   }
   if (input.payNow) {
     await assertTreasuryTenantModule(ctx);
-    if (!can(ctx.roles, "EDIT", "TREASURY")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para registrar movimientos de tesorería");
+    if (!canRegisterApPayment(ctx.roles)) {
+      throw new ServiceError(
+        "FORBIDDEN",
+        "Sin permisos para pagar (requiere finanzas de empresa o tesorería)",
+      );
     }
   }
 
@@ -331,6 +334,62 @@ export async function registerApExpense(
   await ensureDraftJournalFromSupplierInvoice(outcome.invoiceId, ctx);
   if (outcome.paymentId) {
     await ensureDraftJournalFromPayment(outcome.paymentId, ctx);
+  }
+
+  if (outcome.projectId && !outcome.paymentId) {
+    const inv = await prisma.supplierInvoice.findUnique({
+      where: { id: outcome.invoiceId },
+      select: {
+        number: true,
+        totalAmount: true,
+        currency: true,
+        purchaseOrderId: true,
+      },
+    });
+    if (inv) {
+      let purchaseOrderCode: string | null = null;
+      if (inv.purchaseOrderId) {
+        const po = await prisma.purchaseOrder.findUnique({
+          where: { id: inv.purchaseOrderId },
+          select: { number: true },
+        });
+        if (po) purchaseOrderCode = `OC-${String(po.number).padStart(3, "0")}`;
+      }
+      await notifyPayableReadyToPay({
+        ctx,
+        supplierInvoiceId: outcome.invoiceId,
+        payableId: outcome.payableId,
+        projectId: outcome.projectId,
+        companyId: outcome.companyId,
+        invoiceNumber: inv.number,
+        purchaseOrderId: inv.purchaseOrderId,
+        purchaseOrderCode,
+        amountLabel: `${serializeMoneyDecimal(inv.totalAmount)} ${inv.currency}`,
+      }).catch(() => undefined);
+    }
+  }
+
+  if (outcome.paymentId) {
+    const payment = await prisma.payment.findUnique({
+      where: { id: outcome.paymentId },
+      include: {
+        account: { select: { name: true } },
+        supplierInvoice: { select: { number: true, purchaseOrderId: true } },
+      },
+    });
+    if (payment) {
+      await notifyPaymentConfirmed({
+        ctx,
+        paymentId: payment.id,
+        supplierInvoiceId: payment.supplierInvoiceId,
+        projectId: payment.projectId,
+        companyId: payment.companyId,
+        invoiceNumber: payment.supplierInvoice.number,
+        amountLabel: `${serializeMoneyDecimal(payment.amount)} ${payment.currency}`,
+        accountName: payment.account.name,
+        purchaseOrderId: payment.supplierInvoice.purchaseOrderId,
+      }).catch(() => undefined);
+    }
   }
 
   const traceChain = buildApExpenseTraceChain(outcome);

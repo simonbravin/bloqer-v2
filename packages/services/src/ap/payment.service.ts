@@ -9,7 +9,8 @@ import { resolvePagination } from "../finance/pagination";
 import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
-import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
+import { canRegisterApPayment, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
+import { notifyPaymentConfirmed } from "./ap-notifications.service";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { ensureDraftJournalFromPayment } from "../accounting/accounting-auto-draft.service";
 import { syncJournalOnOperationalCancel } from "../accounting/accounting-cancel-sync.service";
@@ -195,8 +196,11 @@ export async function createPayment(
   if (isCrossCompany(payablePreview.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a la empresa activa");
   }
-  if (!canMutateApForScope(ctx.roles, payablePreview.projectId)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para registrar pagos");
+  if (!canRegisterApPayment(ctx.roles)) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      "Sin permisos para registrar pagos (requiere finanzas de empresa o tesorería)",
+    );
   }
   if (projectScopeId !== undefined && payablePreview.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
@@ -236,7 +240,7 @@ export async function createPayment(
 
     const supplierInvoice = await tx.supplierInvoice.findUnique({
       where: { id: payable.supplierInvoiceId },
-      select: { status: true, number: true },
+      select: { status: true, number: true, purchaseOrderId: true },
     });
     if (!supplierInvoice) {
       throw new ServiceError("CONFLICT", "La factura de proveedor asociada no existe");
@@ -279,11 +283,22 @@ export async function createPayment(
       },
     );
 
-    return result;
+    return { result, supplierInvoice };
   });
 
-  await ensureDraftJournalFromPayment(result.id, ctx);
-  return serialize(result);
+  await ensureDraftJournalFromPayment(result.result.id, ctx);
+  await notifyPaymentConfirmed({
+    ctx,
+    paymentId: result.result.id,
+    supplierInvoiceId: result.result.supplierInvoiceId,
+    projectId: result.result.projectId,
+    companyId: result.result.companyId,
+    invoiceNumber: result.supplierInvoice.number,
+    amountLabel: `${serializeMoneyDecimal(result.result.amount)} ${result.result.currency}`,
+    accountName: result.result.account.name,
+    purchaseOrderId: result.supplierInvoice.purchaseOrderId,
+  }).catch(() => undefined);
+  return serialize(result.result);
 }
 
 export async function cancelPayment(
@@ -303,8 +318,11 @@ export async function cancelPayment(
   if (isCrossCompany(paymentPreview.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "El pago no pertenece a la empresa activa");
   }
-  if (!canMutateApForScope(ctx.roles, paymentPreview.projectId)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar pagos");
+  if (!canRegisterApPayment(ctx.roles)) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      "Sin permisos para cancelar pagos (requiere finanzas de empresa o tesorería)",
+    );
   }
   if (projectScopeId !== undefined && paymentPreview.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");

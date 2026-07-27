@@ -22,6 +22,7 @@ import {
   getSupplierInvoiceById,
   getSupplierInvoicePurchaseOrderWarnings,
   listEntityDocuments,
+  canRegisterApPayment,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -79,10 +80,11 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
   const isIssued = invoice.status === "ISSUED";
   const isCancelled = invoice.status === "CANCELLED";
   const canPay =
-    payable
-    && (payable.status === "OPEN" ||
-      payable.status === "PARTIAL" ||
-      payable.status === "OVERDUE");
+    Boolean(payable) &&
+    canRegisterApPayment(current.tenantCtx.roles) &&
+    (payable!.status === "OPEN" ||
+      payable!.status === "PARTIAL" ||
+      payable!.status === "OVERDUE");
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={invoice.code}>

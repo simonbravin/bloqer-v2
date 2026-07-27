@@ -7,8 +7,7 @@ import { PayableStatusBadge, PaymentTable } from "@/features/ap";
 import type { PaymentListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
-import { getCompanyPayableById, listPaymentsByPayable, ServiceError } from "@bloqer/services";
-import { can } from "@bloqer/domain";
+import { getCompanyPayableById, listPaymentsByPayable, canRegisterApPayment, ServiceError } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -50,9 +49,8 @@ export default async function FinanzasPayableDetailPage({ params }: PageProps) {
     supplierInvoiceId: p.supplierInvoiceId,
   }));
 
-  const canEditAp = can(ctx.roles, "EDIT", "AP");
   const canPay =
-    canEditAp &&
+    canRegisterApPayment(ctx.roles) &&
     (payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE");
 
   return (

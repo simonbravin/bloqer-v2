@@ -219,6 +219,12 @@ Esta sección **no** cambia reglas de código; documenta huecos entre matriz doc
 - **Antes:** PM con `EDIT AR` ⇒ `VIEW AR` ⇒ aging CxC tenant-wide.
 - **Ahora:** listados/hub company AR/AP requieren rol de company finance (`OWNER`/`ADMIN`/`FINANCE`/`TREASURER`/`VIEWER`). PM y `PROJECT_FINANCE` usan rutas de proyecto.
 
+### 9.3b Pagos AP / débito de tesorería — [D-069]
+
+- Emitir factura / abrir CxP: sigue `EDIT AP` (proyecto) o company-finance + `EDIT AP` (corporativo).
+- **Registrar o cancelar Payment** (elige cuenta bancaria): `canRegisterApPayment` = company-finance + `EDIT AP`, **o** `EDIT TREASURY`. PROCUREMENT/PM no debitan caja.
+- Notificaciones in-app: `PAYABLE_READY_TO_PAY` (a finanzas/tesorería + OWNER/ADMIN) y `PAYMENT_CONFIRMED` (a compras + OWNER/ADMIN). Sin email en esta iteración.
+
 ### 9.4 Certificaciones vs atajo `VIEW PROJECTS`
 
 - **`certification.service`** valida `CERTIFICATIONS` sin combinar `VIEW PROJECTS` en el mismo guard que libro de obra/documentos. Es coherente con tratar certificaciones como módulo fuerte; roles solo-proyecto sin `CERTIFICATIONS` no acceden (p. ej. **`WAREHOUSE`** no tiene `CERTIFICATIONS` en la matriz).

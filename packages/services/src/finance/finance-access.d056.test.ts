@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { canEditCompanyAp, canMutateApForScope, canViewCompanyAp } from "../ap/ap-access";
+import { canEditCompanyAp, canMutateApForScope, canRegisterApPayment, canViewCompanyAp } from "../ap/ap-access";
 import { canMutateArForScope, canViewCompanyAr } from "../ar/ar-access";
 import { canViewCompanyFinanceHub, canViewCompanyTreasury } from "../finance/finance-access";
 
@@ -31,6 +31,17 @@ describe("D-056 company finance helpers", () => {
     assert.equal(canEditCompanyAp(["PROCUREMENT"]), false);
     assert.equal(canMutateApForScope(["PROCUREMENT"], null), false);
     assert.equal(canMutateApForScope(["PROCUREMENT"], "proj-1"), true);
+  });
+
+  it("D-069: only company-finance / treasury may register AP payments", () => {
+    assert.equal(canRegisterApPayment(["PROCUREMENT"]), false);
+    assert.equal(canRegisterApPayment(["PROJECT_MANAGER"]), false);
+    assert.equal(canRegisterApPayment(["PROJECT_FINANCE"]), false);
+    assert.equal(canRegisterApPayment(["FINANCE"]), true);
+    assert.equal(canRegisterApPayment(["TREASURER"]), true);
+    assert.equal(canRegisterApPayment(["OWNER"]), true);
+    assert.equal(canRegisterApPayment(["ADMIN"]), true);
+    assert.equal(canRegisterApPayment(["VIEWER"]), false);
   });
 
   it("blocks SALES from company AR mutate on corporate scope", () => {
