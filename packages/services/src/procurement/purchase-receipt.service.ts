@@ -2,6 +2,7 @@ import { Prisma, prisma, PurchaseReceipt, PurchaseReceiptStatus, PurchaseOrderSt
 import type { CreatePurchaseReceiptInput } from "@bloqer/validators";
 import { auditProcurement } from "./procurement-audit";
 import { assertPoEligibleForReceipt, assertReceiptQtyWithinRemaining } from "./purchase-receipt-guards";
+import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import { createReceiptStockMovement, cancelReceiptStockMovements } from "../inventory/stock-movement.service";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -196,7 +197,10 @@ export async function createPurchaseReceipt(
   // BR-PUR-004: receipt only allowed on CONFIRMED+
   assertPoEligibleForReceipt(po.status);
 
-  // Validate each line exists on PO and quantity > 0 and doesn't exceed remaining
+  const settings = await getCompanyProcurementSettingsForProject(po.projectId, ctx);
+  const tolerancePct = new Prisma.Decimal(settings.overReceiptTolerancePct);
+
+  // Validate each line exists on PO and quantity > 0 within remaining + over-receipt tolerance ([D-067])
   for (const inputLine of input.lines) {
     const poLine = po.lines.find((l) => l.id === inputLine.purchaseOrderLineId);
     if (!poLine) {
@@ -204,7 +208,11 @@ export async function createPurchaseReceipt(
     }
     const qtyReceived = new Prisma.Decimal(inputLine.quantityReceived);
     const remaining = poLine.quantity.minus(poLine.receivedQuantity);
-    assertReceiptQtyWithinRemaining(qtyReceived, remaining, poLine.description);
+    assertReceiptQtyWithinRemaining(qtyReceived, remaining, poLine.description, {
+      orderQuantity: poLine.quantity,
+      alreadyReceived: poLine.receivedQuantity,
+      tolerancePct,
+    });
   }
 
   const receipt = await prisma.$transaction(async (tx) => {
@@ -260,7 +268,19 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
     where: { id },
     include: {
       lines: {
-        include: { purchaseOrderLine: { select: { productId: true, unitPrice: true, wbsNodeId: true } } },
+        include: {
+          purchaseOrderLine: {
+            select: {
+              id: true,
+              productId: true,
+              unitPrice: true,
+              wbsNodeId: true,
+              description: true,
+              quantity: true,
+              receivedQuantity: true,
+            },
+          },
+        },
       },
     },
   });
@@ -271,7 +291,21 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
     throw new ServiceError("CONFLICT", `La recepción en estado "${existing.status}" no puede confirmarse.`);
   }
 
+  const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
+  const tolerancePct = new Prisma.Decimal(settings.overReceiptTolerancePct);
+
   const receipt = await prisma.$transaction(async (tx) => {
+    // Re-check over-receipt against current PO line totals (TOCTOU vs create) [D-067]
+    for (const line of existing.lines) {
+      const poLine = line.purchaseOrderLine;
+      const remaining = poLine.quantity.minus(poLine.receivedQuantity);
+      assertReceiptQtyWithinRemaining(line.quantityReceived, remaining, poLine.description, {
+        orderQuantity: poLine.quantity,
+        alreadyReceived: poLine.receivedQuantity,
+        tolerancePct,
+      });
+    }
+
     // Increment receivedQuantity on each PO line
     for (const line of existing.lines) {
       await tx.purchaseOrderLine.update({

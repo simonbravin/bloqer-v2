@@ -65,9 +65,9 @@
 | D-060 | Columna Incidencia % | §6.1b |
 | D-061 | Plantilla CoA AR + auto-DRAFT soft + reverse | §15 · §16 · §19 |
 | D-062 | Libros/estados gerenciales + exports contabilidad | §1.2 · §15 |
-| D-063 | Lock montos DRAFT sourced + notif cola EDIT ACCOUNTING | §15.3 |
+| D-063 | Lock montos DRAFT sourced + notif cola EDIT ACCOUNTING | §15.2 |
 
-**También alineado en guía (julio 2026):** menú proyecto (Tablero de compras, EDT y costos, Recepciones bajo Compras), tablero Materiales §9.0, checklists §18.
+**También alineado en guía (julio 2026):** menú proyecto (Tablero de compras, EDT y costos, Recepciones bajo Compras), tablero Materiales §9.0, checklists §18, **procedimientos paso a paso** §§0.1–0.2 y §§5–15 (etiquetas UI exactas), auth email/Google, contabilidad puesta en marcha.
 
 ---
 

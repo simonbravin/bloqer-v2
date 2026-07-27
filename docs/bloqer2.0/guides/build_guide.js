@@ -502,7 +502,7 @@ const doc = new Document({
               new TableCell({ borders: borders(GRAY_BORDER), width: { size: 2600, type: WidthType.DXA }, shading: { fill: BLUE_LIGHT, type: ShadingType.CLEAR }, margins: cellPadSm,
                 children: [new Paragraph({ children: [new TextRun({ text: "Versión", bold: true, color: BLUE_DARK, size: 18, font: "Arial" })] })] }),
               new TableCell({ borders: borders(GRAY_BORDER), width: { size: 5000, type: WidthType.DXA }, shading: { fill: WHITE, type: ShadingType.CLEAR }, margins: cellPadSm,
-                children: [new Paragraph({ children: [new TextRun({ text: "2.1 — Julio 2026", size: 18, font: "Arial" })] })] }),
+                children: [new Paragraph({ children: [new TextRun({ text: "2.2 — Julio 2026", size: 18, font: "Arial" })] })] }),
             ] }),
             new TableRow({ children: [
               new TableCell({ borders: borders(GRAY_BORDER), width: { size: 2600, type: WidthType.DXA }, shading: { fill: BLUE_LIGHT, type: ShadingType.CLEAR }, margins: cellPadSm,

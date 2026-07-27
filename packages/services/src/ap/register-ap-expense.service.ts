@@ -15,6 +15,7 @@ import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.s
 import { toMoneyDecimal } from "../finance/money-decimal";
 import {
   assertPurchaseOrderLinkableForAp,
+  assertSupplierInvoiceLinesPoLink,
   assertSupplierInvoiceLinesWbs,
   resolveCompanyIdForAp,
 } from "./supplier-invoice.service";
@@ -164,6 +165,12 @@ export async function registerApExpense(
   }
 
   await assertSupplierInvoiceLinesWbs(projectId, input.lines, ctx.tenantId);
+  await assertSupplierInvoiceLinesPoLink(
+    projectId,
+    input.purchaseOrderId,
+    input.lines,
+    ctx.tenantId,
+  );
 
   const companyId = await resolveCompanyIdForAp(projectId, ctx);
 
@@ -205,6 +212,7 @@ export async function registerApExpense(
             data: {
               invoiceId: created.id,
               wbsNodeId: line.wbsNodeId ?? null,
+              purchaseOrderLineId: line.purchaseOrderLineId ?? null,
               description: line.description,
               quantity: qty,
               unitPrice: price,

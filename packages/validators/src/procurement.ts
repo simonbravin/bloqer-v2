@@ -1,8 +1,10 @@
 import { z } from "zod";
 
 const purchaseOrderLineSchema = z.object({
-  wbsNodeId: z.string().uuid({ message: "Cada línea debe imputar a un ítem WBS" }),
+  wbsNodeId: z.string().uuid({ message: "Cada línea debe imputar a un ítem EDT" }),
   productId: z.string().uuid().optional().nullable(),
+  /** Optional APU hint ([D-068]); does not change EDT imputation. */
+  costAnalysisLineId: z.string().uuid().optional().nullable(),
   description: z.string().min(1, "Descripción requerida"),
   unit: z.string().default(""),
   quantity: z.string().regex(/^\d+(\.\d+)?$/, "Cantidad inválida"),

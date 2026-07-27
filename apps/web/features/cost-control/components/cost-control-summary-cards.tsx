@@ -24,7 +24,7 @@ export function CostControlSummaryCards({ totals }: Props) {
         iconKey="cost_exposure"
         label="Exposición esperada"
         value={fmt(totals.expectedCostExposure)}
-        subtitle={`Certificado: ${fmt(totals.certifiedApproved)}`}
+        subtitle={`Comp. abierto: ${fmt(totals.openCommittedCost)} · Devengado + abierto`}
       />
       <KpiStatCard
         iconKey="cost_certified"

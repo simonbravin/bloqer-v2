@@ -73,8 +73,8 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
         title="Compras y proveedores"
         subtitle={
           report.type === "REPORT"
-            ? `${report.budgetName} · desvíos de material vs OC y facturas`
-            : undefined
+            ? `${report.budgetName} · desvío proveedor vs OC/facturas. El control de $ está en EDT y costos.`
+            : "Desvío proveedor vs OC/facturas. El control de $ está en EDT y costos."
         }
         actions={
           report.type === "REPORT" ? (
@@ -90,6 +90,12 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
       <div className="flex flex-wrap gap-2 text-sm">
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/reportes`}>← Reportes</Link>
+        </Button>
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={`/proyectos/${projectId}/control-costos`}>EDT y costos</Link>
+        </Button>
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={`/proyectos/${projectId}/materiales`}>Materiales</Link>
         </Button>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/ordenes-compra`}>Órdenes de compra</Link>

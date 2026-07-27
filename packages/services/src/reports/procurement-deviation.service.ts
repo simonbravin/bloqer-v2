@@ -210,6 +210,14 @@ export async function getProcurementDeviationReport(
         totalAmount: true,
         purchaseOrderId: true,
         supplierContact: { select: { id: true, legalName: true, fantasyName: true } },
+        lines: {
+          select: {
+            lineTotal: true,
+            wbsNodeId: true,
+            purchaseOrderLineId: true,
+            purchaseOrderLine: { select: { wbsNodeId: true } },
+          },
+        },
         purchaseOrder: {
           select: {
             lines: { select: { wbsNodeId: true, lineTotal: true } },
@@ -246,6 +254,26 @@ export async function getProcurementDeviationReport(
           description: "Factura sin OC",
           amount: inv.totalAmount.toFixed(2),
         });
+        continue;
+      }
+
+      const linkedLines = inv.lines.filter((l) => l.purchaseOrderLineId);
+      if (linkedLines.length > 0) {
+        for (const line of linkedLines) {
+          const wbsId = line.purchaseOrderLine?.wbsNodeId ?? line.wbsNodeId;
+          if (!wbsId) continue;
+          accruedByWbs.set(
+            wbsId,
+            (accruedByWbs.get(wbsId) ?? new Prisma.Decimal(0)).add(line.lineTotal),
+          );
+        }
+        for (const line of inv.lines.filter((l) => !l.purchaseOrderLineId)) {
+          if (!line.wbsNodeId) continue;
+          accruedByWbs.set(
+            line.wbsNodeId,
+            (accruedByWbs.get(line.wbsNodeId) ?? new Prisma.Decimal(0)).add(line.lineTotal),
+          );
+        }
         continue;
       }
 

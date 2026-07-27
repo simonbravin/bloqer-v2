@@ -75,7 +75,11 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Estructura de Desglose de Trabajo y Costos"
-        subtitle={subtitle}
+        subtitle={
+          subtitle
+            ? `${subtitle} · Tablero de costos (Materiales y Compras alimentan este tablero).`
+            : "Tablero de costos del proyecto. Materiales y Compras alimentan este tablero."
+        }
         actions={
           result.type === "REPORT" ? (
             <div className="flex flex-wrap items-center gap-2">

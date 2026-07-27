@@ -1,11 +1,11 @@
 import { Prisma, prisma, type PurchaseRequest } from "@bloqer/database";
-import type { CreatePurchaseRequestInput, UpdatePurchaseRequestInput } from "@bloqer/validators";
+import type { CreatePurchaseRequestInput } from "@bloqer/validators";
 import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseRequests, canViewPurchaseRequests } from "./procurement-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { assertWbsLineForProject } from "./procurement-wbs";
+import { assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
 import {
   assertWbsRequiredOnLines,
   budgetBaselineForPurchaseLine,
@@ -20,6 +20,7 @@ export type PurchaseRequestLineView = {
   id: string;
   wbsNodeId: string | null;
   productId: string | null;
+  costAnalysisLineId: string | null;
   lineType: string;
   description: string;
   unit: string;
@@ -99,6 +100,7 @@ export async function listPurchaseRequestsByProject(
           id: l.id,
           wbsNodeId: l.wbsNodeId,
           productId: l.productId,
+          costAnalysisLineId: l.costAnalysisLineId,
           lineType: l.lineType,
           description: l.description,
           unit: l.unit,
@@ -129,6 +131,7 @@ export async function getPurchaseRequestById(id: string, ctx: ServiceContext): P
         id: l.id,
         wbsNodeId: l.wbsNodeId,
         productId: l.productId,
+        costAnalysisLineId: l.costAnalysisLineId,
         lineType: l.lineType,
         description: l.description,
         unit: l.unit,
@@ -154,6 +157,9 @@ export async function createPurchaseRequest(
   assertWbsRequiredOnLines(input.lines);
   for (const line of input.lines) {
     await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId);
+    if (line.costAnalysisLineId) {
+      await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId);
+    }
   }
 
   const pr = await prisma.$transaction(async (tx) => {
@@ -173,6 +179,7 @@ export async function createPurchaseRequest(
           create: input.lines.map((line, i) => ({
             wbsNodeId: line.wbsNodeId,
             productId: line.productId ?? null,
+            costAnalysisLineId: line.costAnalysisLineId ?? null,
             lineType: line.lineType,
             description: line.description,
             unit: line.unit ?? "",
@@ -215,12 +222,13 @@ export async function submitPurchaseRequest(id: string, ctx: ServiceContext): Pr
       if (!line.wbsNodeId) {
         throw new ServiceError(
           "CONFLICT",
-          "Todas las líneas deben tener WBS antes de enviar la solicitud",
+          "Todas las líneas deben tener EDT antes de enviar la solicitud",
         );
       }
       const baseline = await budgetBaselineForPurchaseLine(
         line.wbsNodeId,
         {
+          costAnalysisLineId: line.costAnalysisLineId,
           productId: line.productId,
           description: line.description,
           unit: line.unit,

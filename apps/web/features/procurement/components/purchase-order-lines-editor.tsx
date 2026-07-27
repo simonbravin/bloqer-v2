@@ -19,6 +19,7 @@ import {
   SearchableCombobox,
   SEARCHABLE_NONE,
   productsToSearchableOptions,
+  toSearchableOptions,
   withNoneOption,
   wbsToSearchableOptions,
 } from "@/components/ui/searchable-combobox";
@@ -26,12 +27,21 @@ import {
 export type PurchaseOrderLine = {
   wbsNodeId: string | null;
   productId: string | null;
+  costAnalysisLineId: string | null;
   description: string;
   unit: string;
   quantity: string;
   unitPrice: string;
   taxRate: string;
   varianceJustification?: string | null;
+};
+
+export type WbsApuOption = {
+  id: string;
+  description: string;
+  unit: string;
+  unitCost: string;
+  productId: string | null;
 };
 
 export type WbsOption = {
@@ -43,6 +53,7 @@ export type WbsOption = {
   budgetUnit?: string | null;
   availableSaldo?: string | null;
   wouldExceedBudget?: boolean;
+  apuLines?: WbsApuOption[];
 };
 export type ProductOption = { id: string; sku: string; name: string; unit: string };
 
@@ -71,6 +82,7 @@ interface Props {
 const DEFAULT_LINE: PurchaseOrderLine = {
   wbsNodeId: null,
   productId: null,
+  costAnalysisLineId: null,
   description: "",
   unit: "",
   quantity: "1",
@@ -95,8 +107,37 @@ export function PurchaseOrderLinesEditor({
   );
 
   function update(i: number, field: keyof PurchaseOrderLine, value: string | null) {
-    const next = lines.map((l, idx) => (idx === i ? { ...l, [field]: value } : l));
+    const next = lines.map((l, idx) => {
+      if (idx !== i) return l;
+      const patched: PurchaseOrderLine = { ...l, [field]: value };
+      if (field === "wbsNodeId") {
+        patched.costAnalysisLineId = null;
+      }
+      return patched;
+    });
     onChange(next);
+  }
+
+  function applyApuHint(i: number, line: PurchaseOrderLine, apuId: string | null, wbs?: WbsOption) {
+    if (!apuId) {
+      update(i, "costAnalysisLineId", null);
+      return;
+    }
+    const apu = wbs?.apuLines?.find((a) => a.id === apuId);
+    if (!apu) {
+      update(i, "costAnalysisLineId", apuId);
+      return;
+    }
+    const next: PurchaseOrderLine = {
+      ...line,
+      costAnalysisLineId: apu.id,
+      description: line.description.trim() ? line.description : apu.description,
+      unit: line.unit.trim() ? line.unit : apu.unit,
+      productId: apu.productId ?? line.productId,
+      unitPrice: line.unitPrice.trim() ? line.unitPrice : apu.unitCost,
+    };
+    onChange(lines.map((l, idx) => (idx === i ? next : l)));
+    toast.success("Insumo APU aplicado (referencia; la imputación sigue en la partida EDT).");
   }
 
   /** Trae el costo unitario del presupuesto (APU) al campo Precio unit. */
@@ -160,7 +201,7 @@ export function PurchaseOrderLinesEditor({
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Cada línea debe imputar a un ítem WBS. Para gastos generales usá la partida de
+        Cada línea debe imputar a un ítem EDT. Para gastos generales usá la partida de
         indirectos del presupuesto.
       </p>
 
@@ -168,9 +209,10 @@ export function PurchaseOrderLinesEditor({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[18%]">WBS (obligatorio)</TableHead>
-              {productOptions.length > 0 && <TableHead className="w-[14%]">Producto</TableHead>}
-              <TableHead className="w-[18%]">Descripción</TableHead>
+              <TableHead className="w-[16%]">EDT (obligatorio)</TableHead>
+              <TableHead className="w-[12%]">Insumo APU</TableHead>
+              {productOptions.length > 0 && <TableHead className="w-[12%]">Producto</TableHead>}
+              <TableHead className="w-[16%]">Descripción</TableHead>
               <TableHead className="w-[6%]">Unidad</TableHead>
               <TableHead className="w-[8%]">Cant.</TableHead>
               <TableHead className="w-[10%]">Precio unit.</TableHead>
@@ -196,7 +238,7 @@ export function PurchaseOrderLinesEditor({
                       options={wbsComboboxOptions}
                       value={line.wbsNodeId ?? ""}
                       onValueChange={(v) => update(i, "wbsNodeId", v || null)}
-                      placeholder="Elegir WBS…"
+                      placeholder="Elegir EDT…"
                       searchPlaceholder="Buscar partida…"
                     />
                     {wbs?.availableSaldo != null && (
@@ -212,6 +254,28 @@ export function PurchaseOrderLinesEditor({
                         {wbs.wouldExceedBudget ? " (alerta)" : ""}
                       </button>
                     )}
+                  </TableCell>
+                  <TableCell className="py-1.5">
+                    <SearchableCombobox
+                      popoverWidth="wide"
+                      className="h-8 text-xs"
+                      options={withNoneOption(
+                        toSearchableOptions(
+                          (wbs?.apuLines ?? []).map((a) => ({
+                            id: a.id,
+                            label: `${a.description} (${a.unit})`,
+                          })),
+                        ),
+                        { label: "Sin insumo APU" },
+                      )}
+                      value={line.costAnalysisLineId ?? SEARCHABLE_NONE}
+                      onValueChange={(v) =>
+                        applyApuHint(i, line, !v || v === SEARCHABLE_NONE ? null : v, wbs)
+                      }
+                      placeholder="Opcional…"
+                      searchPlaceholder="Buscar insumo…"
+                      disabled={!line.wbsNodeId || !(wbs?.apuLines?.length)}
+                    />
                   </TableCell>
                   {productOptions.length > 0 && (
                     <TableCell className="py-1.5">

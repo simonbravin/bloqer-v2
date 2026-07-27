@@ -180,6 +180,7 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 
 ### BR-PUR-006 — Sobrerrecepción bloqueada con tolerancia configurable
 - **Regla:** la suma de cantidades recibidas no puede exceder la cantidad de la OC en más de un % configurable por empresa (default 0%, máximo configurable 5%).
+- **Campo:** `CompanyProcurementSettings.overReceiptTolerancePct` ([D-067]).
 
 ### BR-PUR-007 — Imputación WBS obligatoria en compras de proyecto
 - **Regla:** toda línea de `PurchaseRequest` y `PurchaseOrder` con `project_id` **debe** tener `wbs_node_id` apuntando a un nodo WBS `ITEM` de un presupuesto `APPROVED` o `CLOSED` del mismo proyecto. Los gastos generales / indirectos de obra se imputan a **partida(s) WBS** presupuestables del proyecto, no a líneas sin WBS. Compras sin proyecto (overhead de empresa) siguen la vía corporativa ([D-035], [D-040]), no este flujo.
@@ -203,7 +204,8 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 
 ### BR-PUR-012 — Matching tres vías y tolerancia en factura
 - **Regla:** la factura de proveedor vinculada a OC se valida contra cantidades/precios de OC y, cuando existe, contra cantidades **recibidas**. Desvíos dentro de la tolerancia de empresa se permiten con registro; fuera de tolerancia requieren justificación y, si supera umbral de varianza, aprobación FINANCE/OWNER/ADMIN según política AP.
-- **Origen:** [D-020], [D-050](../00-product/DECISION_LOG.md).
+- **Implementación actual ([D-067]):** avisos soft en detalle OC / preview factura (qty por línea vía [D-066] + monto header); **no bloquea** emitir. Justificación / aprobación AP por matching fuera de tolerancia = pendiente.
+- **Origen:** [D-020], [D-050](../00-product/DECISION_LOG.md), [D-067](../00-product/DECISION_LOG.md).
 
 ### BR-PUR-013 — Cierre parcial de OC
 - **Regla:** una OC en `PARTIALLY_RECEIVED` (o `CONFIRMED` con saldo pendiente que no se recibirá) puede **cerrarse** dejando el saldo sin recibir: el `committed_amount` abierto se reduce al monto efectivamente comprometido/recibido según política de reporting; no se anula si ya hay recepciones confirmadas o facturas activas (usar cierre, no `CANCELLED`).

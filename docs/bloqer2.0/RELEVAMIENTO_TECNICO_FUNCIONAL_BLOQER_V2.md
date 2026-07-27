@@ -394,7 +394,7 @@ Elementos con lógica/endpoint pero sin acceso operativo claro desde la UI:
 | R-03 | **Aislamiento tenant** | comparación `tenantId` en servicios | Mitigado | Guard transversal (verificar cobertura 100%) |
 | R-04 | **Autorización en backend** | `can()` en servicios + gating | Mitigado | Verificar que toda action pase por service |
 | R-05 | **Multi-moneda en tesorería** | cobros/pagos/transfer exigen misma moneda | Media | Documentos guardan fxRate; falta FX en caja |
-| R-06 | **Doble conteo OC/factura** | capas separadas + `expectedCostExposure = max(...)` | Mitigado | Diseño anti doble conteo (D-021) |
+| R-06 | **Doble conteo OC/factura** | capas separadas + `expectedCostExposure = accrued + open_committed` ([BR-COS-002] / [D-065]) | Mitigado | Diseño anti doble conteo (D-021); corregido drift `max(...)` |
 | R-07 | **3-way match incompleto** (PR/OC/recepción/factura) | factura enlaza PO opcional; valida consistencia, no match total | Media | Validación parcial en service |
 | R-08 | **Storage `PLACEHOLDER`** | `document.service`; si R2 no configurado, no hay archivo | Media | Banner de advertencia en UI |
 | R-09 | **Cierre de período GL ausente** | solo overhead freeze | Media | — |

@@ -81,7 +81,7 @@ async function applyVarianceSnapshots(
     if (!line.wbsNodeId) {
       throw new ServiceError(
         "CONFLICT",
-        "Todas las líneas deben tener WBS antes de enviar la orden",
+        "Todas las líneas deben tener EDT antes de enviar la orden",
       );
     }
 
@@ -91,6 +91,7 @@ async function applyVarianceSnapshots(
         productId: line.productId,
         description: line.description,
         unit: line.unit,
+        costAnalysisLineId: line.costAnalysisLineId,
       },
       tx,
     );

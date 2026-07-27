@@ -40,7 +40,7 @@ export function PurchaseOrderVarianceTable({
           <TableRow>
             <TableHead>OC</TableHead>
             <TableHead>Línea</TableHead>
-            <TableHead>WBS</TableHead>
+            <TableHead>EDT</TableHead>
             <TableHead>Tier</TableHead>
             <TableHead className="text-right">Desvío %</TableHead>
             <TableHead className="text-right">P. unit.</TableHead>

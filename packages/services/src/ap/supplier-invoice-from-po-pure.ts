@@ -17,6 +17,7 @@ export type InvoiceDraftLineInput = {
   unitPrice: string;
   taxRate: string;
   wbsNodeId?: string | null;
+  purchaseOrderLineId?: string | null;
 };
 
 const ZERO = new Prisma.Decimal(0);
@@ -59,6 +60,31 @@ export function computePendingToInvoiceAmount(
 ): Prisma.Decimal {
   const pending = receivedAmount.sub(invoicedAmount);
   return pending.greaterThan(0) ? pending : ZERO;
+}
+
+/**
+ * Clamp receipt qtys so a draft from a receipt cannot re-invoice qty already
+ * covered by ISSUED invoices on the same PO line ([D-066]).
+ */
+export function clampReceiptQuantitiesToPendingInvoice(
+  receiptQuantities: ReadonlyMap<string, string>,
+  lines: PoLineForInvoiceDraft[],
+  invoicedQtyByPoLine: ReadonlyMap<string, Prisma.Decimal>,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [poLineId, qtyStr] of receiptQuantities) {
+    const line = lines.find((l) => l.id === poLineId);
+    if (!line) continue;
+    const received = new Prisma.Decimal(line.receivedQuantity);
+    const invoiced = invoicedQtyByPoLine.get(poLineId) ?? ZERO;
+    const pending = received.greaterThan(invoiced) ? received.sub(invoiced) : ZERO;
+    const receiptQty = new Prisma.Decimal(qtyStr);
+    const use = receiptQty.lessThanOrEqualTo(pending) ? receiptQty : pending;
+    if (use.greaterThan(0)) {
+      out.set(poLineId, use.toString());
+    }
+  }
+  return out;
 }
 
 /**
@@ -105,6 +131,7 @@ export function buildInvoiceDraftLinesFromPo(
       unitPrice: line.unitPrice,
       taxRate: line.taxRate,
       wbsNodeId: line.wbsNodeId,
+      purchaseOrderLineId: line.id,
     });
   }
 

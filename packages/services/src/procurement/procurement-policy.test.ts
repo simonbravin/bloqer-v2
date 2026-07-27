@@ -25,6 +25,8 @@ const baseSettings: CompanyProcurementSettingsView = {
   varianceSoftAlertPct: "10",
   varianceNoteRequiredPct: "25",
   varianceExtraApprovalPct: "25",
+  overReceiptTolerancePct: "0",
+  invoiceMatchTolerancePct: "0",
   approvalSlaHours: 72,
 };
 

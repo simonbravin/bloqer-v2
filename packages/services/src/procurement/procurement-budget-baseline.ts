@@ -26,12 +26,18 @@ type AnalysisLineRow = {
 };
 
 /**
- * Match a purchase line to a MATERIAL APU resource line (productId → desc+unit → desc).
+ * Match a purchase line to a MATERIAL APU resource line
+ * (costAnalysisLineId → productId → desc+unit → desc).
  * Returns resource unit + resource unit price + physical need qty — not CostItem.unit.
  */
 export async function budgetBaselineForPurchaseLine(
   wbsNodeId: string,
-  match: { productId?: string | null; description: string; unit: string },
+  match: {
+    productId?: string | null;
+    description: string;
+    unit: string;
+    costAnalysisLineId?: string | null;
+  },
   db: DbClient = prisma,
 ): Promise<BudgetLineBaseline> {
   const item = await db.costItem.findFirst({
@@ -41,6 +47,7 @@ export async function budgetBaselineForPurchaseLine(
       analysisLines: {
         where: { category: "MATERIAL" },
         select: {
+          id: true,
           productId: true,
           description: true,
           unit: true,
@@ -54,6 +61,23 @@ export async function budgetBaselineForPurchaseLine(
     },
   });
   if (!item) return { unitCost: null, unit: null, quantity: null };
+
+  if (match.costAnalysisLineId) {
+    const byId = item.analysisLines.find((l) => l.id === match.costAnalysisLineId);
+    if (byId) {
+      const need = physicalNeedQty(
+        byId.partidaQuantity != null ? Number(byId.partidaQuantity.toString()) : null,
+        Number(byId.coefficient.toString()),
+        Number(item.quantity.toString()),
+        { isLumpSum: byId.isLumpSum, unit: byId.unit },
+      );
+      return {
+        unitCost: byId.unitCost,
+        unit: byId.unit || null,
+        quantity: new Prisma.Decimal(need),
+      };
+    }
+  }
 
   const purchasable = item.analysisLines.filter(
     (l) =>
@@ -206,7 +230,7 @@ export async function getWbsBudgetReference(
     where: { id: wbsNodeId, budget: { tenantId } },
     select: { id: true, code: true, name: true },
   });
-  if (!node) throw new ServiceError("NOT_FOUND", "Nodo WBS no encontrado");
+  if (!node) throw new ServiceError("NOT_FOUND", "Ítem EDT no encontrado");
 
   const baseline = await budgetBaselineForWbs(wbsNodeId, db);
   const unit = baseline.unitCost;
@@ -261,7 +285,7 @@ export function assertWbsRequiredOnLines(
     if (!line.wbsNodeId) {
       throw new ServiceError(
         "VALIDATION",
-        "Cada línea de compra debe imputar a un ítem WBS del presupuesto (gastos generales: usar partida de indirectos).",
+        "Cada línea de compra debe imputar a un ítem EDT del presupuesto (gastos generales: usar partida de indirectos).",
       );
     }
   }

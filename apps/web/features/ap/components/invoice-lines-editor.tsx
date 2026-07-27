@@ -30,6 +30,8 @@ export type InvoiceLine = {
   unitPrice: string;
   taxRate: string;
   wbsNodeId?: string | null;
+  /** Set when line comes from OC draft ([D-066]); kept for submit. */
+  purchaseOrderLineId?: string | null;
 };
 
 export type InvoiceWbsOption = {
@@ -72,14 +74,22 @@ export function InvoiceLinesEditor({
   const wbsCombobox = wbsToSearchableOptions(wbsOptions);
 
   function update(i: number, field: keyof InvoiceLine, value: string | null) {
-    const next = lines.map((l, idx) => (idx === i ? { ...l, [field]: value } : l));
+    const next = lines.map((l, idx) => {
+      if (idx !== i) return l;
+      const patched: InvoiceLine = { ...l, [field]: value };
+      // Changing EDT breaks the OC-line link only when the partida actually changes ([D-066]).
+      if (field === "wbsNodeId" && value !== l.wbsNodeId) {
+        patched.purchaseOrderLineId = null;
+      }
+      return patched;
+    });
     onChange(next);
   }
 
   function addLine() {
     onChange([
       ...lines,
-      { description: "", quantity: "1", unitPrice: "", taxRate: "21", wbsNodeId: null },
+      { description: "", quantity: "1", unitPrice: "", taxRate: "21", wbsNodeId: null, purchaseOrderLineId: null },
     ]);
   }
 

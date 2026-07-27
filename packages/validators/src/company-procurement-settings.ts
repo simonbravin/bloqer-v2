@@ -8,6 +8,20 @@ const decimalOptional = z
 
 const pct = z.string().regex(/^\d+(\.\d+)?$/, "Porcentaje inválido");
 
+const overReceiptPct = z
+  .string()
+  .regex(/^\d+(\.\d+)?$/, "Porcentaje inválido")
+  .refine((v) => Number(v) >= 0 && Number(v) <= 5, {
+    message: "La tolerancia de sobrecantidad debe estar entre 0 y 5%",
+  });
+
+const invoiceMatchPct = z
+  .string()
+  .regex(/^\d+(\.\d+)?$/, "Porcentaje inválido")
+  .refine((v) => Number(v) >= 0 && Number(v) <= 25, {
+    message: "La tolerancia de matching factura debe estar entre 0 y 25%",
+  });
+
 export const upsertCompanyProcurementSettingsSchema = z
   .object({
     poApprovalThresholdArs: decimalOptional,
@@ -21,6 +35,8 @@ export const upsertCompanyProcurementSettingsSchema = z
     varianceSoftAlertPct: pct.optional(),
     varianceNoteRequiredPct: pct.optional(),
     varianceExtraApprovalPct: pct.optional(),
+    overReceiptTolerancePct: overReceiptPct.optional(),
+    invoiceMatchTolerancePct: invoiceMatchPct.optional(),
   })
   .superRefine((data, ctx) => {
     if (

@@ -6,8 +6,9 @@
 > **Regla de prevalencia:** cuando el texto de una pantalla o de la documentación difiere del comportamiento del código, esta guía describe **lo que hace el sistema hoy**.
 > **Relación con otros documentos:** visión ejecutiva [`PANORAMA_GENERAL_BLOQER_V2.md`](./PANORAMA_GENERAL_BLOQER_V2.md); estado técnico A–G [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md); smoke por rol [`08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md).
 > **Entregable DOCX:** un solo archivo `guides/Guía_Operativa_Bloqer_v2.docx`, regenerado con `cd docs/bloqer2.0/guides && node build_guide.js` desde **esta** MD.
-> **Mantenimiento obligatorio:** todo cambio de UX, rutas, etiquetas, flujos financieros/contables, presupuesto/EDT, notificaciones o reglas visibles al usuario **debe actualizar esta guía en el mismo PR** (y regenerar el DOCX si se entrega a cliente). Ver [D-050](./00-product/DECISION_LOG.md)–[D-062](./00-product/DECISION_LOG.md) y `AGENT_GUARDRAILS.md`.
+> **Mantenimiento obligatorio:** todo cambio de UX, rutas, etiquetas, flujos financieros/contables, presupuesto/EDT, notificaciones o reglas visibles al usuario **debe actualizar esta guía en el mismo PR** (y regenerar el DOCX si se entrega a cliente). Ver [D-050](./00-product/DECISION_LOG.md)–[D-064](./00-product/DECISION_LOG.md) y `AGENT_GUARDRAILS.md`.
 > **Capturas:** los bloques `📷 Captura sugerida` indican dónde insertar pantallazos reales. No inventar UI: fotografiar el producto actual.
+> **Cómo usar los procedimientos:** en §§5–15 los pasos numerados usan **etiquetas exactas de la UI** (botones, menús, diálogos). Los enums en inglés (`APPROVED`, `CONFIRMED`, …) son el estado técnico; en pantalla suelen verse en español (Aprobado, Confirmada, …).
 
 ---
 
@@ -53,18 +54,49 @@ flowchart TB
 
 > Cada ítem de menú aparece **solo si** el usuario tiene el **permiso** correspondiente **y** el **módulo está habilitado** para la empresa.
 
+### 0.1 Orden operativo recomendado (obra nueva)
+
+Hacé esto **en orden** la primera vez; después cada módulo se usa en paralelo según el día a día.
+
+| # | Qué | Dónde | Para qué |
+|---|-----|-------|----------|
+| 1 | Cliente / proveedores / subcontratistas en Directorio | `/directorio` | Sin **Cliente** no se crea la obra |
+| 2 | Cuentas de tesorería (caja/banco) | `/tesoreria/cuentas` | Cobranzas y pagos |
+| 3 | Contabilidad: **Aplicar plantilla AR** (si el plan está vacío) | `/contabilidad/cuentas` | Auto-borradores de asientos |
+| 4 | Crear proyecto → **Activar obra** | `/proyectos/nuevo` | Estado `ACTIVE` |
+| 5 | Presupuesto: EDT + APU → **Enviar a revisión** → **Aprobar** | Planificación → Presupuesto | Baseline + certificaciones |
+| 6 | Cronograma: **Importar desde presupuesto** + fechas | Planificación → Cronograma | Plan temporal alineado a EDT |
+| 7 | Operar: libro de obra, materiales, SC/OC, recepciones, consumos | Operación / Compras | Avance real + abastecimiento |
+| 8 | Certificar → facturar → cobrar / pagar | Operación + Finanzas del proyecto | AR/AP |
+| 9 | Revisar **EDT y costos** + asientos DRAFT → **Contabilizar** | Planificación + Contabilidad | Control y libros |
+
+### 0.2 Qué significa “afectaciones” en Bloqer
+
+No hay un menú llamado **Afectaciones**. En obra, “afectar” = **imputar** una operación a una **partida EDT** y ver el impacto en las capas de costo / avance:
+
+| Operación | Afecta (capa / dimensión) |
+|-----------|---------------------------|
+| Confirmar OC | **Comprometido** en EDT y costos |
+| Emitir factura proveedor | **Devengado** (+ CxP; auto-DRAFT contable) |
+| Pagar CxP | **Pagado** (+ caja; auto-DRAFT) |
+| Aprobar libro de obra | **Avance real** del cronograma (+ consumo stock si aplica) |
+| Emitir/aprobar certificación cliente | **Avance certificado** (+ base para factura) |
+| Consumo de stock | Stock + (si hay WBS) imputación a partida |
+
+La pantalla **EDT y costos** (`/control-costos`) es el tablero de esas afectaciones por partida.
+
 ---
 
 ## 1. Configuración inicial de la empresa (nivel empresa)
 
 ### 1.1 Ingreso y navegación
 
-- Acceso en `/login` con **email y contraseña** (registro en `/registro` + confirmación por email) o **Google**. No hay segundo factor (2FA) al momento de este relevamiento.
+- Acceso en `/login` con **email y contraseña** (registro en `/registro` + verificación de email; recuperación en `/recuperar-contrasena`) o **Google**. No hay segundo factor (2FA) al momento de este relevamiento.
 - El **menú lateral de empresa** agrupa: **General · Finanzas · Tesorería · Contabilidad · Configuración**.
 - Al entrar a una obra, el menú lateral se reemplaza por el **menú del proyecto**.
 
-> **📷 Captura sugerida — Login Google**  
-> Ruta: `/login` · Mostrar botón de Google y marca Bloqer · Tip: desktop, sin datos sensibles.
+> **📷 Captura sugerida — Login (email + Google)**  
+> Ruta: `/login` · Mostrar formulario email/contraseña + botón Google y marca Bloqer · Tip: desktop, sin datos sensibles.
 
 > **📷 Captura sugerida — Dashboard / menú empresa**  
 > Ruta: `/dashboard` · Mostrar sidebar (General · Finanzas · Tesorería · Contabilidad · Configuración) + campana de notificaciones en el header · Tip: recortar solo shell + KPI principales.
@@ -226,37 +258,43 @@ Para operadores: **no hace falta pensar en “escalas de base de datos”**. En 
 
 ## 5. Crear y operar un proyecto (nivel proyecto)
 
-### 5.1 Alta
+### 5.1 Procedimiento — Alta de proyecto
 
-- **Ruta:** `/proyectos/nuevo`.
-- Campos: código, nombre, **cliente** (del directorio), **tipo de obra** y fechas contractuales (metadata, no reemplazan al cronograma).
-  - **PUBLIC:** techo estricto de 100% en certificaciones.
-  - **PRIVATE:** permite exceder el 100% con **nota obligatoria**.
+**Prerrequisitos**
 
-### 5.2 Ciclo de vida (enum `ProjectStatus`)
+1. En `/directorio`, existir al menos un contacto con rol **Cliente** activo (si no, el formulario lo dice y no deja elegir cliente).
+2. Permiso para crear proyectos (`EDIT` / alta en módulo Proyectos).
 
-```mermaid
-stateDiagram-v2
-  [*] --> DRAFT
-  DRAFT --> ACTIVE: Activar
-  ACTIVE --> ON_HOLD: Pausar
-  ON_HOLD --> ACTIVE: Reactivar
-  ACTIVE --> COMPLETED: Completar
-  ACTIVE --> CANCELLED: Cancelar (no destructiva)
-  ON_HOLD --> CANCELLED
-  COMPLETED --> [*]
-```
+**Pasos**
 
-- La **cancelación es no destructiva** (conserva datos y traza).
-- **Menú del proyecto:** Resumen · Planificación · Operación · Finanzas del proyecto · Administración.
+1. Menú empresa → **Proyectos** → `/proyectos` → **Nuevo proyecto** (o ir a `/proyectos/nuevo`).
+2. Completar el formulario:
+   - **Código \*** (ej. `PRY-2026-001`)
+   - **Tipo \***: **Privado** (`PRIVATE`) o **Público** (`PUBLIC`)
+     - Público: techo estricto **100%** en certificaciones.
+     - Privado: permite exceder 100% con **nota obligatoria**.
+   - **Nombre \***
+   - **Cliente \*** (buscador de contactos Cliente)
+   - Ubicación / país (default AR) y fechas contractuales si aplica (metadata; **no** reemplazan al cronograma)
+3. Pulsar **Crear proyecto**.
+4. El sistema abre el **Resumen** de la obra (`/proyectos/[id]`). El estado inicial es `DRAFT`.
+5. En el resumen / acciones de ciclo de vida, pulsar **Activar** (**Activar obra**) → estado `ACTIVE`. Sin activar, la operación diaria queda limitada.
+
+**Estados posteriores**
+
+| Acción UI | Estado |
+|-----------|--------|
+| Pausar | `ON_HOLD` |
+| Reactivar | `ACTIVE` |
+| Completar | `COMPLETED` |
+| Cancelar | `CANCELLED` (no destructiva: conserva datos) |
 
 > **📷 Captura sugerida — Alta de proyecto**  
-> Ruta: `/proyectos/nuevo` · Mostrar campos código, nombre, cliente, tipo PUBLIC/PRIVATE · Tip: no enviar sin completar cliente.
+> Ruta: `/proyectos/nuevo` · Campos Código, Nombre, Cliente, Tipo Privado/Público · Tip: no enviar sin cliente.
 
-> **📷 Captura sugerida — Menú del proyecto (Compras + Operación)**  
-> Ruta: cualquier `/proyectos/[id]/…` · Expandir **Compras** (Tablero · Solicitudes · Órdenes · Recepciones) y **Operación** (Materiales · Consumos) · Tip: Recepciones está bajo Compras, no bajo Operación.
+### 5.2 Menú del proyecto (rutas reales)
 
-### 5.3 Menú del proyecto (rutas reales)
+Al entrar a la obra, el sidebar muestra (según permisos y módulos):
 
 | Sección | Ítems (etiqueta → ruta relativa) |
 |---------|----------------------------------|
@@ -267,13 +305,27 @@ stateDiagram-v2
 | Finanzas del proyecto | **Tablero de finanzas** → `/finanzas` · Flujo de caja → `/flujo-caja` · Subcontratos → `/subcontratos` · CxP → `/cuentas-por-pagar` · CxC → `/cuentas-por-cobrar` · Facturas proveedor → `/facturas-proveedor` · Facturas emitidas → `/facturas` |
 | Administración | Configuración → `/editar` |
 
-> En UI, “EDT” = **Estructura de Desglose de Trabajo** (término en español del WBS técnico). En código/Prisma sigue siendo `WbsNode`; en pantallas se usa **EDT**.
+> En UI, **EDT** = Estructura de Desglose de Trabajo (WBS técnico = `WbsNode`).  
+> **Recepciones** viven bajo **Compras**, no bajo Operación. **Consumos** viven bajo **Operación**.
+
+> **📷 Captura sugerida — Menú del proyecto (Compras + Operación)**  
+> Ruta: cualquier `/proyectos/[id]/…` · Expandir Compras y Operación · Tip: Recepciones ≠ Consumos.
 
 ---
 
 ## 6. Presupuesto, EDT/WBS y APU (nivel proyecto)
 
-**Ruta:** `/proyectos/[id]/presupuestos`
+**Ruta base:** Planificación → **Presupuesto** → `/proyectos/[id]/presupuestos`
+
+### 6.0 Procedimiento — Crear presupuesto
+
+1. En el listado, **Nuevo presupuesto** → `/presupuestos/nuevo`.
+2. Completar:
+   - **Nombre del presupuesto \***
+   - **Moneda** (default ARS)
+   - **Parámetros económicos:** Gastos generales (%) · Costo financiero (%) · Utilidad (%) · Impuestos (%)
+   - Opcional: precarga / importación WBS en el mismo alta (sección de preload del formulario)
+3. Guardar. Queda en `DRAFT` y abre el detalle `/presupuestos/[budgetId]`.
 
 ### 6.1 Estructura — capítulo vs partida vs insumo (D-057)
 
@@ -283,30 +335,48 @@ stateDiagram-v2
 | **Partida certificable** | `ITEM` hoja | Unidad, cantidad, **APU** (`CostItem`) | Certificar, comprar e imputar costos |
 | **Insumo** | Línea APU (`CostAnalysisLine`) | MAT / LAB / EQP / SUB / OTHER bajo la partida | Composición del costo; **nunca** hijo WBS |
 
-- Se puede **importar desde Excel/CSV** o cargar manualmente.
-- **Parámetros de venta** (BudgetSettings): gastos generales %, utilidad %, impuestos.
-- **Anti-patrón (muy frecuente):** modelar hierros, mallas o cuadrillas como hijos WBS (`4.1.1`, `4.1.2`) bajo una partida medible (ej. zapata ml × 390). Eso rompe unidad/cantidad y genera partidas certificables falsas. Los insumos van en el **APU de la partida** (`4.1`), no como nodos del árbol.
-- Subdividir un `ITEM` convierte al padre en `GROUP` (migrar o descartar APU): sirve para partir **alcance de obra**, no para desglosar BOM.
+- **Anti-patrón:** hierros, mallas o cuadrillas como hijos WBS (`4.1.1`) bajo una partida medible. Los insumos van en el **APU de la partida** (`4.1`).
+- Subdividir un `ITEM` convierte al padre en `GROUP`: sirve para partir **alcance de obra**, no para desglosar BOM.
 
-### 6.1b Vista EDT en el presupuesto (D-058 · D-059 · D-060)
+### 6.1a Procedimiento — Cargar la EDT (WBS)
 
-En el detalle del presupuesto (árbol EDT):
+**Opción A — Importar**
 
-- **KPIs de cabecera:** Costo directo total · Precio de venta total · Margen (venta − costo).
-- **Toolbar de vista:**
+1. En el detalle del presupuesto (`DRAFT`), **Importar WBS**.
+2. Diálogo **Importar estructura WBS**: subir Excel/CSV (columna A = numeración, B = nombre; multi-rubro si el archivo trae prefijos).
+3. Confirmar **Importar**.
+
+**Opción B — Manual**
+
+1. Agregar capítulos (`GROUP`) e ítems hoja (`ITEM`) desde el árbol (acciones del nodo: p. ej. **Agregar ítem**).
+2. En cada partida hoja: unidad + cantidad + guardar (**Guardar** en el panel del ítem).
+3. Código único por presupuesto.
+
+### 6.1b Procedimiento — Completar el APU de una partida
+
+1. En la tabla EDT, abrir la partida hoja (panel / click) → sección **Análisis de precio unitario (APU)** o modal **APU — Análisis de precio unitario**.
+2. El modal muestra **solo costo** (D-058): no edita PU ni total de venta (eso va en la tabla EDT, base **Venta**).
+3. Por categoría (Materiales / Mano de obra / Equipos / Subcontratos / Otros), agregar líneas con:
+   - Descripción, unidad, cantidad/coeficiente, precio
+   - Modo de carga: **Por unidad** o **Total partida** (default al agregar: Total partida — “necesito 500 un a $X”; Bloqer calcula el aporte unitario y guarda necesidad para Materiales)
+   - **Importes sin compra:** unidad **Global** (`gl`) + cant. 1 (o N) + precio = monto; **no** genera necesidad en el tablero Materiales
+4. **Guardar cambios**.
+5. En la EDT, expandir la partida (chevron) para ver filas de detalle de solo lectura (`APU·MAT`, etc.) (D-059). Click en una fila detalle → reabre el APU de la **partida**. Esas filas **no** se certifican ni se compran: siempre contra la partida hoja.
+
+### 6.1c Vista EDT (toolbar) — D-058 · D-059 · D-060
+
+- **KPIs de cabecera:** Costo directo total · Precio de venta total · Margen.
+- **Toolbar:**
   - Base **Costo** | **Venta**
-  - Escala **Compacto** | **Desglose** (desglose por categoría solo en base Costo)
-  - Toggle **Unitario** (aditivo: agrega columnas `/u` al lado; los totales **siempre** se muestran)
-  - Toggle **Incidencia** `%` (independiente): peso de la fila sobre el TOTAL GENERAL
-- **Modal APU = solo costo** (D-058): unidad, cantidad, costo directo unitario/total y desglose MAT/LAB/EQP/SUB. **Sin** PU ni total de venta (la venta se edita/ve en la tabla EDT).
-- **Modo de carga:** por unidad o **Total partida** (reparto al APU).
-- **Expandir partida hoja** (D-059): muestra filas de detalle APU de solo lectura (badges `APU·MAT`, etc.). Click abre el modal APU de la partida. **No** son nodos WBS: no se certifican ni se imputan compras contra esas filas — siempre contra la partida (ej. `4.1`).
-- **Exports** CSV/XLSX/PDF: solo filas WBS (sin filas APU); respetan modo activo (`base`, `scale`, `detail`, `incidence`).
+  - Escala **Compacto** | **Desglose** (desglose por categoría solo en Costo)
+  - Toggle **Unitario** (agrega columnas `/u`; los totales siempre se muestran)
+  - Toggle **Incidencia** `%` (peso de la fila sobre TOTAL GENERAL)
+- **Exports** CSV/XLSX/PDF: solo filas WBS (sin filas APU); respetan el modo activo.
 
 > **📷 Captura sugerida — EDT con insumos expandibles**  
-> Ruta: `/proyectos/[id]/presupuestos/[budgetId]` · Partida hoja expandida con filas APU·MAT + toolbar Costo/Venta · Tip: dejar claro que el chevron APU ≠ hijos WBS.
+> Ruta: `/proyectos/[id]/presupuestos/[budgetId]` · Partida expandida con APU·MAT + toolbar Costo/Venta · Tip: chevron APU ≠ hijos WBS.
 
-### 6.2 Ciclo de aprobación (enum `BudgetStatus`)
+### 6.2 Procedimiento — Aprobar el presupuesto
 
 ```mermaid
 stateDiagram-v2
@@ -319,109 +389,131 @@ stateDiagram-v2
   DRAFT --> CANCELLED
 ```
 
+1. Con la EDT y APU listos en `DRAFT`, pulsar **Enviar a revisión** → `IN_REVIEW` (economía bloqueada).
+2. Un aprobador revisa y pulsa **Aprobar presupuesto** → `APPROVED` (economía congelada).
+3. Opcional: **Cerrar** → `CLOSED` (base contractual de presentación).
+4. Si hacen falta correcciones en revisión: devolver → `RETURNED_FOR_CHANGES` → editar → reenviar.
+
 | Estado | Qué permite |
 |--------|-------------|
 | `DRAFT` | Editar WBS, APU y precios |
 | `IN_REVIEW` | Solo revisión; economía bloqueada |
 | `RETURNED_FOR_CHANGES` | Correcciones y reenvío |
-| `APPROVED` | Economía congelada; habilita certificaciones y baseline de control de costos |
+| `APPROVED` | Congelado; habilita certificaciones, Materiales y baseline de EDT y costos |
 | `CLOSED` | Base contractual |
 | `CANCELLED` | Anulado |
 
-> **Hito clave:** con `APPROVED` o `CLOSED` se habilitan las certificaciones al cliente y el baseline de control de costos.
+> **Hito:** con `APPROVED` o `CLOSED` se habilitan certificaciones al cliente, tablero Materiales (líneas MAT) y baseline de control de costos.  
+> **Solo un** presupuesto `APPROVED` por proyecto a la vez.
 
-> **📷 Captura sugerida — Presupuesto aprobado / WBS**  
-> Ruta: `/proyectos/[id]/presupuestos/[budgetId]` · Mostrar estado APPROVED + árbol WBS con un ítem hoja · Tip: copy de adenda operativa (sin “versión” formal).
+> **📷 Captura sugerida — Presupuesto aprobado / EDT**  
+> Ruta: `/proyectos/[id]/presupuestos/[budgetId]` · Estado Aprobado + partida hoja · Tip: sin copy de “versión” formal.
 
 ### 6.3 Adendas — limitación actual
 
-- Un cambio contractual se maneja hoy como **adenda operativa / presupuesto nuevo** del proyecto (copy de producto: **sin** “versión” formal automática).
-- En UI puede aparecer un rótulo `v{n}`: es numeración de presentación, **no** versionado contractual con vínculo padre‑hijo.
-- **Solo un presupuesto `APPROVED` por proyecto** a la vez.
-- **No existe** un estado `SUPERSEDED` ni un vínculo formal padre‑hijo entre presupuestos. **Contratos, adendas y órdenes de cambio como entidades formales no están implementados** (ver §19).
+- Cambio contractual hoy = **adenda operativa / presupuesto nuevo** (sin vínculo padre‑hijo automático).
+- El rótulo `v{n}` en UI es numeración de presentación, no versionado contractual.
+- **Contratos, adendas y órdenes de cambio como entidades formales no están implementados** (ver §19).
 
 ---
 
 ## 7. Planificación: Cronograma (nivel proyecto)
 
-**Ruta:** `/proyectos/[id]/cronograma`
+**Ruta:** Planificación → **Cronograma** → `/proyectos/[id]/cronograma`
 
-- Un **cronograma** por proyecto, con **presupuesto base** opcional como referencia.
-- **Vistas:** Gantt (`?view=gantt`), Calendario (`?view=calendar`), Kanban (`?view=kanban`), Tabla (`?view=table`).
-- **Tipos de ítem:** `TASK` (tarea con duración) y `MILESTONE` (hito). Los **contenedores** derivan fechas de sus hojas (no se editan a mano).
-- **Estados de ítem (enum `ScheduleItemStatus`):** `PLANNED`, `IN_PROGRESS`, `BLOCKED`, `COMPLETED`, `CANCELLED` (el Kanban se organiza por estos estados).
-- **Dependencias:** solo **Finish‑to‑Start (FS)**. Las violaciones generan **advertencias**, no bloqueos.
-- **Vínculo WBS ↔ cronograma:** cada tarea puede enlazar nodos WBS (uno primario), lo que habilita KPIs y el sync de avance real.
+### 7.0 Procedimiento — Armar el cronograma
+
+1. Abrir Cronograma. Vistas: Gantt (`?view=gantt`), Calendario, Kanban, Tabla.
+2. (Recomendado) **Importar desde presupuesto** → diálogo **Importar WBS al cronograma** → elegir presupuesto aprobado → **Importar**. Así las tareas nacen alineadas a la EDT.
+3. Completar fechas en ítems **hoja** (no en contenedores: sus fechas se derivan).
+4. Crear ítems adicionales con **Nueva tarea o hito** (`TASK` o `MILESTONE`).
+5. Dependencias: solo **Finish‑to‑Start (FS)**; violaciones = advertencias, no bloqueos.
+6. En cada tarea crítica: vincular nodos EDT (uno **primario**) para sync de avance real y KPIs.
+7. Revisar si aparece aviso de **baselineBudgetMismatch** (presupuesto base del cronograma ≠ el aprobado actual).
+
+**Estados de ítem:** `PLANNED` · `IN_PROGRESS` · `BLOCKED` · `COMPLETED` · `CANCELLED` (Kanban por estado).
 
 > **📷 Captura sugerida — Cronograma Gantt**  
-> Ruta: `/proyectos/[id]/cronograma?view=gantt` · Mostrar tareas + hitos · Tip: una obra con 5–8 ítems alcanza.
+> Ruta: `/proyectos/[id]/cronograma?view=gantt` · Tareas + hitos · Tip: 5–8 ítems alcanzan.
 
 ### 7.1 Cuatro dimensiones de avance (no confundir)
 
+En detalle de tarea / tabla aparecen como **Real / plan t. / cant. / cert.**:
+
 | Dimensión | Fuente | Quién la mueve |
 |-----------|--------|----------------|
-| **Real** | `ScheduleItem.progressPct` | Libro de obra aprobado (o ajuste manual del PM) |
+| **Real** | `ScheduleItem.progressPct` | Libro de obra **aprobado** (o ajuste manual **Avance real %** del PM) |
 | **Plan (tiempo)** | Fechas vs. hoy | Automático |
 | **Cantidades** | Cantidades físicas vs. presupuesto | Libro de obra |
-| **Certificado** | Certificaciones emitidas | Módulo de certificaciones |
+| **Certificado** | Certificaciones emitidas | Módulo Certificaciones |
 
 ---
 
-## 8. Ejecución: Libro de obra (nivel proyecto)
+## 8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)
 
-**Ruta:** `/proyectos/[id]/libro-obra`
+### 8.1 Procedimiento — Parte diario (libro de obra)
 
-### 8.1 Flujo diario
+**Ruta:** Operación → **Libro de obra** → `/proyectos/[id]/libro-obra`
+
+1. **Nuevo parte** (fecha no futura, clima, cuadrilla, tareas).
+2. Cargar **avance por partida EDT/WBS** (cantidades / % según lo que pida el formulario).
+3. Adjuntar fotos y observaciones.
+4. **Enviar a revisión** → `SUBMITTED`.
+5. El PM abre el parte y pulsa **Aprobar parte** → `APPROVED` (queda inmutable salvo anulación con motivo). Si hace falta, devolver.
 
 ```mermaid
 flowchart LR
-  N["Nuevo parte (DRAFT)"] --> S["Enviar (SUBMITTED)"]
-  S --> A["Aprobar (APPROVED)"]
+  N["Nuevo parte (DRAFT)"] --> S["Enviar a revisión (SUBMITTED)"]
+  S --> A["Aprobar parte (APPROVED)"]
   S --> R["Devolver"]
   A --> SYNC["Actualiza % Real del cronograma"]
   A --> STK["Consumo de inventario (si aplica)"]
 ```
 
-1. **Nuevo parte** con fecha (no futura), clima, cuadrilla, tareas y avance por WBS.
-2. Adjuntar fotos y observaciones.
-3. **Enviar** → `SUBMITTED`; el PM **aprueba** → `APPROVED`.
+### 8.2 Efectos al aprobar el parte
+
+- Actualiza el **% Real** de tareas con WBS primario enlazado.
+- Materiales del parte con producto + depósito pueden generar **consumo de inventario**.
+- **Imputación WBS del consumo (D-055):** WBS de la línea de material; si falta y hay **exactamente una** partida de progreso → esa; si hay **varias** partidas y el material no trae WBS → **conflicto** (no se crea consumo).
+
+### 8.3 Procedimiento — Consumos de stock (manual)
+
+**Ruta:** Operación → **Consumos** → `/proyectos/[id]/consumos`
+
+1. **Registrar consumo** (abre diálogo; también `?create=1`). La ruta `/consumos/nuevo` redirige al diálogo.
+2. Completar: **Producto** · **Depósito** · cantidad · fecha · **Partida WBS (opcional)** · notas.
+3. **Registrar consumo**.
+4. Atajos: desde Inventario del proyecto o desde Materiales → enlace **Consumos**.
 
 > **📷 Captura sugerida — Parte de obra (detalle)**  
-> Ruta: `/proyectos/[id]/libro-obra/[logId]` · Mostrar avance por WBS + adjuntos · Tip: estado SUBMITTED o APPROVED.
-
-### 8.2 Efectos al aprobar
-
-- El parte queda **inmutable** (salvo anulación con motivo).
-- Actualiza el **% Real** de las tareas con WBS primario enlazado.
-- Los materiales con producto + depósito pueden generar **consumo de inventario** (salida de stock).
-- **Imputación WBS del consumo (D-055):** se usa el WBS de la línea de material; si falta y hay **exactamente una** partida de progreso en el parte, se usa esa; si hay **varias** partidas de progreso y el material no trae WBS → **conflicto** (no se crea consumo sin partida).
-
-> **Nota de navegación:** el listado de consumos está en `/proyectos/[id]/consumos` (menú Operación → **Consumos**). El alta es `/consumos/nuevo`.
+> Ruta: `/proyectos/[id]/libro-obra/[logId]` · Avance por WBS + adjuntos · Tip: SUBMITTED o APPROVED.
 
 > **📷 Captura sugerida — Listado de consumos**  
-> Ruta: `/proyectos/[id]/consumos` · Mostrar empty state con CTA o filas de consumo · Tip: no confundir con Inventario genérico.
+> Ruta: `/proyectos/[id]/consumos` · Empty state con **Registrar consumo** o filas · Tip: no confundir con Inventario corporativo.
 
 ---
 
 ## 9. Compras, materiales y abastecimiento (nivel proyecto)
 
-**Tablero de compras:** `/proyectos/[id]/compras` — pendientes de SC, cotización, OC y recepción en un solo lugar (menú **Compras** → **Tablero de compras**). El alta de SC/OC puede abrirse como diálogo desde el listado (también con `?create=1`).
+**Tablero:** Compras → **Tablero de compras** → `/proyectos/[id]/compras` (pendientes SC / cotización / OC / recepción). Altas de SC/OC en **diálogo** desde el listado (`?create=1`; rutas `/nueva` redirigen). Es el tablero de **documentos** de abastecimiento; el control de **$** por partida está en **EDT y costos**.
 
-### 9.0 Materiales del proyecto (plan operativo)
+### 9.0 Procedimiento — Materiales del proyecto
 
-**Ruta:** `/proyectos/[id]/materiales` (menú Operación → **Materiales**).
+**Ruta:** Operación → **Materiales** → `/proyectos/[id]/materiales`
 
-Tablero de necesidad APU **MAT** vs pedido / recibido / consumido. Requiere presupuesto `APPROVED` o `CLOSED` con líneas MATERIAL en el APU.
+**Rol:** tablero de **cantidades** (necesidad APU vs pedido/recibido/consumido). El control de **$** por partida está en Planificación → **EDT y costos** — no lo reemplaza.
 
-| Vista | Contenido |
-|-------|-----------|
-| **Operativo** (default) | Ventanas: Esta semana · **Próximos 14 días** (default) · Este mes · Todo. KPIs: Presupuesto MAT · Filas con faltante · Cant. recibida · Cant. consumida. Columnas: EDT · Material · Necesidad · $ Presup. · Pedido · Recibido · Consumido · Faltante. CTA **Pedir** → prellena solicitud de compra. |
-| **Varianza ($)** (`?tab=varianza`) | Desvío monetario de materiales (export CSV/PDF). Antes vivía en `/reportes/materiales`. |
+**Prerrequisito:** presupuesto `APPROVED`/`CLOSED` con líneas **MATERIAL** en APU.
 
-Atajos desde la pantalla: Tablero de compras · Solicitudes · Consumos.
+1. Abrir vista **Operativo** (default). Ventana temporal: Esta semana · **Próximos 14 días** (default) · Este mes · Todo.
+2. Revisar KPIs: Presupuesto MAT · Filas con faltante · Cant. recibida · Cant. consumida.
+3. Columnas: EDT · Material · Necesidad · $ Presup. · Pedido · Recibido · Consumido · Faltante.
+4. En una fila con faltante, **Pedir** → prellena una **solicitud de compra**.
+5. Vista **Varianza ($)** (`?tab=varianza`): desvío monetario (export CSV/PDF).
+6. Atajos en pantalla: **EDT y costos** · Tablero de compras · Solicitudes · Consumos.
 
 > **📷 Captura sugerida — Materiales Operativo + Pedir**  
-> Ruta: `/proyectos/[id]/materiales` · Mostrar fila con faltante + CTA Pedir · Tip: ventana “Próximos 14 días”.
+> Ruta: `/proyectos/[id]/materiales` · Fila con faltante + CTA Pedir · Tip: ventana “Próximos 14 días”.
 
 ```mermaid
 flowchart LR
@@ -433,95 +525,85 @@ flowchart LR
   PO --> SI["Factura de proveedor → Cuenta por pagar"]
 ```
 
-> **Regla base (D-050 / D-055):** toda línea de **solicitud/OC** y toda línea de **factura de proveedor de proyecto** imputa obligatoriamente a un ítem WBS (partida hoja). Las facturas generadas desde OC **copian** el WBS de la línea de OC. Facturas corporativas (sin obra) **no** llevan WBS. Los consumos de libro de obra también imputan WBS al aprobar el parte (§8.2).
+> **Regla (D-050 / D-055):** toda línea de **solicitud/OC** y toda **factura de proveedor de proyecto** imputa a una **partida hoja**. Facturas desde OC **copian** el WBS de la OC. Facturas corporativas (sin obra) **sin** WBS.
 
-### 9.1 Solicitudes de compra
+### 9.1 Procedimiento — Solicitud de compra (SC)
 
-- **Ruta:** `/proyectos/[id]/solicitudes-compra` (menú **Solicitudes de compra**).
-- Flujo: crear `DRAFT` → **Enviar** (`SUBMITTED`, toma snapshot del costo presupuestario y de la cantidad por WBS) → **Cotizaciones** → **Seleccionar** → genera **OC en borrador**.
-- En listados conviene revisar la columna de **quién solicitó / envió** (trazabilidad más allá del estado).
-- **Cotizaciones comparables:** cada cotización registra **precio** y **plazo de entrega (lead time, en días)**, además de la validez y la referencia de presupuesto, para comparar por precio **y** plazo. El mínimo de cotizaciones es configurable por empresa.
-- **Notificaciones (§1.5):** al enviar una solicitud se avisa a compras/aprobadores (in‑app + email, con CC a OWNER/ADMIN). Si una solicitud queda demorada sin cotizar, se emite un **recordatorio por SLA**.
+**Ruta:** Compras → **Solicitudes de compra**
 
-### 9.2 Órdenes de compra
+1. **Nueva solicitud** (diálogo / `?create=1`), o llegar prellenada desde Materiales → **Pedir**.
+2. Líneas: cantidad, unidad, descripción y **partida EDT obligatoria**.
+3. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por WBS).
+4. Cargar **Cotizaciones** (precio + **plazo de entrega en días** + validez). Cumplir mínimo de cotizaciones de `/configuracion/compras`.
+5. **Seleccionar** proveedor → genera **OC en borrador**.
+6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora.
 
-- **Ruta:** `/proyectos/[id]/ordenes-compra` (+ `/nueva`, detalle `/[poId]`, edición `/[poId]/editar`).
-- **Estados en pantalla:** Borrador → Pend. aprobación → Aprobada → Confirmada → Recepción parcial / Recibida · Anulada.
-- Ciclo técnico (enum `PurchaseOrderStatus`): `DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED` (o `CANCELLED`).
-- **Devolución:** un aprobador puede **devolver** una OC en `SUBMITTED` a `DRAFT` con **motivo obligatorio**; queda auditoría de quién y por qué.
-- En listados: columnas de actor según hito (**Aprobado por**, etc.) para trazabilidad.
+### 9.2 Procedimiento — Orden de compra (OC)
 
-**Acciones del detalle (según estado y permisos):** Editar · Enviar a aprobación · Aprobar · Devolver a borrador · **Confirmar al proveedor** · Registrar recepción · **Registrar factura desde OC** (requiere cantidades recibidas) · Anular.
+**Ruta:** Compras → **Órdenes de compra**
 
-**Flujo formal (un paso por acción):**
+**Estados en pantalla:** Borrador → Pend. aprobación → Aprobada → Confirmada → Recepción parcial / Recibida · Anulada.  
+**Enum:** `DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED` (o `CANCELLED`).
 
-```mermaid
-stateDiagram-v2
-  [*] --> DRAFT
-  DRAFT --> SUBMITTED: Enviar a aprobación
-  SUBMITTED --> APPROVED: Aprobar
-  SUBMITTED --> DRAFT: Devolver (con motivo)
-  APPROVED --> CONFIRMED: Confirmar al proveedor
-  CONFIRMED --> PARTIALLY_RECEIVED
-  CONFIRMED --> RECEIVED
-  DRAFT --> CANCELLED
-```
+1. **Nueva OC** desde listado/tablero (`?create=1`) o desde SC seleccionada. Cada línea: **partida hoja** + cantidades/precios. Al elegir partida se muestran **costo ref. materiales** y **saldo de partida** (alerta, no bloqueo).
+2. **Enviar a aprobación** → `SUBMITTED`.
+3. Aprobador: **Aprobar** → `APPROVED`, o **Devolver a borrador** con **motivo obligatorio**.
+4. **Confirmar al proveedor** → `CONFIRMED` = **comprometido** en EDT y costos.  
+   > No existe atajo “Emitir y confirmar (rápido)”: siempre Enviar → Aprobar → Confirmar.
+5. **Registrar recepción** (parcial o total).
+6. Con cantidades recibidas: **Registrar factura desde OC** (o alta manual en Facturas proveedor).
+7. Desvíos de precio vs referencia: alerta → justificación → tramos altos con aprobación admin.
+8. **OC directa** (sin SC): solo si la política de compras lo habilita; umbrales altos pueden exigir motivo de emergencia (`OWNER`/`ADMIN`).
 
-> El atajo “Emitir y confirmar (rápido)” fue **retirado**: la OC recorre siempre **Enviar → Aprobar → Confirmar** para preservar la segregación de funciones.
-
-| Hito | Impacto económico |
-|------|-------------------|
-| **APPROVED** | Aprobación interna (segregación / política de empresa) |
-| **CONFIRMED** | **Comprometido** en el control de costos |
-| Recepción | Ingreso de stock + cantidades recibidas (**no** crea CxP por sí sola) |
-| Factura de proveedor **emitida** | **Devengado** + cuenta por pagar |
-
-- **Imputación:** cada línea → WBS ítem hoja (**obligatorio**, D-050). Al elegir partida: **costo ref. materiales** y **saldo de partida** (alerta, no bloqueo).
-- **Desvíos de precio** vs costo referencial: alerta → justificación → aprobación admin en tramos altos.
-- **OC directa (sin solicitud):** solo si `/configuracion/compras` lo habilita; umbral alto exige motivo de emergencia (`OWNER`/`ADMIN`).
-- **Cotizaciones:** comparar **precio y plazo (días)**.
-- **Notificaciones:** pendiente / aprobada / devuelta / confirmada + recordatorio SLA.
+| Hito | Impacto |
+|------|---------|
+| APPROVED | Control interno / segregación |
+| CONFIRMED | **Comprometido** |
+| Recepción | Stock + cantidades recibidas (**no** crea CxP sola) |
+| Factura proveedor **emitida** | **Devengado** + CxP (+ auto-DRAFT contable) |
 
 > **📷 Captura sugerida — OC confirmada con links**  
-> Ruta: `/proyectos/[id]/ordenes-compra/[poId]` · Mostrar estado Confirmada + enlace a recepción / factura · Tip: incluir botones Enviar/Aprobar/Devolver según estado.
+> Ruta: `/proyectos/[id]/ordenes-compra/[poId]` · Estado Confirmada + recepción/factura · Tip: botones Enviar/Aprobar/Devolver según estado.
 
-### 9.3 Recepciones
+### 9.3 Procedimiento — Recepciones
 
-- **Menú:** Compras → **Recepciones** (`/proyectos/[id]/recepciones`).
-- **Alta:** desde la OC → **Nueva recepción** (`/ordenes-compra/[poId]/recepciones/nueva`) o desde el listado de recepciones.
-- Al confirmar, actualiza cantidades recibidas y puede generar **entrada de stock** si hay depósito/producto (el movimiento IN puede copiar `wbsNodeId` cuando está disponible).
+1. Compras → **Recepciones**, o desde la OC → **Nueva recepción** (`/ordenes-compra/[poId]/recepciones/nueva`).
+2. Indicar cantidades recibidas por línea; confirmar.
+3. Si hay producto/depósito → **entrada de stock** (el movimiento IN puede copiar `wbsNodeId`).
 
 > **📷 Captura sugerida — Listado Recepciones**  
-> Ruta: `/proyectos/[id]/recepciones` · Mostrar listado bajo menú Compras · Tip: no confundir con Operación → Consumos.
+> Ruta: `/proyectos/[id]/recepciones` · Bajo menú Compras · Tip: no confundir con Consumos.
 
 ---
 
 ## 10. Subcontratos (nivel proyecto)
 
-**Ruta:** `/proyectos/[id]/subcontratos`
+**Ruta:** Finanzas del proyecto → **Subcontratos** → `/proyectos/[id]/subcontratos`
 
-1. Alta del contrato con un **subcontratista** del directorio; imputable a WBS categoría **SUB**.
-2. **Certificaciones de subcontrato** (enum `SubcontractCertificationStatus`): `DRAFT → ISSUED → APPROVED` (o `REJECTED` / `CANCELLED`).
-3. Al **aprobar** la certificación se genera (o se ofrece CTA hacia) una **factura de proveedor en borrador** (y con ello una cuenta por pagar), habilitando el pago.
+### 10.1 Procedimiento
+
+1. **Nuevo subcontrato** (diálogo/`?create=1` si aplica): subcontratista del directorio (rol **Subcontratista**), alcance e imputación a partidas con categoría **SUB** en APU cuando corresponda.
+2. Crear **certificación de subcontrato** del período.
+3. Ciclo (enum `SubcontractCertificationStatus`): `DRAFT` → emitir (`ISSUED`) → **Aprobar** (`APPROVED`) (o `REJECTED` / `CANCELLED`).
+4. Al **aprobar**, el sistema genera / ofrece CTA hacia una **factura de proveedor en borrador**; hay que **emitirla** para crear la CxP y poder pagar.
+5. En el detalle: badge de estado de factura + **Revisar y emitir** o **Ver factura**.
 
 > **📷 Captura sugerida — Cert. subcontrato con factura**  
-> Ruta: `/proyectos/[id]/subcontratos/[subId]/certificaciones/[certId]` · Mostrar badge de estado de factura + CTA “Revisar y emitir” o “Ver factura” · Tip: Lote 3 B-03.
+> Ruta: `/proyectos/[id]/subcontratos/[subId]/certificaciones/[certId]` · Badge factura + CTA · Tip: estado intermedio = ISSUED, no SUBMITTED.
 
-> **Corrección respecto de la guía original:** el estado intermedio es **`ISSUED`** (emitida), no `SUBMITTED`. Además, la certificación de subcontrato aprobada genera una **factura de proveedor (SupplierInvoice) en DRAFT**, que al emitirse crea la cuenta por pagar.
-
-> **Limitación:** **retenciones y anticipos** de subcontratos no están modelados como entidad separada.
+> **Limitación:** retenciones y anticipos de subcontrato **no** están modelados como entidad separada.
 
 ---
 
 ## 11. Certificaciones al cliente (nivel proyecto)
 
-**Ruta:** `/proyectos/[id]/certificaciones`
+**Ruta:** Operación → **Certificaciones** → `/proyectos/[id]/certificaciones`
 
 ### 11.1 Precondición
 
 - Presupuesto `APPROVED` o `CLOSED`.
 
-### 11.2 Emitir y aprobar (enum `CertificationStatus`)
+### 11.2 Procedimiento — Emitir y aprobar
 
 ```mermaid
 stateDiagram-v2
@@ -532,20 +614,22 @@ stateDiagram-v2
   APPROVED --> [*]
 ```
 
-1. **Nueva certificación** con período (desde/hasta).
-2. Por ítem: **Δ% físico** y **$ económico** del período.
-3. Validación de techos: obra **pública** bloquea si supera 100% acumulado; obra **privada** permite con **nota obligatoria**.
-4. **Emitir** → `ISSUED` (inmutable). Marcar `APPROVED`/`REJECTED` según respuesta del mandante.
+1. **Nueva certificación** con período (desde / hasta).
+2. Por partida: cargar **Δ% físico** y/o **$ económico** del período (según el formulario).
+3. Validar techos: obra **Pública** bloquea si supera 100% acumulado; **Privada** permite con **nota obligatoria**.
+4. **Emitir** → `ISSUED` (inmutable).
+5. Según respuesta del mandante: marcar **Aprobar** (`APPROVED`) o rechazar (`REJECTED`).
 
-### 11.3 De la certificación a la factura
+### 11.3 Procedimiento — De la certificación a la factura de venta
 
-- La **factura de venta** se emite desde la certificación (`/proyectos/[id]/facturas`) y genera una **cuenta por cobrar (Receivable)**.
-- Con certificación en `APPROVED`, la pantalla de detalle ofrece CTA **Emitir factura** (o muestra la factura ya vinculada).
-- **No hay estado `INVOICED`** en la certificación: el estado de cobro se **deriva** de las cobranzas asociadas (por diseño).
-- La emisión de la factura es un **paso manual**; la certificación aprobada **no crea la factura automáticamente**.
+1. Con certificación `APPROVED`, en el detalle usar CTA **Emitir factura** (o ver factura ya vinculada).
+2. La factura genera **cuenta por cobrar (Receivable)**.
+3. Cobrar desde **Cuentas por cobrar** del proyecto (no hay “Cobrar ahora” en el alta de factura de obra).
+4. **No** existe estado `INVOICED` en la certificación: el cobro se deriva de las cobranzas.
+5. La emisión de factura es **manual**; aprobar la certificación **no** crea la factura sola.
 
 > **📷 Captura sugerida — Certificación cliente APPROVED**  
-> Ruta: `/proyectos/[id]/certificaciones/[certId]` · Mostrar CTA **Emitir factura** o panel de factura vinculada · Tip: Lote 3 B-02.
+> Ruta: `/proyectos/[id]/certificaciones/[certId]` · CTA Emitir factura o factura vinculada · Tip: Lote 3 B-02.
 
 ---
 
@@ -644,12 +728,24 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 
 - **Menú:** Planificación → **EDT y costos**.
 - **Ruta:** `/proyectos/[id]/control-costos` (título de pantalla: **Estructura de Desglose de Trabajo y Costos**; drill-down en `/control-costos/[wbsNodeId]`).
-- Compara **presupuesto baseline vs. real** por ítem EDT/WBS, en capas: **comprometido**, **devengado**, **pagado**, **consumido**, más **certificado acumulado**.
-- Si las líneas de factura de proveedor tienen WBS, el devengado/pagado se imputa **por línea**; si no (legacy), se prorratea vía OC (D-055).
-- **Exposición esperada** = devengado + comprometido abierto (**no** suma OC + factura duplicados; diseño anti doble conteo).
+- Es el **tablero de control de costos** del proyecto. Materiales (cantidades) y Compras (documentos) alimentan este tablero; no lo reemplazan.
+- Compara **presupuesto baseline vs. real** por ítem EDT/WBS, en capas: **comprometido**, **recibido** (informativo), **devengado**, **pagado**, más **certificado acumulado**. Es el tablero de **afectaciones** por partida (§0.2).
+- Si las líneas de factura de proveedor tienen WBS, el devengado/pagado se imputa **por línea**; si hay vínculo a línea de OC (`purchaseOrderLineId`, D-066), se usa esa partida; si no (legacy), se prorratea vía OC (D-055).
+- **Exposición esperada** = **devengado + comprometido abierto** ([BR-COS-002] / [D-065]). Comprometido abierto = comprometido − devengado ligado al mismo compromiso. **No** usar `max(comprometido, recibido, devengado)` ni sumar OC + factura en bruto.
+- **Drill-down de partida:** links a OC, subcontratos, facturas de proveedor y pagos (trazabilidad partida → documento).
+- **Matching 3 vías (compras):** en detalle de OC, avisos si facturado supera recibido ± tolerancia de empresa ([D-067]); la recepción respeta tolerancia de sobrecantidad (0–5%).
+- **Insumo APU en OC (opcional):** se puede elegir un material del APU de la partida para prellenar; la imputación de $ sigue en la partida EDT ([D-068] / [D-057]).
+
+**Smoke manual — trazabilidad partida → pago**
+
+1. Planificación → **EDT y costos** → abrir una partida con saldo.
+2. Compras → crear/confirmar **OC** imputada a esa partida (insumo APU opcional).
+3. Registrar **recepción**; crear **factura de proveedor** desde la OC (“Traer líneas”) y **emitir**.
+4. Registrar **pago** de la CxP.
+5. Volver al drill-down de la partida: deben aparecer links a OC, factura y pago; la exposición = devengado + comprometido abierto.
 
 > **📷 Captura sugerida — EDT y costos**  
-> Ruta: `/proyectos/[id]/control-costos` · Mostrar título EDT + columnas comprometido/devengado/pagado · Tip: primera columna sticky si aplica.
+> Ruta: `/proyectos/[id]/control-costos` · Mostrar título EDT + columnas comprometido/devengado/pagado/exposición · Tip: primera columna sticky si aplica. Hover en encabezados muestra definición de cada capa.
 
 ### 13.2 Rentabilidad y reportes
 
@@ -674,9 +770,17 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 
 ---
 
-## 15. Contabilidad (nivel empresa) — D-061 · D-062
+## 15. Contabilidad (nivel empresa) — D-061 · D-062 · D-063
 
 Contabilidad **gerencial interna** (libro mayor). No sustituye estados oficiales, AFIP ni ajuste por inflación. Visible solo para roles de company finance (§2.5).
+
+### 15.0 Procedimiento — Puesta en marcha (una vez por empresa)
+
+1. Confirmar módulo Contabilidad habilitado y usuario con permiso de editar/contabilizar.
+2. Ir a **Contabilidad → Cuentas** (`/contabilidad/cuentas`).
+3. Si el plan está vacío: **Aplicar plantilla AR** (~40 cuentas típicas AR + reglas de mapeo). Es **idempotente por código** (reaplicar no duplica).
+4. Revisar **Reglas** (`/contabilidad/reglas`): mapeo evento → cuentas Debe/Haber; ajustar si la empresa usa códigos propios.
+5. Opcional: alta manual de cuentas (**Nueva cuenta**) si faltan rubros.
 
 ### 15.1 Pantallas (subnav)
 
@@ -693,11 +797,7 @@ Contabilidad **gerencial interna** (libro mayor). No sustituye estados oficiales
 
 Exports CSV/PDF (y XLSX en sumas, diario, ESP y EERR) desde `/api/reports/contabilidad/*`.
 
-### 15.2 Arranque: plantilla de plan de cuentas (AR)
-
-En **Cuentas** → **Aplicar plantilla AR**: carga ~40 cuentas típicas argentinas (Caja, Bancos ARS/USD, Clientes, Proveedores, IVA crédito/débito, Materiales en stock, Ingresos por obras, Costo de materiales, etc.) **más reglas de mapeo default**. Es **idempotente por código** (reaplicar no duplica).
-
-### 15.3 Flujo diario (auto-DRAFT + posteo manual)
+### 15.2 Procedimiento — Día a día (auto-DRAFT + posteo)
 
 ```mermaid
 flowchart LR
@@ -708,13 +808,16 @@ flowchart LR
   POST --> REV2["Revertir asiento (si hace falta)"]
 ```
 
-1. Las operaciones económicas **crean un asiento en borrador** de forma automática (soft, post-commit): no bloquean cobros/pagos si falla la contabilidad; no exigen permiso EDIT ACCOUNTING para que aparezca el borrador.
-2. Un usuario con permiso de contabilidad **revisa** el borrador en `/contabilidad/asientos` y pulsa **Contabilizar** (`POSTED`).
-3. **Nunca** se auto-posta: el paso humano es obligatorio.
-4. En borradores **con origen operativo**, los **montos/moneda/estructura** no se editan (sí cuentas y textos). Los asientos manuales siguen editables al 100% ([D-063](./00-product/DECISION_LOG.md)).
-5. Quienes tienen permiso de editar contabilidad reciben un **aviso in-app** (máx. uno cada 24 h por empresa) cuando hay borradores nuevos.
-6. Un asiento `POSTED` se puede **Revertir** desde la UI (crea el asiento de reversa). Anular un borrador: **Anular borrador**.
-7. Al **anular el documento origen**, se cancela el DRAFT vinculado. Si hay asiento `POSTED` sin reverso, la anulación del origen **se bloquea**.
+1. Operar finanzas con normalidad (facturas, cobros, pagos, transferencias). Cada hecho relevante **crea un asiento DRAFT** en segundo plano (soft: no bloquea la operación si falla la contabilidad).
+2. Abrir `/contabilidad` y revisar card **Borradores pendientes**, o ir a **Asientos** filtrando borradores.
+3. Abrir el asiento:
+   - Si tiene **origen operativo** (sourced): montos/moneda/estructura **bloqueados** (D-063); sí se pueden ajustar **cuentas** y textos.
+   - Si es **manual**: editable al 100%.
+4. Pulsar **Contabilizar** → `POSTED`. **Nunca** se auto-posta.
+5. Quienes editan contabilidad reciben aviso in-app (máx. uno cada 24 h por empresa) cuando hay borradores nuevos.
+6. Corrección: **Revertir** un `POSTED` (crea asiento de reversa). Anular un borrador: **Anular borrador**.
+7. Al **anular el documento origen**, se cancela el DRAFT vinculado. Si hay `POSTED` sin reverso, la anulación del origen **se bloquea**.
+8. Correr reportes del período (Libro diario / Sumas y saldos / Situación / Resultados) — solo incluyen `POSTED`.
 
 **Qué genera auto-DRAFT hoy**
 
@@ -729,17 +832,13 @@ flowchart LR
 | Movimiento de tesorería cuyo origen ya es cobro/pago/apertura | **No** (anti doble conteo) |
 | Consumo de stock / recepción | **No** aún (costeo diferido) |
 
-> **Limitaciones que siguen vigentes:**
-> - No hay **cierre de período / ejercicio GL** ni numeración correlativa de libro.
-> - Reportes = **gerenciales on-the-fly** sobre `POSTED` únicamente; disclaimer en el hub.
-> - Multi-moneda: bloques por moneda, **sin** consolidación FX.
-> - IVA/retenciones: solo si hay cuentas en el plan; no hay motor fiscal.
+> **Limitaciones:** sin cierre de ejercicio GL ni numeración correlativa; reportes gerenciales on-the-fly ≠ AFIP; multi-moneda por bloques sin consolidación FX; IVA/retenciones solo si hay cuentas en el plan.
 
 > **📷 Captura sugerida — Contabilidad hub + plantilla**  
-> Ruta: `/contabilidad` · Subnav completo (incl. Libro diario / Sumas / Situación / Resultados) + card Borradores pendientes · Tip: D-061/D-062.
+> Ruta: `/contabilidad` · Subnav + Borradores pendientes · Tip: D-061/D-062.
 
 > **📷 Captura sugerida — Aplicar plantilla AR**  
-> Ruta: `/contabilidad/cuentas` · CTA Aplicar plantilla AR · Tip: empresa nueva o sin plan.
+> Ruta: `/contabilidad/cuentas` · CTA Aplicar plantilla AR · Tip: empresa nueva.
 
 ---
 
@@ -830,7 +929,8 @@ flowchart LR
 - [ ] Tablero **Materiales** revisado (faltantes → Pedir)
 - [ ] Certificaciones periódicas (y CTA a factura cuando corresponda)
 - [ ] Recepciones (Compras) y consumos (Operación) al día
-- [ ] **EDT y costos** revisado semanalmente
+- [ ] **EDT y costos** revisado semanalmente (tablero de $; Materiales = cantidades; Compras = documentos)
+- [ ] Smoke: partida → OC → factura → pago visible en drill-down de EDT y costos
 
 ### Capataz
 
@@ -848,6 +948,7 @@ flowchart LR
 - [ ] OC enviada → aprobada (o **devuelta con motivo**) → **confirmada** al proveedor
 - [ ] Recepciones registradas (menú **Compras → Recepciones** o desde la OC)
 - [ ] Facturas de proveedor con WBS (desde OC o alta manual)
+- [ ] Tras emitir factura/pago: verificar partida en **EDT y costos** (no solo en Materiales)
 
 ### Administración / Finanzas / Tesorería
 
@@ -906,7 +1007,7 @@ flowchart LR
 - Plan de mejoras corto plazo: [`PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md`](./PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md)
 - Smoke por rol (J-02): [`08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md)
 - Changelog UI Lotes 1–6 (autores): [`guides/CHANGELOG_UI_LOTES_1_6.md`](./guides/CHANGELOG_UI_LOTES_1_6.md)
-- Decisiones recientes: [D-050](./00-product/DECISION_LOG.md) (compras/WBS) · [D-051](./00-product/DECISION_LOG.md) (AR corporativo) · [D-052](./00-product/DECISION_LOG.md) (AP pay-now) · [D-053](./00-product/DECISION_LOG.md) (decimales) · [D-054](./00-product/DECISION_LOG.md) (notificaciones) · [D-055](./00-product/DECISION_LOG.md) (WBS en factura/JL) · [D-056](./00-product/DECISION_LOG.md) (company vs project finance) · [D-057](./00-product/DECISION_LOG.md)–[D-060](./00-product/DECISION_LOG.md) (EDT/APU) · [D-061](./00-product/DECISION_LOG.md)–[D-062](./00-product/DECISION_LOG.md) (contabilidad auto-DRAFT + reportes)
+- Decisiones recientes: [D-050](./00-product/DECISION_LOG.md)–[D-055](./00-product/DECISION_LOG.md) (compras/WBS/AR/AP/decimales/notif) · [D-056](./00-product/DECISION_LOG.md) (company vs project finance) · [D-057](./00-product/DECISION_LOG.md)–[D-060](./00-product/DECISION_LOG.md) (EDT/APU) · [D-061](./00-product/DECISION_LOG.md)–[D-063](./00-product/DECISION_LOG.md) (contabilidad) · [D-064](./00-product/DECISION_LOG.md) (invitación por email)
 - Contabilidad: [`02-modules/ACCOUNTING.md`](./02-modules/ACCOUNTING.md), [`08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md`](./08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md)
 - Notificaciones: [`02-modules/NOTIFICATIONS.md`](./02-modules/NOTIFICATIONS.md)
 - Estados canónicos: [`01-domain/STATE_MACHINES.md`](./01-domain/STATE_MACHINES.md)
@@ -925,4 +1026,4 @@ flowchart LR
 
 ---
 
-*Documento vivo. Actualizado julio 2026 (D-050…D-062: compras, AR/AP, decimales, notificaciones, EDT/APU, materiales, company finance, contabilidad auto-DRAFT y reportes gerenciales). Actualizar en el mismo PR que el cambio de producto.*
+*Documento vivo. Actualizado julio 2026 (procedimientos paso a paso UI: proyecto, presupuesto/EDT/APU, cronograma, libro de obra, materiales, SC/OC, certificaciones, afectaciones vía EDT y costos, contabilidad D-061…D-063; auth email/Google). Actualizar en el mismo PR que el cambio de producto.*

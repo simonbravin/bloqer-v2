@@ -1277,6 +1277,8 @@ model CostAnalysisLine {
   product  Product? @relation(fields: [productId], references: [id])
   costItem CostItem @relation(fields: [costItemId], references: [id])
   budget   Budget   @relation(fields: [budgetId], references: [id])
+  purchaseOrderLines   PurchaseOrderLine[]
+  purchaseRequestLines PurchaseRequestLine[]
 
   @@index([costItemId])
   @@index([budgetId])
@@ -1750,7 +1752,7 @@ model SupplierInvoice {
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
-  // Optional link to PurchaseOrder — no 3-way match yet; validates consistency in service.
+  // Optional link to PurchaseOrder — 3-way match warnings via D-066 line FK + D-067 tolerances.
   purchaseOrderId            String?
   // Optional link to SubcontractCertification — set on certification approve.
   subcontractCertificationId String? @unique
@@ -1778,6 +1780,8 @@ model SupplierInvoiceLine {
   invoiceId    String
   /// Required in service when invoice.projectId is set ([D-055] / Q-053).
   wbsNodeId    String?
+  /// Optional link to PO line for 3-way / exposure anti-double-count ([D-066]).
+  purchaseOrderLineId String?
   description  String
   quantity     Decimal  @db.Decimal(18, 4)
   unitPrice    Decimal  @db.Decimal(18, 4)
@@ -1789,11 +1793,13 @@ model SupplierInvoiceLine {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  invoice SupplierInvoice @relation(fields: [invoiceId], references: [id])
-  wbsNode WbsNode?        @relation(fields: [wbsNodeId], references: [id])
+  invoice           SupplierInvoice    @relation(fields: [invoiceId], references: [id])
+  wbsNode           WbsNode?           @relation(fields: [wbsNodeId], references: [id])
+  purchaseOrderLine PurchaseOrderLine? @relation(fields: [purchaseOrderLineId], references: [id], onDelete: SetNull)
 
   @@index([invoiceId])
   @@index([wbsNodeId])
+  @@index([purchaseOrderLineId])
   @@map("supplier_invoice_lines")
 }
 
@@ -1892,6 +1898,10 @@ model CompanyProcurementSettings {
   varianceSoftAlertPct            Decimal  @default(10) @db.Decimal(8, 4)
   varianceNoteRequiredPct         Decimal  @default(25) @db.Decimal(8, 4)
   varianceExtraApprovalPct        Decimal  @default(25) @db.Decimal(8, 4)
+  /// Over-receipt vs OC qty allowed % ([BR-PUR-006] / [D-067]). Default 0 = hard block; max 5.
+  overReceiptTolerancePct         Decimal  @default(0) @db.Decimal(8, 4)
+  /// Invoice vs received qty/amount soft-match tolerance % ([BR-PUR-012] / [D-067]). Warn only in P2.
+  invoiceMatchTolerancePct        Decimal  @default(0) @db.Decimal(8, 4)
   /// Hours before SLA reminder for SUBMITTED POs / SUBMITTED PRs without quotes (D-050).
   approvalSlaHours                Int      @default(72)
   createdAt                       DateTime @default(now())
@@ -1937,6 +1947,8 @@ model PurchaseRequestLine {
   purchaseRequestId      String
   wbsNodeId              String?
   productId              String?
+  /// Optional APU hint under the ITEM ([D-068]); cost still imputes to wbsNodeId ([D-057]).
+  costAnalysisLineId     String?
   lineType               PurchaseRequestLineType @default(MATERIAL)
   description            String
   unit                   String                  @default("")
@@ -1947,13 +1959,15 @@ model PurchaseRequestLine {
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
-  purchaseRequest PurchaseRequest        @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
-  wbsNode         WbsNode?               @relation(fields: [wbsNodeId], references: [id])
-  product         Product?               @relation(fields: [productId], references: [id])
-  quoteLines      ProcurementQuoteLine[]
+  purchaseRequest  PurchaseRequest        @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  wbsNode          WbsNode?               @relation(fields: [wbsNodeId], references: [id])
+  product          Product?               @relation(fields: [productId], references: [id])
+  costAnalysisLine CostAnalysisLine?      @relation(fields: [costAnalysisLineId], references: [id], onDelete: SetNull)
+  quoteLines       ProcurementQuoteLine[]
 
   @@index([purchaseRequestId])
   @@index([wbsNodeId])
+  @@index([costAnalysisLineId])
   @@map("purchase_request_lines")
 }
 
@@ -2070,6 +2084,8 @@ model PurchaseOrderLine {
   purchaseOrderId        String
   wbsNodeId              String?
   productId              String?
+  /// Optional APU hint under the ITEM ([D-068]); cost still imputes to wbsNodeId ([D-057]).
+  costAnalysisLineId     String?
   description            String
   unit                   String                    @default("")
   quantity               Decimal                   @db.Decimal(18, 4)
@@ -2088,14 +2104,17 @@ model PurchaseOrderLine {
   createdAt              DateTime                  @default(now())
   updatedAt              DateTime                  @updatedAt
 
-  purchaseOrder PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id])
-  wbsNode       WbsNode?              @relation(fields: [wbsNodeId], references: [id])
-  product       Product?              @relation(fields: [productId], references: [id])
-  receiptLines  PurchaseReceiptLine[]
+  purchaseOrder        PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id])
+  wbsNode              WbsNode?              @relation(fields: [wbsNodeId], references: [id])
+  product              Product?              @relation(fields: [productId], references: [id])
+  costAnalysisLine     CostAnalysisLine?     @relation(fields: [costAnalysisLineId], references: [id], onDelete: SetNull)
+  receiptLines         PurchaseReceiptLine[]
+  supplierInvoiceLines SupplierInvoiceLine[]
 
   @@index([purchaseOrderId])
   @@index([wbsNodeId])
   @@index([productId])
+  @@index([costAnalysisLineId])
   @@map("purchase_order_lines")
 }
 

@@ -130,7 +130,7 @@ export default async function ProyectoMaterialesPage({ params, searchParams }: P
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Materiales del proyecto"
-        subtitle="Necesidad APU vs pedido, recibido y consumido"
+        subtitle="Cantidades APU vs pedido, recibido y consumido. El control de $ está en EDT y costos."
         actions={
           <div className="flex flex-wrap gap-2">
             {tab === "varianza" ? (
@@ -140,6 +140,9 @@ export default async function ProyectoMaterialesPage({ params, searchParams }: P
                 pdf
               />
             ) : null}
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/proyectos/${projectId}/control-costos`}>EDT y costos</Link>
+            </Button>
             {showCompras ? (
               <>
                 <Button asChild variant="outline" size="sm">

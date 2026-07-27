@@ -69,7 +69,7 @@ Interpretación: lo que **sigue vigente** como compromiso firme **sin** haberse 
 \text{expected\_cost\_exposure} = \text{accrued\_amount} + \text{open\_committed\_amount}
 \]
 
-**Regla anti doble conteo ([BR-COS-002]):** **no** es válido usar \(\text{committed\_amount} + \text{accrued\_amount}\) cuando parte del devengado ya “consume” el compromiso (misma OC). La forma canónica es la suma anterior.
+**Regla anti doble conteo ([BR-COS-002] / [D-065]):** **no** es válido usar \(\text{committed\_amount} + \text{accrued\_amount}\) cuando parte del devengado ya “consume” el compromiso (misma OC). La forma canónica es la suma anterior. **Prohibido** usar \(\max(\text{committed}, \text{received}, \text{accrued})\) como proxy de exposición.
 
 ### 1.7 Ejemplo numérico ([BR-COS-002])
 

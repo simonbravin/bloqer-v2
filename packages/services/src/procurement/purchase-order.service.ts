@@ -10,7 +10,7 @@ import {
 } from "./procurement-access";
 import { PO_RECEIPT_ELIGIBLE_STATUSES } from "./procurement-constants";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { assertCompanyMatchesProject, assertWbsLineForProject } from "./procurement-wbs";
+import { assertCompanyMatchesProject, assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import { assertDirectPoAllowed } from "./procurement-policy.service";
 import { sortTreeOrder } from "@bloqer/utils";
@@ -42,6 +42,7 @@ export type PurchaseOrderLineView = {
   wbsNodeCode: string | null;
   wbsNodeName: string | null;
   productId: string | null;
+  costAnalysisLineId: string | null;
   description: string;
   unit: string;
   quantity: string;
@@ -74,6 +75,7 @@ export type PurchaseOrderView = Omit<PurchaseOrder, "subtotal" | "taxAmount" | "
 function serializeLine(
   l: {
     id: string; purchaseOrderId: string; wbsNodeId: string | null; productId: string | null;
+    costAnalysisLineId: string | null;
     description: string; unit: string;
     quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; taxRate: Prisma.Decimal;
     lineSubtotal: Prisma.Decimal; lineTax: Prisma.Decimal; lineTotal: Prisma.Decimal;
@@ -93,6 +95,7 @@ function serializeLine(
     wbsNodeCode:       l.wbsNode?.code ?? null,
     wbsNodeName:       l.wbsNode?.name ?? null,
     productId:         l.productId,
+    costAnalysisLineId: l.costAnalysisLineId,
     description:       l.description,
     unit:              l.unit,
     quantity:          l.quantity.toString(),
@@ -198,6 +201,14 @@ export async function listLinkablePurchaseOrders(
 
 // ─── WBS options helper ───────────────────────────────────────────────────────
 
+export type ProcurementApuOption = {
+  id: string;
+  description: string;
+  unit: string;
+  unitCost: string;
+  productId: string | null;
+};
+
 export type ProcurementWbsOption = {
   id: string;
   code: string;
@@ -207,6 +218,8 @@ export type ProcurementWbsOption = {
   budgetUnit: string | null;
   availableSaldo: string | null;
   wouldExceedBudget: boolean;
+  /** MATERIAL APU hints under this ITEM ([D-068]). */
+  apuLines: ProcurementApuOption[];
 };
 
 export async function listProcurementWbsOptions(
@@ -215,7 +228,7 @@ export async function listProcurementWbsOptions(
 ): Promise<ProcurementWbsOption[]> {
   await assertProcurementTenantModule(ctx);
   if (!canViewProcurementProjectArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para opciones de compra / WBS");
+    throw new ServiceError("FORBIDDEN", "Sin permisos para opciones de compra / EDT");
   }
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
@@ -233,6 +246,21 @@ export async function listProcurementWbsOptions(
       parentId: true,
       sortOrder: true,
       budget: { select: { name: true, versionNumber: true } },
+      costItem: {
+        select: {
+          analysisLines: {
+            where: { category: "MATERIAL", isLumpSum: false },
+            orderBy: { sortOrder: "asc" },
+            select: {
+              id: true,
+              description: true,
+              unit: true,
+              unitCost: true,
+              productId: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -250,6 +278,13 @@ export async function listProcurementWbsOptions(
       budgetUnit: ref.budgetUnit,
       availableSaldo: ref.availableSaldo,
       wouldExceedBudget: ref.wouldExceedBudget,
+      apuLines: (n.costItem?.analysisLines ?? []).map((l) => ({
+        id: l.id,
+        description: l.description,
+        unit: l.unit,
+        unitCost: l.unitCost.toString(),
+        productId: l.productId,
+      })),
     });
   }
   return result;
@@ -331,6 +366,9 @@ export async function createPurchaseOrder(
   assertWbsRequiredOnLines(input.lines);
   for (const line of input.lines) {
     await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId);
+    if (line.costAnalysisLineId) {
+      await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId);
+    }
   }
 
   const companyId = await resolveCompanyId(input.projectId, ctx);
@@ -388,6 +426,7 @@ export async function createPurchaseOrder(
           productId: line.productId,
           description: line.description,
           unit: line.unit ?? "",
+          costAnalysisLineId: line.costAnalysisLineId,
         },
         tx,
       );
@@ -396,6 +435,7 @@ export async function createPurchaseOrder(
           purchaseOrderId: created.id,
           wbsNodeId: line.wbsNodeId,
           productId: line.productId ?? null,
+          costAnalysisLineId: line.costAnalysisLineId ?? null,
           description: line.description,
           unit: line.unit ?? "",
           quantity: qty,
@@ -460,6 +500,9 @@ export async function updatePurchaseOrder(
     assertWbsRequiredOnLines(input.lines);
     for (const line of input.lines) {
       await assertWbsLineForProject(line.wbsNodeId, existing.projectId, ctx.tenantId);
+      if (line.costAnalysisLineId) {
+        await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId);
+      }
     }
   }
 
@@ -497,6 +540,7 @@ export async function updatePurchaseOrder(
             productId: line.productId,
             description: line.description,
             unit: line.unit ?? "",
+            costAnalysisLineId: line.costAnalysisLineId,
           },
           tx,
         );
@@ -511,6 +555,7 @@ export async function updatePurchaseOrder(
             purchaseOrderId: id,
             wbsNodeId:       line.wbsNodeId,
             productId:       line.productId ?? null,
+            costAnalysisLineId: line.costAnalysisLineId ?? null,
             description:     line.description,
             unit:            line.unit ?? "",
             quantity:        qty,

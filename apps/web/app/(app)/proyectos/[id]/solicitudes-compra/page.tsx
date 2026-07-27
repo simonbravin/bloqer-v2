@@ -36,6 +36,7 @@ interface PageProps {
     description?: string;
     quantity?: string;
     productId?: string;
+    costAnalysisLineId?: string;
     from?: string;
   }>;
 }
@@ -93,6 +94,7 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
       budgetUnit: n.budgetUnit,
       availableSaldo: n.availableSaldo,
       wouldExceedBudget: n.wouldExceedBudget,
+      apuLines: n.apuLines,
     }));
   }
 
@@ -107,6 +109,7 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
           description: sp.description,
           quantity: sp.quantity,
           productId: sp.productId,
+          costAnalysisLineId: sp.costAnalysisLineId,
         }}
         prefilledFromMaterials={sp.from === "materiales"}
       />

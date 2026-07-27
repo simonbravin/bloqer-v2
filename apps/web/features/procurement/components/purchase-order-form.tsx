@@ -27,6 +27,7 @@ interface Props {
 const DEFAULT_LINE: PurchaseOrderLine = {
   wbsNodeId: null,
   productId: null,
+  costAnalysisLineId: null,
   description: "",
   unit: "",
   quantity: "1",
@@ -57,7 +58,7 @@ export function PurchaseOrderForm({
       return;
     }
     if (lines.some((l) => !l.wbsNodeId)) {
-      setError("Cada línea debe tener un ítem WBS");
+      setError("Cada línea debe tener un ítem EDT");
       return;
     }
     if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {

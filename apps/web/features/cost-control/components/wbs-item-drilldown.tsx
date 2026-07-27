@@ -1,3 +1,6 @@
+"use client";
+
+import Link from "next/link";
 import { formatDate } from "@/lib/format";
 import type { WbsItemCostDetail } from "@bloqer/services";
 import {
@@ -17,12 +20,11 @@ function fmtDate(d: Date) {
   return formatDate(d);
 }
 
-type Props = { detail: WbsItemCostDetail };
+type Props = { detail: WbsItemCostDetail; projectId: string };
 
-export function WbsItemDrilldown({ detail }: Props) {
+export function WbsItemDrilldown({ detail, projectId }: Props) {
   return (
     <div className="space-y-6">
-      {/* Budget item */}
       {detail.budgetItem ? (
         <Section title="Análisis de presupuesto">
           <div className="grid grid-cols-3 gap-4 text-sm">
@@ -40,7 +42,6 @@ export function WbsItemDrilldown({ detail }: Props) {
         </div>
       )}
 
-      {/* Certifications */}
       {detail.certificationLines.length > 0 && (
         <Section title="Certificaciones de cliente">
           <SimpleTable
@@ -55,13 +56,18 @@ export function WbsItemDrilldown({ detail }: Props) {
         </Section>
       )}
 
-      {/* Purchase orders */}
       {detail.purchaseOrderLines.length > 0 && (
         <Section title="Órdenes de compra">
           <SimpleTable
             headers={["OC N°", "Estado", "Descripción", "Cant.", "PU", "Total", "Recibido"]}
-            rows={detail.purchaseOrderLines.map((pol) => [
-              String(pol.poNumber),
+            rows={detail.purchaseOrderLines.map((pol, idx) => [
+              <Link
+                key={`${pol.poId}-${idx}`}
+                href={`/proyectos/${projectId}/ordenes-compra/${pol.poId}`}
+                className="text-primary hover:underline font-medium"
+              >
+                {String(pol.poNumber)}
+              </Link>,
               pol.poStatus,
               pol.description,
               pol.quantity,
@@ -73,13 +79,18 @@ export function WbsItemDrilldown({ detail }: Props) {
         </Section>
       )}
 
-      {/* Subcontracts */}
       {detail.subcontractLines.length > 0 && (
         <Section title="Subcontratos">
           <SimpleTable
             headers={["Código", "Estado", "Descripción", "Cant.", "PU", "Total", "Certif."]}
             rows={detail.subcontractLines.map((sl) => [
-              `SC-${String(sl.subcontractNumber).padStart(3, "0")}`,
+              <Link
+                key={sl.subcontractId}
+                href={`/proyectos/${projectId}/subcontratos/${sl.subcontractId}`}
+                className="text-primary hover:underline font-medium"
+              >
+                {`SC-${String(sl.subcontractNumber).padStart(3, "0")}`}
+              </Link>,
               sl.subcontractStatus,
               sl.description,
               sl.quantity,
@@ -91,13 +102,18 @@ export function WbsItemDrilldown({ detail }: Props) {
         </Section>
       )}
 
-      {/* Subcontract certifications */}
       {detail.subcontractCertLines.length > 0 && (
         <Section title="Certificaciones de subcontratos">
           <SimpleTable
             headers={["N°", "Estado", "Fecha", "Cantidad período", "Importe"]}
             rows={detail.subcontractCertLines.map((scl) => [
-              String(scl.certNumber),
+              <Link
+                key={scl.certId}
+                href={`/proyectos/${projectId}/subcontratos/${scl.subcontractId}/certificaciones/${scl.certId}`}
+                className="text-primary hover:underline font-medium"
+              >
+                {String(scl.certNumber)}
+              </Link>,
               scl.certStatus,
               fmtDate(scl.certificationDate),
               scl.currentQty,
@@ -107,7 +123,64 @@ export function WbsItemDrilldown({ detail }: Props) {
         </Section>
       )}
 
-      {/* Stock movements */}
+      {detail.supplierInvoices.length > 0 && (
+        <Section title="Facturas de proveedor">
+          <SimpleTable
+            headers={["Factura", "Estado", "Fecha", "Total", "OC"]}
+            rows={detail.supplierInvoices.map((inv) => [
+              <Link
+                key={inv.invoiceId}
+                href={`/proyectos/${projectId}/facturas-proveedor/${inv.invoiceId}`}
+                className="text-primary hover:underline font-medium"
+              >
+                {`FP-${String(inv.invoiceNumber).padStart(5, "0")}`}
+              </Link>,
+              inv.status,
+              fmtDate(inv.issueDate),
+              fmt(inv.totalAmount),
+              inv.purchaseOrderId ? (
+                <Link
+                  key={`po-${inv.invoiceId}`}
+                  href={`/proyectos/${projectId}/ordenes-compra/${inv.purchaseOrderId}`}
+                  className="text-primary hover:underline"
+                >
+                  Ver OC
+                </Link>
+              ) : (
+                "—"
+              ),
+            ])}
+          />
+        </Section>
+      )}
+
+      {detail.payments.length > 0 && (
+        <Section title="Pagos">
+          <SimpleTable
+            headers={["Pago", "Fecha", "Monto", "Estado", "Factura"]}
+            rows={detail.payments.map((p) => [
+              <Link
+                key={p.paymentId}
+                href={`/proyectos/${projectId}/pagos/${p.paymentId}`}
+                className="text-primary hover:underline font-medium"
+              >
+                Ver pago
+              </Link>,
+              fmtDate(p.paymentDate),
+              fmt(p.amount),
+              p.status,
+              <Link
+                key={`inv-${p.paymentId}`}
+                href={`/proyectos/${projectId}/facturas-proveedor/${p.invoiceId}`}
+                className="text-primary hover:underline"
+              >
+                {`FP-${String(p.invoiceNumber).padStart(5, "0")}`}
+              </Link>,
+            ])}
+          />
+        </Section>
+      )}
+
       {detail.stockMovements.length > 0 && (
         <Section title="Consumos de inventario">
           <SimpleTable
@@ -122,25 +195,18 @@ export function WbsItemDrilldown({ detail }: Props) {
         </Section>
       )}
 
-      {/* Jobsite progress */}
       {detail.jobsiteProgress.length > 0 && (
-        <Section title="Avance físico (partes de obra)">
+        <Section title="Avance de libro de obra">
           <SimpleTable
             headers={["Fecha", "Estado", "Cant. completada", "% físico"]}
-            rows={detail.jobsiteProgress.map((p) => [
-              fmtDate(p.logDate),
-              p.logStatus,
-              p.quantityCompleted,
-              p.physicalPct ? `${p.physicalPct}%` : "—",
+            rows={detail.jobsiteProgress.map((jp) => [
+              fmtDate(jp.logDate),
+              jp.logStatus,
+              jp.quantityCompleted,
+              jp.physicalPct ?? "—",
             ])}
           />
         </Section>
-      )}
-
-      {detail.certificationLines.length === 0 && detail.purchaseOrderLines.length === 0 &&
-       detail.subcontractLines.length === 0 && detail.stockMovements.length === 0 &&
-       detail.jobsiteProgress.length === 0 && (
-        <p className="text-sm text-muted-foreground">No hay documentos asociados a este ítem EDT.</p>
       )}
     </div>
   );
@@ -148,9 +214,9 @@ export function WbsItemDrilldown({ detail }: Props) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border bg-card">
-      <div className="border-b px-4 py-3"><p className="text-sm font-semibold">{title}</p></div>
-      <div className="p-4">{children}</div>
+    <div>
+      <h3 className="text-sm font-semibold mb-2">{title}</h3>
+      {children}
     </div>
   );
 }
@@ -164,7 +230,13 @@ function Kv({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
+function SimpleTable({
+  headers,
+  rows,
+}: {
+  headers: string[];
+  rows: Array<Array<React.ReactNode>>;
+}) {
   return (
     <TableScroll>
       <Table className="text-xs">

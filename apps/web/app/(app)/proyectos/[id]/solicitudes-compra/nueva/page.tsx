@@ -9,6 +9,7 @@ interface PageProps {
     description?: string;
     quantity?: string;
     productId?: string;
+    costAnalysisLineId?: string;
     from?: string;
   }>;
 }
@@ -27,6 +28,7 @@ export default async function NuevaSolicitudCompraPage({ params, searchParams }:
   if (sp.description) next.set("description", sp.description);
   if (sp.quantity) next.set("quantity", sp.quantity);
   if (sp.productId) next.set("productId", sp.productId);
+  if (sp.costAnalysisLineId) next.set("costAnalysisLineId", sp.costAnalysisLineId);
   if (sp.from) next.set("from", sp.from);
 
   redirect(`/proyectos/${id}/solicitudes-compra?${next.toString()}`);

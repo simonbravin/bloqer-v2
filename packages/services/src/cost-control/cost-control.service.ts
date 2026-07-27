@@ -6,8 +6,10 @@ import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenan
 
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
+import { computeCostExposureLayers } from "./cost-exposure";
 
 export { canViewProjectCostControlReport };
+export { computeCostExposureLayers } from "./cost-exposure";
 
 // ─── Filter / output types ────────────────────────────────────────────────────
 
@@ -47,9 +49,9 @@ export type CostControlRow = {
   // ─ Progress ─
   operationalProgressQty: string;   // APPROVED logs only
   submittedProgressQty: string;     // SUBMITTED logs (informational)
-  // ─ Derived ─
-  // Assumption: expectedCostExposure = max(committed, received, accrued) per user decision.
-  // openCommittedCost = max(0, committed - accrued) — simplified; does not chase individual line links.
+  // ─ Derived ([BR-COS-002] / [D-065]) ─
+  // openCommittedCost = max(0, committed − accrued_linked)
+  // expectedCostExposure = accrued + openCommitted (received is informational only)
   openCommittedCost: string;
   expectedCostExposure: string;
   remainingBudgetCost: string; // budgetTotalCost - expectedCostExposure
@@ -69,6 +71,7 @@ export type CostControlTotals = {
   paidCost: string;
   inventoryConsumedCost: string;
   operationalProgressQty: string;
+  openCommittedCost: string;
   expectedCostExposure: string;
   remainingBudgetCost: string;
   costVariance: string;
@@ -116,6 +119,8 @@ type WbsAcc = {
   committedCost: Prisma.Decimal;
   receivedCost: Prisma.Decimal;
   accruedCost: Prisma.Decimal;
+  /** Accrued that consumes a commitment (PO-linked invoice / approved subcontract cert). */
+  accruedLinkedCost: Prisma.Decimal;
   paidCost: Prisma.Decimal;
   inventoryConsumedCost: Prisma.Decimal;
   operationalProgressQty: Prisma.Decimal;
@@ -126,7 +131,7 @@ const ZERO = new Prisma.Decimal(0);
 function newAcc(): WbsAcc {
   return {
     certifiedIssued: ZERO, certifiedApproved: ZERO,
-    committedCost: ZERO, receivedCost: ZERO, accruedCost: ZERO,
+    committedCost: ZERO, receivedCost: ZERO, accruedCost: ZERO, accruedLinkedCost: ZERO,
     paidCost: ZERO, inventoryConsumedCost: ZERO,
     operationalProgressQty: ZERO, submittedProgressQty: ZERO,
   };
@@ -365,7 +370,21 @@ export async function getProjectCostControl(
           },
           select: {
             id: true, totalAmount: true, purchaseOrderId: true,
-            purchaseOrder: { select: { id: true, totalAmount: true, lines: { select: { wbsNodeId: true, lineTotal: true } } } },
+            lines: {
+              select: {
+                lineTotal: true,
+                wbsNodeId: true,
+                purchaseOrderLineId: true,
+                purchaseOrderLine: { select: { wbsNodeId: true, lineTotal: true } },
+              },
+            },
+            purchaseOrder: {
+              select: {
+                id: true,
+                totalAmount: true,
+                lines: { select: { id: true, wbsNodeId: true, lineTotal: true } },
+              },
+            },
           },
         })
       : Promise.resolve([]),
@@ -396,8 +415,20 @@ export async function getProjectCostControl(
                   select: {
                     id: true, totalAmount: true,
                     purchaseOrderId: true, subcontractCertificationId: true,
-                    purchaseOrder: { select: { totalAmount: true, lines: { select: { wbsNodeId: true, lineTotal: true } } } },
-                    lines: { select: { wbsNodeId: true, lineTotal: true } },
+                    purchaseOrder: {
+                      select: {
+                        totalAmount: true,
+                        lines: { select: { id: true, wbsNodeId: true, lineTotal: true } },
+                      },
+                    },
+                    lines: {
+                      select: {
+                        wbsNodeId: true,
+                        lineTotal: true,
+                        purchaseOrderLineId: true,
+                        purchaseOrderLine: { select: { wbsNodeId: true } },
+                      },
+                    },
                   },
                 },
               },
@@ -441,19 +472,6 @@ export async function getProjectCostControl(
   ]);
 
   // ─ Build WBS allocation maps for payment routing ─
-  // poWbsMap: poId → [{ wbsNodeId: string | null, fraction: Decimal }]
-  const poWbsMap = new Map<string, Array<{ wbsNodeId: string | null; fraction: Prisma.Decimal }>>();
-  for (const inv of poLinkedInvoices) {
-    if (!inv.purchaseOrder || poWbsMap.has(inv.purchaseOrder.id)) continue;
-    const lines = inv.purchaseOrder.lines;
-    const poTotal = lines.reduce((s, l) => s.add(l.lineTotal), ZERO);
-    if (poTotal.isZero()) continue;
-    poWbsMap.set(inv.purchaseOrder.id, lines.map((l) => ({
-      wbsNodeId: l.wbsNodeId,
-      fraction: new Prisma.Decimal(l.lineTotal).div(poTotal),
-    })));
-  }
-
   // subCertWbsMap: subCertId → [{ wbsNodeId: string | null, fraction: Decimal }]
   const subCertTotals = new Map<string, Prisma.Decimal>();
   const subCertLinesBySubCert = new Map<string, SubCertLineForCostControl[]>();
@@ -520,20 +538,55 @@ export async function getProjectCostControl(
     }
   }
 
-  // D. Accrued from APPROVED sub cert lines
+  // D. Accrued from APPROVED sub cert lines (linked to subcontract commitment)
   for (const scl of subCertLines) {
     const wbsId = scl.subcontractLine.wbsNodeId;
+    const amount = new Prisma.Decimal(scl.lineTotal);
     if (wbsId && wbsNodeIds.has(wbsId)) {
-      add(accMap, wbsId, "accruedCost", new Prisma.Decimal(scl.lineTotal));
+      add(accMap, wbsId, "accruedCost", amount);
+      add(accMap, wbsId, "accruedLinkedCost", amount);
     } else {
-      unalloc.accruedCost = unalloc.accruedCost.add(scl.lineTotal);
+      unalloc.accruedCost = unalloc.accruedCost.add(amount);
     }
   }
 
-  // E. Accrued from ISSUED SupplierInvoices (PO-linked, proportional allocation)
-  // Assumption: invoice amount allocated proportionally by PO line WBS weights.
+  // E. Accrued from ISSUED SupplierInvoices (PO-linked) — prefer line FK ([D-066]), else PO weights
   for (const inv of poLinkedInvoices) {
     if (!inv.purchaseOrder) continue;
+    const linkedLines = inv.lines.filter((l) => l.purchaseOrderLineId);
+    if (linkedLines.length > 0) {
+      for (const line of linkedLines) {
+        const wbsId = line.purchaseOrderLine?.wbsNodeId ?? line.wbsNodeId;
+        const amount = new Prisma.Decimal(line.lineTotal);
+        if (wbsId && wbsNodeIds.has(wbsId)) {
+          add(accMap, wbsId, "accruedCost", amount);
+          // Only FK-mapped lines consume open_committed on that partida ([D-065]).
+          add(accMap, wbsId, "accruedLinkedCost", amount);
+        } else {
+          unalloc.accruedCost = unalloc.accruedCost.add(amount);
+        }
+      }
+      // Orphan lines on a PO invoice: accrue by line WBS. If that WBS is on the
+      // same OC commitment, also count as linked so open_committed shrinks ([D-065]).
+      const orphanLines = inv.lines.filter((l) => !l.purchaseOrderLineId);
+      const poWbsOnCommitment = new Set(
+        inv.purchaseOrder.lines.map((l) => l.wbsNodeId).filter((id): id is string => Boolean(id)),
+      );
+      for (const line of orphanLines) {
+        const amount = new Prisma.Decimal(line.lineTotal);
+        const wbsId = line.wbsNodeId;
+        if (wbsId && wbsNodeIds.has(wbsId)) {
+          add(accMap, wbsId, "accruedCost", amount);
+          if (poWbsOnCommitment.has(wbsId)) {
+            add(accMap, wbsId, "accruedLinkedCost", amount);
+          }
+        } else {
+          unalloc.accruedCost = unalloc.accruedCost.add(amount);
+        }
+      }
+      continue;
+    }
+
     const poLines2 = inv.purchaseOrder.lines;
     const poTotal  = poLines2.reduce((s, l) => s.add(l.lineTotal), ZERO);
     if (poTotal.isZero()) {
@@ -545,13 +598,14 @@ export async function getProjectCostControl(
       const wbsId = pol.wbsNodeId;
       if (wbsId && wbsNodeIds.has(wbsId)) {
         add(accMap, wbsId, "accruedCost", share);
+        add(accMap, wbsId, "accruedLinkedCost", share);
       } else {
         unalloc.accruedCost = unalloc.accruedCost.add(share);
       }
     }
   }
 
-  // F. Direct project invoices (no PO, no sub cert) — prefer line WBS ([D-055])
+  // F. Direct project invoices (no PO, no sub cert) — prefer line WBS ([D-055]); NOT linked to commitment
   for (const inv of unallocatedInvoices) {
     const linesWithWbs = inv.lines.filter((l) => l.wbsNodeId);
     if (linesWithWbs.length > 0) {
@@ -578,13 +632,22 @@ export async function getProjectCostControl(
     warnings.push(`${unallocWithoutLineWbs.length} factura(s) de proveedor sin OC ni WBS en líneas — costo no asignado a WBS.`);
   }
 
-  // G. Paid cost (CONFIRMED payments, proportional WBS allocation via invoice chain)
+  // G. Paid cost (CONFIRMED payments) — prefer invoice line → PO line WBS when present
   for (const pmt of payments) {
     const inv = pmt.payable?.supplierInvoice;
     if (!inv) { unalloc.paidCost = unalloc.paidCost.add(pmt.amount); continue; }
 
-    if (inv.purchaseOrderId && inv.purchaseOrder) {
-      // Allocate via PO line WBS fractions
+    const invLinesWithPo = inv.lines?.filter((l) => l.purchaseOrderLineId) ?? [];
+    if (invLinesWithPo.length > 0) {
+      const lineTotal = inv.lines.reduce((s, l) => s.add(l.lineTotal), ZERO);
+      if (lineTotal.isZero()) { unalloc.paidCost = unalloc.paidCost.add(pmt.amount); continue; }
+      for (const line of inv.lines) {
+        const share = new Prisma.Decimal(line.lineTotal).div(lineTotal).mul(pmt.amount);
+        const wbsId = line.purchaseOrderLine?.wbsNodeId ?? line.wbsNodeId;
+        if (wbsId && wbsNodeIds.has(wbsId)) add(accMap, wbsId, "paidCost", share);
+        else unalloc.paidCost = unalloc.paidCost.add(share);
+      }
+    } else if (inv.purchaseOrderId && inv.purchaseOrder) {
       const poLines2 = inv.purchaseOrder.lines;
       const poTotal  = poLines2.reduce((s, l) => s.add(l.lineTotal), ZERO);
       if (poTotal.isZero()) { unalloc.paidCost = unalloc.paidCost.add(pmt.amount); continue; }
@@ -640,6 +703,7 @@ export async function getProjectCostControl(
   const totAcc = newAcc();
   let totBudgetCost = ZERO, totBudgetSale = ZERO;
   let totExpected = ZERO, totRemaining = ZERO, totVariance = ZERO, totMargin = ZERO;
+  let totOpenCommitted = ZERO;
 
   for (const node of wbsNodes) {
     const acc    = accMap.get(node.id)!;
@@ -653,10 +717,14 @@ export async function getProjectCostControl(
     const committed = acc.committedCost;
     const received  = acc.receivedCost;
     const accrued   = acc.accruedCost;
+    const accruedLinked = acc.accruedLinkedCost;
 
-    // expectedCostExposure = max(committed, received, accrued) per user decision
-    const expected = Prisma.Decimal.max(committed, received, accrued);
-    const openCommitted = Prisma.Decimal.max(ZERO, committed.sub(accrued));
+    // [BR-COS-002] / [D-065]: exposure = accrued + open_committed (not max / not committed+accrued)
+    const { openCommitted, expectedCostExposure: expected } = computeCostExposureLayers({
+      committed,
+      accrued,
+      accruedLinked,
+    });
     const remaining = bCost.sub(expected);
     const variance  = remaining; // positive = saving
     const margin    = bSale.sub(expected);
@@ -701,6 +769,7 @@ export async function getProjectCostControl(
     totRemaining  = totRemaining.add(remaining);
     totVariance   = totVariance.add(variance);
     totMargin     = totMargin.add(margin);
+    totOpenCommitted = totOpenCommitted.add(openCommitted);
     for (const k of Object.keys(acc) as (keyof WbsAcc)[]) {
       (totAcc[k] as Prisma.Decimal) = (totAcc[k] as Prisma.Decimal).add(acc[k] as Prisma.Decimal);
     }
@@ -717,6 +786,7 @@ export async function getProjectCostControl(
     paidCost:             totAcc.paidCost.toFixed(2),
     inventoryConsumedCost: totAcc.inventoryConsumedCost.toFixed(2),
     operationalProgressQty: totAcc.operationalProgressQty.toFixed(4),
+    openCommittedCost:    totOpenCommitted.toFixed(2),
     expectedCostExposure: totExpected.toFixed(2),
     remainingBudgetCost:  totRemaining.toFixed(2),
     costVariance:         totVariance.toFixed(2),
@@ -767,8 +837,16 @@ export type WbsItemCostDetail = {
     certifiedQuantity: string;
   }>;
   subcontractCertLines: Array<{
-    certId: string; certNumber: number; certStatus: string;
+    certId: string; subcontractId: string; certNumber: number; certStatus: string;
     currentQty: string; lineTotal: string; certificationDate: Date;
+  }>;
+  supplierInvoices: Array<{
+    invoiceId: string; invoiceNumber: number; status: string;
+    issueDate: Date; totalAmount: string; purchaseOrderId: string | null;
+  }>;
+  payments: Array<{
+    paymentId: string; paymentDate: Date; amount: string; status: string;
+    invoiceId: string; invoiceNumber: number;
   }>;
   stockMovements: Array<{
     id: string; movementDate: Date; quantity: string;
@@ -804,13 +882,15 @@ export async function getWbsItemCostDetail(
   const incCert = gate.isEnabled("CERTIFICATIONS");
   const incProc = gate.isEnabled("PROCUREMENT");
   const incSub = gate.isEnabled("SUBCONTRACTS");
+  const incAp = gate.isEnabled("AP");
   const incInv = gate.isEnabled("INVENTORY");
   const incJl = gate.isEnabled("JOBSITE_LOG");
 
   const dateFrom = filters.dateFrom;
   const dateTo   = filters.dateTo;
 
-  const [certLines, poLines, subLines, subCertLines2, stockMoves, logProgress] = await Promise.all([
+  const [certLines, poLines, subLines, subCertLines2, stockMoves, logProgress, invoiceLinesDirect, invoiceLinesViaPo, invoicesViaPoHeader] =
+    await Promise.all([
     incCert
       ? prisma.certificationLine.findMany({
           where: { wbsNodeId, certification: { projectId, tenantId: ctx.tenantId, status: { in: ["ISSUED", "APPROVED"] } } },
@@ -838,7 +918,11 @@ export async function getWbsItemCostDetail(
             subcontractLine: { wbsNodeId },
             certification: { projectId, tenantId: ctx.tenantId, status: { in: ["ISSUED", "APPROVED"] } },
           },
-          include: { certification: { select: { id: true, number: true, status: true, certificationDate: true } } },
+          include: {
+            certification: {
+              select: { id: true, number: true, status: true, certificationDate: true, subcontractId: true },
+            },
+          },
           orderBy: { certification: { certificationDate: "desc" } },
         })
       : Promise.resolve([]),
@@ -858,7 +942,122 @@ export async function getWbsItemCostDetail(
           orderBy: { jobsiteLog: { logDate: "desc" } },
         })
       : Promise.resolve([]),
+    incAp
+      ? prisma.supplierInvoiceLine.findMany({
+          where: {
+            wbsNodeId,
+            invoice: {
+              projectId,
+              tenantId: ctx.tenantId,
+              status: "ISSUED",
+              ...(dateWhere(dateFrom, dateTo) ? { issueDate: dateWhere(dateFrom, dateTo) } : {}),
+            },
+          },
+          include: {
+            invoice: {
+              select: {
+                id: true, number: true, status: true, issueDate: true, totalAmount: true, purchaseOrderId: true,
+              },
+            },
+          },
+          orderBy: { invoice: { issueDate: "desc" } },
+        })
+      : Promise.resolve([]),
+    incAp
+      ? prisma.supplierInvoiceLine.findMany({
+          where: {
+            purchaseOrderLine: { wbsNodeId },
+            OR: [{ wbsNodeId: null }, { wbsNodeId: { not: wbsNodeId } }],
+            invoice: {
+              projectId,
+              tenantId: ctx.tenantId,
+              status: "ISSUED",
+              ...(dateWhere(dateFrom, dateTo) ? { issueDate: dateWhere(dateFrom, dateTo) } : {}),
+            },
+          },
+          include: {
+            invoice: {
+              select: {
+                id: true, number: true, status: true, issueDate: true, totalAmount: true, purchaseOrderId: true,
+              },
+            },
+          },
+          orderBy: { invoice: { issueDate: "desc" } },
+        })
+      : Promise.resolve([]),
+    // Legacy PO-header invoices without line WBS / PO-line FK for this partida (proportional case).
+    incAp
+      ? prisma.supplierInvoice.findMany({
+          where: {
+            projectId,
+            tenantId: ctx.tenantId,
+            status: "ISSUED",
+            purchaseOrder: { lines: { some: { wbsNodeId } } },
+            lines: {
+              none: {
+                OR: [
+                  { wbsNodeId },
+                  { purchaseOrderLine: { wbsNodeId } },
+                ],
+              },
+            },
+            ...(dateWhere(dateFrom, dateTo) ? { issueDate: dateWhere(dateFrom, dateTo) } : {}),
+          },
+          select: {
+            id: true, number: true, status: true, issueDate: true, totalAmount: true, purchaseOrderId: true,
+          },
+          orderBy: { issueDate: "desc" },
+        })
+      : Promise.resolve([]),
   ]);
+
+  // Deduplicate invoices by id (direct WBS line + via PO line FK + via PO header)
+  const invoiceById = new Map<string, {
+    invoiceId: string; invoiceNumber: number; status: string;
+    issueDate: Date; totalAmount: string; purchaseOrderId: string | null;
+  }>();
+  for (const row of [...invoiceLinesDirect, ...invoiceLinesViaPo]) {
+    if (!invoiceById.has(row.invoice.id)) {
+      invoiceById.set(row.invoice.id, {
+        invoiceId: row.invoice.id,
+        invoiceNumber: row.invoice.number,
+        status: row.invoice.status,
+        issueDate: row.invoice.issueDate,
+        totalAmount: row.invoice.totalAmount.toFixed(2),
+        purchaseOrderId: row.invoice.purchaseOrderId,
+      });
+    }
+  }
+  for (const inv of invoicesViaPoHeader) {
+    if (!invoiceById.has(inv.id)) {
+      invoiceById.set(inv.id, {
+        invoiceId: inv.id,
+        invoiceNumber: inv.number,
+        status: inv.status,
+        issueDate: inv.issueDate,
+        totalAmount: inv.totalAmount.toFixed(2),
+        purchaseOrderId: inv.purchaseOrderId,
+      });
+    }
+  }
+  const supplierInvoices = Array.from(invoiceById.values());
+
+  const invoiceIds = supplierInvoices.map((i) => i.invoiceId);
+  const paymentRows = incAp && invoiceIds.length > 0
+    ? await prisma.payment.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          projectId,
+          status: "CONFIRMED",
+          supplierInvoiceId: { in: invoiceIds },
+          ...(dateWhere(dateFrom, dateTo) ? { paymentDate: dateWhere(dateFrom, dateTo) } : {}),
+        },
+        include: {
+          supplierInvoice: { select: { id: true, number: true } },
+        },
+        orderBy: { paymentDate: "desc" },
+      })
+    : [];
 
   const ci = node.costItem;
   return {
@@ -901,11 +1100,21 @@ export async function getWbsItemCostDetail(
     })),
     subcontractCertLines: subCertLines2.map((scl) => ({
       certId: scl.certification.id,
+      subcontractId: scl.certification.subcontractId,
       certNumber: scl.certification.number,
       certStatus: scl.certification.status,
       currentQty: scl.currentQty.toFixed(4),
       lineTotal: scl.lineTotal.toFixed(2),
       certificationDate: scl.certification.certificationDate,
+    })),
+    supplierInvoices,
+    payments: paymentRows.map((p) => ({
+      paymentId: p.id,
+      paymentDate: p.paymentDate,
+      amount: p.amount.toFixed(2),
+      status: p.status,
+      invoiceId: p.supplierInvoice.id,
+      invoiceNumber: p.supplierInvoice.number,
     })),
     stockMovements: stockMoves.map((sm) => ({
       id: sm.id,

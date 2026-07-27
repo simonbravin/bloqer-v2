@@ -39,6 +39,7 @@ export type SupplierInvoiceLineView = {
   id: string;
   invoiceId: string;
   wbsNodeId: string | null;
+  purchaseOrderLineId: string | null;
   description: string;
   quantity: string;
   unitPrice: string;
@@ -93,6 +94,66 @@ export async function assertSupplierInvoiceLinesWbs(
       );
     }
     await assertWbsLineForProject(line.wbsNodeId, projectId, tenantId);
+  }
+}
+
+/**
+ * [D-066] When a line references a PO line, it must belong to the linked OC (same tenant/project).
+ * Corporate invoices cannot carry purchaseOrderLineId.
+ */
+export async function assertSupplierInvoiceLinesPoLink(
+  projectId: string | null,
+  purchaseOrderId: string | null | undefined,
+  lines: Array<{ purchaseOrderLineId?: string | null; wbsNodeId?: string | null }>,
+  tenantId: string,
+): Promise<void> {
+  const hasPoLineRef = lines.some((l) => l.purchaseOrderLineId);
+  if (!hasPoLineRef) return;
+
+  if (!projectId) {
+    throw new ServiceError(
+      "CONFLICT",
+      "Las facturas corporativas no pueden vincular líneas a una orden de compra",
+    );
+  }
+  if (!purchaseOrderId) {
+    throw new ServiceError(
+      "CONFLICT",
+      "Para vincular líneas a OC, la factura debe tener orden de compra",
+    );
+  }
+
+  const po = await prisma.purchaseOrder.findUnique({
+    where: { id: purchaseOrderId },
+    select: {
+      id: true,
+      tenantId: true,
+      projectId: true,
+      lines: { select: { id: true, wbsNodeId: true } },
+    },
+  });
+  if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
+  if (po.tenantId !== tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (po.projectId !== projectId) {
+    throw new ServiceError("CONFLICT", "La orden de compra no pertenece al mismo proyecto");
+  }
+
+  const poLineById = new Map(po.lines.map((l) => [l.id, l]));
+  for (const line of lines) {
+    if (!line.purchaseOrderLineId) continue;
+    const poLine = poLineById.get(line.purchaseOrderLineId);
+    if (!poLine) {
+      throw new ServiceError(
+        "CONFLICT",
+        "La línea de OC no pertenece a la orden de compra vinculada",
+      );
+    }
+    if (line.wbsNodeId && poLine.wbsNodeId && line.wbsNodeId !== poLine.wbsNodeId) {
+      throw new ServiceError(
+        "CONFLICT",
+        "La partida EDT de la línea no coincide con la de la línea de OC",
+      );
+    }
   }
 }
 
@@ -431,6 +492,12 @@ export async function createSupplierInvoice(
   }
 
   await assertSupplierInvoiceLinesWbs(projectId, input.lines, ctx.tenantId);
+  await assertSupplierInvoiceLinesPoLink(
+    projectId,
+    input.purchaseOrderId,
+    input.lines,
+    ctx.tenantId,
+  );
 
   const companyId = await resolveCompanyIdForAp(projectId, ctx);
 
@@ -469,6 +536,7 @@ export async function createSupplierInvoice(
         data: {
           invoiceId:   created.id,
           wbsNodeId:   line.wbsNodeId ?? null,
+          purchaseOrderLineId: line.purchaseOrderLineId ?? null,
           description: line.description,
           quantity:    qty,
           unitPrice:   price,
@@ -561,9 +629,20 @@ export async function updateSupplierInvoice(
 
   if (input.lines) {
       await assertSupplierInvoiceLinesWbs(existing.projectId, input.lines, ctx.tenantId);
+      const poId =
+        input.purchaseOrderId !== undefined ? input.purchaseOrderId : existing.purchaseOrderId;
+      await assertSupplierInvoiceLinesPoLink(
+        existing.projectId,
+        poId,
+        input.lines,
+        ctx.tenantId,
+      );
     }
 
   const inv = await prisma.$transaction(async (tx) => {
+    const nextPurchaseOrderId =
+      input.purchaseOrderId !== undefined ? input.purchaseOrderId : undefined;
+
     await tx.supplierInvoice.update({
       where: { id },
       data: {
@@ -572,11 +651,19 @@ export async function updateSupplierInvoice(
         dueDate:         input.dueDate   ? new Date(input.dueDate)   : undefined,
         notes:           input.notes,
         internalNotes:   input.internalNotes,
-        purchaseOrderId: input.purchaseOrderId !== undefined ? input.purchaseOrderId : undefined,
+        purchaseOrderId: nextPurchaseOrderId,
         fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : undefined,
         updatedBy:       ctx.actorUserId,
       },
     });
+
+    // Clearing OC header without rewriting lines must drop stale D-066 FKs.
+    if (nextPurchaseOrderId === null && !input.lines) {
+      await tx.supplierInvoiceLine.updateMany({
+        where: { invoiceId: id },
+        data: { purchaseOrderLineId: null },
+      });
+    }
 
     if (input.lines) {
       await tx.supplierInvoiceLine.deleteMany({ where: { invoiceId: id } });
@@ -589,6 +676,7 @@ export async function updateSupplierInvoice(
           data: {
             invoiceId: id,
             wbsNodeId: line.wbsNodeId ?? null,
+            purchaseOrderLineId: line.purchaseOrderLineId ?? null,
             description: line.description,
             quantity: qty,
             unitPrice: price,
@@ -860,6 +948,7 @@ type RawInvoice = SupplierInvoice & {
     id: string;
     invoiceId: string;
     wbsNodeId: string | null;
+    purchaseOrderLineId: string | null;
     description: string;
     quantity: Prisma.Decimal;
     unitPrice: Prisma.Decimal;
@@ -908,6 +997,7 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
       id:          l.id,
       invoiceId:   l.invoiceId,
       wbsNodeId:   l.wbsNodeId,
+      purchaseOrderLineId: l.purchaseOrderLineId,
       description: l.description,
       quantity:    l.quantity.toString(),
       unitPrice:   serializeMoneyDecimal(l.unitPrice),

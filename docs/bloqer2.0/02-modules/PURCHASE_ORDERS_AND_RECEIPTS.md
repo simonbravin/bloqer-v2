@@ -19,9 +19,11 @@ Mezclar OC, recepción y factura genera errores de stock, de compromiso de caja 
 
 ## 5. Datos que produce (outputs)
 - **PurchaseOrder** numerada `OC-NNN` **por empresa** ([D-050] / Q-002).
-- En `CONFIRMED` aporta a **`committed_amount`**; la factura asociada aporta a **`accrued_amount`** sin duplicar ([BR-COS-002], [D-006]).
+- En `CONFIRMED` aporta a **`committed_amount`**; la factura asociada aporta a **`accrued_amount`** sin duplicar ([BR-COS-002], [D-006], [D-065]).
 - **Receipt** parcial o total → **StockMovement IN** si hay producto ([BR-INV-005]).
-- Trazabilidad: SC (si aplica) → cotización → OC → recepción → factura → pago.
+- Trazabilidad: SC (si aplica) → cotización → OC → recepción → factura → pago. Líneas de factura desde OC pueden persistir `SupplierInvoiceLine.purchaseOrderLineId` ([D-066]).
+- Matching 3 vías: recepción respeta `overReceiptTolerancePct` (bloqueo); factura vs recibido usa `invoiceMatchTolerancePct` como **aviso** ([D-067]).
+- `PurchaseOrderLine.costAnalysisLineId` / `PurchaseRequestLine.costAnalysisLineId` opcionales: hint de insumo APU; imputación de $ sigue en `wbs_node_id` ([D-068] / [D-057]).
 
 ## 6. Entidades principales
 - **PurchaseOrder**, **PurchaseOrderLine**, **Receipt** / `PurchaseReceipt`, **ReceiptLine**.

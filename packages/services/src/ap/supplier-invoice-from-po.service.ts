@@ -16,11 +16,17 @@ import {
 import {
   buildAutoFromPoInternalNotes,
   buildInvoiceDraftLinesFromPo,
+  clampReceiptQuantitiesToPendingInvoice,
   computePendingToInvoiceAmount,
   sumPoLinesReceivedAmount,
   type InvoiceDraftLineInput,
   type PoLineForInvoiceDraft,
 } from "./supplier-invoice-from-po-pure";
+import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
+import {
+  evaluateThreeWayLineQtyMatch,
+  invoiceExceedsReceivedWithTolerance,
+} from "../procurement/three-way-match-pure";
 
 const LINKABLE_PO_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
 
@@ -31,6 +37,17 @@ export type PurchaseOrderBillingSummary = {
   pendingToInvoice: string;
   hasReceivedQuantity: boolean;
   draftInvoiceCount: number;
+  /** Per-line 3-way qty status ([D-067]). */
+  lineMatches: Array<{
+    poLineId: string;
+    description: string;
+    status: "OK" | "WARN";
+    message: string | null;
+    orderQty: string;
+    receivedQty: string;
+    invoicedQty: string;
+  }>;
+  matchWarningCount: number;
 };
 
 function defaultDueDate(): string {
@@ -99,12 +116,14 @@ export async function getPurchaseOrderBillingSummary(
       totalAmount: true,
       status: true,
       payable: { select: { paidAmount: true, status: true } },
+      lines: { select: { purchaseOrderLineId: true, quantity: true } },
     },
   });
 
   let invoicedAmount = new Prisma.Decimal(0);
   let paidAmount = new Prisma.Decimal(0);
   let draftInvoiceCount = 0;
+  const invoicedQtyByPoLine = new Map<string, Prisma.Decimal>();
 
   for (const inv of invoices) {
     if (inv.status === "DRAFT") {
@@ -115,7 +134,28 @@ export async function getPurchaseOrderBillingSummary(
     if (inv.payable && inv.payable.status !== "CANCELLED") {
       paidAmount = paidAmount.add(inv.payable.paidAmount);
     }
+    for (const line of inv.lines) {
+      if (!line.purchaseOrderLineId) continue;
+      const prev = invoicedQtyByPoLine.get(line.purchaseOrderLineId) ?? new Prisma.Decimal(0);
+      invoicedQtyByPoLine.set(line.purchaseOrderLineId, prev.add(line.quantity));
+    }
   }
+
+  const settings = await getCompanyProcurementSettingsForProject(po.projectId, ctx);
+  const matchTol = new Prisma.Decimal(settings.invoiceMatchTolerancePct);
+  const lineMatches = po.lines.map((line) =>
+    evaluateThreeWayLineQtyMatch(
+      {
+        poLineId: line.id,
+        description: line.description,
+        orderQty: line.quantity,
+        receivedQty: line.receivedQuantity,
+        invoicedQty: invoicedQtyByPoLine.get(line.id) ?? new Prisma.Decimal(0),
+      },
+      matchTol,
+    ),
+  );
+  const matchWarningCount = lineMatches.filter((l) => l.status === "WARN").length;
 
   const pendingToInvoice = computePendingToInvoiceAmount(receivedAmount, invoicedAmount);
 
@@ -126,6 +166,8 @@ export async function getPurchaseOrderBillingSummary(
     pendingToInvoice: pendingToInvoice.toFixed(2),
     hasReceivedQuantity,
     draftInvoiceCount,
+    lineMatches,
+    matchWarningCount,
   };
 }
 
@@ -221,11 +263,13 @@ export async function getSupplierInvoicePurchaseOrderWarnings(
     where: { id: supplierInvoiceId },
     select: {
       tenantId: true,
+      projectId: true,
       purchaseOrderId: true,
       totalAmount: true,
       currency: true,
       supplierContactId: true,
       status: true,
+      lines: { select: { purchaseOrderLineId: true, quantity: true, description: true } },
     },
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
@@ -241,10 +285,57 @@ export async function getSupplierInvoicePurchaseOrderWarnings(
   const warnings: string[] = [];
   const receivedAmount = sumPoLinesReceivedAmount(po.lines.map(toPoLineDraft));
 
-  if (inv.totalAmount.greaterThan(receivedAmount) && receivedAmount.greaterThan(0)) {
+  const settings = inv.projectId
+    ? await getCompanyProcurementSettingsForProject(inv.projectId, ctx)
+    : await getCompanyProcurementSettingsForProject(po.projectId, ctx);
+  const matchTol = new Prisma.Decimal(settings.invoiceMatchTolerancePct);
+
+  if (
+    invoiceExceedsReceivedWithTolerance(inv.totalAmount, receivedAmount, matchTol) &&
+    (receivedAmount.greaterThan(0) || inv.totalAmount.greaterThan(0))
+  ) {
     warnings.push(
-      `El total de la factura (${inv.totalAmount.toFixed(2)}) supera el valor recibido acumulado de la OC (${receivedAmount.toFixed(2)}).`,
+      `El total de la factura (${inv.totalAmount.toFixed(2)}) supera el valor recibido acumulado de la OC (${receivedAmount.toFixed(2)})` +
+        (matchTol.greaterThan(0) ? ` más tolerancia ${matchTol.toFixed(2)}%.` : "."),
     );
+  }
+
+  // Per-line qty using this invoice's lines + other ISSUED invoices on same PO
+  const otherIssued = await prisma.supplierInvoice.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      purchaseOrderId: inv.purchaseOrderId,
+      status: "ISSUED",
+      id: { not: supplierInvoiceId },
+    },
+    select: { lines: { select: { purchaseOrderLineId: true, quantity: true } } },
+  });
+  const invoicedQtyByPoLine = new Map<string, Prisma.Decimal>();
+  for (const other of otherIssued) {
+    for (const line of other.lines) {
+      if (!line.purchaseOrderLineId) continue;
+      const prev = invoicedQtyByPoLine.get(line.purchaseOrderLineId) ?? new Prisma.Decimal(0);
+      invoicedQtyByPoLine.set(line.purchaseOrderLineId, prev.add(line.quantity));
+    }
+  }
+  for (const line of inv.lines) {
+    if (!line.purchaseOrderLineId) continue;
+    const prev = invoicedQtyByPoLine.get(line.purchaseOrderLineId) ?? new Prisma.Decimal(0);
+    invoicedQtyByPoLine.set(line.purchaseOrderLineId, prev.add(line.quantity));
+  }
+
+  for (const poLine of po.lines) {
+    const match = evaluateThreeWayLineQtyMatch(
+      {
+        poLineId: poLine.id,
+        description: poLine.description,
+        orderQty: poLine.quantity,
+        receivedQty: poLine.receivedQuantity,
+        invoicedQty: invoicedQtyByPoLine.get(poLine.id) ?? new Prisma.Decimal(0),
+      },
+      matchTol,
+    );
+    if (match.message) warnings.push(match.message);
   }
 
   if (po.supplierContactId !== inv.supplierContactId) {
@@ -334,6 +425,20 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
   }
 
   const poLines = po.lines.map(toPoLineDraft);
+  const summary = await getPurchaseOrderBillingSummary(input.purchaseOrderId, ctx);
+  const invoicedAmount = new Prisma.Decimal(summary.invoicedAmount);
+
+  if (receiptQuantities) {
+    const invoicedQtyByPoLine = new Map(
+      summary.lineMatches.map((l) => [l.poLineId, new Prisma.Decimal(l.invoicedQty)]),
+    );
+    receiptQuantities = clampReceiptQuantitiesToPendingInvoice(
+      receiptQuantities,
+      poLines,
+      invoicedQtyByPoLine,
+    );
+  }
+
   const receivedAmount = receiptQuantities
     ? poLines.reduce((acc, line) => {
         const qty = receiptQuantities!.get(line.id);
@@ -345,18 +450,16 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
       }, new Prisma.Decimal(0))
     : sumPoLinesReceivedAmount(poLines);
 
-  const summary = await getPurchaseOrderBillingSummary(input.purchaseOrderId, ctx);
-  const invoicedAmount = new Prisma.Decimal(summary.invoicedAmount);
-
   if (receivedAmount.lessThanOrEqualTo(0)) {
     throw new ServiceError(
       "CONFLICT",
       input.purchaseReceiptId
-        ? "La recepción no tiene cantidades facturables"
+        ? "La recepción no tiene cantidades pendientes de facturar (ya facturadas o sin recibir)"
         : "La orden de compra no tiene cantidades recibidas para facturar",
     );
   }
 
+  // Receipt path: quantities already clamped to pending; OC path scales by remaining when needed.
   const basis = input.purchaseReceiptId
     ? "received"
     : invoicedAmount.greaterThan(0)

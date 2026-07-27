@@ -922,6 +922,72 @@
 
 ---
 
+### D-065 — Exposición esperada canónica en EDT y costos ([BR-COS-002])
+
+- **Fecha:** 2026-07-26
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** El service de control de costos usaba `expectedCostExposure = max(committed, received, accrued)`, divergente de [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md), [BR-COS-002], la guía operativa y D-021. Eso hacía ilegible el tablero frente a Procore / control de obra.
+- **Decisión:**
+  1. **`open_committed_amount`** = `max(0, committed − accrued_linked_to_commitments)`.
+  2. **`expected_cost_exposure`** = `accrued + open_committed` (**no** `max(...)`; **no** sumar committed+accrued bruto).
+  3. **`accrued_linked`** incluye facturas ISSUED con vínculo a compromiso (OC header y/o `SupplierInvoiceLine.purchaseOrderLineId` [D-066]) y certificaciones de subcontrato APPROVED. Facturas directas de proyecto **no** reducen open_committed.
+  4. La capa **Recibido** permanece informativa (físico); **no** entra en la exposición.
+  5. Invalidar notas de SESSION_HANDOFF / RELEVAMIENTO R-06 que documentaban `max(...)` como mitigación canónica.
+- **Implicancias:** `cost-control.service` + helper `computeCostExposureLayers`; tooltips UI; PDF/CSV heredan el campo corregido.
+- **Documentos afectados:** [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md), [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) BR-COS-002, [`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md), [`SESSION_HANDOFF.md`](../SESSION_HANDOFF.md).
+
+---
+
+### D-066 — `SupplierInvoiceLine.purchaseOrderLineId` (trazabilidad OC → factura)
+
+- **Fecha:** 2026-07-26
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Solo existía `SupplierInvoice.purchaseOrderId` a nivel header; el reporting prorrateaba por pesos de líneas OC. Faltaba click-path y anti doble conteo por vínculo real línea a línea (alineado a Procore commitments → invoices).
+- **Decisión:**
+  1. Agregar `SupplierInvoiceLine.purchaseOrderLineId` **nullable** (facturas directas / legacy).
+  2. Al crear factura desde OC (“Traer líneas” / draft from PO), **persistir** el FK + `wbsNodeId` de la línea OC.
+  3. En service: si la factura tiene `purchaseOrderId` y la línea nace del draft OC, el FK es **requerido** para esas líneas; alta manual puede omitirlo.
+  4. Cost control: preferir imputación accrued/paid por `purchaseOrderLine.wbsNodeId` cuando el FK existe; fallback al prorrateo header.
+  5. **No** cambia [D-057]: el eje de costo sigue siendo la partida EDT (`wbsNodeId`), no el APU.
+- **Implicancias:** migración Prisma; validators AP; `supplier-invoice-from-po*`; drilldown EDT lista facturas/pagos con links.
+- **Documentos afectados:** [`PURCHASE_ORDERS_AND_RECEIPTS.md`](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [`PROCUREMENT.md`](../02-modules/PROCUREMENT.md), schema Prisma.
+
+---
+
+### D-067 — Tolerancias de recepción y matching 3 vías (P-PROC-01/02)
+
+- **Fecha:** 2026-07-26
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** BR-PUR-006 pedía tolerancia de sobrecantidad configurable (0–5%) pero la recepción bloqueaba siempre. BR-PUR-012 pedía matching OC↔recepción↔factura; solo había avisos de monto header.
+- **Decisión:**
+  1. `CompanyProcurementSettings.overReceiptTolerancePct` (default **0**, máximo **5**): la recepción puede superar la cantidad de OC hasta ese %; fuera de tolerancia → **bloqueo**.
+  2. `CompanyProcurementSettings.invoiceMatchTolerancePct` (default **0**, máximo **25**): si factura (monto o qty por línea vía [D-066]) supera recibido + tolerancia → **aviso** en detalle OC/factura; **no bloquea** emitir en esta fase.
+  3. Panel de facturación OC muestra avisos por línea (ordenado / recibido / facturado).
+  4. Justificación obligatoria / aprobación AP por matching fuera de tolerancia queda para fase posterior (sigue [BR-PUR-012] documentado).
+- **Implicancias:** settings UI `/configuracion/compras`; `purchase-receipt-guards`; `three-way-match-pure`; billing summary.
+- **Documentos afectados:** [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) BR-PUR-006/012, [`SESSION_HANDOFF.md`](../SESSION_HANDOFF.md) P-PROC-01/02, guía operativa.
+
+---
+
+### D-068 — `costAnalysisLineId` opcional en líneas OC/SC (hint APU)
+
+- **Fecha:** 2026-07-26
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** El usuario quiere elegir el insumo APU (material) bajo la partida al armar OC, sin convertir el APU en cost code ([D-057]).
+- **Decisión:**
+  1. `PurchaseOrderLine.costAnalysisLineId` y `PurchaseRequestLine.costAnalysisLineId` **nullable**.
+  2. Solo válido si el APU pertenece al `CostItem` de la partida `wbsNodeId` elegida.
+  3. Prefill de descripción / unidad / precio / `productId` es UX; el **eje de imputación de $** sigue siendo `wbsNodeId`.
+  4. Baseline de varianza prefiere el APU explícito cuando está seteado.
+- **Implicancias:** editor OC con columna “Insumo APU”; `listProcurementWbsOptions` incluye `apuLines`.
+- **Documentos afectados:** [`WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`PURCHASE_ORDERS_AND_RECEIPTS.md`](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -930,7 +996,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-065`…).
+1. Tomar el siguiente ID disponible (`D-069`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

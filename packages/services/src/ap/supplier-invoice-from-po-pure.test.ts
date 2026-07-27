@@ -4,6 +4,7 @@ import { Prisma } from "@bloqer/database";
 import {
   buildAutoFromPoInternalNotes,
   buildInvoiceDraftLinesFromPo,
+  clampReceiptQuantitiesToPendingInvoice,
   computePendingToInvoiceAmount,
   formatInvoiceLineQuantity,
   poLineReceivedAmount,
@@ -60,6 +61,8 @@ test("buildInvoiceDraftLinesFromPo uses received quantities", () => {
   assert.equal(lines.length, 1);
   assert.equal(lines[0]!.quantity, "5");
   assert.equal(lines[0]!.unitPrice, "100");
+  assert.equal(lines[0]!.purchaseOrderLineId, "line-1");
+  assert.equal(lines[0]!.wbsNodeId, "wbs-1");
 });
 
 test("buildInvoiceDraftLinesFromPo scales remaining basis", () => {
@@ -103,4 +106,20 @@ test("formatInvoiceLineQuantity preserves integer and decimal quantities", () =>
   assert.equal(formatInvoiceLineQuantity(new Prisma.Decimal(100)), "100");
   assert.equal(formatInvoiceLineQuantity(new Prisma.Decimal(10)), "10");
   assert.equal(formatInvoiceLineQuantity(new Prisma.Decimal(2.5)), "2.5");
+});
+
+test("clampReceiptQuantitiesToPendingInvoice prevents re-invoicing already billed qty", () => {
+  const clamped = clampReceiptQuantitiesToPendingInvoice(
+    new Map([["line-1", "5"]]),
+    [sampleLine],
+    new Map([["line-1", new Prisma.Decimal(3)]]),
+  );
+  assert.equal(clamped.get("line-1"), "2");
+
+  const fullyInvoiced = clampReceiptQuantitiesToPendingInvoice(
+    new Map([["line-1", "5"]]),
+    [sampleLine],
+    new Map([["line-1", new Prisma.Decimal(5)]]),
+  );
+  assert.equal(fullyInvoiced.size, 0);
 });

@@ -708,7 +708,7 @@ export async function exportProjectCostControlCsv(
     r.totals.inventoryConsumedCost,
     r.totals.operationalProgressQty,
     "",
-    "",
+    r.totals.openCommittedCost,
     r.totals.expectedCostExposure,
     r.totals.remainingBudgetCost,
     r.totals.costVariance,

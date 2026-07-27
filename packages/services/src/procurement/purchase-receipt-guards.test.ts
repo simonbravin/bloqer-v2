@@ -34,3 +34,25 @@ test("assertReceiptQtyWithinRemaining rejects zero qty", () => {
     (err) => err instanceof ServiceError && err.code === "CONFLICT",
   );
 });
+
+test("assertReceiptQtyWithinRemaining allows over-receipt within tolerance [D-067]", () => {
+  assert.doesNotThrow(() =>
+    assertReceiptQtyWithinRemaining(new Prisma.Decimal("103"), new Prisma.Decimal("100"), "Cemento", {
+      orderQuantity: new Prisma.Decimal("100"),
+      alreadyReceived: new Prisma.Decimal("0"),
+      tolerancePct: new Prisma.Decimal("5"),
+    }),
+  );
+});
+
+test("assertReceiptQtyWithinRemaining blocks over-receipt beyond tolerance [D-067]", () => {
+  assert.throws(
+    () =>
+      assertReceiptQtyWithinRemaining(new Prisma.Decimal("106"), new Prisma.Decimal("100"), "Cemento", {
+        orderQuantity: new Prisma.Decimal("100"),
+        alreadyReceived: new Prisma.Decimal("0"),
+        tolerancePct: new Prisma.Decimal("5"),
+      }),
+    (err) => err instanceof ServiceError && err.code === "CONFLICT",
+  );
+});

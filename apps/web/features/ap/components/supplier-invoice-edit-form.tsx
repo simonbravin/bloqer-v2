@@ -38,6 +38,12 @@ export function SupplierInvoiceEditForm({
   const [supplierContactId, setSupplierContactId] = useState(invoice.supplierContactId);
   const [purchaseOrderId, setPurchaseOrderId] = useState<string | null>(invoice.purchaseOrderId ?? null);
 
+  function onPurchaseOrderChange(nextId: string | null) {
+    if (nextId === purchaseOrderId) return;
+    setPurchaseOrderId(nextId);
+    setLines((prev) => prev.map((l) => ({ ...l, purchaseOrderLineId: null })));
+  }
+
   const filteredPOs = poOptions.filter(
     (po) => !supplierContactId || po.supplierContactId === supplierContactId,
   );
@@ -57,8 +63,9 @@ export function SupplierInvoiceEditForm({
           unitPrice:   l.unitPrice,
           taxRate:     l.taxRate,
           wbsNodeId:   l.wbsNodeId,
+          purchaseOrderLineId: l.purchaseOrderLineId,
         }))
-      : [{ description: "", quantity: "1", unitPrice: "", taxRate: "21", wbsNodeId: null }],
+      : [{ description: "", quantity: "1", unitPrice: "", taxRate: "21", wbsNodeId: null, purchaseOrderLineId: null }],
   );
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -116,7 +123,7 @@ export function SupplierInvoiceEditForm({
                 options={poComboboxOptions}
                 value={purchaseOrderId ?? SEARCHABLE_NONE}
                 onValueChange={(v) =>
-                  setPurchaseOrderId(v === SEARCHABLE_NONE ? null : v)
+                  onPurchaseOrderChange(v === SEARCHABLE_NONE ? null : v)
                 }
                 placeholder="Sin OC vinculada"
                 searchPlaceholder="Buscar OC…"

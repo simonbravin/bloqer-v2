@@ -15,6 +15,8 @@ export type CompanyProcurementSettingsView = {
   varianceSoftAlertPct: string;
   varianceNoteRequiredPct: string;
   varianceExtraApprovalPct: string;
+  overReceiptTolerancePct: string;
+  invoiceMatchTolerancePct: string;
   approvalSlaHours: number;
 };
 
@@ -27,6 +29,8 @@ const DEFAULTS = {
   varianceSoftAlertPct: new Prisma.Decimal(10),
   varianceNoteRequiredPct: new Prisma.Decimal(25),
   varianceExtraApprovalPct: new Prisma.Decimal(25),
+  overReceiptTolerancePct: new Prisma.Decimal(0),
+  invoiceMatchTolerancePct: new Prisma.Decimal(0),
   approvalSlaHours: 72,
 };
 
@@ -43,6 +47,8 @@ function serialize(row: {
   varianceSoftAlertPct: Prisma.Decimal;
   varianceNoteRequiredPct: Prisma.Decimal;
   varianceExtraApprovalPct: Prisma.Decimal;
+  overReceiptTolerancePct: Prisma.Decimal;
+  invoiceMatchTolerancePct: Prisma.Decimal;
   approvalSlaHours: number;
 }): CompanyProcurementSettingsView {
   const cats = row.quoteRequiredCategories;
@@ -59,6 +65,8 @@ function serialize(row: {
     varianceSoftAlertPct: row.varianceSoftAlertPct.toString(),
     varianceNoteRequiredPct: row.varianceNoteRequiredPct.toString(),
     varianceExtraApprovalPct: row.varianceExtraApprovalPct.toString(),
+    overReceiptTolerancePct: row.overReceiptTolerancePct.toString(),
+    invoiceMatchTolerancePct: row.invoiceMatchTolerancePct.toString(),
     approvalSlaHours: row.approvalSlaHours ?? 72,
   };
 }
@@ -87,6 +95,8 @@ export async function getCompanyProcurementSettings(
       varianceSoftAlertPct: DEFAULTS.varianceSoftAlertPct.toString(),
       varianceNoteRequiredPct: DEFAULTS.varianceNoteRequiredPct.toString(),
       varianceExtraApprovalPct: DEFAULTS.varianceExtraApprovalPct.toString(),
+      overReceiptTolerancePct: DEFAULTS.overReceiptTolerancePct.toString(),
+      invoiceMatchTolerancePct: DEFAULTS.invoiceMatchTolerancePct.toString(),
       approvalSlaHours: DEFAULTS.approvalSlaHours,
     };
   }
@@ -121,6 +131,8 @@ export async function upsertCompanyProcurementSettings(
     varianceSoftAlertPct: string;
     varianceNoteRequiredPct: string;
     varianceExtraApprovalPct: string;
+    overReceiptTolerancePct: string;
+    invoiceMatchTolerancePct: string;
     approvalSlaHours: number;
   }>,
   ctx: ServiceContext,
@@ -136,7 +148,7 @@ export async function upsertCompanyProcurementSettings(
   });
   if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
 
-  const data: Prisma.CompanyProcurementSettingsUpsertArgs["create"] = {
+  const createData: Prisma.CompanyProcurementSettingsUpsertArgs["create"] = {
     companyId,
     poApprovalThresholdArs:
       input.poApprovalThresholdArs != null && input.poApprovalThresholdArs !== ""
@@ -166,13 +178,42 @@ export async function upsertCompanyProcurementSettings(
     varianceExtraApprovalPct: input.varianceExtraApprovalPct
       ? new Prisma.Decimal(input.varianceExtraApprovalPct)
       : DEFAULTS.varianceExtraApprovalPct,
+    overReceiptTolerancePct: input.overReceiptTolerancePct
+      ? new Prisma.Decimal(input.overReceiptTolerancePct)
+      : DEFAULTS.overReceiptTolerancePct,
+    invoiceMatchTolerancePct: input.invoiceMatchTolerancePct
+      ? new Prisma.Decimal(input.invoiceMatchTolerancePct)
+      : DEFAULTS.invoiceMatchTolerancePct,
     approvalSlaHours: input.approvalSlaHours ?? DEFAULTS.approvalSlaHours,
   };
 
+  // Update only fields present in the payload so omitted keys (e.g. approvalSlaHours)
+  // keep their stored values instead of resetting to defaults.
+  const updateData: Prisma.CompanyProcurementSettingsUncheckedUpdateInput = {
+    poApprovalThresholdArs: createData.poApprovalThresholdArs,
+    purchaseRequestRequiredAboveArs: createData.purchaseRequestRequiredAboveArs,
+    minQuotesRequired: createData.minQuotesRequired,
+    maxQuotesAllowed: createData.maxQuotesAllowed,
+    allowDirectPo: createData.allowDirectPo,
+    allowSelfApproval: createData.allowSelfApproval,
+    allowEmergencyDirectPo: createData.allowEmergencyDirectPo,
+    varianceSoftAlertPct: createData.varianceSoftAlertPct,
+    varianceNoteRequiredPct: createData.varianceNoteRequiredPct,
+    varianceExtraApprovalPct: createData.varianceExtraApprovalPct,
+    overReceiptTolerancePct: createData.overReceiptTolerancePct,
+    invoiceMatchTolerancePct: createData.invoiceMatchTolerancePct,
+  };
+  if (input.quoteRequiredCategories !== undefined) {
+    updateData.quoteRequiredCategories = createData.quoteRequiredCategories;
+  }
+  if (input.approvalSlaHours !== undefined) {
+    updateData.approvalSlaHours = input.approvalSlaHours;
+  }
+
   const row = await prisma.companyProcurementSettings.upsert({
     where: { companyId },
-    create: data,
-    update: data,
+    create: createData,
+    update: updateData,
   });
   return serialize(row);
 }

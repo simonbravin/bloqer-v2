@@ -44,6 +44,21 @@ export function PoBillingNextStepPanel({
             proveedor.
           </p>
         )}
+        {billing.matchWarningCount > 0 ? (
+          <div className="rounded border border-amber-300/60 bg-amber-50/80 dark:bg-amber-950/20 p-2 space-y-1">
+            <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
+              Matching 3 vías: {billing.matchWarningCount} aviso(s) (no bloquea emitir)
+            </p>
+            <ul className="text-[11px] text-amber-900/90 dark:text-amber-100/90 list-disc pl-4 space-y-0.5">
+              {billing.lineMatches
+                .filter((l) => l.message)
+                .slice(0, 5)
+                .map((l) => (
+                  <li key={l.poLineId}>{l.message}</li>
+                ))}
+            </ul>
+          </div>
+        ) : null}
         {showAction ? (
           <p className="text-xs text-amber-800 dark:text-amber-200">
             La recepción no genera deuda automáticamente. Registrá la factura del proveedor y

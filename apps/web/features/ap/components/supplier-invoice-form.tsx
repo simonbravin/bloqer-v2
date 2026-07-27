@@ -50,6 +50,7 @@ const DEFAULT_LINE: InvoiceLine = {
   unitPrice: "",
   taxRate: "21",
   wbsNodeId: null,
+  purchaseOrderLineId: null,
 };
 const INVOICE_CURRENCY = "ARS";
 
@@ -112,6 +113,7 @@ export function SupplierInvoiceForm({
         unitPrice: l.unitPrice,
         taxRate: l.taxRate,
         wbsNodeId: l.wbsNodeId ?? null,
+        purchaseOrderLineId: l.purchaseOrderLineId ?? null,
       })),
     );
     toast.success("Líneas traídas desde la OC (pendiente de facturar). Podés ajustarlas.");
@@ -125,9 +127,17 @@ export function SupplierInvoiceForm({
   useEffect(() => {
     if (purchaseOrderId && !filteredPOs.some((po) => po.id === purchaseOrderId)) {
       setPurchaseOrderId(null);
+      setLines((prev) => prev.map((l) => ({ ...l, purchaseOrderLineId: null })));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierContactId]);
+
+  function onPurchaseOrderChange(nextId: string | null) {
+    if (nextId === purchaseOrderId) return;
+    setPurchaseOrderId(nextId);
+    // Drop OC-line FKs when unlinking or switching OC ([D-066]).
+    setLines((prev) => prev.map((l) => ({ ...l, purchaseOrderLineId: null })));
+  }
 
   const poComboboxOptions = useMemo(
     () =>
@@ -309,7 +319,7 @@ export function SupplierInvoiceForm({
                 options={poComboboxOptions}
                 value={purchaseOrderId ?? SEARCHABLE_NONE}
                 onValueChange={(v) =>
-                  setPurchaseOrderId(v === SEARCHABLE_NONE ? null : v)
+                  onPurchaseOrderChange(v === SEARCHABLE_NONE ? null : v)
                 }
                 placeholder="Sin OC vinculada"
                 searchPlaceholder="Buscar OC…"

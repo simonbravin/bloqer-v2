@@ -25,6 +25,8 @@ interface Props {
     description?: string;
     quantity?: string;
     productId?: string;
+    costAnalysisLineId?: string;
+    unit?: string;
   };
   prefilledFromMaterials?: boolean;
 }

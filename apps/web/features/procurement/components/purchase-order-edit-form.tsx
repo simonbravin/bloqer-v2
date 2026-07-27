@@ -35,6 +35,7 @@ export function PurchaseOrderEditForm({ projectId, order, suppliers, wbsOptions,
       ? order.lines.map((l) => ({
           wbsNodeId:   l.wbsNodeId,
           productId:   l.productId ?? null,
+          costAnalysisLineId: l.costAnalysisLineId ?? null,
           description: l.description,
           unit:        l.unit,
           quantity:    l.quantity,
@@ -42,13 +43,13 @@ export function PurchaseOrderEditForm({ projectId, order, suppliers, wbsOptions,
           taxRate:     l.taxRate,
           varianceJustification: l.varianceJustification,
         }))
-      : [{ wbsNodeId: null, productId: null, description: "", unit: "", quantity: "1", unitPrice: "", taxRate: "21" }],
+      : [{ wbsNodeId: null, productId: null, costAnalysisLineId: null, description: "", unit: "", quantity: "1", unitPrice: "", taxRate: "21" }],
   );
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (lines.some((l) => !l.wbsNodeId)) {
-      setError("Cada línea debe tener un ítem WBS");
+      setError("Cada línea debe tener un ítem EDT");
       return;
     }
     if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {

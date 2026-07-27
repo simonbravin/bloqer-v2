@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import type { CostControlRow, CostControlTotals } from "@bloqer/services";
 import {
@@ -10,6 +12,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { CostVarianceBadge } from "./cost-variance-badge";
 
 function formatAmount(value: string) {
@@ -17,6 +25,35 @@ function formatAmount(value: string) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(parseFloat(value));
+}
+
+const COLUMN_HINTS: Record<string, string> = {
+  committed:
+    "Compromisos firmes: OC confirmadas y subcontratos activos. Aún no necesariamente facturados.",
+  received:
+    "Recepción física confirmada (cant. × PU de la OC). Informativo; no suma a la exposición.",
+  accrued:
+    "Obligación reconocida: facturas de proveedor emitidas y certificaciones de subcontrato aprobadas.",
+  paid: "Pagos confirmados imputables a esta partida.",
+  openCommitted:
+    "Comprometido abierto = max(0, Comprometido − Devengado ligado al mismo compromiso). Evita doble conteo OC+factura.",
+  exposure:
+    "Exposición esperada = Devengado + Comprometido abierto (anti doble conteo). No suma OC + factura en bruto.",
+};
+
+function HintHead({ label, hint }: { label: string; hint: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <TableHead className="text-right cursor-help underline decoration-dotted decoration-muted-foreground/50">
+          {label}
+        </TableHead>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs text-xs">
+        {hint}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 type Props = {
@@ -27,7 +64,8 @@ type Props = {
 
 export function CostControlTable({ rows, totals, projectId }: Props) {
   return (
-    <TableScroll stickyFirstColumn>
+    <TooltipProvider delayDuration={200}>
+      <TableScroll stickyFirstColumn>
         <Table className="text-xs">
           <TableHeader className="sticky top-0 z-10 bg-muted/50">
             <TableRow>
@@ -36,11 +74,12 @@ export function CostControlTable({ rows, totals, projectId }: Props) {
               <TableHead className="text-right">Pres. costo</TableHead>
               <TableHead className="text-right">Pres. venta</TableHead>
               <TableHead className="text-right">Cert. aprobado</TableHead>
-              <TableHead className="text-right">Comprometido</TableHead>
-              <TableHead className="text-right">Recibido</TableHead>
-              <TableHead className="text-right">Devengado</TableHead>
-              <TableHead className="text-right">Pagado</TableHead>
-              <TableHead className="text-right">Exposición esp.</TableHead>
+              <HintHead label="Comprometido" hint={COLUMN_HINTS.committed!} />
+              <HintHead label="Recibido" hint={COLUMN_HINTS.received!} />
+              <HintHead label="Devengado" hint={COLUMN_HINTS.accrued!} />
+              <HintHead label="Pagado" hint={COLUMN_HINTS.paid!} />
+              <HintHead label="Comp. abierto" hint={COLUMN_HINTS.openCommitted!} />
+              <HintHead label="Exposición esp." hint={COLUMN_HINTS.exposure!} />
               <TableHead className="text-right">Variación</TableHead>
               <TableHead className="text-right">Avance físico</TableHead>
             </TableRow>
@@ -90,6 +129,9 @@ export function CostControlTable({ rows, totals, projectId }: Props) {
                 <TableCell className="text-right text-muted-foreground">
                   {formatAmount(row.paidCost)}
                 </TableCell>
+                <TableCell className="text-right text-muted-foreground">
+                  {formatAmount(row.openCommittedCost)}
+                </TableCell>
                 <TableCell className="text-right font-medium">
                   {formatAmount(row.expectedCostExposure)}
                 </TableCell>
@@ -100,44 +142,29 @@ export function CostControlTable({ rows, totals, projectId }: Props) {
                   />
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {parseFloat(row.operationalProgressQty) > 0
-                    ? `${formatAmount(row.operationalProgressQty)} ${row.unit}`
-                    : "—"}
+                  {row.operationalProgressQty}
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
-          <TableFooter className="bg-muted/40 font-semibold">
-            <TableRow>
+          <TableFooter>
+            <TableRow className="font-semibold">
               <TableCell colSpan={2}>Total</TableCell>
               <TableCell className="text-right">{formatAmount(totals.budgetTotalCost)}</TableCell>
-              <TableCell className="text-right text-muted-foreground">
-                {formatAmount(totals.budgetTotalSale)}
-              </TableCell>
+              <TableCell className="text-right">{formatAmount(totals.budgetTotalSale)}</TableCell>
               <TableCell className="text-right">{formatAmount(totals.certifiedApproved)}</TableCell>
-              <TableCell className="text-right text-muted-foreground">
-                {formatAmount(totals.committedCost)}
-              </TableCell>
-              <TableCell className="text-right text-muted-foreground">
-                {formatAmount(totals.receivedCost)}
-              </TableCell>
-              <TableCell className="text-right text-muted-foreground">
-                {formatAmount(totals.accruedCost)}
-              </TableCell>
-              <TableCell className="text-right text-muted-foreground">
-                {formatAmount(totals.paidCost)}
-              </TableCell>
+              <TableCell className="text-right">{formatAmount(totals.committedCost)}</TableCell>
+              <TableCell className="text-right">{formatAmount(totals.receivedCost)}</TableCell>
+              <TableCell className="text-right">{formatAmount(totals.accruedCost)}</TableCell>
+              <TableCell className="text-right">{formatAmount(totals.paidCost)}</TableCell>
+              <TableCell className="text-right">{formatAmount(totals.openCommittedCost)}</TableCell>
               <TableCell className="text-right">{formatAmount(totals.expectedCostExposure)}</TableCell>
-              <TableCell className="text-right">
-                <CostVarianceBadge
-                  variance={totals.costVariance}
-                  label={formatAmount(totals.costVariance)}
-                />
-              </TableCell>
+              <TableCell className="text-right">{formatAmount(totals.costVariance)}</TableCell>
               <TableCell />
             </TableRow>
           </TableFooter>
         </Table>
       </TableScroll>
+    </TooltipProvider>
   );
 }

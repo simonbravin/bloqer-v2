@@ -8,6 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   SearchableCombobox,
+  SEARCHABLE_NONE,
+  toSearchableOptions,
+  withNoneOption,
   wbsToSearchableOptions,
 } from "@/components/ui/searchable-combobox";
 import { formatDecimalAr } from "@/lib/format-money";
@@ -22,6 +25,8 @@ interface PurchaseRequestFormProps {
     description?: string;
     quantity?: string;
     productId?: string;
+    costAnalysisLineId?: string;
+    unit?: string;
   };
   /** When true, show banner that fields came from materiales board. */
   prefilledFromMaterials?: boolean;
@@ -43,9 +48,51 @@ export function PurchaseRequestForm({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [wbsNodeId, setWbsNodeId] = useState<string>(initialLine?.wbsNodeId ?? "");
+  const [costAnalysisLineId, setCostAnalysisLineId] = useState<string | null>(
+    initialLine?.costAnalysisLineId ?? null,
+  );
+  const [description, setDescription] = useState(initialLine?.description ?? "");
+  const [unit, setUnit] = useState(initialLine?.unit ?? "");
+  const [productId, setProductId] = useState<string | null>(initialLine?.productId ?? null);
 
   const wbsComboboxOptions = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
   const selectedWbs = wbsOptions.find((w) => w.id === wbsNodeId);
+  const apuOptions = useMemo(
+    () =>
+      withNoneOption(
+        toSearchableOptions(
+          (selectedWbs?.apuLines ?? []).map((a) => ({
+            id: a.id,
+            label: `${a.description} (${a.unit})`,
+          })),
+        ),
+        { label: "Sin insumo APU" },
+      ),
+    [selectedWbs],
+  );
+
+  function applyApu(apuId: string | null) {
+    if (!apuId) {
+      setCostAnalysisLineId(null);
+      return;
+    }
+    const apu = selectedWbs?.apuLines?.find((a) => a.id === apuId);
+    if (!apu) {
+      setCostAnalysisLineId(apuId);
+      return;
+    }
+    setCostAnalysisLineId(apu.id);
+    setDescription(apu.description);
+    setUnit(apu.unit);
+    setProductId(apu.productId);
+  }
+
+  function onWbsChange(nextWbsId: string) {
+    setWbsNodeId(nextWbsId);
+    setCostAnalysisLineId(null);
+    const wbs = wbsOptions.find((w) => w.id === nextWbsId);
+    if (wbs?.budgetUnit && !unit) setUnit(wbs.budgetUnit);
+  }
 
   return (
     <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
@@ -55,7 +102,7 @@ export function PurchaseRequestForm({
           startTransition(async () => {
             setError(null);
             if (!wbsNodeId) {
-              setError("Seleccioná un ítem WBS");
+              setError("Seleccioná un ítem EDT");
               return;
             }
             const result = await createPurchaseRequestAction(projectId, {
@@ -66,9 +113,10 @@ export function PurchaseRequestForm({
                 {
                   wbsNodeId,
                   lineType: "MATERIAL",
-                  productId: initialLine?.productId ?? null,
-                  description: fd.get("description")?.toString() ?? "",
-                  unit: fd.get("unit")?.toString() ?? "u",
+                  productId,
+                  costAnalysisLineId,
+                  description: description.trim() || (fd.get("description")?.toString() ?? ""),
+                  unit: unit || fd.get("unit")?.toString() || "u",
                   quantity: fd.get("quantity")?.toString() ?? "1",
                   sortOrder: 0,
                 },
@@ -97,42 +145,10 @@ export function PurchaseRequestForm({
         ) : null}
 
         <div className="space-y-2">
-          <Label htmlFor="description">Descripción</Label>
-          <Input
-            id="description"
-            name="description"
-            required
-            defaultValue={initialLine?.description ?? ""}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="quantity">Cantidad</Label>
-            <Input
-              id="quantity"
-              name="quantity"
-              inputMode="decimal"
-              defaultValue={initialLine?.quantity ?? "1"}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="unit">Unidad</Label>
-            <Input
-              key={selectedWbs?.budgetUnit ?? "u"}
-              id="unit"
-              name="unit"
-              defaultValue={selectedWbs?.budgetUnit ?? "u"}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="pr-wbs">Ítem WBS (obligatorio)</Label>
+          <Label htmlFor="pr-wbs">Ítem EDT (obligatorio)</Label>
           {wbsOptions.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No hay ítems WBS en presupuestos aprobados/cerrados.
+              No hay ítems EDT en presupuestos aprobados/cerrados.
             </p>
           ) : (
             <SearchableCombobox
@@ -140,7 +156,7 @@ export function PurchaseRequestForm({
               popoverWidth="wide"
               options={wbsComboboxOptions}
               value={wbsNodeId}
-              onValueChange={setWbsNodeId}
+              onValueChange={onWbsChange}
               placeholder="Elegir partida…"
               searchPlaceholder="Buscar partida…"
             />
@@ -158,6 +174,56 @@ export function PurchaseRequestForm({
               Este ítem ya está cerca o por encima del saldo disponible.
             </p>
           ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="pr-apu">Insumo APU (opcional)</Label>
+          <SearchableCombobox
+            id="pr-apu"
+            popoverWidth="wide"
+            options={apuOptions}
+            value={costAnalysisLineId ?? SEARCHABLE_NONE}
+            onValueChange={(v) => applyApu(v === SEARCHABLE_NONE ? null : v)}
+            placeholder="Elegir material del APU…"
+            searchPlaceholder="Buscar insumo…"
+            disabled={!wbsNodeId || (selectedWbs?.apuLines?.length ?? 0) === 0}
+          />
+          <p className="text-xs text-muted-foreground">
+            Prefill de descripción/unidad; la imputación de $ sigue en la partida EDT.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="description">Descripción</Label>
+          <Input
+            id="description"
+            name="description"
+            required
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="quantity">Cantidad</Label>
+            <Input
+              id="quantity"
+              name="quantity"
+              inputMode="decimal"
+              defaultValue={initialLine?.quantity ?? "1"}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="unit">Unidad</Label>
+            <Input
+              id="unit"
+              name="unit"
+              value={unit || selectedWbs?.budgetUnit || "u"}
+              onChange={(e) => setUnit(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="space-y-2">

@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
-Last updated: 2026-07-24  
-Status: **D-056** company vs project finance RBAC — hub `/finanzas` + tesorería/GL solo `OWNER|ADMIN|FINANCE|TREASURER|VIEWER`; roles `PROJECT_FINANCE` (obra) y `TREASURER` (caja sin APPROVE GL); PM/SALES/PROCUREMENT sin caja empresa; hardening IDOR/scope AR-AP (Fase 0). Ver [`PERMISSIONS_MATRIX.md`](./00-product/PERMISSIONS_MATRIX.md) §2.2 + [D-056](./00-product/DECISION_LOG.md).
+Last updated: 2026-07-26  
+Status: **Cost board track P0→P3 cerrado** — exposición [D-065], FK línea factura→OC [D-066], matching soft + APU hint [D-067]/[D-068], copy Materiales/Compras vs EDT y costos. P-PROC-01/03 resueltos; P-PROC-02 partial (avisos soft).
 
 ---
 
@@ -578,9 +578,9 @@ R2 endpoint: `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
 | P-ERD-04 | Correlative invoice numbering (Q-002) |
 | P-CERT-01 | Advisory lock for concurrent certification issuance |
 | P-AP-02 | AP aging report — OVERDUE count/amount summary by project/company |
-| P-PROC-01 | Over-receipt tolerance configurable per tenant (BR-PUR-006) — currently always blocks |
-| P-PROC-02 | 3-way matching workflow (PO ↔ Receipt ↔ SupplierInvoice qty/amount validation) |
-| P-PROC-03 | Committed/accrued/paid cost reporting (PO ISSUED = committed; Receipt CONFIRMED = accrued; Payment = paid) |
+| ~~P-PROC-01~~ | ~~Over-receipt tolerance~~ — **DONE [D-067]** (`overReceiptTolerancePct`, default 0, max 5) |
+| P-PROC-02 | 3-way matching — **partial [D-067]**: line qty + amount warnings (soft); hard block / justification AP deferred |
+| ~~P-PROC-03~~ | ~~Committed/accrued/paid cost reporting~~ — **RESOLVED**: capas en EDT y costos; OC `CONFIRMED`+ = committed; receipt = received (informativo); invoice `ISSUED` = accrued; payment `CONFIRMED` = paid ([D-065]/[D-066]) |
 | ~~P-PROC-04~~ | ~~Inventory stock movements on receipt~~ — **RESOLVED in Phase 4C** |
 | ~~P-INV-01~~ | ~~Warehouse transfers~~ — **RESOLVED in Phase 5C** |
 | P-INV-02 | Inventory valuation FIFO/LIFO/AVG — unitCost captured but no costing method yet |
@@ -639,15 +639,18 @@ pnpm --filter @bloqer/database db:seed        # needs SEED_USER_EMAIL in env
 ## Phase 5A — Cost Control design decisions and assumptions
 
 **Cost layer definitions:**
-- `committedCost` = ISSUED/PARTIALLY_RECEIVED/RECEIVED POs + ACTIVE Subcontracts (COMPLETED excluded)
+- `committedCost` = CONFIRMED/PARTIALLY_RECEIVED/RECEIVED POs + ACTIVE Subcontracts (COMPLETED excluded)
 - `receivedCost` = CONFIRMED PurchaseReceipts (own layer, not folded into accrued)
-- `accruedCost` = ISSUED SupplierInvoices with PO link (proportional by POLine WBS weight) + APPROVED SubcontractCertificationLines
-- `paidCost` = CONFIRMED Payments, allocated proportionally via invoice → PO/subCert chain
-- `expectedCostExposure` = `max(committed, received, accrued)` per WBS — NOT sum
+- `accruedCost` = ISSUED SupplierInvoices (PO-linked preferential via [D-066] line FK) + APPROVED SubcontractCertificationLines
+- `paidCost` = CONFIRMED Payments, allocated via invoice → PO/subCert chain (prefer line FK when present)
+- `expectedCostExposure` = `accrued + open_committed` per WBS ([BR-COS-002] / [D-065]) — **not** `max(committed, received, accrued)` and **not** raw committed+accrued
+- `openCommittedCost` = `max(0, committed − accrued_linked)` where linked = PO-linked invoices / approved subcontract certs ([D-066] line FK when present)
 - `inventoryConsumedCost` = StockMovement OUT CONSUMPTION CONFIRMED with wbsNodeId
 - Anti double-count (BR-COS-002): sub-cert-linked SupplierInvoices excluded from PO-proportional accrual
+- Procurement matching ([D-067]): `overReceiptTolerancePct` hard-blocks over-receipt; `invoiceMatchTolerancePct` soft-warns on OC billing panel (line qty via D-066 + header amount)
+- Optional APU hint ([D-068]): `PurchaseOrderLine`/`PurchaseRequestLine`.`costAnalysisLineId` — does **not** change WBS imputation axis ([D-057])
 
-**Proportional WBS allocation assumption:** SupplierInvoiceLine has no wbsNodeId; amounts split by POLine total weight fractions. Documented, not hidden.
+**Proportional WBS allocation assumption:** Prefer `SupplierInvoiceLine.purchaseOrderLineId` → PO line WBS ([D-066]); else `SupplierInvoiceLine.wbsNodeId` ([D-055]); else split by POLine total weight fractions when only header `purchaseOrderId` exists. Documented, not hidden.
 
 **Budget selection guard:** multiple APPROVED/CLOSED budgets → `BudgetSelectionRequired` (not an error). Single budget auto-selected in service.
 

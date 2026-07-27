@@ -17,6 +17,8 @@ const supplierInvoiceLineSchema = z.object({
   sortOrder:   z.number().int().min(0).optional().default(0),
   /** Required when invoice has projectId ([D-055]). */
   wbsNodeId:   z.string().uuid().optional().nullable(),
+  /** Optional link to PO line when invoice is tied to an OC ([D-066]). */
+  purchaseOrderLineId: z.string().uuid().optional().nullable(),
 });
 
 /** projectId null/omit = company-level AP (Phase 16B). Project routes must still pass projectId from URL. */

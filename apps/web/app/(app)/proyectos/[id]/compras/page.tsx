@@ -62,13 +62,18 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Tablero de compras"
-        subtitle="Pendientes de solicitud, cotización, orden y recepción"
+        subtitle="Documentos pendientes (SC → cotización → OC → recepción). El control de $ está en EDT y costos."
         actions={
           <div className="flex flex-wrap gap-2">
             {showMateriales ? (
-              <Button asChild variant="outline">
-                <Link href={`/proyectos/${projectId}/materiales`}>Materiales</Link>
-              </Button>
+              <>
+                <Button asChild variant="outline">
+                  <Link href={`/proyectos/${projectId}/materiales`}>Materiales</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href={`/proyectos/${projectId}/control-costos`}>EDT y costos</Link>
+                </Button>
+              </>
             ) : null}
             {canCreateSc ? (
               <Button asChild variant="outline">

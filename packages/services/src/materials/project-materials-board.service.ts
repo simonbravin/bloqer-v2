@@ -26,6 +26,8 @@ export type MaterialsBoardRow = {
   wbsNodeId: string;
   wbsCode: string;
   wbsName: string;
+  /** APU line id when the row maps 1:1 to a CostAnalysisLine ([D-068]). */
+  costAnalysisLineId: string | null;
   productId: string | null;
   description: string;
   needQty: string;
@@ -194,6 +196,7 @@ export async function getProjectMaterialsBoard(
       analysisLines: {
         where: { category: "MATERIAL" },
         select: {
+          id: true,
           productId: true,
           description: true,
           coefficient: true,
@@ -208,6 +211,7 @@ export async function getProjectMaterialsBoard(
 
   type Agg = {
     wbsNodeId: string;
+    costAnalysisLineId: string | null;
     productId: string | null;
     description: string;
     needQty: Prisma.Decimal;
@@ -238,9 +242,12 @@ export async function getProjectMaterialsBoard(
       if (prev) {
         prev.needQty = prev.needQty.add(needQty);
         prev.needCost = prev.needCost.add(needCost);
+        // Ambiguous merge → drop single APU hint.
+        if (prev.costAnalysisLineId !== line.id) prev.costAnalysisLineId = null;
       } else {
         map.set(key, {
           wbsNodeId: item.wbsNodeId,
+          costAnalysisLineId: line.id,
           productId: line.productId,
           description: line.description,
           needQty,
@@ -263,6 +270,7 @@ export async function getProjectMaterialsBoard(
     if (!row) {
       row = {
         wbsNodeId,
+        costAnalysisLineId: null,
         productId,
         description,
         needQty: ZERO,
@@ -440,6 +448,7 @@ export async function getProjectMaterialsBoard(
       wbsNodeId: agg.wbsNodeId,
       wbsCode: meta.code,
       wbsName: meta.name,
+      costAnalysisLineId: agg.costAnalysisLineId,
       productId: agg.productId,
       description: agg.description,
       needQty: agg.needQty.toFixed(4),

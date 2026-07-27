@@ -75,7 +75,8 @@ export function ReportsHub({
     },
     {
       title: "Compras y proveedores",
-      description: "Material presupuestado vs OC/facturas, líneas sin WBS y resumen por proveedor.",
+      description:
+        "Desvío proveedor vs presupuesto/OC/facturas. El control de $ por partida está en EDT y costos.",
       href: `${base}/compras-proveedores`,
       icon: <Package className="h-5 w-5" />,
       available: canProcurementReports,
@@ -83,7 +84,7 @@ export function ReportsHub({
     {
       title: "Materiales",
       description:
-        "Cobertura APU vs pedido/recibido/consumido y varianza $ por partida (tablero operativo).",
+        "Cantidades APU vs pedido/recibido/consumido. El control de $ por partida está en EDT y costos.",
       href: `/proyectos/${projectId}/materiales`,
       icon: <Package className="h-5 w-5" />,
       // Same gate as /materiales (cost-control / budgets) — inventory optional for cobertura.
@@ -104,8 +105,9 @@ export function ReportsHub({
       available: canCostReports,
     },
     {
-      title: "Control de costos (detalle)",
-      description: "Vista completa por capas: comprometido, devengado, pagado, certificaciones y avance.",
+      title: "EDT y costos",
+      description:
+        "Tablero de $ por partida: comprometido, recibido, devengado, pagado y exposición. Materiales y Compras alimentan este tablero.",
       href: `/proyectos/${projectId}/control-costos`,
       icon: <BarChart3 className="h-5 w-5" />,
       available: canCostReports,

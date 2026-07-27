@@ -58,6 +58,8 @@ export function CompanyProcurementSettingsForm({
                 varianceSoftAlertPct: fd.get("varianceSoftAlertPct")?.toString() ?? "10",
                 varianceNoteRequiredPct: fd.get("varianceNoteRequiredPct")?.toString() ?? "25",
                 varianceExtraApprovalPct: fd.get("varianceExtraApprovalPct")?.toString() ?? "25",
+                overReceiptTolerancePct: fd.get("overReceiptTolerancePct")?.toString() ?? "0",
+                invoiceMatchTolerancePct: fd.get("invoiceMatchTolerancePct")?.toString() ?? "0",
               });
               if ("error" in res) {
                 setError(res.error);
@@ -153,6 +155,33 @@ export function CompanyProcurementSettingsForm({
                 defaultValue={settings.varianceExtraApprovalPct}
                 disabled={!canEdit || pending}
               />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="overReceiptTolerancePct">Tolerancia sobrecantidad recepción (%)</Label>
+              <Input
+                id="overReceiptTolerancePct"
+                name="overReceiptTolerancePct"
+                defaultValue={settings.overReceiptTolerancePct}
+                disabled={!canEdit || pending}
+              />
+              <p className="text-xs text-muted-foreground">
+                0–5%. Default 0 = no permitir recibir más que la OC ([BR-PUR-006]).
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invoiceMatchTolerancePct">Tolerancia matching factura (%)</Label>
+              <Input
+                id="invoiceMatchTolerancePct"
+                name="invoiceMatchTolerancePct"
+                defaultValue={settings.invoiceMatchTolerancePct}
+                disabled={!canEdit || pending}
+              />
+              <p className="text-xs text-muted-foreground">
+                Aviso (no bloqueo) si factura supera recibido + tolerancia ([BR-PUR-012]).
+              </p>
             </div>
           </div>
 

@@ -88,6 +88,7 @@ export async function selectProcurementQuoteAndCreatePo(
         data: {
           purchaseOrderId: po.id,
           wbsNodeId: prl.wbsNodeId,
+          costAnalysisLineId: prl.costAnalysisLineId,
           productId: prl.productId,
           description: prl.description,
           unit: prl.unit,

@@ -42,7 +42,7 @@ export default async function WbsItemDetailPage({ params, searchParams }: PagePr
         </div>
       </div>
 
-      <WbsItemDrilldown detail={detail} />
+      <WbsItemDrilldown detail={detail} projectId={projectId} />
     </PageShell>
   );
 }
