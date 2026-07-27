@@ -1,4 +1,4 @@
-import { Prisma, prisma } from "@bloqer/database";
+import { Prisma, prisma, type ApPaymentNotificationChannel } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
 
@@ -18,6 +18,8 @@ export type CompanyProcurementSettingsView = {
   overReceiptTolerancePct: string;
   invoiceMatchTolerancePct: string;
   approvalSlaHours: number;
+  /** [D-070] Channel for PAYABLE_READY_TO_PAY / PAYMENT_CONFIRMED. */
+  apPaymentNotificationChannel: ApPaymentNotificationChannel;
 };
 
 const DEFAULTS = {
@@ -32,6 +34,7 @@ const DEFAULTS = {
   overReceiptTolerancePct: new Prisma.Decimal(0),
   invoiceMatchTolerancePct: new Prisma.Decimal(0),
   approvalSlaHours: 72,
+  apPaymentNotificationChannel: "IN_APP_AND_EMAIL" as ApPaymentNotificationChannel,
 };
 
 function serialize(row: {
@@ -50,6 +53,7 @@ function serialize(row: {
   overReceiptTolerancePct: Prisma.Decimal;
   invoiceMatchTolerancePct: Prisma.Decimal;
   approvalSlaHours: number;
+  apPaymentNotificationChannel: ApPaymentNotificationChannel;
 }): CompanyProcurementSettingsView {
   const cats = row.quoteRequiredCategories;
   return {
@@ -68,6 +72,7 @@ function serialize(row: {
     overReceiptTolerancePct: row.overReceiptTolerancePct.toString(),
     invoiceMatchTolerancePct: row.invoiceMatchTolerancePct.toString(),
     approvalSlaHours: row.approvalSlaHours ?? 72,
+    apPaymentNotificationChannel: row.apPaymentNotificationChannel ?? DEFAULTS.apPaymentNotificationChannel,
   };
 }
 
@@ -98,6 +103,7 @@ export async function getCompanyProcurementSettings(
       overReceiptTolerancePct: DEFAULTS.overReceiptTolerancePct.toString(),
       invoiceMatchTolerancePct: DEFAULTS.invoiceMatchTolerancePct.toString(),
       approvalSlaHours: DEFAULTS.approvalSlaHours,
+      apPaymentNotificationChannel: DEFAULTS.apPaymentNotificationChannel,
     };
   }
   return serialize(row);
@@ -134,6 +140,7 @@ export async function upsertCompanyProcurementSettings(
     overReceiptTolerancePct: string;
     invoiceMatchTolerancePct: string;
     approvalSlaHours: number;
+    apPaymentNotificationChannel: ApPaymentNotificationChannel;
   }>,
   ctx: ServiceContext,
 ): Promise<CompanyProcurementSettingsView> {
@@ -185,6 +192,8 @@ export async function upsertCompanyProcurementSettings(
       ? new Prisma.Decimal(input.invoiceMatchTolerancePct)
       : DEFAULTS.invoiceMatchTolerancePct,
     approvalSlaHours: input.approvalSlaHours ?? DEFAULTS.approvalSlaHours,
+    apPaymentNotificationChannel:
+      input.apPaymentNotificationChannel ?? DEFAULTS.apPaymentNotificationChannel,
   };
 
   // Update only fields present in the payload so omitted keys (e.g. approvalSlaHours)
@@ -208,6 +217,9 @@ export async function upsertCompanyProcurementSettings(
   }
   if (input.approvalSlaHours !== undefined) {
     updateData.approvalSlaHours = input.approvalSlaHours;
+  }
+  if (input.apPaymentNotificationChannel !== undefined) {
+    updateData.apPaymentNotificationChannel = input.apPaymentNotificationChannel;
   }
 
   const row = await prisma.companyProcurementSettings.upsert({

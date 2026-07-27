@@ -60,6 +60,11 @@ export function CompanyProcurementSettingsForm({
                 varianceExtraApprovalPct: fd.get("varianceExtraApprovalPct")?.toString() ?? "25",
                 overReceiptTolerancePct: fd.get("overReceiptTolerancePct")?.toString() ?? "0",
                 invoiceMatchTolerancePct: fd.get("invoiceMatchTolerancePct")?.toString() ?? "0",
+                apPaymentNotificationChannel:
+                  (fd.get("apPaymentNotificationChannel")?.toString() as
+                    | "IN_APP"
+                    | "IN_APP_AND_EMAIL"
+                    | undefined) ?? "IN_APP_AND_EMAIL",
               });
               if ("error" in res) {
                 setError(res.error);
@@ -183,6 +188,24 @@ export function CompanyProcurementSettingsForm({
                 Aviso (no bloqueo) si factura supera recibido + tolerancia ([BR-PUR-012]).
               </p>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="apPaymentNotificationChannel">Avisos de pago a proveedores</Label>
+            <select
+              id="apPaymentNotificationChannel"
+              name="apPaymentNotificationChannel"
+              defaultValue={settings.apPaymentNotificationChannel}
+              disabled={!canEdit || pending}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="IN_APP_AND_EMAIL">In-app + email</option>
+              <option value="IN_APP">Solo in-app</option>
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Cuando hay una CxP lista para pagar o se confirma un pago. El email requiere Resend
+              configurado; si no, queda solo la notificación en la plataforma.
+            </p>
           </div>
 
           <div className="flex flex-col gap-3 text-sm">

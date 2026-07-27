@@ -37,6 +37,7 @@ export const upsertCompanyProcurementSettingsSchema = z
     varianceExtraApprovalPct: pct.optional(),
     overReceiptTolerancePct: overReceiptPct.optional(),
     invoiceMatchTolerancePct: invoiceMatchPct.optional(),
+    apPaymentNotificationChannel: z.enum(["IN_APP", "IN_APP_AND_EMAIL"]).optional(),
   })
   .superRefine((data, ctx) => {
     if (

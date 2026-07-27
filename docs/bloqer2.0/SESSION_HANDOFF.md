@@ -1,7 +1,7 @@
 # Session Handoff — Bloqer 2.0
 
 Last updated: 2026-07-26  
-Status: **[D-069] pago CxP solo finanzas/tesorería** + notifs in-app listo-para-pagar / pago-confirmado. Cost board P0→P3 cerrado ([D-065]–[D-068]). Q-056 resuelta.
+Status: **[D-070]** canal avisos pago AP (in-app / in-app+email). **[D-069]** pago CxP solo finanzas/tesorería. Cost board P0→P3 ([D-065]–[D-068]). Q-056 resuelta.
 
 ---
 

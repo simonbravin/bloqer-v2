@@ -471,7 +471,7 @@
 
 - **Categoría:** AP / Tesorería / RBAC
 - **Estado:** RESUELTA → [D-069](./DECISION_LOG.md)
-- **Resolución:** opción 2 — `canRegisterApPayment` (company-finance + `EDIT AP`, o `EDIT TREASURY`). Notificaciones in-app `PAYABLE_READY_TO_PAY` / `PAYMENT_CONFIRMED` (sin email por ahora). Compras/PM emiten factura/CxP; finanzas/tesorería eligen cuenta y pagan.
+- **Resolución:** opción 2 — `canRegisterApPayment` (company-finance + `EDIT AP`, o `EDIT TREASURY`). Notificaciones `PAYABLE_READY_TO_PAY` / `PAYMENT_CONFIRMED`; canal por empresa `apPaymentNotificationChannel` ([D-070]: in-app o in-app+email, default email). Compras/PM emiten factura/CxP; finanzas/tesorería eligen cuenta y pagan.
 
 ---
 

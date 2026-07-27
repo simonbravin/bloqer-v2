@@ -1884,6 +1884,12 @@ model Payment {
 // BR-PUR-004: Receipt only when PO status is CONFIRMED | PARTIALLY_RECEIVED | RECEIVED.
 // BR-SUP-001: supplierContactId must have active SUPPLIER role (enforced at service layer).
 
+/// Channel for AP payment workflow alerts ([D-070]): always in-app; email optional.
+enum ApPaymentNotificationChannel {
+  IN_APP
+  IN_APP_AND_EMAIL
+}
+
 model CompanyProcurementSettings {
   id                              String   @id @default(uuid())
   companyId                       String   @unique
@@ -1904,6 +1910,8 @@ model CompanyProcurementSettings {
   invoiceMatchTolerancePct        Decimal  @default(0) @db.Decimal(8, 4)
   /// Hours before SLA reminder for SUBMITTED POs / SUBMITTED PRs without quotes (D-050).
   approvalSlaHours                Int      @default(72)
+  /// Ready-to-pay / payment-confirmed alerts ([D-069]/[D-070]). Default email+in-app so finance is reached off-app.
+  apPaymentNotificationChannel    ApPaymentNotificationChannel @default(IN_APP_AND_EMAIL)
   createdAt                       DateTime @default(now())
   updatedAt                       DateTime @updatedAt
 

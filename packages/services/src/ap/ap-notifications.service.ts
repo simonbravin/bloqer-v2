@@ -1,7 +1,9 @@
 import type { NotificationType } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import { createSystemNotification } from "../notifications/notification.service";
+import { sendNotificationEmailAsSystem } from "../notifications/notification-email.service";
 import { resolveNotificationAudience } from "../notifications/notification-audience.service";
+import { getCompanyProcurementSettings } from "../procurement/company-procurement-settings.service";
 import type { ServiceContext } from "../types";
 import { canRegisterApPayment } from "./ap-access";
 
@@ -18,7 +20,7 @@ export async function findActiveApPaymentAudience(tenantId: string): Promise<str
   ];
 }
 
-async function notifyInAppOnly(params: {
+async function notifyApPaymentWorkflow(params: {
   ctx: ServiceContext;
   recipients: string[];
   type: NotificationType;
@@ -39,9 +41,13 @@ async function notifyInAppOnly(params: {
     excludeUserId: params.excludeUserId,
     alwaysCcOwnerAdmin: params.alwaysCcOwnerAdmin ?? true,
   });
+
+  const settings = await getCompanyProcurementSettings(params.companyId, params.ctx);
+  const sendEmail = settings.apPaymentNotificationChannel === "IN_APP_AND_EMAIL";
+
   for (const recipientUserId of unique) {
     try {
-      await createSystemNotification({
+      const { id: notificationId } = await createSystemNotification({
         tenantId: params.ctx.tenantId,
         companyId: params.companyId,
         recipientUserId,
@@ -54,15 +60,19 @@ async function notifyInAppOnly(params: {
         projectId: params.projectId,
         actionUrl: params.actionUrl,
       });
+      // [D-070] Email only when company channel is IN_APP_AND_EMAIL; best-effort.
+      if (sendEmail) {
+        await sendNotificationEmailAsSystem(notificationId, params.ctx).catch(() => undefined);
+      }
     } catch {
-      /* best-effort in-app only ([D-069]) — no email */
+      /* best-effort — never abort payment / issue flows */
     }
   }
 }
 
 /**
  * After a project supplier invoice is ISSUED → payable OPEN: alert finance/treasury + OWNER/ADMIN.
- * In-app only ([D-069]).
+ * Channel: company `apPaymentNotificationChannel` ([D-070]).
  */
 export async function notifyPayableReadyToPay(params: {
   ctx: ServiceContext;
@@ -86,7 +96,7 @@ export async function notifyPayableReadyToPay(params: {
     ? `/proyectos/${params.projectId}/ordenes-compra/${params.purchaseOrderId}`
     : `/proyectos/${params.projectId}/cuentas-por-pagar/${params.payableId}`;
 
-  await notifyInAppOnly({
+  await notifyApPaymentWorkflow({
     ctx: params.ctx,
     recipients,
     type: "PAYABLE_READY_TO_PAY",
@@ -104,7 +114,7 @@ export async function notifyPayableReadyToPay(params: {
 }
 
 /**
- * After Payment CONFIRMED: notify procurement (+ OWNER/ADMIN CC). In-app only ([D-069]).
+ * After Payment CONFIRMED: notify procurement (+ OWNER/ADMIN CC). Channel [D-070].
  */
 export async function notifyPaymentConfirmed(params: {
   ctx: ServiceContext;
@@ -131,7 +141,7 @@ export async function notifyPaymentConfirmed(params: {
       : `/proyectos/${params.projectId}/facturas-proveedor/${params.supplierInvoiceId}`
     : `/finanzas/facturas-proveedor/${params.supplierInvoiceId}`;
 
-  await notifyInAppOnly({
+  await notifyApPaymentWorkflow({
     ctx: params.ctx,
     recipients,
     type: "PAYMENT_CONFIRMED",

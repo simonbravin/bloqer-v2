@@ -223,7 +223,7 @@ Esta sección **no** cambia reglas de código; documenta huecos entre matriz doc
 
 - Emitir factura / abrir CxP: sigue `EDIT AP` (proyecto) o company-finance + `EDIT AP` (corporativo).
 - **Registrar o cancelar Payment** (elige cuenta bancaria): `canRegisterApPayment` = company-finance + `EDIT AP`, **o** `EDIT TREASURY`. PROCUREMENT/PM no debitan caja.
-- Notificaciones in-app: `PAYABLE_READY_TO_PAY` (a finanzas/tesorería + OWNER/ADMIN) y `PAYMENT_CONFIRMED` (a compras + OWNER/ADMIN). Sin email en esta iteración.
+- Notificaciones: `PAYABLE_READY_TO_PAY` (finanzas/tesorería + OWNER/ADMIN) y `PAYMENT_CONFIRMED` (compras + OWNER/ADMIN). Canal por empresa `apPaymentNotificationChannel` ([D-070]): `IN_APP` o `IN_APP_AND_EMAIL` (default). UI en `/configuracion/compras`.
 
 ### 9.4 Certificaciones vs atajo `VIEW PROJECTS`
 

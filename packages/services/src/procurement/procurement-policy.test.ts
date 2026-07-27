@@ -28,6 +28,7 @@ const baseSettings: CompanyProcurementSettingsView = {
   overReceiptTolerancePct: "0",
   invoiceMatchTolerancePct: "0",
   approvalSlaHours: 72,
+  apPaymentNotificationChannel: "IN_APP_AND_EMAIL",
 };
 
 function ctx(roles: ServiceContext["roles"]): ServiceContext {

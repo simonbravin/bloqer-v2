@@ -54,6 +54,7 @@ export {
   DocumentCategory, DocumentStatus, LinkedEntityType, StorageProvider,
   NotificationType, NotificationSeverity, NotificationStatus,
   EmailDeliveryType, EmailDeliveryStatus, EmailProvider,
+  ApPaymentNotificationChannel,
   SubscriptionStatus,
   TenantInvitationStatus,
   AccountType,

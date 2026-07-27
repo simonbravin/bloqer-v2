@@ -996,10 +996,26 @@
 - **Contexto:** Compras podía debitar cuentas de empresa con solo `EDIT AP`. El PM no elige banco; hace falta segregación tipo payment run y avisos cuando hay algo listo para pagar / cuando se pagó.
 - **Decisión:**
   1. **Quién paga ([Q-056] opción 2):** `canRegisterApPayment` = company-finance + `EDIT AP`, **o** `EDIT TREASURY`. Aplica a `createPayment`, `cancelPayment` y “Emitir y pagar ahora”. PROCUREMENT/PM siguen emitiendo facturas/CxP pero **no** eligen cuenta bancaria.
-  2. **Notificación `PAYABLE_READY_TO_PAY`:** al emitir factura de **proyecto** (payable OPEN), in-app a audiencia de pago + CC OWNER/ADMIN. Menciona OC si está vinculada. **Sin email** en esta iteración.
-  3. **Notificación `PAYMENT_CONFIRMED`:** al confirmar pago, in-app a `EDIT PROCUREMENT` + CC OWNER/ADMIN. **Sin email** en esta iteración.
+  2. **Notificación `PAYABLE_READY_TO_PAY`:** al emitir factura de **proyecto** (payable OPEN), a audiencia de pago + CC OWNER/ADMIN. Menciona OC si está vinculada. Canal configurable por empresa ([D-070]).
+  3. **Notificación `PAYMENT_CONFIRMED`:** al confirmar pago, a `EDIT PROCUREMENT` + CC OWNER/ADMIN. Canal configurable por empresa ([D-070]).
 - **Implicancias:** migración enum `NotificationType`; UI oculta “Registrar pago” / pay-now sin permiso; [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) Q-056 resuelta.
 - **Documentos afectados:** [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md) (nota), [`SESSION_HANDOFF.md`](../SESSION_HANDOFF.md).
+
+---
+
+### D-070 — Canal de avisos de pago AP: in-app o in-app+email
+
+- **Fecha:** 2026-07-26
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Con solo in-app ([D-069]), finanzas/compras fuera de la app no se enteran y pueden atrasar obra. Hace falta poder elegir email también.
+- **Decisión:**
+  1. Campo `CompanyProcurementSettings.apPaymentNotificationChannel`: `IN_APP` | `IN_APP_AND_EMAIL`.
+  2. **Default:** `IN_APP_AND_EMAIL` (recomendado para no atrasar pagos).
+  3. Aplica a `PAYABLE_READY_TO_PAY` y `PAYMENT_CONFIRMED`. Email vía `sendNotificationEmailAsSystem` (best-effort; si Resend no está configurado, queda solo in-app).
+  4. UI en `/configuracion/compras`.
+- **Implicancias:** no cambia quién recibe (audiencia [D-069]); solo el canal.
+- **Documentos afectados:** [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) Q-056, [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md) §9.3b.
 
 ---
 
@@ -1011,7 +1027,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-070`…).
+1. Tomar el siguiente ID disponible (`D-071`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.
