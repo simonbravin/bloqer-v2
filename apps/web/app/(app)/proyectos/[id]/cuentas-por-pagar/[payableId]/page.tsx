@@ -1,4 +1,5 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DataTableSection } from "@/components/ui/data-table-section";
@@ -65,7 +66,7 @@ export default async function PayableDetailPage({ params }: PageProps) {
   const canPay = canPayStatus && canRegisterApPayment(ctx.roles);
 
   return (
-    <PageShell variant="default" className="space-y-6" breadcrumbLabel={payable.supplierName}>
+    <PageShell variant="detail" className="space-y-6" breadcrumbLabel={payable.supplierName}>
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Cuenta por pagar</h1>
         <PayableStatusBadge status={payable.status} />
@@ -118,40 +119,31 @@ export default async function PayableDetailPage({ params }: PageProps) {
           <div>
             <p className="text-muted-foreground">Total original</p>
             <p className="font-medium tabular-nums">
-              {Number(payable.originalAmount).toLocaleString("es-AR", {
-                style: "currency",
-                currency: payable.currency,
-              })}
+              {formatMoneyAmount(payable.originalAmount, payable.currency)}
             </p>
           </div>
           <div>
             <p className="text-muted-foreground">Pagado</p>
             <p className="font-medium tabular-nums">
-              {Number(payable.paidAmount).toLocaleString("es-AR", {
-                style: "currency",
-                currency: payable.currency,
-              })}
+              {formatMoneyAmount(payable.paidAmount, payable.currency)}
             </p>
           </div>
           <div>
             <p className="text-muted-foreground font-semibold">Saldo pendiente</p>
             <p className="font-semibold tabular-nums">
-              {Number(payable.balanceDue).toLocaleString("es-AR", {
-                style: "currency",
-                currency: payable.currency,
-              })}
+              {formatMoneyAmount(payable.balanceDue, payable.currency)}
             </p>
           </div>
         </div>
 
-        <Button asChild>
+        <Button asChild variant="outline">
           <Link href={`/proyectos/${id}/facturas-proveedor/${payable.supplierInvoiceId}`}>
             Ver factura →
           </Link>
         </Button>
       </div>
 
-      {canPay && (
+      {canPay ? (
         <div className="flex justify-end">
           <Button asChild>
             <Link href={`/proyectos/${id}/cuentas-por-pagar/${payableId}/pagar`}>
@@ -159,7 +151,11 @@ export default async function PayableDetailPage({ params }: PageProps) {
             </Link>
           </Button>
         </div>
-      )}
+      ) : canPayStatus ? (
+        <p className="text-right text-sm text-muted-foreground">
+          El pago lo registra finanzas o tesorería (elige la cuenta bancaria).
+        </p>
+      ) : null}
 
       <DataTableSection title="Pagos registrados">
         <PaymentTable payments={paymentItems} hrefPrefix={`/proyectos/${id}/pagos`} />

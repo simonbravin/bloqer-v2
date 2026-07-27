@@ -5,7 +5,7 @@ import { getPayableAgingReport, getReceivableAgingReport } from "../aging/aging.
 import { canEditArArea, canViewArProjectArea } from "../ar/ar-access";
 import { countOpenSalesInvoicesByProject } from "../ar/sales-invoice.service";
 import { summarizeReceivablesByProject } from "../ar/receivable.service";
-import { canViewApProjectArea } from "../ap/ap-access";
+import { canViewApProjectArea, canRegisterApPayment } from "../ap/ap-access";
 import { countOpenSupplierInvoicesByProject } from "../ap/supplier-invoice.service";
 import { summarizePayablesByProject } from "../ap/payable.service";
 import { canViewBudgetsArea, listBudgetsByProject } from "../budget/budget.service";
@@ -279,11 +279,11 @@ export async function getProjectFinanceOverview(
       pushUniqueQuickAction(quickActions, seenHrefs, { label: "Ver facturas proveedor", href: links.supplierInvoices });
       pushUniqueQuickAction(quickActions, seenHrefs, { label: "Ver cuentas por pagar", href: links.payables });
       pushUniqueQuickAction(quickActions, seenHrefs, { label: "Ver pagos", href: links.payments });
-      if (can(ctx.roles, "EDIT", "AP")) {
+      if (canRegisterApPayment(ctx.roles)) {
         pushUniqueQuickAction(quickActions, seenHrefs, {
           label:        "Registrar pago",
           href:         links.payables,
-          description: "Desde cada C×P podés abrir el registro de pago.",
+          description: "Desde cada C×P finanzas o tesorería elige la cuenta y registra el pago.",
         });
       }
     }

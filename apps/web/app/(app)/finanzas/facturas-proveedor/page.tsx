@@ -15,7 +15,7 @@ import { ReportExportActions } from "@/features/reports";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
-import { listCompanySupplierInvoices, listContacts, ServiceError } from "@bloqer/services";
+import { listCompanySupplierInvoices, listContacts, canRegisterApPayment, ServiceError } from "@bloqer/services";
 import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -54,6 +54,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     roles: current.tenantCtx.roles,
   };
   const canCreateInvoice = can(ctx.roles, "EDIT", "AP");
+  const canRegisterPayment = canRegisterApPayment(ctx.roles);
 
   let result;
   let suppliersResult = null;
@@ -172,6 +173,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
             invoices={items}
             hrefPrefix="/finanzas/facturas-proveedor"
             payableHrefPrefix="/finanzas/cuentas-por-pagar"
+            canRegisterPayment={canRegisterPayment}
           />
         </Suspense>
       )}

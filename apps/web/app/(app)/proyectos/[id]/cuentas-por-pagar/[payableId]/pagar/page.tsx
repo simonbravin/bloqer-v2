@@ -12,9 +12,12 @@ interface PageProps {
 export default async function PagarPage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
-  if (!canRegisterApPayment(current.tenantCtx.roles)) redirect("/dashboard");
 
   const { id, payableId } = await params;
+  if (!canRegisterApPayment(current.tenantCtx.roles)) {
+    redirect(`/proyectos/${id}/cuentas-por-pagar/${payableId}`);
+  }
+
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -47,13 +50,17 @@ export default async function PagarPage({ params }: PageProps) {
 
   return (
     <PageShell
-      variant="default"
+      variant="form"
       className="space-y-6"
       breadcrumbSegmentLabels={{ [payableId]: payable.supplierName }}
     >
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Registrar pago</h1>
       </div>
+
+      <p className="text-sm text-muted-foreground">
+        Elegí la cuenta de tesorería de la empresa. El débito se registra al confirmar el pago.
+      </p>
 
       {isBlocked ? (
         <div className="rounded-lg border bg-card p-6">

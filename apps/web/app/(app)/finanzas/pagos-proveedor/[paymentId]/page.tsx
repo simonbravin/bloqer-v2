@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { getCurrentUser } from "@/lib/auth";
 import { generateJournalFromPaymentAction } from "@/app/(app)/contabilidad/source-draft-actions";
-import { getCompanyPaymentById, ServiceError } from "@bloqer/services";
+import { getCompanyPaymentById, canRegisterApPayment, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { cancelCompanyPaymentAction } from "@/app/(app)/finanzas/cuentas-por-pagar/actions";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
@@ -43,11 +43,11 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
 
   const isConfirmed = payment.status === "CONFIRMED";
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
-  const canEditAp = can(current.tenantCtx.roles, "EDIT", "AP");
+  const canCancelPayment = canRegisterApPayment(current.tenantCtx.roles);
   const returnPath = `/finanzas/pagos-proveedor/${paymentId}`;
 
   return (
-    <PageShell variant="form" className="space-y-6" breadcrumbLabel={formatDate(payment.paymentDate)}>
+    <PageShell variant="detail" className="space-y-6" breadcrumbLabel={formatDate(payment.paymentDate)}>
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Pago (empresa)</h1>
         <Badge variant={isConfirmed ? "default" : "destructive"}>
@@ -92,6 +92,13 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
               Ver cuenta por pagar →
             </Link>
           </Button>
+          {payment.supplierInvoiceId ? (
+            <Button asChild variant="outline">
+              <Link href={`/finanzas/facturas-proveedor/${payment.supplierInvoiceId}`}>
+                Ver factura proveedor →
+              </Link>
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -116,7 +123,7 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
         </div>
       )}
 
-      {canEditAp && isConfirmed && (
+      {canCancelPayment && isConfirmed && (
         <form
           action={async () => {
             "use server";

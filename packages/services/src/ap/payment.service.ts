@@ -240,7 +240,7 @@ export async function createPayment(
 
     const supplierInvoice = await tx.supplierInvoice.findUnique({
       where: { id: payable.supplierInvoiceId },
-      select: { status: true, number: true, purchaseOrderId: true },
+      select: { status: true, number: true },
     });
     if (!supplierInvoice) {
       throw new ServiceError("CONFLICT", "La factura de proveedor asociada no existe");
@@ -289,14 +289,12 @@ export async function createPayment(
   await ensureDraftJournalFromPayment(result.result.id, ctx);
   await notifyPaymentConfirmed({
     ctx,
-    paymentId: result.result.id,
     supplierInvoiceId: result.result.supplierInvoiceId,
     projectId: result.result.projectId,
     companyId: result.result.companyId,
     invoiceNumber: result.supplierInvoice.number,
     amountLabel: `${serializeMoneyDecimal(result.result.amount)} ${result.result.currency}`,
     accountName: result.result.account.name,
-    purchaseOrderId: result.supplierInvoice.purchaseOrderId,
   }).catch(() => undefined);
   return serialize(result.result);
 }
@@ -308,6 +306,7 @@ export async function cancelPayment(
   projectScopeId?: string,
 ): Promise<Payment> {
   await assertApTenantModule(ctx);
+  await assertTreasuryTenantModule(ctx);
 
   const paymentPreview = await prisma.payment.findUnique({
     where: { id },

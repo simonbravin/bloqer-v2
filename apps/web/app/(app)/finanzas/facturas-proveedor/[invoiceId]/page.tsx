@@ -221,6 +221,12 @@ export default async function FinanzasFacturaProveedorDetailPage({
                     Registrar pago
                   </Link>
                 </Button>
+              ) : payable.status === "OPEN" ||
+                payable.status === "PARTIAL" ||
+                payable.status === "OVERDUE" ? (
+                <p className="text-xs text-muted-foreground w-full">
+                  Finanzas o tesorería registra el pago y elige la cuenta bancaria.
+                </p>
               ) : null}
             </div>
           </CardContent>

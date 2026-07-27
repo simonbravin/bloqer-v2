@@ -2,7 +2,10 @@ import type { NotificationType } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import { createSystemNotification } from "../notifications/notification.service";
 import { sendNotificationEmailAsSystem } from "../notifications/notification-email.service";
-import { resolveNotificationAudience } from "../notifications/notification-audience.service";
+import {
+  resolveNotificationAudience,
+  type NotificationPermissionTarget,
+} from "../notifications/notification-audience.service";
 import { getCompanyProcurementSettings } from "../procurement/company-procurement-settings.service";
 import type { ServiceContext } from "../types";
 import { canRegisterApPayment } from "./ap-access";
@@ -20,9 +23,23 @@ export async function findActiveApPaymentAudience(tenantId: string): Promise<str
   ];
 }
 
+async function resolveApPaymentEmailEnabled(
+  companyId: string,
+  ctx: ServiceContext,
+): Promise<boolean> {
+  try {
+    const settings = await getCompanyProcurementSettings(companyId, ctx);
+    return settings.apPaymentNotificationChannel === "IN_APP_AND_EMAIL";
+  } catch {
+    // Fail open to email+in-app ([D-070] default) so a settings glitch does not silence alerts.
+    return true;
+  }
+}
+
 async function notifyApPaymentWorkflow(params: {
   ctx: ServiceContext;
-  recipients: string[];
+  recipients?: string[];
+  permissionTargets?: NotificationPermissionTarget[];
   type: NotificationType;
   title: string;
   body: string;
@@ -38,12 +55,12 @@ async function notifyApPaymentWorkflow(params: {
   const unique = await resolveNotificationAudience({
     tenantId: params.ctx.tenantId,
     primaryUserIds: params.recipients,
+    permissionTargets: params.permissionTargets,
     excludeUserId: params.excludeUserId,
     alwaysCcOwnerAdmin: params.alwaysCcOwnerAdmin ?? true,
   });
 
-  const settings = await getCompanyProcurementSettings(params.companyId, params.ctx);
-  const sendEmail = settings.apPaymentNotificationChannel === "IN_APP_AND_EMAIL";
+  const sendEmail = await resolveApPaymentEmailEnabled(params.companyId, params.ctx);
 
   for (const recipientUserId of unique) {
     try {
@@ -86,15 +103,14 @@ export async function notifyPayableReadyToPay(params: {
   amountLabel: string;
 }): Promise<void> {
   const recipients = await findActiveApPaymentAudience(params.ctx.tenantId);
-  const invCode = `FP-${String(params.invoiceNumber).padStart(3, "0")}`;
+  const invCode = `FP-${String(params.invoiceNumber).padStart(5, "0")}`;
   const ocPart = params.purchaseOrderCode
     ? ` vinculada a ${params.purchaseOrderCode}`
     : params.purchaseOrderId
       ? " vinculada a una OC"
       : "";
-  const actionUrl = params.purchaseOrderId
-    ? `/proyectos/${params.projectId}/ordenes-compra/${params.purchaseOrderId}`
-    : `/proyectos/${params.projectId}/cuentas-por-pagar/${params.payableId}`;
+  // Deep-link to pay form ([D-069]): finance should act, not land on OC detail.
+  const actionUrl = `/proyectos/${params.projectId}/cuentas-por-pagar/${params.payableId}/pagar`;
 
   await notifyApPaymentWorkflow({
     ctx: params.ctx,
@@ -118,32 +134,21 @@ export async function notifyPayableReadyToPay(params: {
  */
 export async function notifyPaymentConfirmed(params: {
   ctx: ServiceContext;
-  paymentId: string;
   supplierInvoiceId: string;
   projectId: string | null;
   companyId: string;
   invoiceNumber: number;
   amountLabel: string;
   accountName: string;
-  purchaseOrderId?: string | null;
 }): Promise<void> {
-  const recipients = await resolveNotificationAudience({
-    tenantId: params.ctx.tenantId,
-    permissionTargets: [{ action: "EDIT", module: "PROCUREMENT" }],
-    excludeUserId: params.ctx.actorUserId,
-    alwaysCcOwnerAdmin: true,
-  });
-
-  const invCode = `FP-${String(params.invoiceNumber).padStart(3, "0")}`;
+  const invCode = `FP-${String(params.invoiceNumber).padStart(5, "0")}`;
   const actionUrl = params.projectId
-    ? params.purchaseOrderId
-      ? `/proyectos/${params.projectId}/ordenes-compra/${params.purchaseOrderId}`
-      : `/proyectos/${params.projectId}/facturas-proveedor/${params.supplierInvoiceId}`
+    ? `/proyectos/${params.projectId}/facturas-proveedor/${params.supplierInvoiceId}`
     : `/finanzas/facturas-proveedor/${params.supplierInvoiceId}`;
 
   await notifyApPaymentWorkflow({
     ctx: params.ctx,
-    recipients,
+    permissionTargets: [{ action: "EDIT", module: "PROCUREMENT" }],
     type: "PAYMENT_CONFIRMED",
     title: "Pago confirmado",
     body: `Se confirmó el pago de ${params.amountLabel} de ${invCode} desde ${params.accountName}.`,
@@ -154,6 +159,6 @@ export async function notifyPaymentConfirmed(params: {
     companyId: params.companyId,
     actionUrl,
     excludeUserId: params.ctx.actorUserId,
-    alwaysCcOwnerAdmin: false, // already included via resolveNotificationAudience above
+    alwaysCcOwnerAdmin: true,
   });
 }

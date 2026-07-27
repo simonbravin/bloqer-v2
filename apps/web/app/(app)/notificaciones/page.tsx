@@ -21,6 +21,7 @@ import {
 import { formatDateTime } from "@/lib/format";
 import { notificationSeverityLabelEs } from "@/lib/notification-severity-label";
 import { safeActionHref } from "@/lib/safe-action-href";
+import { notificationActionLinkLabel } from "@/lib/notification-action-label";
 import { PageShell } from "@/components/layout/page-shell";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 
@@ -174,7 +175,9 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
                         {actionHref && (
                           <p className="pt-1">
                             <Button variant="link" className="h-auto p-0 text-sm" asChild>
-                              <Link href={actionHref}>Abrir detalle</Link>
+                              <Link href={actionHref}>
+                                {notificationActionLinkLabel(n.type, n.actionUrl)}
+                              </Link>
                             </Button>
                           </p>
                         )}

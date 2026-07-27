@@ -110,13 +110,19 @@ export default async function FinanzasPayableDetailPage({ params }: PageProps) {
         </Button>
       </div>
 
-      {canPay && (
+      {canPay ? (
         <div className="flex justify-end">
           <Button asChild>
             <Link href={`/finanzas/cuentas-por-pagar/${payableId}/pagar`}>Registrar pago</Link>
           </Button>
         </div>
-      )}
+      ) : payable.status === "OPEN" ||
+        payable.status === "PARTIAL" ||
+        payable.status === "OVERDUE" ? (
+        <p className="text-right text-sm text-muted-foreground">
+          El pago lo registra finanzas o tesorería (elige la cuenta bancaria).
+        </p>
+      ) : null}
 
       <DataTableSection title="Pagos registrados">
         <PaymentTable payments={paymentItems} hrefPrefix="/finanzas/pagos-proveedor" />

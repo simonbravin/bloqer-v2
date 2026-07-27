@@ -40,7 +40,8 @@ export default async function ConfiguracionComprasPage({ searchParams }: PagePro
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Compras</h1>
         <p className="text-sm text-muted-foreground">
-          Política de solicitudes, cotizaciones y aprobación de órdenes de compra por empresa.
+          Política de solicitudes, cotizaciones, aprobación de OC y avisos cuando hay CxP lista para
+          pagar o se confirma un pago.
         </p>
       </div>
 

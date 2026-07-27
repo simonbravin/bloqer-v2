@@ -3,6 +3,7 @@ import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import type { CreateTreasuryAccountInput, UpdateTreasuryAccountInput } from "@bloqer/validators";
 import { auditTreasury } from "./treasury-audit";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { canRegisterApPayment } from "../ap/ap-access";
 import { ServiceContext, ServiceError } from "../types";
 import { getAccountBalance, AccountBalanceSummary } from "./balance.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
@@ -93,7 +94,7 @@ export async function listSelectableTreasuryAccounts(
   await assertTreasuryTenantModule(ctx);
   const canPick =
     can(ctx.roles, "EDIT", "AR")
-    || can(ctx.roles, "EDIT", "AP")
+    || canRegisterApPayment(ctx.roles)
     || can(ctx.roles, "VIEW", "TREASURY")
     || can(ctx.roles, "VIEW", "BANK_ACCOUNTS");
   if (!canPick) {

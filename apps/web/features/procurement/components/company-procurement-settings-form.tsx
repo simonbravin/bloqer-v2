@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { updateCompanyProcurementSettingsAction } from "@/app/(app)/configuracion/compras/actions";
 
 interface Props {
@@ -29,13 +36,16 @@ export function CompanyProcurementSettingsForm({
   const [allowDirectPo, setAllowDirectPo] = useState(settings.allowDirectPo);
   const [allowSelfApproval, setAllowSelfApproval] = useState(settings.allowSelfApproval);
   const [allowEmergencyDirectPo, setAllowEmergencyDirectPo] = useState(settings.allowEmergencyDirectPo);
+  const [apPaymentNotificationChannel, setApPaymentNotificationChannel] = useState(
+    settings.apPaymentNotificationChannel,
+  );
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Política de compras — {companyName}</CardTitle>
         <CardDescription>
-          Umbrales de aprobación, cotizaciones y desvíos presupuestarios para órdenes de compra.
+          Umbrales de aprobación, cotizaciones, desvíos y canal de avisos de pago a proveedores.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -60,11 +70,7 @@ export function CompanyProcurementSettingsForm({
                 varianceExtraApprovalPct: fd.get("varianceExtraApprovalPct")?.toString() ?? "25",
                 overReceiptTolerancePct: fd.get("overReceiptTolerancePct")?.toString() ?? "0",
                 invoiceMatchTolerancePct: fd.get("invoiceMatchTolerancePct")?.toString() ?? "0",
-                apPaymentNotificationChannel:
-                  (fd.get("apPaymentNotificationChannel")?.toString() as
-                    | "IN_APP"
-                    | "IN_APP_AND_EMAIL"
-                    | undefined) ?? "IN_APP_AND_EMAIL",
+                apPaymentNotificationChannel,
               });
               if ("error" in res) {
                 setError(res.error);
@@ -192,16 +198,21 @@ export function CompanyProcurementSettingsForm({
 
           <div className="space-y-2">
             <Label htmlFor="apPaymentNotificationChannel">Avisos de pago a proveedores</Label>
-            <select
-              id="apPaymentNotificationChannel"
-              name="apPaymentNotificationChannel"
-              defaultValue={settings.apPaymentNotificationChannel}
+            <Select
+              value={apPaymentNotificationChannel}
+              onValueChange={(v) =>
+                setApPaymentNotificationChannel(v as "IN_APP" | "IN_APP_AND_EMAIL")
+              }
               disabled={!canEdit || pending}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <option value="IN_APP_AND_EMAIL">In-app + email</option>
-              <option value="IN_APP">Solo in-app</option>
-            </select>
+              <SelectTrigger id="apPaymentNotificationChannel">
+                <SelectValue placeholder="Canal de avisos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IN_APP_AND_EMAIL">In-app + email</SelectItem>
+                <SelectItem value="IN_APP">Solo in-app</SelectItem>
+              </SelectContent>
+            </Select>
             <p className="text-xs text-muted-foreground">
               Cuando hay una CxP lista para pagar o se confirma un pago. El email requiere Resend
               configurado; si no, queda solo la notificación en la plataforma.

@@ -1,18 +1,21 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { getCurrentUser } from "@/lib/auth";
 import { generateJournalFromPaymentAction } from "@/app/(app)/contabilidad/source-draft-actions";
-import { getPaymentById, ServiceError } from "@bloqer/services";
+import { getPaymentById, canRegisterApPayment, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { cancelPaymentAction } from "@/app/(app)/proyectos/[id]/cuentas-por-pagar/actions";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; paymentId: string }>;
-  searchParams: Promise<{ contabilidad?: string }>;
+  searchParams: Promise<{ contabilidad?: string; actionError?: string }>;
 }
 
 export default async function PaymentDetailPage({ params, searchParams }: PageProps) {
@@ -39,16 +42,19 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
 
   const isConfirmed = payment.status === "CONFIRMED";
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
+  const canCancelPayment = canRegisterApPayment(current.tenantCtx.roles);
   const returnPath = `/proyectos/${id}/pagos/${paymentId}`;
 
   return (
-    <PageShell variant="default" className="space-y-6" breadcrumbLabel={formatDate(payment.paymentDate)}>
+    <PageShell variant="detail" className="space-y-6" breadcrumbLabel={formatDate(payment.paymentDate)}>
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Pago</h1>
         <Badge variant={isConfirmed ? "default" : "destructive"}>
           {isConfirmed ? "Confirmado" : "Cancelado"}
         </Badge>
       </div>
+
+      <ActionErrorBanner message={sp.actionError} />
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -67,10 +73,7 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
           <div>
             <p className="text-muted-foreground">Monto</p>
             <p className="font-semibold tabular-nums">
-              {Number(payment.amount).toLocaleString("es-AR", {
-                style: "currency",
-                currency: payment.currency,
-              })}
+              {formatMoneyAmount(payment.amount, payment.currency)}
             </p>
           </div>
         </div>
@@ -117,12 +120,13 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
         </div>
       )}
 
-      {isConfirmed && (
+      {canCancelPayment && isConfirmed && (
         <form
           action={async () => {
             "use server";
-            await cancelPaymentAction(paymentId, id);
-            redirect(`/proyectos/${id}/pagos/${paymentId}`);
+            const result = await cancelPaymentAction(paymentId, id);
+            if ("error" in result) redirectWithActionError(returnPath, result.error);
+            redirect(returnPath);
           }}
         >
           <Button type="submit" variant="destructive">

@@ -197,6 +197,7 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
           invoices={items}
           hrefPrefix={`/proyectos/${id}/facturas-proveedor`}
           payableHrefPrefix={`/proyectos/${id}/cuentas-por-pagar`}
+          canRegisterPayment={canRegisterApPayment(ctx.roles)}
         />
       </Suspense>
 

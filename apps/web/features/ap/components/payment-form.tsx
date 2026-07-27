@@ -101,9 +101,9 @@ export function PaymentForm({
       const res = await createPaymentAction(projectId, payload);
       if ("error" in res) {
         setError(res.error);
-      } else {
-        router.push(`/proyectos/${projectId}/cuentas-por-pagar/${payableId}`);
-      }
+        } else {
+          router.push(`/proyectos/${projectId}/pagos/${res.id}`);
+        }
     });
   }
 

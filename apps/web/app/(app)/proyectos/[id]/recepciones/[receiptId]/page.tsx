@@ -29,11 +29,13 @@ import {
   confirmPurchaseReceiptAction,
   cancelPurchaseReceiptAction,
 } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; receiptId: string }>;
-  searchParams: Promise<{ invoiceError?: string }>;
+  searchParams: Promise<{ invoiceError?: string; actionError?: string }>;
 }
 
 export default async function RecepcionDetailPage({ params, searchParams }: PageProps) {
@@ -42,6 +44,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
 
   const { id, receiptId } = await params;
   const sp = await searchParams;
+  const detailPath = `/proyectos/${id}/recepciones/${receiptId}`;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -83,6 +86,8 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
         </h1>
         <PurchaseReceiptStatusBadge status={receipt.status} />
       </div>
+
+      <ActionErrorBanner message={sp.actionError} />
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -168,8 +173,13 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
           <form
             action={async () => {
               "use server";
-              await confirmPurchaseReceiptAction(receiptId, id, receipt.purchaseOrderId);
-              redirect(`/proyectos/${id}/recepciones/${receiptId}`);
+              const result = await confirmPurchaseReceiptAction(
+                receiptId,
+                id,
+                receipt.purchaseOrderId,
+              );
+              if ("error" in result) redirectWithActionError(detailPath, result.error);
+              redirect(detailPath);
             }}
           >
             <Button type="submit">Confirmar recepción</Button>
@@ -179,8 +189,13 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
           <form
             action={async () => {
               "use server";
-              await cancelPurchaseReceiptAction(receiptId, id, receipt.purchaseOrderId);
-              redirect(`/proyectos/${id}/recepciones/${receiptId}`);
+              const result = await cancelPurchaseReceiptAction(
+                receiptId,
+                id,
+                receipt.purchaseOrderId,
+              );
+              if ("error" in result) redirectWithActionError(detailPath, result.error);
+              redirect(detailPath);
             }}
           >
             <Button type="submit" variant="destructive">

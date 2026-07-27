@@ -22,11 +22,14 @@ export function SupplierInvoiceTable({
   invoices,
   hrefPrefix,
   payableHrefPrefix,
+  canRegisterPayment = false,
 }: {
   invoices: SupplierInvoiceListItem[];
   hrefPrefix: string;
   /** Base path for CxP detail/pay, e.g. `/finanzas/cuentas-por-pagar` or `/proyectos/:id/cuentas-por-pagar`. */
   payableHrefPrefix?: string;
+  /** [D-069] Only show /pagar deep-link when the viewer may register AP payments. */
+  canRegisterPayment?: boolean;
 }) {
   if (invoices.length === 0) {
     return (
@@ -53,6 +56,7 @@ export function SupplierInvoiceTable({
         <TableBody>
           {invoices.map((inv) => {
             const canPay =
+              Boolean(canRegisterPayment) &&
               Boolean(payableHrefPrefix) &&
               inv.payableId &&
               inv.payableStatus &&

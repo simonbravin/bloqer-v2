@@ -9,10 +9,12 @@ export function SupplierInvoiceListSection({
   invoices,
   hrefPrefix,
   payableHrefPrefix,
+  canRegisterPayment = false,
 }: {
   invoices: SupplierInvoiceListItem[];
   hrefPrefix: string;
   payableHrefPrefix?: string;
+  canRegisterPayment?: boolean;
 }) {
   const view = useSearchParams().get("view") === "cards" ? "cards" : "table";
   if (view === "cards") {
@@ -21,6 +23,7 @@ export function SupplierInvoiceListSection({
         invoices={invoices}
         hrefPrefix={hrefPrefix}
         payableHrefPrefix={payableHrefPrefix}
+        canRegisterPayment={canRegisterPayment}
       />
     );
   }
@@ -29,6 +32,7 @@ export function SupplierInvoiceListSection({
       invoices={invoices}
       hrefPrefix={hrefPrefix}
       payableHrefPrefix={payableHrefPrefix}
+      canRegisterPayment={canRegisterPayment}
     />
   );
 }

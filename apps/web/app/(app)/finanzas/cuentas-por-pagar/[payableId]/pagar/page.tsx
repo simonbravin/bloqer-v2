@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { PaymentForm } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
-import { getCompanyPayableById, listTreasuryAccounts, canRegisterApPayment, ServiceError } from "@bloqer/services";
+import { getCompanyPayableById, listSelectableTreasuryAccounts, canRegisterApPayment, ServiceError } from "@bloqer/services";
 
 interface PageProps {
   params: Promise<{ payableId: string }>;
@@ -12,9 +12,12 @@ interface PageProps {
 export default async function FinanzasPagarPage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
-  if (!canRegisterApPayment(current.tenantCtx.roles)) redirect("/dashboard");
 
   const { payableId } = await params;
+  if (!canRegisterApPayment(current.tenantCtx.roles)) {
+    redirect(`/finanzas/cuentas-por-pagar/${payableId}`);
+  }
+
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -23,23 +26,29 @@ export default async function FinanzasPagarPage({ params }: PageProps) {
   };
 
   let payable;
-  let allAccounts;
+  let activeAccounts;
   try {
     const [payableResult, accountsResult] = await Promise.all([
       getCompanyPayableById(payableId, ctx),
-      listTreasuryAccounts(ctx),
+      listSelectableTreasuryAccounts(ctx),
     ]);
     payable = payableResult;
-    allAccounts = accountsResult.data;
+    activeAccounts = accountsResult
+      .filter(
+        (a) =>
+          a.status === "ACTIVE" &&
+          (!ctx.companyId || !a.companyId || a.companyId === ctx.companyId),
+      )
+      .map((a) => ({
+        id: a.id,
+        name: a.name,
+        currency: a.currency,
+      }));
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
       notFound();
     throw err;
   }
-
-  const activeAccounts = allAccounts
-    .filter((a) => a.status === "ACTIVE")
-    .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
 
   const isBlocked = payable.status === "PAID" || payable.status === "CANCELLED";
 
@@ -52,6 +61,10 @@ export default async function FinanzasPagarPage({ params }: PageProps) {
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Registrar pago (empresa)</h1>
       </div>
+
+      <p className="text-sm text-muted-foreground">
+        Elegí la cuenta de tesorería. El débito se registra al confirmar el pago.
+      </p>
 
       {isBlocked ? (
         <div className="rounded-lg border bg-card p-6">

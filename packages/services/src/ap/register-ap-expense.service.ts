@@ -374,20 +374,18 @@ export async function registerApExpense(
       where: { id: outcome.paymentId },
       include: {
         account: { select: { name: true } },
-        supplierInvoice: { select: { number: true, purchaseOrderId: true } },
+        supplierInvoice: { select: { number: true } },
       },
     });
     if (payment) {
       await notifyPaymentConfirmed({
         ctx,
-        paymentId: payment.id,
         supplierInvoiceId: payment.supplierInvoiceId,
         projectId: payment.projectId,
         companyId: payment.companyId,
         invoiceNumber: payment.supplierInvoice.number,
         amountLabel: `${serializeMoneyDecimal(payment.amount)} ${payment.currency}`,
         accountName: payment.account.name,
-        purchaseOrderId: payment.supplierInvoice.purchaseOrderId,
       }).catch(() => undefined);
     }
   }

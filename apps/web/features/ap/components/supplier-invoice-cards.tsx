@@ -11,10 +11,13 @@ export function SupplierInvoiceCards({
   invoices,
   hrefPrefix,
   payableHrefPrefix,
+  canRegisterPayment = false,
 }: {
   invoices: SupplierInvoiceListItem[];
   hrefPrefix: string;
   payableHrefPrefix?: string;
+  /** [D-069] Only show /pagar deep-link when the viewer may register AP payments. */
+  canRegisterPayment?: boolean;
 }) {
   if (invoices.length === 0) {
     return (
@@ -26,6 +29,7 @@ export function SupplierInvoiceCards({
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {invoices.map((inv) => {
         const canPay =
+          Boolean(canRegisterPayment) &&
           Boolean(payableHrefPrefix) &&
           inv.payableId &&
           inv.payableStatus &&

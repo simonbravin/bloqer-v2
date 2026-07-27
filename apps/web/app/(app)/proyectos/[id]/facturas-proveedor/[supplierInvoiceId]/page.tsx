@@ -30,18 +30,23 @@ import {
   issueSupplierInvoiceAction,
   cancelSupplierInvoiceAction,
 } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PageProps {
   params: Promise<{ id: string; supplierInvoiceId: string }>;
+  searchParams: Promise<{ actionError?: string }>;
 }
 
-export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
+export default async function SupplierInvoiceDetailPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id, supplierInvoiceId } = await params;
+  const sp = await searchParams;
+  const detailPath = `/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -92,6 +97,8 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
         <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
         <SupplierInvoiceStatusBadge status={invoice.status} />
       </div>
+
+      <ActionErrorBanner message={sp.actionError} />
 
       {(invoice.purchaseOrderId || invoice.subcontractCertificationId || (isIssued && payable)) ? (
         <Card>
@@ -232,6 +239,12 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
                     Registrar pago
                   </Link>
                 </Button>
+              ) : payable.status === "OPEN" ||
+                payable.status === "PARTIAL" ||
+                payable.status === "OVERDUE" ? (
+                <p className="text-xs text-muted-foreground w-full">
+                  Finanzas o tesorería registra el pago y elige la cuenta bancaria.
+                </p>
               ) : null}
             </div>
           </CardContent>
@@ -249,8 +262,9 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
             <form
               action={async () => {
                 "use server";
-                await issueSupplierInvoiceAction(supplierInvoiceId, id);
-                redirect(`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`);
+                const result = await issueSupplierInvoiceAction(supplierInvoiceId, id);
+                if ("error" in result) redirectWithActionError(detailPath, result.error);
+                redirect(detailPath);
               }}
             >
               <Button type="submit">Emitir factura</Button>
@@ -261,8 +275,9 @@ export default async function SupplierInvoiceDetailPage({ params }: PageProps) {
           <form
             action={async () => {
               "use server";
-              await cancelSupplierInvoiceAction(supplierInvoiceId, id);
-              redirect(`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`);
+              const result = await cancelSupplierInvoiceAction(supplierInvoiceId, id);
+              if ("error" in result) redirectWithActionError(detailPath, result.error);
+              redirect(detailPath);
             }}
           >
             <Button type="submit" variant="destructive">
