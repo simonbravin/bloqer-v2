@@ -73,7 +73,7 @@ export function NewPurchaseOrderDialog({
       <DialogTrigger asChild>
         <Button variant={triggerVariant}>{triggerLabel}</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
+      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Nueva orden de compra</DialogTitle>
           <DialogDescription className="sr-only">

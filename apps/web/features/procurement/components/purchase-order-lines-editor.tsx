@@ -5,15 +5,7 @@ import { toast } from "sonner";
 import { divideDecimal, roundQty, QTY_DECIMALS } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { TableScroll } from "@/components/ui/table-scroll";
+import { Label } from "@/components/ui/label";
 import { formatDecimalAr } from "@/lib/format-money";
 import {
   SearchableCombobox,
@@ -205,135 +197,148 @@ export function PurchaseOrderLinesEditor({
         indirectos del presupuesto.
       </p>
 
-      <TableScroll>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[16%]">EDT (obligatorio)</TableHead>
-              <TableHead className="w-[12%]">Insumo APU</TableHead>
-              {productOptions.length > 0 && <TableHead className="w-[12%]">Producto</TableHead>}
-              <TableHead className="w-[16%]">Descripción</TableHead>
-              <TableHead className="w-[6%]">Unidad</TableHead>
-              <TableHead className="w-[8%]">Cant.</TableHead>
-              <TableHead className="w-[10%]">Precio unit.</TableHead>
-              <TableHead className="w-[8%]">Ref. presup.</TableHead>
-              <TableHead className="w-[7%]">IVA %</TableHead>
-              {showVarianceJustification && (
-                <TableHead className="w-[12%]">Justif. desvío</TableHead>
-              )}
-              <TableHead className="w-[8%] text-right">Total</TableHead>
-              <TableHead className="w-8" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {lines.map((line, i) => {
-              const p = linePreview(line);
-              const wbs = wbsOptions.find((w) => w.id === line.wbsNodeId);
-              return (
-                <TableRow key={i} className="align-top">
-                  <TableCell className="py-1.5">
-                    <SearchableCombobox
-                      popoverWidth="wide"
-                      className="h-8 text-xs"
-                      options={wbsComboboxOptions}
-                      value={line.wbsNodeId ?? ""}
-                      onValueChange={(v) => update(i, "wbsNodeId", v || null)}
-                      placeholder="Elegir EDT…"
-                      searchPlaceholder="Buscar partida…"
-                    />
-                    {wbs?.availableSaldo != null && (
-                      <button
-                        type="button"
-                        onClick={() => consumePartidaSaldo(i, line, wbs)}
-                        title="Ajustar la cantidad para consumir este saldo"
-                        className={`mt-1 block text-left text-[10px] underline decoration-dotted underline-offset-2 hover:opacity-80 ${
-                          wbs.wouldExceedBudget ? "text-destructive" : "text-muted-foreground"
-                        }`}
-                      >
-                        Saldo part.: {formatDecimalAr(Number(wbs.availableSaldo))}
-                        {wbs.wouldExceedBudget ? " (alerta)" : ""}
-                      </button>
-                    )}
-                  </TableCell>
-                  <TableCell className="py-1.5">
-                    <SearchableCombobox
-                      popoverWidth="wide"
-                      className="h-8 text-xs"
-                      options={withNoneOption(
-                        toSearchableOptions(
-                          (wbs?.apuLines ?? []).map((a) => ({
-                            id: a.id,
-                            label: `${a.description} (${a.unit})`,
-                          })),
-                        ),
-                        { label: "Sin insumo APU" },
-                      )}
-                      value={line.costAnalysisLineId ?? SEARCHABLE_NONE}
-                      onValueChange={(v) =>
-                        applyApuHint(i, line, !v || v === SEARCHABLE_NONE ? null : v, wbs)
-                      }
-                      placeholder="Opcional…"
-                      searchPlaceholder="Buscar insumo…"
-                      disabled={!line.wbsNodeId || !(wbs?.apuLines?.length)}
-                    />
-                  </TableCell>
-                  {productOptions.length > 0 && (
-                    <TableCell className="py-1.5">
-                      <SearchableCombobox
-                        popoverWidth="wide"
-                        className="h-8 text-xs"
-                        options={productComboboxOptions}
-                        value={line.productId ?? SEARCHABLE_NONE}
-                        onValueChange={(v) => {
-                          const selected = productOptions.find((pr) => pr.id === v);
-                          const next = {
-                            ...lines[i],
-                            productId: v === SEARCHABLE_NONE ? null : v,
-                          };
-                          if (selected && !lines[i].unit) next.unit = selected.unit;
-                          onChange(lines.map((l, idx) => (idx === i ? next : l)));
-                        }}
-                        placeholder="Sin producto"
-                        searchPlaceholder="Buscar producto…"
-                      />
-                    </TableCell>
+      <div className="space-y-3">
+        {lines.map((line, i) => {
+          const p = linePreview(line);
+          const wbs = wbsOptions.find((w) => w.id === line.wbsNodeId);
+          return (
+            <div key={i} className="rounded-lg border bg-card/40 p-3 space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs font-medium text-muted-foreground">Línea {i + 1}</p>
+                {lines.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeLine(i)}
+                    className="text-muted-foreground hover:text-destructive text-xs"
+                    aria-label="Eliminar línea"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Row 1: EDT + Insumo APU */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">EDT (obligatorio)</Label>
+                  <SearchableCombobox
+                    popoverWidth="wide"
+                    className="h-8 text-xs"
+                    options={wbsComboboxOptions}
+                    value={line.wbsNodeId ?? ""}
+                    onValueChange={(v) => update(i, "wbsNodeId", v || null)}
+                    placeholder="Elegir EDT…"
+                    searchPlaceholder="Buscar partida…"
+                  />
+                  {wbs?.availableSaldo != null && (
+                    <button
+                      type="button"
+                      onClick={() => consumePartidaSaldo(i, line, wbs)}
+                      title="Ajustar la cantidad para consumir este saldo"
+                      className={`block text-left text-[10px] underline decoration-dotted underline-offset-2 hover:opacity-80 ${
+                        wbs.wouldExceedBudget ? "text-destructive" : "text-muted-foreground"
+                      }`}
+                    >
+                      Saldo part.: {formatDecimalAr(Number(wbs.availableSaldo))}
+                      {wbs.wouldExceedBudget ? " (alerta)" : ""}
+                    </button>
                   )}
-                  <TableCell className="py-1.5">
-                    <Input
-                      required
-                      value={line.description}
-                      onChange={(e) => update(i, "description", e.target.value)}
-                      placeholder="Descripción"
-                      className="h-8 text-sm"
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Insumo APU</Label>
+                  <SearchableCombobox
+                    popoverWidth="wide"
+                    className="h-8 text-xs"
+                    options={withNoneOption(
+                      toSearchableOptions(
+                        (wbs?.apuLines ?? []).map((a) => ({
+                          id: a.id,
+                          label: `${a.description} (${a.unit})`,
+                        })),
+                      ),
+                      { label: "Sin insumo APU" },
+                    )}
+                    value={line.costAnalysisLineId ?? SEARCHABLE_NONE}
+                    onValueChange={(v) =>
+                      applyApuHint(i, line, !v || v === SEARCHABLE_NONE ? null : v, wbs)
+                    }
+                    placeholder="Opcional…"
+                    searchPlaceholder="Buscar insumo…"
+                    disabled={!line.wbsNodeId || !(wbs?.apuLines?.length)}
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: description + amounts (12 cols: product optional). */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-12">
+                {productOptions.length > 0 && (
+                  <div className="col-span-2 space-y-1 sm:col-span-2">
+                    <Label className="text-xs">Producto</Label>
+                    <SearchableCombobox
+                      popoverWidth="wide"
+                      className="h-8 text-xs"
+                      options={productComboboxOptions}
+                      value={line.productId ?? SEARCHABLE_NONE}
+                      onValueChange={(v) => {
+                        const selected = productOptions.find((pr) => pr.id === v);
+                        const next = {
+                          ...lines[i],
+                          productId: v === SEARCHABLE_NONE ? null : v,
+                        };
+                        if (selected && !lines[i].unit) next.unit = selected.unit;
+                        onChange(lines.map((l, idx) => (idx === i ? next : l)));
+                      }}
+                      placeholder="Sin producto"
+                      searchPlaceholder="Buscar producto…"
                     />
-                  </TableCell>
-                  <TableCell className="py-1.5">
-                    <Input
-                      value={line.unit}
-                      onChange={(e) => update(i, "unit", e.target.value)}
-                      placeholder="un"
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  <TableCell className="py-1.5">
-                    <Input
-                      required
-                      value={line.quantity}
-                      onChange={(e) => update(i, "quantity", e.target.value)}
-                      placeholder="1"
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  <TableCell className="py-1.5">
-                    <Input
-                      required
-                      value={line.unitPrice}
-                      onChange={(e) => update(i, "unitPrice", e.target.value)}
-                      placeholder="0.00"
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  <TableCell className="py-1.5 text-xs tabular-nums text-muted-foreground">
+                  </div>
+                )}
+                <div
+                  className={`col-span-2 space-y-1 ${
+                    productOptions.length > 0 ? "sm:col-span-3" : "sm:col-span-5"
+                  }`}
+                >
+                  <Label className="text-xs">Descripción</Label>
+                  <Input
+                    required
+                    value={line.description}
+                    onChange={(e) => update(i, "description", e.target.value)}
+                    placeholder="Descripción"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-1">
+                  <Label className="text-xs">Unidad</Label>
+                  <Input
+                    value={line.unit}
+                    onChange={(e) => update(i, "unit", e.target.value)}
+                    placeholder="un"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-1">
+                  <Label className="text-xs">Cant.</Label>
+                  <Input
+                    required
+                    value={line.quantity}
+                    onChange={(e) => update(i, "quantity", e.target.value)}
+                    placeholder="1"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs">Precio unit.</Label>
+                  <Input
+                    required
+                    value={line.unitPrice}
+                    onChange={(e) => update(i, "unitPrice", e.target.value)}
+                    placeholder="0.00"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-1">
+                  <Label className="text-xs">Ref. presup.</Label>
+                  <div className="flex h-8 items-center text-xs tabular-nums text-muted-foreground">
                     {wbs?.budgetUnitCost != null ? (
                       <button
                         type="button"
@@ -347,46 +352,41 @@ export function PurchaseOrderLinesEditor({
                     ) : (
                       "—"
                     )}
-                  </TableCell>
-                  <TableCell className="py-1.5">
-                    <Input
-                      value={line.taxRate}
-                      onChange={(e) => update(i, "taxRate", e.target.value)}
-                      placeholder="21"
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  {showVarianceJustification && (
-                    <TableCell className="py-1.5">
-                      <Input
-                        value={line.varianceJustification ?? ""}
-                        onChange={(e) => update(i, "varianceJustification", e.target.value)}
-                        placeholder="Si supera presupuesto…"
-                        className="h-8 text-sm"
-                      />
-                    </TableCell>
-                  )}
-                  <TableCell className="text-right tabular-nums align-top pt-3">
+                  </div>
+                </div>
+                <div className="space-y-1 sm:col-span-1">
+                  <Label className="text-xs">IVA %</Label>
+                  <Input
+                    value={line.taxRate}
+                    onChange={(e) => update(i, "taxRate", e.target.value)}
+                    placeholder="21"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-1">
+                  <Label className="text-xs">Total</Label>
+                  <p className="flex h-8 items-center justify-end text-sm tabular-nums font-medium">
                     {formatDecimalAr(p.total)}
-                  </TableCell>
-                  <TableCell className="align-top pt-2">
-                    {lines.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeLine(i)}
-                        className="text-muted-foreground hover:text-destructive text-xs"
-                        aria-label="Eliminar línea"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableScroll>
+                  </p>
+                </div>
+              </div>
+
+              {/* Row 3: variance justification */}
+              {showVarianceJustification && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Justificación desvío</Label>
+                  <Input
+                    value={line.varianceJustification ?? ""}
+                    onChange={(e) => update(i, "varianceJustification", e.target.value)}
+                    placeholder="Si supera presupuesto…"
+                    className="h-8 text-sm"
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       <div className="flex justify-end gap-8 text-sm border-t pt-3">
         <div className="text-right">

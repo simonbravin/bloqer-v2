@@ -1,24 +1,33 @@
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { DataTableSection } from "@/components/ui/data-table-section";
-import { PayableStatusBadge, PaymentTable } from "@/features/ap";
+import { PayableStatusBadge, PaymentTable, RegisterCompanyPaymentDialog } from "@/features/ap";
 import type { PaymentListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
-import { getCompanyPayableById, listPaymentsByPayable, canRegisterApPayment, ServiceError } from "@bloqer/services";
+import {
+  getCompanyPayableById,
+  listPaymentsByPayable,
+  listSelectableTreasuryAccounts,
+  canRegisterApPayment,
+  ServiceError,
+} from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ payableId: string }>;
+  searchParams: Promise<{ pagar?: string }>;
 }
 
-export default async function FinanzasPayableDetailPage({ params }: PageProps) {
+export default async function FinanzasPayableDetailPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { payableId } = await params;
+  const { pagar } = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -29,14 +38,42 @@ export default async function FinanzasPayableDetailPage({ params }: PageProps) {
   let payable;
   let payments;
   try {
-    [payable, payments] = await Promise.all([
+    const [payableResult, paymentsResult] = await Promise.all([
       getCompanyPayableById(payableId, ctx),
       listPaymentsByPayable(payableId, ctx),
     ]);
+    payable = payableResult;
+    payments = paymentsResult;
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
       notFound();
     throw err;
+  }
+
+  const canPay =
+    canRegisterApPayment(ctx.roles) &&
+    (payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE");
+
+  /** Only load treasury accounts when the dialog can actually open — avoid 404 if TREASURY is gated. */
+  let activeAccounts: { id: string; name: string; currency: string }[] = [];
+  if (canPay) {
+    try {
+      const accountsResult = await listSelectableTreasuryAccounts(ctx);
+      activeAccounts = accountsResult
+        .filter(
+          (a) =>
+            a.status === "ACTIVE" &&
+            (!ctx.companyId || !a.companyId || a.companyId === ctx.companyId),
+        )
+        .map((a) => ({
+          id: a.id,
+          name: a.name,
+          currency: a.currency,
+        }));
+    } catch (err) {
+      if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
+      // Detail remains usable; dialog will show empty-accounts messaging.
+    }
   }
 
   const paymentItems: PaymentListItem[] = payments.map((p) => ({
@@ -49,9 +86,8 @@ export default async function FinanzasPayableDetailPage({ params }: PageProps) {
     supplierInvoiceId: p.supplierInvoiceId,
   }));
 
-  const canPay =
-    canRegisterApPayment(ctx.roles) &&
-    (payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE");
+  const openPagarDeepLink = pagar === "1";
+  const blockedByStatus = payable.status === "PAID" || payable.status === "CANCELLED";
 
   return (
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={payable.supplierName}>
@@ -112,10 +148,22 @@ export default async function FinanzasPayableDetailPage({ params }: PageProps) {
 
       {canPay ? (
         <div className="flex justify-end">
-          <Button asChild>
-            <Link href={`/finanzas/cuentas-por-pagar/${payableId}/pagar`}>Registrar pago</Link>
-          </Button>
+          <Suspense fallback={<Button disabled>Registrar pago</Button>}>
+            <RegisterCompanyPaymentDialog
+              payableId={payableId}
+              payableBalance={payable.balanceDue}
+              payableCurrency={payable.currency}
+              accounts={activeAccounts}
+              defaultOpen={openPagarDeepLink}
+            />
+          </Suspense>
         </div>
+      ) : openPagarDeepLink && blockedByStatus ? (
+        <p className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+          Esta cuenta por pagar está en estado{" "}
+          <strong>{payable.status === "PAID" ? "pagada" : "cancelada"}</strong> y no admite nuevos
+          pagos.
+        </p>
       ) : payable.status === "OPEN" ||
         payable.status === "PARTIAL" ||
         payable.status === "OVERDUE" ? (

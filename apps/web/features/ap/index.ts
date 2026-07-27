@@ -17,6 +17,7 @@ export { PayableTable } from "./components/payable-table";
 export { PayableCards } from "./components/payable-cards";
 export { PayableListSection } from "./components/payable-list-section";
 export { PaymentForm } from "./components/payment-form";
+export { RegisterCompanyPaymentDialog } from "./components/register-company-payment-dialog";
 export type { PaymentListItem } from "./components/payment-list";
 export { PaymentTable } from "./components/payment-table";
 export { PaymentCards } from "./components/payment-cards";

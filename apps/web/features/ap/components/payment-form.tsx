@@ -29,6 +29,9 @@ interface Props {
   /** Project workspace */
   projectId?: string;
   companyFinanzas?: boolean;
+  variant?: "card" | "plain";
+  onCancel?: () => void;
+  onSuccess?: () => void;
 }
 
 export function PaymentForm({
@@ -38,6 +41,9 @@ export function PaymentForm({
   payableBalance,
   payableCurrency,
   accounts,
+  variant = "card",
+  onCancel,
+  onSuccess,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -90,6 +96,7 @@ export function PaymentForm({
         if ("error" in res) {
           setError(res.error);
         } else {
+          onSuccess?.();
           router.push(`/finanzas/pagos-proveedor/${res.id}`);
         }
         return;
@@ -101,24 +108,32 @@ export function PaymentForm({
       const res = await createPaymentAction(projectId, payload);
       if ("error" in res) {
         setError(res.error);
-        } else {
-          router.push(`/proyectos/${projectId}/pagos/${res.id}`);
-        }
+      } else {
+        onSuccess?.();
+        router.push(`/proyectos/${projectId}/pagos/${res.id}`);
+      }
     });
   }
 
   if (matchingAccounts.length === 0) {
     return (
-      <div className="rounded-lg border bg-card p-6">
+      <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
         <p className="text-sm text-muted-foreground">
           No hay cuentas de tesorería activas en {payableCurrency}. Cree una cuenta con esa moneda primero.
         </p>
+        {onCancel ? (
+          <div className="mt-4 flex justify-end">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cerrar
+            </Button>
+          </div>
+        ) : null}
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border bg-card p-6">
+    <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
@@ -181,7 +196,7 @@ export function PaymentForm({
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <Button type="button" variant="outline" onClick={onCancel ?? (() => router.back())}>
             Cancelar
           </Button>
           <Button type="submit" disabled={isPending}>

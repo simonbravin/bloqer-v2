@@ -12,18 +12,30 @@ const columnClass: Record<KpiStatGridColumns, string> = {
 export function KpiStatGrid({
   title = "Indicadores",
   columns = 4,
+  actions,
   children,
   className,
 }: {
   title?: string | null;
   columns?: KpiStatGridColumns;
+  /** Optional controls aligned with the section title (e.g. create buttons). */
+  actions?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
     <section className={cn("space-y-4", className)}>
-      {title ? (
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
+      {title || actions ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {title ? (
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {title}
+            </h2>
+          ) : (
+            <span />
+          )}
+          {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        </div>
       ) : null}
       <div className={cn("grid grid-cols-1 gap-4", columnClass[columns])}>{children}</div>
     </section>

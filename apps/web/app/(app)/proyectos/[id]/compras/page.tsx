@@ -64,32 +64,30 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
         title="Tablero de compras"
         subtitle="Documentos pendientes (SC → cotización → OC → recepción). El control de $ está en EDT y costos."
         actions={
-          <div className="flex flex-wrap gap-2">
-            {showMateriales ? (
-              <>
-                <Button asChild variant="outline">
-                  <Link href={`/proyectos/${projectId}/materiales`}>Materiales</Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href={`/proyectos/${projectId}/control-costos`}>EDT y costos</Link>
-                </Button>
-              </>
-            ) : null}
-            {canCreateSc ? (
+          showMateriales ? (
+            <div className="flex flex-wrap gap-2">
               <Button asChild variant="outline">
-                <Link href={`${hub.links.solicitudes}?create=1`}>Nueva solicitud</Link>
+                <Link href={`/proyectos/${projectId}/materiales`}>Materiales</Link>
               </Button>
-            ) : null}
-            {canCreateOc ? (
-              <Button asChild>
-                <Link href={`${hub.links.ordenes}?create=1`}>Nueva OC</Link>
+              <Button asChild variant="outline">
+                <Link href={`/proyectos/${projectId}/control-costos`}>EDT y costos</Link>
               </Button>
-            ) : null}
-          </div>
+            </div>
+          ) : null
         }
       />
 
-      <KpiStatGrid title="Solicitudes" columns={4}>
+      <KpiStatGrid
+        title="Solicitudes"
+        columns={4}
+        actions={
+          canCreateSc ? (
+            <Button asChild size="sm">
+              <Link href={`${hub.links.solicitudes}?create=1`}>Nueva solicitud</Link>
+            </Button>
+          ) : null
+        }
+      >
         <KpiStatCard
           label="Borradores"
           value={String(hub.purchaseRequests.openDraft)}
@@ -112,7 +110,17 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
         />
       </KpiStatGrid>
 
-      <KpiStatGrid title="Órdenes de compra" columns={4}>
+      <KpiStatGrid
+        title="Órdenes de compra"
+        columns={4}
+        actions={
+          canCreateOc ? (
+            <Button asChild size="sm">
+              <Link href={`${hub.links.ordenes}?create=1`}>Nueva OC</Link>
+            </Button>
+          ) : null
+        }
+      >
         <KpiStatCard
           label="Por enviar"
           value={String(hub.purchaseOrders.draft)}
