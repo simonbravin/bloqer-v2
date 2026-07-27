@@ -116,6 +116,12 @@ export function OverheadAllocationsPanel({
 
   return (
     <div className="space-y-6">
+      {error ? (
+        <p className="text-sm text-destructive rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2" role="alert">
+          {error}
+        </p>
+      ) : null}
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Método de imputación a obra</CardTitle>
@@ -155,7 +161,9 @@ export function OverheadAllocationsPanel({
               </SelectContent>
             </Select>
           </div>
-          <p className="text-xs text-muted-foreground w-full">Empresa: {settings.companyName}</p>
+          <p className="text-xs text-muted-foreground w-full">
+            Empresa: {settings.companyName}. El monto imputado impacta el margen neto del proyecto; no se mezcla con EDT y costos.
+          </p>
         </CardContent>
       </Card>
 
@@ -437,8 +445,6 @@ export function OverheadAllocationsPanel({
           </Card>
         </>
       )}
-
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>
   );
 }

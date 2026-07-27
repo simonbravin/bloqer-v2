@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { ProjectProfitabilityReport } from "@bloqer/services";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
@@ -17,6 +18,11 @@ type Props = {
   report: ProjectProfitabilityReport;
 };
 
+function ggDisplayCurrency(report: ProjectProfitabilityReport): string {
+  // AUTO_WEIGHT always ARS; MANUAL uses report currency (same as service).
+  return report.overheadManualAmount != null ? report.currency : "ARS";
+}
+
 export function ProfitabilitySummary({ report }: Props) {
   const gmTone =
     parseFloat(report.grossMargin) > 0
@@ -24,6 +30,9 @@ export function ProfitabilitySummary({ report }: Props) {
       : parseFloat(report.grossMargin) < 0
         ? "danger"
         : "muted";
+
+  const ggCurrency = ggDisplayCurrency(report);
+  const isAutoWeight = report.overheadManualAmount == null && report.overheadCalculatedAmount != null;
 
   return (
     <div className="space-y-4">
@@ -98,16 +107,11 @@ export function ProfitabilitySummary({ report }: Props) {
           <CardDescription>{report.netMarginNote}</CardDescription>
         </CardHeader>
         <CardContent className="text-sm space-y-2">
-          {report.netMarginAvailable && report.netMargin != null ? (
+          {report.overheadAmount != null ? (
             <>
               <p>
                 GG total imputado:{" "}
-                {report.overheadAmount != null
-                  ? formatMoneyAmount(
-                      report.overheadAmount,
-                      report.overheadManualAmount != null ? report.currency : "ARS",
-                    )
-                  : "—"}
+                {formatMoneyAmount(report.overheadAmount, ggCurrency)}
               </p>
               {report.overheadManualAmount != null &&
               parseFloat(report.overheadManualAmount) > 0 ? (
@@ -120,24 +124,31 @@ export function ProfitabilitySummary({ report }: Props) {
               parseFloat(report.overheadCalculatedAmount) > 0 ? (
                 <p className="text-muted-foreground">
                   ·{" "}
-                  {report.overheadManualAmount == null
-                    ? `Prorrateo por peso del CD${report.overheadCompanyPct ? ` (${report.overheadCompanyPct}% del pool)` : ""}`
+                  {isAutoWeight
+                    ? `Prorrateo por peso del CD${report.overheadCompanyPct ? ` (peso ${report.overheadCompanyPct}%)` : ""}`
                     : `${report.overheadCompanyPct ?? "0"}% empresa sobre CD devengado`}
                   :{" "}
-                  {formatMoneyAmount(
-                    report.overheadCalculatedAmount,
-                    report.overheadManualAmount != null ? report.currency : "ARS",
-                  )}
+                  {formatMoneyAmount(report.overheadCalculatedAmount, ggCurrency)}
                 </p>
               ) : null}
-              <p className="font-semibold">
-                Margen neto: {formatMoneyAmount(report.netMargin, report.currency)}
+              {report.netMarginAvailable && report.netMargin != null ? (
+                <p className="font-semibold">
+                  Margen neto: {formatMoneyAmount(report.netMargin, report.currency)}
+                </p>
+              ) : (
+                <p className="text-muted-foreground">
+                  Margen neto no disponible en esta vista (la moneda de los GG no coincide con la del reporte).
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground pt-1">
+                Los GG de empresa no aparecen en EDT y costos.{" "}
+                <Link href="/finanzas/gastos-generales" className="text-primary hover:underline">
+                  Ver imputación GG
+                </Link>
               </p>
             </>
           ) : (
-            <p className="text-muted-foreground">
-              {report.netMarginNote}
-            </p>
+            <p className="text-muted-foreground">{report.netMarginNote}</p>
           )}
         </CardContent>
       </Card>

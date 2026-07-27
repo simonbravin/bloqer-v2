@@ -61,8 +61,9 @@ export type ProjectProfitabilityEmpty = { type: "NO_APPROVED_BUDGETS" };
 
 export type ProjectProfitabilityResult = ProjectProfitabilityReport | ProjectProfitabilityEmpty;
 
+/** Net margin (R-004 / GG) — OWNER|ADMIN by default [D-013]. */
 function canViewNetMargin(roles: UserRole[]): boolean {
-  return roles.includes("OWNER") || roles.includes("ADMIN") || roles.includes("FINANCE");
+  return roles.includes("OWNER") || roles.includes("ADMIN");
 }
 
 function getDirectCost(
@@ -247,8 +248,8 @@ export async function getProjectProfitabilityReport(
   let overheadCalculatedAmount: string | null = null;
   let overheadCompanyPct: string | null = null;
   let netMarginNote = netAvailable
-    ? "Margen neto = margen bruto − GG imputados a la obra [D-040]."
-    : "Margen neto visible solo para OWNER, ADMIN o FINANCE [D-013].";
+    ? "Margen neto = margen bruto − GG imputados a la obra [D-040]. Los GG de empresa no entran en EDT y costos."
+    : "Margen neto (y GG imputados) visible solo para OWNER o ADMIN [D-013].";
 
   let netMarginAvailableFlag = false;
   if (netAvailable && project.companyId) {

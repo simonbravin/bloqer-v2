@@ -324,7 +324,13 @@ export async function sumAutoWeightOverheadForProject(
       continue;
     }
 
-    const context = await buildAutoWeightPeriodContext(companyId, period, ctx);
+    // D-043: live OPEN preview must match close rules (exclude DRAFT from CD weights).
+    const context = await buildAutoWeightPeriodContext(
+      companyId,
+      period,
+      ctx,
+      AUTO_WEIGHT_PERIOD_CLOSE_OPTS,
+    );
     const { allocatedAmount, weightPct } = allocateProjectFromContext(context, projectId);
     total = total.plus(new Prisma.Decimal(allocatedAmount));
     poolSum = poolSum.plus(context.pool);

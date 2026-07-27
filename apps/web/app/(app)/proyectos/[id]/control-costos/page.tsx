@@ -71,15 +71,15 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
         ? `${result.availableBudgets.length} presupuestos aprobados`
         : undefined;
 
+  const subtitleFull = subtitle
+    ? `${subtitle} · Costos directos de obra (OC, facturas, subcontratos, stock). Los GG de empresa van a Rentabilidad → margen neto.`
+    : "Costos directos de obra. Los GG de empresa no se imputan acá; se ven en Rentabilidad (margen neto).";
+
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Estructura de Desglose de Trabajo y Costos"
-        subtitle={
-          subtitle
-            ? `${subtitle} · Tablero de costos (Materiales y Compras alimentan este tablero).`
-            : "Tablero de costos del proyecto. Materiales y Compras alimentan este tablero."
-        }
+        subtitle={subtitleFull}
         actions={
           result.type === "REPORT" ? (
             <div className="flex flex-wrap items-center gap-2">

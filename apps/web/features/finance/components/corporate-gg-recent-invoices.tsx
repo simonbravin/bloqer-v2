@@ -30,7 +30,7 @@ export function CorporateGgRecentInvoices({ invoices }: Props) {
     <DataTableSection title="Últimas facturas corporativas">
       {invoices.length === 0 ? (
         <p className="text-sm text-muted-foreground px-1 py-4">
-          No hay facturas corporativas registradas.
+          No hay facturas corporativas emitidas recientes. Registrá gastos sin obra en Facturas proveedor.
         </p>
       ) : (
         <TableScroll>

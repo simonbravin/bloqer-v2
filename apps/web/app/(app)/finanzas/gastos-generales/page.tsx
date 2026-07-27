@@ -69,6 +69,7 @@ export default async function GastosGeneralesPage() {
 
   let overheadPanel: ReactNode = null;
   let periodSummaries: Awaited<ReturnType<typeof listOverheadPeriodSummaries>> = [];
+  let overheadLoadFailed = false;
 
   if (!companyId) {
     overheadPanel = (
@@ -110,15 +111,23 @@ export default async function GastosGeneralesPage() {
         />
       );
     } catch (err) {
-      if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
+      if (err instanceof ServiceError && err.code === "FORBIDDEN") {
+        overheadLoadFailed = true;
+      } else {
+        throw err;
+      }
     }
   }
 
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">Gastos generales</h1>
+          <p className="text-sm text-muted-foreground max-w-2xl">
+            Facturas corporativas (sin obra) e imputación a proyectos para margen neto.
+            Estos montos no se mezclan con EDT y costos de cada obra.
+          </p>
         </div>
       </div>
 
@@ -140,7 +149,13 @@ export default async function GastosGeneralesPage() {
 
       <CorporateGgRecentInvoices invoices={recentInvoices} />
 
-      {overheadPanel}
+      {overheadLoadFailed ? (
+        <p className="text-sm text-muted-foreground rounded-lg border bg-card p-4">
+          No tenés permisos para ver o editar la imputación de gastos generales a obra.
+        </p>
+      ) : (
+        overheadPanel
+      )}
     </PageShell>
   );
 }

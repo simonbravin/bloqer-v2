@@ -5,6 +5,8 @@ import { computeWeightShare } from "./overhead-period";
 
 /**
  * Regresión D-043: peso congelado debe ser estable (helper usado al cerrar período).
+ * Live OPEN allocation must use the same excludeDraftProjects rule as close/preview
+ * (see sumAutoWeightOverheadForProject → AUTO_WEIGHT_PERIOD_CLOSE_OPTS).
  */
 test("computeWeightShare matches auto-weight allocation ratio", () => {
   const cdProject = new Prisma.Decimal(300);
@@ -14,4 +16,9 @@ test("computeWeightShare matches auto-weight allocation ratio", () => {
   const allocated = pool.mul(cdProject).div(cdTotal);
   assert.equal(allocated.toFixed(2), "3000.00");
   assert.equal(weight.toFixed(2), "30.00");
+});
+
+test("AUTO_WEIGHT_PERIOD_CLOSE_OPTS excludes draft projects", async () => {
+  const { AUTO_WEIGHT_PERIOD_CLOSE_OPTS } = await import("./overhead-auto-weight.service");
+  assert.equal(AUTO_WEIGHT_PERIOD_CLOSE_OPTS.excludeDraftProjects, true);
 });

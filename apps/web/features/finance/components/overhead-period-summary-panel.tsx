@@ -36,6 +36,17 @@ export function OverheadPeriodSummaryPanel({ companyId, periods, canEdit }: Prop
     period: string,
     action: "close" | "reopen",
   ) {
+    if (action === "close") {
+      const ok = confirm(
+        `¿Cerrar el período ${period}? Se fijan los montos de GG por obra. Un proyecto nuevo no alterará este mes.`,
+      );
+      if (!ok) return;
+    } else {
+      const ok = confirm(
+        `¿Reabrir el período ${period}? Se eliminan los snapshots congelados y el prorrateo vuelve a ser dinámico.`,
+      );
+      if (!ok) return;
+    }
     startTransition(async () => {
       setError(null);
       const res =
