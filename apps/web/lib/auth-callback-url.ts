@@ -1,4 +1,17 @@
 /**
+ * Drop abandoned `/es` locale prefix (must not match paths like `/estado-resultados`).
+ * Returns null when the path has no legacy prefix.
+ */
+export function stripLegacyEsLocalePrefix(pathname: string): string | null {
+  if (pathname === "/es") return "/";
+  if (pathname.startsWith("/es/")) {
+    const stripped = pathname.slice(3);
+    return stripped.length > 0 ? stripped : "/";
+  }
+  return null;
+}
+
+/**
  * Sanitize post-login redirect targets from query params.
  * Only same-origin relative paths are allowed.
  */
@@ -10,7 +23,8 @@ export function safeCallbackUrl(raw: string | null | undefined): string {
   try {
     const parsed = new URL(trimmed, "http://bloqer.local");
     if (parsed.origin !== "http://bloqer.local") return "/dashboard";
-    const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    const pathname = stripLegacyEsLocalePrefix(parsed.pathname) ?? parsed.pathname;
+    const path = `${pathname}${parsed.search}${parsed.hash}`;
     return path.startsWith("/") ? path : "/dashboard";
   } catch {
     return "/dashboard";

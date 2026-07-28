@@ -1,5 +1,5 @@
 import { auth } from "@bloqer/auth/middleware";
-import { safeCallbackUrl } from "@/lib/auth-callback-url";
+import { safeCallbackUrl, stripLegacyEsLocalePrefix } from "@/lib/auth-callback-url";
 import { NextResponse } from "next/server";
 
 const PUBLIC_EXACT = new Set([
@@ -18,8 +18,18 @@ function isPublicPath(pathname: string): boolean {
 }
 
 export default auth((req) => {
-  const isAuthenticated = !!req.auth;
   const pathname = req.nextUrl.pathname;
+
+  // Strip abandoned `/es` locale prefix before auth/public checks (avoids
+  // `/es/login` → `/login?callbackUrl=/es/login` → post-login 404 loop).
+  const withoutLocale = stripLegacyEsLocalePrefix(pathname);
+  if (withoutLocale !== null) {
+    const url = req.nextUrl.clone();
+    url.pathname = withoutLocale;
+    return NextResponse.redirect(url);
+  }
+
+  const isAuthenticated = !!req.auth;
   const publicPath = isPublicPath(pathname);
 
   if (!isAuthenticated && !publicPath) {

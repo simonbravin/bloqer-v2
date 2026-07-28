@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: monorepoRoot,
   async redirects() {
     return [
+      // Abandoned i18n locale prefix — UI is es-AR only, no `/es` routes.
+      { source: "/es", destination: "/", permanent: true },
+      { source: "/es/:path*", destination: "/:path*", permanent: true },
       { source: "/tesoreria/reportes", destination: "/tesoreria", permanent: true },
       {
         source: "/tesoreria/reportes/posicion-caja",
