@@ -492,9 +492,9 @@ export function CostItemApuDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={requestClose}>
-        <DialogContent className="flex max-h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0 pr-12">
-          <div className="border-b px-5 py-3">
-            <DialogTitle className="pr-6 text-base">
+        <DialogContent className="flex max-h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
+          <div className="border-b px-5 py-3 pr-12">
+            <DialogTitle className="text-base">
               APU — Análisis de precio unitario
             </DialogTitle>
             <p className="mt-0.5 text-sm text-muted-foreground">
