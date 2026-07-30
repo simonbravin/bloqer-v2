@@ -19,16 +19,7 @@ import {
   createScheduledReportAction,
   updateScheduledReportAction,
 } from "@/app/(app)/configuracion/scheduled-report-actions";
-
-const TIMEZONE_OPTIONS = [
-  "America/Argentina/Buenos_Aires",
-  "America/Argentina/Cordoba",
-  "America/Argentina/Mendoza",
-  "America/Argentina/Salta",
-  "America/Argentina/Tucuman",
-  "America/Argentina/Ushuaia",
-  "UTC",
-] as const;
+import { listTenantTimezoneSelectOptions, resolveDisplayTimeZone } from "@bloqer/utils";
 
 const WEEKDAY_LABELS: Record<number, string> = {
   1: "Lunes",
@@ -124,7 +115,9 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
   const [timeOfDay, setTimeOfDay] = React.useState(
     props.initial?.timeOfDay?.slice(0, 5) ?? "08:00",
   );
-  const [timezone, setTimezone] = React.useState(props.initial?.timezone ?? props.defaultTimezone);
+  const [timezone, setTimezone] = React.useState(
+    resolveDisplayTimeZone(props.initial?.timezone ?? props.defaultTimezone),
+  );
   const [dateFrom, setDateFrom] = React.useState(props.initial?.params?.dateFrom ?? "");
   const [dateTo, setDateTo] = React.useState(props.initial?.params?.dateTo ?? "");
   const [currency, setCurrency] = React.useState(props.initial?.params?.currency ?? "");
@@ -133,6 +126,11 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
   );
   const [selectedRecipients, setSelectedRecipients] = React.useState<Set<string>>(
     () => new Set(props.initial?.recipientUserIds ?? []),
+  );
+
+  const timezoneOptions = React.useMemo(
+    () => listTenantTimezoneSelectOptions(timezone),
+    [timezone],
   );
 
   const catalog = scope === "TENANT" ? props.tenantCatalog : props.projectCatalog;
@@ -402,9 +400,9 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {TIMEZONE_OPTIONS.map((tz) => (
-                  <SelectItem key={tz} value={tz}>
-                    {tz}
+                {timezoneOptions.map((tz) => (
+                  <SelectItem key={tz.value} value={tz.value}>
+                    {tz.label}
                   </SelectItem>
                 ))}
               </SelectContent>

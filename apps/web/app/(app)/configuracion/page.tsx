@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { formatCurrencyDisplay } from "@/lib/format";
+import { formatTimezoneOptionLabel } from "@bloqer/utils";
 import {
   canEditTenantDisplaySettings,
   canReadTenantConfigArea,
@@ -76,7 +77,7 @@ export default async function ConfiguracionHomePage() {
           </div>
           <div>
             <p className="text-muted-foreground">Zona horaria</p>
-            <p>{tenant.timezone}</p>
+            <p>{formatTimezoneOptionLabel(tenant.timezone)}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Moneda base</p>

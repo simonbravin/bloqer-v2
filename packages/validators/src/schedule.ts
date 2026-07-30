@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { roundToDecimals } from "@bloqer/utils";
 
 export const scheduleItemStatusSchema = z.enum([
   "PLANNED",
@@ -29,6 +30,8 @@ export const createScheduleItemSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   sortOrder: z.number().int().min(0).optional(),
+  /** Optional leaf WBS (EDT) to link as primary after create. */
+  wbsNodeId: z.string().uuid().optional(),
 });
 
 export const updateScheduleItemDatesSchema = z.object({
@@ -36,17 +39,47 @@ export const updateScheduleItemDatesSchema = z.object({
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
 });
 
+/** Progress % — half-up to 2 dp (ScheduleItem.progressPct Decimal(5,2) / D-053). */
 export const updateScheduleItemProgressSchema = z.object({
-  progressPct: z.number().min(0).max(100),
+  progressPct: z
+    .union([z.number(), z.string()])
+    .transform((v) => roundToDecimals(v, 2))
+    .refine((v) => {
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 && n <= 100;
+    }, "Avance inválido (0–100)")
+    .transform((v) => Number(v)),
 });
 
 export const blockScheduleItemSchema = z.object({
   blockReason: z.string().min(1, "La causa es obligatoria").max(2000),
 });
 
-export const linkWbsNodesSchema = z.object({
-  wbsNodeIds: z.array(z.string().uuid()).min(1),
-  primaryWbsNodeId: z.string().uuid().optional(),
+export const linkWbsNodesSchema = z
+  .object({
+    wbsNodeIds: z.array(z.string().uuid()).min(1),
+    primaryWbsNodeId: z.string().uuid().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const unique = new Set(data.wbsNodeIds);
+    if (unique.size !== data.wbsNodeIds.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Hay partidas EDT duplicadas",
+        path: ["wbsNodeIds"],
+      });
+    }
+    if (data.primaryWbsNodeId && !unique.has(data.primaryWbsNodeId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La partida primaria debe estar en la lista vinculada",
+        path: ["primaryWbsNodeId"],
+      });
+    }
+  });
+
+export const unlinkWbsNodeSchema = z.object({
+  wbsNodeId: z.string().uuid(),
 });
 
 export const addScheduleDependencySchema = z.object({

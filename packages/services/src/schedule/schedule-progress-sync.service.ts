@@ -13,8 +13,6 @@ type TxClient = Omit<
   "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
 
-const HUNDRED = new Prisma.Decimal(100);
-
 async function sumApprovedPhysicalPct(
   projectId: string,
   wbsNodeId: string,
@@ -148,9 +146,8 @@ export async function syncScheduleProgressFromJobsiteLog(
   for (const wbsNodeId of wbsIds) {
     const pctDec = await resolveWbsPhysicalPct(projectId, wbsNodeId, jobsiteLogId, ctx, tx);
     if (!pctDec || pctDec.lessThanOrEqualTo(0)) continue;
-    if (pctDec.greaterThan(HUNDRED)) continue;
 
-    const pct = capSyncProgressPct(parseFloat(pctDec.toFixed(2)));
+    const pct = capSyncProgressPct(pctDec.toString());
     if (pct === null) continue;
 
     const links = await tx.scheduleItemWbsLink.findMany({
@@ -158,7 +155,10 @@ export async function syncScheduleProgressFromJobsiteLog(
         tenantId: ctx.tenantId,
         wbsNodeId,
         isPrimary: true,
-        scheduleItem: { scheduleId: schedule.id },
+        scheduleItem: {
+          scheduleId: schedule.id,
+          status: { not: "CANCELLED" },
+        },
       },
       include: { scheduleItem: true },
     });

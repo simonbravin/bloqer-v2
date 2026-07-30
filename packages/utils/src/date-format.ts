@@ -1,4 +1,6 @@
 /** Locale fijo para UI es-AR: fechas siempre dd/mm/yyyy. */
+import { resolveDisplayTimeZone } from "./timezones";
+
 const LOCALE = "es-AR";
 
 /** Fecha calendario local como YYYY-MM-DD (evita desfase UTC en issueDate/dueDate). */
@@ -35,11 +37,46 @@ function toDate(value: Date | string | number): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+export type FormatDateOptions = {
+  fallback?: string;
+  /** IANA timezone (e.g. America/Argentina/Buenos_Aires). Same on SSR and client. */
+  timeZone?: string;
+};
+
+function resolveFormatOptions(
+  fallbackOrOptions: string | FormatDateOptions | undefined,
+  defaultFallback: string,
+): { fallback: string; timeZone?: string } {
+  if (fallbackOrOptions == null) return { fallback: defaultFallback };
+  if (typeof fallbackOrOptions === "string") {
+    return { fallback: fallbackOrOptions };
+  }
+  return {
+    fallback: fallbackOrOptions.fallback ?? defaultFallback,
+    timeZone: fallbackOrOptions.timeZone,
+  };
+}
+
+function localeOptions(
+  base: Intl.DateTimeFormatOptions,
+  timeZone?: string,
+): Intl.DateTimeFormatOptions {
+  // When caller asks for a zone, always pin a valid IANA (never fall back to runtime TZ).
+  if (timeZone != null && timeZone !== "") {
+    return { ...base, timeZone: resolveDisplayTimeZone(timeZone) };
+  }
+  return base;
+}
+
 /** Fecha corta: dd/mm/yyyy */
-export function formatDate(value: Date | string | number | null | undefined, fallback = "—"): string {
+export function formatDate(
+  value: Date | string | number | null | undefined,
+  fallbackOrOptions: string | FormatDateOptions = "—",
+): string {
+  const { fallback, timeZone } = resolveFormatOptions(fallbackOrOptions, "—");
   const d = value == null ? null : toDate(value);
   if (!d) return fallback;
-  return d.toLocaleDateString(LOCALE, DATE_PARTS);
+  return d.toLocaleDateString(LOCALE, localeOptions(DATE_PARTS, timeZone));
 }
 
 /** Rango corto: dd/mm/yyyy → dd/mm/yyyy (para ISO strings y Date). */
@@ -51,21 +88,35 @@ export function formatDateRange(
   return `${formatDate(from)}${separator}${formatDate(to)}`;
 }
 
-/** Fecha y hora: dd/mm/yyyy, hh:mm */
-export function formatDateTime(value: Date | string | number | null | undefined, fallback = "—"): string {
+/** Fecha y hora: dd/mm/yyyy, hh:mm — pass `timeZone` so SSR and client match. */
+export function formatDateTime(
+  value: Date | string | number | null | undefined,
+  fallbackOrOptions: string | FormatDateOptions = "—",
+): string {
+  const { fallback, timeZone } = resolveFormatOptions(fallbackOrOptions, "—");
   const d = value == null ? null : toDate(value);
   if (!d) return fallback;
-  return d.toLocaleString(LOCALE, DATE_TIME_PARTS);
+  return d.toLocaleString(LOCALE, localeOptions(DATE_TIME_PARTS, timeZone));
 }
 
 /** Fecha larga para detalle: "lunes, 26 de mayo de 2026" */
-export function formatDateLong(value: Date | string | number | null | undefined, fallback = "—"): string {
+export function formatDateLong(
+  value: Date | string | number | null | undefined,
+  fallbackOrOptions: string | FormatDateOptions = "—",
+): string {
+  const { fallback, timeZone } = resolveFormatOptions(fallbackOrOptions, "—");
   const d = value == null ? null : toDate(value);
   if (!d) return fallback;
-  return d.toLocaleDateString(LOCALE, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return d.toLocaleDateString(
+    LOCALE,
+    localeOptions(
+      {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      },
+      timeZone,
+    ),
+  );
 }

@@ -10,6 +10,7 @@ import {
   type AuditUiModule,
 } from "@bloqer/domain";
 import { listTenantAuditLogFiltersSchema } from "@bloqer/validators";
+import { formatDateTime, formatTimezoneOptionLabel } from "@bloqer/utils";
 import { ServiceContext, ServiceError } from "../types";
 import {
   decodeAuditLogCursor,
@@ -24,6 +25,7 @@ import { resolveEntityIdsForProject } from "./audit-project-resolver";
 import { buildCsv } from "../report-exports/csv-export.service";
 import { safeReportFilename } from "../report-exports/filename.service";
 import type { ReportCsvPayload } from "../report-exports/report-export.types";
+import { getTenantDisplayTimezone } from "../tenant-settings/tenant-settings.service";
 
 export const MAX_TENANT_AUDIT_LOG_EXPORT_ROWS = 10_000;
 
@@ -420,15 +422,14 @@ export async function exportTenantAuditLogCsv(
   filters: Omit<ListTenantAuditLogFilters, "cursor" | "limit">,
   ctx: ServiceContext,
 ): Promise<ReportCsvPayload> {
-  const { rows: page, truncated } = await fetchTenantAuditLogForExport(
-    filters,
-    ctx,
-    MAX_TENANT_AUDIT_LOG_EXPORT_ROWS,
-  );
+  const [{ rows: page, truncated }, timeZone] = await Promise.all([
+    fetchTenantAuditLogForExport(filters, ctx, MAX_TENANT_AUDIT_LOG_EXPORT_ROWS),
+    getTenantDisplayTimezone(ctx),
+  ]);
 
   const headers = [
     "ID registro",
-    "Fecha (UTC)",
+    `Fecha (${formatTimezoneOptionLabel(timeZone)})`,
     "Usuario",
     "Email",
     "Módulo",
@@ -449,7 +450,7 @@ export async function exportTenantAuditLogCsv(
     const moduleLabel = r.module ? AUDIT_UI_MODULE_LABEL_ES[r.module] : "";
     return [
       r.id,
-      r.createdAt.toISOString(),
+      formatDateTime(r.createdAt, { timeZone }),
       r.actorLabel,
       r.actorEmail ?? "",
       moduleLabel,

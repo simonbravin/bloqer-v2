@@ -3,6 +3,7 @@
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
 import { Badge } from "@/components/ui/badge";
 import { formatDateAr } from "@/lib/gantt-date-format";
+import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
 import {
   STATUS_LABELS,
   primaryWbsLink,
@@ -11,15 +12,18 @@ import {
 } from "../adapters/schedule-view-types";
 import { ScheduleProgressDimensions } from "./schedule-progress-dimensions";
 import { ScheduleViewEmptyMessage } from "./schedule-empty-state";
+import { ScheduleMissingEdtBadge } from "./schedule-missing-edt-badge";
 
 export function ScheduleTableView({
   items,
   onSelect,
+  budgetCurrency = "ARS",
   filtersExcludeAll = false,
   unfilteredActiveCount = 0,
 }: {
   items: ScheduleWorkspaceItemDto[];
   onSelect: (item: ScheduleWorkspaceItemDto) => void;
+  budgetCurrency?: string;
   filtersExcludeAll?: boolean;
   unfilteredActiveCount?: number;
 }) {
@@ -31,6 +35,9 @@ export function ScheduleTableView({
       />
     );
   }
+
+  const money = (raw: string | undefined | null) =>
+    raw != null && raw !== "" ? formatMoneyAmount(raw, budgetCurrency) : "—";
 
   return (
     <div className="overflow-x-auto rounded-md border">
@@ -74,6 +81,7 @@ export function ScheduleTableView({
                     {primary && (
                       <span className="text-xs text-muted-foreground">{primary.wbsCode}</span>
                     )}
+                    <ScheduleMissingEdtBadge item={item} allItems={items} />
                   </div>
                 </td>
                 <td className="p-3">{STATUS_LABELS[item.status] ?? item.status}</td>
@@ -83,10 +91,10 @@ export function ScheduleTableView({
                   <ScheduleProgressDimensions item={item} compact />
                 </td>
                 <td className="p-3 text-right tabular-nums">
-                  {item.metrics?.budgetTotalCost ?? "—"}
+                  {money(item.metrics?.budgetTotalCost)}
                 </td>
                 <td className="p-3 text-right tabular-nums">
-                  {item.metrics?.committedCost ?? "—"}
+                  {money(item.metrics?.committedCost)}
                 </td>
                 <td className="p-3">
                   <div className="flex flex-wrap gap-1">
@@ -98,6 +106,11 @@ export function ScheduleTableView({
                     {item.metrics?.overBudget && (
                       <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-700 dark:text-amber-400">
                         Sobre PPTO
+                      </span>
+                    )}
+                    {item.metrics && isPositiveMoneyAmount(item.metrics.committedCost) && (
+                      <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-xs text-sky-800 dark:text-sky-300">
+                        Compras
                       </span>
                     )}
                   </div>

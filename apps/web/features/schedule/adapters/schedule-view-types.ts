@@ -175,7 +175,24 @@ export function mapScheduleItemsToCalendarFeatures(
 }
 
 export function primaryWbsLink(item: ScheduleWorkspaceItemDto) {
-  return item.wbsLinks.find((l) => l.isPrimary) ?? item.wbsLinks[0] ?? null;
+  return item.wbsLinks.find((l) => l.isPrimary) ?? null;
+}
+
+/** True when a leaf has no primary EDT — blocks Real sync (BR-SCH-004). */
+export function hasPrimaryWbsLink(item: ScheduleWorkspaceItemDto): boolean {
+  return item.wbsLinks.some((l) => l.isPrimary);
+}
+
+/**
+ * When no status filter is active, hide CANCELLED so all views match.
+ * When status=CANCELLED (or any status), server already scoped the list.
+ */
+export function filterScheduleItemsForDisplay(
+  items: ScheduleWorkspaceItemDto[],
+  statusFilter: string | null,
+): ScheduleWorkspaceItemDto[] {
+  if (statusFilter) return items;
+  return items.filter((i) => i.status !== "CANCELLED");
 }
 
 export function mapItemToKanbanCard(item: ScheduleWorkspaceItemDto): KanbanCard {
@@ -185,8 +202,12 @@ export function mapItemToKanbanCard(item: ScheduleWorkspaceItemDto): KanbanCard 
   }
   if (item.daysLate) badges.push(`Atrasado ${item.daysLate}d`);
   if (item.metrics?.overBudget) badges.push("Sobre presupuesto");
+  if (item.metrics?.committedCost && item.metrics.committedCost !== "0.00" && !item.metrics.committedCost.startsWith("-")) {
+    badges.push("Con compras");
+  }
   const primary = primaryWbsLink(item);
   if (primary) badges.push(primary.wbsCode);
+  else if (!hasPrimaryWbsLink(item)) badges.push("Sin EDT");
   return {
     id: item.id,
     name: item.name,

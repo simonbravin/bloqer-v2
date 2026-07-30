@@ -1,7 +1,8 @@
 import { prisma } from "@bloqer/database";
 import type { Prisma } from "@bloqer/database";
-import type { OverviewPermissionModule } from "@bloqer/domain";
+import { can, type OverviewPermissionModule } from "@bloqer/domain";
 import { OVERVIEW_MODULES } from "@bloqer/domain";
+import { resolveDisplayTimeZone } from "@bloqer/utils";
 import { updateTenantDisplaySettingsInputSchema, updateTenantPermissionMatrixNotesInputSchema } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
@@ -34,6 +35,23 @@ export type TenantSettingsView = {
   createdAt: Date;
   primaryCompany: TenantPrimaryCompanyView | null;
 };
+
+/**
+ * Tenant IANA timezone for display (audit log, exports).
+ * Allowed for config readers and audit viewers — does not require full settings access.
+ * Always returns a valid IANA id (falls back to product default).
+ */
+export async function getTenantDisplayTimezone(ctx: ServiceContext): Promise<string> {
+  if (!canReadTenantConfigArea(ctx.roles) && !can(ctx.roles, "VIEW", "AUDIT")) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para leer la zona horaria del tenant");
+  }
+  const row = await prisma.tenant.findFirst({
+    where: { id: ctx.tenantId },
+    select: { timezone: true },
+  });
+  if (!row) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
+  return resolveDisplayTimeZone(row.timezone);
+}
 
 export async function getTenantSettings(ctx: ServiceContext): Promise<TenantSettingsView> {
   if (!canReadTenantConfigArea(ctx.roles)) {

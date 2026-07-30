@@ -1,7 +1,7 @@
 import type { Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import type { ScheduleItemStatus, ScheduleItemType } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { sortTreeOrder } from "@bloqer/utils";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
@@ -26,6 +26,7 @@ import {
   statusChangeAuditAction,
 } from "./schedule-audit";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
+import { serializeProgressPct } from "./schedule-progress-sync-pure";
 
 const MS_PER_DAY = 86_400_000;
 
@@ -421,6 +422,8 @@ export async function createScheduleItem(
     startDate?: string | null;
     endDate?: string | null;
     sortOrder?: number;
+    /** Optional leaf WBS to link as primary (D-039). */
+    wbsNodeId?: string;
   },
   ctx: ServiceContext,
 ) {
@@ -436,6 +439,26 @@ export async function createScheduleItem(
       where: { id: input.parentId, scheduleId: schedule.id },
     });
     if (!parent) throw new ServiceError("NOT_FOUND", "Ítem padre no encontrado");
+  }
+
+  if (input.wbsNodeId) {
+    if (!schedule.baselineBudgetId) {
+      throw new ServiceError(
+        "VALIDATION",
+        "Definí un presupuesto base (importá desde presupuesto) antes de vincular EDT",
+      );
+    }
+    const node = await prisma.wbsNode.findFirst({
+      where: {
+        id: input.wbsNodeId,
+        budgetId: schedule.baselineBudgetId,
+        type: "ITEM",
+      },
+      select: { id: true },
+    });
+    if (!node) {
+      throw new ServiceError("NOT_FOUND", "La partida EDT no pertenece al presupuesto base");
+    }
   }
 
   const startDate = input.startDate ? parseDateOnly(input.startDate) : null;
@@ -459,6 +482,16 @@ export async function createScheduleItem(
         updatedBy: ctx.actorUserId,
       },
     });
+    if (input.wbsNodeId) {
+      await tx.scheduleItemWbsLink.create({
+        data: {
+          tenantId: ctx.tenantId,
+          scheduleItemId: row.id,
+          wbsNodeId: input.wbsNodeId,
+          isPrimary: true,
+        },
+      });
+    }
     await rollupScheduleContainerDatesInTx(schedule.id, ctx, tx);
     return row;
   });
@@ -468,8 +501,12 @@ export async function createScheduleItem(
     SCHEDULE_ITEM_ENTITY,
     created.id,
     undefined,
-    scheduleItemSnapshot(created),
+    {
+      ...scheduleItemSnapshot(created),
+      ...(input.wbsNodeId ? { wbsNodeId: input.wbsNodeId } : {}),
+    },
   );
+
   return created;
 }
 
@@ -601,11 +638,12 @@ export async function updateScheduleItemProgress(
     );
   }
 
-  const before = { progressPct: item.progressPct.toFixed(2) };
+  const before = { progressPct: serializeProgressPct(item.progressPct.toString()) };
+  const pct = serializeProgressPct(progressPct);
   const updated = await prisma.scheduleItem.update({
     where: { id: item.id },
     data: {
-      progressPct,
+      progressPct: pct,
       updatedBy: ctx.actorUserId,
     },
   });
@@ -615,7 +653,7 @@ export async function updateScheduleItemProgress(
     SCHEDULE_ITEM_ENTITY,
     item.id,
     before,
-    { progressPct: updated.progressPct.toFixed(2) },
+    { progressPct: serializeProgressPct(updated.progressPct.toString()) },
   );
   return updated;
 }
@@ -723,20 +761,32 @@ export async function linkWbsNodesToScheduleItem(
     throw new ServiceError("VALIDATION", "Definí un presupuesto base antes de vincular WBS");
   }
 
+  const uniqueWbsIds = [...new Set(wbsNodeIds)];
   const nodes = await prisma.wbsNode.findMany({
     where: {
-      id: { in: wbsNodeIds },
+      id: { in: uniqueWbsIds },
       budgetId: schedule.baselineBudgetId,
     },
   });
-  if (nodes.length !== wbsNodeIds.length) {
+  if (nodes.length !== uniqueWbsIds.length) {
     throw new ServiceError("NOT_FOUND", "Uno o más nodos WBS no pertenecen al presupuesto base");
   }
 
-  const primary = primaryWbsNodeId ?? wbsNodeIds[0]!;
+  if (primaryWbsNodeId && !uniqueWbsIds.includes(primaryWbsNodeId)) {
+    throw new ServiceError(
+      "VALIDATION",
+      "La partida primaria debe estar en la lista vinculada",
+    );
+  }
+  const primary = primaryWbsNodeId ?? uniqueWbsIds[0]!;
 
   await prisma.$transaction(async (tx) => {
-    for (const wbsNodeId of wbsNodeIds) {
+    // Demote all first so we never leave multiple or zero primaries mid-upsert.
+    await tx.scheduleItemWbsLink.updateMany({
+      where: { scheduleItemId },
+      data: { isPrimary: false },
+    });
+    for (const wbsNodeId of uniqueWbsIds) {
       await tx.scheduleItemWbsLink.upsert({
         where: {
           scheduleItemId_wbsNodeId: { scheduleItemId, wbsNodeId },
@@ -750,13 +800,6 @@ export async function linkWbsNodesToScheduleItem(
         update: { isPrimary: wbsNodeId === primary },
       });
     }
-    await tx.scheduleItemWbsLink.updateMany({
-      where: {
-        scheduleItemId,
-        wbsNodeId: { notIn: wbsNodeIds },
-      },
-      data: { isPrimary: false },
-    });
   });
 
   await auditSchedule(
@@ -765,7 +808,7 @@ export async function linkWbsNodesToScheduleItem(
     SCHEDULE_ITEM_ENTITY,
     scheduleItemId,
     undefined,
-    { wbsNodeIds, primaryWbsNodeId: primary },
+    { wbsNodeIds: uniqueWbsIds, primaryWbsNodeId: primary },
   );
 
   return prisma.scheduleItem.findUniqueOrThrow({
@@ -785,9 +828,31 @@ export async function unlinkWbsNodeFromScheduleItem(
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
   }
   await getScheduleItemForMutation(scheduleItemId, ctx);
-  await prisma.scheduleItemWbsLink.deleteMany({
-    where: { scheduleItemId, wbsNodeId },
+
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.scheduleItemWbsLink.findUnique({
+      where: { scheduleItemId_wbsNodeId: { scheduleItemId, wbsNodeId } },
+    });
+    if (!existing) return;
+
+    await tx.scheduleItemWbsLink.delete({
+      where: { scheduleItemId_wbsNodeId: { scheduleItemId, wbsNodeId } },
+    });
+
+    if (existing.isPrimary) {
+      const next = await tx.scheduleItemWbsLink.findFirst({
+        where: { scheduleItemId },
+        orderBy: { createdAt: "asc" },
+      });
+      if (next) {
+        await tx.scheduleItemWbsLink.update({
+          where: { id: next.id },
+          data: { isPrimary: true },
+        });
+      }
+    }
   });
+
   await auditSchedule(
     ctx,
     "schedule_item.wbs_unlinked",
@@ -931,6 +996,41 @@ export async function getScheduleLinkedWbsNodeIds(
   return [
     ...new Set(schedule.items.flatMap((i) => i.wbsLinks.map((l) => l.wbsNodeId))),
   ];
+}
+
+export type ScheduleLinkableWbsOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+/** Leaf EDT (WBS ITEM) nodes from the schedule baseline budget — for link pickers. */
+export async function listScheduleLinkableWbsOptions(
+  projectId: string,
+  ctx: ServiceContext,
+): Promise<ScheduleLinkableWbsOption[]> {
+  if (!canViewScheduleArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cronograma");
+  }
+  await assertProjectAccess(projectId, ctx);
+  const schedule = await prisma.schedule.findUnique({
+    where: { projectId },
+    select: { baselineBudgetId: true, tenantId: true },
+  });
+  if (!schedule || schedule.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Cronograma no encontrado");
+  }
+  if (!schedule.baselineBudgetId) return [];
+
+  const nodes = await prisma.wbsNode.findMany({
+    where: {
+      type: "ITEM",
+      budgetId: schedule.baselineBudgetId,
+    },
+    select: { id: true, code: true, name: true, parentId: true, sortOrder: true },
+  });
+  const ordered = sortTreeOrder(nodes, (a, b) => a.code.localeCompare(b.code, "es"));
+  return ordered.map((n) => ({ id: n.id, code: n.code, name: n.name }));
 }
 
 export { formatDateOnly, getScheduleForProject };

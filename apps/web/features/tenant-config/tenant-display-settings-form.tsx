@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { TenantPrimaryCompanyView, TenantSettingsView } from "@bloqer/services";
-import { formatCurrencyLabel } from "@bloqer/utils";
+import { formatCurrencyLabel, listTenantTimezoneSelectOptions, resolveDisplayTimeZone } from "@bloqer/utils";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,13 @@ type Props = {
 
 export function TenantDisplaySettingsForm({ tenant, company, action }: Props) {
   const [baseCurrency, setBaseCurrency] = useState(tenant.baseCurrency);
+  const safeTimezone = resolveDisplayTimeZone(tenant.timezone);
+  const timezoneInvalid =
+    Boolean(tenant.timezone?.trim()) && tenant.timezone.trim() !== safeTimezone;
+  const timezoneOptions = useMemo(
+    () => listTenantTimezoneSelectOptions(safeTimezone),
+    [safeTimezone],
+  );
 
   return (
     <form action={action} className="grid max-w-lg gap-6">
@@ -65,14 +72,31 @@ export function TenantDisplaySettingsForm({ tenant, company, action }: Props) {
         </div>
         <div className="grid gap-1">
           <Label htmlFor="timezone">Zona horaria</Label>
-          <Input
+          <select
             id="timezone"
             name="timezone"
-            defaultValue={tenant.timezone}
-            maxLength={64}
+            className={selectClassName}
+            defaultValue={safeTimezone}
             required
-            placeholder="America/Argentina/Buenos_Aires"
-          />
+          >
+            {timezoneOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          {timezoneInvalid ? (
+            <p className="text-xs text-destructive">
+              La zona guardada «{tenant.timezone}» no es válida. Se propone{" "}
+              {timezoneOptions.find((o) => o.value === safeTimezone)?.label ?? safeTimezone}. Guardá
+              para corregirla.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Se usa en el registro de actividad y reportes programados. Argentina (Buenos Aires) es{" "}
+              <span className="font-medium">GMT-3</span> todo el año (sin horario de verano).
+            </p>
+          )}
         </div>
         <div className="grid gap-1">
           <Label htmlFor="baseCurrency">Moneda base</Label>

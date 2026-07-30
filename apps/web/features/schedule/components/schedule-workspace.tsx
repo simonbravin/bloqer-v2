@@ -10,11 +10,15 @@ import { ScheduleGanttView } from "./schedule-gantt-view";
 import { ScheduleKanbanView } from "./schedule-kanban-view";
 import { ScheduleCalendarView } from "./schedule-calendar-view";
 import { ScheduleImportDialog } from "./schedule-import-dialog";
-import { ScheduleItemDialog } from "./schedule-item-dialog";
+import {
+  ScheduleItemDialog,
+  type ScheduleItemDialogTab,
+} from "./schedule-item-dialog";
 import { ScheduleFilters } from "./schedule-filters";
 import { ScheduleCreateDialog } from "./schedule-create-dialog";
 import { ScheduleProgressLegend } from "./schedule-progress-dimensions";
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
+import { filterScheduleItemsForDisplay } from "../adapters/schedule-view-types";
 
 type ViewId = "gantt" | "calendar" | "kanban" | "table";
 
@@ -25,9 +29,18 @@ const VIEWS: { id: ViewId; label: string }[] = [
   { id: "table", label: "Tabla" },
 ];
 
+const DIALOG_TABS: ScheduleItemDialogTab[] = ["detail", "deps", "history", "links"];
+
 function parseView(raw: string | null): ViewId {
   if (raw && VIEWS.some((v) => v.id === raw)) return raw as ViewId;
-  return "table";
+  return "gantt";
+}
+
+function parseDialogTab(raw: string | null): ScheduleItemDialogTab {
+  if (raw && DIALOG_TABS.includes(raw as ScheduleItemDialogTab)) {
+    return raw as ScheduleItemDialogTab;
+  }
+  return "detail";
 }
 
 export function ScheduleWorkspace({
@@ -41,15 +54,27 @@ export function ScheduleWorkspace({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const view = useMemo(() => parseView(searchParams.get("view")), [searchParams]);
+  const statusFilter = searchParams.get("status");
+  const dialogTab = useMemo(
+    () => parseDialogTab(searchParams.get("dialogTab")),
+    [searchParams],
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const items = workspace.items;
+  const items = useMemo(
+    () => filterScheduleItemsForDisplay(workspace.items, statusFilter),
+    [workspace.items, statusFilter],
+  );
+
   const filtersExcludeAll =
     workspace.summary.unfilteredActiveCount > 0 && items.length === 0;
 
   const hasActiveFilters =
     searchParams.get("status") != null || searchParams.get("delayedOnly") === "1";
+
+  const cancelledHidden =
+    !statusFilter && workspace.items.some((i) => i.status === "CANCELLED");
 
   function clearFilters() {
     const params = new URLSearchParams(searchParams.toString());
@@ -66,11 +91,13 @@ export function ScheduleWorkspace({
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   }
 
-  function selectItem(item: ScheduleWorkspaceItemDto) {
+  function selectItem(item: ScheduleWorkspaceItemDto, tab: ScheduleItemDialogTab = "detail") {
     setSelectedId(item.id);
     setDialogOpen(true);
     const params = new URLSearchParams(searchParams.toString());
     params.set("itemId", item.id);
+    if (tab === "detail") params.delete("dialogTab");
+    else params.set("dialogTab", tab);
     const q = params.toString();
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   }
@@ -81,6 +108,7 @@ export function ScheduleWorkspace({
       setSelectedId(null);
       const params = new URLSearchParams(searchParams.toString());
       params.delete("itemId");
+      params.delete("dialogTab");
       const q = params.toString();
       router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
     }
@@ -99,6 +127,7 @@ export function ScheduleWorkspace({
     }
     const params = new URLSearchParams(searchParams.toString());
     params.delete("itemId");
+    params.delete("dialogTab");
     const q = params.toString();
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   }, [itemIdParam, workspace.items, pathname, router, searchParams]);
@@ -122,6 +151,13 @@ export function ScheduleWorkspace({
             </Button>
           )}
         </div>
+      )}
+
+      {cancelledHidden && (
+        <p className="text-xs text-muted-foreground">
+          Las tareas canceladas están ocultas. Para verlas, filtrá por estado{" "}
+          <strong className="font-medium text-foreground">Cancelado</strong>.
+        </p>
       )}
 
       {workspace.baselineBudgetMismatch && (
@@ -172,7 +208,8 @@ export function ScheduleWorkspace({
       {view === "table" && (
         <ScheduleTableView
           items={items}
-          onSelect={selectItem}
+          onSelect={(item) => selectItem(item)}
+          budgetCurrency={workspace.budgetCurrency}
           filtersExcludeAll={filtersExcludeAll}
           unfilteredActiveCount={workspace.summary.unfilteredActiveCount}
         />
@@ -182,7 +219,8 @@ export function ScheduleWorkspace({
           projectId={projectId}
           workspace={workspace}
           items={items}
-          onSelect={selectItem}
+          onSelect={(item) => selectItem(item)}
+          onSelectWithTab={(item, tab) => selectItem(item, tab)}
           filtersExcludeAll={filtersExcludeAll}
           unfilteredActiveCount={workspace.summary.unfilteredActiveCount}
         />
@@ -192,7 +230,7 @@ export function ScheduleWorkspace({
           projectId={projectId}
           workspace={workspace}
           items={items}
-          onSelect={selectItem}
+          onSelect={(item) => selectItem(item)}
           filtersExcludeAll={filtersExcludeAll}
           unfilteredActiveCount={workspace.summary.unfilteredActiveCount}
         />
@@ -200,7 +238,7 @@ export function ScheduleWorkspace({
       {view === "calendar" && (
         <ScheduleCalendarView
           items={items}
-          onSelect={selectItem}
+          onSelect={(item) => selectItem(item)}
           filtersExcludeAll={filtersExcludeAll}
           unfilteredActiveCount={workspace.summary.unfilteredActiveCount}
         />
@@ -213,6 +251,7 @@ export function ScheduleWorkspace({
         allItems={workspace.items}
         open={dialogOpen}
         onOpenChange={closeDialog}
+        initialTab={dialogTab}
       />
     </div>
   );

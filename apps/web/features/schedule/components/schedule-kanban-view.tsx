@@ -33,6 +33,15 @@ const NEXT_STATUS: Partial<Record<ScheduleItemStatus, ScheduleItemStatus>> = {
   BLOCKED: "IN_PROGRESS",
 };
 
+/** Mirrors server ALLOWED transitions (schedule-helpers) for Kanban drops. */
+const KANBAN_ALLOWED: Record<ScheduleItemStatus, ScheduleItemStatus[]> = {
+  PLANNED: ["IN_PROGRESS", "BLOCKED", "CANCELLED"],
+  IN_PROGRESS: ["COMPLETED", "BLOCKED", "CANCELLED"],
+  BLOCKED: ["IN_PROGRESS", "CANCELLED"],
+  COMPLETED: [],
+  CANCELLED: [],
+};
+
 type KanbanRow = ReturnType<typeof mapItemToKanbanCard> & {
   id: string;
   name: string;
@@ -59,16 +68,15 @@ export function ScheduleKanbanView({
   const [pending, startTransition] = useTransition();
   const [blockTarget, setBlockTarget] = useState<ScheduleWorkspaceItemDto | null>(null);
 
-  const boardItems = useMemo(
-    () => items.filter((i) => i.status !== "CANCELLED"),
-    [items],
-  );
-  const cancelledCount = items.length - boardItems.length;
+  const boardItems = items;
 
-  const columns = useMemo(
-    () => COLUMNS.map((id) => ({ id, name: STATUS_LABELS[id] ?? id })),
-    [],
-  );
+  const columns = useMemo(() => {
+    const ids: ScheduleItemStatus[] = [...COLUMNS];
+    if (items.some((i) => i.status === "CANCELLED")) {
+      ids.push("CANCELLED");
+    }
+    return ids.map((id) => ({ id, name: STATUS_LABELS[id] ?? id }));
+  }, [items]);
 
   const cards = useMemo(() => boardItems.map((item) => mapItemToKanbanCard(item)), [boardItems]);
   const [data, setData] = useState<KanbanRow[]>(cards);
@@ -83,22 +91,12 @@ export function ScheduleKanbanView({
     setData(cards);
   }
 
-  if (items.length === 0) {
+  if (boardItems.length === 0) {
     return (
       <ScheduleViewEmptyMessage
         filtersExcludeAll={filtersExcludeAll}
         unfilteredActiveCount={unfilteredActiveCount}
       />
-    );
-  }
-
-  if (boardItems.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground py-8 text-center">
-        {cancelledCount === items.length
-          ? "Las tareas del listado están canceladas y no aparecen en el tablero Kanban."
-          : "No hay tareas activas para mostrar en el tablero."}
-      </p>
     );
   }
 
@@ -116,9 +114,10 @@ export function ScheduleKanbanView({
 
   function resolveTargetColumn(overId: string | undefined): ScheduleItemStatus | null {
     if (!overId) return null;
-    if (COLUMNS.includes(overId as ScheduleItemStatus)) return overId as ScheduleItemStatus;
+    const droppable: ScheduleItemStatus[] = [...COLUMNS, "CANCELLED"];
+    if (droppable.includes(overId as ScheduleItemStatus)) return overId as ScheduleItemStatus;
     const overCard = data.find((d) => d.id === overId);
-    if (overCard && COLUMNS.includes(overCard.column as ScheduleItemStatus)) {
+    if (overCard && droppable.includes(overCard.column as ScheduleItemStatus)) {
       return overCard.column as ScheduleItemStatus;
     }
     return null;
@@ -143,9 +142,27 @@ export function ScheduleKanbanView({
       return;
     }
 
+    if (target === "CANCELLED") {
+      queueMicrotask(syncDataFromServer);
+      toast.message("Para cancelar, abrí el detalle de la tarea.");
+      return;
+    }
+
+    if (target === "PLANNED") {
+      queueMicrotask(syncDataFromServer);
+      toast.message("No se puede volver a Planificado desde el tablero.");
+      return;
+    }
+
     if (target === "BLOCKED") {
       queueMicrotask(syncDataFromServer);
       setBlockTarget(item);
+      return;
+    }
+
+    if (!KANBAN_ALLOWED[item.status]?.includes(target)) {
+      queueMicrotask(syncDataFromServer);
+      toast.error(`Transición no permitida: ${STATUS_LABELS[item.status] ?? item.status} → ${STATUS_LABELS[target] ?? target}`);
       return;
     }
 
@@ -154,12 +171,6 @@ export function ScheduleKanbanView({
 
   return (
     <>
-      {cancelledCount > 0 && (
-        <p className="text-xs text-muted-foreground mb-2">
-          {cancelledCount} tarea{cancelledCount > 1 ? "s" : ""} cancelada
-          {cancelledCount > 1 ? "s" : ""} no aparece{cancelledCount > 1 ? "n" : ""} en el tablero.
-        </p>
-      )}
       <KanbanProvider
         className="auto-cols-[minmax(240px,1fr)]"
         columns={columns}

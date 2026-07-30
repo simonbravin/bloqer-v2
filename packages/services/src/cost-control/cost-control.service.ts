@@ -1,5 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { roundQty, roundToDecimals } from "@bloqer/utils";
 import { ServiceContext, ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
@@ -7,6 +8,11 @@ import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenan
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { computeCostExposureLayers } from "./cost-exposure";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
+
+function serializePct2(raw: string | number): string {
+  return roundToDecimals(raw, 2);
+}
 
 export { canViewProjectCostControlReport };
 export { computeCostExposureLayers } from "./cost-exposure";
@@ -740,25 +746,25 @@ export async function getProjectCostControl(
       wbsCode:   node.code,
       wbsName:   node.name,
       unit:      ci?.unit ?? "",
-      budgetQty:       bQty.toFixed(4),
-      budgetUnitCost:  bUCost.toFixed(4),
-      budgetTotalCost: bCost.toFixed(2),
-      budgetUnitSale:  bUSale.toFixed(4),
-      budgetTotalSale: bSale.toFixed(2),
-      certifiedIssued:   acc.certifiedIssued.toFixed(2),
-      certifiedApproved: acc.certifiedApproved.toFixed(2),
-      committedCost:         committed.toFixed(2),
-      receivedCost:          received.toFixed(2),
-      accruedCost:           accrued.toFixed(2),
-      paidCost:              acc.paidCost.toFixed(2),
-      inventoryConsumedCost: acc.inventoryConsumedCost.toFixed(2),
-      operationalProgressQty: acc.operationalProgressQty.toFixed(4),
-      submittedProgressQty:   acc.submittedProgressQty.toFixed(4),
-      openCommittedCost:    openCommitted.toFixed(2),
-      expectedCostExposure: expected.toFixed(2),
-      remainingBudgetCost:  remaining.toFixed(2),
-      costVariance:         variance.toFixed(2),
-      projectedMargin:      margin.toFixed(2),
+      budgetQty:       roundQty(bQty.toString()),
+      budgetUnitCost:  roundQty(bUCost.toString()),
+      budgetTotalCost: serializeMoneyDecimal(bCost),
+      budgetUnitSale:  roundQty(bUSale.toString()),
+      budgetTotalSale: serializeMoneyDecimal(bSale),
+      certifiedIssued:   serializeMoneyDecimal(acc.certifiedIssued),
+      certifiedApproved: serializeMoneyDecimal(acc.certifiedApproved),
+      committedCost:         serializeMoneyDecimal(committed),
+      receivedCost:          serializeMoneyDecimal(received),
+      accruedCost:           serializeMoneyDecimal(accrued),
+      paidCost:              serializeMoneyDecimal(acc.paidCost),
+      inventoryConsumedCost: serializeMoneyDecimal(acc.inventoryConsumedCost),
+      operationalProgressQty: roundQty(acc.operationalProgressQty.toString()),
+      submittedProgressQty:   roundQty(acc.submittedProgressQty.toString()),
+      openCommittedCost:    serializeMoneyDecimal(openCommitted),
+      expectedCostExposure: serializeMoneyDecimal(expected),
+      remainingBudgetCost:  serializeMoneyDecimal(remaining),
+      costVariance:         serializeMoneyDecimal(variance),
+      projectedMargin:      serializeMoneyDecimal(margin),
       flags,
     });
 
@@ -776,21 +782,21 @@ export async function getProjectCostControl(
   }
 
   const totals: CostControlTotals = {
-    budgetTotalCost:      totBudgetCost.toFixed(2),
-    budgetTotalSale:      totBudgetSale.toFixed(2),
-    certifiedIssued:      totAcc.certifiedIssued.toFixed(2),
-    certifiedApproved:    totAcc.certifiedApproved.toFixed(2),
-    committedCost:        totAcc.committedCost.toFixed(2),
-    receivedCost:         totAcc.receivedCost.toFixed(2),
-    accruedCost:          totAcc.accruedCost.toFixed(2),
-    paidCost:             totAcc.paidCost.toFixed(2),
-    inventoryConsumedCost: totAcc.inventoryConsumedCost.toFixed(2),
-    operationalProgressQty: totAcc.operationalProgressQty.toFixed(4),
-    openCommittedCost:    totOpenCommitted.toFixed(2),
-    expectedCostExposure: totExpected.toFixed(2),
-    remainingBudgetCost:  totRemaining.toFixed(2),
-    costVariance:         totVariance.toFixed(2),
-    projectedMargin:      totMargin.toFixed(2),
+    budgetTotalCost:      serializeMoneyDecimal(totBudgetCost),
+    budgetTotalSale:      serializeMoneyDecimal(totBudgetSale),
+    certifiedIssued:      serializeMoneyDecimal(totAcc.certifiedIssued),
+    certifiedApproved:    serializeMoneyDecimal(totAcc.certifiedApproved),
+    committedCost:        serializeMoneyDecimal(totAcc.committedCost),
+    receivedCost:         serializeMoneyDecimal(totAcc.receivedCost),
+    accruedCost:          serializeMoneyDecimal(totAcc.accruedCost),
+    paidCost:             serializeMoneyDecimal(totAcc.paidCost),
+    inventoryConsumedCost: serializeMoneyDecimal(totAcc.inventoryConsumedCost),
+    operationalProgressQty: roundQty(totAcc.operationalProgressQty.toString()),
+    openCommittedCost:    serializeMoneyDecimal(totOpenCommitted),
+    expectedCostExposure: serializeMoneyDecimal(totExpected),
+    remainingBudgetCost:  serializeMoneyDecimal(totRemaining),
+    costVariance:         serializeMoneyDecimal(totVariance),
+    projectedMargin:      serializeMoneyDecimal(totMargin),
   };
 
   return {
@@ -802,11 +808,11 @@ export async function getProjectCostControl(
     availableBudgets: validBudgets,
     rows,
     totals,
-    unallocatedCommittedCost:        unalloc.committedCost.toFixed(2),
-    unallocatedReceivedCost:         unalloc.receivedCost.toFixed(2),
-    unallocatedAccruedCost:          unalloc.accruedCost.toFixed(2),
-    unallocatedPaidCost:             unalloc.paidCost.toFixed(2),
-    unallocatedInventoryConsumedCost: unalloc.inventoryConsumedCost.toFixed(2),
+    unallocatedCommittedCost:        serializeMoneyDecimal(unalloc.committedCost),
+    unallocatedReceivedCost:         serializeMoneyDecimal(unalloc.receivedCost),
+    unallocatedAccruedCost:          serializeMoneyDecimal(unalloc.accruedCost),
+    unallocatedPaidCost:             serializeMoneyDecimal(unalloc.paidCost),
+    unallocatedInventoryConsumedCost: serializeMoneyDecimal(unalloc.inventoryConsumedCost),
     warnings,
     sectionsExcluded,
   };
@@ -1023,7 +1029,7 @@ export async function getWbsItemCostDetail(
         invoiceNumber: row.invoice.number,
         status: row.invoice.status,
         issueDate: row.invoice.issueDate,
-        totalAmount: row.invoice.totalAmount.toFixed(2),
+        totalAmount: serializeMoneyDecimal(row.invoice.totalAmount),
         purchaseOrderId: row.invoice.purchaseOrderId,
       });
     }
@@ -1035,7 +1041,7 @@ export async function getWbsItemCostDetail(
         invoiceNumber: inv.number,
         status: inv.status,
         issueDate: inv.issueDate,
-        totalAmount: inv.totalAmount.toFixed(2),
+        totalAmount: serializeMoneyDecimal(inv.totalAmount),
         purchaseOrderId: inv.purchaseOrderId,
       });
     }
@@ -1064,16 +1070,16 @@ export async function getWbsItemCostDetail(
     wbsNodeId, wbsCode: node.code, wbsName: node.name,
     budgetItem: ci ? {
       unit: ci.unit,
-      quantity: ci.quantity.toFixed(4),
-      unitCostDirect: ci.unitCostDirect.toFixed(4),
-      totalCostDirect: ci.totalCostDirect.toFixed(2),
-      unitSalePrice: ci.unitSalePrice.toFixed(4),
-      totalSalePrice: ci.totalSalePrice.toFixed(2),
+      quantity: roundQty(ci.quantity.toString()),
+      unitCostDirect: roundQty(ci.unitCostDirect.toString()),
+      totalCostDirect: serializeMoneyDecimal(ci.totalCostDirect),
+      unitSalePrice: roundQty(ci.unitSalePrice.toString()),
+      totalSalePrice: serializeMoneyDecimal(ci.totalSalePrice),
     } : null,
     certificationLines: certLines.map((cl) => ({
       certNumber: cl.certification.number,
       certStatus: cl.certification.status,
-      periodAmount: cl.periodAmount.toFixed(2),
+      periodAmount: serializeMoneyDecimal(cl.periodAmount),
       periodStart: cl.certification.periodStart,
       periodEnd: cl.certification.periodEnd,
     })),
@@ -1082,10 +1088,10 @@ export async function getWbsItemCostDetail(
       poNumber: pol.purchaseOrder.number,
       poStatus: pol.purchaseOrder.status,
       description: pol.description,
-      quantity: pol.quantity.toFixed(4),
-      unitPrice: pol.unitPrice.toFixed(4),
-      lineTotal: pol.lineTotal.toFixed(2),
-      receivedQty: pol.receivedQuantity.toFixed(4),
+      quantity: roundQty(pol.quantity.toString()),
+      unitPrice: serializeMoneyDecimal(pol.unitPrice),
+      lineTotal: serializeMoneyDecimal(pol.lineTotal),
+      receivedQty: roundQty(pol.receivedQuantity.toString()),
     })),
     subcontractLines: subLines.map((sl) => ({
       subcontractId: sl.subcontract.id,
@@ -1093,25 +1099,25 @@ export async function getWbsItemCostDetail(
       subcontractTitle: sl.subcontract.title,
       subcontractStatus: sl.subcontract.status,
       description: sl.description,
-      quantity: sl.quantity.toFixed(4),
-      unitPrice: sl.unitPrice.toFixed(4),
-      lineTotal: sl.lineTotal.toFixed(2),
-      certifiedQuantity: sl.certifiedQuantity.toFixed(4),
+      quantity: roundQty(sl.quantity.toString()),
+      unitPrice: serializeMoneyDecimal(sl.unitPrice),
+      lineTotal: serializeMoneyDecimal(sl.lineTotal),
+      certifiedQuantity: roundQty(sl.certifiedQuantity.toString()),
     })),
     subcontractCertLines: subCertLines2.map((scl) => ({
       certId: scl.certification.id,
       subcontractId: scl.certification.subcontractId,
       certNumber: scl.certification.number,
       certStatus: scl.certification.status,
-      currentQty: scl.currentQty.toFixed(4),
-      lineTotal: scl.lineTotal.toFixed(2),
+      currentQty: roundQty(scl.currentQty.toString()),
+      lineTotal: serializeMoneyDecimal(scl.lineTotal),
       certificationDate: scl.certification.certificationDate,
     })),
     supplierInvoices,
     payments: paymentRows.map((p) => ({
       paymentId: p.id,
       paymentDate: p.paymentDate,
-      amount: p.amount.toFixed(2),
+      amount: serializeMoneyDecimal(p.amount),
       status: p.status,
       invoiceId: p.supplierInvoice.id,
       invoiceNumber: p.supplierInvoice.number,
@@ -1119,17 +1125,17 @@ export async function getWbsItemCostDetail(
     stockMovements: stockMoves.map((sm) => ({
       id: sm.id,
       movementDate: sm.movementDate,
-      quantity: sm.quantity.toFixed(4),
-      unitCost: sm.unitCost?.toFixed(4) ?? null,
-      totalCost: sm.totalCost?.toFixed(2) ?? null,
+      quantity: roundQty(sm.quantity.toString()),
+      unitCost: sm.unitCost != null ? serializeMoneyDecimal(sm.unitCost) : null,
+      totalCost: sm.totalCost != null ? serializeMoneyDecimal(sm.totalCost) : null,
       sourceType: sm.sourceType,
     })),
     jobsiteProgress: logProgress.map((p) => ({
       logId: p.jobsiteLog.id,
       logDate: p.jobsiteLog.logDate,
       logStatus: p.jobsiteLog.status,
-      quantityCompleted: p.quantityCompleted.toFixed(4),
-      physicalPct: p.physicalPct?.toFixed(2) ?? null,
+      quantityCompleted: roundQty(p.quantityCompleted.toString()),
+      physicalPct: p.physicalPct != null ? serializePct2(p.physicalPct.toString()) : null,
     })),
   };
 }

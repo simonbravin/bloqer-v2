@@ -57,10 +57,13 @@ export function AuditLogDetailDialog({
   detail,
   open,
   closeHref,
+  timeZone,
 }: {
   detail: AuditLogDetailView | null;
   open: boolean;
   closeHref: string;
+  /** Tenant IANA timezone — must match the registro table (SSR/client parity). */
+  timeZone: string;
 }) {
   const router = useRouter();
 
@@ -83,7 +86,7 @@ export function AuditLogDetailDialog({
             <DialogHeader>
               <DialogTitle>{detail.actionLabel}</DialogTitle>
               <DialogDescription>
-                {formatDateTime(detail.createdAt)}
+                {formatDateTime(detail.createdAt, { timeZone })}
                 {detail.module ? ` · ${AUDIT_UI_MODULE_LABEL_ES[detail.module as AuditUiModule]}` : ""}
               </DialogDescription>
             </DialogHeader>

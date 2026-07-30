@@ -17,6 +17,7 @@
     "@bloqer/domain": "workspace:*",
     "@bloqer/email": "workspace:*",
     "@bloqer/services": "workspace:*",
+    "@bloqer/utils": "workspace:*",
     "@bloqer/validators": "workspace:*",
     "@react-pdf/renderer": "^4",
     "react": "^19"

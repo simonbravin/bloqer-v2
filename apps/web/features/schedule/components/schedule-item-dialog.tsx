@@ -36,8 +36,10 @@ import {
   addScheduleDependencyAction,
   copyProgressFromPhysicalAction,
   getScheduleItemContextAction,
+  linkWbsNodesToScheduleItemAction,
   listScheduleItemAuditAction,
   removeScheduleDependencyAction,
+  unlinkWbsNodeFromScheduleItemAction,
   updateScheduleItemDatesAction,
   updateScheduleItemNameAction,
   updateScheduleItemProgressAction,
@@ -45,7 +47,10 @@ import {
 } from "../actions/schedule-actions";
 import { STATUS_LABELS, primaryWbsLink, scheduleItemHasActiveChildren } from "../adapters/schedule-view-types";
 import { formatDateAr } from "@/lib/gantt-date-format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { ScheduleCancelDialog } from "./schedule-cancel-dialog";
+import { ScheduleWbsPicker } from "./schedule-wbs-picker";
+import { ScheduleMissingEdtBadge } from "./schedule-missing-edt-badge";
 
 const CATEGORY_LABELS: Record<string, string> = {
   MATERIAL: "Materiales",
@@ -55,6 +60,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   OTHER: "Otros",
 };
 
+export type ScheduleItemDialogTab = "detail" | "deps" | "history" | "links";
+
 export function ScheduleItemDialog({
   projectId,
   workspace,
@@ -62,6 +69,7 @@ export function ScheduleItemDialog({
   allItems,
   open,
   onOpenChange,
+  initialTab = "detail",
 }: {
   projectId: string;
   workspace: ScheduleWorkspaceDto;
@@ -69,6 +77,7 @@ export function ScheduleItemDialog({
   allItems: ScheduleWorkspaceItemDto[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialTab?: ScheduleItemDialogTab;
 }) {
   const router = useRouter();
   const item = itemId ? allItems.find((i) => i.id === itemId) ?? null : null;
@@ -77,10 +86,11 @@ export function ScheduleItemDialog({
   const [audit, setAudit] = useState<ScheduleItemAuditEntryView[]>([]);
   const [context, setContext] = useState<ScheduleItemContextDto | null>(null);
   const [predecessorPick, setPredecessorPick] = useState("");
+  const [wbsPick, setWbsPick] = useState("");
   const [progressInput, setProgressInput] = useState("");
   const [startDateInput, setStartDateInput] = useState("");
   const [endDateInput, setEndDateInput] = useState("");
-  const [tab, setTab] = useState<"detail" | "history" | "links">("detail");
+  const [tab, setTab] = useState<ScheduleItemDialogTab>(initialTab);
   const [cancelOpen, setCancelOpen] = useState(false);
 
   const depCandidates = useMemo(() => {
@@ -96,10 +106,19 @@ export function ScheduleItemDialog({
   );
 
   useEffect(() => {
+    if (!open) return;
+    setTab(initialTab);
+  }, [open, initialTab, itemId]);
+
+  const wbsLinksKey =
+    item?.wbsLinks.map((l) => `${l.wbsNodeId}:${l.isPrimary ? "1" : "0"}`).join("|") ?? "";
+
+  useEffect(() => {
     if (!open || !item) return;
     setProgressInput(item.progressPct);
     setStartDateInput(item.startDate ?? "");
     setEndDateInput(item.endDate ?? "");
+    setWbsPick("");
     startTransition(async () => {
       const [auditRes, ctxRes] = await Promise.all([
         listScheduleItemAuditAction(item.id),
@@ -110,10 +129,19 @@ export function ScheduleItemDialog({
       if ("context" in ctxRes) setContext(ctxRes.context);
       else setContext(null);
     });
-  }, [open, item?.id, projectId]);
+  }, [
+    open,
+    item?.id,
+    item?.progressPct,
+    item?.startDate,
+    item?.endDate,
+    wbsLinksKey,
+    projectId,
+  ]);
 
   const m = item?.metrics;
   const primaryWbs = item ? primaryWbsLink(item) : null;
+  const linkedIds = item?.wbsLinks.map((l) => l.wbsNodeId) ?? [];
   const predItems = (item?.predecessorDependencies ?? [])
     .map((d) => {
       const task = allItems.find((i) => i.id === d.predecessorId);
@@ -123,6 +151,7 @@ export function ScheduleItemDialog({
   const succItems = (item?.successorIds ?? [])
     .map((id) => allItems.find((i) => i.id === id))
     .filter(Boolean) as ScheduleWorkspaceItemDto[];
+
   function copyPhysical() {
     const pct = m?.operationalProgressPct;
     if (!pct) {
@@ -203,6 +232,50 @@ export function ScheduleItemDialog({
     });
   }
 
+  function linkWbs() {
+    if (!wbsPick || !item) return;
+    const nextIds = [...new Set([...linkedIds, wbsPick])];
+    startTransition(async () => {
+      const res = await linkWbsNodesToScheduleItemAction(projectId, item.id, {
+        wbsNodeIds: nextIds,
+        primaryWbsNodeId: wbsPick,
+      });
+      if ("error" in res) toast.error(res.error);
+      else {
+        toast.success("Partida EDT vinculada (primaria)");
+        setWbsPick("");
+        router.refresh();
+      }
+    });
+  }
+
+  function unlinkWbs(wbsNodeId: string) {
+    if (!item) return;
+    startTransition(async () => {
+      const res = await unlinkWbsNodeFromScheduleItemAction(projectId, item.id, { wbsNodeId });
+      if ("error" in res) toast.error(res.error);
+      else {
+        toast.success("Vínculo EDT eliminado");
+        router.refresh();
+      }
+    });
+  }
+
+  function setPrimaryWbs(wbsNodeId: string) {
+    if (!item || linkedIds.length === 0) return;
+    startTransition(async () => {
+      const res = await linkWbsNodesToScheduleItemAction(projectId, item.id, {
+        wbsNodeIds: linkedIds,
+        primaryWbsNodeId: wbsNodeId,
+      });
+      if ("error" in res) toast.error(res.error);
+      else {
+        toast.success("Partida primaria actualizada");
+        router.refresh();
+      }
+    });
+  }
+
   function confirmCancelItem() {
     startTransition(async () => {
       const res = await cancelScheduleItemAction(projectId, item!.id);
@@ -235,12 +308,20 @@ export function ScheduleItemDialog({
     });
   }
 
+  const money = (raw: string | undefined | null) =>
+    raw != null && raw !== ""
+      ? formatMoneyAmount(raw, workspace.budgetCurrency)
+      : "—";
+
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{item?.name ?? "Tarea"}</DialogTitle>
+          <DialogTitle className="flex flex-wrap items-center gap-2">
+            <span>{item?.name ?? "Tarea"}</span>
+            {item ? <ScheduleMissingEdtBadge item={item} allItems={allItems} /> : null}
+          </DialogTitle>
           <DialogDescription>
             {item ? (
               <>
@@ -255,6 +336,7 @@ export function ScheduleItemDialog({
           {(
             [
               ["detail", "Detalle"],
+              ["deps", "Dependencias"],
               ["history", "Historial"],
               ["links", "Integraciones"],
             ] as const
@@ -282,6 +364,10 @@ export function ScheduleItemDialog({
               <h3 className="font-medium">Cuatro dimensiones de avance (BR-SCH-002 / D-045)</h3>
               <ScheduleProgressDimensions item={item} />
               <ScheduleProgressLegend />
+              <p className="text-xs text-muted-foreground">
+                Solo <strong className="font-medium text-foreground">Real</strong> se edita o
+                sincroniza desde el libro. Plan (t), Cant. y Cert. son de solo lectura.
+              </p>
             </section>
 
             <section className="space-y-2">
@@ -325,7 +411,7 @@ export function ScheduleItemDialog({
               {item.blockReason && (
                 <p className="text-destructive">Bloqueo: {item.blockReason}</p>
               )}
-              {workspace.canEdit && (
+              {workspace.canEdit && !isContainer && (
                 <div className="flex gap-2 items-end pt-2">
                   <div className="space-y-1 flex-1">
                     <Label className="text-xs">Avance real %</Label>
@@ -342,6 +428,11 @@ export function ScheduleItemDialog({
                     Guardar
                   </Button>
                 </div>
+              )}
+              {isContainer && (
+                <p className="text-xs text-muted-foreground pt-1">
+                  El avance real se registra en las subtareas hoja (no en contenedores).
+                </p>
               )}
             </section>
 
@@ -364,16 +455,113 @@ export function ScheduleItemDialog({
               </section>
             )}
 
+            <section className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-medium">EDT enlazado</h3>
+                <ScheduleMissingEdtBadge item={item} allItems={allItems} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                La partida <strong className="font-medium text-foreground">primaria</strong>{" "}
+                sincroniza el avance Real al aprobar el libro y alimenta costos/certificados.
+              </p>
+              {item.wbsLinks.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Sin partidas vinculadas.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {item.wbsLinks.map((link) => (
+                    <li
+                      key={link.wbsNodeId}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded border px-2 py-1.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate">
+                          {link.wbsCode} — {link.wbsName}
+                          {link.isPrimary ? (
+                            <span className="ml-1 text-[10px] text-primary">(primaria)</span>
+                          ) : null}
+                        </p>
+                        <div className="flex flex-wrap gap-2 mt-0.5">
+                          <Button variant="link" className="h-auto p-0 text-xs" asChild>
+                            <Link href={`/proyectos/${projectId}/control-costos/${link.wbsNodeId}`}>
+                              EDT y costos
+                            </Link>
+                          </Button>
+                          <Button variant="link" className="h-auto p-0 text-xs" asChild>
+                            <Link
+                              href={`/proyectos/${projectId}/libro-obra?wbsNodeId=${link.wbsNodeId}`}
+                            >
+                              Libro de obra
+                            </Link>
+                          </Button>
+                        </div>
+                      </div>
+                      {workspace.canEdit && (
+                        <div className="flex shrink-0 gap-1">
+                          {!link.isPrimary && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              className="h-7 text-xs"
+                              disabled={pending}
+                              onClick={() => setPrimaryWbs(link.wbsNodeId)}
+                            >
+                              Primaria
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs"
+                            disabled={pending}
+                            onClick={() => unlinkWbs(link.wbsNodeId)}
+                          >
+                            Quitar
+                          </Button>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {workspace.canEdit && !isContainer && (
+                <div className="flex gap-2 items-end pt-1">
+                  <div className="flex-1">
+                    <ScheduleWbsPicker
+                      projectId={projectId}
+                      value={wbsPick}
+                      onValueChange={setWbsPick}
+                      disabled={pending}
+                      label="Vincular partida"
+                      excludeIds={linkedIds}
+                    />
+                  </div>
+                  <Button size="sm" disabled={pending || !wbsPick} onClick={linkWbs}>
+                    Vincular
+                  </Button>
+                </div>
+              )}
+            </section>
+
             {m && (
               <section className="space-y-2">
                 <h3 className="font-medium">Presupuesto vs real</h3>
+                <p className="text-xs text-muted-foreground">
+                  Comprometido refleja OC confirmadas y subcontratos (solo lectura). Certificado ($)
+                  proviene de certificaciones emitidas.
+                </p>
                 <dl className="grid grid-cols-2 gap-2">
                   <dt className="text-muted-foreground">Presupuestado</dt>
-                  <dd className="text-right tabular-nums">{m.budgetTotalCost}</dd>
+                  <dd className="text-right tabular-nums">{money(m.budgetTotalCost)}</dd>
                   <dt className="text-muted-foreground">Comprometido</dt>
-                  <dd className="text-right tabular-nums">{m.committedCost}</dd>
+                  <dd className="text-right tabular-nums">{money(m.committedCost)}</dd>
+                  <dt className="text-muted-foreground">Devengado</dt>
+                  <dd className="text-right tabular-nums">{money(m.accruedCost)}</dd>
+                  <dt className="text-muted-foreground">Pagado</dt>
+                  <dd className="text-right tabular-nums">{money(m.paidCost)}</dd>
                   <dt className="text-muted-foreground">Certificado ($)</dt>
-                  <dd className="text-right tabular-nums">{m.certifiedApproved}</dd>
+                  <dd className="text-right tabular-nums">{money(m.certifiedApproved)}</dd>
                 </dl>
                 <div className="space-y-1 pt-2">
                   {(
@@ -381,50 +569,48 @@ export function ScheduleItemDialog({
                   ).map((key) => (
                     <div key={key} className="flex justify-between text-xs">
                       <span>{CATEGORY_LABELS[key]}</span>
-                      <span className="tabular-nums">{m.costByCategory[key]}</span>
+                      <span className="tabular-nums">{money(m.costByCategory[key])}</span>
                     </div>
                   ))}
                 </div>
               </section>
             )}
 
-            {primaryWbs && (
-              <section>
-                <h3 className="font-medium mb-2">WBS enlazado</h3>
-                <p className="text-muted-foreground">
-                  {primaryWbs.wbsCode} — {primaryWbs.wbsName}
-                </p>
-                <div className="flex flex-col items-start gap-1">
-                  <Button variant="link" className="h-auto p-0" asChild>
-                    <Link href={`/proyectos/${projectId}/control-costos/${primaryWbs.wbsNodeId}`}>
-                      Ver en control de costos
-                    </Link>
-                  </Button>
-                  <Button variant="link" className="h-auto p-0" asChild>
-                    <Link
-                      href={`/proyectos/${projectId}/libro-obra?wbsNodeId=${primaryWbs.wbsNodeId}`}
-                    >
-                      Ver partes en libro de obra
-                    </Link>
-                  </Button>
-                </div>
-              </section>
-            )}
-
-            {workspace.canEdit && m?.operationalProgressPct && (
+            {workspace.canEdit && !isContainer && m?.operationalProgressPct && (
               <Button size="sm" variant="secondary" disabled={pending} onClick={copyPhysical}>
                 Copiar avance por cantidad (operativo)
               </Button>
             )}
 
-            {workspace.canEdit && context?.jobsitePhysicalPctCumulative && (
+            {workspace.canEdit && !isContainer && context?.jobsitePhysicalPctCumulative && (
               <Button size="sm" variant="secondary" disabled={pending} onClick={copyJobsitePhysicalPct}>
                 Copiar % físico acumulado ({context.jobsitePhysicalPctCumulative}%)
               </Button>
             )}
 
+            {workspace.canEdit &&
+              item.status !== "CANCELLED" &&
+              item.status !== "COMPLETED" && (
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={pending}
+                onClick={() => setCancelOpen(true)}
+              >
+                Cancelar tarea
+              </Button>
+            )}
+          </div>
+        )}
+
+        {item && tab === "deps" && (
+          <div className="space-y-4 text-sm mt-4">
             <section className="space-y-2">
-              <h3 className="font-medium">Dependencias (FS)</h3>
+              <h3 className="font-medium">Dependencias Finish-to-Start (FS)</h3>
+              <p className="text-xs text-muted-foreground">
+                Las violaciones FS se guardan con advertencia (no bloquean). Editá vínculos acá; en
+                el Gantt las flechas son de solo lectura.
+              </p>
               {predItems.length === 0 ? (
                 <p className="text-muted-foreground text-xs">Sin predecesoras</p>
               ) : (
@@ -474,17 +660,6 @@ export function ScheduleItemDialog({
                 </div>
               )}
             </section>
-
-            {workspace.canEdit && item.status !== "CANCELLED" && (
-              <Button
-                size="sm"
-                variant="destructive"
-                disabled={pending}
-                onClick={() => setCancelOpen(true)}
-              >
-                Cancelar tarea
-              </Button>
-            )}
           </div>
         )}
 
@@ -537,7 +712,10 @@ export function ScheduleItemDialog({
               )}
             </section>
             <section>
-              <h3 className="font-medium mb-2">Certificaciones</h3>
+              <h3 className="font-medium mb-2">Certificaciones (solo lectura)</h3>
+              <p className="text-xs text-muted-foreground mb-2">
+                No actualizan el avance Real del cronograma (BR-SCH-002).
+              </p>
               {!context?.certificationEntries.length ? (
                 <p className="text-muted-foreground text-xs">Sin líneas certificadas en el WBS.</p>
               ) : (
@@ -547,7 +725,7 @@ export function ScheduleItemDialog({
                       <Link href={c.href} className="text-primary hover:underline">
                         Cert. #{c.certificationNumber} ({c.status})
                       </Link>
-                      <span className="tabular-nums">{c.periodAmount}</span>
+                      <span className="tabular-nums">{money(c.periodAmount)}</span>
                     </li>
                   ))}
                 </ul>

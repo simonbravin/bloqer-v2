@@ -1,4 +1,5 @@
 import { OVERVIEW_MODULE_KEYS_FOR_ZOD } from "@bloqer/domain";
+import { isValidIanaTimeZone } from "@bloqer/utils";
 import { z } from "zod";
 
 /** ISO 4217 codes supported in UI (`AMERICAS_CURRENCY_OPTIONS` in `@bloqer/utils`). */
@@ -40,7 +41,12 @@ const userRoleEnum = z.enum([
 export const updateTenantDisplaySettingsInputSchema = z.object({
   /** Shown across the app (tenant display name); not the legal company name. */
   name: z.string().trim().min(1, "El nombre a mostrar es obligatorio").max(120),
-  timezone: z.string().trim().min(1).max(64),
+  timezone: z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .refine(isValidIanaTimeZone, "Zona horaria inválida (usá una zona IANA, ej. America/Argentina/Buenos_Aires)"),
   baseCurrency: americasCurrencyCodeSchema,
   address: z.string().trim().min(1).max(500).optional(),
   city: z.string().trim().min(1).max(120).optional(),

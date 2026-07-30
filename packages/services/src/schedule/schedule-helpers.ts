@@ -1,6 +1,8 @@
 import { Prisma } from "@bloqer/database";
 import type { ScheduleItemStatus } from "@bloqer/database";
+import { divideDecimal, multiplyDecimal } from "@bloqer/utils";
 import { ServiceError } from "../types";
+import { serializeProgressPct } from "./schedule-progress-sync-pure";
 
 const MS_PER_DAY = 86_400_000;
 
@@ -238,12 +240,18 @@ const ALLOWED: Record<ScheduleItemStatus, ScheduleItemStatus[]> = {
   CANCELLED: [],
 };
 
+export function isScheduleStatusTransitionAllowed(
+  from: ScheduleItemStatus,
+  to: ScheduleItemStatus,
+): boolean {
+  return ALLOWED[from]?.includes(to) ?? false;
+}
+
 export function assertScheduleStatusTransition(
   from: ScheduleItemStatus,
   to: ScheduleItemStatus,
 ): void {
-  const next = ALLOWED[from];
-  if (!next?.includes(to)) {
+  if (!isScheduleStatusTransitionAllowed(from, to)) {
     throw new ServiceError(
       "VALIDATION",
       `Transición de estado no permitida: ${from} → ${to}`,
@@ -276,7 +284,9 @@ export function computeTimePlanProgressPct(
   if (total <= 0) return now >= t1 ? "100.00" : "0.00";
   if (now <= t0) return "0.00";
   if (now >= t1) return "100.00";
-  return new Prisma.Decimal(now - t0).div(total).mul(100).toFixed(2);
+  return serializeProgressPct(
+    divideDecimal(multiplyDecimal(String(now - t0), "100"), String(total), 2),
+  );
 }
 
 export const ZERO_DEC = new Prisma.Decimal(0);
@@ -300,8 +310,16 @@ export function checkFinishStartViolations(
 
   for (const pred of predecessors) {
     if (!pred.endDate || !itemStart) continue;
-    const pEnd = pred.endDate.getTime();
-    const sStart = itemStart.getTime();
+    const pEnd = Date.UTC(
+      pred.endDate.getUTCFullYear(),
+      pred.endDate.getUTCMonth(),
+      pred.endDate.getUTCDate(),
+    );
+    const sStart = Date.UTC(
+      itemStart.getUTCFullYear(),
+      itemStart.getUTCMonth(),
+      itemStart.getUTCDate(),
+    );
     if (sStart < pEnd) {
       warnings.push(
         `Dependencia FS: el inicio de esta tarea es anterior al fin de «${pred.name}».`,
@@ -311,7 +329,17 @@ export function checkFinishStartViolations(
 
   for (const succ of successors) {
     if (!itemEnd || !succ.startDate) continue;
-    if (succ.startDate.getTime() < itemEnd.getTime()) {
+    const iEnd = Date.UTC(
+      itemEnd.getUTCFullYear(),
+      itemEnd.getUTCMonth(),
+      itemEnd.getUTCDate(),
+    );
+    const sStart = Date.UTC(
+      succ.startDate.getUTCFullYear(),
+      succ.startDate.getUTCMonth(),
+      succ.startDate.getUTCDate(),
+    );
+    if (sStart < iEnd) {
       warnings.push(
         `Dependencia FS: «${succ.name}» inicia antes del fin de esta tarea.`,
       );

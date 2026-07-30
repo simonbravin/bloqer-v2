@@ -9,9 +9,10 @@ import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { canEditScheduleArea, canViewScheduleArea } from "./schedule-access";
-import { computeDaysLate, formatDateOnly, ZERO_DEC, computeTimePlanProgressPct, isScheduleLeafItem, mergeDerivedContainerDatesIntoDtos } from "./schedule-helpers";
+import { computeDaysLate, formatDateOnly, computeTimePlanProgressPct, isScheduleLeafItem, mergeDerivedContainerDatesIntoDtos } from "./schedule-helpers";
 import { ensureScheduleForProject } from "./schedule.service";
-import { sortTreeOrder } from "@bloqer/utils";
+import { addDecimal, divideDecimal, multiplyDecimal, serializeMoney, sortTreeOrder } from "@bloqer/utils";
+import { serializeProgressPct } from "./schedule-progress-sync-pure";
 
 export type ScheduleWorkspaceFilters = {
   budgetId?: string;
@@ -79,6 +80,8 @@ export type ScheduleWorkspaceDto = {
   budgetId: string;
   budgetName: string;
   budgetStatus: string;
+  /** ISO currency of the budget used for schedule item cost metrics (baseline when linked). */
+  budgetCurrency: string;
   availableBudgets: AvailableBudget[];
   canEdit: boolean;
   items: ScheduleWorkspaceItemDto[];
@@ -131,7 +134,7 @@ function emptyMetrics(): ScheduleItemMetricsDto {
 }
 
 function addDecStrings(a: string, b: string): string {
-  return new Prisma.Decimal(a).add(new Prisma.Decimal(b)).toFixed(2);
+  return serializeMoney(addDecimal(a, b));
 }
 
 function aggregateMetricsFromRows(rows: CostControlRow[]): ScheduleItemMetricsDto {
@@ -156,15 +159,20 @@ function aggregateMetricsFromRows(rows: CostControlRow[]): ScheduleItemMetricsDt
   }
 
   if (totalBudgetQty.gt(0)) {
-    m.operationalProgressPct = totalOpQty.div(totalBudgetQty).mul(100).toFixed(2);
+    m.operationalProgressPct = serializeProgressPct(
+      divideDecimal(
+        multiplyDecimal(totalOpQty.toString(), "100"),
+        totalBudgetQty.toString(),
+        2,
+      ),
+    );
   }
 
-  const sale = new Prisma.Decimal(m.budgetTotalSale);
-  if (sale.gt(0)) {
-    m.certifiedProgressPct = new Prisma.Decimal(m.certifiedApproved)
-      .div(sale)
-      .mul(100)
-      .toFixed(2);
+  const sale = m.budgetTotalSale;
+  if (sale !== "0.00" && !sale.startsWith("-")) {
+    m.certifiedProgressPct = serializeProgressPct(
+      divideDecimal(multiplyDecimal(m.certifiedApproved, "100"), sale, 2),
+    );
   }
   return m;
 }
@@ -193,9 +201,11 @@ async function loadCostByCategoryForWbs(
     const bucket = map.get(wbsId);
     if (!bucket) continue;
     const cat = line.category as keyof ScheduleCostByCategory;
-    // [D-059] partida money = totalCost × CostItem.quantity
-    const partida = new Prisma.Decimal(line.totalCost).mul(line.costItem.quantity);
-    bucket[cat] = new Prisma.Decimal(bucket[cat]).add(partida).toFixed(2);
+    // [D-059] partida money = totalCost × CostItem.quantity — round money at 2 dp (D-053)
+    const partida = serializeMoney(
+      multiplyDecimal(line.totalCost.toString(), line.costItem.quantity.toString()),
+    );
+    bucket[cat] = serializeMoney(addDecimal(bucket[cat], partida));
   }
   return map;
 }
@@ -205,7 +215,7 @@ function mergeCategoryTotals(
   source: ScheduleCostByCategory,
 ): void {
   for (const k of Object.keys(target) as (keyof ScheduleCostByCategory)[]) {
-    target[k] = new Prisma.Decimal(target[k]).add(new Prisma.Decimal(source[k])).toFixed(2);
+    target[k] = serializeMoney(addDecimal(target[k], source[k]));
   }
 }
 
@@ -243,7 +253,25 @@ export async function getProjectScheduleWorkspace(
   }
   const baselineBudgetMismatch = baselineBudgetId !== cc.budgetId;
 
-  const costRowByWbs = new Map(cc.rows.map((r) => [r.wbsNodeId, r]));
+  /** WBS links live on the baseline budget — join cost rows there so committed/cert don't show fake zeros. */
+  let metricsCc = cc;
+  if (baselineBudgetMismatch && baselineBudgetId) {
+    const baselineCc = await getProjectCostControl(
+      projectId,
+      { budgetId: baselineBudgetId },
+      ctx,
+    );
+    if (baselineCc.type === "REPORT") {
+      metricsCc = baselineCc;
+    }
+  }
+  const costRowByWbs = new Map(metricsCc.rows.map((r) => [r.wbsNodeId, r]));
+
+  const metricsBudget = await prisma.budget.findUnique({
+    where: { id: metricsCc.budgetId },
+    select: { currency: true },
+  });
+  const budgetCurrency = metricsBudget?.currency ?? "ARS";
 
   const unfilteredActiveCount = await prisma.scheduleItem.count({
     where: {
@@ -300,38 +328,45 @@ export async function getProjectScheduleWorkspace(
 
     let metrics: ScheduleItemMetricsDto | null = null;
     if (wbsLinks.length > 0) {
-      const primary =
-        wbsLinks.find((l) => l.isPrimary) ?? wbsLinks[0]!;
       const linkedRows = wbsLinks
         .map((l) => costRowByWbs.get(l.wbsNodeId))
         .filter((r): r is CostControlRow => r !== undefined);
 
-      metrics = linkedRows.length > 0
-        ? aggregateMetricsFromRows(linkedRows)
-        : emptyMetrics();
+      if (linkedRows.length > 0) {
+        metrics = aggregateMetricsFromRows(linkedRows);
 
-      const catTotals: ScheduleCostByCategory = { ...EMPTY_CATEGORY };
-      for (const link of wbsLinks) {
-        const cats = categoryByWbs.get(link.wbsNodeId);
-        if (cats) mergeCategoryTotals(catTotals, cats);
-      }
-      metrics.costByCategory = catTotals;
+        const catTotals: ScheduleCostByCategory = { ...EMPTY_CATEGORY };
+        for (const link of wbsLinks) {
+          const cats = categoryByWbs.get(link.wbsNodeId);
+          if (cats) mergeCategoryTotals(catTotals, cats);
+        }
+        metrics.costByCategory = catTotals;
 
-      if (linkedRows.length === 1) {
-        const r = linkedRows[0]!;
-        const qty = new Prisma.Decimal(r.budgetQty);
-        const op = new Prisma.Decimal(r.operationalProgressQty);
-        metrics.operationalProgressPct = qty.gt(0)
-          ? op.div(qty).mul(100).toFixed(2)
-          : null;
-        const sale = new Prisma.Decimal(r.budgetTotalSale);
-        if (sale.gt(0)) {
-          metrics.certifiedProgressPct = new Prisma.Decimal(r.certifiedApproved)
-            .div(sale)
-            .mul(100)
-            .toFixed(2);
+        if (linkedRows.length === 1) {
+          const r = linkedRows[0]!;
+          const qtyDec = new Prisma.Decimal(r.budgetQty);
+          const saleDec = new Prisma.Decimal(r.budgetTotalSale);
+          metrics.operationalProgressPct = qtyDec.gt(0)
+            ? serializeProgressPct(
+                divideDecimal(
+                  multiplyDecimal(r.operationalProgressQty, "100"),
+                  r.budgetQty,
+                  2,
+                ),
+              )
+            : null;
+          if (saleDec.gt(0)) {
+            metrics.certifiedProgressPct = serializeProgressPct(
+              divideDecimal(
+                multiplyDecimal(r.certifiedApproved, "100"),
+                r.budgetTotalSale,
+                2,
+              ),
+            );
+          }
         }
       }
+      // linked but no cost rows (orphan WBS ids) → metrics stay null; never fabricate zeros
     }
 
     dtoItems.push({
@@ -345,7 +380,7 @@ export async function getProjectScheduleWorkspace(
       startDate: formatDateOnly(item.startDate),
       endDate: formatDateOnly(item.endDate),
       durationDays: item.durationDays,
-      progressPct: item.progressPct.toFixed(2),
+      progressPct: serializeProgressPct(item.progressPct.toString()),
       timePlanPct: computeTimePlanProgressPct(
         formatDateOnly(item.startDate),
         formatDateOnly(item.endDate),
@@ -380,19 +415,21 @@ export async function getProjectScheduleWorkspace(
     if (computeDaysLate(i.endDate, i.status) !== null) delayedItems += 1;
   }
 
-  let weighted = ZERO_DEC;
-  let weightSum = ZERO_DEC;
+  let weighted = "0";
+  let weightSum = "0";
   for (const i of fullActive) {
     if (!fullLeafIds.has(i.id)) continue;
-    const dur = i.durationDays && i.durationDays > 0
-      ? new Prisma.Decimal(i.durationDays)
-      : new Prisma.Decimal(1);
-    weighted = weighted.add(new Prisma.Decimal(i.progressPct).mul(dur));
-    weightSum = weightSum.add(dur);
+    const dur =
+      i.durationDays && i.durationDays > 0 ? String(i.durationDays) : "1";
+    weighted = addDecimal(
+      weighted,
+      multiplyDecimal(i.progressPct.toString(), dur),
+    );
+    weightSum = addDecimal(weightSum, dur);
   }
-  const scheduleProgressPct = weightSum.gt(0)
-    ? weighted.div(weightSum).toFixed(2)
-    : null;
+  const scheduleProgressPct = new Prisma.Decimal(weightSum).greaterThan(0)
+      ? serializeProgressPct(divideDecimal(weighted, weightSum, 2))
+      : null;
 
   return {
     type: "WORKSPACE",
@@ -403,6 +440,7 @@ export async function getProjectScheduleWorkspace(
     budgetId: cc.budgetId,
     budgetName: cc.budgetName,
     budgetStatus: cc.budgetStatus,
+    budgetCurrency,
     availableBudgets: cc.availableBudgets,
     canEdit: canEditScheduleArea(ctx.roles),
     items: sortTreeOrder(dtoItems, (a, b) => a.name.localeCompare(b.name, "es")),

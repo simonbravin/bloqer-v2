@@ -423,29 +423,32 @@ stateDiagram-v2
 
 ### 7.0 Procedimiento — Armar el cronograma
 
-1. Abrir Cronograma. Vistas: Gantt (`?view=gantt`), Calendario, Kanban, Tabla.
+1. Abrir Cronograma. Vista por defecto: **Gantt** (`?view=gantt`). También: Calendario, Kanban, Tabla.
 2. (Recomendado) **Importar desde presupuesto** → diálogo **Importar WBS al cronograma** → elegir presupuesto aprobado → **Importar**. Así las tareas nacen alineadas a la EDT.
-3. Completar fechas en ítems **hoja** (no en contenedores: sus fechas se derivan).
-4. Crear ítems adicionales con **Nueva tarea o hito** (`TASK` o `MILESTONE`).
-5. Dependencias: solo **Finish‑to‑Start (FS)**; violaciones = advertencias, no bloqueos.
-6. En cada tarea crítica: vincular nodos EDT (uno **primario**) para sync de avance real y KPIs.
+3. Completar fechas en ítems **hoja** (no en contenedores: sus fechas se derivan; usar **Recalcular contenedores** en el Gantt si hace falta). En Gantt: arrastrar/redimensionar barras y **hitos**.
+4. Crear ítems adicionales con **+ Tarea / hito** (`TASK` o `MILESTONE`). Opcional: vincular partida EDT al crear.
+5. Dependencias: solo **Finish‑to‑Start (FS)** en la pestaña **Dependencias** del detalle (o botón **FS** en el Gantt). Violaciones = advertencias al guardar fechas, no bloqueos. Las flechas del Gantt son de solo lectura.
+6. En cada tarea crítica: vincular nodos EDT (uno **primario**) desde el detalle — sin vínculo aparece el chip **Sin EDT** (no hay sync Real ni métricas de costo/cert).
 7. Revisar si aparece aviso de **baselineBudgetMismatch** (presupuesto base del cronograma ≠ el aprobado actual).
+8. Las tareas **canceladas** están ocultas por defecto en las cuatro vistas; filtrá estado **Cancelado** para verlas.
 
 **Estados de ítem:** `PLANNED` · `IN_PROGRESS` · `BLOCKED` · `COMPLETED` · `CANCELLED` (Kanban por estado).
 
 > **📷 Captura sugerida — Cronograma Gantt**  
-> Ruta: `/proyectos/[id]/cronograma?view=gantt` · Tareas + hitos · Tip: 5–8 ítems alcanzan.
+> Ruta: `/proyectos/[id]/cronograma` (default Gantt) o `?view=gantt` · Tareas + hitos · Tip: 5–8 ítems alcanzan.
 
 ### 7.1 Cuatro dimensiones de avance (no confundir)
 
-En detalle de tarea / tabla aparecen como **Real / plan t. / cant. / cert.**:
+En detalle de tarea / tabla / Gantt aparecen como **Real / plan t. / cant. / cert.**:
 
 | Dimensión | Fuente | Quién la mueve |
 |-----------|--------|----------------|
 | **Real** | `ScheduleItem.progressPct` | Libro de obra **aprobado** (o ajuste manual **Avance real %** del PM) |
 | **Plan (tiempo)** | Fechas vs. hoy | Automático |
 | **Cantidades** | Cantidades físicas vs. presupuesto | Libro de obra |
-| **Certificado** | Certificaciones emitidas | Módulo Certificaciones |
+| **Certificado** | Certificaciones emitidas | Módulo Certificaciones (solo lectura en cronograma) |
+
+En el Gantt: relleno oscuro de la barra = **Real**; franja/borde ámbar = **Cert.** Comprometido (compras / OC confirmadas) se ve en sidebar, tabla y bloque «Presupuesto vs real» del detalle cuando hay EDT vinculado.
 
 ---
 

@@ -2,11 +2,26 @@
 
 import { useId, useMemo } from "react";
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
-import { getOffset, useGanttLayout } from "@/components/kibo-ui/gantt";
+import { getOffset, useGanttLayout, type Range, type TimelineData } from "@/components/kibo-ui/gantt";
 import type { ScheduleGanttEntry } from "../adapters/schedule-view-types";
 
 function rowCenterY(rowIndex: number, headerHeight: number, rowHeight: number): number {
   return headerHeight + rowIndex * rowHeight + rowHeight / 2;
+}
+
+/** Match Kibo header columns: daily = days; monthly/quarterly = months. */
+function countTimelineColumns(timelineData: TimelineData, range: Range): number {
+  let months = 0;
+  let days = 0;
+  for (const year of timelineData) {
+    for (const quarter of year.quarters) {
+      months += quarter.months.length;
+      for (const month of quarter.months) {
+        days += month.days;
+      }
+    }
+  }
+  return range === "daily" ? days : months;
 }
 
 export function ScheduleGanttDependencyLayer({
@@ -34,6 +49,11 @@ export function ScheduleGanttDependencyLayer({
     () => new Date(gantt.timelineData.at(0)?.year ?? new Date().getFullYear(), 0, 1),
     [gantt.timelineData],
   );
+
+  const columnWidthPx = (gantt.columnWidth * gantt.zoom) / 100;
+  const columnCount = countTimelineColumns(gantt.timelineData, gantt.range);
+  const timelineWidth = Math.max(1, columnCount * columnWidthPx);
+  const timelineHeight = gantt.headerHeight + items.length * gantt.rowHeight;
 
   const paths = useMemo(() => {
     const result: string[] = [];
@@ -65,8 +85,12 @@ export function ScheduleGanttDependencyLayer({
 
   return (
     <svg
-      className="pointer-events-none absolute inset-0 z-10 overflow-visible"
-      style={{ width: "100%", height: "100%" }}
+      className="pointer-events-none absolute left-0 top-0 z-10"
+      width={timelineWidth}
+      height={timelineHeight}
+      viewBox={`0 0 ${timelineWidth} ${timelineHeight}`}
+      overflow="visible"
+      aria-hidden
     >
       <defs>
         <marker

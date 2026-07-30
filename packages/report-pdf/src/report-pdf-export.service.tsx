@@ -57,7 +57,9 @@ import {
   type StockMovementReportFilters,
   type SubcontractReportFilters,
   type TenantAuditLogExportUrlFilters,
+  getTenantDisplayTimezone,
 } from "@bloqer/services";
+import { formatDateTime, formatTimezoneOptionLabel } from "@bloqer/utils";
 import { resolvePdfReportBranding } from "./branding/pdf-branding.service";
 import type { PdfReportBranding } from "./branding/pdf-branding.types";
 import { safeReportFilename } from "./filename.service";
@@ -318,14 +320,13 @@ export async function exportTenantAuditLogPdf(
   ctx: ServiceContext,
   urlFilters?: TenantAuditLogExportUrlFilters,
 ): Promise<ReportPdfPayload> {
-  const { rows, truncated } = await fetchTenantAuditLogForExport(
-    filters,
-    ctx,
-    MAX_AUDIT_LOG_PDF_ROWS,
-  );
+  const [{ rows, truncated }, timeZone] = await Promise.all([
+    fetchTenantAuditLogForExport(filters, ctx, MAX_AUDIT_LOG_PDF_ROWS),
+    getTenantDisplayTimezone(ctx),
+  ]);
 
   const pdfRows = rows.map((r) => ({
-    createdAt: r.createdAt.toISOString().replace("T", " ").slice(0, 19),
+    createdAt: formatDateTime(r.createdAt, { timeZone }),
     actor: r.actorLabel,
     module: r.module ? AUDIT_UI_MODULE_LABEL_ES[r.module] : "—",
     action: r.actionLabel,
@@ -350,11 +351,11 @@ export async function exportTenantAuditLogPdf(
     <ProjectSimpleTablePdfDocument
       branding={branding}
       title="Registro de actividad"
-      subtitle="Trazabilidad de acciones críticas del tenant"
+      subtitle={`Trazabilidad de acciones críticas · ${formatTimezoneOptionLabel(timeZone)}`}
       filterLine={filterLine}
       maxRows={MAX_AUDIT_LOG_PDF_ROWS}
       columns={[
-        { key: "createdAt", label: "Fecha (UTC)", flex: 1.15 },
+        { key: "createdAt", label: "Fecha", flex: 1.15 },
         { key: "actor", label: "Usuario", flex: 1.2 },
         { key: "module", label: "Módulo", flex: 0.9 },
         { key: "action", label: "Acción", flex: 1.35 },

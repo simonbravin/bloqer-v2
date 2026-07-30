@@ -76,11 +76,20 @@ export function ScheduleProgressDimensions({
 
 export function ScheduleProgressLegend({ className }: { className?: string }) {
   return (
-    <p className={cn("text-xs text-muted-foreground", className)}>
-      <strong className="font-medium text-foreground">Real</strong> = cronograma (sincronizado desde libro) ·{" "}
-      <strong className="font-medium text-foreground">Plan (t)</strong> = tiempo transcurrido ·{" "}
-      <strong className="font-medium text-foreground">Cant.</strong> = cantidades en obra ·{" "}
-      <strong className="font-medium text-foreground">Cert.</strong> = facturación certificada.
-    </p>
+    <div className={cn("space-y-1 text-xs text-muted-foreground", className)}>
+      <p>
+        <strong className="font-medium text-foreground">Real</strong> = cronograma
+        (sincronizado desde libro) ·{" "}
+        <strong className="font-medium text-foreground">Plan (t)</strong> = tiempo
+        transcurrido ·{" "}
+        <strong className="font-medium text-foreground">Cant.</strong> = cantidades en
+        obra · <strong className="font-medium text-foreground">Cert.</strong> = facturación
+        certificada (solo lectura).
+      </p>
+      <p>
+        En el Gantt: relleno oscuro = Real; franja/borde ámbar = Cert. Comprometido (compras)
+        se muestra en sidebar, tabla y detalle cuando hay EDT vinculado.
+      </p>
+    </div>
   );
 }

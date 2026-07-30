@@ -23,12 +23,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createScheduleItemAction } from "../actions/schedule-actions";
+import { ScheduleWbsPicker } from "./schedule-wbs-picker";
 
 export function ScheduleCreateDialog({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [type, setType] = useState<"TASK" | "MILESTONE">("TASK");
+  const [wbsNodeId, setWbsNodeId] = useState("");
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -47,18 +49,26 @@ export function ScheduleCreateDialog({ projectId }: { projectId: string }) {
         type,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
+        wbsNodeId: wbsNodeId || undefined,
       });
       if ("error" in res) toast.error(res.error);
       else {
-        toast.success("Tarea creada");
+        toast.success(wbsNodeId ? "Tarea creada y vinculada a EDT" : "Tarea creada");
         setOpen(false);
+        setWbsNodeId("");
         router.refresh();
       }
     });
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setWbsNodeId("");
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
           + Tarea / hito
@@ -69,7 +79,7 @@ export function ScheduleCreateDialog({ projectId }: { projectId: string }) {
           <DialogHeader>
             <DialogTitle>Nueva tarea o hito</DialogTitle>
             <DialogDescription>
-              Creá un ítem manual en el cronograma (sin importar desde presupuesto).
+              Creá un ítem manual. Vinculá una partida EDT para sync de avance (libro) y costos.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 py-4">
@@ -99,6 +109,12 @@ export function ScheduleCreateDialog({ projectId }: { projectId: string }) {
                 <Input id="sched-end" name="endDate" type="date" />
               </div>
             </div>
+            <ScheduleWbsPicker
+              projectId={projectId}
+              value={wbsNodeId}
+              onValueChange={setWbsNodeId}
+              disabled={pending}
+            />
           </div>
           <DialogFooter>
             <Button type="submit" disabled={pending}>

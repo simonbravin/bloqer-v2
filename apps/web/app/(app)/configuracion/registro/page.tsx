@@ -7,6 +7,7 @@ import {
 } from "@bloqer/domain";
 import {
   getTenantAuditLogEntry,
+  getTenantDisplayTimezone,
   listAuditActorOptions,
   listAuditProjectOptions,
   listTenantAuditLog,
@@ -16,6 +17,7 @@ import {
   type ListTenantAuditLogResult,
   type TenantAuditLogDetail,
 } from "@bloqer/services";
+import { formatTimezoneOptionLabel } from "@bloqer/utils";
 import { listTenantAuditLogUrlFiltersSchema, exportTenantAuditLogUrlFiltersSchema } from "@bloqer/validators";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
@@ -117,12 +119,17 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
   let actors: Awaited<ReturnType<typeof listAuditActorOptions>> = [];
   let projects: Awaited<ReturnType<typeof listAuditProjectOptions>> = [];
   let detail: TenantAuditLogDetail | null = null;
+  let timeZone = "America/Argentina/Buenos_Aires";
 
   try {
-    [actors, projects] = await Promise.all([
+    const [actorsRes, projectsRes, displayTz] = await Promise.all([
       listAuditActorOptions(ctx),
       listAuditProjectOptions(ctx),
+      getTenantDisplayTimezone(ctx),
     ]);
+    actors = actorsRes;
+    projects = projectsRes;
+    timeZone = displayTz;
 
     if (entryId) {
       try {
@@ -173,7 +180,8 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
           <h1 className="text-2xl font-bold tracking-tight">Registro de actividad</h1>
           <p className="text-sm text-muted-foreground">
             Trazabilidad de acciones críticas: quién hizo qué, sobre qué entidad y cuándo. Solo visible para
-            administradores. CSV hasta 10.000 filas (con diff JSON); PDF hasta 350 filas (resumen).
+            administradores. CSV hasta 10.000 filas (con diff JSON); PDF hasta 350 filas (resumen). Fechas y
+            horas en zona de la empresa: {formatTimezoneOptionLabel(timeZone)}.
           </p>
         </div>
         {exportFilters.success && !validationError ? (
@@ -310,7 +318,7 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
                     <TableRow key={row.id} className="cursor-pointer hover:bg-muted/40">
                       <TableCell className="whitespace-nowrap">
                         <Link href={rowHref} className="block text-muted-foreground">
-                          {formatDateTime(row.createdAt)}
+                          {formatDateTime(row.createdAt, { timeZone })}
                         </Link>
                       </TableCell>
                       <TableCell>
@@ -362,7 +370,12 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
         </div>
       ) : null}
 
-      <AuditLogDetailDialog detail={detail} open={Boolean(entryId)} closeHref={closeHref} />
+      <AuditLogDetailDialog
+        detail={detail}
+        open={Boolean(entryId)}
+        closeHref={closeHref}
+        timeZone={timeZone}
+      />
     </PageShell>
   );
 }

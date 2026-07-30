@@ -12,10 +12,12 @@ import {
   importScheduleFromBudget,
   linkWbsNodesToScheduleItem,
   listScheduleItemAuditHistory,
+  listScheduleLinkableWbsOptions,
   moveScheduleItemToStatus,
   removeScheduleDependency,
   ServiceError,
   rollupScheduleContainersForProject,
+  unlinkWbsNodeFromScheduleItem,
   updateScheduleItemDates,
   updateScheduleItemName,
   updateScheduleItemProgress,
@@ -26,7 +28,9 @@ import {
   blockScheduleItemSchema,
   createScheduleItemSchema,
   importScheduleFromBudgetSchema,
+  linkWbsNodesSchema,
   removeScheduleDependencySchema,
+  unlinkWbsNodeSchema,
   updateScheduleItemDatesSchema,
   updateScheduleItemNameSchema,
   updateScheduleItemProgressSchema,
@@ -71,6 +75,53 @@ export async function createScheduleItemAction(projectId: string, raw: unknown) 
   const input = createScheduleItemSchema.parse(raw);
   try {
     await createScheduleItem(projectId, input, ctx);
+    revalidateCronograma(projectId);
+    return { ok: true as const };
+  } catch (e) {
+    return handle(e);
+  }
+}
+
+export async function listScheduleLinkableWbsOptionsAction(projectId: string) {
+  const ctx = await getCtx();
+  try {
+    const options = await listScheduleLinkableWbsOptions(projectId, ctx);
+    return { ok: true as const, options };
+  } catch (e) {
+    return handle(e);
+  }
+}
+
+export async function linkWbsNodesToScheduleItemAction(
+  projectId: string,
+  scheduleItemId: string,
+  raw: unknown,
+) {
+  const ctx = await getCtx();
+  const input = linkWbsNodesSchema.parse(raw);
+  try {
+    await linkWbsNodesToScheduleItem(
+      scheduleItemId,
+      input.wbsNodeIds,
+      input.primaryWbsNodeId,
+      ctx,
+    );
+    revalidateCronograma(projectId);
+    return { ok: true as const };
+  } catch (e) {
+    return handle(e);
+  }
+}
+
+export async function unlinkWbsNodeFromScheduleItemAction(
+  projectId: string,
+  scheduleItemId: string,
+  raw: unknown,
+) {
+  const ctx = await getCtx();
+  const input = unlinkWbsNodeSchema.parse(raw);
+  try {
+    await unlinkWbsNodeFromScheduleItem(scheduleItemId, input.wbsNodeId, ctx);
     revalidateCronograma(projectId);
     return { ok: true as const };
   } catch (e) {

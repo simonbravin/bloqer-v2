@@ -1,3 +1,4 @@
+import { isValidIanaTimeZone } from "@bloqer/utils";
 import { z } from "zod";
 
 /** Closed catalog — must match `scheduled-report-registry` in services. */
@@ -47,7 +48,12 @@ const timeOfDaySchema = z.preprocess(
   z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, "Hora inválida (use HH:mm)"),
 );
 
-const timezoneSchema = z.string().trim().min(1).max(64);
+const timezoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .refine(isValidIanaTimeZone, "Zona horaria inválida (usá una zona IANA, ej. America/Argentina/Buenos_Aires)");
 
 const paramsRecordSchema = z
   .record(z.string().max(64), z.string().max(512))

@@ -2,6 +2,9 @@ import { Prisma, prisma } from "@bloqer/database";
 import { canViewScheduleArea } from "./schedule-access";
 import { ServiceError } from "../types";
 import type { ServiceContext } from "../types";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { roundQty } from "@bloqer/utils";
+import { serializeProgressPct } from "./schedule-progress-sync-pure";
 
 export type ScheduleItemJobsiteEntry = {
   jobsiteLogId: string;
@@ -45,7 +48,9 @@ async function getWbsIncrementalPhysicalPctSum(
   for (const r of rows) {
     if (r.physicalPct) sum = sum.add(r.physicalPct);
   }
-  return sum.toFixed(2);
+  // Cap at 100 for schedule copy / display (over-allocation is a jobsite data issue).
+  if (sum.greaterThan(100)) return "100.00";
+  return serializeProgressPct(sum.toString());
 }
 
 export async function getScheduleItemContext(
@@ -59,7 +64,7 @@ export async function getScheduleItemContext(
 
   const item = await prisma.scheduleItem.findFirst({
     where: { id: scheduleItemId, schedule: { projectId, tenantId: ctx.tenantId } },
-    include: { wbsLinks: { where: { isPrimary: true }, take: 1 } },
+    include: { wbsLinks: { where: { isPrimary: true }, take: 1, orderBy: { createdAt: "asc" } } },
   });
   if (!item) throw new ServiceError("NOT_FOUND", "Ítem no encontrado");
 
@@ -105,15 +110,17 @@ export async function getScheduleItemContext(
       jobsiteLogId: p.jobsiteLog.id,
       logDate: p.jobsiteLog.logDate.toISOString().slice(0, 10),
       status: p.jobsiteLog.status,
-      quantityCompleted: p.quantityCompleted?.toString() ?? null,
-      physicalPct: p.physicalPct?.toFixed(2) ?? null,
+      quantityCompleted: p.quantityCompleted
+        ? roundQty(p.quantityCompleted.toString())
+        : null,
+      physicalPct: p.physicalPct ? serializeProgressPct(p.physicalPct.toString()) : null,
       href: `${base}/libro-obra/${p.jobsiteLog.id}`,
     })),
     certificationEntries: certLines.map((l) => ({
       certificationId: l.certification.id,
       certificationNumber: l.certification.number,
       status: l.certification.status,
-      periodAmount: l.periodAmount.toFixed(2),
+      periodAmount: serializeMoneyDecimal(l.periodAmount),
       href: `${base}/certificaciones/${l.certification.id}`,
     })),
     jobsitePhysicalPctCumulative,

@@ -2,6 +2,7 @@ import type { Prisma, ScheduleItemStatus } from "@bloqer/database";
 import { log, listEntityAuditLogs } from "../audit/audit.service";
 import type { ServiceContext } from "../types";
 import { formatDateOnly } from "./schedule-helpers";
+import { serializeProgressPct } from "./schedule-progress-sync-pure";
 
 export const SCHEDULE_ITEM_ENTITY = "ScheduleItem";
 export const SCHEDULE_ENTITY = "Schedule";
@@ -69,7 +70,7 @@ export function scheduleItemSnapshot(item: {
   status: ScheduleItemStatus;
   startDate: Date | null;
   endDate: Date | null;
-  progressPct: { toFixed: (n: number) => string };
+  progressPct: { toString: () => string };
   blockReason: string | null;
 }) {
   return {
@@ -77,7 +78,7 @@ export function scheduleItemSnapshot(item: {
     status: item.status,
     startDate: formatDateOnly(item.startDate),
     endDate: formatDateOnly(item.endDate),
-    progressPct: item.progressPct.toFixed(2),
+    progressPct: serializeProgressPct(item.progressPct.toString()),
     blockReason: item.blockReason,
   };
 }

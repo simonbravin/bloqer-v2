@@ -325,6 +325,9 @@ importers:
       '@bloqer/services':
         specifier: workspace:*
         version: link:../services
+      '@bloqer/utils':
+        specifier: workspace:*
+        version: link:../utils
       '@bloqer/validators':
         specifier: workspace:*
         version: link:../validators

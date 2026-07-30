@@ -2,7 +2,7 @@ import { serializeMoney } from "@bloqer/utils";
 
 /** Decimal estilo AR sin depender del locale del runtime (seguro para SSR + cliente). */
 export function formatDecimalAr(n: number): string {
-  return formatDecimalArFromString(n.toFixed(2));
+  return formatDecimalArFromString(serializeMoney(n));
 }
 
 /** Format a decimal string as es-AR without IEEE float (D-053). */
@@ -41,4 +41,15 @@ export function formatMoneyAmount(raw: string, currency?: string): string {
     return `${body} ${currency}`;
   }
   return body;
+}
+
+/** True when a serialized money string is strictly greater than zero (no IEEE float). */
+export function isPositiveMoneyAmount(raw: string | null | undefined): boolean {
+  if (raw == null || raw === "") return false;
+  try {
+    const s = serializeMoney(raw);
+    return s !== "0.00" && !s.startsWith("-");
+  } catch {
+    return false;
+  }
 }

@@ -871,6 +871,11 @@ export const GanttFeatureItem: FC<GanttFeatureItemProps> = ({
   const [startAt, setStartAt] = useState<Date>(feature.startAt);
   const [endAt, setEndAt] = useState<Date | null>(feature.endAt);
 
+  useEffect(() => {
+    setStartAt(feature.startAt);
+    setEndAt(feature.endAt);
+  }, [feature.startAt, feature.endAt]);
+
   // Memoize expensive calculations
   const width = useMemo(
     () => getWidth(startAt, endAt, gantt),
@@ -1446,7 +1451,7 @@ export const GanttTimeline: FC<GanttTimelineProps> = ({
 }) => (
   <div
     className={cn(
-      "relative flex h-full w-max flex-none overflow-clip",
+      "relative flex h-full w-max flex-none overflow-visible",
       className
     )}
   >

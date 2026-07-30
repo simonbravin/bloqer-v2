@@ -89,7 +89,9 @@ export function ScheduleFilters({ budgets, currentBudgetId, delayedOnly }: Props
           <SelectContent>
             {STATUS_OPTIONS.map((s) => (
               <SelectItem key={s} value={s}>
-                {s === "ALL" ? "Todos" : (STATUS_LABELS[s] ?? s)}
+                {s === "ALL"
+                  ? "Activos (sin canceladas)"
+                  : (STATUS_LABELS[s] ?? s)}
               </SelectItem>
             ))}
           </SelectContent>

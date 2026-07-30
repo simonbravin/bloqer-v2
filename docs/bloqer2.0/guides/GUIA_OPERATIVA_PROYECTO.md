@@ -218,30 +218,36 @@ El modal APU muestra solo **costo**; PU/total de venta viven en la tabla EDT ([D
 
 | Vista | URL | Uso |
 |-------|-----|-----|
-| Gantt | `?view=gantt` | Barras, dependencias, línea **Hoy**, botón **Ir a hoy** |
+| Gantt (default) | `?view=gantt` o sin `view` | Barras (Real + Cert), dependencias FS, línea **Hoy**, **Ir a hoy**, drag de tareas e hitos |
 | Calendario | `?view=calendar` | Hitos por fecha |
 | Kanban | `?view=kanban` | Por estado PLANNED / IN_PROGRESS / … |
-| Tabla | `?view=table` | Edición masiva de fechas |
+| Tabla | `?view=table` | Avance 4 dims + presup./comprometido |
+
+Las tareas **canceladas** se ocultan por defecto; filtrá estado **Cancelado** para verlas en las cuatro vistas.
 
 ### 4.5 Setear fechas
 
 1. Abrí el **detalle de la tarea** (click en fila o barra).
 2. Completá **inicio** y **fin** (solo **hojas**; contenedores son lectura).
-3. En Gantt: arrastrar barra (si tenés permiso EDIT).
+3. En Gantt: arrastrar barra o hito (si tenés permiso EDIT). Toast de éxito o advertencia FS.
 
 **Recalcular contenedores:** toolbar → persiste rollup en DB si quedó desfasado.
 
 ### 4.6 Dependencias Finish-to-Start (FS)
 
-1. En el diálogo de tarea → sección **Predecesoras**.
+1. En el diálogo de tarea → pestaña **Dependencias** (o botón **FS** en sidebar/barra del Gantt → `?dialogTab=deps`).
 2. Agregar tarea predecesora (tipo FS).
 3. Al guardar fechas que violen FS → **advertencias** (no bloquean en Fase 1); corregí o aceptá el riesgo.
+4. Las flechas del Gantt son de solo lectura y deben permanecer alineadas al hacer scroll horizontal.
 
 ### 4.7 Vínculo WBS ↔ cronograma
 
 - Cada tarea puede enlazar uno o más nodos WBS; uno marcado **primario**.
+- Al **crear** tarea/hito: picker opcional de partida EDT.
+- En el detalle: vincular / marcar primaria / quitar. Sin vínculo en hoja → chip **Sin EDT** (sin sync Real ni métricas de costo/cert).
+- Import desde presupuesto ya crea los vínculos.
 - El vínculo primario permite:
-  - KPI de avance/certificado en sidebar del Gantt
+  - KPI de avance/certificado y comprometido (compras) en sidebar del Gantt / tabla
   - Sync de avance desde libro de obra
 
 ### 4.8 Cuatro dimensiones de avance (no confundir)
@@ -251,7 +257,9 @@ El modal APU muestra solo **costo**; PU/total de venta viven en la tabla EDT ([D
 | **Real** | `ScheduleItem.progressPct` | Libro de obra aprobado; manual excepcional PM |
 | **Plan (t)** | Fechas vs hoy | Automático |
 | **Cant.** | Cantidades físicas / presupuesto | Libro de obra |
-| **Cert.** | Certificaciones emitidas | Módulo certificaciones |
+| **Cert.** | Certificaciones emitidas | Módulo certificaciones (solo lectura) |
+
+En Gantt: relleno oscuro = Real; franja/borde ámbar = Cert.
 
 ---
 

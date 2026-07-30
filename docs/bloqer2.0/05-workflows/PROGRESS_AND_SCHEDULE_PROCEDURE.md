@@ -40,17 +40,24 @@
 ## 6. Pantallas
 
 - **Libro de obra:** listado tabla + calendario mensual por fecha del parte (`?view=table|calendar`).
-- **Cronograma:** vistas `?view=gantt|calendar|kanban|table` con **Kibo UI**; detalle de tarea en `ScheduleItemDialog` con las cuatro dimensiones de avance; deep link `?itemId=<uuid>`.
+- **Cronograma:** vistas `?view=gantt|calendar|kanban|table` (default **gantt**) con **Kibo UI**; detalle de tarea en `ScheduleItemDialog` (pestañas Detalle / Dependencias / Historial / Integraciones) con las cuatro dimensiones de avance; deep link `?itemId=<uuid>` y `?dialogTab=deps`.
 
 ## 7. Smoke manual (dev)
 
 Ejecutar una vez tras cambios en cronograma/libro:
 
 - [ ] Aprobar un parte con WBS primario enlazado → abrir cronograma (misma sesión) y verificar % **Real** sin F5.
+- [ ] Aprobar un parte sobre WBS de tarea **cancelada** → el % Real de esa tarea **no** cambia.
 - [ ] Aplicar filtro de estado sin coincidencias → banner “Ninguna tarea coincide…” + **Limpiar filtros**.
-- [ ] Gantt: flechas FS visibles entre dos tareas enlazadas; scroll horizontal mantiene alineación.
-- [ ] Gantt: hito `MILESTONE` visible; línea **Hoy** en español.
-- [ ] Kanban: transición inválida muestra toast de error del servicio.
+- [ ] Gantt: flechas FS visibles entre dos tareas enlazadas; scroll horizontal mantiene alineación (diario/mensual).
+- [ ] Gantt: hito `MILESTONE` visible y arrastrable; línea **Hoy** en español; toast al mover fechas.
+- [ ] Gantt: barra con relleno Real + indicador Cert (ámbar) cuando hay % certificado.
+- [ ] Crear tarea manual → vincular EDT (o al crear) → chip **Sin EDT** desaparece; métricas de costo aparecen.
+- [ ] Desvincular EDT primaria con otra secundaria → la secundaria pasa a primaria automáticamente.
+- [ ] Cancelar tarea → desaparece de las 4 vistas; filtro **Cancelado** la muestra.
+- [ ] Kanban: soltar en Planificado o Cancelado muestra mensaje claro; transición inválida toast del servicio.
 - [ ] Libro: chip **En cronograma** abre cronograma con `?itemId=` cuando hay vínculo primario.
-- [ ] Cronograma → diálogo → **Ver partes en libro** con `?wbsNodeId=`.
+- [ ] Cronograma → diálogo → **Ver partes en libro** / **EDT y costos** con `?wbsNodeId=` / control-costos.
 - [ ] Calendario Kibo y libro: labels/combobox en español.
+- [ ] Confirmar OC imputada a la misma partida → **Comprometido** visible en detalle/tabla (moneda del presupuesto).
+- [ ] Con presupuesto de control ≠ base del cronograma: métricas siguen la base (no $0 inventados) + banner mismatch.
