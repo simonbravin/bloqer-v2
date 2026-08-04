@@ -574,7 +574,7 @@ export function CostItemApuDialog({
             </section>
 
             {/* 2. Costo por categoría */}
-            <section className="space-y-1.5">
+            <section className="form-section space-y-1.5 p-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Costo por categoría
               </h3>
