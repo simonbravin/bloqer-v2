@@ -77,6 +77,7 @@ export default async function EditarParteObraPage({ params }: PageProps) {
           code: n.code,
           name: n.name,
           unit: n.costItem?.unit ?? "",
+          budgetQty: n.costItem?.quantity?.toString(),
         }))}
         contactOptions={pickList.contactOptions}
         productOptions={pickList.productOptions}

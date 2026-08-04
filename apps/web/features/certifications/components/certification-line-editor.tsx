@@ -32,7 +32,16 @@ function fmt2(v: string) {
   return new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(v));
 }
 
-export type WbsItemOption = { id: string; code: string; name: string; unit: string };
+export type WbsItemOption = {
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+  budgetQty?: string;
+  previousQty?: string;
+  remainingQty?: string;
+  unitSalePrice?: string;
+};
 
 type AddDialogState = { type: "closed" } | { type: "add" } | { type: "edit"; line: CertificationLineView };
 
@@ -223,10 +232,27 @@ function AddLineForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [wbsNodeId, setWbsNodeId] = useState(items[0]?.id ?? "");
+  const selected = items.find((i) => i.id === wbsNodeId);
   const [physicalPct, setPhysicalPct] = useState("0");
-  const [currentQty, setCurrentQty] = useState("0");
+  const [currentQty, setCurrentQty] = useState(() => {
+    const rem = items[0]?.remainingQty;
+    return rem != null && rem !== "" ? rem : "0";
+  });
   const [notes, setNotes] = useState("");
   const wbsOptions = useMemo(() => wbsToSearchableOptions(items), [items]);
+
+  function onWbsChange(id: string) {
+    setWbsNodeId(id);
+    const item = items.find((i) => i.id === id);
+    if (item?.remainingQty != null && item.remainingQty !== "") {
+      setCurrentQty(item.remainingQty);
+    }
+  }
+
+  const previewCumulative =
+    (parseFloat(selected?.previousQty ?? "0") + (parseFloat(currentQty) || 0)).toFixed(4);
+  const budgetQty = selected?.budgetQty ?? "0";
+  const isOver = selected != null && parseFloat(previewCumulative) > parseFloat(budgetQty);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -255,11 +281,42 @@ function AddLineForm({
           popoverWidth="wide"
           options={wbsOptions}
           value={wbsNodeId}
-          onValueChange={setWbsNodeId}
+          onValueChange={onWbsChange}
           placeholder="Seleccionar ítem…"
           searchPlaceholder="Buscar partida…"
         />
+        {selected ? (
+          <p className="text-xs text-muted-foreground">
+            Unidad: {selected.unit || "—"}
+            {selected.unitSalePrice != null
+              ? ` · PU venta ${fmt2(selected.unitSalePrice)}`
+              : ""}
+          </p>
+        ) : null}
       </div>
+
+      {selected ? (
+        <div className="grid grid-cols-3 gap-3 text-sm text-muted-foreground rounded-md border bg-muted/40 px-3 py-2">
+          <div>
+            <p className="text-xs">Qty ppto.</p>
+            <p className="font-mono font-medium text-foreground">
+              {fmt4(selected.budgetQty ?? "0")}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs">Qty previa</p>
+            <p className="font-mono font-medium text-foreground">
+              {fmt4(selected.previousQty ?? "0")}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs">Saldo pend.</p>
+            <p className="font-mono font-medium text-foreground">
+              {fmt4(selected.remainingQty ?? "0")}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
@@ -271,9 +328,12 @@ function AddLineForm({
             value={currentQty}
             onChange={(e) => setCurrentQty(e.target.value)}
           />
+          <p className="text-[11px] text-muted-foreground">
+            Precargado con el saldo pendiente (editable).
+          </p>
         </div>
         <div className="space-y-1.5">
-          <Label>% Físico</Label>
+          <Label>% Físico (período)</Label>
           <Input
             type="number"
             step="0.01"
@@ -282,8 +342,17 @@ function AddLineForm({
             value={physicalPct}
             onChange={(e) => setPhysicalPct(e.target.value)}
           />
+          <p className="text-[11px] text-muted-foreground">
+            Independiente de la qty económica (BR-CERT-003).
+          </p>
         </div>
       </div>
+
+      {isOver ? (
+        <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+          Aviso: el acumulado ({previewCumulative}) supera el presupuesto ({fmt4(budgetQty)}).
+        </div>
+      ) : null}
 
       <div className="space-y-1.5">
         <Label>Notas</Label>
@@ -296,7 +365,7 @@ function AddLineForm({
         <Button type="button" variant="outline" size="sm" onClick={onDone} disabled={isPending}>
           Cancelar
         </Button>
-        <Button type="submit" size="sm" disabled={isPending}>
+        <Button type="submit" size="sm" disabled={isPending || !wbsNodeId}>
           {isPending ? "Guardando..." : "Agregar"}
         </Button>
       </div>
@@ -322,6 +391,11 @@ function EditLineForm({
   // Client-side preview of cumulative
   const previewCumulative = (parseFloat(line.previousQty) + (parseFloat(currentQty) || 0)).toFixed(4);
   const isOver = parseFloat(previewCumulative) > parseFloat(line.budgetQty);
+  // Ceiling for this period = ppto − previa (not post-line remainingQty).
+  const periodRemaining = Math.max(
+    0,
+    parseFloat(line.budgetQty) - parseFloat(line.previousQty),
+  ).toFixed(4);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -347,7 +421,7 @@ function EditLineForm({
         <span className="ml-2 text-muted-foreground">({line.wbsNode.unit})</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
+      <div className="grid grid-cols-3 gap-3 text-sm text-muted-foreground">
         <div>
           <p className="text-xs">Qty presupuestada</p>
           <p className="font-mono font-medium text-foreground">{fmt4(line.budgetQty)}</p>
@@ -355,6 +429,10 @@ function EditLineForm({
         <div>
           <p className="text-xs">Qty certificada previa</p>
           <p className="font-mono font-medium text-foreground">{fmt4(line.previousQty)}</p>
+        </div>
+        <div>
+          <p className="text-xs">Saldo pend.</p>
+          <p className="font-mono font-medium text-foreground">{fmt4(periodRemaining)}</p>
         </div>
       </div>
 

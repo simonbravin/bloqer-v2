@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +13,36 @@ import {
   withNoneOption,
   wbsToSearchableOptions,
 } from "@/components/ui/searchable-combobox";
+import { UnitSelect } from "@/features/budgets/components/unit-select";
+import { budgetUnitLabel } from "@/lib/budget-units";
 import { formatDecimalAr } from "@/lib/format-money";
-import type { WbsOption } from "./purchase-order-lines-editor";
+import type { WbsApuOption, WbsOption } from "./purchase-order-lines-editor";
 import { createPurchaseRequestAction } from "@/app/(app)/proyectos/[id]/solicitudes-compra/actions";
+
+function fmtQtyHint(raw: string | null | undefined): string {
+  if (raw == null || raw === "") return "—";
+  const t = raw.trim();
+  if (!/^-?\d+(\.\d+)?$/.test(t)) return t;
+  const [i, d = ""] = t.split(".");
+  const trimmed = d.replace(/0+$/, "");
+  return trimmed ? `${i}.${trimmed}` : i;
+}
+
+function isPositiveQty(raw: string | null | undefined): boolean {
+  if (raw == null || raw === "") return false;
+  const t = raw.trim();
+  if (!/^-?\d+(\.\d+)?$/.test(t)) return false;
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0;
+}
+
+function apuCommitmentHint(apu: WbsApuOption): string {
+  const u = budgetUnitLabel(apu.unit);
+  if (apu.needQty != null || apu.orderedQty != null) {
+    return `Necesidad ${fmtQtyHint(apu.needQty)} · Pedido ${fmtQtyHint(apu.orderedQty)} · Faltante ${fmtQtyHint(apu.shortfallQty ?? apu.quantity)} ${u}`;
+  }
+  return `Ref. APU: ${fmtQtyHint(apu.quantity)} ${u}`;
+}
 
 interface PurchaseRequestFormProps {
   projectId: string;
@@ -52,8 +79,10 @@ export function PurchaseRequestForm({
     initialLine?.costAnalysisLineId ?? null,
   );
   const [description, setDescription] = useState(initialLine?.description ?? "");
+  const [quantity, setQuantity] = useState(initialLine?.quantity ?? "1");
   const [unit, setUnit] = useState(initialLine?.unit ?? "");
   const [productId, setProductId] = useState<string | null>(initialLine?.productId ?? null);
+  const [apuHint, setApuHint] = useState<string | null>(null);
 
   const wbsComboboxOptions = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
   const selectedWbs = wbsOptions.find((w) => w.id === wbsNodeId);
@@ -63,7 +92,10 @@ export function PurchaseRequestForm({
         toSearchableOptions(
           (selectedWbs?.apuLines ?? []).map((a) => ({
             id: a.id,
-            label: `${a.description} (${a.unit})`,
+            label:
+              a.shortfallQty != null || a.quantity != null
+                ? `${a.description} (faltante ${fmtQtyHint(a.shortfallQty ?? a.quantity)} ${budgetUnitLabel(a.unit)})`
+                : `${a.description} (${budgetUnitLabel(a.unit)})`,
           })),
         ),
         { label: "Sin insumo APU" },
@@ -71,28 +103,46 @@ export function PurchaseRequestForm({
     [selectedWbs],
   );
 
-  function applyApu(apuId: string | null) {
+  function applyApu(apuId: string | null, opts?: { keepQuantity?: boolean }) {
     if (!apuId) {
       setCostAnalysisLineId(null);
+      setApuHint(null);
       return;
     }
     const apu = selectedWbs?.apuLines?.find((a) => a.id === apuId);
     if (!apu) {
       setCostAnalysisLineId(apuId);
+      setApuHint(null);
       return;
     }
     setCostAnalysisLineId(apu.id);
     setDescription(apu.description);
     setUnit(apu.unit);
     setProductId(apu.productId);
+    if (!opts?.keepQuantity && isPositiveQty(apu.quantity)) {
+      setQuantity(fmtQtyHint(apu.quantity));
+    }
+    setApuHint(apuCommitmentHint(apu));
   }
 
   function onWbsChange(nextWbsId: string) {
     setWbsNodeId(nextWbsId);
     setCostAnalysisLineId(null);
+    setApuHint(null);
     const wbs = wbsOptions.find((w) => w.id === nextWbsId);
     if (wbs?.budgetUnit && !unit) setUnit(wbs.budgetUnit);
   }
+
+  // Sync APU hint / unit when opened from Materiales with costAnalysisLineId.
+  useEffect(() => {
+    if (!initialLine?.costAnalysisLineId || !wbsNodeId) return;
+    const wbs = wbsOptions.find((w) => w.id === wbsNodeId);
+    const apu = wbs?.apuLines?.find((a) => a.id === initialLine.costAnalysisLineId);
+    if (!apu) return;
+    if (!unit) setUnit(apu.unit || initialLine.unit || "");
+    setApuHint(apuCommitmentHint(apu));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount / initial APU
+  }, [initialLine?.costAnalysisLineId, wbsNodeId, wbsOptions]);
 
   return (
     <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
@@ -116,8 +166,8 @@ export function PurchaseRequestForm({
                   productId,
                   costAnalysisLineId,
                   description: description.trim() || (fd.get("description")?.toString() ?? ""),
-                  unit: unit || fd.get("unit")?.toString() || "u",
-                  quantity: fd.get("quantity")?.toString() ?? "1",
+                  unit: unit || selectedWbs?.budgetUnit || "un",
+                  quantity: quantity || "1",
                   sortOrder: 0,
                 },
               ],
@@ -189,7 +239,7 @@ export function PurchaseRequestForm({
             disabled={!wbsNodeId || (selectedWbs?.apuLines?.length ?? 0) === 0}
           />
           <p className="text-xs text-muted-foreground">
-            Prefill de descripción/unidad; la imputación de $ sigue en la partida EDT.
+            Al elegir un insumo se precarga el faltante (necesidad − ya pedido). Editable.
           </p>
         </div>
 
@@ -211,20 +261,20 @@ export function PurchaseRequestForm({
               id="quantity"
               name="quantity"
               inputMode="decimal"
-              defaultValue={initialLine?.quantity ?? "1"}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
               required
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="unit">Unidad</Label>
-            <Input
-              id="unit"
-              name="unit"
-              value={unit || selectedWbs?.budgetUnit || "u"}
-              onChange={(e) => setUnit(e.target.value)}
+            <UnitSelect
+              value={unit || selectedWbs?.budgetUnit || "un"}
+              onChange={setUnit}
             />
           </div>
         </div>
+        {apuHint ? <p className="text-xs text-muted-foreground">{apuHint}</p> : null}
 
         <div className="space-y-2">
           <Label htmlFor="neededByDate">Fecha necesaria</Label>

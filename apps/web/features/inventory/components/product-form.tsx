@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { createProductAction } from "@/app/(app)/inventario/productos/actions";
 
 interface Props {
@@ -16,6 +17,7 @@ export function ProductForm({ companyId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [unit, setUnit] = useState("un");
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -26,7 +28,7 @@ export function ProductForm({ companyId }: Props) {
         sku:         fd.get("sku") as string,
         name:        fd.get("name") as string,
         description: (fd.get("description") as string) || null,
-        unit:        (fd.get("unit") as string) || "",
+        unit:        unit || "un",
         category:    (fd.get("category") as string) || null,
         notes:       (fd.get("notes") as string) || null,
       });
@@ -49,7 +51,7 @@ export function ProductForm({ companyId }: Props) {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="unit">Unidad</Label>
-          <Input id="unit" name="unit" placeholder="kg, m, un" />
+          <UnitSelect value={unit} onChange={setUnit} />
         </div>
       </div>
 

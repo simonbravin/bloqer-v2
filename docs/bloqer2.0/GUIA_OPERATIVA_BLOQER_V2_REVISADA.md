@@ -117,12 +117,22 @@ La pantalla **EDT y costos** (`/control-costos`) es el tablero de esas afectacio
 
 ### 1.3 Datos de la empresa
 
-- **Ruta:** `/configuracion`.
-- Datos de la empresa, preferencias de visualización y políticas.
+- **Ruta:** `/configuracion` (Configuración → **General**). OWNER/ADMIN pueden editar.
+- **Nombre a mostrar**, **moneda base** y **zona horaria** (preferencias de visualización).
+- **Zona horaria:** desplegable con ciudades + offset **GMT** (ej. `Buenos Aires (GMT-3)`). No hay que escribir el id IANA a mano. Argentina (Buenos Aires) es **GMT-3 todo el año** (sin horario de verano).
+- Esa zona se usa en el **Registro de actividad** (tabla, detalle y exports CSV/PDF) y en **reportes programados**. Tabla y detalle deben mostrar **la misma hora**.
+- Razón social / CUIT son de solo lectura acá (datos fiscales de la empresa principal).
 - **Política de compras:** `/configuracion/compras` (subnavegación Configuración → **Compras**, o card desde `/configuracion`): umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos.
 
-> **📷 Captura sugerida — Configuración + acceso Compras**  
-> Ruta: `/configuracion` · Mostrar card/enlace a política de compras · Tip: incluir subnav de configuración si está visible.
+> **📷 Captura sugerida — Configuración + zona horaria**  
+> Ruta: `/configuracion` · Mostrar desplegable de zona con etiqueta GMT · Tip: incluir subnav de configuración si está visible.
+
+### 1.3a Registro de actividad
+
+- **Ruta:** Configuración → **Registro** → `/configuracion/registro` (solo OWNER/ADMIN).
+- Lista quién hizo qué, sobre qué entidad y cuándo.
+- **Fechas y horas** en la zona de la empresa (§1.3), no en UTC del servidor ni en la zona del navegador. El detalle al hacer click debe coincidir con la columna Fecha.
+- Exports CSV/PDF usan la misma zona (el encabezado CSV indica la zona, ej. `Fecha (Buenos Aires (GMT-3))`).
 
 ### 1.4 Módulos habilitados
 
@@ -432,7 +442,11 @@ stateDiagram-v2
 7. Revisar si aparece aviso de **baselineBudgetMismatch** (presupuesto base del cronograma ≠ el aprobado actual).
 8. Las tareas **canceladas** están ocultas por defecto en las cuatro vistas; filtrá estado **Cancelado** para verlas.
 
-**Estados de ítem:** `PLANNED` · `IN_PROGRESS` · `BLOCKED` · `COMPLETED` · `CANCELLED` (Kanban por estado).
+**Estados de ítem:** `PLANNED` · `IN_PROGRESS` · `BLOCKED` · `COMPLETED` · `CANCELLED`.
+
+**Kanban:** solo transiciones permitidas (ej. Planificado → En curso / Bloqueado; En curso → Hecho / Bloqueado). Soltar en Planificado o Cancelado, o un salto inválido, muestra un mensaje y no cambia el estado. Para cancelar, usar el detalle de la tarea.
+
+**Montos** en sidebar/tabla/detalle (comprometido, presupuesto, certificado): moneda del presupuesto base del cronograma.
 
 > **📷 Captura sugerida — Cronograma Gantt**  
 > Ruta: `/proyectos/[id]/cronograma` (default Gantt) o `?view=gantt` · Tareas + hitos · Tip: 5–8 ítems alcanzan.
@@ -1029,4 +1043,4 @@ flowchart LR
 
 ---
 
-*Documento vivo. Actualizado julio 2026 (procedimientos paso a paso UI: proyecto, presupuesto/EDT/APU, cronograma, libro de obra, materiales, SC/OC, certificaciones, afectaciones vía EDT y costos, contabilidad D-061…D-063; auth email/Google). Actualizar en el mismo PR que el cambio de producto.*
+*Documento vivo. Actualizado julio 2026 (zona horaria empresa + registro de actividad; cronograma EDT/Gantt/Kanban; procedimientos UI presupuesto/EDT/APU, libro de obra, materiales, SC/OC, certificaciones, EDT y costos, contabilidad D-061…D-063; auth email/Google). Actualizar en el mismo PR que el cambio de producto.*

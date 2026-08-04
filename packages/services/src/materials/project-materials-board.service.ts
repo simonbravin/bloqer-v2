@@ -11,6 +11,10 @@ import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 import { resolveApprovedBudgetForProject } from "../reports/report-budget-resolve";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import {
+  MATERIAL_ORDERED_PO_STATUSES,
+  MATERIAL_ORDERED_PR_STATUSES,
+} from "./material-commitment-pure";
 
 export type MaterialsBoardWindow = "this_week" | "next_14_days" | "month" | "all";
 
@@ -30,6 +34,7 @@ export type MaterialsBoardRow = {
   costAnalysisLineId: string | null;
   productId: string | null;
   description: string;
+  unit: string | null;
   needQty: string;
   needCost: string;
   orderedQty: string;
@@ -65,8 +70,8 @@ export type MaterialsBoardEmpty = { type: "NO_APPROVED_BUDGETS" };
 export type MaterialsBoardResult = MaterialsBoardReport | MaterialsBoardEmpty;
 
 const ZERO = new Prisma.Decimal(0);
-const ORDERED_PO_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
-const ORDERED_PR_STATUSES = ["SUBMITTED", "QUOTE_SELECTED"] as const;
+const ORDERED_PO_STATUSES = MATERIAL_ORDERED_PO_STATUSES;
+const ORDERED_PR_STATUSES = MATERIAL_ORDERED_PR_STATUSES;
 
 /** Inclusive calendar day → UTC midnight (stable for date-only schedule overlap). */
 function calendarDayStartUtc(isoDate: string): Date {
@@ -214,6 +219,7 @@ export async function getProjectMaterialsBoard(
     costAnalysisLineId: string | null;
     productId: string | null;
     description: string;
+    unit: string | null;
     needQty: Prisma.Decimal;
     needCost: Prisma.Decimal;
     orderedQty: Prisma.Decimal;
@@ -243,13 +249,17 @@ export async function getProjectMaterialsBoard(
         prev.needQty = prev.needQty.add(needQty);
         prev.needCost = prev.needCost.add(needCost);
         // Ambiguous merge → drop single APU hint.
-        if (prev.costAnalysisLineId !== line.id) prev.costAnalysisLineId = null;
+        if (prev.costAnalysisLineId !== line.id) {
+          prev.costAnalysisLineId = null;
+          prev.unit = prev.unit === line.unit ? prev.unit : null;
+        }
       } else {
         map.set(key, {
           wbsNodeId: item.wbsNodeId,
           costAnalysisLineId: line.id,
           productId: line.productId,
           description: line.description,
+          unit: line.unit,
           needQty,
           needCost,
           orderedQty: ZERO,
@@ -264,15 +274,23 @@ export async function getProjectMaterialsBoard(
     wbsNodeId: string,
     productId: string | null,
     description: string,
+    costAnalysisLineId?: string | null,
   ): Agg => {
+    // Prefer exact APU match when present.
+    if (costAnalysisLineId) {
+      for (const row of map.values()) {
+        if (row.costAnalysisLineId === costAnalysisLineId) return row;
+      }
+    }
     const key = rowKey(wbsNodeId, productId, description);
     let row = map.get(key);
     if (!row) {
       row = {
         wbsNodeId,
-        costAnalysisLineId: null,
+        costAnalysisLineId: costAnalysisLineId ?? null,
         productId,
         description,
+        unit: null,
         needQty: ZERO,
         needCost: ZERO,
         orderedQty: ZERO,
@@ -300,6 +318,7 @@ export async function getProjectMaterialsBoard(
       },
       select: {
         wbsNodeId: true,
+        costAnalysisLineId: true,
         productId: true,
         description: true,
         quantity: true,
@@ -316,6 +335,7 @@ export async function getProjectMaterialsBoard(
       },
       select: {
         wbsNodeId: true,
+        costAnalysisLineId: true,
         productId: true,
         description: true,
         quantity: true,
@@ -359,12 +379,22 @@ export async function getProjectMaterialsBoard(
 
   for (const line of prLines) {
     if (!line.wbsNodeId) continue;
-    const row = ensureRow(line.wbsNodeId, line.productId, line.description);
+    const row = ensureRow(
+      line.wbsNodeId,
+      line.productId,
+      line.description,
+      line.costAnalysisLineId,
+    );
     row.orderedQty = row.orderedQty.add(line.quantity);
   }
   for (const line of poLines) {
     if (!line.wbsNodeId) continue;
-    const row = ensureRow(line.wbsNodeId, line.productId, line.description);
+    const row = ensureRow(
+      line.wbsNodeId,
+      line.productId,
+      line.description,
+      line.costAnalysisLineId,
+    );
     row.orderedQty = row.orderedQty.add(line.quantity);
     row.receivedQty = row.receivedQty.add(line.receivedQuantity);
   }
@@ -451,6 +481,7 @@ export async function getProjectMaterialsBoard(
       costAnalysisLineId: agg.costAnalysisLineId,
       productId: agg.productId,
       description: agg.description,
+      unit: agg.unit,
       needQty: agg.needQty.toFixed(4),
       needCost: serializeMoneyDecimal(agg.needCost),
       orderedQty: agg.orderedQty.toFixed(4),

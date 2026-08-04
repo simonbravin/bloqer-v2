@@ -17,7 +17,14 @@ import {
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { WbsIncrementalProgressSnapshot } from "@bloqer/services";
 
-export type WbsItemOption = { id: string; code: string; name: string; unit: string };
+export type WbsItemOption = {
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+  /** CostItem.quantity — techo operativo de la partida. */
+  budgetQty?: string;
+};
 export type ContactOption  = { id: string; name: string };
 export type ProductOption  = { id: string; name: string };
 export type WarehouseOption = { id: string; name: string };
@@ -44,13 +51,52 @@ function isValidProgressLine(p: ProgressLine): boolean {
   return p.wbsNodeId !== "__none__" && QTY_RE.test(p.quantityCompleted);
 }
 
+function fmtHintQty(raw: string | undefined): string {
+  if (raw == null || raw === "") return "—";
+  const t = raw.trim();
+  if (!/^-?\d+(\.\d+)?$/.test(t)) return t;
+  const [i, d = ""] = t.split(".");
+  const trimmed = d.replace(/0+$/, "");
+  return trimmed ? `${i}.${trimmed}` : i;
+}
+
+function remainingPctForWbs(
+  wbsNodeId: string,
+  snapshot: WbsIncrementalProgressSnapshot,
+  /** Other draft rows already consuming % for this WBS (exclude the row being edited). */
+  draftProgress?: ProgressLine[],
+  excludeIndex?: number,
+): string {
+  if (wbsNodeId === "__none__") return "";
+  const entry = snapshot[wbsNodeId];
+  const baseRem = entry?.remainingPct != null ? parseNum(entry.remainingPct) : 100;
+  let draftUsed = 0;
+  if (draftProgress) {
+    for (let i = 0; i < draftProgress.length; i++) {
+      if (excludeIndex != null && i === excludeIndex) continue;
+      const row = draftProgress[i]!;
+      if (row.wbsNodeId !== wbsNodeId || !row.physicalPct) continue;
+      draftUsed += parseNum(row.physicalPct);
+    }
+  }
+  return Math.max(0, baseRem - draftUsed).toFixed(2);
+}
+
+function approvedPctForWbs(
+  wbsNodeId: string,
+  snapshot: WbsIncrementalProgressSnapshot,
+): string {
+  if (wbsNodeId === "__none__") return "0";
+  return snapshot[wbsNodeId]?.approvedIncrementalPct ?? "0";
+}
+
 function cumulativePctLabel(
   wbsNodeId: string,
   progress: ProgressLine[],
   snapshot: WbsIncrementalProgressSnapshot,
 ): string {
   if (wbsNodeId === "__none__") return "— / 100";
-  const approved = parseNum(snapshot[wbsNodeId]?.approvedIncrementalPct ?? "0");
+  const approved = parseNum(approvedPctForWbs(wbsNodeId, snapshot));
   let draftSum = 0;
   for (const row of progress) {
     if (row.wbsNodeId !== wbsNodeId || !row.physicalPct) continue;
@@ -193,7 +239,25 @@ export function JobsiteLogForm({
   }, [inventoryModuleEnabled, stockPreviewAction]);
 
   function updateProgress(i: number, field: keyof ProgressLine, val: string) {
-    setProgress((prev) => prev.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
+    setProgress((prev) =>
+      prev.map((r, idx) => {
+        if (idx !== i) return r;
+        if (field !== "wbsNodeId") return { ...r, [field]: val };
+        // Prefill remaining % only when the partida actually changes (editable afterwards).
+        if (val === r.wbsNodeId) return r;
+        const rem = remainingPctForWbs(val, wbsProgressSnapshot, prev, i);
+        const wbs = wbsOptions.find((w) => w.id === val);
+        const next: ProgressLine = {
+          ...r,
+          wbsNodeId: val,
+          physicalPct: rem,
+        };
+        if (!r.description.trim() && wbs) {
+          next.description = `${wbs.code} — ${wbs.name}`;
+        }
+        return next;
+      }),
+    );
   }
   function updateLabor(i: number, field: keyof LaborLine, val: string) {
     setLabor((prev) => prev.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
@@ -349,7 +413,17 @@ export function JobsiteLogForm({
           <ListEmptyState message="Sin registros de avance." className="p-6" />
         ) : (
           <div className="space-y-3">
-            {progress.map((row, i) => (
+            {progress.map((row, i) => {
+              const wbs = wbsOptions.find((w) => w.id === row.wbsNodeId);
+              const approvedPct = approvedPctForWbs(row.wbsNodeId, wbsProgressSnapshot);
+              const remPct = remainingPctForWbs(
+                row.wbsNodeId,
+                wbsProgressSnapshot,
+                progress,
+                i,
+              );
+              const approvedQty = wbsProgressSnapshot[row.wbsNodeId]?.approvedQty;
+              return (
               <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                 <div className="space-y-1">
                   <Label className="text-xs">Partida WBS</Label>
@@ -369,12 +443,20 @@ export function JobsiteLogForm({
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs">Cantidad</Label>
+                    <Label className="text-xs">
+                      Cantidad{wbs?.unit ? ` (${wbs.unit})` : ""}
+                    </Label>
                     <Input className="h-8 text-xs" value={row.quantityCompleted} onChange={(e) => updateProgress(i, "quantityCompleted", e.target.value)} placeholder="0.00" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">% del día</Label>
-                    <Input className="h-8 text-xs" value={row.physicalPct} onChange={(e) => updateProgress(i, "physicalPct", e.target.value)} placeholder="0" />
+                    <Input
+                      className="h-8 text-xs"
+                      value={row.physicalPct}
+                      onChange={(e) => updateProgress(i, "physicalPct", e.target.value)}
+                      placeholder="0"
+                      inputMode="decimal"
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Avance acumulado</Label>
@@ -387,11 +469,23 @@ export function JobsiteLogForm({
                     <Input className="h-8 text-xs" value={row.notes} onChange={(e) => updateProgress(i, "notes", e.target.value)} />
                   </div>
                 </div>
+                {row.wbsNodeId !== "__none__" ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Ya {fmtHintQty(approvedPct)}%
+                    {approvedQty != null ? ` · Qty aprobada ${fmtHintQty(approvedQty)}` : ""}
+                    {wbs?.budgetQty
+                      ? ` / ppto ${fmtHintQty(wbs.budgetQty)}${wbs.unit ? ` ${wbs.unit}` : ""}`
+                      : ""}
+                    {" · "}
+                    Restante sugerido {fmtHintQty(remPct)}% (editable)
+                  </p>
+                ) : null}
                 <div className="flex justify-end">
                   <Button type="button" variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => setProgress((p) => p.filter((_, idx) => idx !== i))}>Eliminar fila</Button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

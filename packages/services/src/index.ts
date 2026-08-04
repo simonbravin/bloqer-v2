@@ -93,6 +93,7 @@ export * from "./procurement/purchase-order.service";
 export * from "./procurement/purchase-receipt.service";
 export * from "./procurement/project-procurement-hub.service";
 export * from "./materials/project-materials-board.service";
+export * from "./materials/material-commitment";
 export * from "./inventory/product.service";
 export * from "./inventory/warehouse.service";
 export * from "./inventory/stock-movement.service";

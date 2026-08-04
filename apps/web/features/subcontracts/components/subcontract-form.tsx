@@ -24,6 +24,7 @@ import {
   wbsToSearchableOptions,
 } from "@/components/ui/searchable-combobox";
 import { CurrencySelect } from "@/components/ui/currency-select";
+import { UnitSelect } from "@/features/budgets/components/unit-select";
 import type { WbsSubcontractBudgetHint } from "@bloqer/services";
 import { SubcontractBudgetHints } from "./subcontract-budget-hints";
 
@@ -262,8 +263,12 @@ export function SubcontractForm({
                       <TableCell className="min-w-[200px]">
                         <Input className="h-8 text-xs" value={line.description} onChange={(e) => updateLine(i, "description", e.target.value)} required />
                       </TableCell>
-                      <TableCell className="min-w-[80px]">
-                        <Input className="h-8 text-xs" value={line.unit} onChange={(e) => updateLine(i, "unit", e.target.value)} />
+                      <TableCell className="min-w-[100px]">
+                        <UnitSelect
+                          value={line.unit}
+                          onChange={(v) => updateLine(i, "unit", v)}
+                          className="h-8 text-xs"
+                        />
                       </TableCell>
                       <TableCell className="min-w-[100px]">
                         <Input className="h-8 text-xs text-right" type="number" step="any" min="0.0001" value={line.quantity} onChange={(e) => updateLine(i, "quantity", e.target.value)} required />

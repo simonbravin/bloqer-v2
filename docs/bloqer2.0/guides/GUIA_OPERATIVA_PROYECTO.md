@@ -20,6 +20,7 @@
 | Paso | Dónde | Para qué |
 |------|--------|----------|
 | Usuarios y roles | Configuración → Equipo / Permisos | PM, compras, finanzas, capataz con permisos VIEW/EDIT/APPROVE |
+| Zona horaria de la empresa | Configuración → General | Desplegable con GMT (ej. Buenos Aires GMT-3); define horas del **Registro** y reportes programados |
 | Directorio | `/directorio` | Contactos con rol **CLIENT** (mandante), **SUPPLIER** (proveedores), **SUBCONTRACTOR** |
 | Cuentas de tesorería | `/tesoreria/cuentas` | Caja/banco donde impactan cobranzas y pagos |
 | Módulos habilitados | Configuración tenant | Presupuesto, cronograma, compras, AR/AP, libro de obra, etc. |
@@ -220,8 +221,8 @@ El modal APU muestra solo **costo**; PU/total de venta viven en la tabla EDT ([D
 |-------|-----|-----|
 | Gantt (default) | `?view=gantt` o sin `view` | Barras (Real + Cert), dependencias FS, línea **Hoy**, **Ir a hoy**, drag de tareas e hitos |
 | Calendario | `?view=calendar` | Hitos por fecha |
-| Kanban | `?view=kanban` | Por estado PLANNED / IN_PROGRESS / … |
-| Tabla | `?view=table` | Avance 4 dims + presup./comprometido |
+| Kanban | `?view=kanban` | Por estado; solo transiciones válidas (toast si el drop no está permitido) |
+| Tabla | `?view=table` | Avance 4 dims + presup./comprometido (moneda del presupuesto base) |
 
 Las tareas **canceladas** se ocultan por defecto; filtrá estado **Cancelado** para verlas en las cuatro vistas.
 
@@ -260,6 +261,8 @@ Las tareas **canceladas** se ocultan por defecto; filtrá estado **Cancelado** p
 | **Cert.** | Certificaciones emitidas | Módulo certificaciones (solo lectura) |
 
 En Gantt: relleno oscuro = Real; franja/borde ámbar = Cert.
+
+Montos (comprometido / presupuesto / certificado) usan la **moneda del presupuesto base** del cronograma.
 
 ---
 
@@ -560,4 +563,4 @@ PLAN ECONÓMICO          PLAN TEMPORAL           EJECUCIÓN OBRA           COBRO
 
 ---
 
-*Documento vivo — actualizar cuando cambien decisiones en `DECISION_LOG.md` o rutas de la app.*
+*Documento vivo — actualizar cuando cambien decisiones en `DECISION_LOG.md` o rutas de la app. Julio 2026: cronograma EDT/Gantt/Kanban + zona horaria empresa / Registro.*

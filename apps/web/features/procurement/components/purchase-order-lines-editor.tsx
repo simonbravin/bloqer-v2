@@ -6,7 +6,6 @@ import { divideDecimal, roundQty, QTY_DECIMALS } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatDecimalAr } from "@/lib/format-money";
 import {
   SearchableCombobox,
   SEARCHABLE_NONE,
@@ -15,6 +14,9 @@ import {
   withNoneOption,
   wbsToSearchableOptions,
 } from "@/components/ui/searchable-combobox";
+import { UnitSelect } from "@/features/budgets/components/unit-select";
+import { budgetUnitLabel } from "@/lib/budget-units";
+import { formatDecimalAr } from "@/lib/format-money";
 
 export type PurchaseOrderLine = {
   wbsNodeId: string | null;
@@ -34,6 +36,11 @@ export type WbsApuOption = {
   unit: string;
   unitCost: string;
   productId: string | null;
+  /** Prefill qty = shortfall (need − ordered); null when unknown / non-purchasable. */
+  quantity: string | null;
+  needQty?: string | null;
+  orderedQty?: string | null;
+  shortfallQty?: string | null;
 };
 
 export type WbsOption = {
@@ -48,6 +55,24 @@ export type WbsOption = {
   apuLines?: WbsApuOption[];
 };
 export type ProductOption = { id: string; sku: string; name: string; unit: string };
+
+function fmtQtyHint(raw: string | null | undefined): string {
+  if (raw == null || raw === "") return "—";
+  const t = raw.trim();
+  if (!/^-?\d+(\.\d+)?$/.test(t)) return t;
+  const [i, d = ""] = t.split(".");
+  const trimmed = d.replace(/0+$/, "");
+  return trimmed ? `${i}.${trimmed}` : i;
+}
+
+/** True when qty string is a finite number > 0 (avoid prefill 0). */
+function isPositiveQty(raw: string | null | undefined): boolean {
+  if (raw == null || raw === "") return false;
+  const t = raw.trim();
+  if (!/^-?\d+(\.\d+)?$/.test(t)) return false;
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0;
+}
 
 function safeNum(v: string) {
   const n = parseFloat(v);
@@ -120,16 +145,24 @@ export function PurchaseOrderLinesEditor({
       update(i, "costAnalysisLineId", apuId);
       return;
     }
+    const prefillQty = isPositiveQty(apu.quantity)
+      ? fmtQtyHint(apu.quantity)
+      : line.quantity;
     const next: PurchaseOrderLine = {
       ...line,
       costAnalysisLineId: apu.id,
-      description: line.description.trim() ? line.description : apu.description,
-      unit: line.unit.trim() ? line.unit : apu.unit,
+      description: apu.description,
+      unit: apu.unit,
       productId: apu.productId ?? line.productId,
       unitPrice: line.unitPrice.trim() ? line.unitPrice : apu.unitCost,
+      quantity: prefillQty,
     };
     onChange(lines.map((l, idx) => (idx === i ? next : l)));
-    toast.success("Insumo APU aplicado (referencia; la imputación sigue en la partida EDT).");
+    const hint =
+      apu.needQty != null || apu.orderedQty != null
+        ? `Necesidad ${fmtQtyHint(apu.needQty)} · Pedido ${fmtQtyHint(apu.orderedQty)} · Faltante ${fmtQtyHint(apu.shortfallQty ?? apu.quantity)}`
+        : `faltante ${fmtQtyHint(apu.quantity)}`;
+    toast.success(`Insumo APU aplicado (${hint}). Podés ajustar cantidad y unidad.`);
   }
 
   /** Trae el costo unitario del presupuesto (APU) al campo Precio unit. */
@@ -201,6 +234,7 @@ export function PurchaseOrderLinesEditor({
         {lines.map((line, i) => {
           const p = linePreview(line);
           const wbs = wbsOptions.find((w) => w.id === line.wbsNodeId);
+          const selectedApu = wbs?.apuLines?.find((a) => a.id === line.costAnalysisLineId);
           return (
             <div key={i} className="rounded-lg border bg-card/40 p-3 space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -253,7 +287,10 @@ export function PurchaseOrderLinesEditor({
                       toSearchableOptions(
                         (wbs?.apuLines ?? []).map((a) => ({
                           id: a.id,
-                          label: `${a.description} (${a.unit})`,
+                          label:
+                            a.shortfallQty != null || a.quantity != null
+                              ? `${a.description} (faltante ${fmtQtyHint(a.shortfallQty ?? a.quantity)} ${budgetUnitLabel(a.unit)})`
+                              : `${a.description} (${budgetUnitLabel(a.unit)})`,
                         })),
                       ),
                       { label: "Sin insumo APU" },
@@ -266,6 +303,16 @@ export function PurchaseOrderLinesEditor({
                     searchPlaceholder="Buscar insumo…"
                     disabled={!line.wbsNodeId || !(wbs?.apuLines?.length)}
                   />
+                  {selectedApu ? (
+                    <p className="text-[10px] text-muted-foreground">
+                      {selectedApu.needQty != null || selectedApu.orderedQty != null
+                        ? `Necesidad ${fmtQtyHint(selectedApu.needQty)} · Pedido ${fmtQtyHint(selectedApu.orderedQty)} · Faltante ${fmtQtyHint(selectedApu.shortfallQty ?? selectedApu.quantity)} ${budgetUnitLabel(selectedApu.unit)}`
+                        : `Ref. APU: ${fmtQtyHint(selectedApu.quantity)} ${budgetUnitLabel(selectedApu.unit)}`}
+                      {selectedApu.unitCost
+                        ? ` · ${formatDecimalAr(Number(selectedApu.unitCost))}/u`
+                        : ""}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
@@ -309,9 +356,9 @@ export function PurchaseOrderLinesEditor({
                 </div>
                 <div className="space-y-1 sm:col-span-1">
                   <Label className="text-xs">Unidad</Label>
-                  <Input
+                  <UnitSelect
                     value={line.unit}
-                    onChange={(e) => update(i, "unit", e.target.value)}
+                    onChange={(v) => update(i, "unit", v)}
                     placeholder="un"
                     className="h-8 text-sm"
                   />

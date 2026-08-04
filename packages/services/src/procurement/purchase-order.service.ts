@@ -1,5 +1,6 @@
 import { Prisma, prisma, PurchaseOrder } from "@bloqer/database";
 import type { CreatePurchaseOrderInput, UpdatePurchaseOrderInput } from "@bloqer/validators";
+import { sortTreeOrder } from "@bloqer/utils";
 import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -13,7 +14,6 @@ import { assertProjectAllowsOperationalMutation } from "../project/project-opera
 import { assertCompanyMatchesProject, assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import { assertDirectPoAllowed } from "./procurement-policy.service";
-import { sortTreeOrder } from "@bloqer/utils";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { onPurchaseOrderDraftCancelled } from "./purchase-request-to-po.service";
 import {
@@ -25,6 +25,7 @@ import {
   resolveUserDisplayNames,
   userDisplayNameFromMap,
 } from "../user/resolve-user-display-names";
+import { loadMaterialApuCommitmentByLineId } from "../materials/material-commitment";
 
 export {
   submitPurchaseOrder,
@@ -207,6 +208,17 @@ export type ProcurementApuOption = {
   unit: string;
   unitCost: string;
   productId: string | null;
+  /**
+   * Prefill qty = shortfall (need − ordered). Null when non-purchasable / zero need.
+   * Falls back to need when nothing ordered yet.
+   */
+  quantity: string | null;
+  /** Budget physical need ([D-047]). */
+  needQty: string | null;
+  /** Committed demand (CONFIRMED+ OC / SC without OC). */
+  orderedQty: string | null;
+  /** max(0, need − ordered). */
+  shortfallQty: string | null;
 };
 
 export type ProcurementWbsOption = {
@@ -265,6 +277,7 @@ export async function listProcurementWbsOptions(
   });
 
   const ordered = sortTreeOrder(nodes, (a, b) => a.code.localeCompare(b.code));
+  const commitments = await loadMaterialApuCommitmentByLineId(projectId, ctx.tenantId);
 
   const result: ProcurementWbsOption[] = [];
   for (const n of ordered) {
@@ -278,13 +291,21 @@ export async function listProcurementWbsOptions(
       budgetUnit: ref.budgetUnit,
       availableSaldo: ref.availableSaldo,
       wouldExceedBudget: ref.wouldExceedBudget,
-      apuLines: (n.costItem?.analysisLines ?? []).map((l) => ({
-        id: l.id,
-        description: l.description,
-        unit: l.unit,
-        unitCost: l.unitCost.toString(),
-        productId: l.productId,
-      })),
+      apuLines: (n.costItem?.analysisLines ?? []).map((l) => {
+        const c = commitments.get(l.id);
+        return {
+          id: l.id,
+          description: l.description,
+          unit: l.unit,
+          unitCost: l.unitCost.toString(),
+          productId: l.productId,
+          // Prefill remaining to buy (0 when fully covered).
+          quantity: c?.shortfallQty ?? null,
+          needQty: c?.needQty ?? null,
+          orderedQty: c?.orderedQty ?? null,
+          shortfallQty: c?.shortfallQty ?? null,
+        };
+      }),
     });
   }
   return result;

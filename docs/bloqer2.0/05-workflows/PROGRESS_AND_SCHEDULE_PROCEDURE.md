@@ -60,4 +60,5 @@ Ejecutar una vez tras cambios en cronograma/libro:
 - [ ] Cronograma → diálogo → **Ver partes en libro** / **EDT y costos** con `?wbsNodeId=` / control-costos.
 - [ ] Calendario Kibo y libro: labels/combobox en español.
 - [ ] Confirmar OC imputada a la misma partida → **Comprometido** visible en detalle/tabla (moneda del presupuesto).
-- [ ] Con presupuesto de control ≠ base del cronograma: métricas siguen la base (no $0 inventados) + banner mismatch.
+- [ ] Con presupuesto de control ≠ base del cronograma: métricas siguen la base (no $0 inventados) + banner mismatch.- [ ] Configuraci�n ? General: zona horaria en desplegable con GMT; Registro: misma hora en tabla y detalle del evento.
+

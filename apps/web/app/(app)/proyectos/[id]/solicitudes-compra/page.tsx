@@ -37,6 +37,7 @@ interface PageProps {
     quantity?: string;
     productId?: string;
     costAnalysisLineId?: string;
+    unit?: string;
     from?: string;
   }>;
 }
@@ -110,6 +111,7 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
           quantity: sp.quantity,
           productId: sp.productId,
           costAnalysisLineId: sp.costAnalysisLineId,
+          unit: sp.unit,
         }}
         prefilledFromMaterials={sp.from === "materiales"}
       />

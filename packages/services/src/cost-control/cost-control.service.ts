@@ -9,6 +9,14 @@ import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { computeCostExposureLayers } from "./cost-exposure";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import {
+  loadMaterialApuCommitments,
+  type MaterialApuCommitmentView,
+} from "../materials/material-commitment";
+import {
+  buildWbsProgressSummary,
+  type WbsProgressSummary,
+} from "./wbs-progress-summary";
 
 function serializePct2(raw: string | number): string {
   return roundToDecimals(raw, 2);
@@ -16,6 +24,7 @@ function serializePct2(raw: string | number): string {
 
 export { canViewProjectCostControlReport };
 export { computeCostExposureLayers } from "./cost-exposure";
+export { buildWbsProgressSummary, type WbsProgressSummary } from "./wbs-progress-summary";
 
 // ─── Filter / output types ────────────────────────────────────────────────────
 
@@ -862,6 +871,10 @@ export type WbsItemCostDetail = {
     logId: string; logDate: Date; logStatus: string;
     quantityCompleted: string; physicalPct: string | null;
   }>;
+  /** MATERIAL APU need / ordered / shortfall for this ITEM. */
+  materialCommitments: MaterialApuCommitmentView[];
+  /** Derived físico / económico / costo % — not persisted. */
+  progressSummary: WbsProgressSummary;
 };
 
 export async function getWbsItemCostDetail(
@@ -1066,6 +1079,64 @@ export async function getWbsItemCostDetail(
     : [];
 
   const ci = node.costItem;
+  const materialCommitments = await loadMaterialApuCommitments(projectId, ctx.tenantId, {
+    wbsNodeIds: [wbsNodeId],
+  });
+
+  // Physical acum: APPROVED libro only (same as getWbsIncrementalProgressSnapshot).
+  let physicalPctAcum = ZERO;
+  let physicalQtyAcum = ZERO;
+  for (const p of logProgress) {
+    if (p.jobsiteLog.status !== "APPROVED") continue;
+    if (p.physicalPct != null) physicalPctAcum = physicalPctAcum.add(p.physicalPct);
+    physicalQtyAcum = physicalQtyAcum.add(p.quantityCompleted);
+  }
+
+  // Economic: ISSUED|APPROVED cert lines already filtered in query.
+  let certifiedQty = ZERO;
+  let certifiedAmount = ZERO;
+  for (const cl of certLines) {
+    certifiedQty = certifiedQty.add(cl.currentQty);
+    certifiedAmount = certifiedAmount.add(cl.periodAmount);
+  }
+
+  // Cost layers D-021 — all-time (no date filter) so the triad matches physical/economic.
+  // Soft-fail ServiceError only: never let cost-control resolution break the drilldown.
+  let committedCost: Prisma.Decimal | null = null;
+  let accruedCost: Prisma.Decimal | null = null;
+  let expectedCostExposure: Prisma.Decimal | null = null;
+  try {
+    const cc = await getProjectCostControl(
+      projectId,
+      { budgetId: filters.budgetId ?? node.budgetId },
+      ctx,
+    );
+    if (cc.type === "REPORT") {
+      const row = cc.rows.find((r) => r.wbsNodeId === wbsNodeId);
+      if (row) {
+        committedCost = new Prisma.Decimal(row.committedCost);
+        accruedCost = new Prisma.Decimal(row.accruedCost);
+        expectedCostExposure = new Prisma.Decimal(row.expectedCostExposure);
+      }
+    }
+  } catch (err) {
+    if (!(err instanceof ServiceError)) throw err;
+    // Layers stay null → UI shows "—" for cost %.
+  }
+
+  const progressSummary = buildWbsProgressSummary({
+    physicalPctAcum,
+    physicalQtyAcum,
+    certifiedQty,
+    certifiedAmount,
+    budgetQty: ci?.quantity ?? null,
+    budgetTotalSale: ci?.totalSalePrice ?? null,
+    budgetTotalCost: ci?.totalCostDirect ?? null,
+    committedCost,
+    accruedCost,
+    expectedCostExposure,
+  });
+
   return {
     wbsNodeId, wbsCode: node.code, wbsName: node.name,
     budgetItem: ci ? {
@@ -1137,5 +1208,7 @@ export async function getWbsItemCostDetail(
       quantityCompleted: roundQty(p.quantityCompleted.toString()),
       physicalPct: p.physicalPct != null ? serializePct2(p.physicalPct.toString()) : null,
     })),
+    materialCommitments,
+    progressSummary,
   };
 }

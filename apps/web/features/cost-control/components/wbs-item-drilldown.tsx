@@ -12,9 +12,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { budgetUnitLabel } from "@/lib/budget-units";
 
 function fmt(v: string) {
   return parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtQty(v: string) {
+  const n = parseFloat(v);
+  if (!Number.isFinite(n)) return v;
+  return n.toLocaleString("es-AR", { maximumFractionDigits: 4 });
 }
 function fmtDate(d: Date) {
   return formatDate(d);
@@ -23,12 +29,96 @@ function fmtDate(d: Date) {
 type Props = { detail: WbsItemCostDetail; projectId: string };
 
 export function WbsItemDrilldown({ detail, projectId }: Props) {
+  const ps = detail.progressSummary;
+  const unit = detail.budgetItem?.unit;
+
   return (
     <div className="space-y-6">
+      <Section
+        title="Avance de la partida"
+        action={
+          <div className="flex flex-wrap gap-3 text-xs">
+            <Link href={`/proyectos/${projectId}/libro-obra`} className="text-primary hover:underline">
+              Libro de obra
+            </Link>
+            <Link href={`/proyectos/${projectId}/certificaciones`} className="text-primary hover:underline">
+              Certificaciones
+            </Link>
+            <Link
+              href={`/proyectos/${projectId}/materiales?wbsNodeId=${encodeURIComponent(detail.wbsNodeId)}`}
+              className="text-primary hover:underline"
+            >
+              Materiales
+            </Link>
+          </div>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-3 text-sm">
+          <ProgressCol
+            title="Físico (libro)"
+            rows={[
+              { label: "% acum.", value: `${ps.physicalPctAcum} %` },
+              {
+                label: "Qty acum.",
+                value: unit
+                  ? `${fmtQty(ps.physicalQtyAcum)} ${budgetUnitLabel(unit) || unit}`
+                  : fmtQty(ps.physicalQtyAcum),
+              },
+              { label: "Restante", value: `${ps.physicalRemainingPct} %` },
+            ]}
+          />
+          <ProgressCol
+            title="Económico (certificación)"
+            rows={[
+              {
+                label: "Certificado",
+                value: unit
+                  ? `${fmtQty(ps.certifiedQty)} ${budgetUnitLabel(unit) || unit}`
+                  : fmtQty(ps.certifiedQty),
+              },
+              { label: "Importe", value: fmt(ps.certifiedAmount) },
+              {
+                label: "% venta",
+                value: ps.economicPctOfSale != null ? `${ps.economicPctOfSale} %` : "—",
+              },
+              {
+                label: "Saldo qty",
+                value: unit
+                  ? `${fmtQty(ps.remainingCertQty)} ${budgetUnitLabel(unit) || unit}`
+                  : fmtQty(ps.remainingCertQty),
+              },
+            ]}
+          />
+          <ProgressCol
+            title="Costo (capas)"
+            rows={[
+              {
+                label: "% comprometido",
+                value: ps.committedPctOfCost != null ? `${ps.committedPctOfCost} %` : "—",
+              },
+              {
+                label: "% devengado",
+                value: ps.accruedPctOfCost != null ? `${ps.accruedPctOfCost} %` : "—",
+              },
+              {
+                label: "% exposición",
+                value:
+                  ps.expectedExposurePctOfCost != null
+                    ? `${ps.expectedExposurePctOfCost} %`
+                    : "—",
+              },
+            ]}
+          />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          El avance físico del libro y el económico de certificación son independientes.
+        </p>
+      </Section>
+
       {detail.budgetItem ? (
         <Section title="Análisis de presupuesto">
           <div className="grid grid-cols-3 gap-4 text-sm">
-            <Kv label="Unidad"     value={detail.budgetItem.unit} />
+            <Kv label="Unidad"     value={budgetUnitLabel(detail.budgetItem.unit) || detail.budgetItem.unit} />
             <Kv label="Cantidad"   value={detail.budgetItem.quantity} />
             <Kv label="PU costo"   value={fmt(detail.budgetItem.unitCostDirect)} />
             <Kv label="Total costo" value={fmt(detail.budgetItem.totalCostDirect)} />
@@ -41,6 +131,46 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
           Este ítem EDT no tiene análisis de costo en el presupuesto.
         </div>
       )}
+
+      <Section
+        title="Materiales APU"
+        action={
+          <Link
+            href={`/proyectos/${projectId}/materiales?wbsNodeId=${encodeURIComponent(detail.wbsNodeId)}`}
+            className="text-xs text-primary hover:underline"
+          >
+            Ver en Materiales
+          </Link>
+        }
+      >
+        {detail.materialCommitments.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Sin insumos de material comprables en el APU de esta partida.
+          </p>
+        ) : (
+          <SimpleTable
+            headers={["Insumo", "Un.", "Necesidad", "Pedido", "Recibido", "Faltante"]}
+            rows={detail.materialCommitments.map((m) => [
+              m.description,
+              budgetUnitLabel(m.unit) || m.unit,
+              fmtQty(m.needQty),
+              fmtQty(m.orderedQty),
+              fmtQty(m.receivedQty),
+              <span
+                key={m.costAnalysisLineId}
+                className={
+                  !/^-?0+(\.0+)?$/.test(m.shortfallQty.trim())
+                    ? "font-medium text-amber-700 dark:text-amber-400"
+                    : undefined
+                }
+              >
+                {fmtQty(m.shortfallQty)}
+                {m.overCommitted ? " (sobre)" : ""}
+              </span>,
+            ])}
+          />
+        )}
+      </Section>
 
       {detail.certificationLines.length > 0 && (
         <Section title="Certificaciones de cliente">
@@ -212,10 +342,21 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  action,
+}: {
+  title: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
   return (
     <div>
-      <h3 className="text-sm font-semibold mb-2">{title}</h3>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {action}
+      </div>
       {children}
     </div>
   );
@@ -226,6 +367,28 @@ function Kv({ label, value }: { label: string; value: string }) {
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="font-medium">{value}</p>
+    </div>
+  );
+}
+
+function ProgressCol({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: Array<{ label: string; value: string }>;
+}) {
+  return (
+    <div className="rounded-lg border p-3 space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      <div className="space-y-1.5">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-baseline justify-between gap-2">
+            <span className="text-xs text-muted-foreground">{r.label}</span>
+            <span className="font-mono text-sm font-medium tabular-nums">{r.value}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

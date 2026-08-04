@@ -23,6 +23,7 @@ import type { CostCategory } from "@bloqer/database";
 
 import { CATEGORY_LABELS } from "@/lib/budget-categories";
 import { budgetUnitLabel } from "@/lib/budget-units";
+import { UnitSelect } from "./unit-select";
 import { apuResourceQtyDisplay } from "../lib/wbs-apu-detail";
 
 function fmt(value: string) {
@@ -117,11 +118,7 @@ export function CostItemPanel({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Unidad</Label>
-                <Input
-                  className="h-8 text-sm"
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                />
+                <UnitSelect value={unit} onChange={setUnit} className="h-8 text-sm" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Cantidad</Label>

@@ -1,10 +1,92 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { roundQty } from "@bloqer/utils";
 import type { AddCertificationLineInput, UpdateCertificationLineInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertCertificationEditable } from "./certification.service";
 import { _computePreviousQty, _recalcCertificationTotals } from "./certification-calc.service";
+
+export type CertificationWbsHint = {
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+  budgetQty: string;
+  previousQty: string;
+  remainingQty: string;
+  unitSalePrice: string;
+};
+
+/**
+ * WBS ITEM hints for certification line forms: budget / previously certified / remaining.
+ * previousQty uses the same rule as line create (ISSUED + APPROVED, excluding this cert).
+ */
+export async function listCertificationWbsHints(
+  certificationId: string,
+  ctx: ServiceContext,
+): Promise<CertificationWbsHint[]> {
+  if (!can(ctx.roles, "VIEW", "CERTIFICATIONS") && !can(ctx.roles, "EDIT", "CERTIFICATIONS")) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver ítems de certificación");
+  }
+  const cert = await prisma.certification.findUnique({
+    where: { id: certificationId },
+    select: { id: true, tenantId: true, budgetId: true },
+  });
+  if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
+  if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+
+  const nodes = await prisma.wbsNode.findMany({
+    where: { budgetId: cert.budgetId, type: "ITEM", costItem: { isNot: null } },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      costItem: { select: { unit: true, quantity: true, unitSalePrice: true } },
+    },
+    orderBy: { code: "asc" },
+  });
+
+  const nodeIds = nodes.map((n) => n.id);
+  const previousRows =
+    nodeIds.length > 0
+      ? await prisma.certificationLine.findMany({
+          where: {
+            wbsNodeId: { in: nodeIds },
+            certificationId: { not: cert.id },
+            certification: {
+              tenantId: ctx.tenantId,
+              status: { in: ["ISSUED", "APPROVED"] },
+            },
+          },
+          select: { wbsNodeId: true, currentQty: true },
+        })
+      : [];
+  const previousByWbs = new Map<string, Prisma.Decimal>();
+  for (const row of previousRows) {
+    const prev = previousByWbs.get(row.wbsNodeId) ?? new Prisma.Decimal(0);
+    previousByWbs.set(row.wbsNodeId, prev.plus(row.currentQty));
+  }
+
+  const hints: CertificationWbsHint[] = [];
+  for (const n of nodes) {
+    if (!n.costItem) continue;
+    const previousQty = previousByWbs.get(n.id) ?? new Prisma.Decimal(0);
+    const budgetQty = n.costItem.quantity;
+    const remaining = Prisma.Decimal.max(new Prisma.Decimal(0), budgetQty.minus(previousQty));
+    hints.push({
+      id: n.id,
+      code: n.code,
+      name: n.name,
+      unit: n.costItem.unit,
+      budgetQty: roundQty(budgetQty.toString()),
+      previousQty: roundQty(previousQty.toString()),
+      remainingQty: roundQty(remaining.toString()),
+      unitSalePrice: roundQty(n.costItem.unitSalePrice.toString()),
+    });
+  }
+  return hints;
+}
 
 async function _guardLine(certificationId: string, ctx: ServiceContext) {
   const cert = await prisma.certification.findUnique({ where: { id: certificationId } });

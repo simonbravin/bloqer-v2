@@ -15,14 +15,16 @@ import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 import {
   assertJobsiteLogApprovable,
+  buildProgressSnapshotEntry,
   hasLegacyPhysicalPctOverflow,
+  remainingPhysicalPct,
   type JobsiteLogProgressSnapshot,
 } from "./jobsite-log-guards";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { sortTreeOrder } from "@bloqer/utils";
 
 export type WbsIncrementalProgressSnapshot = JobsiteLogProgressSnapshot;
-export { hasLegacyPhysicalPctOverflow };
+export { hasLegacyPhysicalPctOverflow, remainingPhysicalPct, buildProgressSnapshotEntry };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HUNDRED = new Prisma.Decimal(100);
@@ -252,7 +254,7 @@ export type JobsiteLogListFilters = {
   status?: string;
 };
 
-/** Sum of incremental physicalPct from jobsite logs, grouped by WBS. */
+/** Sum of incremental physicalPct (+ qty) from jobsite logs, grouped by WBS. */
 export async function getWbsIncrementalProgressSnapshot(
   projectId: string,
   ctx: ServiceContext,
@@ -268,7 +270,6 @@ export async function getWbsIncrementalProgressSnapshot(
     : ["APPROVED"];
   const rows = await prisma.jobsiteLogProgress.findMany({
     where: {
-      physicalPct: { not: null },
       jobsiteLog: {
         tenantId: ctx.tenantId,
         projectId,
@@ -276,19 +277,26 @@ export async function getWbsIncrementalProgressSnapshot(
         ...(options?.excludeLogId ? { id: { not: options.excludeLogId } } : {}),
       },
     },
-    select: { wbsNodeId: true, physicalPct: true },
+    select: { wbsNodeId: true, physicalPct: true, quantityCompleted: true },
   });
 
-  const sums = new Map<string, Prisma.Decimal>();
+  const pctSums = new Map<string, Prisma.Decimal>();
+  const qtySums = new Map<string, Prisma.Decimal>();
   for (const row of rows) {
-    if (!row.physicalPct) continue;
-    const prev = sums.get(row.wbsNodeId) ?? new Prisma.Decimal(0);
-    sums.set(row.wbsNodeId, prev.add(row.physicalPct));
+    if (row.physicalPct) {
+      const prev = pctSums.get(row.wbsNodeId) ?? new Prisma.Decimal(0);
+      pctSums.set(row.wbsNodeId, prev.add(row.physicalPct));
+    }
+    const prevQty = qtySums.get(row.wbsNodeId) ?? new Prisma.Decimal(0);
+    qtySums.set(row.wbsNodeId, prevQty.add(row.quantityCompleted));
   }
 
+  const wbsIds = new Set([...pctSums.keys(), ...qtySums.keys()]);
   const out: WbsIncrementalProgressSnapshot = {};
-  for (const [wbsNodeId, total] of sums) {
-    out[wbsNodeId] = { approvedIncrementalPct: total.toFixed(2) };
+  for (const wbsNodeId of wbsIds) {
+    const pct = pctSums.get(wbsNodeId) ?? new Prisma.Decimal(0);
+    const qty = qtySums.get(wbsNodeId) ?? new Prisma.Decimal(0);
+    out[wbsNodeId] = buildProgressSnapshotEntry(pct.toFixed(2), qty.toFixed(4));
   }
   return out;
 }
@@ -1205,7 +1213,7 @@ export async function listProjectWbsItemsForLog(projectId: string, ctx: ServiceC
       name: true,
       parentId: true,
       sortOrder: true,
-      costItem: { select: { unit: true } },
+      costItem: { select: { unit: true, quantity: true } },
     },
   });
   return sortTreeOrder(nodes, (a, b) => a.code.localeCompare(b.code, "es"));

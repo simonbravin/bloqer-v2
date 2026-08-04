@@ -12,8 +12,8 @@ import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import {
   getCertificationById,
-  getWbsTree,
   getActiveInvoiceForCertification,
+  listCertificationWbsHints,
   listEntityDocuments,
   ServiceError,
 } from "@bloqer/services";
@@ -34,22 +34,6 @@ interface PageProps {
   params: Promise<{ id: string; certId: string }>;
 }
 
-function flattenItemNodes(
-  nodes: Awaited<ReturnType<typeof getWbsTree>>,
-): { id: string; code: string; name: string; unit: string }[] {
-  const result: { id: string; code: string; name: string; unit: string }[] = [];
-  function walk(ns: typeof nodes) {
-    for (const n of ns) {
-      if (n.type === "ITEM" && n.costItem) {
-        result.push({ id: n.id, code: n.code, name: n.name, unit: n.costItem.unit });
-      }
-      walk(n.children);
-    }
-  }
-  walk(nodes);
-  return result;
-}
-
 export default async function CertificacionDetailPage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -63,12 +47,12 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
   };
 
   let cert;
-  let wbsTree;
+  let allItems: Awaited<ReturnType<typeof listCertificationWbsHints>> = [];
   let existingInvoice: { id: string; code: string } | null = null;
   try {
     cert = await getCertificationById(certId, ctx);
-    [wbsTree, existingInvoice] = await Promise.all([
-      getWbsTree(cert.budgetId, ctx),
+    [allItems, existingInvoice] = await Promise.all([
+      listCertificationWbsHints(certId, ctx),
       getActiveInvoiceForCertification(certId, ctx),
     ]);
   } catch (err) {
@@ -83,7 +67,6 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
   const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "CERTIFICATIONS");
 
   const editable = cert.status === "DRAFT";
-  const allItems = flattenItemNodes(wbsTree);
 
   return (
     <PageShell variant="default" className="space-y-4" breadcrumbLabel={cert.code}>

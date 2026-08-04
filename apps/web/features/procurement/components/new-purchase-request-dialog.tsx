@@ -68,7 +68,8 @@ export function NewPurchaseRequestDialog({
       Boolean(searchParams.get("wbsNodeId")) ||
       Boolean(searchParams.get("description")) ||
       Boolean(searchParams.get("quantity")) ||
-      Boolean(searchParams.get("productId"));
+      Boolean(searchParams.get("productId")) ||
+      Boolean(searchParams.get("unit"));
     if (!hasCreate && !hasPrefill) return;
 
     const next = new URLSearchParams(searchParams.toString());
@@ -78,6 +79,8 @@ export function NewPurchaseRequestDialog({
     next.delete("description");
     next.delete("quantity");
     next.delete("productId");
+    next.delete("costAnalysisLineId");
+    next.delete("unit");
     const query = next.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
