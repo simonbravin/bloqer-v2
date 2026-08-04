@@ -2,7 +2,6 @@ import { notFound, redirect } from "next/navigation";
 import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { Suspense } from "react";
-import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
@@ -17,9 +16,12 @@ import {
 } from "@/components/ui/table";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  getJobsiteLogFormPickList,
   getProjectShellInfo,
   getPrimaryScheduleItemIdsByWbs,
   getScheduleLinkedWbsNodeIds,
+  getWbsIncrementalProgressSnapshot,
+  hasLegacyPhysicalPctOverflow,
   listJobsiteLogsByProject,
   listProjectWbsItemsForLog,
   ServiceError,
@@ -28,13 +30,21 @@ import {
   JobsiteLogListFilters,
   JobsiteLogStatusBadge,
   JobsiteLogWorkspaceView,
+  NewJobsiteLogDialog,
   type JobsiteLogListRow,
 } from "@/features/jobsite-log";
 import { PageShell } from "@/components/layout/page-shell";
+import { createJobsiteLogAction, getStockBalancePreviewAction } from "./actions";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ dateFrom?: string; dateTo?: string; wbsNodeId?: string; status?: string }>;
+  searchParams: Promise<{
+    dateFrom?: string;
+    dateTo?: string;
+    wbsNodeId?: string;
+    status?: string;
+    create?: string;
+  }>;
 }
 
 export default async function LibroObraPage({ params, searchParams }: PageProps) {
@@ -67,20 +77,23 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
   const hasFilters = Boolean(sp.dateFrom || sp.dateTo || sp.wbsNodeId || sp.status);
 
   let logs: Awaited<ReturnType<typeof listJobsiteLogsByProject>> = [];
-  let scheduleWbsIds = new Set<string>();
   let scheduleItemByWbs = new Map<string, string>();
-  let wbsOptions: Awaited<ReturnType<typeof listProjectWbsItemsForLog>> = [];
   let filterError: string | null = null;
   let wbsLoadError = false;
+
+  // Form picklists independent of list filters — CONFLICT on filters must not wipe WBS options.
+  const [pickList, wbsProgressSnapshot, scheduleWbsIds, wbsOptions] = await Promise.all([
+    getJobsiteLogFormPickList(projectId, ctx),
+    getWbsIncrementalProgressSnapshot(projectId, ctx),
+    getScheduleLinkedWbsNodeIds(projectId, ctx).then((ids) => new Set(ids)),
+    listProjectWbsItemsForLog(projectId, ctx).catch(() => {
+      wbsLoadError = true;
+      return [] as Awaited<ReturnType<typeof listProjectWbsItemsForLog>>;
+    }),
+  ]);
+
   try {
-    [logs, scheduleWbsIds, wbsOptions] = await Promise.all([
-      listJobsiteLogsByProject(projectId, filters, ctx),
-      getScheduleLinkedWbsNodeIds(projectId, ctx).then((ids) => new Set(ids)),
-      listProjectWbsItemsForLog(projectId, ctx).catch(() => {
-        wbsLoadError = true;
-        return [];
-      }),
-    ]);
+    logs = await listJobsiteLogsByProject(projectId, filters, ctx);
     const wbsIdsForLinks = [
       ...new Set(logs.flatMap((l) => l.progress.map((p) => p.wbsNodeId))),
     ].filter((id) => scheduleWbsIds.has(id));
@@ -99,6 +112,15 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
     }
   }
 
+  const companyId = pickList.companyId || current.tenantCtx.companyId || "";
+  const formWbsOptions = wbsOptions.map((n) => ({
+    id: n.id,
+    code: n.code,
+    name: n.name,
+    unit: n.costItem?.unit ?? "",
+    budgetQty: n.costItem?.quantity?.toString(),
+  }));
+
   const subtitleParts = [`${logs.length} ${logs.length === 1 ? "parte" : "partes"}`];
   if (hasFilters) subtitleParts.push("filtrado");
 
@@ -108,9 +130,27 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
         title="Libro de obra"
         subtitle={subtitleParts.join(" · ")}
         actions={
-          <Button asChild>
-            <Link href={`/proyectos/${projectId}/libro-obra/nuevo`}>+ Nuevo parte</Link>
-          </Button>
+          <Suspense fallback={null}>
+            <NewJobsiteLogDialog
+              projectId={projectId}
+              companyId={companyId}
+              wbsOptions={formWbsOptions}
+              contactOptions={pickList.contactOptions}
+              productOptions={pickList.productOptions}
+              warehouseOptions={pickList.warehouseOptions}
+              subcontractOptions={pickList.subcontractOptions.map((s) => ({
+                id: s.id,
+                code: `SC-${String(s.number).padStart(3, "0")}`,
+                title: s.title,
+              }))}
+              wbsProgressSnapshot={wbsProgressSnapshot}
+              legacyPhysicalPctWarning={hasLegacyPhysicalPctOverflow(wbsProgressSnapshot)}
+              inventoryModuleEnabled={pickList.inventoryModuleEnabled}
+              stockPreviewAction={getStockBalancePreviewAction}
+              action={createJobsiteLogAction}
+              defaultOpen={sp.create === "1"}
+            />
+          </Suspense>
         }
       />
 

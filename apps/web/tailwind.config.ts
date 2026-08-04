@@ -57,10 +57,11 @@ const config: Config = {
   				foreground: 'hsl(var(--sidebar-foreground))',
   				border: 'hsl(var(--sidebar-border))'
   			},
-  			workspace: {
-  				DEFAULT: 'hsl(var(--workspace))',
-  				foreground: 'hsl(var(--workspace-foreground))'
-  			}
+			workspace: {
+				DEFAULT: 'hsl(var(--workspace))',
+				foreground: 'hsl(var(--workspace-foreground))'
+			},
+			'form-section': 'hsl(var(--form-section))'
   		},
   		borderRadius: {
   			lg: 'var(--radius)',

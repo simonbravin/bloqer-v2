@@ -103,7 +103,7 @@ export function CostItemPanel({
   return (
     <div className="space-y-4">
       {/* CostItem header */}
-      <div className="rounded-lg border p-4 space-y-3">
+      <div className="form-section space-y-3 p-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">Datos del ítem</h3>
           {editable && !editingItem && (
@@ -182,8 +182,8 @@ export function CostItemPanel({
       </div>
 
       {/* Analysis lines */}
-      <div className="rounded-lg border">
-        <div className="flex items-center justify-between border-b px-4 py-3">
+      <div className="form-section overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border/80 px-4 py-3">
           <h3 className="text-sm font-semibold">Análisis de precio unitario (APU)</h3>
           {editable && (
             <Button size="sm" variant="outline" onClick={() => setDialogState({ type: "add" })}>

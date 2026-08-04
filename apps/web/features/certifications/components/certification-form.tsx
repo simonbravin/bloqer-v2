@@ -20,9 +20,20 @@ interface CertificationFormProps {
   budgets: BudgetOption[];
   defaultBudgetId?: string;
   onSubmit: (data: CreateCertificationInput) => Promise<{ id: string } | { error: string }>;
+  variant?: "card" | "plain";
+  onCancel?: () => void;
+  onSuccess?: () => void;
 }
 
-export function CertificationForm({ projectId, budgets, defaultBudgetId, onSubmit }: CertificationFormProps) {
+export function CertificationForm({
+  projectId,
+  budgets,
+  defaultBudgetId,
+  onSubmit,
+  variant = "card",
+  onCancel,
+  onSuccess,
+}: CertificationFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -42,88 +53,97 @@ export function CertificationForm({ projectId, budgets, defaultBudgetId, onSubmi
       if ("error" in result) {
         setServerError(result.error);
       } else {
-        router.push(`/proyectos/${projectId}/certificaciones/${result.id}`);
+        onSuccess?.();
+        // replace avoids Back landing on ?create=1 and reopening the dialog
+        router.replace(`/proyectos/${projectId}/certificaciones/${result.id}`);
       }
     });
   });
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      {budgets.length > 1 && (
+    <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {budgets.length > 1 && (
+          <div className="space-y-1.5">
+            <Label htmlFor="cert-budget">Presupuesto *</Label>
+            <Select
+              value={form.watch("budgetId")}
+              onValueChange={(v) => form.setValue("budgetId", v)}
+            >
+              <SelectTrigger id="cert-budget">
+                <SelectValue placeholder="Seleccionar presupuesto..." />
+              </SelectTrigger>
+              <SelectContent>
+                {budgets.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    v{b.versionNumber} — {b.name} ({b.status})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.formState.errors.budgetId && (
+              <p className="text-xs text-destructive">{form.formState.errors.budgetId.message}</p>
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="cert-period-start">Inicio del período *</Label>
+            <Input id="cert-period-start" type="date" {...form.register("periodStart")} />
+            {form.formState.errors.periodStart && (
+              <p className="text-xs text-destructive">{form.formState.errors.periodStart.message}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cert-period-end">Fin del período *</Label>
+            <Input id="cert-period-end" type="date" {...form.register("periodEnd")} />
+            {form.formState.errors.periodEnd && (
+              <p className="text-xs text-destructive">{form.formState.errors.periodEnd.message}</p>
+            )}
+          </div>
+        </div>
+
         <div className="space-y-1.5">
-          <Label htmlFor="cert-budget">Presupuesto *</Label>
-          <Select
-            value={form.watch("budgetId")}
-            onValueChange={(v) => form.setValue("budgetId", v)}
+          <Label htmlFor="cert-notes">Notas para el cliente</Label>
+          <Textarea
+            id="cert-notes"
+            rows={3}
+            placeholder="Observaciones o aclaraciones para el cliente..."
+            {...form.register("notes")}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="cert-internal-notes">Notas internas</Label>
+          <Textarea
+            id="cert-internal-notes"
+            rows={2}
+            placeholder="Notas internas (no visibles al cliente)..."
+            {...form.register("internalNotes")}
+          />
+        </div>
+
+        {serverError && (
+          <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
+            {serverError}
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <Button type="submit" disabled={isPending}>
+            {isPending ? "Creando..." : "Crear certificación"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => (onCancel ? onCancel() : router.back())}
+            disabled={isPending}
           >
-            <SelectTrigger id="cert-budget">
-              <SelectValue placeholder="Seleccionar presupuesto..." />
-            </SelectTrigger>
-            <SelectContent>
-              {budgets.map((b) => (
-                <SelectItem key={b.id} value={b.id}>
-                  v{b.versionNumber} — {b.name} ({b.status})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {form.formState.errors.budgetId && (
-            <p className="text-xs text-destructive">{form.formState.errors.budgetId.message}</p>
-          )}
+            Cancelar
+          </Button>
         </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="cert-period-start">Inicio del período *</Label>
-          <Input id="cert-period-start" type="date" {...form.register("periodStart")} />
-          {form.formState.errors.periodStart && (
-            <p className="text-xs text-destructive">{form.formState.errors.periodStart.message}</p>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="cert-period-end">Fin del período *</Label>
-          <Input id="cert-period-end" type="date" {...form.register("periodEnd")} />
-          {form.formState.errors.periodEnd && (
-            <p className="text-xs text-destructive">{form.formState.errors.periodEnd.message}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="cert-notes">Notas para el cliente</Label>
-        <Textarea
-          id="cert-notes"
-          rows={3}
-          placeholder="Observaciones o aclaraciones para el cliente..."
-          {...form.register("notes")}
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="cert-internal-notes">Notas internas</Label>
-        <Textarea
-          id="cert-internal-notes"
-          rows={2}
-          placeholder="Notas internas (no visibles al cliente)..."
-          {...form.register("internalNotes")}
-        />
-      </div>
-
-      {serverError && (
-        <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
-          {serverError}
-        </div>
-      )}
-
-      <div className="flex gap-3">
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Creando..." : "Crear certificación"}
-        </Button>
-        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isPending}>
-          Cancelar
-        </Button>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 }

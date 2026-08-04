@@ -509,7 +509,7 @@ export function CostItemApuDialog({
 
           <div className="flex-1 space-y-3 overflow-y-auto px-5 py-3">
             {/* 1. Datos del ítem */}
-            <section className="space-y-2 rounded-md border p-3">
+            <section className="form-section space-y-2 p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Datos del ítem
@@ -603,7 +603,7 @@ export function CostItemApuDialog({
             </section>
 
             {/* 3. Insumos APU — alta arriba, listado abajo */}
-            <section className="space-y-2 rounded-md border p-3">
+            <section className="form-section space-y-2 p-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Insumos APU
               </h3>

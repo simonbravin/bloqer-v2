@@ -68,8 +68,7 @@ export default async function EditarParteObraPage({ params }: PageProps) {
         title="Editar parte de obra"
         subtitle={formatDateLong(log.logDate)}
       />
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
-        <JobsiteLogForm
+      <JobsiteLogForm
         projectId={projectId}
         companyId={companyId}
         wbsOptions={wbsRaw.map((n) => ({
@@ -101,9 +100,6 @@ export default async function EditarParteObraPage({ params }: PageProps) {
           shift: log.shift ?? "",
           weather: log.weather ?? "",
           generalNotes: log.generalNotes ?? "",
-          blockers: log.blockers ?? "",
-          incidents: log.incidents ?? "",
-          safetyNotes: log.safetyNotes ?? "",
           progress: log.progress.map((p) => ({
             wbsNodeId: p.wbsNodeId,
             description: p.description ?? "",
@@ -134,8 +130,7 @@ export default async function EditarParteObraPage({ params }: PageProps) {
             notes: iss.notes ?? "",
           })),
         }}
-        />
-      </div>
+      />
     </PageShell>
   );
 }

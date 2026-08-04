@@ -316,103 +316,105 @@ export function PurchaseOrderLinesEditor({
                 </div>
               </div>
 
-              {/* Row 2: description + amounts (12 cols: product optional). */}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-12">
-                {productOptions.length > 0 && (
-                  <div className="col-span-2 space-y-1 sm:col-span-2">
-                    <Label className="text-xs">Producto</Label>
-                    <SearchableCombobox
-                      popoverWidth="wide"
-                      className="h-8 text-xs"
-                      options={productComboboxOptions}
-                      value={line.productId ?? SEARCHABLE_NONE}
-                      onValueChange={(v) => {
-                        const selected = productOptions.find((pr) => pr.id === v);
-                        const next = {
-                          ...lines[i],
-                          productId: v === SEARCHABLE_NONE ? null : v,
-                        };
-                        if (selected && !lines[i].unit) next.unit = selected.unit;
-                        onChange(lines.map((l, idx) => (idx === i ? next : l)));
-                      }}
-                      placeholder="Sin producto"
-                      searchPlaceholder="Buscar producto…"
-                    />
-                  </div>
-                )}
-                <div
-                  className={`col-span-2 space-y-1 ${
-                    productOptions.length > 0 ? "sm:col-span-3" : "sm:col-span-5"
-                  }`}
-                >
-                  <Label className="text-xs">Descripción</Label>
-                  <Input
-                    required
-                    value={line.description}
-                    onChange={(e) => update(i, "description", e.target.value)}
-                    placeholder="Descripción"
-                    className="h-8 text-sm"
+              {productOptions.length > 0 && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Producto</Label>
+                  <SearchableCombobox
+                    popoverWidth="wide"
+                    className="h-8 text-xs"
+                    options={productComboboxOptions}
+                    value={line.productId ?? SEARCHABLE_NONE}
+                    onValueChange={(v) => {
+                      const selected = productOptions.find((pr) => pr.id === v);
+                      const next = {
+                        ...lines[i],
+                        productId: v === SEARCHABLE_NONE ? null : v,
+                      };
+                      if (selected && !lines[i].unit) next.unit = selected.unit;
+                      onChange(lines.map((l, idx) => (idx === i ? next : l)));
+                    }}
+                    placeholder="Sin producto"
+                    searchPlaceholder="Buscar producto…"
                   />
                 </div>
-                <div className="space-y-1 sm:col-span-1">
+              )}
+
+              {/* Descripción en fila completa para leer/editar sin apretar montos. */}
+              <div className="space-y-1">
+                <Label className="text-xs">Descripción</Label>
+                <Input
+                  required
+                  value={line.description}
+                  onChange={(e) => update(i, "description", e.target.value)}
+                  placeholder="Descripción del ítem"
+                  className="h-9 text-sm"
+                />
+              </div>
+
+              {/* Montos: una fila con columnas legibles. */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Unidad</Label>
                   <UnitSelect
                     value={line.unit}
                     onChange={(v) => update(i, "unit", v)}
                     placeholder="un"
-                    className="h-8 text-sm"
+                    className="h-9 text-sm w-full"
                   />
                 </div>
-                <div className="space-y-1 sm:col-span-1">
-                  <Label className="text-xs">Cant.</Label>
+                <div className="space-y-1 min-w-0">
+                  <Label className="text-xs">Cantidad</Label>
                   <Input
                     required
                     value={line.quantity}
                     onChange={(e) => update(i, "quantity", e.target.value)}
                     placeholder="1"
-                    className="h-8 text-sm"
+                    inputMode="decimal"
+                    className="h-9 text-sm tabular-nums"
                   />
                 </div>
-                <div className="space-y-1 sm:col-span-2">
+                <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Precio unit.</Label>
                   <Input
                     required
                     value={line.unitPrice}
                     onChange={(e) => update(i, "unitPrice", e.target.value)}
                     placeholder="0.00"
-                    className="h-8 text-sm"
+                    inputMode="decimal"
+                    className="h-9 text-sm tabular-nums"
                   />
                 </div>
-                <div className="space-y-1 sm:col-span-1">
+                <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Ref. presup.</Label>
-                  <div className="flex h-8 items-center text-xs tabular-nums text-muted-foreground">
+                  <div className="flex h-9 items-center text-sm tabular-nums text-muted-foreground">
                     {wbs?.budgetUnitCost != null ? (
                       <button
                         type="button"
                         onClick={() => fillBudgetUnitPrice(i, wbs)}
                         title="Usar este costo como precio unitario"
-                        className="text-left underline decoration-dotted underline-offset-2 hover:text-foreground"
+                        className="text-left underline decoration-dotted underline-offset-2 hover:text-foreground truncate max-w-full"
                       >
                         {formatDecimalAr(Number(wbs.budgetUnitCost))}
-                        {wbs.budgetUnit ? ` / ${wbs.budgetUnit}` : ""}
+                        {wbs.budgetUnit ? ` / ${budgetUnitLabel(wbs.budgetUnit) || wbs.budgetUnit}` : ""}
                       </button>
                     ) : (
                       "—"
                     )}
                   </div>
                 </div>
-                <div className="space-y-1 sm:col-span-1">
+                <div className="space-y-1 min-w-0">
                   <Label className="text-xs">IVA %</Label>
                   <Input
                     value={line.taxRate}
                     onChange={(e) => update(i, "taxRate", e.target.value)}
                     placeholder="21"
-                    className="h-8 text-sm"
+                    inputMode="decimal"
+                    className="h-9 text-sm tabular-nums"
                   />
                 </div>
-                <div className="space-y-1 sm:col-span-1">
+                <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Total</Label>
-                  <p className="flex h-8 items-center justify-end text-sm tabular-nums font-medium">
+                  <p className="flex h-9 items-center text-sm tabular-nums font-semibold">
                     {formatDecimalAr(p.total)}
                   </p>
                 </div>

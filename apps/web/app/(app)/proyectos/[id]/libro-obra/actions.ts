@@ -38,11 +38,18 @@ function handle(err: unknown): Err {
   return { error: "Error inesperado" };
 }
 
-function parseJsonArray(fd: FormData, key: string) {
+function parseJsonArray(fd: FormData, key: string): unknown[] {
+  const raw = fd.get(key);
+  if (raw == null || raw === "") return [];
   try {
-    return JSON.parse((fd.get(key) as string) ?? "[]");
-  } catch {
-    return [];
+    const parsed = JSON.parse(String(raw));
+    if (!Array.isArray(parsed)) {
+      throw new Error(`Campo "${key}" inválido`);
+    }
+    return parsed;
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('Campo "')) throw err;
+    throw new Error(`Campo "${key}" inválido`);
   }
 }
 
@@ -88,7 +95,19 @@ export async function createJobsiteLogAction(
 ): Promise<{ error: string } | { id: string }> {
   try {
     const ctx = await getCtx();
-    const raw = {
+    let progress: unknown[];
+    let labor: unknown[];
+    let materials: unknown[];
+    let issues: unknown[];
+    try {
+      progress = parseJsonArray(fd, "progress");
+      labor = parseJsonArray(fd, "labor");
+      materials = parseJsonArray(fd, "materials");
+      issues = parseJsonArray(fd, "issues");
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Datos de líneas inválidos" };
+    }
+    const parsed = createJobsiteLogSchema.safeParse({
       companyId: fd.get("companyId") as string,
       projectId: fd.get("projectId") as string,
       logDate: fd.get("logDate") as string,
@@ -97,17 +116,20 @@ export async function createJobsiteLogAction(
       shift: (fd.get("shift") as string) || null,
       weather: (fd.get("weather") as string) || null,
       generalNotes: (fd.get("generalNotes") as string) || null,
-      blockers: (fd.get("blockers") as string) || null,
-      incidents: (fd.get("incidents") as string) || null,
-      safetyNotes: (fd.get("safetyNotes") as string) || null,
-      progress: parseJsonArray(fd, "progress"),
-      labor: parseJsonArray(fd, "labor"),
-      materials: parseJsonArray(fd, "materials"),
-      issues: parseJsonArray(fd, "issues"),
-    };
-    const input = createJobsiteLogSchema.parse(raw);
-    const log = await createJobsiteLog(input, ctx);
-    revalidateJobsiteLogPaths(input.projectId, log.id);
+      // Free-text legacy fields: no UI capture; persist null on create.
+      blockers: null,
+      incidents: null,
+      safetyNotes: null,
+      progress,
+      labor,
+      materials,
+      issues,
+    });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    }
+    const log = await createJobsiteLog(parsed.data, ctx);
+    revalidateJobsiteLogPaths(parsed.data.projectId, log.id);
     return { id: log.id };
   } catch (err) {
     return handle(err);
@@ -120,23 +142,36 @@ export async function updateJobsiteLogAction(
 ): Promise<{ error: string } | { id: string }> {
   try {
     const ctx = await getCtx();
-    const raw = {
+    let progress: unknown[];
+    let labor: unknown[];
+    let materials: unknown[];
+    let issues: unknown[];
+    try {
+      progress = parseJsonArray(fd, "progress");
+      labor = parseJsonArray(fd, "labor");
+      materials = parseJsonArray(fd, "materials");
+      issues = parseJsonArray(fd, "issues");
+    } catch (err) {
+      // Never fall back to [] on update — that would wipe existing children.
+      return { error: err instanceof Error ? err.message : "Datos de líneas inválidos" };
+    }
+    // Do NOT send blockers/incidents/safetyNotes — omitting keeps legacy values (service undefined → existing).
+    const parsed = updateJobsiteLogSchema.safeParse({
       logDate: (fd.get("logDate") as string) || undefined,
       title: (fd.get("title") as string) || null,
       workFront: (fd.get("workFront") as string) || null,
       shift: (fd.get("shift") as string) || null,
       weather: (fd.get("weather") as string) || null,
       generalNotes: (fd.get("generalNotes") as string) || null,
-      blockers: (fd.get("blockers") as string) || null,
-      incidents: (fd.get("incidents") as string) || null,
-      safetyNotes: (fd.get("safetyNotes") as string) || null,
-      progress: parseJsonArray(fd, "progress"),
-      labor: parseJsonArray(fd, "labor"),
-      materials: parseJsonArray(fd, "materials"),
-      issues: parseJsonArray(fd, "issues"),
-    };
-    const input = updateJobsiteLogSchema.parse(raw);
-    const log = await updateJobsiteLog(logId, input, ctx);
+      progress,
+      labor,
+      materials,
+      issues,
+    });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    }
+    const log = await updateJobsiteLog(logId, parsed.data, ctx);
     revalidateJobsiteLogPaths(log.projectId, logId);
     return { id: log.id };
   } catch (err) {

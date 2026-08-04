@@ -1,24 +1,30 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
-import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
-import { CertificationListSection } from "@/features/certifications";
+import { CertificationListSection, NewCertificationDialog } from "@/features/certifications";
 import { getCurrentUser } from "@/lib/auth";
-import { listCertificationsByProject, getProjectShellInfo, ServiceError } from "@bloqer/services";
+import {
+  listBudgetsByProject,
+  listCertificationsByProject,
+  getProjectShellInfo,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+import { createCertificationAction } from "./actions";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ create?: string }>;
 }
 
-export default async function CertificacionesPage({ params }: PageProps) {
+export default async function CertificacionesPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id } = await params;
+  const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -34,7 +40,19 @@ export default async function CertificacionesPage({ params }: PageProps) {
     throw err;
   }
 
-  const certs = await listCertificationsByProject(id, ctx);
+  const [certs, allBudgets] = await Promise.all([
+    listCertificationsByProject(id, ctx),
+    listBudgetsByProject(id, ctx),
+  ]);
+
+  const eligibleBudgets = allBudgets
+    .filter((b) => b.status === "APPROVED" || b.status === "CLOSED")
+    .map((b) => ({
+      id: b.id,
+      name: b.name,
+      versionNumber: b.versionNumber,
+      status: b.status,
+    }));
 
   const serialized = certs.map((c) => ({
     id: c.id,
@@ -57,9 +75,17 @@ export default async function CertificacionesPage({ params }: PageProps) {
             <Suspense fallback={null}>
               <ListViewToggle storageKey={`certificaciones-${id}`} />
             </Suspense>
-            <Button asChild>
-              <Link href={`/proyectos/${id}/certificaciones/nueva`}>Nueva certificación</Link>
-            </Button>
+            <Suspense fallback={null}>
+              <NewCertificationDialog
+                projectId={id}
+                budgets={eligibleBudgets}
+                defaultBudgetId={
+                  eligibleBudgets.length === 1 ? eligibleBudgets[0]!.id : undefined
+                }
+                onSubmit={createCertificationAction.bind(null, id)}
+                defaultOpen={sp.create === "1"}
+              />
+            </Suspense>
           </>
         }
       />

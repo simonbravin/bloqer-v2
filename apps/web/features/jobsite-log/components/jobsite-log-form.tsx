@@ -16,6 +16,12 @@ import {
 } from "@/components/ui/searchable-combobox";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { WbsIncrementalProgressSnapshot } from "@bloqer/services";
+import {
+  JOBSITE_SHIFT_OPTIONS,
+  JOBSITE_WEATHER_OPTIONS,
+  isKnownJobsiteShift,
+  isKnownJobsiteWeather,
+} from "../lib/jobsite-log-options";
 
 export type WbsItemOption = {
   id: string;
@@ -49,6 +55,18 @@ function parseNum(v: string): number {
 
 function isValidProgressLine(p: ProgressLine): boolean {
   return p.wbsNodeId !== "__none__" && QTY_RE.test(p.quantityCompleted);
+}
+
+/** Drop blank draft rows (defaults are workersCount=1 with no other fields). */
+function isMeaningfulLaborLine(l: LaborLine): boolean {
+  return (
+    l.contactId !== "__none__" ||
+    l.subcontractId !== "__none__" ||
+    Boolean(l.crewDescription.trim()) ||
+    Boolean(l.hoursWorked.trim()) ||
+    Boolean(l.notes.trim()) ||
+    (Boolean(l.workersCount.trim()) && l.workersCount !== "1")
+  );
 }
 
 function fmtHintQty(raw: string | undefined): string {
@@ -127,9 +145,6 @@ type Props = {
     shift: string;
     weather: string;
     generalNotes: string;
-    blockers: string;
-    incidents: string;
-    safetyNotes: string;
     progress: ProgressLine[];
     labor: LaborLine[];
     materials: MaterialLine[];
@@ -137,7 +152,13 @@ type Props = {
   };
   submitLabel?: string;
   mode?: "create" | "edit";
+  onCancel?: () => void;
+  onSuccess?: () => void;
 };
+
+const SELECT_NONE = "__none__";
+const SHIFT_CUSTOM = "__custom_shift__";
+const WEATHER_CUSTOM = "__custom_weather__";
 
 export function JobsiteLogForm({
   projectId, companyId, wbsOptions, contactOptions, productOptions, warehouseOptions, subcontractOptions,
@@ -146,6 +167,8 @@ export function JobsiteLogForm({
   legacyPhysicalPctWarning = false,
   stockPreviewAction,
   action, defaultValues, submitLabel = "Crear parte", mode = "create",
+  onCancel,
+  onSuccess,
 }: Props) {
   const router = useRouter();
 
@@ -153,10 +176,23 @@ export function JobsiteLogForm({
   const [labor,     setLabor]     = useState<LaborLine[]>(defaultValues?.labor     ?? []);
   const [materials, setMaterials] = useState<MaterialLine[]>(defaultValues?.materials ?? []);
   const [issues,    setIssues]    = useState<IssueLine[]>(defaultValues?.issues    ?? []);
+  const [shift, setShift] = useState(defaultValues?.shift ?? "");
+  const [weather, setWeather] = useState(defaultValues?.weather ?? "");
   const [error,     setError]     = useState<string | null>(null);
   const [pending,   setPending]   = useState(false);
   const [stockByKey, setStockByKey] = useState<Record<string, string>>({});
   const stockTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const shiftSelectValue = !shift
+    ? SELECT_NONE
+    : isKnownJobsiteShift(shift)
+      ? shift
+      : SHIFT_CUSTOM;
+  const weatherSelectValue = !weather
+    ? SELECT_NONE
+    : isKnownJobsiteWeather(weather)
+      ? weather
+      : WEATHER_CUSTOM;
 
   const progressWbsOptions = useMemo(
     () => wbsToSearchableOptions(wbsOptions),
@@ -297,7 +333,7 @@ export function JobsiteLogForm({
       notes: p.notes || undefined,
       sortOrder: i,
     }))));
-    fd.set("labor", JSON.stringify(labor.map((l, i) => ({
+    fd.set("labor", JSON.stringify(labor.filter(isMeaningfulLaborLine).map((l, i) => ({
       contactId: l.contactId === "__none__" ? undefined : l.contactId,
       subcontractId: l.subcontractId === "__none__" ? undefined : l.subcontractId,
       crewDescription: l.crewDescription || undefined,
@@ -329,10 +365,12 @@ export function JobsiteLogForm({
         setError(result.error);
       } else {
         toast.success(mode === "edit" ? "Parte actualizado." : "Parte guardado.");
+        onSuccess?.();
         if (mode === "edit") {
           router.push("..");
         } else {
-          router.push(`/proyectos/${projectId}/libro-obra/${result.id}`);
+          // replace avoids Back landing on ?create=1 and reopening the dialog
+          router.replace(`/proyectos/${projectId}/libro-obra/${result.id}`);
         }
         router.refresh();
       }
@@ -357,52 +395,80 @@ export function JobsiteLogForm({
           (posible carga acumulada legacy). Ver Q-005b en documentación de producto.
         </div>
       )}
-      <section className="rounded-lg border bg-card p-6 space-y-4">
+      <section className="form-section space-y-4 p-4 sm:p-5">
         <h2 className="font-semibold">Encabezado</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <Label htmlFor="logDate">Fecha *</Label>
-            <Input id="logDate" name="logDate" type="date" required defaultValue={defaultValues?.logDate} />
-          </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1">
             <Label htmlFor="title">Título</Label>
-            <Input id="title" name="title" placeholder="Ej: Jornada mañana - Frente A" defaultValue={defaultValues?.title} />
+            <Input id="title" name="title" placeholder="Ej: Jornada — Frente A" defaultValue={defaultValues?.title} />
           </div>
           <div className="space-y-1">
             <Label htmlFor="workFront">Frente de trabajo</Label>
             <Input id="workFront" name="workFront" defaultValue={defaultValues?.workFront} />
           </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="space-y-1">
-            <Label htmlFor="shift">Turno</Label>
-            <Input id="shift" name="shift" placeholder="Mañana / Tarde / Noche" defaultValue={defaultValues?.shift} />
+            <Label htmlFor="logDate">Fecha *</Label>
+            <Input id="logDate" name="logDate" type="date" required defaultValue={defaultValues?.logDate} />
           </div>
-          <div className="space-y-1 col-span-2">
-            <Label htmlFor="weather">Clima</Label>
-            <Input id="weather" name="weather" placeholder="Soleado, lluvioso…" defaultValue={defaultValues?.weather} />
+          <div className="space-y-1">
+            <Label>Turno</Label>
+            <input type="hidden" name="shift" value={shift} />
+            <Select
+              value={shiftSelectValue}
+              onValueChange={(v) => {
+                if (v === SHIFT_CUSTOM) return;
+                setShift(v === SELECT_NONE ? "" : v);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SELECT_NONE}>— Sin especificar —</SelectItem>
+                {JOBSITE_SHIFT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                ))}
+                {shift && !isKnownJobsiteShift(shift) ? (
+                  <SelectItem value={SHIFT_CUSTOM}>{shift} (actual)</SelectItem>
+                ) : null}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Clima</Label>
+            <input type="hidden" name="weather" value={weather} />
+            <Select
+              value={weatherSelectValue}
+              onValueChange={(v) => {
+                if (v === WEATHER_CUSTOM) return;
+                setWeather(v === SELECT_NONE ? "" : v);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SELECT_NONE}>— Sin especificar —</SelectItem>
+                {JOBSITE_WEATHER_OPTIONS.map((opt) => (
+                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                ))}
+                {weather && !isKnownJobsiteWeather(weather) ? (
+                  <SelectItem value={WEATHER_CUSTOM}>{weather} (actual)</SelectItem>
+                ) : null}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="space-y-1">
           <Label htmlFor="generalNotes">Notas generales</Label>
           <Textarea id="generalNotes" name="generalNotes" rows={3} defaultValue={defaultValues?.generalNotes} />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <Label htmlFor="blockers">Impedimentos</Label>
-            <Textarea id="blockers" name="blockers" rows={2} defaultValue={defaultValues?.blockers} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="incidents">Incidentes</Label>
-            <Textarea id="incidents" name="incidents" rows={2} defaultValue={defaultValues?.incidents} />
-          </div>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="safetyNotes">Observaciones de seguridad</Label>
-          <Textarea id="safetyNotes" name="safetyNotes" rows={2} defaultValue={defaultValues?.safetyNotes} />
-        </div>
       </section>
 
       {/* ── Progress ── */}
-      <section className="rounded-lg border bg-card p-6 space-y-3">
+      <section className="form-section space-y-3 p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Avance de obra</h2>
           <Button type="button" variant="outline" size="sm" onClick={() => setProgress((p) => [...p, { ...DEFAULT_PROGRESS }])}>
@@ -491,7 +557,7 @@ export function JobsiteLogForm({
       </section>
 
       {/* ── Labor ── */}
-      <section className="rounded-lg border bg-card p-6 space-y-3">
+      <section className="form-section space-y-3 p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Mano de obra</h2>
           <Button type="button" variant="outline" size="sm" onClick={() => setLabor((p) => [...p, { ...DEFAULT_LABOR }])}>
@@ -558,7 +624,7 @@ export function JobsiteLogForm({
       </section>
 
       {/* ── Materials ── */}
-      <section className="rounded-lg border bg-card p-6 space-y-3">
+      <section className="form-section space-y-3 p-4 sm:p-5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h2 className="font-semibold">
@@ -625,7 +691,7 @@ export function JobsiteLogForm({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1 sm:col-span-2">
                       <Label className="text-xs">Descripción *</Label>
-                      <Input className="h-8 text-xs" value={row.description} onChange={(e) => updateMaterial(i, "description", e.target.value)} required />
+                      <Input className="h-8 text-xs" value={row.description} onChange={(e) => updateMaterial(i, "description", e.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Cantidad</Label>
@@ -647,7 +713,7 @@ export function JobsiteLogForm({
       </section>
 
       {/* ── Issues ── */}
-      <section className="rounded-lg border bg-card p-6 space-y-3">
+      <section className="form-section space-y-3 p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Problemas / Incidencias</h2>
           <Button type="button" variant="outline" size="sm" onClick={() => setIssues((p) => [...p, { ...DEFAULT_ISSUE }])}>
@@ -659,52 +725,63 @@ export function JobsiteLogForm({
         ) : (
           <div className="space-y-3">
             {issues.map((row, i) => (
-              <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset grid grid-cols-2 sm:grid-cols-5 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Tipo</Label>
-                  <Select value={row.type} onValueChange={(v) => updateIssue(i, "type", v)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="INCIDENT">Incidente</SelectItem>
-                      <SelectItem value="BLOCKER">Bloqueo</SelectItem>
-                      <SelectItem value="SAFETY">Seguridad</SelectItem>
-                      <SelectItem value="OTHER">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tipo</Label>
+                    <Select value={row.type} onValueChange={(v) => updateIssue(i, "type", v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="INCIDENT">Incidente</SelectItem>
+                        <SelectItem value="BLOCKER">Bloqueo</SelectItem>
+                        <SelectItem value="SAFETY">Seguridad</SelectItem>
+                        <SelectItem value="OTHER">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Severidad</Label>
+                    <Select value={row.severity} onValueChange={(v) => updateIssue(i, "severity", v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="LOW">Baja</SelectItem>
+                        <SelectItem value="MEDIUM">Media</SelectItem>
+                        <SelectItem value="HIGH">Alta</SelectItem>
+                        <SelectItem value="CRITICAL">Crítica</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Estado</Label>
+                    <Select value={row.status} onValueChange={(v) => updateIssue(i, "status", v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="OPEN">Abierto</SelectItem>
+                        <SelectItem value="RESOLVED">Resuelto</SelectItem>
+                        <SelectItem value="ESCALATED">Escalado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Severidad</Label>
-                  <Select value={row.severity} onValueChange={(v) => updateIssue(i, "severity", v)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="LOW">Baja</SelectItem>
-                      <SelectItem value="MEDIUM">Media</SelectItem>
-                      <SelectItem value="HIGH">Alta</SelectItem>
-                      <SelectItem value="CRITICAL">Crítica</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1 col-span-2">
                   <Label className="text-xs">Descripción *</Label>
-                  <Input className="h-8 text-xs" value={row.description} onChange={(e) => updateIssue(i, "description", e.target.value)} required />
+                  {/* No HTML required: empty draft rows are dropped on submit (same as materials filter). */}
+                  <Input className="h-8 text-xs" value={row.description} onChange={(e) => updateIssue(i, "description", e.target.value)} />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Estado</Label>
-                  <Select value={row.status} onValueChange={(v) => updateIssue(i, "status", v)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="OPEN">Abierto</SelectItem>
-                      <SelectItem value="RESOLVED">Resuelto</SelectItem>
-                      <SelectItem value="ESCALATED">Escalado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1 col-span-full">
-                  <Label className="text-xs">Notas</Label>
-                  <Input className="h-8 text-xs" value={row.notes} onChange={(e) => updateIssue(i, "notes", e.target.value)} />
-                </div>
-                <div className="col-span-full flex justify-end">
-                  <Button type="button" variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => setIssues((p) => p.filter((_, idx) => idx !== i))}>Eliminar fila</Button>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <Label className="text-xs">Notas</Label>
+                    <Input className="h-8 text-xs" value={row.notes} onChange={(e) => updateIssue(i, "notes", e.target.value)} />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive h-8 shrink-0 px-2 self-end"
+                    onClick={() => setIssues((p) => p.filter((_, idx) => idx !== i))}
+                  >
+                    Eliminar
+                  </Button>
                 </div>
               </div>
             ))}
@@ -716,7 +793,14 @@ export function JobsiteLogForm({
 
       <div className="flex gap-3">
         <Button type="submit" disabled={pending || stockExceeded}>{pending ? "Guardando…" : submitLabel}</Button>
-        <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={pending}
+          onClick={() => (onCancel ? onCancel() : router.back())}
+        >
+          Cancelar
+        </Button>
       </div>
     </form>
   );
