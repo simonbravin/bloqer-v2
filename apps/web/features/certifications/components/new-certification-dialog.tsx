@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { CertificationForm, type BudgetOption } from "./certification-form";
 import type { CreateCertificationInput } from "@bloqer/validators";
 
@@ -38,18 +40,8 @@ export function NewCertificationDialog({
   const hasBudgets = budgets.length > 0;
 
   useEffect(() => {
-    if (defaultOpen && hasBudgets) setOpen(true);
-  }, [defaultOpen, hasBudgets]);
-
-  // No eligible budgets: still clear ?create=1 so the URL does not stay stuck.
-  useEffect(() => {
-    if (hasBudgets) return;
-    if (searchParams.get("create") !== "1") return;
-    const next = new URLSearchParams(searchParams.toString());
-    next.delete("create");
-    const query = next.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [hasBudgets, searchParams, pathname, router]);
+    if (defaultOpen) setOpen(true);
+  }, [defaultOpen]);
 
   function clearCreateQueryParam() {
     if (searchParams.get("create") !== "1") return;
@@ -68,14 +60,6 @@ export function NewCertificationDialog({
     setOpen(false);
   }
 
-  if (!hasBudgets) {
-    return (
-      <Button disabled title="Apruebe un presupuesto antes de crear una certificación">
-        {triggerLabel}
-      </Button>
-    );
-  }
-
   return (
     <Dialog
       open={open}
@@ -91,10 +75,25 @@ export function NewCertificationDialog({
         <DialogHeader>
           <DialogTitle>Nueva certificación</DialogTitle>
           <DialogDescription className="sr-only">
-            Indicá el período y notas para crear la certificación.
+            {hasBudgets
+              ? "Indicá el período y notas para crear la certificación."
+              : "Se necesita un presupuesto aprobado para crear una certificación."}
           </DialogDescription>
         </DialogHeader>
-        {open ? (
+        {!hasBudgets ? (
+          <ListEmptyState
+            className="border-0 bg-transparent p-2"
+            title="No hay presupuesto aprobado"
+            description="Aprobá un presupuesto del proyecto (o usá uno cerrado) antes de crear una certificación."
+            action={
+              <Button asChild variant="outline">
+                <Link href={`/proyectos/${projectId}/presupuestos`} onClick={closeDialog}>
+                  Ir a presupuestos
+                </Link>
+              </Button>
+            }
+          />
+        ) : open ? (
           <CertificationForm
             projectId={projectId}
             budgets={budgets}
