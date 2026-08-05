@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { divideDecimal, roundQty, QTY_DECIMALS } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
@@ -107,6 +107,10 @@ const DEFAULT_LINE: PurchaseOrderLine = {
   taxRate: "21",
 };
 
+function createLineKey(): string {
+  return crypto.randomUUID();
+}
+
 export function PurchaseOrderLinesEditor({
   lines,
   onChange,
@@ -122,6 +126,23 @@ export function PurchaseOrderLinesEditor({
     () => withNoneOption(productsToSearchableOptions(productOptions), { label: "Sin producto" }),
     [productOptions],
   );
+  const [lineKeys, setLineKeys] = useState<string[]>(() =>
+    Array.from({ length: Math.max(lines.length, 1) }, createLineKey),
+  );
+
+  useEffect(() => {
+    setLineKeys((prev) => {
+      if (prev.length === lines.length) return prev;
+      if (lines.length > prev.length) {
+        return [
+          ...prev,
+          ...Array.from({ length: lines.length - prev.length }, createLineKey),
+        ];
+      }
+      if (lines.length <= 1) return [createLineKey()];
+      return prev.slice(0, lines.length);
+    });
+  }, [lines.length]);
 
   function update(i: number, field: keyof PurchaseOrderLine, value: string | null) {
     const next = lines.map((l, idx) => {
@@ -201,11 +222,13 @@ export function PurchaseOrderLinesEditor({
   }
 
   function addLine() {
+    setLineKeys((keys) => [...keys, createLineKey()]);
     onChange([...lines, { ...DEFAULT_LINE }]);
   }
 
   function removeLine(i: number) {
     if (lines.length <= 1) return;
+    setLineKeys((keys) => keys.filter((_, idx) => idx !== i));
     onChange(lines.filter((_, idx) => idx !== i));
   }
 
@@ -232,11 +255,16 @@ export function PurchaseOrderLinesEditor({
 
       <div className="space-y-3">
         {lines.map((line, i) => {
+          const lineKey = lineKeys[i] ?? String(i);
           const p = linePreview(line);
           const wbs = wbsOptions.find((w) => w.id === line.wbsNodeId);
           const selectedApu = wbs?.apuLines?.find((a) => a.id === line.costAnalysisLineId);
           return (
-            <div key={i} className="rounded-lg border bg-card/40 p-3 space-y-3">
+            <section
+              key={lineKey}
+              aria-label={`Línea ${i + 1}`}
+              className="form-section p-3 space-y-3"
+            >
               <div className="flex items-start justify-between gap-2">
                 <p className="text-xs font-medium text-muted-foreground">Línea {i + 1}</p>
                 {lines.length > 1 && (
@@ -244,7 +272,7 @@ export function PurchaseOrderLinesEditor({
                     type="button"
                     onClick={() => removeLine(i)}
                     className="text-muted-foreground hover:text-destructive text-xs"
-                    aria-label="Eliminar línea"
+                    aria-label={`Eliminar línea ${i + 1}`}
                   >
                     ✕
                   </button>
@@ -432,7 +460,7 @@ export function PurchaseOrderLinesEditor({
                   />
                 </div>
               )}
-            </div>
+            </section>
           );
         })}
       </div>

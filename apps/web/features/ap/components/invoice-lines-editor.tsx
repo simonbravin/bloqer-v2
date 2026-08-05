@@ -147,7 +147,11 @@ export function InvoiceLinesEditor({
           const wbsId = `invoice-line-${lineKey}-wbs`;
 
           return (
-            <div key={lineKey} className="rounded-lg border bg-card/40 p-3 space-y-3">
+            <section
+              key={lineKey}
+              aria-label={`Línea ${i + 1}`}
+              className="form-section p-3 space-y-3"
+            >
               <div className="flex items-start justify-between gap-2">
                 <p className="text-xs font-medium text-muted-foreground">Línea {i + 1}</p>
                 {lines.length > 1 && (
@@ -258,7 +262,7 @@ export function InvoiceLinesEditor({
                   </p>
                 </div>
               </div>
-            </div>
+            </section>
           );
         })}
       </div>
