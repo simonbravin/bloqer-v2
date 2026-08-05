@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import {
   addDecimal,
   divideDecimal,
@@ -8,15 +9,7 @@ import {
 } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { TableScroll } from "@/components/ui/table-scroll";
+import { Label } from "@/components/ui/label";
 import { formatDecimalArFromString } from "@/lib/format-money";
 import {
   SearchableCombobox,
@@ -39,6 +32,10 @@ export type InvoiceWbsOption = {
   code: string;
   name: string;
 };
+
+function createLineKey(): string {
+  return crypto.randomUUID();
+}
 
 function safeDecimal(v: string): string {
   const t = v.trim();
@@ -71,7 +68,25 @@ export function InvoiceLinesEditor({
   requireWbs = false,
   wbsOptions = [],
 }: Props) {
-  const wbsCombobox = wbsToSearchableOptions(wbsOptions);
+  const wbsCombobox = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
+  const [lineKeys, setLineKeys] = useState<string[]>(() =>
+    Array.from({ length: Math.max(lines.length, 1) }, createLineKey),
+  );
+
+  // Keep React keys aligned when the parent replaces lines (PO import, form reset, etc.).
+  useEffect(() => {
+    setLineKeys((prev) => {
+      if (prev.length === lines.length) return prev;
+      if (lines.length > prev.length) {
+        return [
+          ...prev,
+          ...Array.from({ length: lines.length - prev.length }, createLineKey),
+        ];
+      }
+      if (lines.length <= 1) return [createLineKey()];
+      return prev.slice(0, lines.length);
+    });
+  }, [lines.length]);
 
   function update(i: number, field: keyof InvoiceLine, value: string | null) {
     const next = lines.map((l, idx) => {
@@ -87,6 +102,7 @@ export function InvoiceLinesEditor({
   }
 
   function addLine() {
+    setLineKeys((keys) => [...keys, createLineKey()]);
     onChange([
       ...lines,
       { description: "", quantity: "1", unitPrice: "", taxRate: "21", wbsNodeId: null, purchaseOrderLineId: null },
@@ -95,6 +111,7 @@ export function InvoiceLinesEditor({
 
   function removeLine(i: number) {
     if (lines.length <= 1) return;
+    setLineKeys((keys) => keys.filter((_, idx) => idx !== i));
     onChange(lines.filter((_, idx) => idx !== i));
   }
 
@@ -119,105 +136,134 @@ export function InvoiceLinesEditor({
         </Button>
       </div>
 
-      <TableScroll>
-        <Table className="min-w-[44rem]">
-          <TableHeader>
-            <TableRow>
-              {requireWbs ? <TableHead className="min-w-[12rem]">Partida EDT</TableHead> : null}
-              <TableHead className="min-w-[14rem]">Descripción</TableHead>
-              <TableHead className="min-w-[5rem] w-[5.5rem]">Cant.</TableHead>
-              <TableHead className="min-w-[7rem] w-[7.5rem]">Precio unit.</TableHead>
-              <TableHead className="min-w-[4.5rem] w-[5rem]">IVA %</TableHead>
-              <TableHead className="min-w-[6rem] text-right">Subtotal</TableHead>
-              <TableHead className="min-w-[5rem] text-right">IVA</TableHead>
-              <TableHead className="min-w-[5.5rem] text-right">Total</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {lines.map((line, i) => {
-              const p = linePreview(line);
-              return (
-                <TableRow key={i} className="align-top">
-                  {requireWbs ? (
-                    <TableCell className="min-w-[12rem] py-2">
-                      <SearchableCombobox
-                        options={wbsCombobox}
-                        value={line.wbsNodeId ?? ""}
-                        onValueChange={(v) =>
-                          update(i, "wbsNodeId", !v || v === SEARCHABLE_NONE ? null : v)
-                        }
-                        placeholder="Partida…"
-                        searchPlaceholder="Buscar partida…"
-                        emptyText="Sin partidas"
-                        className="h-9 text-xs"
-                      />
-                    </TableCell>
-                  ) : null}
-                  <TableCell className="min-w-[14rem] py-2">
-                    <Input
-                      required
-                      value={line.description}
-                      onChange={(e) => update(i, "description", e.target.value)}
-                      placeholder="Descripción del ítem"
-                      className="h-9 w-full min-w-[12rem] text-sm"
-                    />
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <Input
-                      required
-                      value={line.quantity}
-                      onChange={(e) => update(i, "quantity", e.target.value)}
-                      placeholder="1"
-                      className="h-9 w-full min-w-[4rem] text-sm tabular-nums"
-                    />
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <Input
-                      required
-                      value={line.unitPrice}
-                      onChange={(e) => update(i, "unitPrice", e.target.value)}
-                      placeholder="0.00"
-                      className="h-9 w-full min-w-[5.5rem] text-sm tabular-nums"
-                    />
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <Input
-                      value={line.taxRate}
-                      onChange={(e) => update(i, "taxRate", e.target.value)}
-                      placeholder="21"
-                      className="h-9 w-full min-w-[3.5rem] text-sm tabular-nums"
-                    />
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">
-                    {formatDecimalArFromString(p.subtotal)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">
-                    {formatDecimalArFromString(p.tax)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums align-top pt-3">
-                    {formatDecimalArFromString(p.total)}
-                  </TableCell>
-                  <TableCell className="align-top pt-2">
-                    {lines.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeLine(i)}
-                        className="text-muted-foreground hover:text-destructive text-xs"
-                        aria-label="Eliminar línea"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableScroll>
+      <div className="space-y-3">
+        {lines.map((line, i) => {
+          const lineKey = lineKeys[i] ?? String(i);
+          const p = linePreview(line);
+          const descriptionId = `invoice-line-${lineKey}-description`;
+          const quantityId = `invoice-line-${lineKey}-quantity`;
+          const unitPriceId = `invoice-line-${lineKey}-unit-price`;
+          const taxRateId = `invoice-line-${lineKey}-tax-rate`;
+          const wbsId = `invoice-line-${lineKey}-wbs`;
 
-      <div className="flex justify-end gap-8 text-sm border-t pt-3">
+          return (
+            <div key={lineKey} className="rounded-lg border bg-card/40 p-3 space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs font-medium text-muted-foreground">Línea {i + 1}</p>
+                {lines.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeLine(i)}
+                    className="text-muted-foreground hover:text-destructive text-xs"
+                    aria-label={`Eliminar línea ${i + 1}`}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {requireWbs ? (
+                <div className="space-y-1">
+                  <Label htmlFor={wbsId} className="text-xs">
+                    Partida EDT (obligatorio)
+                  </Label>
+                  <SearchableCombobox
+                    id={wbsId}
+                    popoverWidth="wide"
+                    options={wbsCombobox}
+                    value={line.wbsNodeId ?? ""}
+                    onValueChange={(v) =>
+                      update(i, "wbsNodeId", !v || v === SEARCHABLE_NONE ? null : v)
+                    }
+                    placeholder="Partida…"
+                    searchPlaceholder="Buscar partida…"
+                    emptyText="Sin partidas"
+                    className="h-9 text-xs"
+                  />
+                </div>
+              ) : null}
+
+              <div className="space-y-1">
+                <Label htmlFor={descriptionId} className="text-xs">
+                  Descripción
+                </Label>
+                <Input
+                  id={descriptionId}
+                  required
+                  value={line.description}
+                  onChange={(e) => update(i, "description", e.target.value)}
+                  placeholder="Descripción del ítem"
+                  className="h-9 text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                <div className="space-y-1 min-w-0">
+                  <Label htmlFor={quantityId} className="text-xs">
+                    Cantidad
+                  </Label>
+                  <Input
+                    id={quantityId}
+                    required
+                    value={line.quantity}
+                    onChange={(e) => update(i, "quantity", e.target.value)}
+                    placeholder="1"
+                    inputMode="decimal"
+                    className="h-9 text-sm tabular-nums"
+                  />
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <Label htmlFor={unitPriceId} className="text-xs">
+                    Precio unit.
+                  </Label>
+                  <Input
+                    id={unitPriceId}
+                    required
+                    value={line.unitPrice}
+                    onChange={(e) => update(i, "unitPrice", e.target.value)}
+                    placeholder="0.00"
+                    inputMode="decimal"
+                    className="h-9 text-sm tabular-nums"
+                  />
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <Label htmlFor={taxRateId} className="text-xs">
+                    IVA %
+                  </Label>
+                  <Input
+                    id={taxRateId}
+                    value={line.taxRate}
+                    onChange={(e) => update(i, "taxRate", e.target.value)}
+                    placeholder="21"
+                    inputMode="decimal"
+                    className="h-9 text-sm tabular-nums"
+                  />
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <Label className="text-xs">Subtotal</Label>
+                  <p className="flex h-9 items-center text-sm tabular-nums text-muted-foreground">
+                    {formatDecimalArFromString(p.subtotal)}
+                  </p>
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <Label className="text-xs">IVA</Label>
+                  <p className="flex h-9 items-center text-sm tabular-nums text-muted-foreground">
+                    {formatDecimalArFromString(p.tax)}
+                  </p>
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <Label className="text-xs">Total</Label>
+                  <p className="flex h-9 items-center text-sm tabular-nums font-semibold">
+                    {formatDecimalArFromString(p.total)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap justify-end gap-x-8 gap-y-2 border-t pt-3 text-sm">
         <div className="text-right">
           <p className="text-xs text-muted-foreground">Subtotal</p>
           <p className="tabular-nums font-medium">{formatDecimalArFromString(totals.subtotal)}</p>

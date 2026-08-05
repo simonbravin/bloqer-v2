@@ -50,7 +50,14 @@ interface Props {
   storageConfigured?: boolean;
 }
 
-const DEFAULT_LINE: InvoiceLine = { description: "", quantity: "1", unitPrice: "", taxRate: "21" };
+const DEFAULT_LINE: InvoiceLine = {
+  description: "",
+  quantity: "1",
+  unitPrice: "",
+  taxRate: "21",
+  wbsNodeId: null,
+  purchaseOrderLineId: null,
+};
 
 function findTraceEntityId(chain: TraceLink[], entityType: string): string | null {
   return chain.find((l) => l.entityType === entityType)?.entityId ?? null;
