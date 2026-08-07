@@ -20,8 +20,11 @@ import {
 import { formatTimezoneOptionLabel } from "@bloqer/utils";
 import { listTenantAuditLogUrlFiltersSchema, exportTenantAuditLogUrlFiltersSchema } from "@bloqer/validators";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageListHeader } from "@/components/ui/page-list-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 import { TableScroll } from "@/components/ui/table-scroll";
 import {
   Table,
@@ -175,23 +178,24 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
 
   return (
     <PageShell variant="default" className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Registro de actividad</h1>
-          <p className="text-sm text-muted-foreground">
-            Trazabilidad de acciones críticas: quién hizo qué, sobre qué entidad y cuándo. Solo visible para
-            administradores. CSV hasta 10.000 filas (con diff JSON); PDF hasta 350 filas (resumen). Fechas y
-            horas en zona de la empresa: {formatTimezoneOptionLabel(timeZone)}.
-          </p>
-        </div>
-        {exportFilters.success && !validationError ? (
-          <ReportExportActions
-            exportPath="/api/configuracion/registro.csv"
-            params={exportFilters.data}
-            pdf
-          />
-        ) : null}
-      </div>
+      <PageListHeader
+        title="Registro de actividad"
+        subtitle={
+          <>
+            Trazabilidad de acciones críticas. CSV hasta 10.000 filas; PDF hasta 350. Fechas en zona de
+            la empresa: {formatTimezoneOptionLabel(timeZone)}.
+          </>
+        }
+        actions={
+          exportFilters.success && !validationError ? (
+            <ReportExportActions
+              exportPath="/api/configuracion/registro.csv"
+              params={exportFilters.data}
+              pdf
+            />
+          ) : null
+        }
+      />
 
       {validationError ? (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -199,96 +203,87 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
         </div>
       ) : null}
 
-      <form className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4" method="get">
-        <div className="grid gap-1">
-          <label htmlFor="module" className="text-xs text-muted-foreground">
-            Módulo
-          </label>
-          <select
-            id="module"
-            name="module"
-            defaultValue={auditModule ?? ""}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            <option value="">Todos</option>
-            {AUDIT_UI_MODULES.map((m) => (
-              <option key={m} value={m}>
-                {AUDIT_UI_MODULE_LABEL_ES[m]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-1">
-          <label htmlFor="projectId" className="text-xs text-muted-foreground">
-            Proyecto
-          </label>
-          <select
-            id="projectId"
-            name="projectId"
-            defaultValue={projectId ?? ""}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            <option value="">Todos</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.code} — {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-1">
-          <label htmlFor="actorUserId" className="text-xs text-muted-foreground">
-            Usuario
-          </label>
-          <select
-            id="actorUserId"
-            name="actorUserId"
-            defaultValue={actorUserId ?? ""}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            <option value="">Todos</option>
-            {actors.map((a) => (
-              <option key={a.userId} value={a.userId}>
-                {a.name ?? a.email}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-1">
-          <label htmlFor="reference" className="text-xs text-muted-foreground">
-            Nº documento
-          </label>
-          <Input id="reference" name="reference" placeholder="#142" defaultValue={reference ?? ""} />
-        </div>
-        <div className="grid gap-1">
-          <label htmlFor="dateFrom" className="text-xs text-muted-foreground">
-            Desde
-          </label>
-          <Input id="dateFrom" name="dateFrom" type="date" defaultValue={parsed?.dateFrom ?? ""} />
-        </div>
-        <div className="grid gap-1">
-          <label htmlFor="dateTo" className="text-xs text-muted-foreground">
-            Hasta
-          </label>
-          <Input id="dateTo" name="dateTo" type="date" defaultValue={parsed?.dateTo ?? ""} />
-        </div>
-        <div className="grid gap-1">
-          <label htmlFor="action" className="text-xs text-muted-foreground">
-            Acción (código)
-          </label>
-          <Input id="action" name="action" placeholder="purchase_order.issued" defaultValue={action ?? ""} />
-        </div>
-        <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-1">
-          <Button type="submit" size="sm" className="w-full sm:w-auto">
-            Filtrar
-          </Button>
-          <Button type="button" variant="outline" size="sm" asChild className="w-full sm:w-auto">
-            <Link href="/configuracion/registro">Limpiar</Link>
-          </Button>
-        </div>
-      </form>
+      <Card>
+        <CardContent className="pt-6">
+          <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" method="get">
+            <div className="space-y-2">
+              <Label htmlFor="module">Módulo</Label>
+              <select
+                id="module"
+                name="module"
+                defaultValue={auditModule ?? ""}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Todos</option>
+                {AUDIT_UI_MODULES.map((m) => (
+                  <option key={m} value={m}>
+                    {AUDIT_UI_MODULE_LABEL_ES[m]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="projectId">Proyecto</Label>
+              <select
+                id="projectId"
+                name="projectId"
+                defaultValue={projectId ?? ""}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Todos</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.code} — {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="actorUserId">Usuario</Label>
+              <select
+                id="actorUserId"
+                name="actorUserId"
+                defaultValue={actorUserId ?? ""}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Todos</option>
+                {actors.map((a) => (
+                  <option key={a.userId} value={a.userId}>
+                    {a.name ?? a.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reference">Nº documento</Label>
+              <Input id="reference" name="reference" placeholder="#142" defaultValue={reference ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dateFrom">Desde</Label>
+              <Input id="dateFrom" name="dateFrom" type="date" defaultValue={parsed?.dateFrom ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dateTo">Hasta</Label>
+              <Input id="dateTo" name="dateTo" type="date" defaultValue={parsed?.dateTo ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="action">Acción (código)</Label>
+              <Input id="action" name="action" placeholder="purchase_order.issued" defaultValue={action ?? ""} />
+            </div>
+            <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-1">
+              <Button type="submit" size="sm" className="w-full sm:w-auto">
+                Filtrar
+              </Button>
+              <Button type="button" variant="outline" size="sm" asChild className="w-full sm:w-auto">
+                <Link href="/configuracion/registro">Limpiar</Link>
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
-      <div className="rounded-xl border bg-card shadow-sm">
+      <Card>
+        <CardContent className="p-0 pt-0">
         <TableScroll>
           <Table>
             <TableHeader>
@@ -360,7 +355,8 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
             </TableBody>
           </Table>
         </TableScroll>
-      </div>
+        </CardContent>
+      </Card>
 
       {nextPageHref ? (
         <div className="flex justify-center">

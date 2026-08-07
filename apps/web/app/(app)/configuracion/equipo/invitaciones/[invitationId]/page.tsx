@@ -15,6 +15,9 @@ import {
 } from "@bloqer/services";
 import { cancelTenantInvitationAction } from "../../invitation-actions";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageListHeader } from "@/components/ui/page-list-header";
+import { DetailField, DetailFieldGrid } from "@/components/ui/detail-field-grid";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -61,54 +64,49 @@ export default async function ConfiguracionEquipoInvitacionDetallePage({ params 
 
   return (
     <PageShell variant="form" className="space-y-6" breadcrumbLabel={inv.email}>
-      <div className="flex flex-wrap gap-2">
-      </div>
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Invitación</h1>
-        <p className="text-sm text-muted-foreground">{inv.email}</p>
-      </div>
+      <PageListHeader title="Invitación" subtitle={inv.email} />
 
       {flashLink ? (
-        <section className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 dark:bg-amber-500/10">
-          <h2 className="text-sm font-semibold">Enlace de invitación (copiá y compartí)</h2>
-          <p className="text-xs text-muted-foreground">
-            {flashEmailNote ??
-              "El correo no se despachó (integración desactivada, URL pública de la app ausente o inválida, o fallo del proveedor). Este enlace incluye un token secreto: no lo publiques en lugares públicos."}
-          </p>
-          <p className="break-all font-mono text-xs">{flashLink}</p>
-        </section>
+        <Card className="border-amber-500/40 bg-amber-500/5 dark:bg-amber-500/10">
+          <CardHeader>
+            <CardTitle className="text-base">Enlace de invitación (copiá y compartí)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              {flashEmailNote ??
+                "El correo no se despachó (integración desactivada, URL pública de la app ausente o inválida, o fallo del proveedor). Este enlace incluye un token secreto: no lo publiques en lugares públicos."}
+            </p>
+            <p className="break-all font-mono text-xs">{flashLink}</p>
+          </CardContent>
+        </Card>
       ) : null}
 
-      <dl className="grid gap-2 text-sm">
-        <div>
-          <dt className="text-muted-foreground">Estado</dt>
-          <dd>{invitationStatusLabel(inv.status)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Roles</dt>
-          <dd className="text-xs">{inv.roles.join(", ")}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Invitó</dt>
-          <dd>{inv.invitedByEmail}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Vence</dt>
-          <dd>{formatDateTime(inv.expiresAt)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Creada</dt>
-          <dd>{formatDateTime(inv.createdAt)}</dd>
-        </div>
-      </dl>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Detalle</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DetailFieldGrid>
+            <DetailField label="Estado">{invitationStatusLabel(inv.status)}</DetailField>
+            <DetailField label="Roles">{inv.roles.join(", ")}</DetailField>
+            <DetailField label="Invitó">{inv.invitedByEmail}</DetailField>
+            <DetailField label="Vence">{formatDateTime(inv.expiresAt)}</DetailField>
+            <DetailField label="Creada">{formatDateTime(inv.createdAt)}</DetailField>
+          </DetailFieldGrid>
+        </CardContent>
+      </Card>
 
       {canEdit && inv.status === "PENDING" ? (
-        <form action={cancelTenantInvitationAction} className="rounded-lg border bg-card p-4">
-          <input type="hidden" name="invitationId" value={inv.id} />
-          <Button type="submit" variant="destructive" size="sm">
-            Cancelar invitación
-          </Button>
-        </form>
+        <Card>
+          <CardContent className="pt-6">
+            <form action={cancelTenantInvitationAction}>
+              <input type="hidden" name="invitationId" value={inv.id} />
+              <Button type="submit" variant="destructive" size="sm">
+                Cancelar invitación
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       ) : null}
     </PageShell>
   );

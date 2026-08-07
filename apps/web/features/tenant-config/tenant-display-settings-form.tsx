@@ -54,7 +54,7 @@ export function TenantDisplaySettingsForm({ tenant, company, action }: Props) {
             El nombre a mostrar aparece en la app; la razón social y el CUIT no se modifican acá.
           </p>
         </div>
-        <div className="grid gap-1">
+        <div className="space-y-2">
           <Label htmlFor="name">Nombre a mostrar</Label>
           <Input
             id="name"
@@ -70,7 +70,7 @@ export function TenantDisplaySettingsForm({ tenant, company, action }: Props) {
             </p>
           ) : null}
         </div>
-        <div className="grid gap-1">
+        <div className="space-y-2">
           <Label htmlFor="timezone">Zona horaria</Label>
           <select
             id="timezone"
@@ -98,7 +98,7 @@ export function TenantDisplaySettingsForm({ tenant, company, action }: Props) {
             </p>
           )}
         </div>
-        <div className="grid gap-1">
+        <div className="space-y-2">
           <Label htmlFor="baseCurrency">Moneda base</Label>
           <input type="hidden" name="baseCurrency" value={baseCurrency} />
           <CurrencySelect
@@ -120,7 +120,7 @@ export function TenantDisplaySettingsForm({ tenant, company, action }: Props) {
               Dirección y teléfono de la empresa principal del tenant. CUIT y razón social son solo lectura.
             </p>
           </div>
-          <div className="grid gap-1">
+          <div className="space-y-2">
             <Label htmlFor="address">Dirección</Label>
             <Input
               id="address"
@@ -131,11 +131,11 @@ export function TenantDisplaySettingsForm({ tenant, company, action }: Props) {
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1">
+            <div className="space-y-2">
               <Label htmlFor="city">Ciudad</Label>
               <Input id="city" name="city" defaultValue={company.city ?? ""} maxLength={120} required />
             </div>
-            <div className="grid gap-1">
+            <div className="space-y-2">
               <Label htmlFor="country">País</Label>
               <select
                 id="country"
@@ -152,7 +152,7 @@ export function TenantDisplaySettingsForm({ tenant, company, action }: Props) {
               </select>
             </div>
           </div>
-          <div className="grid gap-1">
+          <div className="space-y-2">
             <Label htmlFor="phone">Teléfono</Label>
             <Input
               id="phone"
@@ -163,7 +163,7 @@ export function TenantDisplaySettingsForm({ tenant, company, action }: Props) {
               required
             />
           </div>
-          <div className="grid gap-1">
+          <div className="space-y-2">
             <Label htmlFor="website">Sitio web (opcional)</Label>
             <Input
               id="website"

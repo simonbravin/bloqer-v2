@@ -33,19 +33,11 @@ export function TenantLogoSettings({
     : "/api/tenant/logo";
 
   return (
-    <div className="space-y-4 border-t border-border/60 pt-4">
-      <div>
-        <h3 className="text-sm font-semibold">Logo de la empresa</h3>
-        <p className="text-xs text-muted-foreground">
-          Reemplaza el logo de Bloqer en el menú lateral y aparece en los PDF exportados. Preferí una
-          versión <span className="font-medium">horizontal</span> (PNG, JPEG o WebP, máx. 2 MB).
-        </p>
-      </div>
-
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
         <div
           className={cn(
-            "flex h-14 w-[9.5rem] items-center justify-center rounded-md border border-border/80 bg-sidebar px-2",
+            "flex h-14 w-[9.5rem] items-center justify-center rounded-md border border-border/80 bg-muted/40 px-2",
           )}
         >
           {previewUrl ? (
@@ -65,12 +57,14 @@ export function TenantLogoSettings({
         <p className="text-xs text-muted-foreground">
           {hasLogo
             ? "Logo actual de tu empresa (vista previa del menú)."
-            : "Sin logo propio: se muestra el de Bloqer."}
+            : "Sin logo propio: se muestra el de Bloqer."}{" "}
+          Preferí una versión <span className="font-medium">horizontal</span> (PNG, JPEG o WebP,
+          máx. 2 MB).
         </p>
       </div>
 
       <form action={uploadAction} className="grid max-w-lg gap-3">
-        <div className="grid gap-1">
+        <div className="space-y-2">
           <Label htmlFor="logo">Subir logo</Label>
           <input
             id="logo"

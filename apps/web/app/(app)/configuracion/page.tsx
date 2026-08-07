@@ -9,9 +9,17 @@ import {
   canReadTenantConfigArea,
   getTenantSettings,
 } from "@bloqer/services";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageListHeader } from "@/components/ui/page-list-header";
+import { DetailField, DetailFieldGrid } from "@/components/ui/detail-field-grid";
 import { TenantDisplaySettingsForm } from "@/features/tenant-config/tenant-display-settings-form";
 import { TenantLogoSettings } from "@/features/tenant-config/tenant-logo-settings";
 import {
@@ -52,64 +60,51 @@ export default async function ConfiguracionHomePage() {
   const company = tenant.primaryCompany;
   const fiscalId = company?.fiscalId ?? tenant.fiscalId;
   const legalName = company?.legalName ?? company?.name ?? null;
+  const addressLine = company
+    ? [company.address, company.city, countryLabel(company.country)].filter(Boolean).join(", ") ||
+      "—"
+    : null;
 
   return (
-    <PageShell variant="default" className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
-      </div>
+    <PageShell variant="default" className="space-y-6">
+      <PageListHeader
+        title="Configuración"
+        subtitle="Datos de la organización, marca y accesos a políticas del tenant."
+      />
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Datos fiscales y operativos</CardTitle>
+          <CardDescription>
+            Resumen de solo lectura. Nombre a mostrar, zona y moneda se editan abajo si tenés
+            permiso.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <p className="text-muted-foreground">Nombre a mostrar (actual)</p>
-            <p className="font-medium">{tenant.name}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Razón social</p>
-            <p className="font-medium">{legalName ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">CUIT / identificador fiscal</p>
-            <p className="font-medium">{fiscalId ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Slug (interno)</p>
-            <p className="font-mono text-xs">{tenant.slug}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Zona horaria</p>
-            <p>{formatTimezoneOptionLabel(tenant.timezone)}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Moneda base</p>
-            <p>{formatCurrencyDisplay(tenant.baseCurrency)}</p>
-          </div>
-          {company ? (
-            <>
-              <div className="sm:col-span-2">
-                <p className="text-muted-foreground">Dirección</p>
-                <p>
-                  {[company.address, company.city, countryLabel(company.country)].filter(Boolean).join(", ") || "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Teléfono</p>
-                <p>{company.phone ?? "—"}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Sitio web</p>
-                <p>{company.website ?? "—"}</p>
-              </div>
-            </>
-          ) : null}
-          <div>
-            <p className="text-muted-foreground">Estado operativo</p>
-            <p>{tenant.status}</p>
-          </div>
+        <CardContent>
+          <DetailFieldGrid>
+            <DetailField label="Nombre a mostrar">{tenant.name}</DetailField>
+            <DetailField label="Razón social">{legalName ?? "—"}</DetailField>
+            <DetailField label="CUIT / identificador fiscal">{fiscalId ?? "—"}</DetailField>
+            <DetailField label="Slug (interno)">
+              <span className="font-mono text-xs">{tenant.slug}</span>
+            </DetailField>
+            <DetailField label="Zona horaria">
+              {formatTimezoneOptionLabel(tenant.timezone)}
+            </DetailField>
+            <DetailField label="Moneda base">
+              {formatCurrencyDisplay(tenant.baseCurrency)}
+            </DetailField>
+            {company ? (
+              <>
+                <DetailField label="Dirección" fullWidth>
+                  {addressLine}
+                </DetailField>
+                <DetailField label="Teléfono">{company.phone ?? "—"}</DetailField>
+                <DetailField label="Sitio web">{company.website ?? "—"}</DetailField>
+              </>
+            ) : null}
+            <DetailField label="Estado operativo">{tenant.status}</DetailField>
+          </DetailFieldGrid>
         </CardContent>
       </Card>
 
@@ -120,6 +115,9 @@ export default async function ConfiguracionHomePage() {
           </div>
           <div className="min-w-0 flex-1 space-y-1">
             <CardTitle className="text-base">Política de compras</CardTitle>
+            <CardDescription>
+              Umbrales de OC, cotizaciones, aprobación y canal de avisos de pago.
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
@@ -130,28 +128,45 @@ export default async function ConfiguracionHomePage() {
       </Card>
 
       {canEditDisplay ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Ajustes de visualización y contacto</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <TenantDisplaySettingsForm
-              tenant={{
-                name: tenant.name,
-                timezone: tenant.timezone,
-                baseCurrency: tenant.baseCurrency,
-              }}
-              company={company}
-              action={updateTenantDisplaySettingsAction}
-            />
-            <TenantLogoSettings
-              hasLogo={tenant.hasLogo}
-              logoVersion={tenant.logoVersion}
-              uploadAction={uploadTenantLogoAction}
-              removeAction={removeTenantLogoAction}
-            />
-          </CardContent>
-        </Card>
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Ajustes de visualización y contacto</CardTitle>
+              <CardDescription>
+                Nombre a mostrar, zona horaria, moneda base y datos de contacto de la empresa
+                principal.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TenantDisplaySettingsForm
+                tenant={{
+                  name: tenant.name,
+                  timezone: tenant.timezone,
+                  baseCurrency: tenant.baseCurrency,
+                }}
+                company={company}
+                action={updateTenantDisplaySettingsAction}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Logo de la empresa</CardTitle>
+              <CardDescription>
+                Reemplaza el logo de Bloqer en el menú lateral y aparece en los PDF exportados.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TenantLogoSettings
+                hasLogo={tenant.hasLogo}
+                logoVersion={tenant.logoVersion}
+                uploadAction={uploadTenantLogoAction}
+                removeAction={removeTenantLogoAction}
+              />
+            </CardContent>
+          </Card>
+        </>
       ) : null}
     </PageShell>
   );

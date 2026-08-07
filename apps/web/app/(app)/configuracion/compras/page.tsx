@@ -8,11 +8,20 @@ import {
   getCompanyProcurementSettings,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageListHeader } from "@/components/ui/page-list-header";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { CompanyProcurementSettingsForm } from "@/features/procurement/components/company-procurement-settings-form";
+import { cn } from "@/lib/utils";
 
 interface PageProps {
   searchParams: Promise<{ companyId?: string }>;
 }
+
+const selectClassName = cn(
+  "flex h-10 min-w-[240px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+);
 
 export default async function ConfiguracionComprasPage({ searchParams }: PageProps) {
   const current = await getCurrentUser();
@@ -37,25 +46,20 @@ export default async function ConfiguracionComprasPage({ searchParams }: PagePro
 
   return (
     <PageShell variant="default" className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Compras</h1>
-        <p className="text-sm text-muted-foreground">
-          Política de solicitudes, cotizaciones, aprobación de OC y avisos cuando hay CxP lista para
-          pagar o se confirma un pago.
-        </p>
-      </div>
+      <PageListHeader
+        title="Compras"
+        subtitle="Política de solicitudes, cotizaciones, aprobación de OC y avisos cuando hay CxP lista para pagar o se confirma un pago."
+      />
 
       {companies.length > 1 && (
         <form method="get" className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1">
-            <label htmlFor="companyId" className="text-sm font-medium">
-              Empresa
-            </label>
+          <div className="space-y-2">
+            <Label htmlFor="companyId">Empresa</Label>
             <select
               id="companyId"
               name="companyId"
               defaultValue={company.id}
-              className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm min-w-[240px]"
+              className={selectClassName}
             >
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -64,12 +68,7 @@ export default async function ConfiguracionComprasPage({ searchParams }: PagePro
               ))}
             </select>
           </div>
-          <button
-            type="submit"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-          >
-            Ver empresa
-          </button>
+          <Button type="submit">Ver empresa</Button>
         </form>
       )}
 

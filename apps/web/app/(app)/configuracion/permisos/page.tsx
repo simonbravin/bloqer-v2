@@ -11,6 +11,7 @@ import { PermissionMatrixOverview } from "@/features/tenant-config";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageListHeader } from "@/components/ui/page-list-header";
 import { Button } from "@/components/ui/button";
 import {
   canEditPermissionMatrixNotes,
@@ -50,12 +51,10 @@ export default async function ConfiguracionPermisosPage() {
 
   return (
     <PageShell variant="default" className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Permisos</h1>
-        <p className="text-sm text-muted-foreground max-w-prose">
-          Vista informativa del techo efectivo por rol y módulo (VER ⊆ EDITAR ⊆ APROBAR).
-        </p>
-      </div>
+      <PageListHeader
+        title="Permisos"
+        subtitle="Vista informativa del techo efectivo por rol y módulo (VER ⊆ EDITAR ⊆ APROBAR)."
+      />
 
       <div
         role="note"

@@ -40,14 +40,14 @@ export function UserProfileForm({ defaultName, email }: Props) {
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="grid max-w-md gap-4">
-      <div className="grid gap-1">
+      <div className="space-y-2">
         <Label htmlFor="profile-name">Nombre</Label>
         <Input id="profile-name" autoComplete="name" {...form.register("name")} />
         {form.formState.errors.name?.message ? (
           <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
         ) : null}
       </div>
-      <div className="grid gap-1">
+      <div className="space-y-2">
         <Label htmlFor="profile-email">Correo</Label>
         <Input id="profile-email" type="email" value={email} readOnly className="bg-muted/50" />
         <p className="text-xs text-muted-foreground">El correo no se puede cambiar desde acá.</p>

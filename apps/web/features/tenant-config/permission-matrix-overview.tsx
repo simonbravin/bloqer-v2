@@ -148,16 +148,16 @@ export function PermissionMatrixOverview({
                         Rol
                       </TableHead>
                       {section.modules.map((m) => (
-                        <TableHead key={m} className="min-w-[56px] px-1 text-center align-bottom">
+                        <TableHead key={m} className="min-w-[72px] px-1 text-center align-bottom">
                           <div className="flex flex-col items-center gap-1">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="cursor-default font-mono text-[11px] font-semibold tracking-tight text-foreground">
-                                  {m}
+                                <span className="cursor-default max-w-[4.5rem] text-[11px] font-semibold leading-tight text-foreground">
+                                  {moduleLabelsEs[m]}
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent side="bottom" className="max-w-xs text-xs">
-                                {moduleLabelsEs[m]}
+                                <span className="font-mono">{m}</span>
                               </TooltipContent>
                             </Tooltip>
                             {notes[m] || canEditNotes ? (
@@ -207,9 +207,15 @@ export function PermissionMatrixOverview({
         <SheetContent className="flex w-full flex-col border-border bg-card sm:max-w-md">
           <SheetHeader>
             <SheetTitle className="text-foreground">
-              Nota — {openModule ? `${openModule}` : ""}
+              Nota — {openModule ? moduleLabelsEs[openModule] : ""}
             </SheetTitle>
-            <SheetDescription>{openModule ? moduleLabelsEs[openModule] : ""}</SheetDescription>
+            <SheetDescription>
+              {openModule ? (
+                <span className="font-mono text-xs">{openModule}</span>
+              ) : (
+                ""
+              )}
+            </SheetDescription>
           </SheetHeader>
           <div className="flex min-h-0 flex-1 flex-col space-y-2 py-4">
             {error ? <p className="text-sm text-destructive">{error}</p> : null}

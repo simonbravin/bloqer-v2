@@ -15,6 +15,7 @@ import {
   SCHEDULED_REPORT_STATUS_LABEL,
   runStatusBadgeVariant,
 } from "@/features/scheduled-reports/scheduled-report-labels";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
 import {
   Table,
   TableBody,
@@ -59,12 +60,14 @@ export default async function ConfiguracionReportesPage({ searchParams }: Props)
       ) : null}
 
       {rows.length === 0 ? (
-        <div className="space-y-3 rounded-lg border bg-card px-6 py-8 text-center text-sm text-muted-foreground">
-          <p>Todavía no hay envíos programados.</p>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/configuracion/reportes/nuevo">Crear primer envío</Link>
-          </Button>
-        </div>
+        <ListEmptyState
+          title="Todavía no hay envíos programados"
+          action={
+            <Button asChild variant="outline" size="sm">
+              <Link href="/configuracion/reportes/nuevo">Crear primer envío</Link>
+            </Button>
+          }
+        />
       ) : (
         <TableScroll>
           <Table>
@@ -96,18 +99,13 @@ export default async function ConfiguracionReportesPage({ searchParams }: Props)
                       <span className="block">
                         {formatDateTime(r.lastRunAt)}
                         {r.lastRunStatus ? (
-                          <>
-                            <Badge
-                              variant={runStatusBadgeVariant(r.lastRunStatus)}
-                              className="mt-1"
-                              title={SCHEDULED_REPORT_RUN_STATUS_HINT[r.lastRunStatus]}
-                            >
-                              {SCHEDULED_REPORT_RUN_STATUS_LABEL[r.lastRunStatus]}
-                            </Badge>
-                            <span className="mt-1 block max-w-xs text-xs text-muted-foreground">
-                              {SCHEDULED_REPORT_RUN_STATUS_HINT[r.lastRunStatus]}
-                            </span>
-                          </>
+                          <Badge
+                            variant={runStatusBadgeVariant(r.lastRunStatus)}
+                            className="mt-1"
+                            title={SCHEDULED_REPORT_RUN_STATUS_HINT[r.lastRunStatus]}
+                          >
+                            {SCHEDULED_REPORT_RUN_STATUS_LABEL[r.lastRunStatus]}
+                          </Badge>
                         ) : null}
                       </span>
                     ) : (

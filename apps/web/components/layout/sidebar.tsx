@@ -52,16 +52,16 @@ export function Sidebar({
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex h-14 shrink-0 items-center border-b border-sidebar-border/80 px-4">
+      <div className="flex h-14 shrink-0 items-center border-b border-sidebar-border/80 px-3 py-1">
         <Link
           href="/dashboard"
-          className="inline-block rounded-md outline-none ring-offset-sidebar focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex h-full items-center rounded-md outline-none ring-offset-sidebar focus-visible:ring-2 focus-visible:ring-ring"
         >
           <TenantBrandLogo
             hasTenantLogo={hasTenantLogo}
             logoVersion={tenantLogoVersion}
             priority
-            className="h-8 max-w-[9.5rem]"
+            className="h-full max-w-[10rem]"
           />
         </Link>
       </div>

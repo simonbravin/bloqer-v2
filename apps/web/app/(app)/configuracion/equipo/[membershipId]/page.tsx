@@ -11,11 +11,15 @@ import {
 } from "@bloqer/services";
 import { Label } from "@/components/ui/label";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageListHeader } from "@/components/ui/page-list-header";
+import { DetailField, DetailFieldGrid } from "@/components/ui/detail-field-grid";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   updateTenantMemberRolesAction,
   updateTenantMemberStatusAction,
 } from "../../configuracion-actions";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface PageProps {
   params: Promise<{ membershipId: string }>;
@@ -24,6 +28,11 @@ interface PageProps {
 function membershipStatusLabel(s: string) {
   return s === "ACTIVE" ? "Activo" : "Inactivo";
 }
+
+const selectClassName = cn(
+  "flex h-10 w-full min-w-[10rem] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+);
 
 export default async function ConfiguracionEquipoDetallePage({ params }: PageProps) {
   const current = await getCurrentUser();
@@ -46,77 +55,79 @@ export default async function ConfiguracionEquipoDetallePage({ params }: PagePro
 
   return (
     <PageShell variant="form" className="space-y-6" breadcrumbLabel={member.name ?? member.email}>
-      <div className="flex flex-wrap gap-2">
-      </div>
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Miembro</h1>
-        <p className="text-sm text-muted-foreground">{member.email}</p>
-      </div>
+      <PageListHeader title="Miembro" subtitle={member.email} />
 
-      <dl className="grid gap-2 text-sm">
-        <div>
-          <dt className="text-muted-foreground">Nombre</dt>
-          <dd>{member.name ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Estado</dt>
-          <dd>{membershipStatusLabel(member.status)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Alta</dt>
-          <dd>{formatDateTime(member.createdAt)}</dd>
-        </div>
-      </dl>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Datos del miembro</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DetailFieldGrid>
+            <DetailField label="Nombre">{member.name ?? "—"}</DetailField>
+            <DetailField label="Estado">{membershipStatusLabel(member.status)}</DetailField>
+            <DetailField label="Alta">{formatDateTime(member.createdAt)}</DetailField>
+            <DetailField label="Roles">{member.roles.join(", ") || "—"}</DetailField>
+          </DetailFieldGrid>
+        </CardContent>
+      </Card>
 
       {canEdit ? (
         <>
-          <section className="space-y-3 rounded-lg border bg-card p-4">
-            <h2 className="text-sm font-semibold">Roles</h2>
-            <form action={updateTenantMemberRolesAction} className="space-y-3">
-              <input type="hidden" name="membershipId" value={member.membershipId} />
-              <div className="grid gap-2 sm:grid-cols-2">
-                {OVERVIEW_ROLES.map((role) => (
-                  <label key={role} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      name={`role_${role}`}
-                      defaultChecked={member.roles.includes(role)}
-                      className="h-4 w-4 rounded border border-input"
-                    />
-                    <span>{role}</span>
-                  </label>
-                ))}
-              </div>
-              <Button type="submit" size="sm">
-                Guardar roles
-              </Button>
-            </form>
-          </section>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Roles</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form action={updateTenantMemberRolesAction} className="space-y-4">
+                <input type="hidden" name="membershipId" value={member.membershipId} />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {OVERVIEW_ROLES.map((role) => (
+                    <label key={role} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name={`role_${role}`}
+                        defaultChecked={member.roles.includes(role)}
+                        className="h-4 w-4 rounded border border-input"
+                      />
+                      <span>{role}</span>
+                    </label>
+                  ))}
+                </div>
+                <Button type="submit" size="sm">
+                  Guardar roles
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
-          <section className="space-y-3 rounded-lg border bg-card p-4">
-            <h2 className="text-sm font-semibold">Estado de membresía</h2>
-            <form
-              action={updateTenantMemberStatusAction}
-              className="flex flex-wrap items-end gap-3"
-            >
-              <input type="hidden" name="membershipId" value={member.membershipId} />
-              <div className="grid gap-1">
-                <Label htmlFor="status">Estado</Label>
-                <select
-                  id="status"
-                  name="status"
-                  defaultValue={member.status}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                >
-                  <option value="ACTIVE">Activo</option>
-                  <option value="INACTIVE">Inactivo</option>
-                </select>
-              </div>
-              <Button type="submit" size="sm" variant="secondary">
-                Guardar estado
-              </Button>
-            </form>
-          </section>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Estado de membresía</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form
+                action={updateTenantMemberStatusAction}
+                className="flex flex-wrap items-end gap-3"
+              >
+                <input type="hidden" name="membershipId" value={member.membershipId} />
+                <div className="space-y-2">
+                  <Label htmlFor="status">Estado</Label>
+                  <select
+                    id="status"
+                    name="status"
+                    defaultValue={member.status}
+                    className={selectClassName}
+                  >
+                    <option value="ACTIVE">Activo</option>
+                    <option value="INACTIVE">Inactivo</option>
+                  </select>
+                </div>
+                <Button type="submit" size="sm" variant="secondary">
+                  Guardar estado
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </>
       ) : (
         <p className="text-sm text-muted-foreground">
