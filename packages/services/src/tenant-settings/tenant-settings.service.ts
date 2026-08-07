@@ -3,6 +3,7 @@ import type { Prisma } from "@bloqer/database";
 import { can, type OverviewPermissionModule } from "@bloqer/domain";
 import { OVERVIEW_MODULES } from "@bloqer/domain";
 import { resolveDisplayTimeZone } from "@bloqer/utils";
+import { isTenantLogoStorageKey } from "@bloqer/storage";
 import { updateTenantDisplaySettingsInputSchema, updateTenantPermissionMatrixNotesInputSchema } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
@@ -33,6 +34,10 @@ export type TenantSettingsView = {
   fiscalId: string | null;
   status: string;
   createdAt: Date;
+  /** True when a tenant-scoped brand logo is configured ([D-071]). */
+  hasLogo: boolean;
+  /** Cache-buster for `/api/tenant/logo?v=` when hasLogo. */
+  logoVersion: string | null;
   primaryCompany: TenantPrimaryCompanyView | null;
 };
 
@@ -68,6 +73,7 @@ export async function getTenantSettings(ctx: ServiceContext): Promise<TenantSett
       fiscalId: true,
       status: true,
       createdAt: true,
+      logoStorageKey: true,
       companies: {
         where: { status: "ACTIVE" },
         orderBy: { createdAt: "asc" },
@@ -87,9 +93,17 @@ export async function getTenantSettings(ctx: ServiceContext): Promise<TenantSett
     },
   });
   if (!row) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
-  const { companies, ...tenant } = row;
+  const { companies, logoStorageKey, ...tenant } = row;
+  const hasLogo = Boolean(
+    logoStorageKey && isTenantLogoStorageKey(ctx.tenantId, logoStorageKey),
+  );
+  const logoVersion = hasLogo && logoStorageKey
+    ? (logoStorageKey.split("/").pop()?.replace(/\.[^.]+$/, "") ?? null)
+    : null;
   return {
     ...tenant,
+    hasLogo,
+    logoVersion,
     primaryCompany: companies[0] ?? null,
   };
 }

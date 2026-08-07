@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BloqerLogo } from "@/components/brand/bloqer-logo";
+import { TenantBrandLogo } from "@/components/brand/tenant-brand-logo";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { CollapsibleNavSection } from "@/features/shell/components/collapsible-nav-section";
@@ -19,12 +19,16 @@ interface ProjectWorkspaceSidebarProps {
   projectId: string;
   roles: UserRole[];
   moduleGateSnapshot: Partial<Record<PermissionModule, boolean>>;
+  hasTenantLogo?: boolean;
+  tenantLogoVersion?: string | null;
 }
 
 export function ProjectWorkspaceSidebar({
   projectId,
   roles,
   moduleGateSnapshot,
+  hasTenantLogo = false,
+  tenantLogoVersion = null,
 }: ProjectWorkspaceSidebarProps) {
   const pathname = usePathname();
   const { state: shellState } = useProjectShell();
@@ -65,7 +69,12 @@ export function ProjectWorkspaceSidebar({
           href="/dashboard"
           className="inline-block rounded-md outline-none ring-offset-sidebar focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <BloqerLogo priority className="h-8 max-w-[9.5rem]" />
+          <TenantBrandLogo
+            hasTenantLogo={hasTenantLogo}
+            logoVersion={tenantLogoVersion}
+            priority
+            className="h-8 max-w-[9.5rem]"
+          />
         </Link>
       </div>
 

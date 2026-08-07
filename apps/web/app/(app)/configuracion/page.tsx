@@ -13,7 +13,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/page-shell";
 import { TenantDisplaySettingsForm } from "@/features/tenant-config/tenant-display-settings-form";
-import { updateTenantDisplaySettingsAction } from "./configuracion-actions";
+import { TenantLogoSettings } from "@/features/tenant-config/tenant-logo-settings";
+import {
+  updateTenantDisplaySettingsAction,
+  uploadTenantLogoAction,
+  removeTenantLogoAction,
+} from "./configuracion-actions";
 import { ShoppingCart } from "lucide-react";
 
 function countryLabel(code: string): string {
@@ -129,7 +134,7 @@ export default async function ConfiguracionHomePage() {
           <CardHeader>
             <CardTitle className="text-base">Ajustes de visualización y contacto</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <TenantDisplaySettingsForm
               tenant={{
                 name: tenant.name,
@@ -138,6 +143,12 @@ export default async function ConfiguracionHomePage() {
               }}
               company={company}
               action={updateTenantDisplaySettingsAction}
+            />
+            <TenantLogoSettings
+              hasLogo={tenant.hasLogo}
+              logoVersion={tenant.logoVersion}
+              uploadAction={uploadTenantLogoAction}
+              removeAction={removeTenantLogoAction}
             />
           </CardContent>
         </Card>

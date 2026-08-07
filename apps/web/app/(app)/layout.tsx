@@ -3,7 +3,12 @@ import { OVERVIEW_MODULES, type PermissionModule } from "@bloqer/domain";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { AppLayout } from "@/components/layout/app-layout";
-import { getTenantModuleGate, getUnreadNotificationCount, isPlatformSuperadmin } from "@bloqer/services";
+import {
+  getTenantModuleGate,
+  getUnreadNotificationCount,
+  isPlatformSuperadmin,
+  getTenantLogoDisplayMeta,
+} from "@bloqer/services";
 
 export default async function AppGroupLayout({ children }: { children: React.ReactNode }) {
   const current = await getCurrentUser();
@@ -36,6 +41,8 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
   }
 
   let moduleGateSnapshot: Partial<Record<PermissionModule, boolean>> | undefined;
+  let hasTenantLogo = false;
+  let tenantLogoVersion: string | null = null;
   if (current.tenantCtx) {
     const ctx = await buildTenantServiceContext();
     if (ctx) {
@@ -46,6 +53,14 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
         ) as Record<PermissionModule, boolean>;
       } catch {
         moduleGateSnapshot = {};
+      }
+      try {
+        const logoMeta = await getTenantLogoDisplayMeta(ctx);
+        hasTenantLogo = logoMeta.hasLogo;
+        tenantLogoVersion = logoMeta.version;
+      } catch {
+        hasTenantLogo = false;
+        tenantLogoVersion = null;
       }
     } else {
       moduleGateSnapshot = {};
@@ -59,6 +74,8 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
       notificationUnreadCount={notificationUnreadCount}
       showPlatformLink={showPlatformLink}
       moduleGateSnapshot={moduleGateSnapshot}
+      hasTenantLogo={hasTenantLogo}
+      tenantLogoVersion={tenantLogoVersion}
     >
       {children}
     </AppLayout>

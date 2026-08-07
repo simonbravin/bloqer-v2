@@ -2,6 +2,7 @@ import { prisma } from "@bloqer/database";
 import {
   formatAuditActorLabel,
   getProjectShellInfo,
+  getTenantLogoDataUri,
   type ServiceContext,
 } from "@bloqer/services";
 import type { PdfReportBranding, ResolvePdfBrandingOptions } from "./pdf-branding.types";
@@ -12,7 +13,7 @@ export async function resolvePdfReportBranding(
 ): Promise<PdfReportBranding> {
   const generatedAtIso = new Date().toISOString();
 
-  const [tenantRow, userRow, scopedCompany] = await Promise.all([
+  const [tenantRow, userRow, scopedCompany, logoDataUri] = await Promise.all([
     prisma.tenant.findFirst({
       where: { id: ctx.tenantId },
       select: {
@@ -35,6 +36,8 @@ export async function resolvePdfReportBranding(
           select: { name: true, legalName: true },
         })
       : Promise.resolve(null),
+    // Logo bytes are resolved only from ctx.tenantId inside the service ([D-071]).
+    getTenantLogoDataUri(ctx).catch(() => null),
   ]);
 
   let projectLabel: string | null = null;
@@ -58,5 +61,6 @@ export async function resolvePdfReportBranding(
       userRow?.email ?? null,
     ),
     generatedAtIso,
+    logoDataUri,
   };
 }

@@ -9,6 +9,8 @@ import {
   updateTenantDisplaySettings,
   updateTenantMemberRoles,
   updateTenantMemberStatus,
+  uploadTenantLogo,
+  removeTenantLogo,
 } from "@bloqer/services";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 
@@ -53,6 +55,56 @@ export async function updateTenantDisplaySettingsAction(formData: FormData) {
   }
   revalidatePath("/configuracion");
   redirect("/configuracion?ok=1");
+}
+
+export async function uploadTenantLogoAction(formData: FormData) {
+  const ctx = await buildTenantServiceContext();
+  if (!ctx) redirect("/login");
+
+  const file = formData.get("logo");
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/configuracion?err=${encodeURIComponent("Seleccioná un archivo de imagen")}`);
+  }
+
+  const mimeType = file.type || "application/octet-stream";
+  const content = Buffer.from(await file.arrayBuffer());
+
+  try {
+    await uploadTenantLogo(
+      {
+        originalFileName: file.name || "logo.png",
+        mimeType,
+        sizeBytes: content.length,
+        content,
+      },
+      ctx,
+    );
+  } catch (e) {
+    if (e instanceof ServiceError) {
+      redirect(`/configuracion?err=${encodeURIComponent(e.message)}`);
+    }
+    redirect(`/configuracion?err=${encodeURIComponent("Error al subir el logo")}`);
+  }
+  revalidatePath("/configuracion");
+  revalidatePath("/", "layout");
+  redirect("/configuracion?ok=logo");
+}
+
+export async function removeTenantLogoAction(_formData: FormData) {
+  const ctx = await buildTenantServiceContext();
+  if (!ctx) redirect("/login");
+
+  try {
+    await removeTenantLogo(ctx);
+  } catch (e) {
+    if (e instanceof ServiceError) {
+      redirect(`/configuracion?err=${encodeURIComponent(e.message)}`);
+    }
+    redirect(`/configuracion?err=${encodeURIComponent("Error al quitar el logo")}`);
+  }
+  revalidatePath("/configuracion");
+  revalidatePath("/", "layout");
+  redirect("/configuracion?ok=logo-removed");
 }
 
 export async function updateTenantMemberRolesAction(formData: FormData) {

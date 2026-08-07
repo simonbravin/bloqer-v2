@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Image, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { PdfReportBranding } from "../branding/pdf-branding.types";
 
 export const reportPdfStyles = StyleSheet.create({
@@ -8,6 +8,11 @@ export const reportPdfStyles = StyleSheet.create({
     paddingHorizontal: 40,
     fontSize: 8,
     fontFamily: "Helvetica",
+  },
+  logo: {
+    height: 28,
+    width: 120,
+    marginBottom: 6,
   },
   orgLine: {
     fontSize: 9,
@@ -89,6 +94,9 @@ export function PdfReportHeader(props: {
   const filterLine = props.filterLine?.trim();
   return (
     <View style={{ marginBottom: 8 }}>
+      {props.branding.logoDataUri ? (
+        <Image src={props.branding.logoDataUri} style={reportPdfStyles.logo} />
+      ) : null}
       <Text style={reportPdfStyles.orgLine}>{organizationLine(props.branding)}</Text>
       {props.branding.projectLabel ? (
         <Text style={reportPdfStyles.projectLine}>Obra: {props.branding.projectLabel}</Text>

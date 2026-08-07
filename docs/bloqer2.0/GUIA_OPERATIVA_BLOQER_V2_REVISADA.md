@@ -119,6 +119,7 @@ La pantalla **EDT y costos** (`/control-costos`) es el tablero de esas afectacio
 
 - **Ruta:** `/configuracion` (Configuración → **General**). OWNER/ADMIN pueden editar.
 - **Nombre a mostrar**, **moneda base** y **zona horaria** (preferencias de visualización).
+- **Logo de la empresa** (opcional, [D-071]): PNG/JPEG/WebP; preferible versión **horizontal**. Reemplaza el logo Bloqer en el menú lateral de la empresa/obra y aparece en encabezados PDF. Sin logo → Bloqer en UI y solo texto en PDF.
 - **Zona horaria:** desplegable con ciudades + offset **GMT** (ej. `Buenos Aires (GMT-3)`). No hay que escribir el id IANA a mano. Argentina (Buenos Aires) es **GMT-3 todo el año** (sin horario de verano).
 - Esa zona se usa en el **Registro de actividad** (tabla, detalle y exports CSV/PDF) y en **reportes programados**. Tabla y detalle deben mostrar **la misma hora**.
 - Razón social / CUIT son de solo lectura acá (datos fiscales de la empresa principal).

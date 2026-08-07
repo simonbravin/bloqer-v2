@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BloqerLogo } from "@/components/brand/bloqer-logo";
+import { TenantBrandLogo } from "@/components/brand/tenant-brand-logo";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { CollapsibleNavSection } from "@/features/shell/components/collapsible-nav-section";
@@ -16,9 +16,17 @@ interface SidebarProps {
   roles: UserRole[];
   /** Phase 12B / 15A: serialized tenant module flags (default-on when key missing). */
   moduleGateSnapshot?: Partial<Record<PermissionModule, boolean>>;
+  /** When true, show tenant brand logo instead of Bloqer ([D-071]). */
+  hasTenantLogo?: boolean;
+  tenantLogoVersion?: string | null;
 }
 
-export function Sidebar({ roles, moduleGateSnapshot }: SidebarProps) {
+export function Sidebar({
+  roles,
+  moduleGateSnapshot,
+  hasTenantLogo = false,
+  tenantLogoVersion = null,
+}: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const gate = useMemo(() => tenantGateFromSnapshot(moduleGateSnapshot ?? {}), [moduleGateSnapshot]);
@@ -49,7 +57,12 @@ export function Sidebar({ roles, moduleGateSnapshot }: SidebarProps) {
           href="/dashboard"
           className="inline-block rounded-md outline-none ring-offset-sidebar focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <BloqerLogo priority className="h-8 max-w-[9.5rem]" />
+          <TenantBrandLogo
+            hasTenantLogo={hasTenantLogo}
+            logoVersion={tenantLogoVersion}
+            priority
+            className="h-8 max-w-[9.5rem]"
+          />
         </Link>
       </div>
       <nav

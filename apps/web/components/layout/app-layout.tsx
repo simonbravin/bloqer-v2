@@ -12,6 +12,8 @@ interface AppLayoutProps {
   showPlatformLink?: boolean;
   /** Phase 12B / 15A: serialized tenant module flags for nav (global sidebar + project workspace). */
   moduleGateSnapshot?: Partial<Record<PermissionModule, boolean>>;
+  hasTenantLogo?: boolean;
+  tenantLogoVersion?: string | null;
   children: React.ReactNode;
 }
 
@@ -21,6 +23,8 @@ export function AppLayout({
   notificationUnreadCount = 0,
   showPlatformLink = false,
   moduleGateSnapshot,
+  hasTenantLogo = false,
+  tenantLogoVersion = null,
   children,
 }: AppLayoutProps) {
   const roles = tenantCtx?.roles ?? [];
@@ -32,6 +36,8 @@ export function AppLayout({
           roles={roles}
           moduleGateSnapshot={moduleGateSnapshot}
           isTenantUser={Boolean(tenantCtx)}
+          hasTenantLogo={hasTenantLogo}
+          tenantLogoVersion={tenantLogoVersion}
         />
       }
       header={

@@ -180,6 +180,7 @@ export * from "./platform/platform-tenant.service";
 export * from "./platform/platform-user.service";
 export * from "./tenant-settings/tenant-settings-guards";
 export * from "./tenant-settings/tenant-settings.service";
+export * from "./tenant-settings/tenant-logo.service";
 export * from "./tenant-settings/team-management.service";
 export * from "./tenant-settings/tenant-invitations.service";
 export * from "./tenant-settings/permissions-overview.service";

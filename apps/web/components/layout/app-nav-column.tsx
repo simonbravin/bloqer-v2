@@ -12,9 +12,17 @@ interface AppNavColumnProps {
   moduleGateSnapshot?: Partial<Record<PermissionModule, boolean>>;
   /** When false, never swap to project workspace (e.g. user without tenant membership). */
   isTenantUser: boolean;
+  hasTenantLogo?: boolean;
+  tenantLogoVersion?: string | null;
 }
 
-export function AppNavColumn({ roles, moduleGateSnapshot, isTenantUser }: AppNavColumnProps) {
+export function AppNavColumn({
+  roles,
+  moduleGateSnapshot,
+  isTenantUser,
+  hasTenantLogo = false,
+  tenantLogoVersion = null,
+}: AppNavColumnProps) {
   const pathname = usePathname();
   const m = pathname.match(/^\/proyectos\/([^/]+)/);
   const projectId = m?.[1];
@@ -25,9 +33,18 @@ export function AppNavColumn({ roles, moduleGateSnapshot, isTenantUser }: AppNav
         projectId={projectId}
         roles={roles}
         moduleGateSnapshot={moduleGateSnapshot ?? {}}
+        hasTenantLogo={hasTenantLogo}
+        tenantLogoVersion={tenantLogoVersion}
       />
     );
   }
 
-  return <Sidebar roles={roles} moduleGateSnapshot={moduleGateSnapshot} />;
+  return (
+    <Sidebar
+      roles={roles}
+      moduleGateSnapshot={moduleGateSnapshot}
+      hasTenantLogo={hasTenantLogo}
+      tenantLogoVersion={tenantLogoVersion}
+    />
+  );
 }

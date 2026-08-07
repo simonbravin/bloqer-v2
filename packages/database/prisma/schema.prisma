@@ -560,6 +560,9 @@ model Tenant {
   platformInternalNotes String?
   /// Internal notes for `/configuracion/permisos` (key = PermissionModule overview key). See ADR-Phase1-05.
   permissionMatrixNotes Json?
+  /// Tenant brand logo in R2 ([D-071]); key must be `{tenantId}/branding/…`.
+  logoStorageKey        String?            @db.VarChar(512)
+  logoMimeType          String?            @db.VarChar(128)
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 

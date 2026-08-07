@@ -1,6 +1,12 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getStorageEnv } from "@bloqer/config";
+import { randomUUID } from "node:crypto";
 
 // ─── Key helpers ──────────────────────────────────────────────────────────────
 
@@ -22,6 +28,40 @@ export function buildStorageKey(
   const safe    = sanitizeFilename(filename);
   const segment = projectId ?? "global";
   return `${tenantId}/${segment}/${documentId}/${safe}`;
+}
+
+/** Branding logo key: `{tenantId}/branding/logo/{uuid}.{ext}` ([D-071]). */
+export function buildTenantLogoStorageKey(
+  tenantId: string,
+  ext: "png" | "jpg" | "webp",
+): string {
+  return `${tenantId}/branding/logo/${randomUUID()}.${ext}`;
+}
+
+/**
+ * Ensures an R2 key is scoped to the given tenant.
+ * Throws if the key is missing or does not start with `{tenantId}/`.
+ */
+export function assertTenantScopedStorageKey(tenantId: string, storageKey: string): void {
+  const prefix = `${tenantId}/`;
+  if (!storageKey || !storageKey.startsWith(prefix)) {
+    throw new Error("Storage key is not scoped to the current tenant");
+  }
+}
+
+/** Logo keys must live under `{tenantId}/branding/` ([D-071]). */
+export function isTenantLogoStorageKey(tenantId: string, storageKey: string): boolean {
+  return Boolean(storageKey) && storageKey.startsWith(`${tenantId}/branding/`);
+}
+
+export function assertTenantLogoStorageKey(tenantId: string, storageKey: string): void {
+  if (!isTenantLogoStorageKey(tenantId, storageKey)) {
+    throw new Error("Storage key is not a tenant branding logo key");
+  }
+}
+
+export function isTenantScopedStorageKey(tenantId: string, storageKey: string): boolean {
+  return Boolean(storageKey) && storageKey.startsWith(`${tenantId}/`);
 }
 
 // ─── S3 client ────────────────────────────────────────────────────────────────
@@ -55,6 +95,37 @@ export async function putObject(
       Key:         storageKey,
       Body:        body,
       ContentType: mimeType,
+    }),
+  );
+}
+
+export async function getObjectBytes(storageKey: string): Promise<{
+  body: Buffer;
+  contentType: string | undefined;
+}> {
+  const { client, bucket } = createS3Client();
+  const result = await client.send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key:    storageKey,
+    }),
+  );
+  if (!result.Body) {
+    throw new Error("Empty object body");
+  }
+  const bytes = await result.Body.transformToByteArray();
+  return {
+    body: Buffer.from(bytes),
+    contentType: result.ContentType,
+  };
+}
+
+export async function deleteObject(storageKey: string): Promise<void> {
+  const { client, bucket } = createS3Client();
+  await client.send(
+    new DeleteObjectCommand({
+      Bucket: bucket,
+      Key:    storageKey,
     }),
   );
 }

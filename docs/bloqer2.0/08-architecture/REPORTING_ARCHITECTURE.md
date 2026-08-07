@@ -91,7 +91,7 @@ Todas las rutas listadas en §Rutas API con `?format=pdf` generan PDF vía `expo
 - Mismos datos que CSV/vista (mismos servicios en `@bloqer/services`); **sin** sumar monedas; totales **por moneda** donde el DTO lo expone (`byCurrency` en aging).
 - **Encabezado (`PdfReportHeader`):** tenant / razón social (empresa primaria activa), **obra** (`código · nombre`) en reportes de proyecto, título del reporte, **generado (UTC ISO)**, línea de **filtros** (sin UUIDs de negocio; filtros estructurales como “filtro activo”).
 - **Pie (`PdfReportFooter`):** tenant, **usuario generador**, paginación `Página X de Y`, avisos de truncado cuando aplica.
-- **Logo tenant:** pendiente (no hay campo persistido); placeholder futuro en [`EXPORT_FORMATS.md`](../06-reports/EXPORT_FORMATS.md).
+- **Logo tenant ([D-071]):** `resolvePdfReportBranding` carga `Tenant.logoStorageKey` filtrado por `ctx.tenantId`, valida prefijo R2 `{tenantId}/`, y adjunta data URI al header; falla storage → PDF sin logo (texto). Ver [`EXPORT_FORMATS.md`](../06-reports/EXPORT_FORMATS.md).
 - **Límites de filas:** aging — máx. **350**; control de costos y tablas genéricas de proyecto — máx. **90** filas (resto indicado en pie + sugerencia CSV).
 - Sin `storageKey`, metadata interna, stack traces; sin IDs técnicos en cuerpo salvo los ya presentes en DTO usados también por CSV (p. ej. códigos WBS visibles).
 

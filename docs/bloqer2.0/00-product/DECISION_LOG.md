@@ -1019,6 +1019,23 @@
 
 ---
 
+### D-071 — Logo de tenant (sidebar + PDF)
+
+- **Fecha:** 2026-08-07
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Las empresas necesitan identidad visual propia en la plataforma (sidebar) y en exportaciones PDF, sin mezclar marcas entre tenants.
+- **Decisión:**
+  1. El logo es **atributo del Tenant** (`logoStorageKey` / mime), no de Company.
+  2. **Quién edita:** OWNER y ADMIN vía `EDIT TENANT_SETTINGS` (igual que nombre / timezone / contacto) en Configuración → General.
+  3. **Dónde se ve en UI:** sidebars de app tenant (menú empresa + workspace de obra). Login, onboarding y consola `/platform` siguen con marca Bloqer.
+  4. **Fallback UI:** sin logo subido → logo Bloqer. **PDF:** con logo → encabezado; sin logo → solo texto (nunca logo Bloqer en PDF del cliente).
+  5. **Aislamiento:** clave R2 bajo `{tenantId}/branding/…`; lectura/escritura/export solo con `ctx.tenantId` / sesión — nunca aceptar `logoKey`/`logoUrl` del cliente en export.
+- **Implicancias:** migración Prisma; upload R2; proxy autenticado para sidebar; `resolvePdfReportBranding` incluye data URI scoped.
+- **Documentos afectados:** [`CORE_ENTITIES.md`](../01-domain/CORE_ENTITIES.md), [`EXPORT_FORMATS.md`](../06-reports/EXPORT_FORMATS.md), [`REPORTING_ARCHITECTURE.md`](../08-architecture/REPORTING_ARCHITECTURE.md), [`FILE_STORAGE_ARCHITECTURE.md`](../08-architecture/FILE_STORAGE_ARCHITECTURE.md), [`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md) §1.3.
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1027,7 +1044,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-071`…).
+1. Tomar el siguiente ID disponible (`D-072`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

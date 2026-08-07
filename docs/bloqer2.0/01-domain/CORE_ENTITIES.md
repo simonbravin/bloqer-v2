@@ -23,7 +23,7 @@
 ### Tenant
 - **Propósito:** representa una empresa cliente del SaaS. Aísla todos los datos.
 - **Identidad:** `tenant_id` único.
-- **Atributos clave:** nombre, CUIT/identificador fiscal, configuración de moneda base, método default de stock, zona horaria, estado (activo/suspendido).
+- **Atributos clave:** nombre, CUIT/identificador fiscal, configuración de moneda base, método default de stock, zona horaria, estado (activo/suspendido), logo de marca (`logoStorageKey` / mime; opcional — [D-071]).
 - **Tenant-scoped:** N/A (es la raíz).
 
 ### Company

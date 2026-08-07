@@ -28,6 +28,12 @@ Almacenar **blobs** (adjuntos de documentos, fotos de obra, PDFs) en **Cloudflar
 2. Tras upload, servidor **confirma** y crea fila metadatos + vínculo a entidad.
 3. Descarga pasa por **autorización** y **auditoría** si el producto lo exige.
 
+## Branding de tenant ([D-071])
+
+- Logo de organización: objeto R2 con clave `{tenantId}/branding/logo/{uuid}.{ext}`; metadatos en `Tenant.logoStorageKey` / `logoMimeType`.
+- Toda lectura/escritura debe **assert** que la clave empieza con `{tenantId}/` del contexto de sesión/servicio.
+- UI (sidebar) sirve bytes vía route autenticada scoped al `tenantId` de sesión; PDF branding usa el mismo aislamiento.
+
 ## Referencias funcionales
 
 - [`../02-modules/DOCUMENTS.md`](../02-modules/DOCUMENTS.md)
