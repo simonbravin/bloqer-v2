@@ -17,6 +17,8 @@ declare module "next-auth" {
 /** JWT claim shape used in auth callbacks (avoid augmenting `next-auth/jwt` for tsc resolution). */
 export type BloqerJwtToken = {
   id?: string;
+  /** Unix seconds at login; used for absolute session max (not refreshed on idle). */
+  authTime?: number;
   pwdAt?: string | null;
   name?: string | null;
   picture?: string | null;

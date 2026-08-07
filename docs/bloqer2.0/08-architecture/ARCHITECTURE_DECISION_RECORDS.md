@@ -170,7 +170,7 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
   4. Login credentials exige `status=ACTIVE`, `emailVerified` set, hash OK. Reset con token válido puede **establecer** password (también para users Google-only) y activa `emailVerified`+`ACTIVE` si aún no lo estaban (posesión del email).
   5. **Takeover:** si existe stub no verificado mismo email y Google inicia sesión, se activa el User existente y se vincula `Account` Google (evita bloqueo por `email` unique).
   6. Credentials `authorize` y Prisma **solo en Node** (`packages/auth/src/auth.ts`); middleware edge sigue con `authConfig` sin Credentials/Prisma.
-  7. Invalidación post-reset: `User.passwordUpdatedAt`; claim `pwdAt` en JWT; chequeo en `getCurrentUser` (Node). Middleware edge no valida contra DB.
+  7. Invalidación post-reset: `User.passwordUpdatedAt`; claim `pwdAt` en JWT; chequeo en `getSession` (Node; usado por `getCurrentUser`). Middleware edge no valida contra DB. `getSession` debe devolver `null` ante mismatch aunque `signOut` falle en RSC.
   8. Sin username-login. Sin magic-link login. Anti-enumeración en register/reset. Join a tenant = invitación only ([D-064](../00-product/DECISION_LOG.md)).
 - **Consecuencias:** Nueva dep `bcryptjs` en `@bloqer/services`. Rutas públicas `/registro`, `/verificar-email`, `/recuperar-contrasena`, `/restablecer-contrasena`. Onboarding trial / invites sin cambio de producto.
 - **Referencias:** [`AUTH_ARCHITECTURE.md`](./AUTH_ARCHITECTURE.md), [`SECURITY_ARCHITECTURE.md`](./SECURITY_ARCHITECTURE.md), [D-064](../00-product/DECISION_LOG.md).

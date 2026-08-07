@@ -12,6 +12,15 @@ Usar **Auth.js / NextAuth** como **primera opción** para autenticación en Next
 - Credentials/`authorize` solo en runtime Node (`packages/auth/src/auth.ts`); middleware edge sin Prisma.
 - Unirse a tenant: solo invitación ([D-064](../00-product/DECISION_LOG.md#d-064--invitación-por-email-al-tenant-q-015)); primer tenant vía `/onboarding` (Phase 14A).
 
+### Duración de sesión
+
+- Estrategia: **JWT** (`session.strategy = "jwt"` en `packages/auth`).
+- **Idle `maxAge`:** **7 días** (`SESSION_IDLE_MAX_AGE_SEC`). Mientras el usuario navega, el middleware re-emite la cookie y extiende el `exp`; sin uso durante 7 días, expira. No es un tope duro desde el login.
+- **Tope absoluto:** **30 días** desde `authTime` en el JWT (`SESSION_ABSOLUTE_MAX_AGE_SEC`), aunque el idle se renueve. El callback `jwt` devuelve `null` al vencer.
+- Invalidación post-reset / suspend: claim `pwdAt` vs `User.passwordUpdatedAt` y status en Node (`getSession` → usado por `getCurrentUser`); el middleware Edge no valida contra DB (ADR-Auth-Credentials-01). Si `signOut` no puede borrar cookies en RSC, la request igual se niega (`null`).
+- No hay “remember me” aparte: UX larga = idle + absoluto arriba (o, a futuro, MFA / logout remoto).
+- `updateAge` de Auth.js **no aplica** a estrategia JWT; no usarlo como control de lifetime.
+
 ## Justificación para Bloqer 2.0
 
 - Modelo de permisos **simple** en producto (VIEW / EDIT / APPROVE por módulo, [D-012](../00-product/DECISION_LOG.md)) mapea bien a **guards** en servidor.

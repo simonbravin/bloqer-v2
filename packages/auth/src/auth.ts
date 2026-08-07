@@ -88,10 +88,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async jwt(params) {
       const base = authConfig.callbacks?.jwt;
-      const token = (typeof base === "function" ? await base(params) : params.token) as
-        | (typeof params.token & BloqerJwtToken)
-        | undefined;
-      if (!token) return params.token;
+      const baseResult = typeof base === "function" ? await base(params) : params.token;
+      // Propagate null: absolute maxAge / explicit invalidation must not restore the old token.
+      if (baseResult == null) return null;
+
+      const token = baseResult as typeof params.token & BloqerJwtToken;
 
       // Always refresh from DB on sign-in so claim matches User.passwordUpdatedAt
       // (Credentials may set a stale/null pwdAt before this runs).
