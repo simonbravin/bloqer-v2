@@ -18,6 +18,7 @@ import {
   cancelDraftJournalOnOperationalCancel,
 } from "../accounting/accounting-cancel-sync.service";
 import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import { assertPeriodOpenUnderCompanyLock } from "../treasury/treasury-write-locks";
 import { assertResourceTenant } from "../security/tenant-isolation";
 
 export type PaymentView = Omit<Payment, "amount"> & {
@@ -383,6 +384,12 @@ export async function cancelPayment(
       throw new ServiceError("CONFLICT", "El pago ya está cancelado");
     }
 
+    await assertPeriodOpenUnderCompanyLock(tx, {
+      tenantId: ctx.tenantId,
+      companyId: p.companyId,
+      date: p.paymentDate,
+    });
+
     const linkedMovement = await tx.accountMovement.findFirst({
       where: { sourceType: "PAYMENT", sourceId: id, status: { in: ["CONFIRMED", "RECONCILED"] } },
       select: { id: true, status: true },
@@ -395,7 +402,7 @@ export async function cancelPayment(
     }
 
     const paymentCancel = await tx.payment.updateMany({
-      where: { id, status: "CONFIRMED" },
+      where: { id, tenantId: ctx.tenantId, status: "CONFIRMED" },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
     });
     assertOptimisticRowUpdate(

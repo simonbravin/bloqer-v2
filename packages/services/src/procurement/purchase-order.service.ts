@@ -2,6 +2,7 @@ import { Prisma, prisma, PurchaseOrder } from "@bloqer/database";
 import type { CreatePurchaseOrderInput, UpdatePurchaseOrderInput } from "@bloqer/validators";
 import { sortTreeOrder } from "@bloqer/utils";
 import { auditProcurement } from "./procurement-audit";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { calcLine, recalcPurchaseOrderTotals } from "./purchase-order-calc.service";
@@ -542,8 +543,9 @@ export async function updatePurchaseOrder(
   }
 
   const po = await prisma.$transaction(async (tx) => {
-    await tx.purchaseOrder.update({
-      where: { id },
+    // Claim DRAFT so concurrent submit cannot leave a submitted PO with rewritten lines.
+    const headerClaim = await tx.purchaseOrder.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
       data: {
         supplierContactId:    input.supplierContactId ?? existing.supplierContactId,
         issueDate:            input.issueDate ? new Date(input.issueDate) : existing.issueDate,
@@ -559,6 +561,10 @@ export async function updatePurchaseOrder(
         updatedBy:            ctx.actorUserId,
       },
     });
+    assertOptimisticRowUpdate(
+      headerClaim.count,
+      "La orden de compra ya no está en borrador. Recargá e intentá de nuevo.",
+    );
 
     if (input.lines) {
       const previousLines = await tx.purchaseOrderLine.findMany({ where: { purchaseOrderId: id } });

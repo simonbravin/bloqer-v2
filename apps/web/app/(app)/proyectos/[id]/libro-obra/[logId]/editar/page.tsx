@@ -34,7 +34,7 @@ export default async function EditarParteObraPage({ params }: PageProps) {
   try {
     log = await getJobsiteLogById(logId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 
@@ -50,7 +50,7 @@ export default async function EditarParteObraPage({ params }: PageProps) {
       getWbsIncrementalProgressSnapshot(projectId, ctx, { excludeLogId: logId }),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }

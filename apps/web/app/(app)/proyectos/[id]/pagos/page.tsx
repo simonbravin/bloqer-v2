@@ -35,7 +35,7 @@ export default async function PagosPage({ params, searchParams }: PageProps) {
   try {
     await getProjectShellInfo(id, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
     throw err;
   }
@@ -44,7 +44,7 @@ export default async function PagosPage({ params, searchParams }: PageProps) {
   try {
     paymentsResult = await listPaymentsByProject(id, ctx, { page, pageSize: PAGE_SIZE });
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 

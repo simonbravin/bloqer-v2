@@ -22,6 +22,7 @@ import {
 import { entryDateGte, entryDateLte, sanitizeIsoDate } from "./accounting-date";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import { assertPeriodOpenUnderCompanyLock } from "../treasury/treasury-write-locks";
 
 /** Sourced journals mirror an operational document [D-063]. */
 export function isSourcedJournalEntry(entry: {
@@ -850,35 +851,40 @@ async function cancelDraftJournalEntryCore(
 
   // Operational cancel-sync [D-061] must still clear DRAFT after cash/doc cancel even if
   // the period was closed in the gap (cleanup must not leave a postable orphan).
-  if (!opts?.skipPeriodLock) {
-    await assertFinancialPeriodOpen({
-      tenantId: ctx.tenantId,
-      companyId: existing.companyId,
-      date: existing.entryDate,
+  await prisma.$transaction(async (tx) => {
+    if (!opts?.skipPeriodLock) {
+      await assertPeriodOpenUnderCompanyLock(tx, {
+        tenantId: ctx.tenantId,
+        companyId: existing.companyId,
+        date: existing.entryDate,
+      });
+    }
+
+    const flipped = await tx.journalEntry.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+      data: {
+        status:          "CANCELLED",
+        cancelledAt:     new Date(),
+        updatedByUserId: ctx.actorUserId,
+      },
     });
-  }
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "El asiento ya no está en borrador. Recargá e intentá de nuevo.",
+    );
 
-  const flipped = await prisma.journalEntry.updateMany({
-    where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
-    data: {
-      status:          "CANCELLED",
-      cancelledAt:     new Date(),
-      updatedByUserId: ctx.actorUserId,
-    },
-  });
-  assertOptimisticRowUpdate(
-    flipped.count,
-    "El asiento ya no está en borrador. Recargá e intentá de nuevo.",
-  );
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "journal_entry.cancelled",
-    entityType:  "JournalEntry",
-    entityId:    id,
-    after:       { status: "CANCELLED", ...(opts?.skipPeriodLock ? { via: "operational_cancel_sync" } : {}) },
-    ipAddress:   ctx.ipAddress,
+    await log(
+      {
+        tenantId:    ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        action:      "journal_entry.cancelled",
+        entityType:  "JournalEntry",
+        entityId:    id,
+        after:       { status: "CANCELLED", ...(opts?.skipPeriodLock ? { via: "operational_cancel_sync" } : {}) },
+        ipAddress:   ctx.ipAddress,
+      },
+      tx,
+    );
   });
 
   return loadJournalEntryView(id, ctx.tenantId, existing.companyId);
@@ -941,18 +947,22 @@ export async function reversePostedJournalEntry(
     opts?.entryDate ?? new Date().toISOString().slice(0, 10);
   const entryDate = new Date(`${entryDateStr}T00:00:00.000Z`);
 
-  await assertFinancialPeriodOpen({
-    tenantId: ctx.tenantId,
-    companyId: existing.companyId,
-    date: existing.entryDate,
-  });
-  await assertFinancialPeriodOpen({
-    tenantId: ctx.tenantId,
-    companyId: existing.companyId,
-    date: entryDate,
-  });
-
   const reverse = await prisma.$transaction(async (tx) => {
+    // Serialize vs period close for both original and reverse dates.
+    await assertPeriodOpenUnderCompanyLock(tx, {
+      tenantId: ctx.tenantId,
+      companyId: existing.companyId,
+      date: existing.entryDate,
+    });
+    await assertFinancialPeriodOpen(
+      {
+        tenantId: ctx.tenantId,
+        companyId: existing.companyId,
+        date: entryDate,
+      },
+      tx,
+    );
+
     const created = await tx.journalEntry.create({
       data: {
         tenantId:        ctx.tenantId,

@@ -34,17 +34,23 @@ import {
   completeSubcontractAction,
   cancelSubcontractAction,
 } from "../actions";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
+import { ConfirmActionButton } from "@/components/feedback/confirm-action-button";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; subcontractId: string }>;
+  searchParams: Promise<{ actionError?: string }>;
 }
 
-export default async function SubcontratoPage({ params }: PageProps) {
+export default async function SubcontratoPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId, subcontractId } = await params;
+  const sp = await searchParams;
+  const returnPath = `/proyectos/${projectId}/subcontratos/${subcontractId}`;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -59,7 +65,7 @@ export default async function SubcontratoPage({ params }: PageProps) {
       listSubcontractCertificationsBySubcontract(subcontractId, ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 
@@ -101,7 +107,9 @@ export default async function SubcontratoPage({ params }: PageProps) {
               <form
                 action={async () => {
                   "use server";
-                  await activateSubcontractAction(subcontractId, projectId);
+                  const res = await activateSubcontractAction(subcontractId, projectId);
+                  if ("error" in res) redirectWithActionError(returnPath, res.error);
+                  redirect(returnPath);
                 }}
               >
                 <Button size="sm" type="submit">
@@ -122,7 +130,9 @@ export default async function SubcontratoPage({ params }: PageProps) {
               <form
                 action={async () => {
                   "use server";
-                  await completeSubcontractAction(subcontractId, projectId);
+                  const res = await completeSubcontractAction(subcontractId, projectId);
+                  if ("error" in res) redirectWithActionError(returnPath, res.error);
+                  redirect(returnPath);
                 }}
               >
                 <Button variant="outline" size="sm" type="submit">
@@ -133,19 +143,21 @@ export default async function SubcontratoPage({ params }: PageProps) {
           )}
           {canEditSubcontracts &&
             (subcontract.status === "DRAFT" || subcontract.status === "ACTIVE") && (
-            <form
-              action={async () => {
-                "use server";
-                await cancelSubcontractAction(subcontractId, projectId);
-              }}
-            >
-              <Button variant="outline" size="sm" type="submit" className="text-destructive">
-                Anular
-              </Button>
-            </form>
+            <ConfirmActionButton
+              label="Anular"
+              title="Anular subcontrato"
+              description="El subcontrato pasará a anulado. No se podrán emitir nuevas certificaciones."
+              confirmLabel="Anular"
+              variant="outline"
+              className="text-destructive"
+              successMessage="Subcontrato anulado"
+              action={cancelSubcontractAction.bind(null, subcontractId, projectId)}
+            />
           )}
         </div>
       </div>
+
+      <ActionErrorBanner message={sp.actionError} />
 
       {subcontract.description && (
         <div className="rounded-lg border bg-card p-4">

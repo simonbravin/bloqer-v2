@@ -30,10 +30,14 @@ import {
   rejectSubcontractCertificationAction,
   cancelSubcontractCertificationAction,
 } from "../../../actions";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
+import { ConfirmActionButton } from "@/components/feedback/confirm-action-button";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; subcontractId: string; certId: string }>;
+  searchParams: Promise<{ actionError?: string }>;
 }
 
 function formatAmount(value: string) {
@@ -43,11 +47,13 @@ function formatAmount(value: string) {
   }).format(parseFloat(value));
 }
 
-export default async function CertificacionPage({ params }: PageProps) {
+export default async function CertificacionPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId, subcontractId, certId } = await params;
+  const sp = await searchParams;
+  const returnPath = `/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${certId}`;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -59,7 +65,7 @@ export default async function CertificacionPage({ params }: PageProps) {
   try {
     cert = await getSubcontractCertificationById(certId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 
@@ -104,7 +110,13 @@ export default async function CertificacionPage({ params }: PageProps) {
               <form
                 action={async () => {
                   "use server";
-                  await issueSubcontractCertificationAction(certId, subcontractId, projectId);
+                  const res = await issueSubcontractCertificationAction(
+                    certId,
+                    subcontractId,
+                    projectId,
+                  );
+                  if ("error" in res) redirectWithActionError(returnPath, res.error);
+                  redirect(returnPath);
                 }}
               >
                 <Button size="sm" type="submit">
@@ -118,37 +130,53 @@ export default async function CertificacionPage({ params }: PageProps) {
               <form
                 action={async () => {
                   "use server";
-                  await approveSubcontractCertificationAction(certId, subcontractId, projectId);
+                  const res = await approveSubcontractCertificationAction(
+                    certId,
+                    subcontractId,
+                    projectId,
+                  );
+                  if ("error" in res) redirectWithActionError(returnPath, res.error);
+                  redirect(returnPath);
                 }}
               >
                 <Button size="sm" type="submit">
                   Aprobar
                 </Button>
               </form>
-              <form
-                action={async () => {
-                  "use server";
-                  await rejectSubcontractCertificationAction(certId, subcontractId, projectId);
-                }}
-              >
-                <Button variant="outline" size="sm" type="submit" className="text-destructive">
-                  Rechazar
-                </Button>
-              </form>
+              <ConfirmActionButton
+                label="Rechazar"
+                title="Rechazar certificación"
+                description="La certificación quedará rechazada. Podés emitir una sucesora si el flujo lo permite."
+                confirmLabel="Rechazar"
+                variant="outline"
+                className="text-destructive"
+                successMessage="Certificación rechazada"
+                action={rejectSubcontractCertificationAction.bind(
+                  null,
+                  certId,
+                  subcontractId,
+                  projectId,
+                )}
+              />
             </>
           )}
           {canEditSubcontracts &&
             (cert.status === "DRAFT" || cert.status === "ISSUED" || cert.status === "APPROVED") && (
-            <form
-              action={async () => {
-                "use server";
-                await cancelSubcontractCertificationAction(certId, subcontractId, projectId);
-              }}
-            >
-              <Button variant="outline" size="sm" type="submit" className="text-destructive">
-                Anular
-              </Button>
-            </form>
+            <ConfirmActionButton
+              label="Anular"
+              title="Anular certificación"
+              description="La certificación de subcontrato se anulará."
+              confirmLabel="Anular"
+              variant="outline"
+              className="text-destructive"
+              successMessage="Certificación anulada"
+              action={cancelSubcontractCertificationAction.bind(
+                null,
+                certId,
+                subcontractId,
+                projectId,
+              )}
+            />
           )}
           {canEditSubcontracts && cert.status === "REJECTED" && (
             <Button size="sm" asChild>
@@ -161,6 +189,8 @@ export default async function CertificacionPage({ params }: PageProps) {
           )}
         </div>
       </div>
+
+      <ActionErrorBanner message={sp.actionError} />
 
       {cert.replacesCertificationId && (
         <p className="text-sm text-muted-foreground">

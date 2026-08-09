@@ -4,13 +4,16 @@ import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import type { CreateManualTreasuryAdjustmentInput } from "@bloqer/validators";
 import { ensureDraftJournalFromTreasuryMovement } from "../accounting/accounting-auto-draft.service";
 import { isCrossCompany } from "../company-scope";
-import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
 import { assertResourceTenant } from "../security/tenant-isolation";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { getAccountBalance } from "./balance.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { auditTreasury } from "./treasury-audit";
+import {
+  assertPeriodOpenUnderCompanyLock,
+  lockTreasuryAccountRow,
+} from "./treasury-write-locks";
 
 /**
  * Generic MANUAL_ADJUSTMENT on a treasury account ([P-TRZ-04] / Phase 3 close).
@@ -39,6 +42,7 @@ export async function registerManualTreasuryAdjustment(
   const movementId = randomUUID();
 
   await prisma.$transaction(async (tx) => {
+    await lockTreasuryAccountRow(tx, input.accountId, ctx.tenantId);
     const account = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
     if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
     assertResourceTenant(account.tenantId, ctx.tenantId);
@@ -59,14 +63,11 @@ export async function registerManualTreasuryAdjustment(
         "El ajuste requiere una empresa activa en el contexto o en la cuenta",
       );
     }
-    await assertFinancialPeriodOpen(
-      {
-        tenantId: ctx.tenantId,
-        companyId,
-        date: input.movementDate,
-      },
-      tx,
-    );
+    await assertPeriodOpenUnderCompanyLock(tx, {
+      tenantId: ctx.tenantId,
+      companyId,
+      date: input.movementDate,
+    });
 
     if (movementType === "OUTFLOW") {
       const balance = await getAccountBalance(account.id, tx);

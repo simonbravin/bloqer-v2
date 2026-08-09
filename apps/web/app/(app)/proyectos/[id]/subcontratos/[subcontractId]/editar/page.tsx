@@ -30,7 +30,7 @@ export default async function EditarSubcontratoPage({ params }: PageProps) {
   try {
     subcontract = await getSubcontractById(subcontractId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 
@@ -41,7 +41,7 @@ export default async function EditarSubcontratoPage({ params }: PageProps) {
   try {
     wbsPick = await getSubcontractFormWbsPickList(projectId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 

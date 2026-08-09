@@ -161,12 +161,14 @@ export function validateImportRows(
     }
 
     if (row.type === "GROUP") {
+      const positiveMoney = (v: string | undefined) =>
+        v != null && !/^-?0+(\.0+)?$/.test(v);
       const hasCosts =
-        row.material_cost ||
-        row.labor_cost ||
-        row.equipment_cost ||
-        row.subcontract_cost ||
-        row.other_cost;
+        positiveMoney(row.material_cost) ||
+        positiveMoney(row.labor_cost) ||
+        positiveMoney(row.equipment_cost) ||
+        positiveMoney(row.subcontract_cost) ||
+        positiveMoney(row.other_cost);
       if (hasCosts) {
         warnings.push({
           row: row._row,

@@ -56,7 +56,9 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
       getActiveInvoiceForCertification(certId, ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) {
+      notFound();
+    }
     throw err;
   }
 
@@ -170,10 +172,10 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
             availableItems={allItems}
             currency={cert.currency}
             editable={editable}
-            onAddLine={addCertificationLineAction}
-            onUpdateLine={updateCertificationLineAction}
-            onRemoveLine={removeCertificationLineAction}
-            onRefresh={refreshPreviousQtyAction.bind(null, certId)}
+            onAddLine={addCertificationLineAction.bind(null, projectId)}
+            onUpdateLine={updateCertificationLineAction.bind(null, projectId, certId)}
+            onRemoveLine={removeCertificationLineAction.bind(null, projectId, certId)}
+            onRefresh={refreshPreviousQtyAction.bind(null, projectId, certId)}
           />
         </div>
 
@@ -184,10 +186,10 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
             totalAmount={cert.totalAmount}
             canEdit={canEditCert}
             canApprove={canApproveCert}
-            onIssue={issueCertificationAction.bind(null, certId)}
-            onApprove={approveCertificationAction.bind(null, certId)}
-            onReject={rejectCertificationAction.bind(null, certId)}
-            onCancel={cancelCertificationAction.bind(null, certId)}
+            onIssue={issueCertificationAction.bind(null, certId, projectId)}
+            onApprove={approveCertificationAction.bind(null, certId, projectId)}
+            onReject={rejectCertificationAction.bind(null, certId, projectId)}
+            onCancel={cancelCertificationAction.bind(null, certId, projectId)}
           />
         </div>
       </div>

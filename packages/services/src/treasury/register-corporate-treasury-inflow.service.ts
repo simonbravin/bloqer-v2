@@ -9,7 +9,10 @@ import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enfo
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { ensureDraftJournalFromTreasuryMovement } from "../accounting/accounting-auto-draft.service";
-import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import {
+  assertPeriodOpenUnderCompanyLock,
+  lockTreasuryAccountRow,
+} from "./treasury-write-locks";
 
 export async function registerCorporateTreasuryInflow(
   input: CreateCorporateTreasuryInflowInput,
@@ -40,6 +43,7 @@ export async function registerCorporateTreasuryInflow(
   const movementId = randomUUID();
 
   await prisma.$transaction(async (tx) => {
+    await lockTreasuryAccountRow(tx, input.accountId, ctx.tenantId);
     const account = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
     if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
     if (account.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -55,14 +59,11 @@ export async function registerCorporateTreasuryInflow(
       );
     }
 
-    await assertFinancialPeriodOpen(
-      {
-        tenantId: ctx.tenantId,
-        companyId: ctx.companyId,
-        date: input.movementDate,
-      },
-      tx,
-    );
+    await assertPeriodOpenUnderCompanyLock(tx, {
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId!,
+      date: input.movementDate,
+    });
 
     if (counterpartyContactId) {
       const contact = await tx.contact.findUnique({

@@ -7,7 +7,6 @@ export { BudgetForm, type BudgetParentOption } from "./components/budget-form";
 export { BudgetSettingsForm, type SettingsDefaults } from "./components/budget-settings-form";
 export { WbsTree } from "./components/wbs-tree";
 export { CostItemPanel } from "./components/cost-item-panel";
-export { BudgetTotalsPanel } from "./components/budget-totals-panel";
 export { BudgetLifecycleDialog } from "./components/budget-lifecycle-dialog";
 export { BudgetMarginConfigSection } from "./components/budget-margin-config-section";
 export { BudgetExportActions } from "./components/budget-export-actions";

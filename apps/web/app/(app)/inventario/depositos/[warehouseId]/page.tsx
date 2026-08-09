@@ -38,7 +38,7 @@ export default async function DepositoPage({ params }: PageProps) {
       listStockMovements({ warehouseId }, ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 

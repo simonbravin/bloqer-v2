@@ -20,6 +20,10 @@ import {
   cancelDraftJournalOnOperationalCancel,
 } from "../accounting/accounting-cancel-sync.service";
 import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import {
+  assertPeriodOpenUnderCompanyLock,
+  lockTreasuryAccountRow,
+} from "./treasury-write-locks";
 import { assertResourceTenant } from "../security/tenant-isolation";
 
 export type CollectionView = Omit<Collection, "amount"> & {
@@ -201,6 +205,7 @@ export async function createCollection(
     }
 
     // Currency + company scope guard (mirror AP payment)
+    await lockTreasuryAccountRow(tx, input.accountId, ctx.tenantId);
     const account = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
     if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
     assertResourceTenant(account.tenantId, ctx.tenantId);
@@ -226,15 +231,18 @@ export async function createCollection(
     assertTreasuryAccountCurrencyMatches(account.currency, receivable.currency);
 
     const companyId = ctx.companyId ?? account.companyId ?? receivable.companyId;
+    if (!companyId) {
+      throw new ServiceError(
+        "VALIDATION",
+        "La cobranza requiere una empresa activa en el contexto, la cuenta o la CxC",
+      );
+    }
 
-    await assertFinancialPeriodOpen(
-      {
-        tenantId: ctx.tenantId,
-        companyId,
-        date: input.collectionDate,
-      },
-      tx,
-    );
+    await assertPeriodOpenUnderCompanyLock(tx, {
+      tenantId: ctx.tenantId,
+      companyId,
+      date: input.collectionDate,
+    });
     const fx = computeDocumentFxAmounts(receivable.currency, amount);
 
     // Create Collection
@@ -403,6 +411,12 @@ export async function cancelCollection(
       throw new ServiceError("CONFLICT", "La cobranza ya está cancelada");
     }
 
+    await assertPeriodOpenUnderCompanyLock(tx, {
+      tenantId: ctx.tenantId,
+      companyId: c.companyId,
+      date: c.collectionDate,
+    });
+
     const linkedMovement = await tx.accountMovement.findFirst({
       where: { sourceType: "COLLECTION", sourceId: id, status: { in: ["CONFIRMED", "RECONCILED"] } },
       select: { id: true, status: true },
@@ -415,7 +429,7 @@ export async function cancelCollection(
     }
 
     const collectionCancel = await tx.collection.updateMany({
-      where: { id, status: "CONFIRMED" },
+      where: { id, tenantId: ctx.tenantId, status: "CONFIRMED" },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
     });
     assertOptimisticRowUpdate(

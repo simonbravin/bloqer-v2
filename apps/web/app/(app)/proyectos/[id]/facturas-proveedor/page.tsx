@@ -63,7 +63,7 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
   try {
     await getProjectShellInfo(id, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
     throw err;
   }
@@ -77,7 +77,7 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
       sortDir: sp.dir === "asc" ? "asc" : "desc",
     });
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 
@@ -130,7 +130,7 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
         name: n.name,
       }));
     } catch (err) {
-      if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+      if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
       throw err;
     }
 

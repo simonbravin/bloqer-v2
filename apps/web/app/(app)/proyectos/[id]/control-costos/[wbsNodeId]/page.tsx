@@ -29,7 +29,7 @@ export default async function WbsItemDetailPage({ params, searchParams }: PagePr
   try {
     detail = await getWbsItemCostDetail(wbsNodeId, projectId, filters, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 

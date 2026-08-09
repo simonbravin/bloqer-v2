@@ -5,9 +5,15 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmAlertDialog } from "@/components/ui/reason-alert-dialog";
-import { cancelInternalTransferAction } from "@/app/(app)/tesoreria/actions";
+import { cancelPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 
-export function CancelInternalTransferButton({ transferId }: { transferId: string }) {
+export function CancelPurchaseOrderButton({
+  poId,
+  projectId,
+}: {
+  poId: string;
+  projectId: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -15,29 +21,16 @@ export function CancelInternalTransferButton({ transferId }: { transferId: strin
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-muted-foreground"
-        type="button"
-        disabled={pending}
-        onClick={() => {
-          setError(null);
-          setOpen(true);
-        }}
-      >
-        Cancelar
+      <Button type="button" variant="destructive" onClick={() => setOpen(true)}>
+        Anular
       </Button>
       <ConfirmAlertDialog
         open={open}
         onOpenChange={setOpen}
-        title="Cancelar transferencia"
+        title="Anular orden de compra"
         description={
           <div className="space-y-2">
-            <p>
-              Se anulan ambos movimientos de la transferencia. Esta acción no se puede deshacer
-              desde aquí.
-            </p>
+            <p>La OC pasará a anulada. No se podrá confirmar ni recibir contra ella.</p>
             {error ? (
               <p className="text-destructive" role="alert">
                 {error}
@@ -45,20 +38,20 @@ export function CancelInternalTransferButton({ transferId }: { transferId: strin
             ) : null}
           </div>
         }
-        confirmLabel="Cancelar transferencia"
+        confirmLabel="Anular OC"
         variant="destructive"
         pending={pending}
         onConfirm={() => {
           startTransition(async () => {
             setError(null);
-            const result = await cancelInternalTransferAction(transferId);
-            if ("error" in result) {
-              setError(result.error);
-              toast.error(result.error);
+            const res = await cancelPurchaseOrderAction(poId, projectId);
+            if ("error" in res) {
+              setError(res.error);
+              toast.error(res.error);
               return;
             }
             setOpen(false);
-            toast.success("Transferencia cancelada");
+            toast.success("Orden de compra anulada");
             router.refresh();
           });
         }}

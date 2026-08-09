@@ -9,7 +9,9 @@ import { canEditTreasuryUi } from "@/features/treasury/lib/treasury-edit-gates";
 import { getCurrentUser } from "@/lib/auth";
 import { getTreasuryAccountById, listAccountMovements, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { reactivateTreasuryAccountAction } from "../../actions";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { Button } from "@/components/ui/button";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { formatMoneyAmount } from "@/lib/format-money";
@@ -17,6 +19,7 @@ import Link from "next/link";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
+  searchParams: Promise<{ actionError?: string }>;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -26,11 +29,13 @@ const TYPE_LABELS: Record<string, string> = {
   OTHER: "Otro",
 };
 
-export default async function AccountDetailPage({ params }: PageProps) {
+export default async function AccountDetailPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { accountId } = await params;
+  const sp = await searchParams;
+  const returnPath = `/tesoreria/cuentas/${accountId}`;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -51,11 +56,6 @@ export default async function AccountDetailPage({ params }: PageProps) {
   }
 
   const canEdit = canEditTreasuryUi(ctx.roles);
-
-  const doReactivate = async () => {
-    "use server";
-    await reactivateTreasuryAccountAction(accountId);
-  };
 
   const movementItems: AccountMovementListItem[] = movements.map((m) => ({
     id: m.id,
@@ -87,7 +87,14 @@ export default async function AccountDetailPage({ params }: PageProps) {
             </>
           )}
           {account.status === "INACTIVE" && canEdit && (
-            <form action={doReactivate}>
+            <form
+              action={async () => {
+                "use server";
+                const result = await reactivateTreasuryAccountAction(accountId);
+                if ("error" in result) redirectWithActionError(returnPath, result.error);
+                redirect(returnPath);
+              }}
+            >
               <Button variant="outline" size="sm">
                 Reactivar
               </Button>
@@ -95,6 +102,8 @@ export default async function AccountDetailPage({ params }: PageProps) {
           )}
         </div>
       </div>
+
+      <ActionErrorBanner message={sp.actionError} />
 
       {!canEdit && account.status === "ACTIVE" ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">

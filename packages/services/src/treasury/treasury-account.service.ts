@@ -7,7 +7,7 @@ import { canRegisterApPayment } from "../ap/ap-access";
 import { ServiceContext, ServiceError } from "../types";
 import { getAccountBalance, AccountBalanceSummary } from "./balance.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
-import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import { assertPeriodOpenUnderCompanyLock } from "./treasury-write-locks";
 
 export type TreasuryAccountView = Omit<TreasuryAccount, "openingBalance"> & {
   openingBalance: string;
@@ -150,21 +150,20 @@ export async function createTreasuryAccount(
 
     // D6: create OPENING_BALANCE movement if openingBalance > 0
     if (openingBalance.greaterThan(0)) {
+      // Guard above ensures companyId when openingBalance > 0.
+      const openingCompanyId = companyId!;
       // Calendar UTC date (same convention as adjustments / recon) — avoid wall-clock TZ drift.
       const todayIso = new Date().toISOString().slice(0, 10);
       const movementDate = new Date(`${todayIso}T00:00:00.000Z`);
-      await assertFinancialPeriodOpen(
-        {
-          tenantId: ctx.tenantId,
-          companyId,
-          date: movementDate,
-        },
-        tx,
-      );
+      await assertPeriodOpenUnderCompanyLock(tx, {
+        tenantId: ctx.tenantId,
+        companyId: openingCompanyId,
+        date: movementDate,
+      });
       await tx.accountMovement.create({
         data: {
           tenantId: ctx.tenantId,
-          companyId,
+          companyId: openingCompanyId,
           accountId: created.id,
           movementDate,
           type: "INFLOW",

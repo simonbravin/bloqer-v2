@@ -18,6 +18,7 @@ import {
   createTenantInvitationSchema,
 } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditTeamMembership, canReadTenantConfigArea } from "./tenant-settings-guards";
 
@@ -342,10 +343,14 @@ export async function cancelTenantInvitation(invitationId: string, ctx: ServiceC
   }
 
   const now = new Date();
-  await prisma.tenantInvitation.update({
-    where: { id: inv.id },
+  const cancelled = await prisma.tenantInvitation.updateMany({
+    where: { id: inv.id, tenantId: ctx.tenantId, status: "PENDING" },
     data:  { status: "CANCELLED", cancelledAt: now },
   });
+  assertOptimisticRowUpdate(
+    cancelled.count,
+    "La invitación ya no está pendiente. Recargá e intentá de nuevo.",
+  );
 
   await log({
     tenantId:    ctx.tenantId,
@@ -412,9 +417,10 @@ export async function acceptTenantInvitation(
       );
     }
     if (inv.expiresAt <= new Date()) {
-      await tx.tenantInvitation.update({
-        where: { id: inv.id },
-        data:  { status: "EXPIRED" },
+      // Only flip PENDING → EXPIRED; never overwrite a concurrent ACCEPT.
+      await tx.tenantInvitation.updateMany({
+        where: { id: inv.id, status: "PENDING" },
+        data: { status: "EXPIRED" },
       });
       throw new ServiceError("CONFLICT", "La invitación expiró");
     }
@@ -444,6 +450,20 @@ export async function acceptTenantInvitation(
     const invitedRoles = dedupeInvitationRoles(inv.roles as UserRole[]);
     const now = new Date();
 
+    // Claim PENDING → ACCEPTED first so cancel cannot win the race mid-accept.
+    const claimed = await tx.tenantInvitation.updateMany({
+      where: { id: inv.id, status: "PENDING" },
+      data: {
+        status:           "ACCEPTED",
+        acceptedByUserId: actorUser.id,
+        acceptedAt:       now,
+      },
+    });
+    assertOptimisticRowUpdate(
+      claimed.count,
+      "Esta invitación ya no puede aceptarse",
+    );
+
     if (existing) {
       await tx.userMembership.update({
         where: { id: existing.id },
@@ -464,15 +484,6 @@ export async function acceptTenantInvitation(
         },
       });
     }
-
-    await tx.tenantInvitation.update({
-      where: { id: inv.id },
-      data: {
-        status:           "ACCEPTED",
-        acceptedByUserId: actorUser.id,
-        acceptedAt:       now,
-      },
-    });
 
     await log({
       tenantId:    inv.tenantId,

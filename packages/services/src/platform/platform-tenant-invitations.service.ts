@@ -14,6 +14,7 @@ import {
   tenantInvitationEmailFailureMessage,
 } from "../tenant-settings/tenant-invitation-shared";
 import type { CreateTenantInvitationResult, TenantInvitationDetail, TenantInvitationRow } from "../tenant-settings/tenant-invitations.service";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceError } from "../types";
 import { assertPlatformAccess, type PlatformServiceContext } from "./platform-auth.service";
 import { createPlatformAuditLog } from "./platform-audit.service";
@@ -241,10 +242,14 @@ export async function cancelPlatformTenantInvitation(
   }
 
   const now = new Date();
-  await prisma.tenantInvitation.update({
-    where: { id: inv.id },
+  const cancelled = await prisma.tenantInvitation.updateMany({
+    where: { id: inv.id, tenantId, status: "PENDING" },
     data:  { status: "CANCELLED", cancelledAt: now },
   });
+  assertOptimisticRowUpdate(
+    cancelled.count,
+    "La invitación ya no está pendiente. Recargá e intentá de nuevo.",
+  );
 
   await createPlatformAuditLog({
     actorUserId: ctx.actorUserId,

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { z } from "zod";
 import { can } from "@bloqer/domain";
 import {
   getBankReconciliationById,
@@ -25,6 +26,8 @@ export default async function ConciliacionDetailPage({ params }: PageProps) {
   if (!current?.tenantCtx) redirect("/login");
 
   const { reconciliationId } = await params;
+  if (!z.string().uuid().safeParse(reconciliationId).success) notFound();
+
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,

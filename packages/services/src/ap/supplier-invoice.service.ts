@@ -665,8 +665,9 @@ export async function updateSupplierInvoice(
     const nextPurchaseOrderId =
       input.purchaseOrderId !== undefined ? input.purchaseOrderId : undefined;
 
-    await tx.supplierInvoice.update({
-      where: { id },
+    // Claim DRAFT so concurrent issue cannot leave an ISSUED invoice with rewritten lines.
+    const headerClaim = await tx.supplierInvoice.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
       data: {
         supplierContactId: input.supplierContactId,
         issueDate:       input.issueDate ? new Date(input.issueDate) : undefined,
@@ -678,6 +679,10 @@ export async function updateSupplierInvoice(
         updatedBy:       ctx.actorUserId,
       },
     });
+    assertOptimisticRowUpdate(
+      headerClaim.count,
+      "La factura ya no está en borrador. Recargá e intentá de nuevo.",
+    );
 
     // Clearing OC header without rewriting lines must drop stale D-066 FKs.
     if (nextPurchaseOrderId === null && !input.lines) {
@@ -804,7 +809,7 @@ export async function issueSupplierInvoice(
     }
 
     const issued = await tx.supplierInvoice.updateMany({
-      where: { id, status: "DRAFT" },
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
       data: {
         status: "ISSUED",
         fxRate: fx.fxRate,

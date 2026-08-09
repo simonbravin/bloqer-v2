@@ -7,6 +7,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { assertCanCancelAccountMovement } from "./account-movement-cancel-guards";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import { assertPeriodOpenUnderCompanyLock } from "./treasury-write-locks";
 import {
   assertJournalAllowsOperationalCancel,
   cancelDraftJournalOnOperationalCancel,
@@ -97,6 +98,14 @@ export async function cancelAccountMovement(
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    if (m.companyId) {
+      await assertPeriodOpenUnderCompanyLock(tx, {
+        tenantId: ctx.tenantId,
+        companyId: m.companyId,
+        date: m.movementDate,
+      });
+    }
+
     const cancelled = await tx.accountMovement.updateMany({
       where: { id, tenantId: ctx.tenantId, status: "CONFIRMED" },
       data: { status: "CANCELLED" },

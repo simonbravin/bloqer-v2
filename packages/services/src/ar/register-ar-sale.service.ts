@@ -21,7 +21,10 @@ import {
   ensureDraftJournalFromSalesInvoice,
 } from "../accounting/accounting-auto-draft.service";
 import { notifyReceivableReadyToCollect } from "./ar-notifications.service";
-import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import {
+  assertPeriodOpenUnderCompanyLock,
+  lockTreasuryAccountRow,
+} from "../treasury/treasury-write-locks";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
@@ -250,6 +253,7 @@ export async function registerArSale(
             );
           }
 
+          await lockTreasuryAccountRow(tx, input.collectNow.accountId, ctx.tenantId);
           const account = await tx.treasuryAccount.findUnique({ where: { id: input.collectNow.accountId } });
           if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
           if (account.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -271,19 +275,23 @@ export async function registerArSale(
             );
           }
 
+          const collectionCompanyId = ctx.companyId ?? account.companyId ?? receivable.companyId;
+          if (!collectionCompanyId) {
+            throw new ServiceError(
+              "VALIDATION",
+              "La cobranza requiere una empresa activa en el contexto, la cuenta o la CxC",
+            );
+          }
           const collectionFx = computeDocumentFxAmounts(receivable.currency, collectAmount);
-          await assertFinancialPeriodOpen(
-            {
-              tenantId: ctx.tenantId,
-              companyId: ctx.companyId ?? account.companyId ?? receivable.companyId,
-              date: input.collectNow.collectionDate,
-            },
-            tx,
-          );
+          await assertPeriodOpenUnderCompanyLock(tx, {
+            tenantId: ctx.tenantId,
+            companyId: collectionCompanyId,
+            date: input.collectNow.collectionDate,
+          });
           const collection = await tx.collection.create({
             data: {
               tenantId: ctx.tenantId,
-              companyId: ctx.companyId ?? account.companyId ?? receivable.companyId,
+              companyId: collectionCompanyId,
               projectId: receivable.projectId,
               clientContactId: receivable.clientContactId,
               receivableId: receivable.id,
@@ -332,6 +340,7 @@ export async function registerArSale(
           const receivableUpdate = await tx.receivable.updateMany({
             where: {
               id: receivable.id,
+              tenantId: ctx.tenantId,
               paidAmount: receivable.paidAmount,
               status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
             },

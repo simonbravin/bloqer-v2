@@ -50,8 +50,10 @@ export function FinancialPeriodClosePanel({
     startTransition(async () => {
       setError(null);
       const res = await closeFinancialPeriodAction({ companyId, periodKey });
-      if ("error" in res) setError(res.error);
-      else {
+      if ("error" in res) {
+        setError(res.error);
+        toast.error(res.error);
+      } else {
         toast.success(`Período ${periodKey} cerrado`);
         setCloseKey(null);
         router.refresh();
@@ -67,8 +69,10 @@ export function FinancialPeriodClosePanel({
         periodKey,
         reason,
       });
-      if ("error" in res) setError(res.error);
-      else {
+      if ("error" in res) {
+        setError(res.error);
+        toast.error(res.error);
+      } else {
         toast.success(`Período ${periodKey} reabierto`);
         setReopenKey(null);
         router.refresh();

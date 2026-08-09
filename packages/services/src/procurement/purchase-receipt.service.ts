@@ -345,6 +345,20 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
   const tolerancePct = new Prisma.Decimal(settings.overReceiptTolerancePct);
 
   const receipt = await prisma.$transaction(async (tx) => {
+    // Claim DRAFT first so concurrent cancel cannot race after stock/PO mutations.
+    await tx.$queryRaw`
+      SELECT id FROM purchase_receipts
+      WHERE id = ${id} AND "tenantId" = ${ctx.tenantId}
+      FOR UPDATE
+    `;
+    const confirmed = await tx.purchaseReceipt.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+      data: { status: PurchaseReceiptStatus.CONFIRMED, updatedBy: ctx.actorUserId },
+    });
+    if (confirmed.count !== 1) {
+      throw new ServiceError("CONFLICT", "La recepción ya no está en borrador");
+    }
+
     // Lock PO lines then re-assert remaining (closes concurrent confirm race) [BR-PUR-006].
     for (const line of existing.lines) {
       await tx.$queryRaw`
@@ -400,14 +414,6 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
       }
     }
 
-    const confirmed = await tx.purchaseReceipt.updateMany({
-      where: { id, status: "DRAFT" },
-      data: { status: PurchaseReceiptStatus.CONFIRMED, updatedBy: ctx.actorUserId },
-    });
-    if (confirmed.count !== 1) {
-      throw new ServiceError("CONFLICT", "La recepción ya no está en borrador");
-    }
-
     const receipt = await tx.purchaseReceipt.findUniqueOrThrow({
       where: { id },
       include: receiptInclude,
@@ -460,7 +466,7 @@ export async function cancelPurchaseReceipt(id: string, ctx: ServiceContext): Pr
     }
 
     const cancelled = await tx.purchaseReceipt.updateMany({
-      where: { id, status: before.status },
+      where: { id, tenantId: ctx.tenantId, status: before.status },
       data: { status: PurchaseReceiptStatus.CANCELLED, updatedBy: ctx.actorUserId },
     });
     if (cancelled.count !== 1) {

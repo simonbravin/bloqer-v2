@@ -36,7 +36,7 @@ export default async function ContactoDetailPage({ params }: PageProps) {
   try {
     contact = await getContactById(id, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 

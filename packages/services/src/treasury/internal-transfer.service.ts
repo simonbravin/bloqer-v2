@@ -14,6 +14,10 @@ import {
 } from "../accounting/accounting-cancel-sync.service";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import {
+  assertPeriodOpenUnderCompanyLock,
+  lockTreasuryAccountRow,
+} from "./treasury-write-locks";
 import { isCrossCompany } from "../company-scope";
 
 export type InternalTransferView = Omit<InternalTransfer, "amount"> & {
@@ -158,6 +162,12 @@ export async function createInternalTransfer(
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    // Stable lock order avoids deadlocks when two transfers cross the same accounts.
+    const accountIds = [input.sourceAccountId, input.destinationAccountId].sort();
+    for (const accountId of accountIds) {
+      await lockTreasuryAccountRow(tx, accountId, ctx.tenantId);
+    }
+
     const source = await tx.treasuryAccount.findUnique({ where: { id: input.sourceAccountId } });
     const dest   = await tx.treasuryAccount.findUnique({ where: { id: input.destinationAccountId } });
 
@@ -182,15 +192,6 @@ export async function createInternalTransfer(
       );
     }
 
-    // Balance check: block negative balance on source (D4)
-    const sourceBalance = await getAccountBalance(source.id, tx as never);
-    if (amount.greaterThan(sourceBalance)) {
-      throw new ServiceError(
-        "CONFLICT",
-        `Saldo insuficiente en cuenta origen. Disponible: ${serializeMoneyDecimal(sourceBalance)} ${source.currency}.`,
-      );
-    }
-
     const companyId = ctx.companyId ?? source.companyId ?? dest.companyId ?? null;
     if (!companyId) {
       throw new ServiceError(
@@ -201,14 +202,20 @@ export async function createInternalTransfer(
     // Canonical pair id = InternalTransfer.id so GL draft + cancel sync share one sourceId.
     const transferPairId = randomUUID();
 
-    await assertFinancialPeriodOpen(
-      {
-        tenantId: ctx.tenantId,
-        companyId,
-        date: input.transferDate,
-      },
-      tx,
-    );
+    await assertPeriodOpenUnderCompanyLock(tx, {
+      tenantId: ctx.tenantId,
+      companyId,
+      date: input.transferDate,
+    });
+
+    // Balance check under account locks: block negative balance on source (D4)
+    const sourceBalance = await getAccountBalance(source.id, tx as never);
+    if (amount.greaterThan(sourceBalance)) {
+      throw new ServiceError(
+        "CONFLICT",
+        `Saldo insuficiente en cuenta origen. Disponible: ${serializeMoneyDecimal(sourceBalance)} ${source.currency}.`,
+      );
+    }
 
     const transfer = await tx.internalTransfer.create({
       data: {
@@ -359,6 +366,12 @@ export async function cancelInternalTransfer(
     if (t.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
     if (t.status === "CANCELLED") throw new ServiceError("CONFLICT", "La transferencia ya está cancelada");
 
+    await assertPeriodOpenUnderCompanyLock(tx, {
+      tenantId: ctx.tenantId,
+      companyId: t.companyId,
+      date: t.transferDate,
+    });
+
     const reconciledLeg = await tx.accountMovement.findFirst({
       where: {
         sourceType: "INTERNAL_TRANSFER",
@@ -385,7 +398,12 @@ export async function cancelInternalTransfer(
 
     // Cancel both linked movements (BR-TRZ-004)
     const legs = await tx.accountMovement.updateMany({
-      where: { sourceType: "INTERNAL_TRANSFER", sourceId: id, status: "CONFIRMED" },
+      where: {
+        tenantId: ctx.tenantId,
+        sourceType: "INTERNAL_TRANSFER",
+        sourceId: id,
+        status: "CONFIRMED",
+      },
       data: { status: "CANCELLED" },
     });
     if (legs.count !== 2) {

@@ -330,7 +330,7 @@ export async function cancelReceiptStockMovements(
   }
 
   await tx.stockMovement.updateMany({
-    where: { purchaseReceiptId, status: "CONFIRMED" },
+    where: { purchaseReceiptId, tenantId, status: "CONFIRMED" },
     data: { status: "CANCELLED" },
   });
 }

@@ -20,6 +20,11 @@ import { assertProjectAllowsBudgetPlanning } from "../project/project-operationa
 import { assertBudgetEditable, lockBudgetForEconomicEdit } from "./budget.service";
 import { _recalcCostItemTotals, _recalcBudgetSummary } from "./budget-calc.service";
 
+/** Persist APU decimals at 4 dp half-up — avoid writing raw IEEE floats. */
+function apuDecimal(value: number | string): Prisma.Decimal {
+  return new Prisma.Decimal(value).toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP);
+}
+
 type TxClient = Omit<
   typeof prisma,
   "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
@@ -74,10 +79,10 @@ export async function _recomputePartidaLinesForQuantity(
       await tx.costAnalysisLine.update({
         where: { id: line.id },
         data: {
-          coefficient: next.coefficient,
-          unitCost: next.unitCost,
-          totalCost: next.totalCost,
-          partidaQuantity: next.partidaQuantity,
+          coefficient: apuDecimal(next.coefficient),
+          unitCost: apuDecimal(next.unitCost),
+          totalCost: apuDecimal(next.totalCost),
+          partidaQuantity: next.partidaQuantity == null ? null : apuDecimal(next.partidaQuantity),
           isLumpSum: true,
         },
       });
@@ -97,10 +102,10 @@ export async function _recomputePartidaLinesForQuantity(
     await tx.costAnalysisLine.update({
       where: { id: line.id },
       data: {
-        coefficient: next.coefficient,
-        unitCost: next.unitCost,
-        totalCost: next.totalCost,
-        partidaQuantity: next.partidaQuantity,
+        coefficient: apuDecimal(next.coefficient),
+        unitCost: apuDecimal(next.unitCost),
+        totalCost: apuDecimal(next.totalCost),
+        partidaQuantity: next.partidaQuantity == null ? null : apuDecimal(next.partidaQuantity),
         isLumpSum: false,
       },
     });
@@ -147,10 +152,11 @@ export async function addCostAnalysisLine(
         category: input.category,
         description: input.description,
         unit,
-        coefficient: stored.coefficient,
-        unitCost: stored.unitCost,
-        totalCost: stored.totalCost,
-        partidaQuantity: stored.partidaQuantity,
+        coefficient: apuDecimal(stored.coefficient),
+        unitCost: apuDecimal(stored.unitCost),
+        totalCost: apuDecimal(stored.totalCost),
+        partidaQuantity:
+          stored.partidaQuantity == null ? null : apuDecimal(stored.partidaQuantity),
         isLumpSum: stored.isLumpSum,
         productId: input.productId ?? null,
         sortOrder: input.sortOrder ?? 0,
@@ -237,10 +243,11 @@ export async function updateCostAnalysisLine(
         category: input.category,
         description: input.description,
         unit,
-        coefficient: stored.coefficient,
-        unitCost: stored.unitCost,
-        totalCost: stored.totalCost,
-        partidaQuantity: stored.partidaQuantity,
+        coefficient: apuDecimal(stored.coefficient),
+        unitCost: apuDecimal(stored.unitCost),
+        totalCost: apuDecimal(stored.totalCost),
+        partidaQuantity:
+          stored.partidaQuantity == null ? null : apuDecimal(stored.partidaQuantity),
         isLumpSum: stored.isLumpSum,
         productId: input.productId === undefined ? undefined : input.productId,
         sortOrder: input.sortOrder,
@@ -382,10 +389,13 @@ export async function saveCostItemApu(
             category: line.category,
             description: line.description,
             unit,
-            coefficient: normalized.coefficient,
-            unitCost: normalized.unitCost,
-            totalCost: normalized.totalCost,
-            partidaQuantity: normalized.partidaQuantity,
+            coefficient: apuDecimal(normalized.coefficient),
+            unitCost: apuDecimal(normalized.unitCost),
+            totalCost: apuDecimal(normalized.totalCost),
+            partidaQuantity:
+              normalized.partidaQuantity == null
+                ? null
+                : apuDecimal(normalized.partidaQuantity),
             isLumpSum: normalized.isLumpSum,
             productId: line.productId === undefined ? undefined : line.productId,
             sortOrder: line.sortOrder ?? 0,
@@ -401,10 +411,13 @@ export async function saveCostItemApu(
             category: line.category,
             description: line.description,
             unit,
-            coefficient: normalized.coefficient,
-            unitCost: normalized.unitCost,
-            totalCost: normalized.totalCost,
-            partidaQuantity: normalized.partidaQuantity,
+            coefficient: apuDecimal(normalized.coefficient),
+            unitCost: apuDecimal(normalized.unitCost),
+            totalCost: apuDecimal(normalized.totalCost),
+            partidaQuantity:
+              normalized.partidaQuantity == null
+                ? null
+                : apuDecimal(normalized.partidaQuantity),
             isLumpSum: normalized.isLumpSum,
             productId: line.productId ?? null,
             sortOrder: line.sortOrder ?? 0,

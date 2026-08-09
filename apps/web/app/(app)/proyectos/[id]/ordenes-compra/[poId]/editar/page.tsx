@@ -32,7 +32,7 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
   try {
     order = await getPurchaseOrderById(poId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 

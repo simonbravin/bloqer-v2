@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,6 +63,7 @@ export function CertificationLineEditor({
   certificationId, lines, availableItems, currency, editable,
   onAddLine, onUpdateLine, onRemoveLine, onRefresh,
 }: CertificationLineEditorProps) {
+  const router = useRouter();
   const [dialogState, setDialogState] = useState<AddDialogState>({ type: "closed" });
   const [removePending, startRemoveTransition] = useTransition();
   const [refreshPending, startRefreshTransition] = useTransition();
@@ -70,11 +73,25 @@ export function CertificationLineEditor({
 
   function handleRemove(lineId: string) {
     if (!confirm("¿Eliminar esta línea de la certificación?")) return;
-    startRemoveTransition(async () => { await onRemoveLine(lineId); });
+    startRemoveTransition(async () => {
+      const result = await onRemoveLine(lineId);
+      if ("error" in result) {
+        toast.error(result.error);
+        return;
+      }
+      router.refresh();
+    });
   }
 
   function handleRefresh() {
-    startRefreshTransition(async () => { await onRefresh(); });
+    startRefreshTransition(async () => {
+      const result = await onRefresh();
+      if ("error" in result) {
+        toast.error(result.error);
+        return;
+      }
+      router.refresh();
+    });
   }
 
   return (
@@ -201,7 +218,10 @@ export function CertificationLineEditor({
               certificationId={certificationId}
               items={remaining}
               onSubmit={onAddLine}
-              onDone={() => setDialogState({ type: "closed" })}
+              onDone={() => {
+                setDialogState({ type: "closed" });
+                router.refresh();
+              }}
             />
           )}
           {dialogState.type === "edit" && (
@@ -210,7 +230,10 @@ export function CertificationLineEditor({
               onSubmit={(data) =>
                 onUpdateLine(dialogState.type === "edit" ? dialogState.line.id : "", data)
               }
-              onDone={() => setDialogState({ type: "closed" })}
+              onDone={() => {
+                setDialogState({ type: "closed" });
+                router.refresh();
+              }}
             />
           )}
         </DialogContent>

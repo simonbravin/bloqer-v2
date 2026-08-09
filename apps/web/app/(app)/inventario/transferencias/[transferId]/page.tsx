@@ -14,8 +14,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { getWarehouseTransferById, ServiceError } from "@bloqer/services";
 import { WarehouseTransferStatusBadge } from "@/features/warehouse-transfer";
 import { cancelWarehouseTransferAction } from "../actions";
+import { ConfirmActionButton } from "@/components/feedback/confirm-action-button";
 import { PageShell } from "@/components/layout/page-shell";
-import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ transferId: string }>;
@@ -55,14 +55,9 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
   try {
     transfer = await getWarehouseTransferById(transferId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
-
-  const doCancel = async () => {
-    "use server";
-    await cancelWarehouseTransferAction(transferId);
-  };
 
   return (
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={`TR-${String(transfer.number).padStart(3, "0")}`}>
@@ -81,11 +76,15 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
           </div>
         </div>
         {transfer.status === "CONFIRMED" && (
-          <form action={doCancel}>
-            <Button variant="outline" size="sm" type="submit">
-              Cancelar transferencia
-            </Button>
-          </form>
+          <ConfirmActionButton
+            label="Cancelar transferencia"
+            title="Cancelar transferencia de stock"
+            description="Se anulan los movimientos de salida y entrada asociados."
+            confirmLabel="Cancelar transferencia"
+            variant="outline"
+            successMessage="Transferencia cancelada"
+            action={cancelWarehouseTransferAction.bind(null, transferId)}
+          />
         )}
       </div>
 

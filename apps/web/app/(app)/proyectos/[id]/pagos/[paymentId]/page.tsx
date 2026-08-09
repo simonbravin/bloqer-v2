@@ -10,7 +10,7 @@ import { generateJournalFromPaymentAction } from "@/app/(app)/contabilidad/sourc
 import { getPaymentById, canRegisterApPayment, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { cancelPaymentAction } from "@/app/(app)/proyectos/[id]/cuentas-por-pagar/actions";
-import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ConfirmActionButton } from "@/components/feedback/confirm-action-button";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 
@@ -37,7 +37,7 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
   try {
     payment = await getPaymentById(paymentId, ctx, id);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 
@@ -134,18 +134,15 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
       )}
 
       {canCancelPayment && isConfirmed && (
-        <form
-          action={async () => {
-            "use server";
-            const result = await cancelPaymentAction(paymentId, id);
-            if ("error" in result) redirectWithActionError(returnPath, result.error);
-            redirect(returnPath);
-          }}
-        >
-          <Button type="submit" variant="destructive">
-            Cancelar pago
-          </Button>
-        </form>
+        <ConfirmActionButton
+          label="Cancelar pago"
+          title="Cancelar pago"
+          description="Se anula el pago y se revierte el impacto en la CxP y en tesorería (si el período lo permite)."
+          confirmLabel="Cancelar pago"
+          size="default"
+          successMessage="Pago cancelado"
+          action={async () => cancelPaymentAction(paymentId, id)}
+        />
       )}
     </PageShell>
   );

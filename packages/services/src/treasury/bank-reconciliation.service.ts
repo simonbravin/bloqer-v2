@@ -27,6 +27,7 @@ import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enfo
 import { ServiceContext, ServiceError } from "../types";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import { assertPeriodOpenUnderCompanyLock } from "./treasury-write-locks";
 
 type TxClient = Omit<
   typeof prisma,
@@ -646,14 +647,40 @@ export async function createMovementFromStatementLine(
       throw new ServiceError("CONFLICT", "La línea ya está emparejada");
     }
 
+    await tx.$queryRaw`
+      SELECT id FROM treasury_accounts
+      WHERE id = ${session.accountId} AND "tenantId" = ${ctx.tenantId}
+      FOR UPDATE
+    `;
     const account = await tx.treasuryAccount.findUnique({ where: { id: session.accountId } });
     if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
+    if (account.tenantId !== ctx.tenantId) {
+      throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    }
     if (account.status !== "ACTIVE") {
       throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
     }
 
     const amount = line.amount;
     const movementType = line.direction === "CREDIT" ? "INFLOW" : "OUTFLOW";
+
+    const companyId = session.companyId ?? account.companyId ?? ctx.companyId ?? null;
+    if (!companyId) {
+      throw new ServiceError(
+        "VALIDATION",
+        "El movimiento requiere una empresa en la cuenta o en el contexto activo (el período cerrado no se puede omitir)",
+      );
+    }
+    // Serialize vs period close (same company row lock as closeFinancialPeriod).
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} FOR UPDATE`;
+    await assertFinancialPeriodOpen(
+      {
+        tenantId: ctx.tenantId,
+        companyId,
+        date: line.lineDate,
+      },
+      tx,
+    );
 
     if (movementType === "OUTFLOW") {
       const balance = await getAccountBalance(account.id, tx);
@@ -665,25 +692,9 @@ export async function createMovementFromStatementLine(
       }
     }
 
-    const companyId = session.companyId ?? account.companyId ?? ctx.companyId ?? null;
-    if (!companyId) {
-      throw new ServiceError(
-        "VALIDATION",
-        "El movimiento requiere una empresa en la cuenta o en el contexto activo (el período cerrado no se puede omitir)",
-      );
-    }
     const description = line.description.startsWith("Conciliación:")
       ? line.description
       : `Conciliación: ${line.description}`;
-
-    await assertFinancialPeriodOpen(
-      {
-        tenantId: ctx.tenantId,
-        companyId,
-        date: line.lineDate,
-      },
-      tx,
-    );
 
     await tx.accountMovement.create({
       data: {
@@ -732,7 +743,7 @@ export async function createMovementFromStatementLine(
         matchedBy: ctx.actorUserId,
       },
     });
-    await markMovementReconciled(tx, movementId);
+    await markMovementReconciled(tx, movementId, ctx.tenantId);
     await tx.bankReconciliation.update({
       where: { id: session.id },
       data: { updatedBy: ctx.actorUserId },
@@ -814,11 +825,17 @@ export async function removeBankStatementLine(
   }
 
   await prisma.$transaction(async (tx) => {
+    // Lock session before unmatch/delete so close cannot race past us.
+    await ensureInProgress(tx, preview.reconciliationId, ctx);
+
     const line = await tx.bankStatementLine.findUnique({
       where: { id: lineId },
       include: { match: true, reconciliation: true },
     });
     if (!line) throw new ServiceError("NOT_FOUND", "Línea de extracto no encontrada");
+    if (line.tenantId !== ctx.tenantId) {
+      throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    }
     if (!EDITABLE_STATUSES.includes(line.reconciliation.status as (typeof EDITABLE_STATUSES)[number])) {
       throw new ServiceError("CONFLICT", "No se pueden borrar líneas en este estado");
     }
@@ -839,6 +856,21 @@ export async function removeBankStatementLine(
         "CONFLICT",
         "Hay un movimiento conciliado ligado a esta línea. Desconciliá antes de borrarla.",
       );
+    }
+
+    // Re-assert period under company lock before cancelling balance-affecting cash.
+    const companyDates = new Map<string, Date>();
+    for (const mov of autoMovements) {
+      if (mov.companyId && (mov.type === "INFLOW" || mov.type === "OUTFLOW")) {
+        companyDates.set(mov.companyId, mov.movementDate);
+      }
+    }
+    for (const [companyId, movementDate] of companyDates) {
+      await assertPeriodOpenUnderCompanyLock(tx, {
+        tenantId: ctx.tenantId,
+        companyId,
+        date: movementDate,
+      });
     }
 
     await tx.accountMovement.updateMany({
@@ -873,9 +905,22 @@ export async function removeBankStatementLine(
   return getBankReconciliationById(preview.reconciliationId, ctx);
 }
 
+async function lockBankReconciliationSession(
+  tx: TxClient,
+  sessionId: string,
+  tenantId: string,
+): Promise<void> {
+  // Tenant-scoped lock: avoid locking another tenant's row if the id is known.
+  await tx.$queryRaw`
+    SELECT id FROM bank_reconciliations
+    WHERE id = ${sessionId} AND "tenantId" = ${tenantId}
+    FOR UPDATE
+  `;
+}
+
 async function ensureInProgress(tx: TxClient, sessionId: string, ctx: ServiceContext) {
-  // Row lock serializes match/close/cancel against the same session.
-  await tx.$queryRaw`SELECT id FROM bank_reconciliations WHERE id = ${sessionId} FOR UPDATE`;
+  // Row lock serializes match/close/cancel/unmatch/remove against the same session.
+  await lockBankReconciliationSession(tx, sessionId, ctx.tenantId);
 
   const session = await tx.bankReconciliation.findUnique({ where: { id: sessionId } });
   if (!session) throw new ServiceError("NOT_FOUND", "Conciliación no encontrada");
@@ -910,10 +955,11 @@ async function ensureInProgress(tx: TxClient, sessionId: string, ctx: ServiceCon
 async function markMovementReconciled(
   tx: TxClient,
   movementId: string,
+  tenantId: string,
   conflictMessage = "El movimiento ya no está confirmado. Recargá e intentá de nuevo.",
 ): Promise<void> {
   const flipped = await tx.accountMovement.updateMany({
-    where: { id: movementId, status: "CONFIRMED" },
+    where: { id: movementId, tenantId, status: "CONFIRMED" },
     data: { status: "RECONCILED" },
   });
   assertOptimisticRowUpdate(flipped.count, conflictMessage);
@@ -936,10 +982,14 @@ async function unmatchInTx(tx: TxClient, matchId: string, ctx: ServiceContext) {
   }
 
   await tx.bankReconciliationMatch.delete({ where: { id: matchId } });
-  await tx.accountMovement.updateMany({
-    where: { id: match.accountMovementId, status: "RECONCILED" },
+  const unreconciled = await tx.accountMovement.updateMany({
+    where: { id: match.accountMovementId, tenantId: ctx.tenantId, status: "RECONCILED" },
     data: { status: "CONFIRMED" },
   });
+  assertOptimisticRowUpdate(
+    unreconciled.count,
+    "El movimiento ya no está conciliado. Recargá e intentá de nuevo.",
+  );
   await auditTreasury(
     ctx,
     "account_movement.unreconciled",
@@ -1016,7 +1066,7 @@ export async function matchBankReconciliationLine(
           matchedBy: ctx.actorUserId,
         },
       });
-      await markMovementReconciled(tx, movement.id);
+      await markMovementReconciled(tx, movement.id, ctx.tenantId);
       await tx.bankReconciliation.update({
         where: { id: session.id },
         data: { updatedBy: ctx.actorUserId },
@@ -1061,7 +1111,12 @@ export async function unmatchBankReconciliationLine(
   await prisma.$transaction(async (tx) => {
     const match = await tx.bankReconciliationMatch.findUnique({ where: { id: matchId } });
     if (!match) throw new ServiceError("NOT_FOUND", "Emparejamiento no encontrado");
+    if (match.tenantId !== ctx.tenantId) {
+      throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    }
     reconciliationId = match.reconciliationId;
+    // Same session lock as close/match — prevents CLOSED with unmatched lines.
+    await ensureInProgress(tx, reconciliationId, ctx);
     await unmatchInTx(tx, matchId, ctx);
     await tx.bankReconciliation.update({
       where: { id: reconciliationId },
@@ -1080,7 +1135,7 @@ export async function closeBankReconciliation(
   assertCanEditBankReconciliation(ctx.roles);
 
   await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM bank_reconciliations WHERE id = ${id} FOR UPDATE`;
+    await lockBankReconciliationSession(tx, id, ctx.tenantId);
     const session = await loadSessionOrThrow(id, ctx, tx);
     if (session.status !== "IN_PROGRESS") {
       throw new ServiceError("CONFLICT", "Solo se puede cerrar una conciliación en progreso");
@@ -1159,6 +1214,7 @@ export async function reopenBankReconciliation(
 
   try {
     await prisma.$transaction(async (tx) => {
+      await lockBankReconciliationSession(tx, input.reconciliationId, ctx.tenantId);
       const session = await tx.bankReconciliation.findUnique({ where: { id: input.reconciliationId } });
       if (!session) throw new ServiceError("NOT_FOUND", "Conciliación no encontrada");
       if (session.tenantId !== ctx.tenantId) {
@@ -1230,7 +1286,7 @@ export async function cancelBankReconciliation(
   const reason = opts?.reason?.trim() || null;
 
   await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM bank_reconciliations WHERE id = ${id} FOR UPDATE`;
+    await lockBankReconciliationSession(tx, id, ctx.tenantId);
     const session = await tx.bankReconciliation.findUnique({ where: { id } });
     if (!session) throw new ServiceError("NOT_FOUND", "Conciliación no encontrada");
     if (session.tenantId !== ctx.tenantId) {

@@ -48,7 +48,7 @@ export default async function PresupuestoVsRealPage({ params, searchParams }: Pa
   try {
     await getProjectShellInfo(projectId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
@@ -69,7 +69,7 @@ export default async function PresupuestoVsRealPage({ params, searchParams }: Pa
       getBudgetCompositionReport(projectId, { budgetId: sp.budgetId }, ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }

@@ -68,26 +68,41 @@ export async function updateCertificationAction(
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
+function revalidateCertificationPaths(projectId: string, certId: string) {
+  revalidatePath(`/proyectos/${projectId}/certificaciones`);
+  revalidatePath(`/proyectos/${projectId}/certificaciones/${certId}`);
+}
+
 async function lifecycleAction(
   certId: string,
+  projectId: string,
   fn: (id: string, ctx: Awaited<ReturnType<typeof getCtx>>) => Promise<unknown>,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
     await fn(certId, ctx);
-    revalidatePath(`/proyectos`);
+    revalidateCertificationPaths(projectId, certId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
 
-export async function issueCertificationAction(id: string)   { return lifecycleAction(id, issueCertification); }
-export async function approveCertificationAction(id: string)  { return lifecycleAction(id, approveCertification); }
-export async function rejectCertificationAction(id: string)   { return lifecycleAction(id, rejectCertification); }
-export async function cancelCertificationAction(id: string)   { return lifecycleAction(id, cancelCertification); }
+export async function issueCertificationAction(id: string, projectId: string) {
+  return lifecycleAction(id, projectId, issueCertification);
+}
+export async function approveCertificationAction(id: string, projectId: string) {
+  return lifecycleAction(id, projectId, approveCertification);
+}
+export async function rejectCertificationAction(id: string, projectId: string) {
+  return lifecycleAction(id, projectId, rejectCertification);
+}
+export async function cancelCertificationAction(id: string, projectId: string) {
+  return lifecycleAction(id, projectId, cancelCertification);
+}
 
 // ─── Lines ────────────────────────────────────────────────────────────────────
 
 export async function addCertificationLineAction(
+  projectId: string,
   data: AddCertificationLineInput,
 ): Promise<{ id: string } | Err> {
   const ctx = await getCtx();
@@ -95,12 +110,14 @@ export async function addCertificationLineAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const result = await addCertificationLine(parsed.data, ctx);
-    revalidatePath(`/proyectos`);
+    revalidateCertificationPaths(projectId, data.certificationId);
     return result;
   } catch (err) { return handle(err); }
 }
 
 export async function updateCertificationLineAction(
+  projectId: string,
+  certId: string,
   lineId: string,
   data: UpdateCertificationLineInput,
 ): Promise<Ok | Err> {
@@ -109,25 +126,32 @@ export async function updateCertificationLineAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateCertificationLine(lineId, parsed.data, ctx);
-    revalidatePath(`/proyectos`);
+    revalidateCertificationPaths(projectId, certId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
 
-export async function removeCertificationLineAction(lineId: string): Promise<Ok | Err> {
+export async function removeCertificationLineAction(
+  projectId: string,
+  certId: string,
+  lineId: string,
+): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
     await removeCertificationLine(lineId, ctx);
-    revalidatePath(`/proyectos`);
+    revalidateCertificationPaths(projectId, certId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
 
-export async function refreshPreviousQtyAction(certId: string): Promise<Ok | Err> {
+export async function refreshPreviousQtyAction(
+  projectId: string,
+  certId: string,
+): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
     await refreshPreviousQty(certId, ctx);
-    revalidatePath(`/proyectos`);
+    revalidateCertificationPaths(projectId, certId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }

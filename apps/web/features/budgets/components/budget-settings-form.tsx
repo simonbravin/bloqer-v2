@@ -49,6 +49,7 @@ export function BudgetSettingsForm({ defaults, onSubmit }: BudgetSettingsFormPro
         setServerError(result.error);
       } else {
         setSaved(true);
+        router.refresh();
       }
     });
   });

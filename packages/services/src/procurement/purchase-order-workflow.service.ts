@@ -366,7 +366,7 @@ export async function approvePurchaseOrder(id: string, ctx: ServiceContext): Pro
     );
 
     const approved = await tx.purchaseOrder.updateMany({
-      where: { id, status: "SUBMITTED" },
+      where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },
       data: {
         status: "APPROVED",
         fxRate: fx.fxRate,
@@ -450,7 +450,7 @@ export async function returnPurchaseOrder(
 
   await prisma.$transaction(async (tx) => {
     const returned = await tx.purchaseOrder.updateMany({
-      where: { id, status: "SUBMITTED" },
+      where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },
       data: {
         status: "DRAFT",
         returnReason: trimmed,
@@ -533,7 +533,7 @@ export async function confirmPurchaseOrder(
     }
 
     const confirmed = await tx.purchaseOrder.updateMany({
-      where: { id, status: "APPROVED" },
+      where: { id, tenantId: ctx.tenantId, status: "APPROVED" },
       data: {
         status: "CONFIRMED",
         fxRate: fx.fxRate,

@@ -7,9 +7,12 @@ import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { getAccountBalance } from "../treasury/balance.service";
 import { assertTreasuryAccountCurrencyMatches } from "../treasury/treasury-currency-guards";
+import {
+  assertPeriodOpenUnderCompanyLock,
+  lockTreasuryAccountRow,
+} from "../treasury/treasury-write-locks";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
-import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
 
 type TxClient = Omit<
   typeof prisma,
@@ -76,6 +79,7 @@ export async function applyPaymentToPayable(
     );
   }
 
+  await lockTreasuryAccountRow(tx, accountId, ctx.tenantId);
   const account = await tx.treasuryAccount.findUnique({ where: { id: accountId } });
   if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
   if (account.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -102,6 +106,22 @@ export async function applyPaymentToPayable(
   }
   assertTreasuryAccountCurrencyMatches(account.currency, payable.currency);
 
+  const paymentCompanyId = ctx.companyId ?? account.companyId ?? payable.companyId;
+  const movementCompanyId = account.companyId ?? ctx.companyId ?? payable.companyId;
+  if (!paymentCompanyId) {
+    throw new ServiceError(
+      "VALIDATION",
+      "El pago requiere una empresa activa en el contexto, la cuenta o la CxP",
+    );
+  }
+
+  // Serialize vs period close, then balance under the account row lock.
+  await assertPeriodOpenUnderCompanyLock(tx, {
+    tenantId: ctx.tenantId,
+    companyId: paymentCompanyId,
+    date: paymentDate,
+  });
+
   // BR-TRZ-004 / D-052: block negative balance on payment source account
   const sourceBalance = await getAccountBalance(account.id, tx);
   if (amountToApply.greaterThan(sourceBalance)) {
@@ -110,18 +130,6 @@ export async function applyPaymentToPayable(
       `Saldo insuficiente en la cuenta de pago. Disponible: ${serializeMoneyDecimal(sourceBalance)} ${account.currency}.`,
     );
   }
-
-  const paymentCompanyId = ctx.companyId ?? account.companyId ?? payable.companyId;
-  const movementCompanyId = account.companyId ?? ctx.companyId ?? payable.companyId;
-
-  await assertFinancialPeriodOpen(
-    {
-      tenantId: ctx.tenantId,
-      companyId: paymentCompanyId,
-      date: paymentDate,
-    },
-    tx,
-  );
 
   const fx = computeDocumentFxAmounts(payable.currency, amountToApply);
 
@@ -174,6 +182,7 @@ export async function applyPaymentToPayable(
   const payableUpdate = await tx.payable.updateMany({
     where: {
       id: payable.id,
+      tenantId: ctx.tenantId,
       paidAmount: payable.paidAmount,
       status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
     },

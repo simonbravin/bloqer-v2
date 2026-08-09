@@ -30,7 +30,7 @@ export default async function ProductoStockPage({ params, searchParams }: PagePr
       ctx,
     );
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 

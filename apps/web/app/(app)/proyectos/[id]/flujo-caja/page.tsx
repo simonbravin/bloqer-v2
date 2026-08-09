@@ -117,7 +117,7 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
         : Promise.resolve(null),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
     throw err;
   }

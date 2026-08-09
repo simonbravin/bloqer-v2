@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { CertificationStatus } from "@bloqer/database";
@@ -33,14 +35,21 @@ export function CertificationTotalsPanel({
   canApprove = false,
   onIssue, onApprove, onReject, onCancel,
 }: CertificationTotalsPanelProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  function run(action: () => Promise<{ ok: true } | { error: string }>) {
+  function run(action: () => Promise<{ ok: true } | { error: string }>, successMsg: string) {
     setError(null);
     startTransition(async () => {
       const result = await action();
-      if ("error" in result) setError(result.error);
+      if ("error" in result) {
+        setError(result.error);
+        toast.error(result.error);
+        return;
+      }
+      toast.success(successMsg);
+      router.refresh();
     });
   }
 
@@ -69,16 +78,16 @@ export function CertificationTotalsPanel({
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Acciones</p>
           <div className="flex flex-col gap-2">
             {showIssue && (
-              <Button size="sm" disabled={isPending} onClick={() => run(onIssue)}>
+              <Button size="sm" disabled={isPending} onClick={() => run(onIssue, "Certificación emitida")}>
                 Emitir certificación
               </Button>
             )}
             {showReview && (
               <>
-                <Button size="sm" disabled={isPending} onClick={() => run(onApprove)}>
+                <Button size="sm" disabled={isPending} onClick={() => run(onApprove, "Certificación aprobada")}>
                   Aprobar
                 </Button>
-                <Button size="sm" variant="outline" disabled={isPending} onClick={() => run(onReject)}>
+                <Button size="sm" variant="outline" disabled={isPending} onClick={() => run(onReject, "Certificación rechazada")}>
                   Rechazar
                 </Button>
               </>
@@ -91,7 +100,7 @@ export function CertificationTotalsPanel({
                 disabled={isPending}
                 onClick={() => {
                   if (confirm("¿Cancelar esta certificación? Esta acción no se puede deshacer.")) {
-                    run(onCancel);
+                    run(onCancel, "Certificación cancelada");
                   }
                 }}
               >

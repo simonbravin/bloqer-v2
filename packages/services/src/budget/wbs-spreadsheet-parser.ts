@@ -118,7 +118,7 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
       pending.push({
         code,
         name: banner?.name ?? discipline,
-        quantity: 0,
+        quantity: "0",
         _sourceRow: banner?.rowNum ?? 0,
         _profile: profile,
       });
@@ -156,7 +156,7 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
       code: canonical,
       parent_code: parentCodeFrom(canonical),
       name: draft.name,
-      quantity: 0,
+      quantity: "0",
       _sourceRow: draft.rowNum,
       _profile: profile,
     });

@@ -98,25 +98,22 @@ export async function executeImport(
   const codeToId = new Map<string, string>();
   const sortOrderByParent = new Map<string | undefined, number>();
 
-  if (options?.replaceExisting && existingNodes.length > 0) {
-    const nodeIds = existingNodes.map((n) => n.id);
-    const [certLines, poLines, jobsiteRefs] = await Promise.all([
-      prisma.certificationLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
-      prisma.purchaseOrderLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
-      prisma.jobsiteLogProgress.count({ where: { wbsNodeId: { in: nodeIds } } }),
-    ]);
-    if (certLines > 0 || poLines > 0 || jobsiteRefs > 0) {
-      throw new ServiceError(
-        "CONFLICT",
-        "No se puede reemplazar la EDT: hay certificaciones, compras o libro de obra vinculados a ítems existentes.",
-      );
-    }
-  }
-
   await prisma.$transaction(async (tx) => {
     await lockBudgetForEconomicEdit(tx, budgetId, ctx.tenantId);
 
     if (options?.replaceExisting && existingNodes.length > 0) {
+      const nodeIds = existingNodes.map((n) => n.id);
+      const [certLines, poLines, jobsiteRefs] = await Promise.all([
+        tx.certificationLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+        tx.purchaseOrderLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+        tx.jobsiteLogProgress.count({ where: { wbsNodeId: { in: nodeIds } } }),
+      ]);
+      if (certLines > 0 || poLines > 0 || jobsiteRefs > 0) {
+        throw new ServiceError(
+          "CONFLICT",
+          "No se puede reemplazar la EDT: hay certificaciones, compras o libro de obra vinculados a ítems existentes.",
+        );
+      }
       await tx.costAnalysisLine.deleteMany({ where: { budgetId } });
       await tx.costItem.deleteMany({ where: { budgetId } });
       await tx.wbsNode.deleteMany({ where: { budgetId } });
@@ -151,7 +148,7 @@ export async function executeImport(
             budgetId,
             wbsNodeId: node.id,
             unit: row.unit ?? "",
-            quantity: new Prisma.Decimal(String(row.quantity ?? 0)),
+            quantity: new Prisma.Decimal(row.quantity ?? "0"),
             notes: row.notes ?? null,
           },
         });
@@ -159,16 +156,20 @@ export async function executeImport(
 
         // full mode: materialize category unit costs as APU lines (unit mode, coef=1).
         if (mode === "full") {
-          const categoryAmounts: Array<{ category: "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER"; amount: number; label: string }> = [
-            { category: "MATERIAL", amount: row.material_cost ?? 0, label: "Materiales (import)" },
-            { category: "LABOR", amount: row.labor_cost ?? 0, label: "Mano de obra (import)" },
-            { category: "EQUIPMENT", amount: row.equipment_cost ?? 0, label: "Equipos (import)" },
-            { category: "SUBCONTRACT", amount: row.subcontract_cost ?? 0, label: "Subcontratos (import)" },
-            { category: "OTHER", amount: row.other_cost ?? 0, label: "Otros (import)" },
+          const categoryAmounts: Array<{
+            category: "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER";
+            amount: string;
+            label: string;
+          }> = [
+            { category: "MATERIAL", amount: row.material_cost ?? "0.00", label: "Materiales (import)" },
+            { category: "LABOR", amount: row.labor_cost ?? "0.00", label: "Mano de obra (import)" },
+            { category: "EQUIPMENT", amount: row.equipment_cost ?? "0.00", label: "Equipos (import)" },
+            { category: "SUBCONTRACT", amount: row.subcontract_cost ?? "0.00", label: "Subcontratos (import)" },
+            { category: "OTHER", amount: row.other_cost ?? "0.00", label: "Otros (import)" },
           ];
           let sortOrder = 0;
           for (const entry of categoryAmounts) {
-            if (!(entry.amount > 0)) continue;
+            if (/^-?0+(\.0+)?$/.test(entry.amount)) continue;
             const money = toMoneyDecimal(entry.amount);
             await tx.costAnalysisLine.create({
               data: {

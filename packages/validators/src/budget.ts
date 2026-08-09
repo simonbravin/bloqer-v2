@@ -1,10 +1,31 @@
 import { z } from "zod";
+import { moneyAmountString, qtyString } from "./money";
 
 export const budgetStatusSchema = z.enum([
   "DRAFT", "IN_REVIEW", "RETURNED_FOR_CHANGES", "APPROVED", "CLOSED", "CANCELLED",
 ]);
 export const wbsNodeTypeSchema = z.enum(["GROUP", "ITEM"]);
 export const costCategorySchema = z.enum(["MATERIAL", "LABOR", "EQUIPMENT", "SUBCONTRACT", "OTHER"]);
+
+/** Spreadsheet/JSON may send number or string — never keep raw JS float for money/qty. */
+function optionalImportDecimal(schema: z.ZodType<string>) {
+  return z.preprocess((v) => {
+    if (v == null || v === "") return undefined;
+    if (typeof v === "number") {
+      if (!Number.isFinite(v)) return v;
+      return String(v);
+    }
+    if (typeof v === "string") return v.trim() === "" ? undefined : v;
+    return v;
+  }, schema.optional());
+}
+
+const optionalImportMoney = optionalImportDecimal(
+  moneyAmountString.refine((v) => !v.startsWith("-"), "El monto no puede ser negativo"),
+);
+const optionalImportQty = optionalImportDecimal(
+  qtyString.refine((v) => !v.startsWith("-"), "La cantidad no puede ser negativa"),
+);
 
 export const createBudgetSchema = z.object({
   projectId: z.string().uuid("Proyecto inválido"),
@@ -151,12 +172,12 @@ export const budgetImportRowSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().max(2000).optional(),
   unit: z.string().max(50).optional(),
-  quantity: z.coerce.number().min(0).optional(),
-  material_cost: z.coerce.number().min(0).optional(),
-  labor_cost: z.coerce.number().min(0).optional(),
-  equipment_cost: z.coerce.number().min(0).optional(),
-  subcontract_cost: z.coerce.number().min(0).optional(),
-  other_cost: z.coerce.number().min(0).optional(),
+  quantity: optionalImportQty,
+  material_cost: optionalImportMoney,
+  labor_cost: optionalImportMoney,
+  equipment_cost: optionalImportMoney,
+  subcontract_cost: optionalImportMoney,
+  other_cost: optionalImportMoney,
   notes: z.string().max(2000).optional(),
 });
 

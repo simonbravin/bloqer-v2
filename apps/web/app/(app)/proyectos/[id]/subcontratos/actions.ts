@@ -116,22 +116,46 @@ export async function updateSubcontractMetaAction(
   } catch (err) { return handle(err); }
 }
 
-export async function activateSubcontractAction(id: string, projectId: string): Promise<void> {
-  const ctx = await getCtx();
-  await activateSubcontract(id, ctx);
-  revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
+export async function activateSubcontractAction(
+  id: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  try {
+    const ctx = await getCtx();
+    await activateSubcontract(id, ctx);
+    revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
 }
 
-export async function completeSubcontractAction(id: string, projectId: string): Promise<void> {
-  const ctx = await getCtx();
-  await completeSubcontract(id, ctx);
-  revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
+export async function completeSubcontractAction(
+  id: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  try {
+    const ctx = await getCtx();
+    await completeSubcontract(id, ctx);
+    revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
 }
 
-export async function cancelSubcontractAction(id: string, projectId: string): Promise<void> {
-  const ctx = await getCtx();
-  await cancelSubcontract(id, ctx);
-  revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
+export async function cancelSubcontractAction(
+  id: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  try {
+    const ctx = await getCtx();
+    await cancelSubcontract(id, ctx);
+    revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 // ─── Certification ────────────────────────────────────────────────────────────
@@ -189,26 +213,62 @@ export async function updateSubcontractCertificationAction(
   } catch (err) { return handle(err); }
 }
 
-export async function issueSubcontractCertificationAction(id: string, subcontractId: string, projectId: string): Promise<void> {
-  const ctx = await getCtx();
-  await issueSubcontractCertification(id, ctx);
-  revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
+export async function issueSubcontractCertificationAction(
+  id: string,
+  subcontractId: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  try {
+    const ctx = await getCtx();
+    await issueSubcontractCertification(id, ctx);
+    revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
 }
 
-export async function approveSubcontractCertificationAction(id: string, subcontractId: string, projectId: string): Promise<void> {
-  const ctx = await getCtx();
-  await approveSubcontractCertification(id, ctx);
-  revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
+export async function approveSubcontractCertificationAction(
+  id: string,
+  subcontractId: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  try {
+    const ctx = await getCtx();
+    await approveSubcontractCertification(id, ctx);
+    revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
 }
 
-export async function rejectSubcontractCertificationAction(id: string, subcontractId: string, projectId: string): Promise<void> {
-  const ctx = await getCtx();
-  await rejectSubcontractCertification(id, ctx);
-  revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
+export async function rejectSubcontractCertificationAction(
+  id: string,
+  subcontractId: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  try {
+    const ctx = await getCtx();
+    await rejectSubcontractCertification(id, ctx);
+    revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
 }
 
-export async function cancelSubcontractCertificationAction(id: string, subcontractId: string, projectId: string): Promise<void> {
-  const ctx = await getCtx();
-  await cancelSubcontractCertification(id, ctx);
-  revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
+export async function cancelSubcontractCertificationAction(
+  id: string,
+  subcontractId: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  try {
+    const ctx = await getCtx();
+    await cancelSubcontractCertification(id, ctx);
+    revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
 }

@@ -37,7 +37,7 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
   try {
     doc = await getDocumentById(documentId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 

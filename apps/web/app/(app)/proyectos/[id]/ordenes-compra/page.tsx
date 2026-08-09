@@ -73,7 +73,7 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
   try {
     await getProjectShellInfo(id, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
@@ -82,7 +82,7 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
   try {
     orders = await listPurchaseOrdersByProject(id, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }

@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   createWarehouseTransfer,
   cancelWarehouseTransfer,
+  ServiceError,
 } from "@bloqer/services";
 import { createWarehouseTransferSchema } from "@bloqer/validators";
 
@@ -49,9 +50,16 @@ export async function createWarehouseTransferAction(
   }
 }
 
-export async function cancelWarehouseTransferAction(id: string): Promise<void> {
+export async function cancelWarehouseTransferAction(
+  id: string,
+): Promise<{ ok: true } | { error: string }> {
   const current = await getCurrentUser();
-  if (!current?.tenantCtx) return;
-  await cancelWarehouseTransfer(id, getCtx(current));
-  redirect(`/inventario/transferencias/${id}`);
+  if (!current?.tenantCtx) return { error: "No autenticado" };
+  try {
+    await cancelWarehouseTransfer(id, getCtx(current));
+    return { ok: true };
+  } catch (err: unknown) {
+    if (err instanceof ServiceError) return { error: err.message };
+    return { error: "Error al cancelar transferencia" };
+  }
 }

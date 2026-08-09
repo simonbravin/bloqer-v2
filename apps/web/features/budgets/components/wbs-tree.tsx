@@ -446,7 +446,11 @@ export function WbsTree({
         parentId: node.parentId ?? null,
         orderedNodeIds: next.map((s) => s.id),
       });
-      if (!("error" in result)) router.refresh();
+      if ("error" in result) {
+        toast.error(result.error);
+        return;
+      }
+      router.refresh();
     });
   }
 

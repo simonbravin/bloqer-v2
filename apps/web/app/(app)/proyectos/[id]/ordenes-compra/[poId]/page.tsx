@@ -13,7 +13,13 @@ import {
 } from "@/components/ui/table";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { PurchaseOrderStatusBadge, PurchaseReceiptTable, PoBillingNextStepPanel, canRegisterApInvoice } from "@/features/procurement";
+import {
+  CancelPurchaseOrderButton,
+  PurchaseOrderStatusBadge,
+  PurchaseReceiptTable,
+  PoBillingNextStepPanel,
+  canRegisterApInvoice,
+} from "@/features/procurement";
 import { SupplierInvoiceTable } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
 import type { PurchaseReceiptListItem } from "@/features/procurement";
@@ -38,7 +44,6 @@ import {
   approvePurchaseOrderAction,
   returnPurchaseOrderAction,
   confirmPurchaseOrderAction,
-  cancelPurchaseOrderAction,
 } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 import { Button } from "@/components/ui/button";
 
@@ -69,7 +74,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
       listSupplierInvoicesByPurchaseOrder(poId, ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
@@ -322,18 +327,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           </Button>
         )}
         {!isCancelled && canEditPo && !["PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status) && (
-          <form
-            action={async () => {
-              "use server";
-              const res = await cancelPurchaseOrderAction(poId, id);
-              if ("error" in res) redirectWithActionError(poPath, res.error);
-              redirect(poPath);
-            }}
-          >
-            <Button type="submit" variant="destructive">
-              Anular
-            </Button>
-          </form>
+          <CancelPurchaseOrderButton poId={poId} projectId={id} />
         )}
       </div>
 

@@ -100,8 +100,10 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
     setError(null);
     startTransition(async () => {
       const res = await action();
-      if ("error" in res) setError(res.error);
-      else {
+      if ("error" in res) {
+        setError(res.error);
+        toast.error(res.error);
+      } else {
         setDialog(null);
         setSelectedLineId(null);
         setSelectedMovementId(null);

@@ -60,7 +60,7 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
   try {
     await getProjectShellInfo(id, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
@@ -73,7 +73,7 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
       getPayableAgingReport(parseAgingFilters({ ...sp, projectId: id }), ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
     throw err;
   }

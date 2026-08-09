@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { InvitationAccountSwitch } from "@/features/auth/components/invitation-account-switch";
 import { InvitationLoginLink } from "@/features/auth/components/invitation-login-link";
 import { getCurrentUser } from "@/lib/auth";
@@ -47,14 +48,27 @@ export default async function InvitacionesAceptarPage({ searchParams }: PageProp
 
   const peek = await peekTenantInvitationForAcceptPage(token);
   if (!peek) {
-    await clearInviteAcceptToken();
+    // RSC cannot reliably mutate cookies — clear via Server Action (best-effort).
+    try {
+      await clearInviteAcceptToken();
+    } catch {
+      /* cookie remains until next accept/logout clears it */
+    }
     return (
       <div className="mx-auto flex min-h-[50vh] max-w-md flex-col justify-center gap-4 px-4">
         <h1 className="text-xl font-semibold">Invitación no válida</h1>
         <p className="text-sm text-muted-foreground">El enlace expiró o ya no está disponible.</p>
-        <Button variant="outline" asChild>
-          <Link href="/login">Ir a iniciar sesión</Link>
-        </Button>
+        <form
+          action={async () => {
+            "use server";
+            await clearInviteAcceptToken();
+            redirect("/login");
+          }}
+        >
+          <Button type="submit" variant="outline" className="w-full">
+            Limpiar enlace e ir a iniciar sesión
+          </Button>
+        </form>
       </div>
     );
   }
