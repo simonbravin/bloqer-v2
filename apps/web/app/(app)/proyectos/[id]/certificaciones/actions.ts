@@ -13,6 +13,7 @@ import {
   type AddCertificationLineInput, type UpdateCertificationLineInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
+import { revalidateProjectCostAndFinancePaths } from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -71,6 +72,7 @@ export async function updateCertificationAction(
 function revalidateCertificationPaths(projectId: string, certId: string) {
   revalidatePath(`/proyectos/${projectId}/certificaciones`);
   revalidatePath(`/proyectos/${projectId}/certificaciones/${certId}`);
+  revalidateProjectCostAndFinancePaths(projectId);
 }
 
 async function lifecycleAction(

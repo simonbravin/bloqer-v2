@@ -10,6 +10,10 @@ import {
   type CreateCollectionInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  revalidateProjectCostAndFinancePaths,
+  revalidateTreasuryPaths,
+} from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -40,6 +44,8 @@ export async function createCollectionAction(
     const collection = await createCollection(parsed.data, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/cobranzas`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateTreasuryPaths();
     return { id: collection.id };
   } catch (err) {
     return handle(err);
@@ -55,6 +61,8 @@ export async function cancelCollectionAction(
     await cancelCollection(collectionId, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/cobranzas`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateTreasuryPaths();
     return { ok: true };
   } catch (err) {
     return handle(err);

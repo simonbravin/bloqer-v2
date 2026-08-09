@@ -10,6 +10,10 @@ import {
   type CreatePaymentInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  revalidateProjectCostAndFinancePaths,
+  revalidateTreasuryPaths,
+} from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -42,6 +46,8 @@ export async function createCompanyPaymentAction(
     revalidatePath(FIN_AP);
     revalidatePath(`${FIN_AP}/${data.payableId}`);
     revalidatePath("/finanzas/transacciones");
+    revalidateTreasuryPaths();
+    if (payment.projectId) revalidateProjectCostAndFinancePaths(payment.projectId);
     return { id: payment.id };
   } catch (err) {
     return handle(err);
@@ -53,10 +59,12 @@ export async function cancelCompanyPaymentAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await cancelPayment(paymentId, ctx);
+    const payment = await cancelPayment(paymentId, ctx);
     revalidatePath(FIN_AP);
     revalidatePath(`/finanzas/pagos-proveedor/${paymentId}`);
     revalidatePath("/finanzas/transacciones");
+    revalidateTreasuryPaths();
+    if (payment.projectId) revalidateProjectCostAndFinancePaths(payment.projectId);
     return { ok: true };
   } catch (err) {
     return handle(err);

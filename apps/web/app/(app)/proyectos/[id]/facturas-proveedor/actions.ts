@@ -21,6 +21,10 @@ import {
   type UpdateSupplierInvoiceInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  revalidateProjectCostAndFinancePaths,
+  revalidateTreasuryPaths,
+} from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -45,6 +49,8 @@ function revalidateProjectApPaths(projectId: string, extra?: string[]) {
   revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);
   revalidatePath(`/proyectos/${projectId}/ordenes-compra`);
   revalidatePath(`/proyectos/${projectId}/recepciones`);
+  revalidateProjectCostAndFinancePaths(projectId);
+  revalidateTreasuryPaths();
   for (const p of extra ?? []) revalidatePath(p);
 }
 

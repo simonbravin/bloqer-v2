@@ -35,6 +35,8 @@ const COLUMN_HINTS: Record<string, string> = {
   accrued:
     "Obligación reconocida: facturas de proveedor emitidas y certificaciones de subcontrato aprobadas.",
   paid: "Pagos confirmados imputables a esta partida.",
+  consumed:
+    "Consumo de inventario (stock OUT CONFIRMED / CONSUMPTION) imputado a la partida. No suma a la exposición esperada.",
   openCommitted:
     "Comprometido abierto = max(0, Comprometido − Devengado ligado al mismo compromiso). Evita doble conteo OC+factura.",
   exposure:
@@ -78,6 +80,7 @@ export function CostControlTable({ rows, totals, projectId }: Props) {
               <HintHead label="Recibido" hint={COLUMN_HINTS.received!} />
               <HintHead label="Devengado" hint={COLUMN_HINTS.accrued!} />
               <HintHead label="Pagado" hint={COLUMN_HINTS.paid!} />
+              <HintHead label="Consumido" hint={COLUMN_HINTS.consumed!} />
               <HintHead label="Comp. abierto" hint={COLUMN_HINTS.openCommitted!} />
               <HintHead label="Exposición esp." hint={COLUMN_HINTS.exposure!} />
               <TableHead className="text-right">Variación</TableHead>
@@ -130,6 +133,9 @@ export function CostControlTable({ rows, totals, projectId }: Props) {
                   {formatAmount(row.paidCost)}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
+                  {formatAmount(row.inventoryConsumedCost)}
+                </TableCell>
+                <TableCell className="text-right text-muted-foreground">
                   {formatAmount(row.openCommittedCost)}
                 </TableCell>
                 <TableCell className="text-right font-medium">
@@ -157,6 +163,7 @@ export function CostControlTable({ rows, totals, projectId }: Props) {
               <TableCell className="text-right">{formatAmount(totals.receivedCost)}</TableCell>
               <TableCell className="text-right">{formatAmount(totals.accruedCost)}</TableCell>
               <TableCell className="text-right">{formatAmount(totals.paidCost)}</TableCell>
+              <TableCell className="text-right">{formatAmount(totals.inventoryConsumedCost)}</TableCell>
               <TableCell className="text-right">{formatAmount(totals.openCommittedCost)}</TableCell>
               <TableCell className="text-right">{formatAmount(totals.expectedCostExposure)}</TableCell>
               <TableCell className="text-right">{formatAmount(totals.costVariance)}</TableCell>

@@ -26,6 +26,7 @@ import {
   type BudgetLifecycleCommentInput, type BudgetReturnForChangesInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
+import { revalidateProjectCostAndFinancePaths } from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -108,6 +109,7 @@ async function lifecycleAction(
     await fn(budgetId, ctx, input);
     revalidatePath(`/proyectos/${projectId}/presupuestos`);
     revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateProjectCostAndFinancePaths(projectId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }

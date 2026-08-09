@@ -25,6 +25,7 @@ import {
   type CreatePurchaseReceiptInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
+import { revalidateProjectCostAndFinancePaths } from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -47,6 +48,7 @@ function handle(err: unknown): { error: string } {
 function revalidatePO(projectId: string, poId?: string) {
   revalidatePath(`/proyectos/${projectId}/ordenes-compra`);
   if (poId) revalidatePath(`/proyectos/${projectId}/ordenes-compra/${poId}`);
+  revalidateProjectCostAndFinancePaths(projectId);
 }
 
 async function assertPoBelongsToProject(
@@ -199,6 +201,7 @@ export async function createPurchaseReceiptAction(
     const receipt = await createPurchaseReceipt(parsed.data, ctx);
     revalidatePath(`/proyectos/${projectId}/recepciones`);
     revalidatePath(`/proyectos/${projectId}/ordenes-compra/${data.purchaseOrderId}`);
+    revalidateProjectCostAndFinancePaths(projectId);
     return { id: receipt.id };
   } catch (err) {
     return handle(err);
@@ -220,6 +223,7 @@ export async function confirmPurchaseReceiptAction(
     revalidatePath(`/proyectos/${projectId}/recepciones`);
     revalidatePath(`/proyectos/${projectId}/recepciones/${receiptId}`);
     revalidatePath(`/proyectos/${projectId}/ordenes-compra/${purchaseOrderId}`);
+    revalidateProjectCostAndFinancePaths(projectId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -241,6 +245,7 @@ export async function cancelPurchaseReceiptAction(
     revalidatePath(`/proyectos/${projectId}/recepciones`);
     revalidatePath(`/proyectos/${projectId}/recepciones/${receiptId}`);
     revalidatePath(`/proyectos/${projectId}/ordenes-compra/${purchaseOrderId}`);
+    revalidateProjectCostAndFinancePaths(projectId);
     return { ok: true };
   } catch (err) {
     return handle(err);

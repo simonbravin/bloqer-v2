@@ -89,7 +89,7 @@ export async function getProjectAccruedByMonth(
         subcontractCertificationId: null,
         ...(dateFilter ? { issueDate: dateFilter } : {}),
       },
-      select: { issueDate: true, totalAmount: true, amountArs: true },
+      select: { issueDate: true, totalAmount: true },
     }),
     prisma.supplierInvoice.findMany({
       where: {
@@ -100,7 +100,7 @@ export async function getProjectAccruedByMonth(
         subcontractCertificationId: null,
         ...(dateFilter ? { issueDate: dateFilter } : {}),
       },
-      select: { issueDate: true, totalAmount: true, amountArs: true },
+      select: { issueDate: true, totalAmount: true },
     }),
   ]);
 
@@ -118,13 +118,13 @@ export async function getProjectAccruedByMonth(
       amount: new Prisma.Decimal(cl.lineTotal),
     });
   }
+  // Use document currency totals (same as getProjectCostControl) so control-costos
+  // and ingresos-gastos stay aligned. ARS consolidation belongs to currencyView, not here.
   for (const inv of poLinkedInvoices) {
-    const amt = inv.amountArs.greaterThan(0) ? inv.amountArs : inv.totalAmount;
-    entries.push({ date: inv.issueDate, amount: new Prisma.Decimal(amt) });
+    entries.push({ date: inv.issueDate, amount: new Prisma.Decimal(inv.totalAmount) });
   }
   for (const inv of unallocatedInvoices) {
-    const amt = inv.amountArs.greaterThan(0) ? inv.amountArs : inv.totalAmount;
-    entries.push({ date: inv.issueDate, amount: new Prisma.Decimal(amt) });
+    entries.push({ date: inv.issueDate, amount: new Prisma.Decimal(inv.totalAmount) });
   }
 
   const series = groupAccruedAmountsByMonth(entries);

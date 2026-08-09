@@ -19,6 +19,10 @@ import {
   type RegisterArSaleInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  revalidateProjectCostAndFinancePaths,
+  revalidateTreasuryPaths,
+} from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -73,8 +77,8 @@ export async function registerProjectArSaleAction(
     revalidatePath(`/proyectos/${projectId}/facturas`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
     revalidatePath(`/proyectos/${projectId}/cobranzas`);
-    revalidatePath(`/proyectos/${projectId}/flujo-caja`);
-    revalidatePath(`/proyectos/${projectId}/finanzas`);
+    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateTreasuryPaths();
     return { id: invoiceId };
   } catch (err) {
     return handle(err);
@@ -112,8 +116,8 @@ export async function registerArAdvanceAction(
     revalidatePath(`/proyectos/${projectId}/facturas`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
     revalidatePath(`/proyectos/${projectId}/cobranzas`);
-    revalidatePath(`/proyectos/${projectId}/flujo-caja`);
-    revalidatePath(`/proyectos/${projectId}/finanzas`);
+    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateTreasuryPaths();
     return { invoiceId };
   } catch (err) {
     return handle(err);
@@ -144,6 +148,8 @@ export async function issueSalesInvoiceAction(
     await issueSalesInvoice(invoiceId, ctx);
     revalidatePath(`/proyectos/${projectId}/facturas`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateTreasuryPaths();
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -157,6 +163,8 @@ export async function cancelSalesInvoiceAction(
     await cancelSalesInvoice(invoiceId, ctx);
     revalidatePath(`/proyectos/${projectId}/facturas`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateTreasuryPaths();
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -169,6 +177,8 @@ export async function cancelReceivableAction(
   try {
     await cancelReceivable(receivableId, ctx);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateTreasuryPaths();
     return { ok: true };
   } catch (err) { return handle(err); }
 }

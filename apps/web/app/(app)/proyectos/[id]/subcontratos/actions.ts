@@ -23,6 +23,7 @@ import {
   updateSubcontractCertificationSchema,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
+import { revalidateProjectCostAndFinancePaths } from "@/lib/revalidate-project-paths";
 import { redirect }       from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -67,6 +68,7 @@ export async function createSubcontractAction(
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     const result = await createSubcontract(parsed.data, ctx);
     revalidatePath(`/proyectos/${parsed.data.projectId}/subcontratos`);
+    revalidateProjectCostAndFinancePaths(parsed.data.projectId);
     return { id: result.id };
   } catch (err) { return handle(err); }
 }
@@ -91,6 +93,7 @@ export async function updateSubcontractAction(
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     const result = await updateSubcontract(id, parsed.data, ctx);
     revalidatePath(`/proyectos/${result.projectId}/subcontratos`);
+    revalidateProjectCostAndFinancePaths(result.projectId);
     return { id };
   } catch (err) { return handle(err); }
 }
@@ -124,6 +127,7 @@ export async function activateSubcontractAction(
     const ctx = await getCtx();
     await activateSubcontract(id, ctx);
     revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
+    revalidateProjectCostAndFinancePaths(projectId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -138,6 +142,7 @@ export async function completeSubcontractAction(
     const ctx = await getCtx();
     await completeSubcontract(id, ctx);
     revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
+    revalidateProjectCostAndFinancePaths(projectId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -152,6 +157,7 @@ export async function cancelSubcontractAction(
     const ctx = await getCtx();
     await cancelSubcontract(id, ctx);
     revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
+    revalidateProjectCostAndFinancePaths(projectId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -188,6 +194,7 @@ export async function createSubcontractCertificationAction(
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     const result = await createSubcontractCertification(parsed.data, ctx);
     revalidatePath(`/proyectos`);
+    revalidateProjectCostAndFinancePaths(result.projectId);
     return { id: result.id };
   } catch (err) { return handle(err); }
 }
@@ -207,8 +214,9 @@ export async function updateSubcontractCertificationAction(
     };
     const parsed = updateSubcontractCertificationSchema.safeParse(raw);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
-    await updateSubcontractCertification(id, parsed.data, ctx);
+    const result = await updateSubcontractCertification(id, parsed.data, ctx);
     revalidatePath(`/proyectos`);
+    revalidateProjectCostAndFinancePaths(result.projectId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -222,6 +230,7 @@ export async function issueSubcontractCertificationAction(
     const ctx = await getCtx();
     await issueSubcontractCertification(id, ctx);
     revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
+    revalidateProjectCostAndFinancePaths(projectId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -237,6 +246,7 @@ export async function approveSubcontractCertificationAction(
     const ctx = await getCtx();
     await approveSubcontractCertification(id, ctx);
     revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
+    revalidateProjectCostAndFinancePaths(projectId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -252,6 +262,7 @@ export async function rejectSubcontractCertificationAction(
     const ctx = await getCtx();
     await rejectSubcontractCertification(id, ctx);
     revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
+    revalidateProjectCostAndFinancePaths(projectId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -267,6 +278,7 @@ export async function cancelSubcontractCertificationAction(
     const ctx = await getCtx();
     await cancelSubcontractCertification(id, ctx);
     revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
+    revalidateProjectCostAndFinancePaths(projectId);
     return { ok: true };
   } catch (err) {
     return handle(err);

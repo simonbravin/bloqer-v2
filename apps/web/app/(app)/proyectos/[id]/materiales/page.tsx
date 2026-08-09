@@ -362,7 +362,7 @@ async function VarianzaTab({
           value={formatMoneyAmount(report.totals.budgetMaterial, "ARS")}
         />
         <KpiStatCard
-          label="Consumo devengado"
+          label="Consumo de inventario"
           value={formatMoneyAmount(report.totals.consumedCost, "ARS")}
         />
         <KpiStatCard

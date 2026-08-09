@@ -13,7 +13,7 @@ export function CostControlSummaryCards({ totals }: Props) {
   const varianceTone = variance >= 0 ? "success" : "danger";
 
   return (
-    <KpiStatGrid title={null} columns={4}>
+    <KpiStatGrid title={null} columns={5}>
       <KpiStatCard
         iconKey="cost_budget"
         label="Presupuesto costo"
@@ -38,6 +38,12 @@ export function CostControlSummaryCards({ totals }: Props) {
         value={fmt(totals.costVariance)}
         subtitle={`Margen proyectado: ${fmt(totals.projectedMargin)}`}
         tone={varianceTone}
+      />
+      <KpiStatCard
+        iconKey="cost_budget"
+        label="Consumo inventario"
+        value={fmt(totals.inventoryConsumedCost)}
+        subtitle={`Devengado: ${fmt(totals.accruedCost)} · Pagado: ${fmt(totals.paidCost)}`}
       />
     </KpiStatGrid>
   );

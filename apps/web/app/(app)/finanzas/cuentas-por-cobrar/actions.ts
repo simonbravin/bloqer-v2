@@ -8,6 +8,10 @@ import {
 } from "@bloqer/services";
 import { createCollectionSchema, type CreateCollectionInput } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  revalidateProjectCostAndFinancePaths,
+  revalidateTreasuryPaths,
+} from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -41,6 +45,8 @@ export async function createCompanyCollectionAction(
     revalidatePath(FIN_AR);
     revalidatePath(`${FIN_AR}/${data.receivableId}`);
     revalidatePath("/finanzas/transacciones");
+    revalidateTreasuryPaths();
+    if (collection.projectId) revalidateProjectCostAndFinancePaths(collection.projectId);
     return { id: collection.id };
   } catch (err) {
     return handle(err);
@@ -53,10 +59,12 @@ export async function cancelCompanyReceivableAction(
   const ctx = await getCtx();
   try {
     await assertCompanyReceivableMutable(receivableId, ctx);
-    await cancelReceivable(receivableId, ctx);
+    const receivable = await cancelReceivable(receivableId, ctx);
     revalidatePath(FIN_AR);
     revalidatePath(`${FIN_AR}/${receivableId}`);
     revalidatePath("/finanzas/transacciones");
+    revalidateTreasuryPaths();
+    if (receivable.projectId) revalidateProjectCostAndFinancePaths(receivable.projectId);
     return { ok: true };
   } catch (err) {
     return handle(err);

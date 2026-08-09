@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
+import { revalidateProjectCostAndFinancePaths } from "@/lib/revalidate-project-paths";
 import { createStockConsumption, ServiceError } from "@bloqer/services";
 import type { CreateStockConsumptionInput } from "@bloqer/validators";
 
@@ -26,6 +27,7 @@ export async function createStockConsumptionAction(
     revalidatePath(`/proyectos/${projectId}/consumos`);
     revalidatePath(`/proyectos/${projectId}/inventario`);
     revalidatePath("/inventario/movimientos");
+    revalidateProjectCostAndFinancePaths(projectId);
     return { id: movement.id };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };

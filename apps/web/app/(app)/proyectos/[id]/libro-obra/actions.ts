@@ -16,6 +16,7 @@ import {
   returnJobsiteLogSchema,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
+import { revalidateProjectCostAndFinancePaths } from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -62,6 +63,7 @@ function revalidateJobsiteLogPaths(projectId: string, logId: string) {
 function revalidateProjectSchedulePaths(projectId: string) {
   revalidatePath(`/proyectos/${projectId}/cronograma`);
   revalidatePath(`/proyectos/${projectId}`);
+  revalidateProjectCostAndFinancePaths(projectId);
 }
 
 async function lifecycleAction(

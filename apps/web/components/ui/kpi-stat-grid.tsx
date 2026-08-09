@@ -1,11 +1,12 @@
 import { cn } from "@/lib/utils";
 
-type KpiStatGridColumns = 2 | 3 | 4 | 7;
+type KpiStatGridColumns = 2 | 3 | 4 | 5 | 7;
 
 const columnClass: Record<KpiStatGridColumns, string> = {
   2: "sm:grid-cols-2",
   3: "sm:grid-cols-2 lg:grid-cols-3",
   4: "sm:grid-cols-2 xl:grid-cols-4",
+  5: "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5",
   7: "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7",
 };
 
