@@ -73,8 +73,8 @@
 
 ### Period
 - **Propósito:** rango temporal (típicamente mensual) que se puede cerrar.
-- **Atributos clave:** start_date, end_date, status (`OPEN | CLOSED`), closed_by, closed_at.
-- **Tenant-scoped:** sí.
+- **Atributos clave:** company_id, period_key (YYYY-MM), start_date, end_date, status (`OPEN | CLOSED`), closed_by, closed_at, last_reopen_reason.
+- **Tenant-scoped:** sí (y por empresa).
 
 ---
 
@@ -186,8 +186,9 @@
 - **Atributos clave:** cost_item_id, type (`MATERIAL` / `LABOR` / `EQUIPMENT` / `SUBCONTRACT` / `OTHER`), product_id (opcional), quantity, unit_cost, total_cost.
 
 ### BudgetSettings
-- **Propósito:** parámetros del presupuesto (overhead %, financial cost rate, profit margin %, taxes %).
-- **Atributos clave:** budget_id, overhead_pct, financial_cost_rate, profit_margin_pct, tax_pct.
+- **Propósito:** parámetros del presupuesto (overhead %, financial cost rate + días promedio, profit margin %, taxes %).
+- **Atributos clave:** budget_id, overhead_pct, financial_cost_rate (`financialCostPct`), `financialDaysAvg`, profit_margin_pct, tax_pct.
+- **Costo financiero:** [D-073] — CF = base × r × d/365 si d > 0; si d = 0, % plano legacy.
 
 ---
 
@@ -327,11 +328,11 @@
 
 ### Payment
 - **Propósito:** pago aplicado a una o más Payables.
-- **Atributos clave:** supplier_id, account_id, amount, currency, fx_rate, date, applies_to[] (lista de Payable + monto), retentions[], document_id.
+- **Atributos clave:** supplier_id, account_id, amount, currency, fx_rate, date, applies_to[] (lista de Payable + monto), retentions[], document_id, **payment_method** (opcional: CASH | BANK_TRANSFER | CHECK | CARD | OTHER), **reference** (opcional; nro transferencia/cheque) — [D-074].
 
 ### Collection
 - **Propósito:** cobranza aplicada a una o más Receivables.
-- **Atributos clave:** client_id, account_id, amount, currency, fx_rate, date, applies_to[] (lista de Receivable + monto), retentions[], document_id.
+- **Atributos clave:** client_id, account_id, amount, currency, fx_rate, date, applies_to[] (lista de Receivable + monto), retentions[], document_id, **payment_method**, **reference** — [D-074].
 
 ### TaxLine
 - **Propósito:** línea de impuesto/retención aplicada a un comprobante.

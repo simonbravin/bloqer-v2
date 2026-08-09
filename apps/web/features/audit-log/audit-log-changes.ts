@@ -36,7 +36,7 @@ const FIELD_LABELS_ES: Record<string, string> = {
   storageProvider: "Almacenamiento",
   sourceType: "Origen",
   budgetId: "Presupuesto",
-  wbsNodeId: "Partida WBS",
+  wbsNodeId: "Partida EDT",
   certificationId: "Certificación",
   contactId: "Contacto",
   email: "Correo",
@@ -70,6 +70,10 @@ const STATUS_VALUE_ES: Record<string, string> = {
   SUBMITTED: "Enviado a revisión",
   TRIAL: "Prueba",
   SUSPENDED: "Suspendido",
+  RECONCILED: "Conciliado",
+  FROZEN: "Congelado",
+  POSTED: "Contabilizado",
+  OPEN: "Abierto",
 };
 
 const TYPE_VALUE_ES: Record<string, string> = {

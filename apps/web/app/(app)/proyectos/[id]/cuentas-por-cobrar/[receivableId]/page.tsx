@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DataTableSection } from "@/components/ui/data-table-section";
@@ -6,13 +6,17 @@ import { ReceivableStatusBadge } from "@/features/sales-invoices";
 import { CollectionTable } from "@/features/collections";
 import type { CollectionListItem } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@bloqer/domain";
 import { getReceivableById, listCollectionsByReceivable, ServiceError } from "@bloqer/services";
 import { cancelReceivableAction } from "../../facturas/actions";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; receivableId: string }>;
+  searchParams: Promise<{ actionError?: string }>;
 }
 
 function fmtDate(d: Date) {
@@ -31,11 +35,12 @@ function fmtMoney(value: string, currency: string) {
 
 const OPEN_STATUSES = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
 
-export default async function ReceivableDetailPage({ params }: PageProps) {
+export default async function ReceivableDetailPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id, receivableId } = await params;
+  const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -56,12 +61,12 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
   }
   if (receivable.projectId !== id) notFound();
 
-  const doCancel = async () => {
-    "use server";
-    await cancelReceivableAction(receivableId, id);
-  };
+  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
 
-  const canCollect = OPEN_STATUSES.has(receivable.status);
+  const returnPath = `/proyectos/${id}/cuentas-por-cobrar/${receivableId}`;
+  const canCollect = canEditAr && OPEN_STATUSES.has(receivable.status);
+  const canCancel =
+    canEditAr && receivable.status !== "CANCELLED" && receivable.status !== "PAID";
 
   const collectionItems: CollectionListItem[] = collections.map((c) => ({
     id: c.id,
@@ -92,8 +97,15 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
               </Link>
             </Button>
           )}
-          {receivable.status !== "CANCELLED" && receivable.status !== "PAID" && (
-            <form action={doCancel}>
+          {canCancel && (
+            <form
+              action={async () => {
+                "use server";
+                const result = await cancelReceivableAction(receivableId, id);
+                if ("error" in result) redirectWithActionError(returnPath, result.error);
+                redirect(returnPath);
+              }}
+            >
               <Button variant="ghost" size="sm" className="text-muted-foreground">
                 Cancelar
               </Button>
@@ -101,6 +113,8 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
           )}
         </div>
       </div>
+
+      <ActionErrorBanner message={sp.actionError} />
 
       <div className="rounded-lg border bg-card">
         <div className="border-b px-6 py-4">
@@ -166,7 +180,7 @@ export default async function ReceivableDetailPage({ params }: PageProps) {
         actions={
           canCollect ? (
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/proyectos/${id}/cobranzas/nueva?receivableId=${receivableId}`}>
+              <Link href={`/proyectos/${id}/cuentas-por-cobrar/${receivableId}/cobrar`}>
                 Registrar cobranza
               </Link>
             </Button>

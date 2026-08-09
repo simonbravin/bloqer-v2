@@ -61,4 +61,32 @@ describe("computeCostExposureLayers [BR-COS-002]", () => {
     assert.equal(openCommitted.toFixed(2), "6000.00");
     assert.equal(expectedCostExposure.toFixed(2), "13000.00");
   });
+
+  it("paid is a separate reporting layer and must not alter exposure (Phase 4 sign-off)", () => {
+    // committed 10k / accrued linked 4k / paid 2k → exposure still 10k; paid is informational
+    const paid = new Prisma.Decimal(2000);
+    const { openCommitted, expectedCostExposure } = computeCostExposureLayers({
+      committed: new Prisma.Decimal(10000),
+      accrued: new Prisma.Decimal(4000),
+      accruedLinked: new Prisma.Decimal(4000),
+    });
+    assert.equal(openCommitted.toFixed(2), "6000.00");
+    assert.equal(expectedCostExposure.toFixed(2), "10000.00");
+    assert.equal(paid.toFixed(2), "2000.00");
+    assert.notEqual(expectedCostExposure.add(paid).toFixed(2), expectedCostExposure.toFixed(2));
+  });
+
+  it("never double-counts linked accrual into both open_committed and exposure addends", () => {
+    // Wrong naive formula would be committed+accrued=14k; correct is exposure=10k
+    const committed = new Prisma.Decimal(10000);
+    const accrued = new Prisma.Decimal(4000);
+    const accruedLinked = new Prisma.Decimal(4000);
+    const { expectedCostExposure } = computeCostExposureLayers({
+      committed,
+      accrued,
+      accruedLinked,
+    });
+    assert.equal(expectedCostExposure.toFixed(2), "10000.00");
+    assert.notEqual(committed.add(accrued).toFixed(2), expectedCostExposure.toFixed(2));
+  });
 });

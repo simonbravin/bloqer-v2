@@ -14,10 +14,23 @@ import {
 } from "./journal-entry.service";
 import { treasuryMovementSupportsAccountingDraft } from "./accounting-treasury-gl-eligibility";
 import { notifyAccountingDraftsPendingSoft } from "./accounting-draft-notifications.service";
+import { suggestTreasuryGlAccountCode } from "./treasury-gl-account-hint";
 
 type EnsureResult =
   | { status: "created" | "existing"; entry: JournalEntryView }
   | { status: "skipped"; reason: string };
+
+async function resolveActiveGlAccountId(
+  tenantId: string,
+  companyId: string,
+  code: string,
+): Promise<string | null> {
+  const acc = await prisma.accountingAccount.findFirst({
+    where: { tenantId, companyId, code, isActive: true },
+    select: { id: true },
+  });
+  return acc?.id ?? null;
+}
 
 function moneyAmountString(d: Prisma.Decimal): string {
   return roundMoney(d.toString());
@@ -110,6 +123,9 @@ async function ensureFromRule(params: {
   amount: Prisma.Decimal;
   lineDebit: string;
   lineCredit: string;
+  /** Soft override for cash/bank side (treasury type/currency heuristic). */
+  debitAccountIdOverride?: string | null;
+  creditAccountIdOverride?: string | null;
 }): Promise<EnsureResult> {
   const { ctx } = params;
 
@@ -155,6 +171,9 @@ async function ensureFromRule(params: {
     return { status: "skipped", reason: "non_positive_amount" };
   }
 
+  const debitAccountId = params.debitAccountIdOverride ?? rule.debitAccountId;
+  const creditAccountId = params.creditAccountIdOverride ?? rule.creditAccountId;
+
   try {
     const input = buildTwoLineDraftInput({
       companyId: params.companyId,
@@ -164,8 +183,8 @@ async function ensureFromRule(params: {
       reference: params.reference,
       currency: params.currency,
       amountStr: moneyAmountString(params.amount),
-      debitAccountId: rule.debitAccountId,
-      creditAccountId: rule.creditAccountId,
+      debitAccountId,
+      creditAccountId,
       lineDescriptionDebit: params.lineDebit,
       lineDescriptionCredit: params.lineCredit,
       sourceType: params.sourceType,
@@ -223,10 +242,13 @@ export async function ensureDraftJournalFromCollection(
   try {
     const col = await prisma.collection.findFirst({
       where: { id: collectionId, tenantId: ctx.tenantId },
+      include: { account: { select: { type: true, currency: true } } },
     });
     if (!col || col.status !== "CONFIRMED") {
       return { status: "skipped", reason: "not_found_or_not_confirmed" };
     }
+    const treasuryGlCode = suggestTreasuryGlAccountCode(col.account);
+    const debitOverride = await resolveActiveGlAccountId(ctx.tenantId, col.companyId, treasuryGlCode);
     return ensureFromRule({
       ctx,
       companyId: col.companyId,
@@ -241,6 +263,7 @@ export async function ensureDraftJournalFromCollection(
       amount: col.amount,
       lineDebit: "Debe — según regla contable",
       lineCredit: "Haber — según regla contable",
+      debitAccountIdOverride: debitOverride,
     });
   } catch {
     return { status: "skipped", reason: "unexpected_error" };
@@ -254,10 +277,13 @@ export async function ensureDraftJournalFromPayment(
   try {
     const pay = await prisma.payment.findFirst({
       where: { id: paymentId, tenantId: ctx.tenantId },
+      include: { account: { select: { type: true, currency: true } } },
     });
     if (!pay || pay.status !== "CONFIRMED") {
       return { status: "skipped", reason: "not_found_or_not_confirmed" };
     }
+    const treasuryGlCode = suggestTreasuryGlAccountCode(pay.account);
+    const creditOverride = await resolveActiveGlAccountId(ctx.tenantId, pay.companyId, treasuryGlCode);
     return ensureFromRule({
       ctx,
       companyId: pay.companyId,
@@ -272,6 +298,7 @@ export async function ensureDraftJournalFromPayment(
       amount: pay.amount,
       lineDebit: "Debe — según regla contable",
       lineCredit: "Haber — según regla contable",
+      creditAccountIdOverride: creditOverride,
     });
   } catch {
     return { status: "skipped", reason: "unexpected_error" };
@@ -287,7 +314,8 @@ export async function ensureDraftJournalFromTreasuryMovement(
       where: { id: accountMovementId, tenantId: ctx.tenantId },
       include: { account: true },
     });
-    if (!mov || mov.status !== "CONFIRMED") {
+    // RECONCILED still needs a DRAFT journal when created via recon “crear movimiento”.
+    if (!mov || (mov.status !== "CONFIRMED" && mov.status !== "RECONCILED")) {
       return { status: "skipped", reason: "not_found_or_not_confirmed" };
     }
     if (!treasuryMovementSupportsAccountingDraft({ type: mov.type, sourceType: mov.sourceType })) {
@@ -298,6 +326,15 @@ export async function ensureDraftJournalFromTreasuryMovement(
       return { status: "skipped", reason: "missing_company" };
     }
 
+    // Transfer journals need both legs for correct debit/credit GL overrides.
+    if (mov.type === "TRANSFER_IN" || mov.type === "TRANSFER_OUT") {
+      const transferId =
+        mov.transferId
+        ?? (mov.sourceType === "INTERNAL_TRANSFER" ? mov.sourceId : null);
+      if (!transferId) return { status: "skipped", reason: "missing_transfer_id" };
+      return ensureDraftJournalFromInternalTransfer(transferId, ctx);
+    }
+
     let eventType: AccountingMappingEventType;
     let sourceType: JournalEntrySourceType;
     if (mov.type === "INFLOW") {
@@ -306,21 +343,27 @@ export async function ensureDraftJournalFromTreasuryMovement(
     } else if (mov.type === "OUTFLOW") {
       eventType = "TREASURY_OUTFLOW";
       sourceType = "TREASURY_OUTFLOW";
-    } else if (mov.type === "TRANSFER_IN" || mov.type === "TRANSFER_OUT") {
-      eventType = "TREASURY_TRANSFER";
-      sourceType = "INTERNAL_TRANSFER";
     } else {
       return { status: "skipped", reason: "unsupported_movement_type" };
     }
 
-    const sourceId = mov.transferId ?? mov.id;
+    const treasuryGlCode = suggestTreasuryGlAccountCode({
+      type: mov.account.type,
+      currency: mov.account.currency,
+    });
+    const treasuryGlId = await resolveActiveGlAccountId(ctx.tenantId, companyId, treasuryGlCode);
+    const debitOverride =
+      mov.type === "INFLOW" ? treasuryGlId : undefined;
+    const creditOverride =
+      mov.type === "OUTFLOW" ? treasuryGlId : undefined;
+
     return ensureFromRule({
       ctx,
       companyId,
       projectId: null,
       eventType,
       sourceType,
-      sourceId,
+      sourceId: mov.id,
       entryDate: mov.movementDate.toISOString().slice(0, 10),
       description: `Asiento automático — tesorería: ${mov.description.slice(0, 200)}`,
       reference: `MOV-${mov.id.slice(0, 8)}`,
@@ -328,6 +371,8 @@ export async function ensureDraftJournalFromTreasuryMovement(
       amount: mov.amount,
       lineDebit: `Debe — ${mov.type}`,
       lineCredit: `Haber — ${mov.type}`,
+      debitAccountIdOverride: debitOverride,
+      creditAccountIdOverride: creditOverride,
     });
   } catch {
     return { status: "skipped", reason: "unexpected_error" };
@@ -345,17 +390,59 @@ export async function ensureDraftJournalFromInternalTransfer(
     if (!transfer || transfer.status !== "CONFIRMED") {
       return { status: "skipped", reason: "not_found_or_not_confirmed" };
     }
-    const leg = await prisma.accountMovement.findFirst({
+    // Legs store transferId === InternalTransfer.id. Also match sourceId for legacy rows
+    // that used a separate random transferId pair key.
+    const legs = await prisma.accountMovement.findMany({
       where: {
         tenantId: ctx.tenantId,
-        transferId: transfer.id,
-        status: "CONFIRMED",
+        status: { in: ["CONFIRMED", "RECONCILED"] },
+        OR: [
+          { transferId: transfer.id },
+          { sourceType: "INTERNAL_TRANSFER", sourceId: transfer.id },
+        ],
       },
       include: { account: true },
       orderBy: { id: "asc" },
     });
-    if (!leg) return { status: "skipped", reason: "missing_movement_leg" };
-    return ensureDraftJournalFromTreasuryMovement(leg.id, ctx);
+    const outLeg = legs.find((l) => l.type === "TRANSFER_OUT") ?? legs[0];
+    const inLeg = legs.find((l) => l.type === "TRANSFER_IN");
+    if (!outLeg) return { status: "skipped", reason: "missing_movement_leg" };
+
+    // Prefer destination (IN) for the base movement path; override both GL sides from legs.
+    const primary = inLeg ?? outLeg;
+    const companyId = primary.companyId ?? primary.account.companyId ?? null;
+    if (!companyId) return { status: "skipped", reason: "missing_company" };
+
+    const debitGl = inLeg
+      ? await resolveActiveGlAccountId(
+          ctx.tenantId,
+          companyId,
+          suggestTreasuryGlAccountCode({ type: inLeg.account.type, currency: inLeg.account.currency }),
+        )
+      : null;
+    const creditGl = await resolveActiveGlAccountId(
+      ctx.tenantId,
+      companyId,
+      suggestTreasuryGlAccountCode({ type: outLeg.account.type, currency: outLeg.account.currency }),
+    );
+
+    return ensureFromRule({
+      ctx,
+      companyId,
+      projectId: null,
+      eventType: "TREASURY_TRANSFER",
+      sourceType: "INTERNAL_TRANSFER",
+      sourceId: transfer.id,
+      entryDate: primary.movementDate.toISOString().slice(0, 10),
+      description: `Asiento automático — transferencia interna (${transfer.id.slice(0, 8)}…)`,
+      reference: `TRF-${transfer.id.slice(0, 8)}`,
+      currency: primary.currency,
+      amount: primary.amount,
+      lineDebit: "Debe — cuenta destino",
+      lineCredit: "Haber — cuenta origen",
+      debitAccountIdOverride: debitGl ?? undefined,
+      creditAccountIdOverride: creditGl ?? undefined,
+    });
   } catch {
     return { status: "skipped", reason: "unexpected_error" };
   }

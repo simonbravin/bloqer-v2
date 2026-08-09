@@ -7,8 +7,8 @@
 - Requiere motor fiscal y homologación ([D-011] explícitamente manual hoy).
 
 ## Banca
-- Importación extractos OFX/CSV automática ([Q-007]).
-- APIs bancarias / pagos masivos.
+- ~~Importación extractos OFX/CSV~~ → **en producto** ([D-076], [D-079]).
+- **APIs bancarias / open banking / pagos masivos** — **fuera de fases 0–5**. Requiere partner, credenciales por banco y decisión de producto aparte; no bloquea cierre de Phase 3/4.
 
 ## BI / Data warehouse
 - Réplica read-only hacia BigQuery/Snowflake.

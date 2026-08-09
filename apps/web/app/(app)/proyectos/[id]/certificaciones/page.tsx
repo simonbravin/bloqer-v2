@@ -5,6 +5,7 @@ import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { CertificationListSection, NewCertificationDialog } from "@/features/certifications";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@bloqer/domain";
 import {
   listBudgetsByProject,
   listCertificationsByProject,
@@ -65,6 +66,8 @@ export default async function CertificacionesPage({ params, searchParams }: Page
     currency: c.currency,
   }));
 
+  const canEditCert = can(current.tenantCtx.roles, "EDIT", "CERTIFICATIONS");
+
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
@@ -75,17 +78,19 @@ export default async function CertificacionesPage({ params, searchParams }: Page
             <Suspense fallback={null}>
               <ListViewToggle storageKey={`certificaciones-${id}`} />
             </Suspense>
-            <Suspense fallback={null}>
-              <NewCertificationDialog
-                projectId={id}
-                budgets={eligibleBudgets}
-                defaultBudgetId={
-                  eligibleBudgets.length === 1 ? eligibleBudgets[0]!.id : undefined
-                }
-                onSubmit={createCertificationAction.bind(null, id)}
-                defaultOpen={sp.create === "1"}
-              />
-            </Suspense>
+            {canEditCert ? (
+              <Suspense fallback={null}>
+                <NewCertificationDialog
+                  projectId={id}
+                  budgets={eligibleBudgets}
+                  defaultBudgetId={
+                    eligibleBudgets.length === 1 ? eligibleBudgets[0]!.id : undefined
+                  }
+                  onSubmit={createCertificationAction.bind(null, id)}
+                  defaultOpen={sp.create === "1"}
+                />
+              </Suspense>
+            ) : null}
           </>
         }
       />

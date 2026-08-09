@@ -23,11 +23,14 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { issueSalesInvoiceAction, cancelSalesInvoiceAction } from "../actions";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; invoiceId: string }>;
+  searchParams: Promise<{ actionError?: string }>;
 }
 
 function fmtDate(d: Date) {
@@ -44,11 +47,12 @@ function fmtMoney(value: string, currency: string) {
   );
 }
 
-export default async function FacturaDetailPage({ params }: PageProps) {
+export default async function FacturaDetailPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id, invoiceId } = await params;
+  const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -71,17 +75,12 @@ export default async function FacturaDetailPage({ params }: PageProps) {
     projectId: id,
   });
   const storageConfigured = isStorageConfigured();
-  const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "AR");
+  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
+  const canEditAttachments = canEditAr;
 
-  const doIssue = async () => {
-    "use server";
-    await issueSalesInvoiceAction(invoiceId, id);
-  };
-  const doCancel = async () => {
-    "use server";
-    await cancelSalesInvoiceAction(invoiceId, id);
-  };
+  const returnPath = `/proyectos/${id}/facturas/${invoiceId}`;
   const canCollect =
+    canEditAr &&
     receivable &&
     (receivable.status === "OPEN" ||
       receivable.status === "PARTIAL" ||
@@ -101,18 +100,32 @@ export default async function FacturaDetailPage({ params }: PageProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          {invoice.status === "DRAFT" && (
+          {canEditAr && invoice.status === "DRAFT" && (
             <>
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/proyectos/${id}/facturas/${invoiceId}/editar`}>Editar</Link>
               </Button>
-              <form action={doIssue}>
+              <form
+                action={async () => {
+                  "use server";
+                  const result = await issueSalesInvoiceAction(invoiceId, id);
+                  if ("error" in result) redirectWithActionError(returnPath, result.error);
+                  redirect(returnPath);
+                }}
+              >
                 <Button size="sm">Emitir</Button>
               </form>
             </>
           )}
-          {invoice.status !== "CANCELLED" && (
-            <form action={doCancel}>
+          {canEditAr && invoice.status !== "CANCELLED" && (
+            <form
+              action={async () => {
+                "use server";
+                const result = await cancelSalesInvoiceAction(invoiceId, id);
+                if ("error" in result) redirectWithActionError(returnPath, result.error);
+                redirect(returnPath);
+              }}
+            >
               <Button variant="ghost" size="sm" className="text-muted-foreground">
                 Anular
               </Button>
@@ -120,6 +133,8 @@ export default async function FacturaDetailPage({ params }: PageProps) {
           )}
         </div>
       </div>
+
+      <ActionErrorBanner message={sp.actionError} />
 
       {receivable ? (
         <div className="rounded-lg border bg-card px-4 py-3 text-sm">
@@ -143,6 +158,22 @@ export default async function FacturaDetailPage({ params }: PageProps) {
               ) : null}
             </div>
           </div>
+        </div>
+      ) : invoice.status === "DRAFT" ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
+          <p className="font-medium">Borrador sin cuenta por cobrar</p>
+          <p className="mt-1 text-xs">
+            Usá <strong>Emitir</strong> para abrir la CxC. La certificación (si hay) no acredita
+            banco: la cobranza posterior, con cuenta de tesorería, es el paso de caja.
+          </p>
+        </div>
+      ) : invoice.status === "ISSUED" ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
+          <p className="font-medium">Factura emitida sin CxC vinculada</p>
+          <p className="mt-1 text-xs">
+            Estado inconsistente: debería existir una cuenta por cobrar. Revisá con soporte o
+            regenerá desde el flujo de emisión si corresponde.
+          </p>
         </div>
       ) : null}
 

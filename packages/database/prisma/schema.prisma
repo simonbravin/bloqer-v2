@@ -58,6 +58,12 @@ enum OverheadPeriodCloseStatus {
   FROZEN
 }
 
+/// D-014 / D-078: cierre de período financiero (tesorería + GL).
+enum PeriodStatus {
+  OPEN
+  CLOSED
+}
+
 enum MembershipStatus {
   ACTIVE
   INACTIVE
@@ -265,10 +271,24 @@ enum AccountMovementType {
   ADJUSTMENT
 }
 
-// No DRAFT (movements created directly as CONFIRMED) and no RECONCILED (Phase 4).
+// No DRAFT (movements created directly as CONFIRMED). RECONCILED = bank match ([D-032]/[D-075]).
 enum AccountMovementStatus {
   CONFIRMED
+  RECONCILED
   CANCELLED
+}
+
+enum BankReconciliationStatus {
+  DRAFT
+  IN_PROGRESS
+  CLOSED
+  CANCELLED
+}
+
+/// Bank statement line direction relative to the account balance ([D-075]).
+enum BankStatementLineDirection {
+  CREDIT
+  DEBIT
 }
 
 enum AccountMovementSourceType {
@@ -358,6 +378,15 @@ enum PurchaseReceiptStatus {
 enum CollectionStatus {
   CONFIRMED
   CANCELLED
+}
+
+/// How cash moved for a Collection or Payment ([D-074] / Q-054).
+enum TreasurySettlementMethod {
+  CASH
+  BANK_TRANSFER
+  CHECK
+  CARD
+  OTHER
 }
 
 enum InternalTransferStatus {
@@ -578,6 +607,9 @@ model Tenant {
   receivables                 Receivable[]
   treasuryAccounts            TreasuryAccount[]
   accountMovements            AccountMovement[]
+  bankReconciliations         BankReconciliation[]
+  bankStatementLines          BankStatementLine[]
+  bankReconciliationMatches   BankReconciliationMatch[]
   collections                 Collection[]
   internalTransfers           InternalTransfer[]
   supplierInvoices            SupplierInvoice[]
@@ -606,6 +638,7 @@ model Tenant {
   projectOverheadAllocations  ProjectOverheadAllocation[]
   overheadPeriodCloses        OverheadPeriodClose[]
   overheadAutoPeriodSnapshots OverheadAutoPeriodSnapshot[]
+  periods                     Period[]
   scheduledReports            ScheduledReport[]
 
   @@map("tenants")
@@ -685,6 +718,7 @@ model Company {
   projectOverheadAllocations  ProjectOverheadAllocation[]
   overheadPeriodCloses        OverheadPeriodClose[]
   overheadAutoPeriodSnapshots OverheadAutoPeriodSnapshot[]
+  periods                     Period[]
   memberships                 UserMembership[]
   projects                    Project[]
   budgets                     Budget[]
@@ -714,6 +748,7 @@ model Company {
   accountingMappingRules      AccountingMappingRule[]
   auditLogs                   AuditLog[]
   scheduledReports            ScheduledReport[]
+  bankReconciliations         BankReconciliation[]
 
   @@index([tenantId])
   @@map("companies")
@@ -764,6 +799,33 @@ model OverheadPeriodClose {
   @@unique([tenantId, companyId, period])
   @@index([tenantId, companyId])
   @@map("overhead_period_closes")
+}
+
+/// D-014 / D-078: cierre mensual por empresa. Bloquea AccountMovement.movementDate y JournalEntry.entryDate.
+model Period {
+  id                   String       @id @default(uuid())
+  tenantId             String
+  companyId            String
+  /// Calendar month YYYY-MM (UTC bounds in startDate/endDate).
+  periodKey            String       @db.VarChar(7)
+  startDate            DateTime     @db.Date
+  endDate              DateTime     @db.Date
+  status               PeriodStatus @default(OPEN)
+  closedAt             DateTime?
+  closedByUserId       String?
+  lastReopenReason     String?      @db.VarChar(1024)
+  lastReopenedAt       DateTime?
+  lastReopenedByUserId String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, companyId, periodKey])
+  @@index([tenantId, companyId, status])
+  @@index([tenantId, companyId, startDate, endDate])
+  @@map("periods")
 }
 
 /// D-043: imputación AUTO congelada por proyecto y período (no mezclar con project_overhead_allocations).
@@ -1324,6 +1386,7 @@ model Certification {
 
   @@unique([projectId, number])
   @@index([tenantId, projectId])
+  @@index([tenantId, projectId, periodStart])
   @@index([budgetId, status])
   @@map("certifications")
 }
@@ -1370,6 +1433,9 @@ model SalesInvoice {
   companyId          String
   projectId          String?
   clientContactId    String
+  /// At most one non-CANCELLED invoice per certification — partial unique index
+  /// `sales_invoices_one_active_per_certification_key` (migration 20260807200000).
+  /// Not a Prisma @@unique (that would incorrectly block CANCELLED rows).
   certificationId    String?
   number             Int
   issueDate          DateTime           @db.Date
@@ -1459,6 +1525,7 @@ model Receivable {
   collections   Collection[]
 
   @@index([tenantId, projectId])
+  @@index([tenantId, projectId, dueDate])
   @@index([tenantId, status])
   @@map("receivables")
 }
@@ -1603,11 +1670,12 @@ model TreasuryAccount {
 
   tenant       Tenant             @relation(fields: [tenantId], references: [id])
   company      Company?           @relation(fields: [companyId], references: [id])
-  movements    AccountMovement[]
-  collections  Collection[]
-  transfersOut InternalTransfer[] @relation("TransferSource")
-  transfersIn  InternalTransfer[] @relation("TransferDest")
-  payments     Payment[]
+  movements         AccountMovement[]
+  collections       Collection[]
+  transfersOut      InternalTransfer[] @relation("TransferSource")
+  transfersIn       InternalTransfer[] @relation("TransferDest")
+  payments          Payment[]
+  bankReconciliations BankReconciliation[]
 
   /// Tenant-wide unique **display name** (see docs/bloqer2.0/03-finance/TREASURY_MODEL.md §TreasuryAccount uniqueness).
   @@unique([tenantId, name])
@@ -1617,7 +1685,7 @@ model TreasuryAccount {
 
 // BR-TRZ-003: movements in a closed period cannot be mutated.
 // No DRAFT state — movements created directly as CONFIRMED.
-// No RECONCILED state yet — added in Bank Reconciliation phase.
+// RECONCILED = matched in bank reconciliation ([D-032]/[D-075]); not editable until unreconciled ([BR-TRZ-002]).
 // Phase 16B: optional project dimension for reporting / manual classification.
 // Movements from Collection/Payment keep projectId null unless explicitly set later; avoid duplicating source truth.
 model AccountMovement {
@@ -1647,13 +1715,87 @@ model AccountMovement {
   account      TreasuryAccount @relation(fields: [accountId], references: [id])
   project      Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   counterparty Contact?        @relation("AccountMovementCounterparty", fields: [counterpartyContactId], references: [id], onDelete: SetNull)
+  reconciliationMatches BankReconciliationMatch[]
 
   @@index([tenantId, accountId, movementDate])
   @@index([tenantId, sourceType, sourceId])
   @@index([transferId])
   @@index([tenantId, projectId])
   @@index([tenantId, counterpartyContactId])
+  @@index([tenantId, status])
   @@map("account_movements")
+}
+
+/// Bank reconciliation session ([D-032]/[D-075]/[D-076]/[D-079]). Manual lines + CSV/OFX import.
+/// Partial unique (migration 20260808180000): one DRAFT|IN_PROGRESS per (tenantId, accountId).
+/// Prisma cannot express that as @@unique without blocking CLOSED/CANCELLED rows.
+model BankReconciliation {
+  id             String                   @id @default(uuid())
+  tenantId       String
+  /// Denormalized from TreasuryAccount; optional FK (ON DELETE SET NULL).
+  companyId      String?
+  accountId      String
+  periodStart    DateTime                 @db.Date
+  periodEnd      DateTime                 @db.Date
+  currency       String
+  openingBalance Decimal                  @db.Decimal(18, 4)
+  closingBalance Decimal                  @db.Decimal(18, 4)
+  status         BankReconciliationStatus @default(DRAFT)
+  notes          String?
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id])
+  company  Company?        @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  account  TreasuryAccount @relation(fields: [accountId], references: [id])
+  lines    BankStatementLine[]
+  matches  BankReconciliationMatch[]
+
+  @@index([tenantId, accountId, status])
+  @@index([tenantId, periodStart, periodEnd])
+  @@map("bank_reconciliations")
+}
+
+model BankStatementLine {
+  id               String                     @id @default(uuid())
+  tenantId         String
+  reconciliationId String
+  lineDate         DateTime                   @db.Date
+  description      String
+  /// Always positive; direction indicates credit/debit on the bank statement.
+  amount           Decimal                    @db.Decimal(18, 4)
+  direction        BankStatementLineDirection
+  reference        String?                    @db.VarChar(120)
+  sortOrder        Int                        @default(0)
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  tenant         Tenant                   @relation(fields: [tenantId], references: [id])
+  reconciliation BankReconciliation       @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  match          BankReconciliationMatch?
+
+  @@index([tenantId, reconciliationId])
+  @@map("bank_statement_lines")
+}
+
+model BankReconciliationMatch {
+  id               String   @id @default(uuid())
+  tenantId         String
+  reconciliationId String
+  statementLineId  String   @unique
+  accountMovementId String  @unique
+  matchedBy        String?
+  matchedAt        DateTime @default(now())
+
+  tenant          Tenant            @relation(fields: [tenantId], references: [id])
+  reconciliation  BankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  statementLine   BankStatementLine @relation(fields: [statementLineId], references: [id], onDelete: Cascade)
+  accountMovement AccountMovement   @relation(fields: [accountMovementId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, reconciliationId])
+  @@map("bank_reconciliation_matches")
 }
 
 // BR-TRZ-006: collection amount cannot exceed Receivable.balanceDue.
@@ -1675,6 +1817,10 @@ model Collection {
   fxRate          Decimal          @default(1) @db.Decimal(18, 6)
   amountArs       Decimal          @default(0) @db.Decimal(18, 4)
   amount          Decimal          @db.Decimal(18, 4)
+  /// Settlement channel ([D-074]). Null on legacy rows.
+  paymentMethod   TreasurySettlementMethod?
+  /// Transfer/cheque/voucher reference ([D-074]).
+  reference       String?
   notes           String?
   status          CollectionStatus @default(CONFIRMED)
   createdBy       String?
@@ -1836,6 +1982,7 @@ model Payable {
   payments        Payment[]
 
   @@index([tenantId, projectId])
+  @@index([tenantId, supplierContactId, dueDate])
   @@index([tenantId, status])
   @@map("payables")
 }
@@ -1858,6 +2005,10 @@ model Payment {
   fxRate            Decimal       @default(1) @db.Decimal(18, 6)
   amountArs         Decimal       @default(0) @db.Decimal(18, 4)
   amount            Decimal       @db.Decimal(18, 4)
+  /// Settlement channel ([D-074]). Null on legacy rows.
+  paymentMethod     TreasurySettlementMethod?
+  /// Transfer/cheque/voucher reference ([D-074]).
+  reference         String?
   notes             String?
   status            PaymentStatus @default(CONFIRMED)
   createdBy         String?
@@ -2289,8 +2440,11 @@ model StockMovement {
   @@index([tenantId, warehouseId, productId])
   @@index([tenantId, productId, status])
   @@index([tenantId, projectId])
+  @@index([tenantId, projectId, wbsNodeId])
+  @@index([tenantId, wbsNodeId])
   @@index([purchaseReceiptId])
   @@index([warehouseTransferId])
+  /// Partial uniques (raw SQL): one CONFIRMED IN per receipt line; one CONFIRMED CONSUMPTION per sourceId; one leg per transfer type.
   @@map("stock_movements")
 }
 
@@ -2365,35 +2519,42 @@ model SubcontractLine {
 // APPROVED → creates SupplierInvoice DRAFT (via SupplierInvoice.subcontractCertificationId unique FK).
 // CANCELLED reverses certifiedQuantity only if previously APPROVED and linked invoice is DRAFT.
 model SubcontractCertification {
-  id                     String                         @id @default(uuid())
-  tenantId               String
-  companyId              String
-  projectId              String
-  subcontractId          String
-  subcontractorContactId String
-  number                 Int
-  periodStart            DateTime                       @db.Date
-  periodEnd              DateTime                       @db.Date
-  certificationDate      DateTime                       @db.Date
-  status                 SubcontractCertificationStatus @default(DRAFT)
-  notes                  String?
-  createdBy              String?
-  updatedBy              String?
-  createdAt              DateTime                       @default(now())
-  updatedAt              DateTime                       @updatedAt
+  id                       String                         @id @default(uuid())
+  tenantId                 String
+  companyId                String
+  projectId                String
+  subcontractId            String
+  subcontractorContactId   String
+  number                   Int
+  periodStart              DateTime                       @db.Date
+  periodEnd                DateTime                       @db.Date
+  certificationDate        DateTime                       @db.Date
+  status                   SubcontractCertificationStatus @default(DRAFT)
+  /// BR-SUB-005 / [D-082]: successor after REJECTED points at the rejected cert.
+  replacesCertificationId  String?
+  notes                    String?
+  createdBy                String?
+  updatedBy                String?
+  createdAt                DateTime                       @default(now())
+  updatedAt                DateTime                       @updatedAt
 
-  tenant               Tenant                         @relation(fields: [tenantId], references: [id])
-  company              Company                        @relation(fields: [companyId], references: [id])
-  project              Project                        @relation(fields: [projectId], references: [id])
-  subcontract          Subcontract                    @relation(fields: [subcontractId], references: [id])
-  subcontractorContact Contact                        @relation("SubcontractCertificationSubcontractor", fields: [subcontractorContactId], references: [id])
-  lines                SubcontractCertificationLine[]
-  supplierInvoice      SupplierInvoice?
+  tenant                 Tenant                         @relation(fields: [tenantId], references: [id])
+  company                Company                        @relation(fields: [companyId], references: [id])
+  project                Project                        @relation(fields: [projectId], references: [id])
+  subcontract            Subcontract                    @relation(fields: [subcontractId], references: [id])
+  subcontractorContact   Contact                        @relation("SubcontractCertificationSubcontractor", fields: [subcontractorContactId], references: [id])
+  replacesCertification  SubcontractCertification?       @relation("SubcontractCertSuccession", fields: [replacesCertificationId], references: [id], onDelete: SetNull)
+  replacedBy             SubcontractCertification[]     @relation("SubcontractCertSuccession")
+  lines                  SubcontractCertificationLine[]
+  supplierInvoice        SupplierInvoice?
 
   @@unique([subcontractId, number])
   @@index([tenantId, projectId])
   @@index([tenantId, subcontractId])
   @@index([tenantId, status])
+  /// Partial unique (migration 20260808190000): at most one non-cancelled successor per predecessor.
+  /// Prisma cannot express WHERE status <> 'CANCELLED' as @@unique.
+  @@index([replacesCertificationId])
   @@map("subcontract_certifications")
 }
 
@@ -2695,6 +2856,8 @@ enum NotificationType {
   PAYABLE_READY_TO_PAY
   /// Confirmed AP payment [D-069] (in-app only for now).
   PAYMENT_CONFIRMED
+  /// Project receivable ready for treasury collection [D-072].
+  RECEIVABLE_READY_TO_COLLECT
 }
 
 enum NotificationSeverity {

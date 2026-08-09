@@ -6,6 +6,12 @@ import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enfo
 import { ServiceContext, ServiceError } from "../types";
 import { assertCanCancelAccountMovement } from "./account-movement-cancel-guards";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import {
+  assertJournalAllowsOperationalCancel,
+  cancelDraftJournalOnOperationalCancel,
+} from "../accounting/accounting-cancel-sync.service";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 
 export type AccountMovementView = Omit<AccountMovement, "amount"> & {
   amount: string;
@@ -48,7 +54,7 @@ export async function listAccountMovements(
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
-// Only CONFIRMED movements can be cancelled; RECONCILED (future) cannot.
+// Only CONFIRMED movements can be cancelled; RECONCILED must be unmatched first.
 export async function cancelAccountMovement(
   id: string,
   ctx: ServiceContext,
@@ -66,11 +72,41 @@ export async function cancelAccountMovement(
     transferId: m.transferId,
   });
 
+  await assertFinancialPeriodOpen({
+    tenantId: ctx.tenantId,
+    companyId: m.companyId,
+    date: m.movementDate,
+  });
+
+  const glParams =
+    m.companyId && (m.type === "INFLOW" || m.type === "OUTFLOW")
+      ? {
+          companyId: m.companyId,
+          sourceType: (m.type === "INFLOW" ? "TREASURY_INFLOW" : "TREASURY_OUTFLOW") as
+            | "TREASURY_INFLOW"
+            | "TREASURY_OUTFLOW",
+          sourceId: m.id,
+          sourceLabel: "el movimiento de tesorería",
+          enforceCompanyScope: false as const,
+        }
+      : null;
+
+  // Block POSTED journals before mutating cash; cancel DRAFT only after commit.
+  if (glParams) {
+    await assertJournalAllowsOperationalCancel(ctx, glParams);
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
-    const updatedMovement = await tx.accountMovement.update({
-      where: { id },
+    const cancelled = await tx.accountMovement.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "CONFIRMED" },
       data: { status: "CANCELLED" },
     });
+    assertOptimisticRowUpdate(
+      cancelled.count,
+      "El movimiento ya no está confirmado (puede haberse conciliado). Recargá e intentá de nuevo.",
+    );
+
+    const updatedMovement = await tx.accountMovement.findUniqueOrThrow({ where: { id } });
 
     await auditTreasury(
       ctx,
@@ -83,6 +119,10 @@ export async function cancelAccountMovement(
 
     return updatedMovement;
   });
+
+  if (glParams) {
+    await cancelDraftJournalOnOperationalCancel(ctx, glParams);
+  }
 
   return updated;
 }

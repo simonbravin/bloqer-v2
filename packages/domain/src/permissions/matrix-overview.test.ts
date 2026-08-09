@@ -9,14 +9,14 @@ import {
   isPermissionModuleUnavailableInThisVersion,
 } from "@bloqer/domain";
 
-test("unavailable modules include the five product-approved keys", () => {
+test("unavailable modules include the product-approved keys (shipped modules excluded)", () => {
   assert.deepEqual([...MODULES_UNAVAILABLE_IN_THIS_VERSION].sort(), [
-    "BANK_RECONCILIATION",
     "CHANGE_ORDERS",
     "CONTRACTS",
     "RFIS",
     "TAXES",
   ]);
+  assert.equal(isPermissionModuleUnavailableInThisVersion("BANK_RECONCILIATION"), false);
 });
 
 test("permission matrix sections exclude unavailable modules", () => {
@@ -38,7 +38,7 @@ test("buildPermissionMatrixGrid does not include unavailable modules as columns"
 
 test("getUnavailablePermissionModulesForUi lists labels for UI notice", () => {
   const rows = getUnavailablePermissionModulesForUi();
-  assert.equal(rows.length, 5);
+  assert.equal(rows.length, 4);
   assert.ok(rows.every((r) => isPermissionModuleUnavailableInThisVersion(r.moduleKey)));
   assert.ok(rows.some((r) => r.moduleKey === "CONTRACTS" && r.labelEs.includes("Contratos")));
   for (const row of rows) {

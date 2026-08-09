@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Prisma, prisma, InternalTransfer } from "@bloqer/database";
 import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import type { CreateInternalTransferInput } from "@bloqer/validators";
@@ -7,7 +8,13 @@ import { ServiceContext, ServiceError } from "../types";
 import { getAccountBalance } from "./balance.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { ensureDraftJournalFromInternalTransfer } from "../accounting/accounting-auto-draft.service";
-import { syncJournalOnOperationalCancel } from "../accounting/accounting-cancel-sync.service";
+import {
+  assertJournalAllowsOperationalCancel,
+  cancelDraftJournalOnOperationalCancel,
+} from "../accounting/accounting-cancel-sync.service";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import { isCrossCompany } from "../company-scope";
 
 export type InternalTransferView = Omit<InternalTransfer, "amount"> & {
   amount: string;
@@ -30,6 +37,58 @@ function assertCanEditInternalTransfers(roles: ServiceContext["roles"]): void {
     || (!can(roles, "EDIT", "INTERNAL_TRANSFERS") && !can(roles, "EDIT", "TREASURY"))
   ) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para registrar transferencias");
+  }
+}
+
+/** Pure BR-TRZ-004 shape: exactly two legs, same transferId, opposite types, same amount. */
+export function buildInternalTransferLegs(params: {
+  transferId: string;
+  amount: string;
+  sourceAccountId: string;
+  destinationAccountId: string;
+}): Array<{
+  type: "TRANSFER_OUT" | "TRANSFER_IN";
+  transferId: string;
+  accountId: string;
+  amount: string;
+}> {
+  return [
+    {
+      type: "TRANSFER_OUT",
+      transferId: params.transferId,
+      accountId: params.sourceAccountId,
+      amount: params.amount,
+    },
+    {
+      type: "TRANSFER_IN",
+      transferId: params.transferId,
+      accountId: params.destinationAccountId,
+      amount: params.amount,
+    },
+  ];
+}
+
+export function assertInternalTransferLegsValid(
+  legs: ReturnType<typeof buildInternalTransferLegs>,
+): void {
+  if (legs.length !== 2) {
+    throw new ServiceError("VALIDATION", "Una transferencia interna debe generar exactamente 2 movimientos");
+  }
+  const [out, inn] = legs;
+  if (!out || !inn) {
+    throw new ServiceError("VALIDATION", "Una transferencia interna debe generar exactamente 2 movimientos");
+  }
+  if (out.type !== "TRANSFER_OUT" || inn.type !== "TRANSFER_IN") {
+    throw new ServiceError("VALIDATION", "Los movimientos de transferencia deben ser TRANSFER_OUT y TRANSFER_IN");
+  }
+  if (out.transferId !== inn.transferId) {
+    throw new ServiceError("VALIDATION", "Ambos movimientos deben compartir el mismo transferId");
+  }
+  if (out.amount !== inn.amount) {
+    throw new ServiceError("VALIDATION", "Ambos movimientos deben tener el mismo monto");
+  }
+  if (out.accountId === inn.accountId) {
+    throw new ServiceError("VALIDATION", "Origen y destino deben ser cuentas distintas");
   }
 }
 
@@ -106,6 +165,12 @@ export async function createInternalTransfer(
     if (!dest)   throw new ServiceError("NOT_FOUND", "Cuenta destino no encontrada");
     if (source.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
     if (dest.tenantId   !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    if (isCrossCompany(source.companyId, ctx) || isCrossCompany(dest.companyId, ctx)) {
+      throw new ServiceError(
+        "FORBIDDEN",
+        "Las cuentas de la transferencia no pertenecen a la empresa activa",
+      );
+    }
     if (source.status !== "ACTIVE") throw new ServiceError("CONFLICT", "La cuenta origen no está activa");
     if (dest.status   !== "ACTIVE") throw new ServiceError("CONFLICT", "La cuenta destino no está activa");
 
@@ -122,17 +187,34 @@ export async function createInternalTransfer(
     if (amount.greaterThan(sourceBalance)) {
       throw new ServiceError(
         "CONFLICT",
-        `Saldo insuficiente en cuenta origen. Disponible: ${sourceBalance.toFixed(2)} ${source.currency}.`,
+        `Saldo insuficiente en cuenta origen. Disponible: ${serializeMoneyDecimal(sourceBalance)} ${source.currency}.`,
       );
     }
 
-    const companyId = ctx.companyId ?? source.companyId ?? null;
-    const transferId = crypto.randomUUID();
+    const companyId = ctx.companyId ?? source.companyId ?? dest.companyId ?? null;
+    if (!companyId) {
+      throw new ServiceError(
+        "VALIDATION",
+        "La transferencia requiere una empresa activa en el contexto o en las cuentas",
+      );
+    }
+    // Canonical pair id = InternalTransfer.id so GL draft + cancel sync share one sourceId.
+    const transferPairId = randomUUID();
+
+    await assertFinancialPeriodOpen(
+      {
+        tenantId: ctx.tenantId,
+        companyId,
+        date: input.transferDate,
+      },
+      tx,
+    );
 
     const transfer = await tx.internalTransfer.create({
       data: {
+        id:                   transferPairId,
         tenantId:             ctx.tenantId,
-        companyId:            companyId ?? dest.companyId ?? "",
+        companyId,
         sourceAccountId:      source.id,
         destinationAccountId: dest.id,
         transferDate:         new Date(input.transferDate),
@@ -145,12 +227,20 @@ export async function createInternalTransfer(
       },
     });
 
-    // BR-TRZ-004: exactly 2 movements linked by transferId
+    // BR-TRZ-004: exactly 2 movements; transferId === InternalTransfer.id for GL linkage
+    const legs = buildInternalTransferLegs({
+      transferId: transfer.id,
+      amount: serializeMoneyDecimal(amount),
+      sourceAccountId: source.id,
+      destinationAccountId: dest.id,
+    });
+    assertInternalTransferLegsValid(legs);
+
     await tx.accountMovement.createMany({
       data: [
         {
           tenantId:     ctx.tenantId,
-          companyId:    source.companyId,
+          companyId:    source.companyId ?? companyId,
           accountId:    source.id,
           movementDate: new Date(input.transferDate),
           type:         "TRANSFER_OUT",
@@ -160,12 +250,12 @@ export async function createInternalTransfer(
           amount,
           description:  `Transferencia a ${dest.name}`,
           status:       "CONFIRMED",
-          transferId,
+          transferId:   transfer.id,
           createdBy:    ctx.actorUserId,
         },
         {
           tenantId:     ctx.tenantId,
-          companyId:    dest.companyId,
+          companyId:    dest.companyId ?? companyId,
           accountId:    dest.id,
           movementDate: new Date(input.transferDate),
           type:         "TRANSFER_IN",
@@ -175,7 +265,7 @@ export async function createInternalTransfer(
           amount,
           description:  `Transferencia desde ${source.name}`,
           status:       "CONFIRMED",
-          transferId,
+          transferId:   transfer.id,
           createdBy:    ctx.actorUserId,
         },
       ],
@@ -221,20 +311,47 @@ export async function cancelInternalTransfer(
 
   const preview = await prisma.internalTransfer.findUnique({
     where: { id },
-    select: { tenantId: true, companyId: true, status: true },
+    select: { tenantId: true, companyId: true, status: true, transferDate: true },
   });
   if (!preview) throw new ServiceError("NOT_FOUND", "Transferencia no encontrada");
   if (preview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (preview.status !== "CANCELLED") {
-    await syncJournalOnOperationalCancel(ctx, {
-      companyId: preview.companyId,
+
+  const glParams = {
+    companyId: preview.companyId,
+    sourceType: "INTERNAL_TRANSFER" as const,
+    sourceId: id,
+    sourceLabel: "la transferencia",
+    // Tesorería / transferencias son tenant-wide (TENANT_COMPANY_SCOPING §2.1).
+    enforceCompanyScope: false as const,
+  };
+
+  if (preview.status === "CANCELLED") {
+    await cancelDraftJournalOnOperationalCancel(ctx, glParams);
+    throw new ServiceError("CONFLICT", "La transferencia ya está cancelada");
+  }
+
+  await assertFinancialPeriodOpen({
+    tenantId: ctx.tenantId,
+    companyId: preview.companyId,
+    date: preview.transferDate,
+  });
+
+  const reconciledLegPreview = await prisma.accountMovement.findFirst({
+    where: {
       sourceType: "INTERNAL_TRANSFER",
       sourceId: id,
-      sourceLabel: "la transferencia",
-      // Tesorería / transferencias son tenant-wide (TENANT_COMPANY_SCOPING §2.1).
-      enforceCompanyScope: false,
-    });
+      status: "RECONCILED",
+    },
+    select: { id: true },
+  });
+  if (reconciledLegPreview) {
+    throw new ServiceError(
+      "CONFLICT",
+      "Un movimiento de la transferencia está conciliado. Desconciliá antes de cancelar.",
+    );
   }
+
+  await assertJournalAllowsOperationalCancel(ctx, glParams);
 
   const updated = await prisma.$transaction(async (tx) => {
     const t = await tx.internalTransfer.findUnique({ where: { id } });
@@ -242,16 +359,43 @@ export async function cancelInternalTransfer(
     if (t.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
     if (t.status === "CANCELLED") throw new ServiceError("CONFLICT", "La transferencia ya está cancelada");
 
+    const reconciledLeg = await tx.accountMovement.findFirst({
+      where: {
+        sourceType: "INTERNAL_TRANSFER",
+        sourceId: id,
+        status: "RECONCILED",
+      },
+      select: { id: true },
+    });
+    if (reconciledLeg) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Un movimiento de la transferencia está conciliado. Desconciliá antes de cancelar.",
+      );
+    }
+
+    const transferFlip = await tx.internalTransfer.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: { not: "CANCELLED" } },
+      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+    });
+    assertOptimisticRowUpdate(
+      transferFlip.count,
+      "La transferencia ya está cancelada. Recargá e intentá de nuevo.",
+    );
+
     // Cancel both linked movements (BR-TRZ-004)
-    await tx.accountMovement.updateMany({
+    const legs = await tx.accountMovement.updateMany({
       where: { sourceType: "INTERNAL_TRANSFER", sourceId: id, status: "CONFIRMED" },
       data: { status: "CANCELLED" },
     });
+    if (legs.count !== 2) {
+      throw new ServiceError(
+        "CONFLICT",
+        "No se pudieron cancelar ambas piernas de la transferencia. Desconciliá e intentá de nuevo.",
+      );
+    }
 
-    const updated = await tx.internalTransfer.update({
-      where: { id },
-      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
-    });
+    const updated = await tx.internalTransfer.findUniqueOrThrow({ where: { id } });
 
     await auditTreasury(
       ctx,
@@ -264,6 +408,8 @@ export async function cancelInternalTransfer(
 
     return updated;
   });
+
+  await cancelDraftJournalOnOperationalCancel(ctx, glParams);
 
   return updated;
 }

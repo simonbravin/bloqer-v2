@@ -11,6 +11,8 @@ export const createBudgetSchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio").max(255),
   currency: z.string().length(3).optional(),
   internalNotes: z.string().max(2000).optional(),
+  /** Complementary budget / phase ([D-002], [BR-BUD-001]): points at parent APPROVED|CLOSED. */
+  parentBudgetId: z.string().uuid().optional().nullable(),
   overheadPct: z.number().min(0).max(100).optional(),
   financialCostPct: z.number().min(0).max(100).optional(),
   financialDaysAvg: z.number().int().min(0).optional(),

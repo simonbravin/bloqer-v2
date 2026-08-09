@@ -21,6 +21,29 @@ export function assertBudgetEditable(budget: Budget): void {
   }
 }
 
+type BudgetLockTx = {
+  $queryRaw: typeof prisma.$queryRaw;
+  budget: { findUniqueOrThrow: typeof prisma.budget.findUniqueOrThrow };
+};
+
+/**
+ * Lock budget row and re-assert editable status inside a write txn
+ * so concurrent submit/approve cannot race APU/qty edits.
+ */
+export async function lockBudgetForEconomicEdit(
+  tx: BudgetLockTx,
+  budgetId: string,
+  tenantId: string,
+): Promise<Budget> {
+  await tx.$queryRaw`SELECT id FROM budgets WHERE id = ${budgetId} FOR UPDATE`;
+  const budget = await tx.budget.findUniqueOrThrow({ where: { id: budgetId } });
+  if (budget.tenantId !== tenantId) {
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  }
+  assertBudgetEditable(budget);
+  return budget;
+}
+
 /** Presupuesto usado como base del cronograma del proyecto (BR-SCH / línea base WBS). */
 export async function isBudgetScheduleBaseline(
   budgetId: string,
@@ -41,7 +64,7 @@ export async function assertBudgetWbsStructureMutable(
   if (await isBudgetScheduleBaseline(budget.id, ctx.tenantId)) {
     throw new ServiceError(
       "CONFLICT",
-      "Este presupuesto es la base del cronograma. No se puede modificar la estructura WBS.",
+      "Este presupuesto es la base del cronograma. No se puede modificar la estructura EDT.",
     );
   }
 }
@@ -63,6 +86,7 @@ export type BudgetLifecycleLogEntry = {
 
 const BUDGET_LIFECYCLE_ACTIONS = [
   "budget.created",
+  "budget.addendum_added",
   "budget.submitted_for_review",
   "budget.returned_for_changes",
   "budget.approved",
@@ -156,48 +180,120 @@ export async function createBudget(
   }
   const project = await assertProjectAllowsBudgetPlanning(input.projectId, ctx.tenantId);
 
-  const maxVersion = await prisma.budget.aggregate({
-    where: { projectId: input.projectId },
-    _max: { versionNumber: true },
-  });
-  const versionNumber = (maxVersion._max.versionNumber ?? 0) + 1;
+  const { name, currency, internalNotes, projectId, parentBudgetId, overheadPct, financialCostPct, financialDaysAvg, profitPct, taxPct } = input;
 
-  const { name, currency, internalNotes, projectId, overheadPct, financialCostPct, financialDaysAvg, profitPct, taxPct } = input;
-
-  const budget = await prisma.$transaction(async (tx) => {
-    const b = await tx.budget.create({
-      data: {
-        tenantId: ctx.tenantId,
-        companyId: ctx.companyId ?? undefined,
-        projectId,
-        versionNumber,
-        name,
-        currency: currency ?? project.country === "AR" ? "ARS" : "USD",
-        internalNotes,
-        createdBy: ctx.actorUserId,
-        updatedBy: ctx.actorUserId,
+  let resolvedParentId: string | null = null;
+  let parentSettingsDefaults: {
+    overheadPct: number;
+    financialCostPct: number;
+    financialDaysAvg: number;
+    profitPct: number;
+    taxPct: number;
+  } | null = null;
+  if (parentBudgetId) {
+    const parent = await prisma.budget.findFirst({
+      where: { id: parentBudgetId, tenantId: ctx.tenantId, projectId },
+      select: {
+        id: true,
+        status: true,
+        settings: {
+          select: {
+            overheadPct: true,
+            financialCostPct: true,
+            financialDaysAvg: true,
+            profitPct: true,
+            taxPct: true,
+          },
+        },
       },
     });
-    await tx.budgetSettings.create({
-      data: {
-        budgetId: b.id,
-        overheadPct: overheadPct ?? 0,
-        financialCostPct: financialCostPct ?? 0,
-        financialDaysAvg: financialDaysAvg ?? 0,
-        profitPct: profitPct ?? 0,
-        taxPct: taxPct ?? 0,
-      },
+    if (!parent) {
+      throw new ServiceError("NOT_FOUND", "Presupuesto padre no encontrado en este proyecto");
+    }
+    if (parent.status !== "APPROVED" && parent.status !== "CLOSED") {
+      throw new ServiceError(
+        "CONFLICT",
+        "La adenda/fase debe apuntar a un presupuesto APPROVED o CLOSED ([D-002])",
+      );
+    }
+    resolvedParentId = parent.id;
+    if (parent.settings) {
+      parentSettingsDefaults = {
+        overheadPct: Number(parent.settings.overheadPct),
+        financialCostPct: Number(parent.settings.financialCostPct),
+        financialDaysAvg: Number(parent.settings.financialDaysAvg),
+        profitPct: Number(parent.settings.profitPct),
+        taxPct: Number(parent.settings.taxPct),
+      };
+    }
+  }
+
+  const resolvedOverhead = overheadPct ?? parentSettingsDefaults?.overheadPct ?? 0;
+  const resolvedFinancialCost =
+    financialCostPct ?? parentSettingsDefaults?.financialCostPct ?? 0;
+  const resolvedFinancialDays =
+    financialDaysAvg ?? parentSettingsDefaults?.financialDaysAvg ?? 0;
+  const resolvedProfit = profitPct ?? parentSettingsDefaults?.profitPct ?? 0;
+  const resolvedTax = taxPct ?? parentSettingsDefaults?.taxPct ?? 0;
+
+  let budget: BudgetWithSettings;
+  try {
+    budget = await prisma.$transaction(async (tx) => {
+      const maxVersion = await tx.budget.aggregate({
+        where: { projectId },
+        _max: { versionNumber: true },
+      });
+      const versionNumber = (maxVersion._max.versionNumber ?? 0) + 1;
+
+      const b = await tx.budget.create({
+        data: {
+          tenantId: ctx.tenantId,
+          companyId: ctx.companyId ?? undefined,
+          projectId,
+          parentBudgetId: resolvedParentId,
+          versionNumber,
+          name,
+          currency: currency ?? (project.country === "AR" ? "ARS" : "USD"),
+          internalNotes,
+          createdBy: ctx.actorUserId,
+          updatedBy: ctx.actorUserId,
+        },
+      });
+      await tx.budgetSettings.create({
+        data: {
+          budgetId: b.id,
+          overheadPct: resolvedOverhead,
+          financialCostPct: resolvedFinancialCost,
+          financialDaysAvg: resolvedFinancialDays,
+          profitPct: resolvedProfit,
+          taxPct: resolvedTax,
+        },
+      });
+      return tx.budget.findUniqueOrThrow({ where: { id: b.id }, include: { settings: true } });
     });
-    return tx.budget.findUniqueOrThrow({ where: { id: b.id }, include: { settings: true } });
-  });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      throw new ServiceError(
+        "CONFLICT",
+        "No se pudo asignar el número de versión. Intentá de nuevo.",
+      );
+    }
+    throw e;
+  }
 
   await log({
     tenantId: ctx.tenantId,
     actorUserId: ctx.actorUserId,
-    action: "budget.created",
+    action: resolvedParentId ? "budget.addendum_added" : "budget.created",
     entityType: "Budget",
     entityId: budget.id,
-    after: { status: "DRAFT", name, versionNumber, projectId },
+    after: {
+      status: "DRAFT",
+      name,
+      versionNumber: budget.versionNumber,
+      projectId,
+      ...(resolvedParentId ? { parentBudgetId: resolvedParentId } : {}),
+    },
     ipAddress: ctx.ipAddress,
   });
 
@@ -216,8 +312,16 @@ export async function updateBudget(
   if (!existing) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await assertProjectAllowsBudgetPlanning(existing.projectId, ctx.tenantId);
-  // name/internalNotes allowed in any non-CANCELLED status
-  if (existing.status === "CANCELLED") throw new ServiceError("CONFLICT", "No se puede editar un presupuesto cancelado");
+  if (existing.status === "CANCELLED") {
+    throw new ServiceError("CONFLICT", "No se puede editar un presupuesto cancelado");
+  }
+  // BR-BUD-008: CLOSED only allows whitelist metadata (internalNotes among updateBudget fields).
+  if (existing.status === "CLOSED" && input.name !== undefined) {
+    throw new ServiceError(
+      "CONFLICT",
+      "Presupuesto cerrado: el nombre no se puede cambiar. Usá adenda (budget hijo) para cambios contractuales.",
+    );
+  }
 
   const updated = await prisma.budget.update({
     where: { id },
@@ -281,6 +385,29 @@ export async function approveBudget(
   if (budget.status !== "IN_REVIEW") {
     throw new ServiceError("CONFLICT", "Solo se puede aprobar un presupuesto en revisión");
   }
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
+
+  // BR-BUD-005: every CostItem must have at least one CostAnalysisLine (APU).
+  const itemsWithoutApu = await prisma.costItem.findMany({
+    where: {
+      budgetId: id,
+      analysisLines: { none: {} },
+    },
+    select: {
+      id: true,
+      wbsNode: { select: { code: true, name: true } },
+    },
+    take: 20,
+  });
+  if (itemsWithoutApu.length > 0) {
+    const sample = itemsWithoutApu
+      .map((i) => i.wbsNode?.code ?? i.id.slice(0, 8))
+      .join(", ");
+    throw new ServiceError(
+      "CONFLICT",
+      `No se puede aprobar: hay ítems sin análisis de costos (APU). Ej.: ${sample}`,
+    );
+  }
 
   // BR-BUD-001: one APPROVED per project (service check + partial unique index in DB).
   const existing = await prisma.budget.findFirst({
@@ -295,11 +422,19 @@ export async function approveBudget(
 
   let updated: Budget;
   try {
-    updated = await prisma.budget.update({
-      where: { id },
+    const result = await prisma.budget.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "IN_REVIEW" },
       data: { status: "APPROVED", updatedBy: ctx.actorUserId },
     });
+    if (result.count === 0) {
+      throw new ServiceError(
+        "CONFLICT",
+        "El presupuesto ya no está en revisión. Recargá e intentá de nuevo.",
+      );
+    }
+    updated = await prisma.budget.findUniqueOrThrow({ where: { id } });
   } catch (e) {
+    if (e instanceof ServiceError) throw e;
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       throw new ServiceError(
         "CONFLICT",
@@ -373,10 +508,17 @@ async function _transition(
 
   const comment = input?.comment?.trim() || null;
 
-  const updated = await prisma.budget.update({
-    where: { id },
+  const result = await prisma.budget.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: { in: allowedFrom } },
     data: { status: to, updatedBy: ctx.actorUserId },
   });
+  if (result.count === 0) {
+    throw new ServiceError(
+      "CONFLICT",
+      `No se puede cambiar el estado desde "${budget.status}". Recargá e intentá de nuevo.`,
+    );
+  }
+  const updated = await prisma.budget.findUniqueOrThrow({ where: { id } });
 
   await log({
     tenantId: ctx.tenantId,

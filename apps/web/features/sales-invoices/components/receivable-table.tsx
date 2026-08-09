@@ -17,15 +17,22 @@ import { ObligationSettledCell } from "@/features/finance/components/obligation-
 import { ReceivableStatusBadge } from "./receivable-status-badge";
 import {
   receivableDetailHref,
+  receivableCollectHref,
   receivableInvoiceHref,
   type ReceivableListItem,
 } from "./receivable-list";
 import { formatMoneyAmount } from "@/lib/format-money";
 
+const COLLECTABLE = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
+
 type Props = {
   receivables: ReceivableListItem[];
   /** Muestra columna de obra (listado empresa). */
   showProjectColumn?: boolean;
+  /** Muestra columna FAC-xxxxx. */
+  showInvoiceColumn?: boolean;
+  /** EDIT AR: muestra botón Cobrar. */
+  canMutate?: boolean;
   invoicesHref?: string;
   invoicesActionLabel?: string;
 };
@@ -33,6 +40,8 @@ type Props = {
 export function ReceivableTable({
   receivables,
   showProjectColumn = false,
+  showInvoiceColumn = false,
+  canMutate = false,
   invoicesHref,
   invoicesActionLabel = "Ir a facturas",
 }: Props) {
@@ -62,17 +71,18 @@ export function ReceivableTable({
             <Suspense fallback={<TableHead>Vencimiento</TableHead>}>
               <UrlSortableTableHead label="Vencimiento" defaultDir="asc" />
             </Suspense>
-            {showProjectColumn ? <TableHead>Factura</TableHead> : null}
+            {showInvoiceColumn ? <TableHead>Factura</TableHead> : null}
             <TableHead>Cobrada</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead className="text-right">Original</TableHead>
             <TableHead className="text-right">Saldo</TableHead>
-            <TableHead className="w-20" />
+            <TableHead className="w-36" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {receivables.map((r) => {
             const invoiceHref = receivableInvoiceHref(r);
+            const canCollect = canMutate && COLLECTABLE.has(r.status);
             return (
               <TableRow key={r.id}>
                 <TableCell className="text-sm font-medium">{r.clientName}</TableCell>
@@ -89,7 +99,7 @@ export function ReceivableTable({
                   </TableCell>
                 ) : null}
                 <TableCell className="text-sm">{formatDate(r.dueDate)}</TableCell>
-                {showProjectColumn ? (
+                {showInvoiceColumn ? (
                   <TableCell className="text-sm text-muted-foreground">
                     {r.salesInvoiceCode && invoiceHref ? (
                       <Link href={invoiceHref} className="hover:underline">
@@ -113,9 +123,16 @@ export function ReceivableTable({
                   {formatMoneyAmount(r.balanceDue)} {r.currency}
                 </TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={receivableDetailHref(r)}>Ver</Link>
-                  </Button>
+                  <div className="flex justify-end gap-1">
+                    {canCollect ? (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={receivableCollectHref(r)}>Cobrar</Link>
+                      </Button>
+                    ) : null}
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={receivableDetailHref(r)}>Ver</Link>
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             );

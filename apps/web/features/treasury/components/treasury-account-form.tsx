@@ -103,6 +103,10 @@ export function TreasuryAccountForm(_props: Props) {
               placeholder="0.00"
               pattern="^\d+(\.\d+)?$"
             />
+            <p className="text-xs text-muted-foreground">
+              Si el saldo inicial es mayor a 0, necesitás una empresa en el contexto de tu membresía
+              (el período financiero se valida contra esa empresa).
+            </p>
           </div>
         </div>
 

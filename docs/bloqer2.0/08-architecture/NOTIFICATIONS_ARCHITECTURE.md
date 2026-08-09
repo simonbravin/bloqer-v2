@@ -29,6 +29,10 @@ Indexes: `[tenantId, recipientUserId, status, createdAt]`, `[tenantId, projectId
 
 **Accounting queue (D-063):** `ACCOUNTING_DRAFTS_PENDING` — in-app only; audience `EDIT ACCOUNTING`; **24h dedupe** per `(tenant, type, recipient, company)`; `LinkedEntityType.OTHER` + `linkedEntityId = companyId`; soft-fail from `ensureDraftJournal*` after create.
 
+**AP payment workflow (D-069 / D-070):** `PAYABLE_READY_TO_PAY`, `PAYMENT_CONFIRMED`.
+
+**AR collection nudge (D-072):** `RECEIVABLE_READY_TO_COLLECT` — after **project** `SalesInvoice` ISSUED with open CxC balance; audience OWNER/ADMIN/FINANCE/TREASURER; CTA `/proyectos/…/cuentas-por-cobrar/…/cobrar`. Does **not** credit treasury (only `Collection` does).
+
 ## Recipient strategy (Phase 8A + audience helper)
 
 - **Only** `recipientUserId` with an **ACTIVE** `UserMembership` for the same `tenantId`.

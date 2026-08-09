@@ -70,7 +70,9 @@ export default async function CertificacionPage({ params }: PageProps) {
     projectId,
   });
   const storageConfigured = isStorageConfigured();
-  const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "SUBCONTRACTS");
+  const canEditSubcontracts = can(current.tenantCtx.roles, "EDIT", "SUBCONTRACTS");
+  const canEditAttachments = canEditSubcontracts;
+  const canEditAp = can(current.tenantCtx.roles, "EDIT", "AP");
 
   return (
     <PageShell
@@ -90,7 +92,7 @@ export default async function CertificacionPage({ params }: PageProps) {
           </div>
         </div>
         <div className="flex gap-2">
-          {cert.status === "DRAFT" && (
+          {canEditSubcontracts && cert.status === "DRAFT" && (
             <>
               <Button variant="outline" size="sm" asChild>
                 <Link
@@ -111,7 +113,7 @@ export default async function CertificacionPage({ params }: PageProps) {
               </form>
             </>
           )}
-          {cert.status === "ISSUED" && (
+          {canEditSubcontracts && cert.status === "ISSUED" && (
             <>
               <form
                 action={async () => {
@@ -135,7 +137,8 @@ export default async function CertificacionPage({ params }: PageProps) {
               </form>
             </>
           )}
-          {(cert.status === "DRAFT" || cert.status === "ISSUED" || cert.status === "APPROVED") && (
+          {canEditSubcontracts &&
+            (cert.status === "DRAFT" || cert.status === "ISSUED" || cert.status === "APPROVED") && (
             <form
               action={async () => {
                 "use server";
@@ -147,8 +150,24 @@ export default async function CertificacionPage({ params }: PageProps) {
               </Button>
             </form>
           )}
+          {canEditSubcontracts && cert.status === "REJECTED" && (
+            <Button size="sm" asChild>
+              <Link
+                href={`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/nueva?replaces=${certId}`}
+              >
+                Nueva versión
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
+
+      {cert.replacesCertificationId && (
+        <p className="text-sm text-muted-foreground">
+          Esta certificación reemplaza a una versión rechazada anterior.
+        </p>
+      )}
+
 
       {/* Info grid */}
       <div className="grid grid-cols-3 gap-4">
@@ -192,7 +211,7 @@ export default async function CertificacionPage({ params }: PageProps) {
               variant={cert.supplierInvoiceStatus === "CANCELLED" ? "outline" : "default"}
             >
               <Link href={`/proyectos/${projectId}/facturas-proveedor/${cert.supplierInvoiceId}`}>
-                {cert.supplierInvoiceStatus === "DRAFT"
+                {cert.supplierInvoiceStatus === "DRAFT" && canEditAp
                   ? "Revisar y emitir factura"
                   : "Ver factura"}
               </Link>

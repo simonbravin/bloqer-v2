@@ -18,6 +18,7 @@ import {
   canCancelDraftProject,
   canReactivateProject,
 } from "./project-lifecycle-access";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
 
 export {
@@ -196,6 +197,32 @@ export async function createProject(
   return project;
 }
 
+/** BR-PROJ-002 helper for edit UI — true when type must stay frozen. */
+export async function isProjectTypeLocked(
+  projectId: string,
+  ctx: ServiceContext,
+): Promise<boolean> {
+  if (!can(ctx.roles, "VIEW", "PROJECTS") && !can(ctx.roles, "EDIT", "PROJECTS")) {
+    throw new ServiceError("FORBIDDEN", "Insufficient permissions");
+  }
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { tenantId: true },
+  });
+  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+
+  const lockedBudget = await prisma.budget.findFirst({
+    where: {
+      projectId,
+      tenantId: ctx.tenantId,
+      status: { in: ["APPROVED", "CLOSED"] },
+    },
+    select: { id: true },
+  });
+  return lockedBudget != null;
+}
+
 export async function updateProject(
   id: string,
   input: UpdateProjectInput,
@@ -212,6 +239,24 @@ export async function updateProject(
   // BR-PROJ-003: completed/cancelled are read-only
   if (existing.status === "COMPLETED" || existing.status === "CANCELLED") {
     throw new ServiceError("CONFLICT", "Los proyectos completados o cancelados no pueden modificarse");
+  }
+
+  // BR-PROJ-002: type drives over-cert rules; immutable after first APPROVED/CLOSED budget.
+  if (input.type !== undefined && input.type !== existing.type) {
+    const lockedBudget = await prisma.budget.findFirst({
+      where: {
+        projectId: id,
+        tenantId: ctx.tenantId,
+        status: { in: ["APPROVED", "CLOSED"] },
+      },
+      select: { id: true },
+    });
+    if (lockedBudget) {
+      throw new ServiceError(
+        "CONFLICT",
+        "No se puede cambiar el tipo de obra después de un presupuesto aprobado o cerrado (BR-PROJ-002)",
+      );
+    }
   }
 
   if (input.code && input.code !== existing.code) {
@@ -364,8 +409,8 @@ export async function reactivateProject(
     throw new ServiceError("CONFLICT", "No se pudo determinar el estado de reactivación");
   }
 
-  const updated = await prisma.project.update({
-    where: { id },
+  const flipped = await prisma.project.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: "CANCELLED" },
     data: {
       status: targetStatus,
       statusBeforeCancellation: null,
@@ -374,6 +419,12 @@ export async function reactivateProject(
       updatedBy: ctx.actorUserId,
     },
   });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "El proyecto ya no está cancelado. Recargá e intentá de nuevo.",
+  );
+
+  const updated = await prisma.project.findUniqueOrThrow({ where: { id } });
 
   await log({
     tenantId: ctx.tenantId,
@@ -429,10 +480,20 @@ async function _transition(
   const comment = input?.comment?.trim() || null;
   const reason = input?.reason?.trim() || null;
 
-  const updated = await prisma.project.update({
-    where: { id },
-    data: { status: to, updatedBy: ctx.actorUserId, ...(extraData?.(project) ?? {}) },
+  const flipped = await prisma.project.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: { in: allowedFrom } },
+    data: {
+      status: to,
+      updatedBy: ctx.actorUserId,
+      ...(extraData?.(project) as Prisma.ProjectUpdateManyMutationInput | undefined),
+    },
   });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    `No se puede cambiar el estado desde ${project.status}. Recargá e intentá de nuevo.`,
+  );
+
+  const updated = await prisma.project.findUniqueOrThrow({ where: { id } });
 
   await log({
     tenantId: ctx.tenantId,

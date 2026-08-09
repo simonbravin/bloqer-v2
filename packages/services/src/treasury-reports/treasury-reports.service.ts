@@ -122,6 +122,7 @@ export type MovementReportRow = {
   accountName:        string;
   movementDate:       string;
   type:               string;
+  status:             string;
   sourceType:         string;
   sourceId:           string;
   sourceLabel:        string;
@@ -278,6 +279,7 @@ type RawMovementRow = {
   accountId: string;
   movementDate: Date;
   type: string;
+  status: string;
   sourceType: string;
   sourceId: string;
   amount: Prisma.Decimal;
@@ -453,7 +455,7 @@ export async function getAccountMovementReport(
 
   const where: Prisma.AccountMovementWhereInput = {
     tenantId: ctx.tenantId,
-    status: "CONFIRMED",
+    status: { in: ["CONFIRMED", "RECONCILED"] },
     ...(filters.accountId ? { accountId: filters.accountId } : {}),
     ...(filters.currency ? { currency: filters.currency } : {}),
     ...(filters.type ? { type: filters.type as never } : {}),
@@ -538,6 +540,7 @@ export async function getAccountMovementReport(
       accountName: m.account.name,
       movementDate: m.movementDate.toISOString().slice(0, 10),
       type: m.type as string,
+      status: m.status as string,
       sourceType,
       sourceId: m.sourceId,
       sourceLabel: movementSourceLabel(
@@ -594,7 +597,7 @@ export async function getCashFlowReport(
   const movements = await prisma.accountMovement.findMany({
     where: {
       tenantId: ctx.tenantId,
-      status:   "CONFIRMED",
+      status:   { in: ["CONFIRMED", "RECONCILED"] },
       ...(filters.currency ? { currency: filters.currency } : {}),
       movementDate: { gte: startDate, lte: endDate },
     },

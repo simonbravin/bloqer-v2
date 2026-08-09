@@ -15,7 +15,10 @@ import { assertCompanyMatchesProject, assertCostAnalysisLineForWbs, assertWbsLin
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import { assertDirectPoAllowed } from "./procurement-policy.service";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
-import { onPurchaseOrderDraftCancelled } from "./purchase-request-to-po.service";
+import {
+  assertPoLinesWithinSelectedQuote,
+  onPurchaseOrderCancelledLinkedToRequest,
+} from "./purchase-request-to-po.service";
 import {
   assertWbsRequiredOnLines,
   budgetBaselineForPurchaseLine,
@@ -525,6 +528,17 @@ export async function updatePurchaseOrder(
         await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId);
       }
     }
+    await assertPoLinesWithinSelectedQuote(
+      id,
+      input.lines.map((l, i) => ({
+        description: l.description,
+        wbsNodeId: l.wbsNodeId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        sortOrder: l.sortOrder ?? i,
+      })),
+      ctx.tenantId,
+    );
   }
 
   const po = await prisma.$transaction(async (tx) => {
@@ -538,6 +552,10 @@ export async function updatePurchaseOrder(
           : existing.expectedDeliveryDate,
         notes:                input.notes !== undefined ? input.notes : existing.notes,
         internalNotes:        input.internalNotes !== undefined ? input.internalNotes : existing.internalNotes,
+        emergencyReason:
+          input.emergencyReason !== undefined
+            ? input.emergencyReason?.trim() || null
+            : existing.emergencyReason,
         updatedBy:            ctx.actorUserId,
       },
     });
@@ -680,14 +698,24 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
       }
     }
 
-    const cancelled = await tx.purchaseOrder.update({
-      where: { id },
+    const cancelledResult = await tx.purchaseOrder.updateMany({
+      where: {
+        id,
+        status: { notIn: ["CANCELLED", "PARTIALLY_RECEIVED", "RECEIVED"] },
+      },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+    });
+    if (cancelledResult.count !== 1) {
+      throw new ServiceError("CONFLICT", "La orden ya no se puede anular (estado cambió)");
+    }
+
+    const cancelled = await tx.purchaseOrder.findUniqueOrThrow({
+      where: { id },
       include: poInclude,
     });
 
-    if (wasDraft && existing.purchaseRequestId) {
-      await onPurchaseOrderDraftCancelled(id, ctx, tx);
+    if (existing.purchaseRequestId) {
+      await onPurchaseOrderCancelledLinkedToRequest(id, ctx, tx);
     }
 
     await auditProcurement(
@@ -700,6 +728,8 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
         after: {
           number: cancelled.number,
           cancelledDraftReceiptCount: draftReceipts.length,
+          previousStatus: existing.status,
+          wasDraft,
         },
         tx,
       },

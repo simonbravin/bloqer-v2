@@ -64,6 +64,14 @@ export async function createProduct(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear productos");
   }
 
+  if (input.companyId) {
+    const company = await prisma.company.findFirst({
+      where: { id: input.companyId, tenantId: ctx.tenantId },
+      select: { id: true },
+    });
+    if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada en el tenant");
+  }
+
   const existing = await prisma.product.findFirst({
     where: {
       tenantId:  ctx.tenantId,

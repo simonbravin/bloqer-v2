@@ -88,11 +88,15 @@ export type ProjectReceivableListFilters = {
   pageSize?: number;
 };
 
+export type ProjectReceivableListRow = ReceivableView & {
+  salesInvoiceCode: string | null;
+};
+
 export async function listReceivablesByProject(
   projectId: string,
   ctx: ServiceContext,
   filters?: ProjectReceivableListFilters,
-): Promise<{ data: ReceivableView[]; total: number }> {
+): Promise<{ data: ProjectReceivableListRow[]; total: number }> {
   await assertArTenantModule(ctx);
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
@@ -111,7 +115,10 @@ export async function listReceivablesByProject(
   const [rows, total] = await Promise.all([
     prisma.receivable.findMany({
       where,
-      include: { clientContact: { select: { legalName: true, fantasyName: true } } },
+      include: {
+        clientContact: { select: { legalName: true, fantasyName: true } },
+        salesInvoice: { select: { number: true } },
+      },
       orderBy: [{ dueDate: "asc" }, { id: "asc" }],
       skip,
       take,
@@ -120,7 +127,15 @@ export async function listReceivablesByProject(
   ]);
   const reconciled = await Promise.all(rows.map((r) => reconcileReceivableStatusIfSettled(r, ctx)));
   return {
-    data: reconciled.map((p, i) => serializeReceivable({ ...rows[i]!, ...p })),
+    data: reconciled.map((p, i) => {
+      const row = rows[i]!;
+      const base = serializeReceivable({ ...row, ...p });
+      const num = row.salesInvoice?.number;
+      return {
+        ...base,
+        salesInvoiceCode: num != null ? `FAC-${String(num).padStart(5, "0")}` : null,
+      };
+    }),
     total,
   };
 }
@@ -255,14 +270,20 @@ export async function listCompanyReceivables(
 /**
  * Corporate receivable: `projectId === null`. VIEW AR only (D-051).
  */
-export async function getCompanyReceivableById(id: string, ctx: ServiceContext): Promise<ReceivableView> {
+export async function getCompanyReceivableById(
+  id: string,
+  ctx: ServiceContext,
+): Promise<CompanyReceivableListRow> {
   await assertArTenantModule(ctx);
   if (!canViewCompanyAr(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar a nivel empresa");
   }
   const r = await prisma.receivable.findUnique({
     where: { id },
-    include: { clientContact: { select: { legalName: true, fantasyName: true } } },
+    include: {
+      clientContact: { select: { legalName: true, fantasyName: true } },
+      salesInvoice: { select: { number: true } },
+    },
   });
   if (!r) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
   if (r.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -276,7 +297,14 @@ export async function getCompanyReceivableById(id: string, ctx: ServiceContext):
     throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
   }
   const reconciled = await reconcileReceivableStatusIfSettled(r, ctx);
-  return serializeReceivable({ ...r, ...reconciled });
+  const base = serializeReceivable({ ...r, ...reconciled });
+  const num = r.salesInvoice?.number;
+  return {
+    ...base,
+    projectCode: "—",
+    projectName: COMPANY_AR_PROJECT_LABEL,
+    salesInvoiceCode: num != null ? `FAC-${String(num).padStart(5, "0")}` : null,
+  };
 }
 
 /**

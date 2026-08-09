@@ -7,6 +7,7 @@ import {
 } from "./overhead-auto-weight.service";
 import { getCompanyOverheadSettings } from "./project-overhead.service";
 import { assertValidOverheadPeriod, currentOverheadPeriod } from "./overhead-period";
+import { assertOptimisticRowUpdate } from "./optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
 
 export type OverheadPeriodSummary = {
@@ -192,7 +193,9 @@ export async function closeOverheadPeriod(
   }
 
   await prisma.$transaction(async (tx) => {
-    const periodClose = await tx.overheadPeriodClose.upsert({
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} FOR UPDATE`;
+
+    const existingRow = await tx.overheadPeriodClose.findUnique({
       where: {
         tenantId_companyId_period: {
           tenantId: ctx.tenantId,
@@ -200,27 +203,47 @@ export async function closeOverheadPeriod(
           period,
         },
       },
-      create: {
-        tenantId: ctx.tenantId,
-        companyId,
-        period,
-        status: "FROZEN",
-        poolArs: pool,
-        totalCdArs: totalCd,
-        frozenAt: new Date(),
-        frozenBy: ctx.actorUserId,
-      },
-      update: {
-        status: "FROZEN",
-        poolArs: pool,
-        totalCdArs: totalCd,
-        frozenAt: new Date(),
-        frozenBy: ctx.actorUserId,
-      },
     });
+    if (existingRow?.status === "FROZEN") {
+      throw new ServiceError("CONFLICT", "El período ya está cerrado. Reabrilo antes de volver a cerrar.");
+    }
+
+    const frozenAt = new Date();
+    let periodCloseId: string;
+    if (!existingRow) {
+      const created = await tx.overheadPeriodClose.create({
+        data: {
+          tenantId: ctx.tenantId,
+          companyId,
+          period,
+          status: "FROZEN",
+          poolArs: pool,
+          totalCdArs: totalCd,
+          frozenAt,
+          frozenBy: ctx.actorUserId,
+        },
+      });
+      periodCloseId = created.id;
+    } else {
+      const flipped = await tx.overheadPeriodClose.updateMany({
+        where: { id: existingRow.id, tenantId: ctx.tenantId, status: "OPEN" },
+        data: {
+          status: "FROZEN",
+          poolArs: pool,
+          totalCdArs: totalCd,
+          frozenAt,
+          frozenBy: ctx.actorUserId,
+        },
+      });
+      assertOptimisticRowUpdate(
+        flipped.count,
+        "El período ya fue cerrado o modificado. Recargá e intentá de nuevo.",
+      );
+      periodCloseId = existingRow.id;
+    }
 
     await tx.overheadAutoPeriodSnapshot.deleteMany({
-      where: { periodCloseId: periodClose.id },
+      where: { periodCloseId },
     });
 
     if (preview.rows.length > 0) {
@@ -230,7 +253,7 @@ export async function closeOverheadPeriod(
           companyId,
           period,
           projectId: row.projectId,
-          periodCloseId: periodClose.id,
+          periodCloseId,
           allocatedAmount: new Prisma.Decimal(row.allocatedAmount),
           weightPct: new Prisma.Decimal(row.weightPct),
         })),
@@ -262,6 +285,8 @@ export async function reopenOverheadPeriod(
   }
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} FOR UPDATE`;
+
     await tx.overheadAutoPeriodSnapshot.deleteMany({
       where: {
         tenantId: ctx.tenantId,
@@ -269,14 +294,18 @@ export async function reopenOverheadPeriod(
         period,
       },
     });
-    await tx.overheadPeriodClose.update({
-      where: { id: existing.id },
+    const flipped = await tx.overheadPeriodClose.updateMany({
+      where: { id: existing.id, tenantId: ctx.tenantId, status: "FROZEN" },
       data: {
         status: "OPEN",
         frozenAt: null,
         frozenBy: null,
       },
     });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "El período ya no está cerrado. Recargá e intentá de nuevo.",
+    );
   });
 }
 

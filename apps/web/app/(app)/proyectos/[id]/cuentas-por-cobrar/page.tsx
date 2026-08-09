@@ -23,6 +23,7 @@ import {
   parseAgingFilters,
   ServiceError,
 } from "@bloqer/services";
+import { can } from "@bloqer/domain";
 import { PageShell } from "@/components/layout/page-shell";
 import { parsePage } from "@/lib/parse-page";
 
@@ -100,7 +101,9 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
     balanceDue: r.balanceDue,
     currency: r.currency,
     clientName: r.clientName,
+    salesInvoiceCode: r.salesInvoiceCode,
   }));
+  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
   const invoices: SalesInvoiceListItem[] = invoicesResult.data.map((inv) => ({
     id: inv.id,
     projectId: inv.projectId,
@@ -163,7 +166,12 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
       </Card>
 
       <Suspense fallback={<ListSectionSkeleton />}>
-        <ReceivableListSection receivables={items} invoicesHref={`/proyectos/${id}/facturas`} />
+        <ReceivableListSection
+          receivables={items}
+          invoicesHref={`/proyectos/${id}/facturas`}
+          showInvoiceColumn
+          canMutate={canEditAr}
+        />
       </Suspense>
 
       <Suspense fallback={null}>

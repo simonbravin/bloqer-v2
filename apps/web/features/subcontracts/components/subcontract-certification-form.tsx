@@ -27,11 +27,15 @@ type Props = {
   initialQuantities?: Record<string, string>;
   defaultDates?: { periodStart?: string; periodEnd?: string; certificationDate?: string };
   defaultNotes?: string;
+  /** BR-SUB-005: rejected predecessor id when creating a corrected version. */
+  replacesCertificationId?: string | null;
+  replacesCertificationCode?: string | null;
 };
 
 export function SubcontractCertificationForm({
   subcontractId, subcontractLines, action,
   mode = "create", initialQuantities, defaultDates, defaultNotes,
+  replacesCertificationId, replacesCertificationCode,
 }: Props) {
   const router = useRouter();
   const [quantities, setQuantities] = useState<Record<string, string>>(initialQuantities ?? {});
@@ -62,18 +66,36 @@ export function SubcontractCertificationForm({
     const fd = new FormData(e.currentTarget);
     fd.set("subcontractId", subcontractId);
     fd.set("lines", JSON.stringify(activeLines));
+    if (replacesCertificationId) {
+      fd.set("replacesCertificationId", replacesCertificationId);
+    }
 
-    const res = await action(fd);
-    setPending(false);
-    if ("error" in res) { setPendingError(res.error ?? null); return; }
-    toast.success(mode === "edit" ? "Certificación actualizada." : "Certificación guardada.");
-    if (mode === "edit") { router.push(".."); return; }
-    if ("id" in res) router.push(`../${res.id}`);
+    try {
+      const res = await action(fd);
+      if ("error" in res) { setPendingError(res.error ?? null); return; }
+      toast.success(mode === "edit" ? "Certificación actualizada." : "Certificación guardada.");
+      if (mode === "edit") { router.push(".."); return; }
+      if ("id" in res) router.push(`../${res.id}`);
+    } catch {
+      setPendingError("Error inesperado al guardar. Reintentá.");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {replacesCertificationId && (
+        <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          Nueva versión que reemplaza{" "}
+          <span className="font-medium text-foreground">
+            {replacesCertificationCode ?? "la certificación rechazada"}
+          </span>
+          .
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">

@@ -3,6 +3,7 @@ import { canEditSubcontractsArea, canViewSubcontractsArea } from "./subcontract-
 import type { CreateSubcontractInput, UpdateSubcontractInput, UpdateSubcontractMetaInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
@@ -192,65 +193,84 @@ export async function createSubcontract(
   for (const line of input.lines) {
     if (line.wbsNodeId) {
       const wbs = await prisma.wbsNode.findUnique({ where: { id: line.wbsNodeId } });
-      if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo WBS no encontrado: ${line.wbsNodeId}`);
-      if (wbs.type !== "ITEM") throw new ServiceError("CONFLICT", "El nodo WBS debe ser de tipo ITEM");
+      if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo EDT no encontrado: ${line.wbsNodeId}`);
+      if (wbs.type !== "ITEM") throw new ServiceError("CONFLICT", "El nodo EDT debe ser de tipo ITEM");
     }
   }
 
   const companyId = input.companyId ?? await resolveCompanyId(input.projectId, ctx);
-  const maxNum = await prisma.subcontract.aggregate({
-    where: { tenantId: ctx.tenantId, companyId },
-    _max: { number: true },
-  });
-  const number = (maxNum._max.number ?? 0) + 1;
 
-  const result = await prisma.$transaction(async (tx) => {
-    const created = await tx.subcontract.create({
-      data: {
-        tenantId:               ctx.tenantId,
-        companyId,
-        projectId:              input.projectId,
-        subcontractorContactId: input.subcontractorContactId,
-        number,
-        title:                  input.title,
-        description:            input.description ?? null,
-        contractDate:           new Date(input.contractDate),
-        startDate:              input.startDate ? new Date(input.startDate) : null,
-        expectedEndDate:        input.expectedEndDate ? new Date(input.expectedEndDate) : null,
-        currency:               input.currency ?? "ARS",
-        notes:                  input.notes ?? null,
-        internalNotes:          input.internalNotes ?? null,
-        createdBy:              ctx.actorUserId,
-        updatedBy:              ctx.actorUserId,
-      },
-    });
+  const maxAttempts = 3;
+  let result: SubcontractWithRelations | null = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      result = await prisma.$transaction(async (tx) => {
+        // Allocate number inside the txn; retry on unique races.
+        const maxNum = await tx.subcontract.aggregate({
+          where: { tenantId: ctx.tenantId, companyId },
+          _max: { number: true },
+        });
+        const number = (maxNum._max.number ?? 0) + 1;
 
-    for (let i = 0; i < input.lines.length; i++) {
-      const line = input.lines[i]!;
-      const qty   = new Prisma.Decimal(line.quantity);
-      const price = new Prisma.Decimal(line.unitPrice);
-      await tx.subcontractLine.create({
-        data: {
-          subcontractId: created.id,
-          wbsNodeId:     line.wbsNodeId ?? null,
-          description:   line.description,
-          unit:          line.unit ?? "",
-          quantity:      qty,
-          unitPrice:     price,
-          lineTotal:     qty.times(price),
-          notes:         line.notes ?? null,
-          sortOrder:     line.sortOrder ?? i,
-        },
+        const created = await tx.subcontract.create({
+          data: {
+            tenantId:               ctx.tenantId,
+            companyId,
+            projectId:              input.projectId,
+            subcontractorContactId: input.subcontractorContactId,
+            number,
+            title:                  input.title,
+            description:            input.description ?? null,
+            contractDate:           new Date(input.contractDate),
+            startDate:              input.startDate ? new Date(input.startDate) : null,
+            expectedEndDate:        input.expectedEndDate ? new Date(input.expectedEndDate) : null,
+            currency:               input.currency ?? "ARS",
+            notes:                  input.notes ?? null,
+            internalNotes:          input.internalNotes ?? null,
+            createdBy:              ctx.actorUserId,
+            updatedBy:              ctx.actorUserId,
+          },
+        });
+
+        for (let i = 0; i < input.lines.length; i++) {
+          const line = input.lines[i]!;
+          const qty   = new Prisma.Decimal(line.quantity);
+          const price = new Prisma.Decimal(line.unitPrice);
+          await tx.subcontractLine.create({
+            data: {
+              subcontractId: created.id,
+              wbsNodeId:     line.wbsNodeId ?? null,
+              description:   line.description,
+              unit:          line.unit ?? "",
+              quantity:      qty,
+              unitPrice:     price,
+              lineTotal:     qty.times(price),
+              notes:         line.notes ?? null,
+              sortOrder:     line.sortOrder ?? i,
+            },
+          });
+        }
+
+        return tx.subcontract.findUniqueOrThrow({
+          where: { id: created.id },
+          include: subcontractInclude,
+        });
       });
+      break;
+    } catch (err) {
+      const isUnique =
+        err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
+      if (!isUnique || attempt === maxAttempts) throw err;
     }
-
-    return tx.subcontract.findUniqueOrThrow({ where: { id: created.id }, include: subcontractInclude });
-  });
+  }
+  if (!result) {
+    throw new ServiceError("CONFLICT", "No se pudo asignar el número de subcontrato. Reintentá.");
+  }
 
   await log({
     tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
     action: "SUBCONTRACT_CREATED", entityType: "Subcontract", entityId: result.id,
-    after: { projectId: input.projectId, number },
+    after: { projectId: input.projectId, number: result.number },
   });
 
   return serializeSubcontract(result);
@@ -278,8 +298,8 @@ export async function updateSubcontract(
     for (const line of input.lines) {
       if (line.wbsNodeId) {
         const wbs = await prisma.wbsNode.findUnique({ where: { id: line.wbsNodeId } });
-        if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo WBS no encontrado: ${line.wbsNodeId}`);
-        if (wbs.type !== "ITEM") throw new ServiceError("CONFLICT", "El nodo WBS debe ser de tipo ITEM");
+        if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo EDT no encontrado: ${line.wbsNodeId}`);
+        if (wbs.type !== "ITEM") throw new ServiceError("CONFLICT", "El nodo EDT debe ser de tipo ITEM");
       }
     }
   }
@@ -383,9 +403,16 @@ export async function activateSubcontract(id: string, ctx: ServiceContext): Prom
     throw new ServiceError("CONFLICT", "El subcontrato debe tener al menos una línea antes de activarse");
   }
 
-  const updated = await prisma.subcontract.update({
-    where: { id },
+  const flipped = await prisma.subcontract.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
     data: { status: "ACTIVE", updatedBy: ctx.actorUserId },
+  });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "El subcontrato ya no está en borrador. Recargá e intentá de nuevo.",
+  );
+  const updated = await prisma.subcontract.findUniqueOrThrow({
+    where: { id },
     include: subcontractInclude,
   });
 
@@ -416,9 +443,16 @@ export async function completeSubcontract(id: string, ctx: ServiceContext): Prom
     throw new ServiceError("CONFLICT", "Existen certificaciones en borrador. Emítalas o cancélelas antes de finalizar el subcontrato");
   }
 
-  const updated = await prisma.subcontract.update({
-    where: { id },
+  const flipped = await prisma.subcontract.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: "ACTIVE" },
     data: { status: "COMPLETED", updatedBy: ctx.actorUserId },
+  });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "El subcontrato ya no está activo. Recargá e intentá de nuevo.",
+  );
+  const updated = await prisma.subcontract.findUniqueOrThrow({
+    where: { id },
     include: subcontractInclude,
   });
 
@@ -452,9 +486,20 @@ export async function cancelSubcontract(id: string, ctx: ServiceContext): Promis
     throw new ServiceError("CONFLICT", "Existen certificaciones aprobadas vinculadas. Cancélelas antes de anular el subcontrato");
   }
 
-  const updated = await prisma.subcontract.update({
-    where: { id },
+  const flipped = await prisma.subcontract.updateMany({
+    where: {
+      id,
+      tenantId: ctx.tenantId,
+      status: { in: ["DRAFT", "ACTIVE"] },
+    },
     data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+  });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "El subcontrato cambió de estado. Recargá e intentá de nuevo.",
+  );
+  const updated = await prisma.subcontract.findUniqueOrThrow({
+    where: { id },
     include: subcontractInclude,
   });
 

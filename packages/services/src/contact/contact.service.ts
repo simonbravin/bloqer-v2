@@ -320,6 +320,24 @@ export async function removeContactRole(
     throw new ServiceError("NOT_FOUND", `El contacto no tiene el rol ${role} activo`);
   }
 
+  // BR-PROJ-001: project client must keep an active CLIENT role.
+  if (role === "CLIENT") {
+    const linkedProject = await prisma.project.findFirst({
+      where: {
+        tenantId: ctx.tenantId,
+        clientContactId: contactId,
+        status: { not: "CANCELLED" },
+      },
+      select: { id: true, code: true },
+    });
+    if (linkedProject) {
+      throw new ServiceError(
+        "CONFLICT",
+        `No se puede quitar el rol cliente: el contacto es cliente del proyecto ${linkedProject.code}. Reasigná el cliente primero.`,
+      );
+    }
+  }
+
   const updated = await prisma.contactRole.update({
     where: { id: contactRole.id },
     data: { status: "INACTIVE" },

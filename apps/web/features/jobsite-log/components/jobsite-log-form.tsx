@@ -492,7 +492,7 @@ export function JobsiteLogForm({
               return (
               <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                 <div className="space-y-1">
-                  <Label className="text-xs">Partida WBS</Label>
+                  <Label className="text-xs">Partida EDT</Label>
                   <SearchableCombobox
                     popoverWidth="wide"
                     className="h-8 text-xs w-full"

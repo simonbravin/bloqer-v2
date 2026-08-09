@@ -246,7 +246,7 @@ export function previewSpreadsheetImport(
     allErrors.push({
       row: 0,
       field: "general",
-      message: "No se encontraron filas WBS válidas en el archivo",
+      message: "No se encontraron filas EDT válidas en el archivo",
     });
   }
 

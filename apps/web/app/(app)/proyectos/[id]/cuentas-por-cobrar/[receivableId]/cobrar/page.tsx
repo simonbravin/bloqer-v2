@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { CollectionForm } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
+import { can } from "@bloqer/domain";
 import { getReceivableById, listSelectableTreasuryAccounts, ServiceError } from "@bloqer/services";
 
 interface PageProps {
@@ -14,6 +15,10 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
   if (!current?.tenantCtx) redirect("/login");
 
   const { id, receivableId } = await params;
+  if (!can(current.tenantCtx.roles, "EDIT", "AR")) {
+    redirect(`/proyectos/${id}/cuentas-por-cobrar/${receivableId}`);
+  }
+
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,

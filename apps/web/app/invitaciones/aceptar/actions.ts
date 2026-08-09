@@ -4,17 +4,22 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { acceptTenantInvitation, peekTenantInvitationForAcceptPage, ServiceError } from "@bloqer/services";
 import { getSession } from "@/lib/auth";
-import { buildInvitationAcceptCallbackUrl, buildInvitationLoginHref } from "@/lib/invitation-auth";
+import { buildInvitationLoginHref } from "@/lib/invitation-auth";
+import {
+  clearInviteAcceptToken,
+  readInviteAcceptToken,
+} from "@/lib/invitation-accept-token";
 import { rethrowNextNavigationError } from "@/lib/next-errors";
 import { setActiveTenantCookie } from "@/lib/active-tenant";
 
-export async function acceptTenantInvitationAction(formData: FormData) {
-  const token = String(formData.get("token") ?? "").trim();
+export async function acceptTenantInvitationAction(_formData: FormData) {
+  const token = (await readInviteAcceptToken())?.trim() || "";
   const session = await getSession();
 
   if (!session?.user?.id) {
     if (!token) redirect("/invitaciones/aceptar");
-    const callbackUrl = buildInvitationAcceptCallbackUrl(token);
+    // Opaque callback — token lives in httpOnly cookie, not Referer/history.
+    const callbackUrl = "/invitaciones/aceptar";
     const peek = await peekTenantInvitationForAcceptPage(token);
     redirect(
       peek
@@ -32,13 +37,21 @@ export async function acceptTenantInvitationAction(formData: FormData) {
 
   try {
     const result = await acceptTenantInvitation(token, { actorUserId: session.user.id, ipAddress: ip });
+    await clearInviteAcceptToken();
     await setActiveTenantCookie(result.tenantId);
   } catch (e) {
     rethrowNextNavigationError(e);
-    if (e instanceof ServiceError) {
-      redirect(`/invitaciones/aceptar?token=${encodeURIComponent(token)}&err=${encodeURIComponent(e.message)}`);
+    // Permanent failures: drop cookie so a stale/attacker token cannot keep retrying.
+    if (
+      e instanceof ServiceError &&
+      (e.code === "NOT_FOUND" || e.code === "CONFLICT" || e.code === "FORBIDDEN")
+    ) {
+      await clearInviteAcceptToken();
     }
-    redirect(`/invitaciones/aceptar?token=${encodeURIComponent(token)}&err=${encodeURIComponent("Error al aceptar")}`);
+    if (e instanceof ServiceError) {
+      redirect(`/invitaciones/aceptar?err=${encodeURIComponent(e.message)}`);
+    }
+    redirect(`/invitaciones/aceptar?err=${encodeURIComponent("Error al aceptar")}`);
   }
   redirect("/dashboard?invite=ok");
 }

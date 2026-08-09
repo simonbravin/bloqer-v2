@@ -163,7 +163,7 @@ export function ScheduleWorkspace({
       {workspace.baselineBudgetMismatch && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
           El presupuesto de control de costos no coincide con la base del cronograma.
-          Los vínculos WBS siguen en la base original; reimportá o reasigná tareas si
+          Los vínculos EDT siguen en la base original; reimportá o reasigná tareas si
           cambió el presupuesto vigente.
         </div>
       )}

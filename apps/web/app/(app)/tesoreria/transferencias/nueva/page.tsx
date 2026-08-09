@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { InternalTransferForm } from "@/features/treasury";
+import { canEditInternalTransfersUi } from "@/features/treasury/lib/treasury-edit-gates";
 import { getCurrentUser } from "@/lib/auth";
 import { listTreasuryAccounts } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -7,6 +8,9 @@ import { PageShell } from "@/components/layout/page-shell";
 export default async function NuevaTransferenciaPage() {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
+  if (!canEditInternalTransfersUi(current.tenantCtx.roles)) {
+    redirect("/tesoreria/transferencias");
+  }
 
   const ctx = {
     actorUserId: current.session.user.id!,

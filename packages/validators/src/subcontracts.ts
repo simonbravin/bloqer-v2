@@ -59,6 +59,8 @@ export const createSubcontractCertificationSchema = z.object({
   periodEnd:        z.string().min(1, "La fecha de fin es requerida"),
   certificationDate: z.string().min(1, "La fecha de certificación es requerida"),
   notes:            z.string().optional().nullable(),
+  /** BR-SUB-005: link to REJECTED predecessor when creating a corrected version. */
+  replacesCertificationId: z.string().uuid().optional().nullable(),
   lines:            z.array(certificationLineInputSchema).min(1, "Se requiere al menos una línea"),
 });
 

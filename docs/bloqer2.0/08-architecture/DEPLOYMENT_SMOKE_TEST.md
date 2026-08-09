@@ -33,3 +33,9 @@ Run after first production (or staging) deploy, **before** announcing availabili
 | 21 | Notifications inbox UX | `/notificaciones` paginates (20/page); `?page=` beyond range still shows last page (no empty false-negative). Severity badges in Spanish (Info / Éxito / Aviso / Error). |
 
 Record who ran the checklist, date, and environment.
+
+## Run log
+
+| Date | Env | Operator | Notes |
+|---|---|---|---|
+| 2026-08-08 | local + portal.bloqer.app | Cursor agent | Technical pass recorded in [`PHASE_5_ASVS_LITE.md`](./PHASE_5_ASVS_LITE.md). Cron auth OK locally after excluding `/api/cron/*` from session middleware; production deploy of that fix still required for Vercel cron. |

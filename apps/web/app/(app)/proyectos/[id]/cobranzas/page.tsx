@@ -7,6 +7,7 @@ import { ProjectFinanceListHeaderActions } from "@/features/projects/components/
 import { CollectionListSection } from "@/features/collections";
 import type { CollectionListItem } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@bloqer/domain";
 import { getProjectShellInfo, listCollectionsByProject, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { parsePage } from "@/lib/parse-page";
@@ -62,6 +63,8 @@ export default async function CobranzasPage({ params, searchParams }: PageProps)
     status: c.status,
   }));
 
+  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
+
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
@@ -71,7 +74,11 @@ export default async function CobranzasPage({ params, searchParams }: PageProps)
           <ProjectFinanceListHeaderActions
             listViewStorageKey={`cobranzas-${id}`}
             secondary={{ href: `/proyectos/${id}/facturas`, label: "Ver facturas emitidas" }}
-            primary={{ href: `/proyectos/${id}/cobranzas/nueva`, label: "+ Nueva cobranza" }}
+            primary={
+              canEditAr
+                ? { href: `/proyectos/${id}/cobranzas/nueva`, label: "+ Nueva cobranza" }
+                : undefined
+            }
           />
         }
       />

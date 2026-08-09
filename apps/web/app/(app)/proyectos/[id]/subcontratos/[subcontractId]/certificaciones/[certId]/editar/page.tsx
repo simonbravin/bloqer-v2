@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@bloqer/domain";
 import {
   getSubcontractCertificationById,
   getSubcontractById,
@@ -22,6 +23,10 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId, subcontractId, certId } = await params;
+  if (!can(current.tenantCtx.roles, "EDIT", "SUBCONTRACTS")) {
+    redirect(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${certId}`);
+  }
+
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -40,6 +45,9 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
     throw err;
   }
 
+  if (cert.projectId !== projectId || cert.subcontractId !== subcontractId) {
+    notFound();
+  }
   if (cert.status !== "DRAFT") {
     redirect(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${certId}`);
   }

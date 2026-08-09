@@ -23,9 +23,18 @@ interface Props {
   suppliers: SupplierOption[];
   wbsOptions: WbsOption[];
   productOptions?: ProductOption[];
+  /** Show emergency reason only for direct OC when policy + OWNER/ADMIN. */
+  allowEmergencyDirectPo?: boolean;
 }
 
-export function PurchaseOrderEditForm({ projectId, order, suppliers, wbsOptions, productOptions = [] }: Props) {
+export function PurchaseOrderEditForm({
+  projectId,
+  order,
+  suppliers,
+  wbsOptions,
+  productOptions = [],
+  allowEmergencyDirectPo = false,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -46,23 +55,43 @@ export function PurchaseOrderEditForm({ projectId, order, suppliers, wbsOptions,
       : [{ wbsNodeId: null, productId: null, costAnalysisLineId: null, description: "", unit: "", quantity: "1", unitPrice: "", taxRate: "21" }],
   );
 
+  const showEmergency =
+    allowEmergencyDirectPo && !order.purchaseRequestId;
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (lines.some((l) => !l.wbsNodeId)) {
       setError("Cada línea debe tener un ítem EDT");
       return;
     }
-    if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {
-      setError("Completar descripción, cantidad y precio en todas las líneas");
+    if (
+      lines.some((l) => {
+        const qty = Number(l.quantity);
+        const price = Number(l.unitPrice);
+        return (
+          !l.description.trim() ||
+          !Number.isFinite(qty) ||
+          qty <= 0 ||
+          l.unitPrice.trim() === "" ||
+          !Number.isFinite(price) ||
+          price < 0
+        );
+      })
+    ) {
+      setError("Completar descripción, cantidad (> 0) y precio (≥ 0) en todas las líneas");
       return;
     }
     const fd = new FormData(e.currentTarget);
+    const emergencyReason = showEmergency
+      ? ((fd.get("emergencyReason") as string) || null)
+      : undefined;
     startTransition(async () => {
       const res = await updatePurchaseOrderAction(order.id, projectId, {
         supplierContactId,
         issueDate:            fd.get("issueDate") as string,
         expectedDeliveryDate: (fd.get("expectedDeliveryDate") as string) || null,
         notes:                (fd.get("notes") as string) || null,
+        ...(emergencyReason !== undefined ? { emergencyReason } : {}),
         lines:                lines.map((l, i) => ({
           ...l,
           wbsNodeId: l.wbsNodeId!,
@@ -124,6 +153,21 @@ export function PurchaseOrderEditForm({ projectId, order, suppliers, wbsOptions,
         />
 
         <hr />
+
+        {showEmergency && (
+          <div className="space-y-1">
+            <Label htmlFor="emergencyReason">Motivo de emergencia (si supera umbral sin SC)</Label>
+            <Textarea
+              id="emergencyReason"
+              name="emergencyReason"
+              rows={2}
+              defaultValue={order.emergencyReason ?? ""}
+            />
+            <p className="text-xs text-muted-foreground">
+              Obligatorio al enviar si el monto supera el umbral de solicitud.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-1">
           <Label htmlFor="notes">Notas (opcional)</Label>

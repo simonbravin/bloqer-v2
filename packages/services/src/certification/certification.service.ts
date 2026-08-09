@@ -1,17 +1,19 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { Certification, CertificationStatus } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { roundQty } from "@bloqer/utils";
 import type { CreateCertificationInput, UpdateCertificationInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { createSystemNotification } from "../notifications/notification.service";
 import { resolveNotificationAudience } from "../notifications/notification-audience.service";
+import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { ServiceContext, ServiceError } from "../types";
 import { _computePreviousQty, _recalcCertificationTotals } from "./certification-calc.service";
 import {
   assertCertificationLineWithinBudget,
   assertCertificationStatusEditable,
 } from "./certification-guards";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
 // ─── View types (Decimal fields serialized to string) ─────────────────────────
 
@@ -106,44 +108,56 @@ export async function createCertification(
 
   await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
-  // BR-CERT-001: budget must be APPROVED or CLOSED
-  const budget = await prisma.budget.findUnique({ where: { id: input.budgetId } });
-  if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
-  if (budget.projectId !== input.projectId) {
-    throw new ServiceError("CONFLICT", "El presupuesto no pertenece a este proyecto");
+  if (input.periodEnd < input.periodStart) {
+    throw new ServiceError("VALIDATION", "La fecha de fin del período no puede ser anterior al inicio");
   }
+
+  // BR-CERT-001: budget must be APPROVED or CLOSED
+  const budget = await prisma.budget.findFirst({
+    where: { id: input.budgetId, tenantId: ctx.tenantId, projectId: input.projectId },
+  });
+  if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.status !== "APPROVED" && budget.status !== "CLOSED") {
     throw new ServiceError("CONFLICT", "Solo se puede certificar contra presupuestos aprobados o cerrados (BR-CERT-001)");
   }
 
-  const maxNum = await prisma.certification.aggregate({
-    where: { projectId: input.projectId },
-    _max: { number: true },
-  });
-  const number = (maxNum._max.number ?? 0) + 1;
-
-  const cert = await prisma.$transaction(async (tx) => {
-    const c = await tx.certification.create({
-      data: {
-        tenantId: ctx.tenantId,
-        companyId: ctx.companyId ?? undefined,
-        projectId: input.projectId,
-        budgetId: input.budgetId,
-        number,
-        periodStart: new Date(input.periodStart),
-        periodEnd: new Date(input.periodEnd),
-        notes: input.notes ?? null,
-        internalNotes: input.internalNotes ?? null,
-        createdBy: ctx.actorUserId,
-        updatedBy: ctx.actorUserId,
-      },
-      include: {
-        budget: { select: { currency: true } },
-        lines: { include: { wbsNode: { include: { costItem: true } } } },
-      },
+  let cert;
+  try {
+    cert = await prisma.$transaction(async (tx) => {
+      const maxNum = await tx.certification.aggregate({
+        where: { projectId: input.projectId, tenantId: ctx.tenantId },
+        _max: { number: true },
+      });
+      const number = (maxNum._max.number ?? 0) + 1;
+      return tx.certification.create({
+        data: {
+          tenantId: ctx.tenantId,
+          companyId: ctx.companyId ?? undefined,
+          projectId: input.projectId,
+          budgetId: input.budgetId,
+          number,
+          periodStart: new Date(input.periodStart),
+          periodEnd: new Date(input.periodEnd),
+          notes: input.notes ?? null,
+          internalNotes: input.internalNotes ?? null,
+          createdBy: ctx.actorUserId,
+          updatedBy: ctx.actorUserId,
+        },
+        include: {
+          budget: { select: { currency: true } },
+          lines: { include: { wbsNode: { include: { costItem: true } } } },
+        },
+      });
     });
-    return c;
-  });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      throw new ServiceError(
+        "CONFLICT",
+        "Ya existe una certificación con ese número. Reintentá en unos segundos.",
+      );
+    }
+    throw e;
+  }
 
   await log({
     tenantId: ctx.tenantId,
@@ -151,7 +165,7 @@ export async function createCertification(
     action: "certification.created",
     entityType: "Certification",
     entityId: cert.id,
-    after: { number, projectId: input.projectId, budgetId: input.budgetId },
+    after: { number: cert.number, projectId: input.projectId, budgetId: input.budgetId },
     ipAddress: ctx.ipAddress,
   });
 
@@ -171,6 +185,12 @@ export async function updateCertification(
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await assertProjectAllowsOperationalMutation(cert.projectId, ctx.tenantId);
   assertCertificationEditable(cert);
+
+  const nextStart = input.periodStart ?? cert.periodStart.toISOString().slice(0, 10);
+  const nextEnd = input.periodEnd ?? cert.periodEnd.toISOString().slice(0, 10);
+  if (nextEnd < nextStart) {
+    throw new ServiceError("VALIDATION", "La fecha de fin del período no puede ser anterior al inicio");
+  }
 
   const updated = await prisma.certification.update({
     where: { id },
@@ -215,20 +235,14 @@ export async function issueCertification(id: string, ctx: ServiceContext): Promi
   if (certPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await assertProjectAllowsOperationalMutation(certPreview.projectId, ctx.tenantId);
 
-  // All validation, line recalculation, and status transition happen inside a
-  // single transaction. This eliminates the check-then-update gap that allowed
-  // two concurrent DRAFT certs to both pass BR-CERT-002 validation.
-  //
-  // Postgres default isolation (READ COMMITTED) ensures each statement within
-  // the txn sees only committed rows, so _computePreviousQty will not count
-  // a concurrently-issued cert that hasn't committed yet. A second concurrent
-  // issuance for the same wbsNodeId that commits first will be visible to
-  // subsequent statements in this txn, but the DRAFT→ISSUED update is atomic
-  // and the status re-check inside the txn prevents double-issuance of the same
-  // cert. Remaining risk: two DRAFT certs sharing a wbsNodeId issued within the
-  // same txn window. Accepted for current single-tenant usage; see
-  // PENDING_ARCHITECTURE_ITEMS.md P-CERT-01 for future advisory lock option.
+  // Single txn + project advisory lock serializes concurrent issues that share WBS
+  // lines (P-CERT-01 / BR-CERT-002). Conditional DRAFT→ISSUED update prevents TOCTOU.
+  const CERT_ISSUE_ADVISORY_CLASS_ID = 824_014_002;
   const updated = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw(
+      Prisma.sql`SELECT pg_advisory_xact_lock(${CERT_ISSUE_ADVISORY_CLASS_ID}::integer, hashtext(${certPreview.projectId}::text))`,
+    );
+
     const cert = await tx.certification.findUnique({
       where: { id },
       include: {
@@ -238,7 +252,6 @@ export async function issueCertification(id: string, ctx: ServiceContext): Promi
     });
     if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
     if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    // Re-check status inside txn — rejects if a concurrent call already issued
     assertCertificationEditable(cert);
 
     if (cert.lines.length === 0) {
@@ -250,7 +263,7 @@ export async function issueCertification(id: string, ctx: ServiceContext): Promi
 
     // BR-CERT-002: validate + recalc using tx client exclusively (no global prisma)
     for (const line of cert.lines) {
-      const livePrev = await _computePreviousQty(tx as never, line.wbsNodeId, id);
+      const livePrev = await _computePreviousQty(tx as never, line.wbsNodeId, id, cert.tenantId);
       const cumulative = livePrev.plus(line.currentQty);
 
       // Ceiling vs presupuesto vigente (live CostItem.quantity); keep sale snapshot frozen.
@@ -282,10 +295,17 @@ export async function issueCertification(id: string, ctx: ServiceContext): Promi
       }
     }
 
-    return tx.certification.update({
-      where: { id },
+    const flipped = await tx.certification.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
       data: { status: "ISSUED", issueDate: new Date(), updatedBy: ctx.actorUserId },
     });
+    if (flipped.count === 0) {
+      throw new ServiceError(
+        "CONFLICT",
+        "La certificación ya no está en borrador. Recargá e intentá de nuevo.",
+      );
+    }
+    return tx.certification.findUniqueOrThrow({ where: { id } });
   });
 
   await log({
@@ -308,10 +328,12 @@ export async function approveCertification(id: string, ctx: ServiceContext): Pro
   }
   const meta = await prisma.certification.findUnique({
     where: { id },
-    select: { createdBy: true, projectId: true, number: true, companyId: true },
+    select: { createdBy: true, projectId: true, number: true, companyId: true, tenantId: true },
   });
+  if (!meta) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
+  if (meta.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(meta.projectId, ctx.tenantId);
   const updated = await _transition(id, ctx, ["ISSUED"], "APPROVED", "certification.approved");
-  if (!meta) return updated;
 
   const recipients = await resolveNotificationAudience({
     tenantId: ctx.tenantId,
@@ -346,6 +368,13 @@ export async function rejectCertification(id: string, ctx: ServiceContext): Prom
   if (!can(ctx.roles, "APPROVE", "CERTIFICATIONS")) {
     throw new ServiceError("FORBIDDEN", "Se requiere permiso de revisión");
   }
+  const meta = await prisma.certification.findUnique({
+    where: { id },
+    select: { projectId: true, tenantId: true },
+  });
+  if (!meta) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
+  if (meta.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(meta.projectId, ctx.tenantId);
   return _transition(id, ctx, ["ISSUED"], "REJECTED", "certification.rejected");
 }
 
@@ -353,9 +382,17 @@ export async function cancelCertification(id: string, ctx: ServiceContext): Prom
   if (!can(ctx.roles, "EDIT", "CERTIFICATIONS")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar certificaciones");
   }
+  const meta = await prisma.certification.findUnique({
+    where: { id },
+    select: { tenantId: true, projectId: true },
+  });
+  if (!meta) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
+  if (meta.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(meta.projectId, ctx.tenantId);
+
   // BR-CERT-005: block if a non-cancelled SalesInvoice is linked to this certification
   const activeInvoice = await prisma.salesInvoice.findFirst({
-    where: { certificationId: id, status: { not: "CANCELLED" } },
+    where: { certificationId: id, tenantId: ctx.tenantId, status: { not: "CANCELLED" } },
   });
   if (activeInvoice) {
     throw new ServiceError(
@@ -382,10 +419,17 @@ async function _transition(
     throw new ServiceError("CONFLICT", `No se puede cambiar el estado desde "${cert.status}"`);
   }
 
-  const updated = await prisma.certification.update({
-    where: { id },
+  const result = await prisma.certification.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: { in: allowedFrom } },
     data: { status: to, updatedBy: ctx.actorUserId },
   });
+  if (result.count === 0) {
+    throw new ServiceError(
+      "CONFLICT",
+      `No se puede cambiar el estado desde "${cert.status}". Recargá e intentá de nuevo.`,
+    );
+  }
+  const updated = await prisma.certification.findUniqueOrThrow({ where: { id } });
 
   await log({
     tenantId: ctx.tenantId,
@@ -427,21 +471,21 @@ function serializeCertification(cert: RawCert): CertificationWithLines {
     ...cert,
     code: `CERT-${String(cert.number).padStart(3, "0")}`,
     currency: cert.budget.currency,
-    totalAmount: cert.totalAmount.toString(),
+    totalAmount: serializeMoneyDecimal(cert.totalAmount),
     lines: cert.lines.map((l) => {
       const remaining = l.budgetQty.minus(l.cumulativeQty);
       return {
         id: l.id,
         certificationId: l.certificationId,
         wbsNodeId: l.wbsNodeId,
-        unitSalePriceSnapshot: l.unitSalePriceSnapshot.toString(),
-        budgetQty: l.budgetQty.toString(),
-        physicalPct: l.physicalPct.toString(),
-        previousQty: l.previousQty.toString(),
-        currentQty: l.currentQty.toString(),
-        cumulativeQty: l.cumulativeQty.toString(),
-        remainingQty: remaining.toString(),
-        periodAmount: l.periodAmount.toString(),
+        unitSalePriceSnapshot: serializeMoneyDecimal(l.unitSalePriceSnapshot),
+        budgetQty: roundQty(l.budgetQty.toString()),
+        physicalPct: roundQty(l.physicalPct.toString()),
+        previousQty: roundQty(l.previousQty.toString()),
+        currentQty: roundQty(l.currentQty.toString()),
+        cumulativeQty: roundQty(l.cumulativeQty.toString()),
+        remainingQty: roundQty(remaining.toString()),
+        periodAmount: serializeMoneyDecimal(l.periodAmount),
         notes: l.notes,
         sortOrder: l.sortOrder,
         wbsNode: {

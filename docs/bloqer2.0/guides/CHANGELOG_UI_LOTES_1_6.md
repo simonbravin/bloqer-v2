@@ -1,7 +1,7 @@
 # Changelog UI — Lotes 1–6 (para autores de guía / DOCX)
 
 > **Uso:** checklist de alineación UI al regenerar `guides/Guía_Operativa_Bloqer_v2.docx`.  
-> **Fuente viva de operación:** [`../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md).  
+> **Fuente viva de operación:** [`../GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md).  
 > **Smoke por rol:** [`../08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](../08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md).  
 > **Entregable DOCX:** **solo** `Guía_Operativa_Bloqer_v2.docx` (la variante `_PROFESIONAL` fue eliminada; era un duplicado).
 
@@ -68,6 +68,20 @@
 | D-063 | Lock montos DRAFT sourced + notif cola EDIT ACCOUNTING | §15.2 |
 
 **También alineado en guía (julio 2026):** menú proyecto (Tablero de compras, EDT y costos, Recepciones bajo Compras), tablero Materiales §9.0, checklists §18, **procedimientos paso a paso** §§0.1–0.2 y §§5–15 (etiquetas UI exactas), auth email/Google, contabilidad puesta en marcha.
+
+### Agosto 2026 — Tesorería / cierres / invitaciones (impacto en guía MD)
+
+| Tema | Impacto en guía |
+|------|-----------------|
+| Conciliación bancaria UI (`/tesoreria/conciliacion`, CSV/OFX, match, cierre/reapertura) | §1.2 · §4.0 · **§4.2** (nuevo) · §16–§19 |
+| Ajuste manual de cuenta (`/tesoreria/cuentas/[id]/ajuste`) | **§4.3** (nuevo) · §19 |
+| Cierre de períodos (`/contabilidad/cierres`) | §1.2 · **§15.3** (nuevo) · checklists §18 · §19 |
+| Método de liquidación en cobros/pagos (D-074) | §4 · §12 |
+| Estado de movimiento Confirmado / Conciliado en ledger | §4.0 · captura ledger |
+| Invitaciones: accept sin `?token=` en URL (cookie httpOnly) | §2.1 + capturas |
+| Errores AR visibles (emitir/anular/cancelar) | §12.1 nota de UX |
+
+**Capturas prioritarias a fotografiar (agosto 2026):** workspace de conciliación (dos columnas), import CSV/OFX, listado de cierres + diálogos Cerrar/Reabrir, ajuste manual, aceptar invitación sin token en barra.
 
 ---
 

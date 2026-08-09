@@ -18,6 +18,7 @@ interface Props {
   suppliers: SupplierOption[];
   wbsOptions: WbsOption[];
   productOptions?: ProductOption[];
+  /** Show emergency reason only when policy allows AND actor is OWNER/ADMIN. */
   allowEmergencyDirectPo?: boolean;
   variant?: "card" | "plain";
   onCancel?: () => void;
@@ -61,8 +62,21 @@ export function PurchaseOrderForm({
       setError("Cada línea debe tener un ítem EDT");
       return;
     }
-    if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {
-      setError("Completar descripción, cantidad y precio en todas las líneas");
+    if (
+      lines.some((l) => {
+        const qty = Number(l.quantity);
+        const price = Number(l.unitPrice);
+        return (
+          !l.description.trim() ||
+          !Number.isFinite(qty) ||
+          qty <= 0 ||
+          l.unitPrice.trim() === "" ||
+          !Number.isFinite(price) ||
+          price < 0
+        );
+      })
+    ) {
+      setError("Completar descripción, cantidad (> 0) y precio (≥ 0) en todas las líneas");
       return;
     }
     const fd = new FormData(e.currentTarget);
@@ -146,7 +160,7 @@ export function PurchaseOrderForm({
             <Label htmlFor="emergencyReason">Motivo de emergencia (si supera umbral sin SC)</Label>
             <Textarea id="emergencyReason" name="emergencyReason" rows={2} />
             <p className="text-xs text-muted-foreground">
-              Solo OWNER/ADMIN pueden autorizar compra de emergencia sobre el umbral.
+              Obligatorio para OC directa sobre el umbral de solicitud. Solo OWNER/ADMIN.
             </p>
           </div>
         )}

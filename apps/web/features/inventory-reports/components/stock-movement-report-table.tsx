@@ -56,7 +56,7 @@ export function StockMovementReportTable({
               {showWarehouse && <TableHead>Depósito</TableHead>}
               <TableHead>Tipo</TableHead>
               <TableHead>Origen</TableHead>
-              <TableHead>Proyecto / WBS</TableHead>
+              <TableHead>Proyecto / EDT</TableHead>
               <TableHead className="text-right">Cantidad</TableHead>
               <TableHead className="text-right">Costo unit.</TableHead>
             </TableRow>

@@ -3,7 +3,8 @@ import { can } from "@bloqer/domain";
 import type { CreateWarehouseTransferInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { assertInventoryTenantModule } from "../tenant-modules/tenant-module-enforcement";
-import { getStockBalance } from "./stock-balance.service";
+import { getStockBalance, lockStockBalanceKey } from "./stock-balance.service";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
 
 // ─── View types ───────────────────────────────────────────────────────────────
@@ -221,12 +222,16 @@ export async function createWarehouseTransfer(
   const transferDate = new Date(input.transferDate);
 
   const transfer = await prisma.$transaction(async (tx) => {
-    // BR-INV-002: check source balance before deducting
-    const srcBalance = await getStockBalance({
-      tenantId:    ctx.tenantId,
-      warehouseId: input.sourceWarehouseId,
-      productId:   input.productId,
-    });
+    // BR-INV-002: serialize + check source balance before deducting
+    await lockStockBalanceKey(tx, input.sourceWarehouseId, input.productId);
+    const srcBalance = await getStockBalance(
+      {
+        tenantId:    ctx.tenantId,
+        warehouseId: input.sourceWarehouseId,
+        productId:   input.productId,
+      },
+      tx,
+    );
     if (qty.greaterThan(srcBalance)) {
       throw new ServiceError(
         "CONFLICT",
@@ -338,12 +343,17 @@ export async function cancelWarehouseTransfer(
   if (t.status !== "CONFIRMED") throw new ServiceError("CONFLICT", "Solo se pueden cancelar transferencias confirmadas");
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM warehouse_transfers WHERE id = ${id} FOR UPDATE`;
     // Guard: cancelling reverses the TRANSFER_IN; if destination stock was consumed, balance could go negative
-    const dstBalance = await getStockBalance({
-      tenantId:    ctx.tenantId,
-      warehouseId: t.destinationWarehouseId,
-      productId:   t.productId,
-    });
+    await lockStockBalanceKey(tx, t.destinationWarehouseId, t.productId);
+    const dstBalance = await getStockBalance(
+      {
+        tenantId:    ctx.tenantId,
+        warehouseId: t.destinationWarehouseId,
+        productId:   t.productId,
+      },
+      tx,
+    );
     if (dstBalance.lessThan(t.quantity)) {
       throw new ServiceError(
         "CONFLICT",
@@ -351,10 +361,14 @@ export async function cancelWarehouseTransfer(
       );
     }
 
-    await tx.warehouseTransfer.update({
-      where: { id },
+    const flipped = await tx.warehouseTransfer.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "CONFIRMED" },
       data:  { status: "CANCELLED", updatedBy: ctx.actorUserId },
     });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "La transferencia ya no está confirmada. Recargá e intentá de nuevo.",
+    );
 
     await tx.stockMovement.updateMany({
       where: { warehouseTransferId: id, status: "CONFIRMED" },

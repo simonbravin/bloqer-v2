@@ -36,10 +36,14 @@
 
 ## Criterios de aceptación
 
-- [ ] Anti–doble conteo en vistas “comprometido / devengado / pagado” ([BR-COS-002](../01-domain/BUSINESS_RULES.md)).  
-- [ ] Reportes que muestran dinero **reconcilian** con fuentes (`account_movement`, `receivable`, etc.).  
-- [ ] `SubcontractCertification` rechazada: sucesión por `replaces_certification_id` ([BR-SUB-005](../01-domain/BUSINESS_RULES.md)).  
-- [ ] Índices multitenant en listados pesados ([`INDEXING_STRATEGY.md`](./INDEXING_STRATEGY.md)).
+- [x] Anti–doble conteo en vistas “comprometido / devengado / pagado” ([BR-COS-002](../01-domain/BUSINESS_RULES.md)) — `computeCostExposureLayers` + tests Phase 4 en `cost-exposure.test.ts`.  
+- [x] Reportes que muestran dinero **reconcilian** con fuentes (`account_movement`, `receivable`, etc.) — misma capa cost-control / R-001 / rentabilidad / R-AP-03.  
+- [x] `SubcontractCertification` rechazada: sucesión por `replacesCertificationId` ([BR-SUB-005](../01-domain/BUSINESS_RULES.md), [D-082](../00-product/DECISION_LOG.md)).  
+- [x] Índices multitenant en listados pesados ([`INDEXING_STRATEGY.md`](./INDEXING_STRATEGY.md), [D-082](../00-product/DECISION_LOG.md)).
+
+## Diferimientos de cierre ([D-083](../00-product/DECISION_LOG.md))
+
+Fuera del cierre Phase 4: FIFO/capas [D-007], `StockReservation` [D-034], R-010/R-011, R-014 valorizado pleno. R-014 qty-only y R-020 quedan en alcance.
 
 ## Riesgos
 

@@ -152,7 +152,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[30%]">Descripción</TableHead>
-                <TableHead>WBS</TableHead>
+                <TableHead>EDT</TableHead>
                 <TableHead className="text-right">Unidad</TableHead>
                 <TableHead className="text-right">Cant.</TableHead>
                 <TableHead className="text-right">Recibido</TableHead>

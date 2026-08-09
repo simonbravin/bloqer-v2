@@ -109,7 +109,7 @@ export async function getTreasuryHubOverview(ctx: ServiceContext): Promise<Treas
     prisma.accountMovement.findMany({
       where: {
         tenantId: ctx.tenantId,
-        status: "CONFIRMED",
+        status: { in: ["CONFIRMED", "RECONCILED"] },
         type: { in: ["INFLOW", "OUTFLOW"] },
         movementDate: { gte: start, lte: end },
       },
@@ -118,7 +118,7 @@ export async function getTreasuryHubOverview(ctx: ServiceContext): Promise<Treas
     prisma.accountMovement.findMany({
       where: {
         tenantId: ctx.tenantId,
-        status: "CONFIRMED",
+        status: { in: ["CONFIRMED", "RECONCILED"] },
       },
       orderBy: [{ movementDate: "desc" }, { createdAt: "desc" }],
       take: RECENT_MOVEMENTS,

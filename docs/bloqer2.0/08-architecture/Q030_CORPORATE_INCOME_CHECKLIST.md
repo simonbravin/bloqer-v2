@@ -18,7 +18,7 @@
 - [x] `TREASURY_INFLOW` permanece para ingresos sin CxC.
 - [x] Tests: schema `AR_INCOME`, permisos company AR, labels aging, `buildFinancialHref` corporativo, `assertCorporateReceivableScope`.
 - [x] Guards: contacto tenant/`ACTIVE` en `registerArIncome`; mutaciones company vía `assertCompanyReceivableMutable` (no operar CxC de obra desde Finanzas).
-- [x] Guía operativa: flujo Factura/CxC vs Solo caja documentado ([`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md) §12.1 / §14).
+- [x] Guía operativa: flujo Factura/CxC vs Solo caja documentado ([`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §12.1 / §14).
 - [ ] ARCA / emisión legal (fuera de alcance).
 
 ## Opción 2 — Solo GL + tesorería — **Phase 1 (sigue disponible)**

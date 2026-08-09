@@ -1,12 +1,19 @@
 import { notFound, redirect } from "next/navigation";
-import { TreasuryAccountStatusBadge, AccountMovementList } from "@/features/treasury";
+import {
+  TreasuryAccountStatusBadge,
+  AccountMovementList,
+  DeactivateTreasuryAccountButton,
+} from "@/features/treasury";
 import type { AccountMovementListItem } from "@/features/treasury";
+import { canEditTreasuryUi } from "@/features/treasury/lib/treasury-edit-gates";
 import { getCurrentUser } from "@/lib/auth";
 import { getTreasuryAccountById, listAccountMovements, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { deactivateTreasuryAccountAction, reactivateTreasuryAccountAction } from "../../actions";
+import { reactivateTreasuryAccountAction } from "../../actions";
 import { Button } from "@/components/ui/button";
 import { DataTableSection } from "@/components/ui/data-table-section";
+import { formatMoneyAmount } from "@/lib/format-money";
+import Link from "next/link";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
@@ -18,17 +25,6 @@ const TYPE_LABELS: Record<string, string> = {
   DIGITAL_WALLET: "Billetera",
   OTHER: "Otro",
 };
-
-function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(parseFloat(value)) +
-    " " +
-    currency
-  );
-}
 
 export default async function AccountDetailPage({ params }: PageProps) {
   const current = await getCurrentUser();
@@ -48,14 +44,13 @@ export default async function AccountDetailPage({ params }: PageProps) {
     account = await getTreasuryAccountById(accountId, ctx);
     movements = await listAccountMovements(accountId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) {
+      notFound();
+    }
     throw err;
   }
 
-  const doDeactivate = async () => {
-    "use server";
-    await deactivateTreasuryAccountAction(accountId);
-  };
+  const canEdit = canEditTreasuryUi(ctx.roles);
 
   const doReactivate = async () => {
     "use server";
@@ -74,29 +69,38 @@ export default async function AccountDetailPage({ params }: PageProps) {
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={account.name}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">{account.name}</h1>
-            <TreasuryAccountStatusBadge status={account.status} />
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight">{account.name}</h1>
+          <TreasuryAccountStatusBadge status={account.status} />
         </div>
 
-        {account.status === "ACTIVE" && (
-          <form action={doDeactivate}>
-            <Button variant="outline" size="sm" className="text-muted-foreground">
-              Desactivar
-            </Button>
-          </form>
-        )}
-        {account.status === "INACTIVE" && (
-          <form action={doReactivate}>
-            <Button variant="outline" size="sm">
-              Reactivar
-            </Button>
-          </form>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {account.status === "ACTIVE" && (
+            <>
+              {canEdit && (
+                <Button asChild variant="default" size="sm">
+                  <Link href={`/tesoreria/cuentas/${accountId}/ajuste`}>Ajuste manual</Link>
+                </Button>
+              )}
+              {canEdit && <DeactivateTreasuryAccountButton accountId={accountId} />}
+            </>
+          )}
+          {account.status === "INACTIVE" && canEdit && (
+            <form action={doReactivate}>
+              <Button variant="outline" size="sm">
+                Reactivar
+              </Button>
+            </form>
+          )}
+        </div>
       </div>
+
+      {!canEdit && account.status === "ACTIVE" ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+          Tenés permiso de ver, no de editar.
+        </p>
+      ) : null}
 
       <div className="rounded-lg border bg-card">
         <div className="border-b px-6 py-4">
@@ -113,7 +117,9 @@ export default async function AccountDetailPage({ params }: PageProps) {
           </div>
           <div>
             <dt className="text-muted-foreground">Saldo actual</dt>
-            <dd className="font-bold font-mono">{fmtMoney(account.balance, account.currency)}</dd>
+            <dd className="font-bold font-mono">
+              {formatMoneyAmount(account.balance, account.currency)}
+            </dd>
           </div>
           {account.bankName && (
             <div>
@@ -136,7 +142,7 @@ export default async function AccountDetailPage({ params }: PageProps) {
           <div>
             <dt className="text-muted-foreground">Saldo inicial</dt>
             <dd className="font-medium font-mono">
-              {fmtMoney(account.openingBalance, account.currency)}
+              {formatMoneyAmount(account.openingBalance, account.currency)}
             </dd>
           </div>
           {account.notes && (

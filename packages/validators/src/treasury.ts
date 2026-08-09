@@ -5,6 +5,7 @@ import {
   optionalMoneyAmountString,
   positiveMoneyAmountString,
 } from "./money";
+import { treasurySettlementFieldsSchema } from "./treasury-settlement";
 import { z } from "zod";
 
 export const createTreasuryAccountSchema = z.object({
@@ -37,6 +38,7 @@ export const createCollectionSchema = z
     collectFullBalance: z.boolean().optional(),
     notes:              z.string().optional().nullable(),
   })
+  .merge(treasurySettlementFieldsSchema)
   .superRefine((val, ctx) => {
     if (!val.collectFullBalance && val.amount == null) {
       ctx.addIssue({
@@ -74,6 +76,15 @@ export const createCorporateTreasuryInflowSchema = z.object({
     .transform((v) => (v && v.length > 0 ? v : null)),
 });
 
+/** Generic account adjustment UI ([P-TRZ-04] / Phase 3 close). */
+export const createManualTreasuryAdjustmentSchema = z.object({
+  accountId: z.string().uuid(),
+  movementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  direction: z.enum(["INFLOW", "OUTFLOW"]),
+  amount: positiveMoneyAmountString,
+  description: z.string().trim().min(1, "Descripción requerida").max(500),
+});
+
 export const registerTransactionSchema = z
   .discriminatedUnion("kind", [
     registerApExpenseSchema.extend({ kind: z.literal("AP_EXPENSE") }),
@@ -97,4 +108,7 @@ export type UpdateTreasuryAccountInput   = z.infer<typeof updateTreasuryAccountS
 export type CreateCollectionInput        = z.infer<typeof createCollectionSchema>;
 export type CreateInternalTransferInput  = z.infer<typeof createInternalTransferSchema>;
 export type CreateCorporateTreasuryInflowInput = z.infer<typeof createCorporateTreasuryInflowSchema>;
+export type CreateManualTreasuryAdjustmentInput = z.infer<
+  typeof createManualTreasuryAdjustmentSchema
+>;
 export type RegisterTransactionInput        = z.infer<typeof registerTransactionSchema>;

@@ -9,6 +9,7 @@ import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enfo
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { ensureDraftJournalFromTreasuryMovement } from "../accounting/accounting-auto-draft.service";
+import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
 
 export async function registerCorporateTreasuryInflow(
   input: CreateCorporateTreasuryInflowInput,
@@ -53,6 +54,15 @@ export async function registerCorporateTreasuryInflow(
         "La cuenta de tesorería no pertenece a la empresa activa.",
       );
     }
+
+    await assertFinancialPeriodOpen(
+      {
+        tenantId: ctx.tenantId,
+        companyId: ctx.companyId,
+        date: input.movementDate,
+      },
+      tx,
+    );
 
     if (counterpartyContactId) {
       const contact = await tx.contact.findUnique({

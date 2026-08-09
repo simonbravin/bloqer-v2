@@ -7,8 +7,14 @@ const purchaseOrderLineSchema = z.object({
   costAnalysisLineId: z.string().uuid().optional().nullable(),
   description: z.string().min(1, "Descripción requerida"),
   unit: z.string().default(""),
-  quantity: z.string().regex(/^\d+(\.\d+)?$/, "Cantidad inválida"),
-  unitPrice: z.string().regex(/^\d+(\.\d+)?$/, "Precio inválido"),
+  quantity: z
+    .string()
+    .regex(/^\d+(\.\d+)?$/, "Cantidad inválida")
+    .refine((v) => Number(v) > 0, { message: "La cantidad debe ser mayor a cero" }),
+  unitPrice: z
+    .string()
+    .regex(/^\d+(\.\d+)?$/, "Precio inválido")
+    .refine((v) => Number(v) >= 0, { message: "Precio inválido" }),
   taxRate: z.string().regex(/^\d+(\.\d+)?$/).default("21"),
   sortOrder: z.number().int().default(0),
   varianceJustification: z.string().max(2000).optional().nullable(),
@@ -32,6 +38,7 @@ export const updatePurchaseOrderSchema = z.object({
   expectedDeliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   notes: z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
+  emergencyReason: z.string().max(2000).optional().nullable(),
   lines: z.array(purchaseOrderLineSchema).min(1).optional(),
 });
 
@@ -41,7 +48,10 @@ export const returnPurchaseOrderSchema = z.object({
 
 const receiptLineSchema = z.object({
   purchaseOrderLineId: z.string().uuid(),
-  quantityReceived: z.string().regex(/^\d+(\.\d+)?$/, "Cantidad recibida inválida"),
+  quantityReceived: z
+    .string()
+    .regex(/^\d+(\.\d+)?$/, "Cantidad recibida inválida")
+    .refine((v) => Number(v) > 0, { message: "La cantidad recibida debe ser mayor a cero" }),
   notes: z.string().optional().nullable(),
 });
 

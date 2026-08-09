@@ -17,7 +17,7 @@ export function SubcontractBudgetHints({ hints, onPick }: Props) {
       <div>
         <p className="text-sm font-semibold">Ítems con subcontrato en presupuesto</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Sugerencias desde el APU aprobado. Al elegir una, se completa la línea con WBS, unidad y
+          Sugerencias desde el APU aprobado. Al elegir una, se completa la línea con EDT, unidad y
           monto referencial (editable).
         </p>
       </div>

@@ -200,9 +200,14 @@ export async function peekTenantInvitationForAcceptPage(token: string): Promise<
   if (!parsed.success) return null;
   const inv = await prisma.tenantInvitation.findFirst({
     where: { tokenHash: hashInvitationToken(parsed.data.token), status: "PENDING" },
-    select: { expiresAt: true, email: true, tenant: { select: { name: true } } },
+    select: {
+      expiresAt: true,
+      email: true,
+      tenant: { select: { name: true, status: true } },
+    },
   });
   if (!inv) return null;
+  if (inv.tenant.status !== "ACTIVE") return null;
   if (inv.expiresAt <= new Date()) {
     await prisma.tenantInvitation.updateMany({
       where: { tokenHash: hashInvitationToken(parsed.data.token), status: "PENDING" },
@@ -391,6 +396,7 @@ export async function acceptTenantInvitation(
         status:     true,
         expiresAt:  true,
         companyId:  true,
+        tenant:     { select: { status: true } },
       },
     });
 
@@ -398,6 +404,12 @@ export async function acceptTenantInvitation(
 
     if (inv.status !== "PENDING") {
       throw new ServiceError("CONFLICT", "Esta invitación ya no puede aceptarse");
+    }
+    if (inv.tenant.status !== "ACTIVE") {
+      throw new ServiceError(
+        "CONFLICT",
+        "La organización está suspendida. No se pueden aceptar invitaciones.",
+      );
     }
     if (inv.expiresAt <= new Date()) {
       await tx.tenantInvitation.update({

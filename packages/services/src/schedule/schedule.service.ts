@@ -758,7 +758,7 @@ export async function linkWbsNodesToScheduleItem(
   });
 
   if (!schedule.baselineBudgetId) {
-    throw new ServiceError("VALIDATION", "Definí un presupuesto base antes de vincular WBS");
+    throw new ServiceError("VALIDATION", "Definí un presupuesto base antes de vincular EDT");
   }
 
   const uniqueWbsIds = [...new Set(wbsNodeIds)];
@@ -769,7 +769,7 @@ export async function linkWbsNodesToScheduleItem(
     },
   });
   if (nodes.length !== uniqueWbsIds.length) {
-    throw new ServiceError("NOT_FOUND", "Uno o más nodos WBS no pertenecen al presupuesto base");
+    throw new ServiceError("NOT_FOUND", "Uno o más nodos EDT no pertenecen al presupuesto base");
   }
 
   if (primaryWbsNodeId && !uniqueWbsIds.includes(primaryWbsNodeId)) {

@@ -10,14 +10,18 @@ import {
   SalesInvoiceListSection,
   type ClientOption,
   type SalesInvoiceListItem,
+  type TreasuryAccountOption,
 } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import {
   canEditArArea,
   getProjectShellInfo,
+  getTenantModuleGate,
   listContacts,
   listInvoicesByProject,
+  listSelectableTreasuryAccounts,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -77,12 +81,41 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
 
   const canCreate = canEditArArea(ctx.roles);
   let clients: ClientOption[] = [];
+  let treasuryAccounts: TreasuryAccountOption[] = [];
+  let canCollectNow = false;
+
   if (canCreate) {
     const { data: contacts } = await listContacts({ role: "CLIENT", status: "ACTIVE" }, ctx);
     clients = contacts.map((c) => ({
       id: c.id,
       label: c.fantasyName ?? c.legalName,
     }));
+
+    try {
+      const gate = await getTenantModuleGate(ctx);
+      canCollectNow = gate.isEnabled("TREASURY") && can(ctx.roles, "EDIT", "TREASURY");
+    } catch {
+      canCollectNow = false;
+    }
+
+    if (canCollectNow) {
+      try {
+        const accountsResult = await listSelectableTreasuryAccounts(ctx);
+        treasuryAccounts = accountsResult
+          .filter(
+            (a) =>
+              a.status === "ACTIVE" &&
+              (!ctx.companyId || !a.companyId || a.companyId === ctx.companyId),
+          )
+          .map((a) => ({
+            id: a.id,
+            label: `${a.name} (${a.currency})`,
+            currency: a.currency,
+          }));
+      } catch {
+        treasuryAccounts = [];
+      }
+    }
   }
 
   return (
@@ -100,6 +133,8 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
                   <NewProjectSalesInvoiceDialog
                     projectId={id}
                     clients={clients}
+                    treasuryAccounts={treasuryAccounts}
+                    canCollectNow={canCollectNow}
                     storageConfigured={isStorageConfigured()}
                     defaultOpen={sp.create === "1"}
                   />

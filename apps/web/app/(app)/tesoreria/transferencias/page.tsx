@@ -6,6 +6,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { getCurrentUser } from "@/lib/auth";
 import { listInternalTransfers, ServiceError } from "@bloqer/services";
 import { InternalTransferListSection } from "@/features/treasury/components/internal-transfer-list-section";
+import { canEditInternalTransfersUi } from "@/features/treasury/lib/treasury-edit-gates";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { parsePage } from "@/lib/parse-page";
@@ -42,6 +43,7 @@ export default async function TransferenciasPage({
   }
 
   const { data: transfers, total } = transfersResult;
+  const canEdit = canEditInternalTransfersUi(ctx.roles);
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -57,9 +59,11 @@ export default async function TransferenciasPage({
               Ver en movimientos
             </Link>
           </Button>
-          <Button asChild size="sm">
-            <Link href="/tesoreria/transferencias/nueva">Nueva transferencia</Link>
-          </Button>
+          {canEdit ? (
+            <Button asChild size="sm">
+              <Link href="/tesoreria/transferencias/nueva">Nueva transferencia</Link>
+            </Button>
+          ) : null}
         </div>
       </div>
 

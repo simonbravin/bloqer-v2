@@ -17,7 +17,14 @@ export function canManageProcurementQuotes(roles: ServiceContext["roles"]): bool
 }
 
 export function canEditPurchaseOrders(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "EDIT", "PURCHASE_ORDERS") || can(roles, "EDIT", "PROCUREMENT");
+  // Matrix gives WAREHOUSE EDIT PURCHASE_ORDERS for receipt workflows, but OC
+  // create/edit/submit/confirm is Compras / PM / Admin / Owner
+  // ([PURCHASE_ORDERS_AND_RECEIPTS] § permisos).
+  return (
+    can(roles, "EDIT", "PROCUREMENT") ||
+    can(roles, "APPROVE", "PURCHASE_ORDERS") ||
+    can(roles, "APPROVE", "PROCUREMENT")
+  );
 }
 
 export function canApprovePurchaseOrders(roles: ServiceContext["roles"]): boolean {
@@ -34,8 +41,4 @@ export function canEditPurchaseReceipts(roles: ServiceContext["roles"]): boolean
     can(roles, "EDIT", "PROCUREMENT") ||
     can(roles, "EDIT", "INVENTORY")
   );
-}
-
-export function canBypassDirectPoPolicy(roles: ServiceContext["roles"]): boolean {
-  return roles.some((r) => r === "OWNER" || r === "ADMIN" || r === "PROCUREMENT");
 }

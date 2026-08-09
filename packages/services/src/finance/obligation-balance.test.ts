@@ -48,4 +48,21 @@ describe("computeObligationBalanceDue", () => {
       "60",
     );
   });
+
+  it("partial collection: two payments leave the remaining receivable balance (Phase 3)", () => {
+    const original = new Prisma.Decimal("1000.00");
+    const afterFirst = effectiveObligationPaidAfterPayment(
+      original,
+      new Prisma.Decimal("400.00"),
+    );
+    assert.equal(afterFirst.toString(), "400");
+    assert.equal(computeObligationBalanceDue(original, afterFirst).toString(), "600");
+
+    const afterSecond = effectiveObligationPaidAfterPayment(
+      original,
+      afterFirst.add(new Prisma.Decimal("350.00")),
+    );
+    assert.equal(afterSecond.toString(), "750");
+    assert.equal(computeObligationBalanceDue(original, afterSecond).toString(), "250");
+  });
 });

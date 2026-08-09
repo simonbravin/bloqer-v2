@@ -17,6 +17,19 @@ import {
   treasuryMovementSupportsAccountingDraft,
   treasuryMovementTypeSupportsAccountingDraft,
 } from "./accounting-treasury-gl-eligibility";
+import { suggestTreasuryGlAccountCode } from "./treasury-gl-account-hint";
+
+async function resolveActiveGlAccountId(
+  tenantId: string,
+  companyId: string,
+  code: string,
+): Promise<string | null> {
+  const acc = await prisma.accountingAccount.findFirst({
+    where: { tenantId, companyId, code, isActive: true },
+    select: { id: true },
+  });
+  return acc?.id ?? null;
+}
 
 export {
   treasuryMovementSupportsAccountingDraft,
@@ -124,6 +137,7 @@ export async function suggestJournalFromCollection(
   await assertEdit(ctx);
   const col = await prisma.collection.findFirst({
     where: { id: collectionId, tenantId: ctx.tenantId },
+    include: { account: { select: { type: true, currency: true } } },
   });
   if (!col) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
   if (col.status !== "CONFIRMED") {
@@ -142,6 +156,13 @@ export async function suggestJournalFromCollection(
   const rule = await findActiveMappingRule(ctx.tenantId, col.companyId, "COLLECTION_CONFIRMED");
   if (!rule) throw noRuleError("cobranza confirmada");
 
+  const treasuryGlCode = suggestTreasuryGlAccountCode(col.account);
+  const debitOverride = await resolveActiveGlAccountId(
+    ctx.tenantId,
+    col.companyId,
+    treasuryGlCode,
+  );
+
   const amountStr = decimalToAmountString(col.amount);
   const entryDate = col.collectionDate.toISOString().slice(0, 10);
   const input = buildTwoLineDraftInput({
@@ -152,7 +173,7 @@ export async function suggestJournalFromCollection(
     reference:     `COB-${col.id.slice(0, 8)}`,
     currency:      col.currency,
     amountStr,
-    debitAccountId:  rule.debitAccountId,
+    debitAccountId:  debitOverride ?? rule.debitAccountId,
     creditAccountId: rule.creditAccountId,
     lineDescriptionDebit:  "Debe — según regla contable",
     lineDescriptionCredit: "Haber — según regla contable",
@@ -169,6 +190,7 @@ export async function suggestJournalFromPayment(
   await assertEdit(ctx);
   const pay = await prisma.payment.findFirst({
     where: { id: paymentId, tenantId: ctx.tenantId },
+    include: { account: { select: { type: true, currency: true } } },
   });
   if (!pay) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
   if (pay.status !== "CONFIRMED") {
@@ -187,6 +209,13 @@ export async function suggestJournalFromPayment(
   const rule = await findActiveMappingRule(ctx.tenantId, pay.companyId, "PAYMENT_CONFIRMED");
   if (!rule) throw noRuleError("pago confirmado");
 
+  const treasuryGlCode = suggestTreasuryGlAccountCode(pay.account);
+  const creditOverride = await resolveActiveGlAccountId(
+    ctx.tenantId,
+    pay.companyId,
+    treasuryGlCode,
+  );
+
   const amountStr = decimalToAmountString(pay.amount);
   const entryDate = pay.paymentDate.toISOString().slice(0, 10);
   const input = buildTwoLineDraftInput({
@@ -198,7 +227,7 @@ export async function suggestJournalFromPayment(
     currency:      pay.currency,
     amountStr,
     debitAccountId:  rule.debitAccountId,
-    creditAccountId: rule.creditAccountId,
+    creditAccountId: creditOverride ?? rule.creditAccountId,
     lineDescriptionDebit:  "Debe — según regla contable",
     lineDescriptionCredit: "Haber — según regla contable",
     sourceType:    "PAYMENT",
@@ -217,8 +246,11 @@ export async function suggestJournalFromTreasuryMovement(
     include: { account: true },
   });
   if (!mov) throw new ServiceError("NOT_FOUND", "Movimiento de tesorería no encontrado");
-  if (mov.status !== "CONFIRMED") {
-    throw new ServiceError("CONFLICT", "Solo se pueden sugerir asientos para movimientos confirmados");
+  if (mov.status !== "CONFIRMED" && mov.status !== "RECONCILED") {
+    throw new ServiceError(
+      "CONFLICT",
+      "Solo se pueden sugerir asientos para movimientos confirmados o conciliados",
+    );
   }
   if (!treasuryMovementSupportsAccountingDraft({ type: mov.type, sourceType: mov.sourceType })) {
     throw new ServiceError(
@@ -239,7 +271,17 @@ export async function suggestJournalFromTreasuryMovement(
 
   const eventType = movementToEventType(mov);
   const sourceType = movementToJournalSourceType(mov);
-  const sourceId = mov.transferId ?? mov.id;
+  // Canonical INTERNAL_TRANSFER sourceId is InternalTransfer.id (same as auto-draft / cancel-sync).
+  const transferId =
+    mov.transferId
+    ?? (mov.sourceType === "INTERNAL_TRANSFER" ? mov.sourceId : null);
+  if ((mov.type === "TRANSFER_IN" || mov.type === "TRANSFER_OUT") && !transferId) {
+    throw new ServiceError(
+      "CONFLICT",
+      "El movimiento de transferencia no tiene id de transferencia; no se puede generar el asiento",
+    );
+  }
+  const sourceId = transferId ?? mov.id;
 
   const existingMov = await getJournalEntryBySourceIfNotCancelled(ctx, {
     companyId,
@@ -250,6 +292,65 @@ export async function suggestJournalFromTreasuryMovement(
 
   const rule = await findActiveMappingRule(ctx.tenantId, companyId, eventType);
   if (!rule) throw noRuleError("movimiento de tesorería de este tipo");
+
+  let debitAccountId = rule.debitAccountId;
+  let creditAccountId = rule.creditAccountId;
+  let lineDescriptionDebit = `Debe — ${mov.type}`;
+  let lineDescriptionCredit = `Haber — ${mov.type}`;
+
+  if (transferId && (mov.type === "TRANSFER_IN" || mov.type === "TRANSFER_OUT")) {
+    const legs = await prisma.accountMovement.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        status: { in: ["CONFIRMED", "RECONCILED"] },
+        OR: [
+          { transferId },
+          { sourceType: "INTERNAL_TRANSFER", sourceId: transferId },
+        ],
+      },
+      include: { account: true },
+      orderBy: { id: "asc" },
+    });
+    const outLeg = legs.find((l) => l.type === "TRANSFER_OUT");
+    const inLeg = legs.find((l) => l.type === "TRANSFER_IN");
+    if (inLeg) {
+      const debitGl = await resolveActiveGlAccountId(
+        ctx.tenantId,
+        companyId,
+        suggestTreasuryGlAccountCode({
+          type: inLeg.account.type,
+          currency: inLeg.account.currency,
+        }),
+      );
+      if (debitGl) debitAccountId = debitGl;
+      lineDescriptionDebit = "Debe — cuenta destino";
+    }
+    if (outLeg) {
+      const creditGl = await resolveActiveGlAccountId(
+        ctx.tenantId,
+        companyId,
+        suggestTreasuryGlAccountCode({
+          type: outLeg.account.type,
+          currency: outLeg.account.currency,
+        }),
+      );
+      if (creditGl) creditAccountId = creditGl;
+      lineDescriptionCredit = "Haber — cuenta origen";
+    }
+  } else {
+    const treasuryGlId = await resolveActiveGlAccountId(
+      ctx.tenantId,
+      companyId,
+      suggestTreasuryGlAccountCode({
+        type: mov.account.type,
+        currency: mov.account.currency,
+      }),
+    );
+    if (treasuryGlId) {
+      if (mov.type === "INFLOW") debitAccountId = treasuryGlId;
+      if (mov.type === "OUTFLOW") creditAccountId = treasuryGlId;
+    }
+  }
 
   const amountStr = decimalToAmountString(mov.amount);
   const entryDate = mov.movementDate.toISOString().slice(0, 10);
@@ -262,10 +363,10 @@ export async function suggestJournalFromTreasuryMovement(
     reference:     `MOV-${mov.id.slice(0, 8)}`,
     currency:      mov.currency,
     amountStr,
-    debitAccountId:  rule.debitAccountId,
-    creditAccountId: rule.creditAccountId,
-    lineDescriptionDebit:  `Debe — ${mov.type}`,
-    lineDescriptionCredit: `Haber — ${mov.type}`,
+    debitAccountId,
+    creditAccountId,
+    lineDescriptionDebit,
+    lineDescriptionCredit,
     sourceType,
     sourceId,
   });
@@ -443,8 +544,7 @@ export async function generateDraftJournalFromSuggestion(
       return suggestJournalFromPayment(input.sourceId, ctx);
     }
     case "TREASURY_INFLOW":
-    case "TREASURY_OUTFLOW":
-    case "TREASURY_TRANSFER": {
+    case "TREASURY_OUTFLOW": {
       const mov = await prisma.accountMovement.findFirst({
         where: { id: input.sourceId, tenantId: ctx.tenantId },
         include: { account: true },
@@ -452,6 +552,46 @@ export async function generateDraftJournalFromSuggestion(
       if (!mov) throw new ServiceError("NOT_FOUND", "Movimiento de tesorería no encontrado");
       const derived = movementToEventType(mov);
       if (derived !== input.eventType) {
+        throw new ServiceError(
+          "VALIDATION",
+          "El tipo de evento no coincide con el movimiento de tesorería seleccionado",
+        );
+      }
+      const movCompanyId = mov.companyId ?? mov.account.companyId ?? null;
+      if (movCompanyId) await assertOptionalCompanyFilter(ctx, input.companyId, movCompanyId);
+      return suggestJournalFromTreasuryMovement(input.sourceId, ctx);
+    }
+    case "TREASURY_TRANSFER": {
+      // Accept InternalTransfer.id (canonical GL sourceId) or a transfer leg movement id.
+      const transfer = await prisma.internalTransfer.findFirst({
+        where: { id: input.sourceId, tenantId: ctx.tenantId },
+      });
+      if (transfer) {
+        await assertOptionalCompanyFilter(ctx, input.companyId, transfer.companyId);
+        const leg = await prisma.accountMovement.findFirst({
+          where: {
+            tenantId: ctx.tenantId,
+            status: { in: ["CONFIRMED", "RECONCILED"] },
+            OR: [
+              { transferId: transfer.id },
+              { sourceType: "INTERNAL_TRANSFER", sourceId: transfer.id },
+            ],
+          },
+          orderBy: { id: "asc" },
+        });
+        if (!leg) {
+          throw new ServiceError("NOT_FOUND", "Movimientos de la transferencia no encontrados");
+        }
+        return suggestJournalFromTreasuryMovement(leg.id, ctx);
+      }
+
+      const mov = await prisma.accountMovement.findFirst({
+        where: { id: input.sourceId, tenantId: ctx.tenantId },
+        include: { account: true },
+      });
+      if (!mov) throw new ServiceError("NOT_FOUND", "Transferencia o movimiento no encontrado");
+      const derived = movementToEventType(mov);
+      if (derived !== "TREASURY_TRANSFER") {
         throw new ServiceError(
           "VALIDATION",
           "El tipo de evento no coincide con el movimiento de tesorería seleccionado",

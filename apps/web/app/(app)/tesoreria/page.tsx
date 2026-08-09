@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { TreasuryHubView } from "@/features/treasury";
+import { canEditBankAccountsUi } from "@/features/treasury/lib/treasury-edit-gates";
 import { getCurrentUser } from "@/lib/auth";
 import { getTreasuryHubOverview, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
@@ -30,7 +31,7 @@ export default async function TesoreriaPage() {
     throw err;
   }
 
-  const canCreateAccount = can(current.tenantCtx.roles, "EDIT", "TREASURY");
+  const canCreateAccount = canEditBankAccountsUi(current.tenantCtx.roles);
 
   return (
     <PageShell variant="default" className="space-y-6">

@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { SettlementFields } from "@/features/treasury/components/settlement-fields";
+import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { createCollectionAction } from "@/app/(app)/proyectos/[id]/cobranzas/actions";
 import { createCompanyCollectionAction } from "@/app/(app)/finanzas/cuentas-por-cobrar/actions";
 
@@ -43,6 +45,7 @@ export function CollectionForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [accountId, setAccountId] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<SettlementMethodValue | "">("");
 
   const matchingAccounts = accounts.filter((a) => a.currency === receivableCurrency);
   const balanceSerialized = serializeMoney(receivableBalance);
@@ -63,7 +66,7 @@ export function CollectionForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!accountId) { setError("Seleccione una cuenta de tesorería"); return; }
+    if (!accountId) { setError("Seleccioná una cuenta de tesorería"); return; }
     if (!companyFinanzas && !projectId) {
       setError("Falta el proyecto");
       return;
@@ -82,12 +85,15 @@ export function CollectionForm({
       rounded === balanceSerialized ||
       rawAmount === receivableBalance ||
       rawAmount === balanceSerialized;
+    const rawRef = String(fd.get("reference") ?? "").trim();
     const payload = {
       receivableId,
       accountId,
       collectionDate: fd.get("collectionDate") as string,
       amount: collectFullBalance ? undefined : rounded,
       collectFullBalance: collectFullBalance || undefined,
+      paymentMethod: paymentMethod || null,
+      reference: rawRef || null,
       notes: (fd.get("notes") as string) || null,
     };
     startTransition(async () => {
@@ -108,7 +114,7 @@ export function CollectionForm({
     return (
       <div className="rounded-lg border bg-card p-6">
         <p className="text-sm text-muted-foreground">
-          No hay cuentas de tesorería activas en {receivableCurrency}. Cree una cuenta con esa moneda primero.
+          No hay cuentas de tesorería activas en {receivableCurrency}. Creá una cuenta con esa moneda primero.
         </p>
       </div>
     );
@@ -173,6 +179,12 @@ export function CollectionForm({
             />
           </div>
         </div>
+
+        <SettlementFields
+          idPrefix="collection"
+          paymentMethod={paymentMethod}
+          onPaymentMethodChange={setPaymentMethod}
+        />
 
         <div className="space-y-1">
           <Label htmlFor="notes">Notas (opcional)</Label>

@@ -7,4 +7,5 @@ export const TESORERIA_SUBNAV_LINKS: ModuleSubnavLink[] = [
   { href: "/tesoreria/movimientos", label: "Movimientos" },
   { href: "/tesoreria/flujo-caja", label: "Flujo de caja" },
   { href: "/tesoreria/transferencias", label: "Transferencias" },
+  { href: "/tesoreria/conciliacion", label: "Conciliación" },
 ];

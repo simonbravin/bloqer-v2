@@ -283,7 +283,7 @@ export function InvoiceLinesEditor({
       </div>
       {requireWbs && wbsOptions.length === 0 ? (
         <p className="text-xs text-destructive" role="alert">
-          No hay partidas EDT disponibles. Aprobá un presupuesto con ítems WBS antes de
+          No hay partidas EDT disponibles. Aprobá un presupuesto con ítems EDT antes de
           cargar la factura.
         </p>
       ) : null}

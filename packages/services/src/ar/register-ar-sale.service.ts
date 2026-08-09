@@ -14,12 +14,14 @@ import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea } from "./ar-access";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
-import { toMoneyDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import {
   ensureDraftJournalFromCollection,
   ensureDraftJournalFromSalesInvoice,
 } from "../accounting/accounting-auto-draft.service";
+import { notifyReceivableReadyToCollect } from "./ar-notifications.service";
+import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
@@ -270,6 +272,14 @@ export async function registerArSale(
           }
 
           const collectionFx = computeDocumentFxAmounts(receivable.currency, collectAmount);
+          await assertFinancialPeriodOpen(
+            {
+              tenantId: ctx.tenantId,
+              companyId: ctx.companyId ?? account.companyId ?? receivable.companyId,
+              date: input.collectNow.collectionDate,
+            },
+            tx,
+          );
           const collection = await tx.collection.create({
             data: {
               tenantId: ctx.tenantId,
@@ -284,6 +294,8 @@ export async function registerArSale(
               amount: collectAmount,
               fxRate: collectionFx.fxRate,
               amountArs: collectionFx.amountArs,
+              paymentMethod: input.collectNow.paymentMethod ?? null,
+              reference: input.collectNow.reference ?? null,
               notes: input.collectNow.notes ?? null,
               status: "CONFIRMED",
               createdBy: ctx.actorUserId,
@@ -386,6 +398,34 @@ export async function registerArSale(
   await ensureDraftJournalFromSalesInvoice(outcome.invoiceId, ctx);
   if (outcome.collectionId) {
     await ensureDraftJournalFromCollection(outcome.collectionId, ctx);
+  }
+
+  // D-072: nudge company finance when CxC still has balance (skip if cobrado al emitir).
+  const receivable = await prisma.receivable.findFirst({
+    where: { id: outcome.receivableId, tenantId: ctx.tenantId },
+    select: {
+      id: true,
+      status: true,
+      originalAmount: true,
+      paidAmount: true,
+      currency: true,
+    },
+  });
+  if (
+    receivable &&
+    receivable.status !== "CANCELLED" &&
+    receivable.status !== "PAID" &&
+    receivable.paidAmount.lt(receivable.originalAmount)
+  ) {
+    await notifyReceivableReadyToCollect({
+      ctx,
+      salesInvoiceId: outcome.invoiceId,
+      receivableId: receivable.id,
+      projectId: outcome.projectId,
+      companyId: outcome.companyId,
+      invoiceNumber: outcome.number,
+      amountLabel: `${serializeMoneyDecimal(receivable.originalAmount.minus(receivable.paidAmount))} ${receivable.currency}`,
+    });
   }
 
   const traceChain = buildArSaleTraceChain(outcome);

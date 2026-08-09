@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { InvoiceEditForm } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@bloqer/domain";
 import { getSalesInvoiceById, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -17,6 +18,10 @@ export default async function EditarFacturaPage({ params }: PageProps) {
   if (!current?.tenantCtx) redirect("/login");
 
   const { id, invoiceId } = await params;
+  if (!can(current.tenantCtx.roles, "EDIT", "AR")) {
+    redirect(`/proyectos/${id}/facturas/${invoiceId}`);
+  }
+
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,

@@ -25,6 +25,8 @@ interface BudgetLifecycleDialogProps {
   status: BudgetStatus;
   lifecycleLog: BudgetLifecycleLogEntry[];
   triggerLabel?: string;
+  /** Soft warn when approving a budget with no leaf items (does not hard-block). */
+  warnEmptyOnApprove?: boolean;
   onSubmitForReview: (data?: LifecyclePayload) => Promise<{ ok: true } | { error: string }>;
   onReturnForChanges: (data: { comment: string }) => Promise<{ ok: true } | { error: string }>;
   onApprove: (data?: LifecyclePayload) => Promise<{ ok: true } | { error: string }>;
@@ -118,6 +120,7 @@ export function BudgetLifecycleDialog({
   status,
   lifecycleLog,
   triggerLabel = "Ciclo de vida",
+  warnEmptyOnApprove = false,
   onSubmitForReview,
   onReturnForChanges,
   onApprove,
@@ -237,6 +240,13 @@ export function BudgetLifecycleDialog({
             {pending ? (
               <div className="space-y-3">
                 <p className="text-sm font-medium">{pendingTitle}</p>
+                {pending.kind === "approve" && warnEmptyOnApprove ? (
+                  <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
+                    Este presupuesto no tiene partidas hoja. Sin ítems del EDT no vas a poder
+                    certificar por línea. Podés aprobar igual, pero conviene cargar la estructura
+                    antes.
+                  </p>
+                ) : null}
                 <div className="space-y-1.5">
                   <Label htmlFor="lifecycle-comment">
                     {pending.kind === "return" ? "Observaciones" : "Comentario"}

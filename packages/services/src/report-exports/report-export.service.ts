@@ -590,7 +590,7 @@ export async function exportStockMovementsCsv(
     "Unidad",
     "Deposito",
     "Proyecto",
-    "WBS",
+    "EDT",
     "Tipo",
     "Origen",
     "EtiquetaOrigen",
@@ -719,7 +719,7 @@ export async function exportProjectCostControlCsv(
   ]);
   rows.push([
     "__NO_ASIGNADO__",
-    "Costos no asignados a WBS",
+    "Costos no asignados a EDT",
     "",
     "",
     "",

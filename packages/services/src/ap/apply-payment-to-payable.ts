@@ -4,11 +4,12 @@ import { resolveObligationStoredStatus } from "../finance/obligation-stored-stat
 import { effectiveObligationPaidAfterPayment } from "../finance/obligation-balance";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
-import { toMoneyDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { getAccountBalance } from "../treasury/balance.service";
 import { assertTreasuryAccountCurrencyMatches } from "../treasury/treasury-currency-guards";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
+import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
 
 type TxClient = Omit<
   typeof prisma,
@@ -34,6 +35,8 @@ export type ApplyPaymentToPayableInput = {
   /** YYYY-MM-DD */
   paymentDate: string;
   notes?: string | null;
+  paymentMethod?: "CASH" | "BANK_TRANSFER" | "CHECK" | "CARD" | "OTHER" | null;
+  reference?: string | null;
 };
 
 export type ApplyPaymentToPayableResult = {
@@ -53,7 +56,7 @@ export async function applyPaymentToPayable(
   input: ApplyPaymentToPayableInput,
   ctx: ServiceContext,
 ): Promise<ApplyPaymentToPayableResult> {
-  const { payable, accountId, paymentDate, notes } = input;
+  const { payable, accountId, paymentDate, notes, paymentMethod, reference } = input;
 
   const balanceDue = payable.originalAmount.minus(payable.paidAmount);
   // D-053: if caller passes the exact stored balance (payFullBalance), keep it;
@@ -87,6 +90,16 @@ export async function applyPaymentToPayable(
       "La cuenta de tesorería no pertenece a la empresa activa.",
     );
   }
+  if (
+    account.companyId
+    && payable.companyId
+    && account.companyId !== payable.companyId
+  ) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      "La cuenta de tesorería pertenece a otra empresa que la cuenta por pagar.",
+    );
+  }
   assertTreasuryAccountCurrencyMatches(account.currency, payable.currency);
 
   // BR-TRZ-004 / D-052: block negative balance on payment source account
@@ -94,12 +107,22 @@ export async function applyPaymentToPayable(
   if (amountToApply.greaterThan(sourceBalance)) {
     throw new ServiceError(
       "CONFLICT",
-      `Saldo insuficiente en la cuenta de pago. Disponible: ${sourceBalance.toFixed(2)} ${account.currency}.`,
+      `Saldo insuficiente en la cuenta de pago. Disponible: ${serializeMoneyDecimal(sourceBalance)} ${account.currency}.`,
     );
   }
 
   const paymentCompanyId = ctx.companyId ?? account.companyId ?? payable.companyId;
   const movementCompanyId = account.companyId ?? ctx.companyId ?? payable.companyId;
+
+  await assertFinancialPeriodOpen(
+    {
+      tenantId: ctx.tenantId,
+      companyId: paymentCompanyId,
+      date: paymentDate,
+    },
+    tx,
+  );
+
   const fx = computeDocumentFxAmounts(payable.currency, amountToApply);
 
   const payment = await tx.payment.create({
@@ -116,6 +139,8 @@ export async function applyPaymentToPayable(
       amount: amountToApply,
       fxRate: fx.fxRate,
       amountArs: fx.amountArs,
+      paymentMethod: paymentMethod ?? null,
+      reference: reference ?? null,
       notes: notes ?? null,
       status: "CONFIRMED",
       createdBy: ctx.actorUserId,

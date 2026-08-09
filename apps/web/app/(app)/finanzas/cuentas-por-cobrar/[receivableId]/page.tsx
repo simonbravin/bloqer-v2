@@ -111,7 +111,11 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
           </div>
           <div>
             <p className="text-muted-foreground">Proyecto</p>
-            <p className="font-medium">Empresa</p>
+            <p className="font-medium">{receivable.projectName}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Factura</p>
+            <p className="font-medium">{receivable.salesInvoiceCode ?? "—"}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Moneda</p>
@@ -146,7 +150,18 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
         </div>
       </div>
 
-      <DataTableSection title="Cobranzas">
+      <DataTableSection
+        title="Cobranzas"
+        actions={
+          canCollect ? (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/finanzas/cuentas-por-cobrar/${receivableId}/cobrar`}>
+                Registrar cobranza
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      >
         {collections.length === 0 ? (
           <p className="text-sm text-muted-foreground px-1 py-2">Sin cobranzas registradas.</p>
         ) : (

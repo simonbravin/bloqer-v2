@@ -1,10 +1,12 @@
 import { Prisma, prisma, PurchaseOrderStatus } from "@bloqer/database";
 import { auditProcurement } from "./procurement-audit";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseOrders } from "./procurement-access";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 import { recalcPurchaseOrderTotals } from "./purchase-order-calc.service";
+
 export async function selectProcurementQuoteAndCreatePo(
   procurementQuoteId: string,
   ctx: ServiceContext,
@@ -48,6 +50,9 @@ export async function selectProcurementQuoteAndCreatePo(
   }
 
   const poId = await prisma.$transaction(async (tx) => {
+    // Serialize selection on the SC row so concurrent selects cannot create two OCs.
+    await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
+
     const activePo = await tx.purchaseOrder.count({
       where: {
         purchaseRequestId: pr.id,
@@ -57,6 +62,28 @@ export async function selectProcurementQuoteAndCreatePo(
     if (activePo > 0) {
       throw new ServiceError("CONFLICT", "Ya existe una orden de compra activa para esta solicitud");
     }
+
+    const quoteFlip = await tx.procurementQuote.updateMany({
+      where: { id: quote.id, tenantId: ctx.tenantId, status: "RECEIVED" },
+      data: { status: "SELECTED" },
+    });
+    assertOptimisticRowUpdate(
+      quoteFlip.count,
+      "La cotización ya no está disponible. Recargá e intentá de nuevo.",
+    );
+
+    const prFlip = await tx.purchaseRequest.updateMany({
+      where: {
+        id: pr.id,
+        tenantId: ctx.tenantId,
+        status: { in: ["SUBMITTED", "QUOTE_SELECTED"] },
+      },
+      data: { status: "QUOTE_SELECTED", updatedBy: ctx.actorUserId },
+    });
+    assertOptimisticRowUpdate(
+      prFlip.count,
+      "La solicitud cambió de estado. Recargá e intentá de nuevo.",
+    );
 
     const maxNum = await tx.purchaseOrder.aggregate({
       where: { tenantId: ctx.tenantId, companyId: pr.companyId },
@@ -106,10 +133,6 @@ export async function selectProcurementQuoteAndCreatePo(
 
     await recalcPurchaseOrderTotals(tx, po.id);
 
-    await tx.procurementQuote.update({
-      where: { id: quote.id },
-      data: { status: "SELECTED" },
-    });
     await tx.procurementQuote.updateMany({
       where: {
         purchaseRequestId: pr.id,
@@ -117,11 +140,6 @@ export async function selectProcurementQuoteAndCreatePo(
         status: "RECEIVED",
       },
       data: { status: "REJECTED" },
-    });
-
-    await tx.purchaseRequest.update({
-      where: { id: pr.id },
-      data: { status: "QUOTE_SELECTED", updatedBy: ctx.actorUserId },
     });
 
     await auditProcurement(
@@ -150,13 +168,20 @@ export async function onPurchaseOrderConfirmed(
   });
   if (!po?.purchaseRequestId) return;
 
-  await tx.purchaseRequest.update({
-    where: { id: po.purchaseRequestId },
+  await tx.purchaseRequest.updateMany({
+    where: {
+      id: po.purchaseRequestId,
+      status: { in: ["QUOTE_SELECTED", "SUBMITTED"] },
+    },
     data: { status: "COMPLETED", updatedBy: ctx.actorUserId },
   });
 }
 
-export async function onPurchaseOrderDraftCancelled(
+/**
+ * When a linked OC is cancelled (draft or later, if still allowed), rewind SC/quote
+ * so Compras can seleccionar de nuevo. Only when no other active OC remains.
+ */
+export async function onPurchaseOrderCancelledLinkedToRequest(
   purchaseOrderId: string,
   ctx: ServiceContext,
   tx: Prisma.TransactionClient,
@@ -167,15 +192,119 @@ export async function onPurchaseOrderDraftCancelled(
   });
   if (!po?.purchaseRequestId) return;
 
+  const otherActive = await tx.purchaseOrder.count({
+    where: {
+      purchaseRequestId: po.purchaseRequestId,
+      id: { not: purchaseOrderId },
+      status: { notIn: ["CANCELLED"] },
+    },
+  });
+  if (otherActive > 0) return;
+
   if (po.selectedProcurementQuoteId) {
-    await tx.procurementQuote.update({
-      where: { id: po.selectedProcurementQuoteId },
+    await tx.procurementQuote.updateMany({
+      where: { id: po.selectedProcurementQuoteId, status: "SELECTED" },
       data: { status: "RECEIVED" },
     });
   }
 
-  await tx.purchaseRequest.update({
-    where: { id: po.purchaseRequestId },
+  // Restore quotes rejected when this selection won so minQuotesRequired can be met again.
+  await tx.procurementQuote.updateMany({
+    where: {
+      purchaseRequestId: po.purchaseRequestId,
+      status: "REJECTED",
+    },
+    data: { status: "RECEIVED" },
+  });
+
+  await tx.purchaseRequest.updateMany({
+    where: {
+      id: po.purchaseRequestId,
+      status: { in: ["QUOTE_SELECTED", "COMPLETED"] },
+    },
     data: { status: "SUBMITTED", updatedBy: ctx.actorUserId },
   });
+}
+
+/** @deprecated Use onPurchaseOrderCancelledLinkedToRequest */
+export async function onPurchaseOrderDraftCancelled(
+  purchaseOrderId: string,
+  ctx: ServiceContext,
+  tx: Prisma.TransactionClient,
+): Promise<void> {
+  return onPurchaseOrderCancelledLinkedToRequest(purchaseOrderId, ctx, tx);
+}
+
+/**
+ * Quote-sourced OC: qty/price cannot exceed the selected competitive quote / SC lines.
+ * Matches by sortOrder (preserved when generating the draft).
+ */
+export async function assertPoLinesWithinSelectedQuote(
+  purchaseOrderId: string,
+  lines: Array<{
+    description: string;
+    wbsNodeId: string | null;
+    quantity: string | Prisma.Decimal;
+    unitPrice: string | Prisma.Decimal;
+    sortOrder?: number;
+  }>,
+  tenantId: string,
+  db: Prisma.TransactionClient | typeof prisma = prisma,
+): Promise<void> {
+  const po = await db.purchaseOrder.findUnique({
+    where: { id: purchaseOrderId },
+    select: { selectedProcurementQuoteId: true, tenantId: true },
+  });
+  if (!po || po.tenantId !== tenantId) {
+    throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
+  }
+  if (!po.selectedProcurementQuoteId) return;
+
+  const quote = await db.procurementQuote.findUnique({
+    where: { id: po.selectedProcurementQuoteId },
+    include: {
+      lines: {
+        include: { purchaseRequestLine: true },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+  });
+  if (!quote) {
+    throw new ServiceError("CONFLICT", "La cotización seleccionada ya no existe");
+  }
+
+  const sorted = [...lines].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  if (sorted.length !== quote.lines.length) {
+    throw new ServiceError(
+      "CONFLICT",
+      "La OC proveniente de cotización debe conservar las mismas líneas que la cotización seleccionada",
+    );
+  }
+
+  for (let i = 0; i < quote.lines.length; i++) {
+    const ql = quote.lines[i]!;
+    const prl = ql.purchaseRequestLine;
+    const line = sorted[i]!;
+    const qty = new Prisma.Decimal(line.quantity);
+    const price = new Prisma.Decimal(line.unitPrice);
+
+    if (line.wbsNodeId && prl.wbsNodeId && line.wbsNodeId !== prl.wbsNodeId) {
+      throw new ServiceError(
+        "CONFLICT",
+        `La línea "${line.description}" no puede cambiar de partida EDT respecto de la solicitud`,
+      );
+    }
+    if (qty.greaterThan(prl.quantity)) {
+      throw new ServiceError(
+        "CONFLICT",
+        `La cantidad de "${line.description}" no puede superar la solicitada (${prl.quantity})`,
+      );
+    }
+    if (price.greaterThan(ql.unitPrice)) {
+      throw new ServiceError(
+        "CONFLICT",
+        `El precio de "${line.description}" no puede superar el de la cotización seleccionada (${ql.unitPrice})`,
+      );
+    }
+  }
 }

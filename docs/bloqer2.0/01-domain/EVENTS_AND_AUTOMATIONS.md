@@ -229,6 +229,7 @@ La **facturación** no emite transición de `Certification.status` ([BR-CERT-007
 |---|---|
 | `bank_reconciliation.started` | `DRAFT` → `IN_PROGRESS` |
 | `bank_reconciliation.closed` | → `CLOSED` |
+| `bank_reconciliation.reopened` | `CLOSED` → `IN_PROGRESS` |
 | `bank_reconciliation.cancelled` | → `CANCELLED` |
 
 ### 2.15 Period

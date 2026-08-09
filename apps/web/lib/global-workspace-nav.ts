@@ -96,6 +96,11 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
         href: "/tesoreria/transferencias",
         require: { action: "VIEW", module: "INTERNAL_TRANSFERS" },
       },
+      {
+        label: "Conciliación",
+        href: "/tesoreria/conciliacion",
+        require: { action: "VIEW", module: "BANK_RECONCILIATION" },
+      },
     ],
   },
   {
@@ -104,6 +109,11 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
       { label: "Resumen", href: "/contabilidad", matchExact: true, require: { action: "VIEW", module: "ACCOUNTING" } },
       { label: "Plan de cuentas", href: "/contabilidad/cuentas", require: { action: "VIEW", module: "ACCOUNTING" } },
       { label: "Asientos", href: "/contabilidad/asientos", require: { action: "VIEW", module: "ACCOUNTING" } },
+      {
+        label: "Cierres",
+        href: "/contabilidad/cierres",
+        require: { action: "VIEW", module: "PERIOD_CLOSE" },
+      },
       { label: "Reglas", href: "/contabilidad/reglas", require: { action: "VIEW", module: "ACCOUNTING" } },
     ],
   },

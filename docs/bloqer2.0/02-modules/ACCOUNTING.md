@@ -85,4 +85,6 @@ Phase 11A–11D (manual + sugerencias) + **11E** (plantilla, auto-DRAFT, reverse
 
 ## 19. Preguntas abiertas
 
-Motor IVA multi-línea; auto-POST; cierre de período GL; costing consumo stock para auto-DRAFT; email para cola DRAFT.
+Motor IVA multi-línea; auto-POST; costing consumo stock para auto-DRAFT; email para cola DRAFT.
+
+Cierre de período financiero (tesorería + GL): implementado ([D-078]) — `/contabilidad/cierres`.

@@ -5,7 +5,8 @@
 > **Base de evidencia:** rutas implementadas en `apps/web`, servicios en `packages/services`, enums en `packages/database/prisma/schema.prisma` y la spec funcional de `docs/bloqer2.0/`.
 > **Regla de prevalencia:** cuando el texto de una pantalla o de la documentación difiere del comportamiento del código, esta guía describe **lo que hace el sistema hoy**.
 > **Relación con otros documentos:** visión ejecutiva [`PANORAMA_GENERAL_BLOQER_V2.md`](./PANORAMA_GENERAL_BLOQER_V2.md); estado técnico A–G [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md); smoke por rol [`08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md).
-> **Entregable DOCX:** un solo archivo `guides/Guía_Operativa_Bloqer_v2.docx`, regenerado con `cd docs/bloqer2.0/guides && node build_guide.js` desde **esta** MD.
+> **Archivo canónico:** `GUIA_OPERATIVA_BLOQER_V2.md` (único; se sobrescribe al evolucionar el producto — no crear variantes `_REVISADA` / `_vN`).
+> **Entregable DOCX:** `guides/Guía_Operativa_Bloqer_v2.docx`, regenerado con `cd docs/bloqer2.0/guides && node build_guide.js` desde **esta** MD.
 > **Mantenimiento obligatorio:** todo cambio de UX, rutas, etiquetas, flujos financieros/contables, presupuesto/EDT, notificaciones o reglas visibles al usuario **debe actualizar esta guía en el mismo PR** (y regenerar el DOCX si se entrega a cliente). Ver [D-050](./00-product/DECISION_LOG.md)–[D-064](./00-product/DECISION_LOG.md) y `AGENT_GUARDRAILS.md`.
 > **Capturas:** los bloques `📷 Captura sugerida` indican dónde insertar pantallazos reales. No inventar UI: fotografiar el producto actual.
 > **Cómo usar los procedimientos:** en §§5–15 los pasos numerados usan **etiquetas exactas de la UI** (botones, menús, diálogos). Los enums en inglés (`APPROVED`, `CONFIRMED`, …) son el estado técnico; en pantalla suelen verse en español (Aprobado, Confirmada, …).
@@ -69,6 +70,8 @@ Hacé esto **en orden** la primera vez; después cada módulo se usa en paralelo
 | 7 | Operar: libro de obra, materiales, SC/OC, recepciones, consumos | Operación / Compras | Avance real + abastecimiento |
 | 8 | Certificar → facturar → cobrar / pagar | Operación + Finanzas del proyecto | AR/AP |
 | 9 | Revisar **EDT y costos** + asientos DRAFT → **Contabilizar** | Planificación + Contabilidad | Control y libros |
+| 10 | Conciliar banco (extracto vs movimientos) | Tesorería → **Conciliación** | Cuadrar caja con banco |
+| 11 | Cerrar el mes (cuando el mes quedó cerrado operativamente) | Contabilidad → **Cierres** | Bloqueo de tesorería + asientos |
 
 ### 0.2 Qué significa “afectaciones” en Bloqer
 
@@ -81,9 +84,47 @@ No hay un menú llamado **Afectaciones**. En obra, “afectar” = **imputar** u
 | Pagar CxP | **Pagado** (+ caja; auto-DRAFT) |
 | Aprobar libro de obra | **Avance real** del cronograma (+ consumo stock si aplica) |
 | Emitir/aprobar certificación cliente | **Avance certificado** (+ base para factura) |
-| Consumo de stock | Stock + (si hay WBS) imputación a partida |
+| Consumo de stock | Stock + (si hay partida EDT) imputación a partida |
 
 La pantalla **EDT y costos** (`/control-costos`) es el tablero de esas afectaciones por partida.
+
+### 0.3 Índice de capturas (dónde pegar pantallazos)
+
+En el Markdown y en el DOCX, cada bloque con este formato es un **hueco para imagen real**:
+
+```text
+> **📷 Captura sugerida — <título>**
+> Ruta: /ruta · Mostrar … · Tip: …
+```
+
+**Cómo completarlas**
+
+1. Entrar al producto con datos demo (sin CUIT/emails reales de clientes).
+2. Abrir la **ruta** indicada, dejar la UI en el estado que pide el tip.
+3. Capturar desktop (salvo que el tip diga lo contrario); recortar chrome innecesario.
+4. En el DOCX regenerado, **reemplazar la caja gris** “📷 CAPTURA SUGERIDA …” por la imagen (el generador no inserta archivos de foto solos: la caja marca el lugar).
+
+**Prioridad alta (módulos nuevos / agosto 2026) — completar primero**
+
+| # | Título del bloque | Sección | Ruta |
+|---|-------------------|---------|------|
+| P1 | Listado de conciliaciones | §4.2 | `/tesoreria/conciliacion` |
+| P2 | Nueva conciliación (alta) | §4.2 | `/tesoreria/conciliacion/nueva` |
+| P3 | Workspace de empareje (dos columnas) | §4.2 | `/tesoreria/conciliacion/[id]` |
+| P4 | Importar CSV / OFX | §4.2 | detalle de sesión |
+| P5 | Cerrar conciliación | §4.2 | diálogo en detalle |
+| P6 | Detalle de cuenta + CTA Ajuste manual | §4.3 | `/tesoreria/cuentas/[id]` |
+| P7 | Ajuste manual de cuenta | §4.3 | `/tesoreria/cuentas/[id]/ajuste` |
+| P8 | Ledger con columna Estado | §4.0 | `/tesoreria/movimientos` |
+| P9 | Tesorería subnav (incl. Conciliación) | §4.0 | `/tesoreria` |
+| P10 | Cierres de período (listado) | §15.3 | `/contabilidad/cierres` |
+| P11 | Diálogo Cerrar período | §15.3 | `/contabilidad/cierres` |
+| P12 | Diálogo Reabrir con motivo | §15.3 | `/contabilidad/cierres` |
+| P13 | Contabilidad hub (subnav con Cierres) | §15 | `/contabilidad` |
+| P14 | Invitar usuario | §2.1 | `/configuracion/equipo/invitar` |
+| P15 | Aceptar invitación (sin token en URL) | §2.1 | `/invitaciones/aceptar` |
+
+El resto de bloques `📷` del documento (login, presupuesto, OC, certificaciones, etc.) siguen vigentes; completarlos cuando armes el entregable completo al cliente.
 
 ---
 
@@ -107,8 +148,8 @@ La pantalla **EDT y costos** (`/control-costos`) es el tablero de esas afectacio
 |---------|--------------------------|
 | General | Inicio → `/dashboard` · Proyectos → `/proyectos` · Directorio → `/directorio` · Inventario → `/inventario` |
 | Finanzas | Tablero → `/finanzas` · Transacciones → `/finanzas/transacciones` · Facturas y gastos → `/finanzas/facturas-proveedor` · Cuentas por cobrar → `/finanzas/cuentas-por-cobrar` · Cuentas por pagar → `/finanzas/cuentas-por-pagar` · Imputación GG → `/finanzas/gastos-generales` |
-| Tesorería | Resumen → `/tesoreria` · Cuentas → `/tesoreria/cuentas` · Movimientos → `/tesoreria/movimientos` · Flujo de caja → `/tesoreria/flujo-caja` · Transferencias → `/tesoreria/transferencias` |
-| Contabilidad | Resumen → `/contabilidad` · Cuentas → `/contabilidad/cuentas` · Asientos → `/contabilidad/asientos` · Reglas → `/contabilidad/reglas` · Libro diario → `/contabilidad/libro-diario` · Sumas y saldos → `/contabilidad/sumas-y-saldos` · Situación → `/contabilidad/situacion-patrimonial` · Resultados → `/contabilidad/estado-resultados` |
+| Tesorería | Resumen → `/tesoreria` · Cuentas → `/tesoreria/cuentas` · Movimientos → `/tesoreria/movimientos` · Flujo de caja → `/tesoreria/flujo-caja` · Transferencias → `/tesoreria/transferencias` · **Conciliación** → `/tesoreria/conciliacion` |
+| Contabilidad | Resumen → `/contabilidad` · Cuentas → `/contabilidad/cuentas` · Asientos → `/contabilidad/asientos` · **Cierres** → `/contabilidad/cierres` · Reglas → `/contabilidad/reglas` · Libro diario → `/contabilidad/libro-diario` · Sumas y saldos → `/contabilidad/sumas-y-saldos` · Situación → `/contabilidad/situacion-patrimonial` · Resultados → `/contabilidad/estado-resultados` |
 | Configuración | General → `/configuracion` · Mi perfil → `/configuracion/perfil` · Equipo → `/configuracion/equipo` · Permisos → `/configuracion/permisos` · Reportes programados → `/configuracion/reportes` · Registro → `/configuracion/registro` |
 
 > **Visibilidad (D-056):** las secciones **Finanzas**, **Tesorería** y **Contabilidad** del menú de empresa solo aparecen para roles de **company finance**: `OWNER`, `ADMIN`, `FINANCE`, `TREASURER` y `VIEWER` (lectura). Roles operativos (`PROJECT_MANAGER`, `PROCUREMENT`, `SALES`, `PROJECT_FINANCE`, etc.) trabajan finanzas desde el **proyecto**, no desde el hub corporativo.
@@ -173,8 +214,17 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 ### 2.1 Alta de usuarios
 
 - **Ruta:** `/configuracion/equipo` → **Invitar** (`/configuracion/equipo/invitar`).
-- El invitado acepta desde el email; queda como miembro con uno o más roles.
+- El sistema envía un email con un enlace a **`/invitaciones/aceptar`**. El token de invitación **no queda visible en la URL** de la pantalla de aceptación (se guarda en cookie httpOnly al hacer clic en el enlace); no hay que copiar/pegar tokens a mano.
+- Si el invitado **aún no tiene cuenta**, primero se registra / inicia sesión; al volver a aceptar, la cookie sigue vigente hasta que acepte o expire.
+- Tras aceptar, queda como miembro con uno o más roles.
 - Gestión de cada miembro: `/configuracion/equipo/[membershipId]`.
+- **Tenant suspendido:** no se puede aceptar una invitación a una empresa inactiva; el mensaje lo indica en pantalla.
+
+> **📷 Captura sugerida — Invitar usuario**  
+> Ruta: `/configuracion/equipo/invitar` · Mostrar formulario email + roles · Tip: datos demo; no usar emails reales de clientes.
+
+> **📷 Captura sugerida — Aceptar invitación**  
+> Ruta: `/invitaciones/aceptar` · Mostrar pantalla de aceptación (sin `?token=` en la barra de direcciones) · Tip: desktop; recortar URL bar para demostrar ausencia del token.
 
 ### 2.2 Roles disponibles (enum `UserRole`)
 
@@ -190,11 +240,11 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 
 - Acciones jerárquicas: **VER < EDITAR < APROBAR** sobre cada módulo.
 - **Ruta:** `/configuracion/permisos` muestra la matriz de permisos. **Es una vista de solo lectura** (informativa); no se editan asignaciones desde ahí. Un banner lo aclara y remite a **Equipo** para asignar roles.
-- En la matriz, algunos módulos aparecen como **no disponibles en esta versión** (p. ej. contratos, órdenes de cambio, RFIs, conciliación bancaria, impuestos): no hay pantallas operativas.
+- En la matriz, algunos módulos aparecen como **no disponibles en esta versión** (p. ej. contratos formales, órdenes de cambio, RFIs, impuestos dedicados): no hay pantallas operativas. **Conciliación bancaria** y **cierre de períodos** **sí** están operativos (ver §4.2 y §15.3).
 - La autorización se aplica **también en el backend** (servicios), no solo en la interfaz.
 
 > **📷 Captura sugerida — Matriz de permisos (solo lectura)**  
-> Ruta: `/configuracion/permisos` · Mostrar banner “solo lectura” + aviso de módulos no disponibles · Tip: no recortar el banner.
+> Ruta: `/configuracion/permisos` · Mostrar banner “solo lectura” + filas BANK_RECONCILIATION / PERIOD_CLOSE si están visibles · Tip: no recortar el banner.
 
 ### 2.4 Reglas especiales
 
@@ -234,25 +284,34 @@ Bloqer separa herramientas de **empresa** y de **proyecto** (estilo Procore):
 
 Configurar tesorería **antes** de operar cobranzas y pagos.
 
-- **Cuentas** (`/tesoreria/cuentas`, alta en `/tesoreria/cuentas/nueva`): banco, caja o billetera, con **saldo de apertura**.
-- **Movimientos:** se generan **automáticamente** al cobrar (ingreso) y pagar (egreso); se pueden **anular** con traza (nunca se borran).
-- **Transferencias internas** (`/tesoreria/transferencias`): mueven fondos entre cuentas propias como **dos movimientos atómicos** (salida + entrada).
-- **Resumen** (`/tesoreria`): saldos por cuenta y moneda, atajos a movimientos y flujo.
-- **Movimientos** (`/tesoreria/movimientos`): extracto / ledger de caja.
-- **Flujo de caja** (`/tesoreria/flujo-caja`): ingresos y egresos por período.
+### 4.0 Pantallas (subnav)
 
-> **📷 Captura sugerida — Tesorería con subnav**  
-> Ruta: `/tesoreria` · Mostrar `ModuleSubnav` (Resumen · Cuentas · Movimientos · Flujo de caja · Transferencias) · Tip: incluir al menos una cuenta con saldo.
+| Etiqueta | Ruta | Para qué |
+|----------|------|----------|
+| Resumen | `/tesoreria` | Saldos por cuenta/moneda y atajos |
+| Cuentas | `/tesoreria/cuentas` · `/nueva` · `/[id]` | Alta de banco/caja/billetera + saldo de apertura; desde el detalle → **Ajuste manual** |
+| Movimientos | `/tesoreria/movimientos` | Ledger / extracto interno (incluye columna **Estado**: Confirmado / Conciliado) |
+| Flujo de caja | `/tesoreria/flujo-caja` | Ingresos y egresos por período |
+| Transferencias | `/tesoreria/transferencias` | Entre cuentas propias (dos movimientos atómicos) |
+| **Conciliación** | `/tesoreria/conciliacion` | Emparejar extracto bancario vs movimientos del sistema (§4.2) |
 
-> **Terminología correcta:** los tipos de movimiento en el sistema son `INFLOW` (ingreso), `OUTFLOW` (egreso), `TRANSFER_IN`, `TRANSFER_OUT` y `ADJUSTMENT`. (La guía original mencionaba `INCOME`/`OUTCOME`; esos términos **no existen** en el código.)
+- **Movimientos operativos:** se generan **automáticamente** al cobrar (`INFLOW`) y pagar (`OUTFLOW`); se pueden **anular** con traza (nunca se borran), salvo que estén **conciliados** (hay que desemparejar antes).
+- En cobranzas y pagos podés indicar **método de liquidación** (Efectivo, Transferencia, Cheque, Tarjeta, Otro) y referencia opcional ([D-074]).
+- **Fondos insuficientes:** un **pago** no puede dejar la cuenta en saldo negativo (igual que transferencias). El sistema muestra el disponible y bloquea.
+
+> **📷 Captura sugerida — Tesorería con subnav (incl. Conciliación)**  
+> Ruta: `/tesoreria` · Mostrar `ModuleSubnav` completo: Resumen · Cuentas · Movimientos · Flujo de caja · Transferencias · **Conciliación** · Tip: incluir al menos una cuenta con saldo.
+
+> **📷 Captura sugerida — Ledger de movimientos con Estado**  
+> Ruta: `/tesoreria/movimientos` · Mostrar columnas Tipo + **Estado** (Confirmado / Conciliado) · Tip: mezclar un movimiento confirmado y uno conciliado si es posible.
+
+> **Terminología correcta:** tipos de movimiento = `INFLOW` (ingreso), `OUTFLOW` (egreso), `TRANSFER_IN`, `TRANSFER_OUT`, `ADJUSTMENT` (ajuste). Estados de movimiento relevantes: **Confirmado** (`CONFIRMED`) y **Conciliado** (`RECONCILED`). Un movimiento conciliado **no** se anula ni se edita hasta desemparejarlo.
 
 > **Limitación actual (importante):** cobros, pagos y transferencias internas operan en **una sola moneda por operación**. **No hay conversión de moneda dentro de tesorería.** Cada documento guarda su moneda, tipo de cambio y monto en pesos, pero el movimiento de caja no convierte.
 
-> **Fondos insuficientes:** un **pago** a proveedor no puede dejar la cuenta de origen en saldo negativo (mismo criterio que las transferencias internas). El sistema muestra el disponible y bloquea la operación.
-
 ---
 
-## 4.1 Montos y decimales (regla de trabajo diaria) — D-053
+### 4.1 Montos y decimales (regla de trabajo diaria) — D-053
 
 Para operadores: **no hace falta pensar en “escalas de base de datos”**. En pantalla y al cargar montos de dinero:
 
@@ -264,6 +323,77 @@ Para operadores: **no hace falta pensar en “escalas de base de datos”**. En 
 
 - Al **pagar o cobrar el total**, usá el saldo que muestra el sistema (o el default del formulario). El servidor aplica el saldo almacenado; no reescribás a mano un redondeo distinto.
 - Si la cuenta no tiene fondos suficientes para el pago, la operación **se rechaza** con el disponible.
+
+---
+
+### 4.2 Procedimiento — Conciliación bancaria ([D-075] · [D-076] · [D-079] · [D-080])
+
+Cuadrá el extracto del banco (o archivo CSV/OFX) con los movimientos que Bloqer ya tiene en la cuenta.
+
+**Quién:** roles con permiso de conciliación (típicamente `FINANCE`, `TREASURER`, `OWNER`, `ADMIN`). Sin permiso de edición verás el listado / detalle en solo lectura.
+
+**Estados de la sesión**
+
+| Estado UI | Técnico | Significado |
+|-----------|---------|-------------|
+| Borrador | `DRAFT` | Sesión creada; aún no se empezó a emparejar en serio |
+| En progreso | `IN_PROGRESS` | Se cargan líneas y se emparejan |
+| Cerrada | `CLOSED` | Conciliación cerrada; matches congelados (reabrir con motivo) |
+| Anulada | `CANCELLED` | Sesión descartada |
+
+#### Pasos
+
+1. Ir a **Tesorería → Conciliación** (`/tesoreria/conciliacion`).
+2. **Nueva conciliación** (`/tesoreria/conciliacion/nueva`): elegir **cuenta**, rango de fechas y **saldos inicial/final del extracto**.
+3. Abrir la sesión (`/tesoreria/conciliacion/[id]`). Si está en borrador, **Iniciar** (pasa a En progreso).
+4. Cargar el extracto de una de estas formas:
+   - **Importar CSV de extracto** (columnas típicas: fecha, descripción, monto, dirección CREDIT/DEBIT, referencia).
+   - **Importar OFX / QFX** (archivo del home banking).
+   - Agregar **líneas manuales** una a una.
+5. En el workspace de dos columnas: seleccionar una línea de extracto + un movimiento candidato del sistema → **Emparejar seleccionados**. El movimiento pasa a estado **Conciliado**.
+6. Si hay una línea de extracto sin movimiento en Bloqer: **Crear movimiento** desde la línea (ajuste operativo + empareje).
+7. Cuando el resumen cuadra (saldo extracto = saldo sistema en el rango): **Cerrar conciliación**.
+8. Si hace falta corregir después del cierre: **Reabrir sesión** (motivo obligatorio, queda auditado) → vuelve a En progreso; los matches se conservan.
+9. Export CSV del listado: desde la pantalla de conciliación / reporte asociado.
+
+> **Errores frecuentes**
+> - Intentar **cancelar un pago o cobranza** cuyo movimiento está **Conciliado** → el sistema lo bloquea: primero desemparejá en la sesión abierta (o reabrí).
+> - Dos sesiones abiertas a la vez sobre la misma cuenta → el sistema lo impide (una sesión abierta por cuenta).
+> - Cerrar el mes contable (§15.3) **antes** de terminar la conciliación del mes → no podrás crear/anular movimientos de esas fechas hasta reabrir el período.
+
+> **📷 Captura sugerida — Listado de conciliaciones**  
+> Ruta: `/tesoreria/conciliacion` · Mostrar tabla con estados (En progreso / Cerrada) + CTA **Nueva conciliación** · Tip: filtros por cuenta/estado visibles.
+
+> **📷 Captura sugerida — Nueva conciliación (alta)**  
+> Ruta: `/tesoreria/conciliacion/nueva` · Formulario cuenta + período + saldos de extracto · Tip: completar con datos demo.
+
+> **📷 Captura sugerida — Workspace de empareje (dos columnas)**  
+> Ruta: `/tesoreria/conciliacion/[id]` · Mostrar líneas de extracto a la izquierda y candidatos del sistema a la derecha + botón **Emparejar seleccionados** · Tip: esta es la captura más importante del módulo; desktop ancho.
+
+> **📷 Captura sugerida — Importar CSV / OFX**  
+> Ruta: detalle de sesión · Bloques **Importar CSV de extracto** e **Importar OFX / QFX** · Tip: no hace falta subir un archivo real en la foto; alcanza con el UI del upload.
+
+> **📷 Captura sugerida — Cerrar conciliación**  
+> Ruta: detalle · Diálogo de confirmación **Cerrar conciliación** con resumen de diferencia en cero o casi cero · Tip: preferible sesión ya cuadrada.
+
+---
+
+### 4.3 Procedimiento — Ajuste manual de cuenta
+
+Para diferencias de caja/banco que no vienen de un cobro/pago (cargos bancarios, redondeos, correcciones operativas):
+
+1. **Tesorería → Cuentas** → abrir la cuenta activa.
+2. Pulsar **Ajuste manual** (`/tesoreria/cuentas/[accountId]/ajuste`).
+3. Completar fecha, monto (2 decimales), sentido (ingreso/egreso de ajuste) y **motivo**.
+4. **Registrar ajuste** → genera un movimiento `ADJUSTMENT` **Confirmado** (impacta saldo).
+
+> El ajuste queda sujeto a **período abierto** (§15.3) y puede emparejarse luego en conciliación si aparece en el extracto.
+
+> **📷 Captura sugerida — Ajuste manual de cuenta**  
+> Ruta: `/tesoreria/cuentas/[accountId]/ajuste` · Formulario con cuenta, moneda, monto y motivo · Tip: desde detalle de cuenta con CTA visible en la captura previa del detalle.
+
+> **📷 Captura sugerida — Detalle de cuenta con CTA Ajuste manual**  
+> Ruta: `/tesoreria/cuentas/[accountId]` · Mostrar botón **Ajuste manual** · Tip: cuenta ACTIVE.
 
 ---
 
@@ -324,7 +454,9 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
 
 ---
 
-## 6. Presupuesto, EDT/WBS y APU (nivel proyecto)
+## 6. Presupuesto, EDT y APU (nivel proyecto)
+
+> En código y modelo de datos la estructura sigue siendo **WBS** (`WbsNode`); en pantalla y en esta guía se dice **EDT**.
 
 **Ruta base:** Planificación → **Presupuesto** → `/proyectos/[id]/presupuestos`
 
@@ -335,7 +467,7 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
    - **Nombre del presupuesto \***
    - **Moneda** (default ARS)
    - **Parámetros económicos:** Gastos generales (%) · Costo financiero (%) · Utilidad (%) · Impuestos (%)
-   - Opcional: precarga / importación WBS en el mismo alta (sección de preload del formulario)
+   - Opcional: precarga / **Importar EDT** en el mismo alta (sección de preload del formulario)
 3. Guardar. Queda en `DRAFT` y abre el detalle `/presupuestos/[budgetId]`.
 
 ### 6.1 Estructura — capítulo vs partida vs insumo (D-057)
@@ -344,17 +476,17 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
 |----------|------|-----------|----------------|
 | **Capítulo** | `GROUP` | Solo rollup de totales (sin unidad/cantidad operativa) | Organizar el cómputo |
 | **Partida certificable** | `ITEM` hoja | Unidad, cantidad, **APU** (`CostItem`) | Certificar, comprar e imputar costos |
-| **Insumo** | Línea APU (`CostAnalysisLine`) | MAT / LAB / EQP / SUB / OTHER bajo la partida | Composición del costo; **nunca** hijo WBS |
+| **Insumo** | Línea APU (`CostAnalysisLine`) | MAT / LAB / EQP / SUB / OTHER bajo la partida | Composición del costo; **nunca** hijo en el árbol EDT |
 
-- **Anti-patrón:** hierros, mallas o cuadrillas como hijos WBS (`4.1.1`) bajo una partida medible. Los insumos van en el **APU de la partida** (`4.1`).
+- **Anti-patrón:** hierros, mallas o cuadrillas como hijos EDT (`4.1.1`) bajo una partida medible. Los insumos van en el **APU de la partida** (`4.1`).
 - Subdividir un `ITEM` convierte al padre en `GROUP`: sirve para partir **alcance de obra**, no para desglosar BOM.
 
-### 6.1a Procedimiento — Cargar la EDT (WBS)
+### 6.1a Procedimiento — Cargar la EDT
 
 **Opción A — Importar**
 
-1. En el detalle del presupuesto (`DRAFT`), **Importar WBS**.
-2. Diálogo **Importar estructura WBS**: subir Excel/CSV (columna A = numeración, B = nombre; multi-rubro si el archivo trae prefijos).
+1. En el detalle del presupuesto (`DRAFT`), **Importar EDT**.
+2. Diálogo **Importar estructura EDT**: subir Excel/CSV (columna A = numeración, B = nombre; multi-rubro si el archivo trae prefijos).
 3. Confirmar **Importar**.
 
 **Opción B — Manual**
@@ -382,10 +514,10 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
   - Escala **Compacto** | **Desglose** (desglose por categoría solo en Costo)
   - Toggle **Unitario** (agrega columnas `/u`; los totales siempre se muestran)
   - Toggle **Incidencia** `%` (peso de la fila sobre TOTAL GENERAL)
-- **Exports** CSV/XLSX/PDF: solo filas WBS (sin filas APU); respetan el modo activo.
+- **Exports** CSV/XLSX/PDF: solo filas EDT (sin filas APU); respetan el modo activo.
 
 > **📷 Captura sugerida — EDT con insumos expandibles**  
-> Ruta: `/proyectos/[id]/presupuestos/[budgetId]` · Partida expandida con APU·MAT + toolbar Costo/Venta · Tip: chevron APU ≠ hijos WBS.
+> Ruta: `/proyectos/[id]/presupuestos/[budgetId]` · Partida expandida con APU·MAT + toolbar Costo/Venta · Tip: chevron APU ≠ hijos EDT.
 
 ### 6.2 Procedimiento — Aprobar el presupuesto
 
@@ -407,7 +539,7 @@ stateDiagram-v2
 
 | Estado | Qué permite |
 |--------|-------------|
-| `DRAFT` | Editar WBS, APU y precios |
+| `DRAFT` | Editar estructura EDT, APU y precios |
 | `IN_REVIEW` | Solo revisión; economía bloqueada |
 | `RETURNED_FOR_CHANGES` | Correcciones y reenvío |
 | `APPROVED` | Congelado; habilita certificaciones, Materiales y baseline de EDT y costos |
@@ -422,7 +554,8 @@ stateDiagram-v2
 
 ### 6.3 Adendas — limitación actual
 
-- Cambio contractual hoy = **adenda operativa / presupuesto nuevo** (sin vínculo padre‑hijo automático).
+- Cambio contractual hoy = **adenda operativa**: nuevo presupuesto con vínculo opcional `parentBudgetId` al APPROVED/CLOSED (UI: **Crear adenda / fase**). No copia la EDT sola.
+- Al crear la adenda se **prellenan** los % económicos (GG, financiero, utilidad, IVA) y la moneda del presupuesto padre; son editables.
 - El rótulo `v{n}` en UI es numeración de presentación, no versionado contractual.
 - **Contratos, adendas y órdenes de cambio como entidades formales no están implementados** (ver §19).
 
@@ -435,7 +568,7 @@ stateDiagram-v2
 ### 7.0 Procedimiento — Armar el cronograma
 
 1. Abrir Cronograma. Vista por defecto: **Gantt** (`?view=gantt`). También: Calendario, Kanban, Tabla.
-2. (Recomendado) **Importar desde presupuesto** → diálogo **Importar WBS al cronograma** → elegir presupuesto aprobado → **Importar**. Así las tareas nacen alineadas a la EDT.
+2. (Recomendado) **Importar desde presupuesto** → diálogo **Importar EDT al cronograma** → elegir presupuesto aprobado → **Importar**. Así las tareas nacen alineadas a la EDT.
 3. Completar fechas en ítems **hoja** (no en contenedores: sus fechas se derivan; usar **Recalcular contenedores** en el Gantt si hace falta). En Gantt: arrastrar/redimensionar barras y **hitos**.
 4. Crear ítems adicionales con **+ Tarea / hito** (`TASK` o `MILESTONE`). Opcional: vincular partida EDT al crear.
 5. Dependencias: solo **Finish‑to‑Start (FS)** en la pestaña **Dependencias** del detalle (o botón **FS** en el Gantt). Violaciones = advertencias al guardar fechas, no bloqueos. Las flechas del Gantt son de solo lectura.
@@ -474,7 +607,7 @@ En el Gantt: relleno oscuro de la barra = **Real**; franja/borde ámbar = **Cert
 **Ruta:** Operación → **Libro de obra** → `/proyectos/[id]/libro-obra`
 
 1. **Nuevo parte** (fecha no futura, clima, cuadrilla, tareas).
-2. Cargar **avance por partida EDT/WBS** (cantidades / % según lo que pida el formulario).
+2. Cargar **avance por partida EDT** (cantidades / % según lo que pida el formulario).
 3. Adjuntar fotos y observaciones.
 4. **Enviar a revisión** → `SUBMITTED`.
 5. El PM abre el parte y pulsa **Aprobar parte** → `APPROVED` (queda inmutable salvo anulación con motivo). Si hace falta, devolver.
@@ -490,21 +623,21 @@ flowchart LR
 
 ### 8.2 Efectos al aprobar el parte
 
-- Actualiza el **% Real** de tareas con WBS primario enlazado.
+- Actualiza el **% Real** de tareas con partida EDT primaria enlazada.
 - Materiales del parte con producto + depósito pueden generar **consumo de inventario**.
-- **Imputación WBS del consumo (D-055):** WBS de la línea de material; si falta y hay **exactamente una** partida de progreso → esa; si hay **varias** partidas y el material no trae WBS → **conflicto** (no se crea consumo).
+- **Imputación EDT del consumo (D-055):** partida EDT de la línea de material (`WbsNode`); si falta y hay **exactamente una** partida de progreso → esa; si hay **varias** partidas y el material no trae partida EDT → **conflicto** (no se crea consumo).
 
 ### 8.3 Procedimiento — Consumos de stock (manual)
 
 **Ruta:** Operación → **Consumos** → `/proyectos/[id]/consumos`
 
 1. **Registrar consumo** (abre diálogo; también `?create=1`). La ruta `/consumos/nuevo` redirige al diálogo.
-2. Completar: **Producto** · **Depósito** · cantidad · fecha · **Partida WBS (opcional)** · notas.
+2. Completar: **Producto** · **Depósito** · cantidad · fecha · **Partida EDT (opcional)** · notas.
 3. **Registrar consumo**.
 4. Atajos: desde Inventario del proyecto o desde Materiales → enlace **Consumos**.
 
 > **📷 Captura sugerida — Parte de obra (detalle)**  
-> Ruta: `/proyectos/[id]/libro-obra/[logId]` · Avance por WBS + adjuntos · Tip: SUBMITTED o APPROVED.
+> Ruta: `/proyectos/[id]/libro-obra/[logId]` · Avance por partida EDT + adjuntos · Tip: SUBMITTED o APPROVED.
 
 > **📷 Captura sugerida — Listado de consumos**  
 > Ruta: `/proyectos/[id]/consumos` · Empty state con **Registrar consumo** o filas · Tip: no confundir con Inventario corporativo.
@@ -543,7 +676,7 @@ flowchart LR
   PO --> SI["Factura de proveedor → Cuenta por pagar"]
 ```
 
-> **Regla (D-050 / D-055):** toda línea de **solicitud/OC** y toda **factura de proveedor de proyecto** imputa a una **partida hoja**. Facturas desde OC **copian** el WBS de la OC. Facturas corporativas (sin obra) **sin** WBS.
+> **Regla (D-050 / D-055):** toda línea de **solicitud/OC** y toda **factura de proveedor de proyecto** imputa a una **partida hoja**. Facturas desde OC **copian** la partida EDT de la OC. Facturas corporativas (sin obra) **sin** partida EDT.
 
 ### 9.1 Procedimiento — Solicitud de compra (SC)
 
@@ -551,7 +684,7 @@ flowchart LR
 
 1. **Nueva solicitud** (diálogo / `?create=1`), o llegar prellenada desde Materiales → **Pedir**.
 2. Líneas: cantidad, unidad, descripción y **partida EDT obligatoria**.
-3. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por WBS).
+3. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por partida EDT).
 4. Cargar **Cotizaciones** (precio + **plazo de entrega en días** + validez). Cumplir mínimo de cotizaciones de `/configuracion/compras`.
 5. **Seleccionar** proveedor → genera **OC en borrador**.
 6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora.
@@ -646,6 +779,12 @@ stateDiagram-v2
 4. **No** existe estado `INVOICED` en la certificación: el cobro se deriva de las cobranzas.
 5. La emisión de factura es **manual**; aprobar la certificación **no** crea la factura sola.
 
+**Certificación, factura y cobro (D-072)**
+
+- La certificación (`APPROVED`) **no** acredita banco ni mueve caja; solo registra avance certificado.
+- **Emitir factura** abre la **cuenta por cobrar**; la **cobranza** elige la cuenta de tesorería y genera el ingreso (`INFLOW`).
+- Al emitir factura de obra con saldo pendiente, `OWNER`/`ADMIN`/`FINANCE`/`TREASURER` reciben aviso **Listo para cobrar**; un PM con permiso de cobro puede registrar la cobranza igual.
+
 > **📷 Captura sugerida — Certificación cliente APPROVED**  
 > Ruta: `/proyectos/[id]/certificaciones/[certId]` · CTA Emitir factura o factura vinculada · Tip: Lote 3 B-02.
 
@@ -665,8 +804,8 @@ flowchart LR
 #### Obra (proyecto)
 
 - **Facturas emitidas** (`/proyectos/[id]/facturas`, estados Borrador / Emitida / Anulada): una vez emitidas son inmutables; solo se pueden **anular**. Detalle: **Emitir** desde borrador; panel de **adjuntos** del comprobante.
-- **Cuentas por cobrar** (`/proyectos/[id]/cuentas-por-cobrar`): estados Pendiente / Parcial / Pagado / Vencido. Desde el detalle → **Cobrar** (`…/[receivableId]/cobrar`): cuenta, fecha, monto (2 decimales). Para saldar el total, dejá el saldo que muestra el sistema.
-- **Cobranzas** (`/proyectos/[id]/cobranzas`): ingresan dinero (`INFLOW`) y bajan el saldo.
+- **Cuentas por cobrar** (`/proyectos/[id]/cuentas-por-cobrar`): estados Pendiente / Parcial / Pagado / Vencido. Desde el detalle → **Cobrar** (`…/[receivableId]/cobrar`): cuenta, fecha, monto (2 decimales), **método** (Efectivo / Transferencia / Cheque / Tarjeta / Otro) y referencia opcional. Para saldar el total, dejá el saldo que muestra el sistema. Solo la **cobranza confirmada** acredita tesorería ([D-072]).
+- **Cobranzas** (`/proyectos/[id]/cobranzas`): ingresan dinero (`INFLOW`) y bajan el saldo. En el detalle, **Cancelar** muestra el error en pantalla si falla (p. ej. movimiento ya conciliado o período cerrado); no se “traga” el mensaje.
 - **Venta rápida / anticipo** (`/proyectos/[id]/facturas/anticipo/nueva`): factura + CxC (+ cobro opcional) en un paso.
 - **No disponible hoy:** “Cobrar ahora” **inline** al crear una factura de venta **de proyecto** (diferido; el cobro se hace desde CxC). El cobro inmediato corporativo sí existe en Transacciones (abajo).
 
@@ -706,8 +845,8 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 
 **Alta en obra (`/nueva`):**
 
-1. Proveedor, fechas, líneas (cada línea con **WBS obligatorio**, D-055), OC opcional, **adjunto** opcional (foto/PDF del comprobante).
-2. Desde OC: **Registrar factura desde OC** copia el WBS de cada línea de la orden.
+1. Proveedor, fechas, líneas (cada línea con **partida EDT obligatoria**, D-055), OC opcional, **adjunto** opcional (foto/PDF del comprobante).
+2. Desde OC: **Registrar factura desde OC** copia la partida EDT de cada línea de la orden.
 3. Sin más: **Crear factura** → queda en **borrador** → luego **Emitir** en el detalle (crea CxP + **asiento DRAFT** en contabilidad, ver §15).
 4. Con permiso **EDIT tesorería** y módulo Tesorería activo: checkbox **Emitir y pagar ahora (egreso de caja)** → cuenta de pago + fecha → **Emitir y pagar**. Crea factura emitida + CxP + pago + egreso en un paso. Si no hay fondos suficientes, **bloquea**.
 
@@ -720,7 +859,7 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 | CxP | `/finanzas/cuentas-por-pagar` → `/[payableId]/pagar` (**Registrar pago**) |
 | Detalle de pago | `/finanzas/pagos-proveedor/[paymentId]` |
 
-**Registrar pago (obra o empresa):** cuenta de tesorería (misma moneda), fecha, monto a 2 decimales, notas. El default es el **saldo pendiente**; usarlo para saldar sin residual. Fondos insuficientes → error con disponible.
+**Registrar pago (obra o empresa):** cuenta de tesorería (misma moneda), fecha, monto a 2 decimales, **método de liquidación** + referencia opcional, notas. El default es el **saldo pendiente**; usarlo para saldar sin residual. Fondos insuficientes → error con disponible. Si el movimiento de caja ya está **Conciliado**, hay que desemparejar antes de cancelar el pago.
 
 > **Notas de navegación y límites:**
 > - Consulta consolidada de pagos: `/finanzas/transacciones` filtrando origen `PAYMENT` y egreso.
@@ -747,8 +886,8 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 - **Menú:** Planificación → **EDT y costos**.
 - **Ruta:** `/proyectos/[id]/control-costos` (título de pantalla: **Estructura de Desglose de Trabajo y Costos**; drill-down en `/control-costos/[wbsNodeId]`).
 - Es el **tablero de control de costos** del proyecto. Materiales (cantidades) y Compras (documentos) alimentan este tablero; no lo reemplazan.
-- Compara **presupuesto baseline vs. real** por ítem EDT/WBS, en capas: **comprometido**, **recibido** (informativo), **devengado**, **pagado**, más **certificado acumulado**. Es el tablero de **afectaciones** por partida (§0.2).
-- Si las líneas de factura de proveedor tienen WBS, el devengado/pagado se imputa **por línea**; si hay vínculo a línea de OC (`purchaseOrderLineId`, D-066), se usa esa partida; si no (legacy), se prorratea vía OC (D-055).
+- Compara **presupuesto baseline vs. real** por partida EDT, en capas: **comprometido**, **recibido** (informativo), **devengado**, **pagado**, más **certificado acumulado**. Es el tablero de **afectaciones** por partida (§0.2).
+- Si las líneas de factura de proveedor tienen partida EDT, el devengado/pagado se imputa **por línea**; si hay vínculo a línea de OC (`purchaseOrderLineId`, D-066), se usa esa partida; si no (legacy), se prorratea vía OC (D-055).
 - **Exposición esperada** = **devengado + comprometido abierto** ([BR-COS-002] / [D-065]). Comprometido abierto = comprometido − devengado ligado al mismo compromiso. **No** usar `max(comprometido, recibido, devengado)` ni sumar OC + factura en bruto.
 - **Drill-down de partida:** links a OC, subcontratos, facturas de proveedor y pagos (trazabilidad partida → documento).
 - **Matching 3 vías (compras):** en detalle de OC, avisos si facturado supera recibido ± tolerancia de empresa ([D-067]); la recepción respeta tolerancia de sobrecantidad (0–5%).
@@ -807,6 +946,7 @@ Contabilidad **gerencial interna** (libro mayor). No sustituye estados oficiales
 | Resumen | `/contabilidad` | KPIs: **Borradores**, **Contabilizados del mes**, **Resultado del mes**, **Activo a hoy** + card **Borradores pendientes** |
 | Cuentas | `/contabilidad/cuentas` | Plan de cuentas; CTA **Aplicar plantilla AR** |
 | Asientos | `/contabilidad/asientos` | Listado `DRAFT` / `POSTED` / `CANCELLED` |
+| **Cierres** | `/contabilidad/cierres` | Cierre / reapertura mensual de tesorería + asientos (§15.3) |
 | Reglas | `/contabilidad/reglas` | Mapeo evento → cuentas Debe/Haber |
 | Libro diario | `/contabilidad/libro-diario` | Solo asientos `POSTED` |
 | Sumas y saldos | `/contabilidad/sumas-y-saldos` | Trial balance por período |
@@ -850,13 +990,48 @@ flowchart LR
 | Movimiento de tesorería cuyo origen ya es cobro/pago/apertura | **No** (anti doble conteo) |
 | Consumo de stock / recepción | **No** aún (costeo diferido) |
 
-> **Limitaciones:** sin cierre de ejercicio GL ni numeración correlativa; reportes gerenciales on-the-fly ≠ AFIP; multi-moneda por bloques sin consolidación FX; IVA/retenciones solo si hay cuentas en el plan.
+> **Limitaciones:** sin cierre de **ejercicio** GL ni numeración correlativa de asientos; sí hay **cierre mensual operativo** (§15.3). Reportes gerenciales on-the-fly ≠ AFIP; multi-moneda por bloques sin consolidación FX; IVA/retenciones solo si hay cuentas en el plan.
 
 > **📷 Captura sugerida — Contabilidad hub + plantilla**  
-> Ruta: `/contabilidad` · Subnav + Borradores pendientes · Tip: D-061/D-062.
+> Ruta: `/contabilidad` · Subnav (incluir pestaña **Cierres**) + Borradores pendientes · Tip: D-061/D-062.
 
 > **📷 Captura sugerida — Aplicar plantilla AR**  
 > Ruta: `/contabilidad/cuentas` · CTA Aplicar plantilla AR · Tip: empresa nueva.
+
+### 15.3 Procedimiento — Cierre de períodos (bloqueo mensual) — [D-014] · [D-078]
+
+Congela **movimientos de tesorería** y **asientos contables** cuya fecha cae en un mes cerrado. No es el cierre de gastos generales (GG / overhead), que es otro flujo en `/finanzas/gastos-generales`.
+
+**Quién opera:** solo **OWNER** / **ADMIN** (permiso `PERIOD_CLOSE`). El módulo debe estar habilitado para el tenant.
+
+#### Pasos — Cerrar
+
+1. Ir a **Contabilidad → Cierres** (`/contabilidad/cierres`).
+2. Verificar la empresa (si hay varias y el usuario no está anclado a una sola).
+3. En la tabla **Períodos mensuales**, ubicar el mes (`YYYY-MM`) en estado **Abierto**.
+4. Pulsar **Cerrar** → confirmar en el diálogo **Cerrar período**.
+5. El período pasa a **Cerrado**. A partir de ahí, crear/editar/anular/postear/revertir con fecha en ese mes → error `PERIOD_CLOSED` (mensaje en español en pantalla).
+
+#### Pasos — Reabrir
+
+1. En el mismo listado, período **Cerrado** → **Reabrir**.
+2. Ingresar **motivo obligatorio** (queda en auditoría).
+3. El período vuelve a **Abierto**.
+
+> **Orden recomendado del mes:** (1) terminar cobros/pagos, (2) **contabilizar** borradores del mes, (3) **conciliar** banco (§4.2), (4) **cerrar** el período. Cerrar antes de conciliar complica las correcciones.
+
+> **No confundir**
+> - **Cierre de período** (`/contabilidad/cierres`) = bloquea caja + GL del mes.
+> - **Cierre de GG / overhead** (`/finanzas/gastos-generales`) = congela el prorrateo automático de gastos generales; **no** bloquea tesorería ni asientos.
+
+> **📷 Captura sugerida — Cierres de período (listado)**  
+> Ruta: `/contabilidad/cierres` · Tabla Períodos mensuales con columnas Período / Desde / Hasta / Estado / Acciones · Tip: mezclar un mes Abierto y uno Cerrado.
+
+> **📷 Captura sugerida — Diálogo Cerrar período**  
+> Ruta: `/contabilidad/cierres` · Modal de confirmación **Cerrar período** · Tip: texto del diálogo legible.
+
+> **📷 Captura sugerida — Diálogo Reabrir con motivo**  
+> Ruta: `/contabilidad/cierres` · Modal **Reabrir** con campo de motivo · Tip: no enviar el formulario en la captura; solo mostrar el UI.
 
 ---
 
@@ -875,8 +1050,12 @@ flowchart LR
 | Emitir factura de venta | **Facturado** + cuenta por cobrar | — | **Auto-DRAFT** → Contabilizar |
 | Cobranza / Cobrar ahora (AR corporativo) | **Cobrado** | Movimiento `INFLOW` | **Auto-DRAFT** → Contabilizar |
 | Transferencia interna | — | TRANSFER_OUT + TRANSFER_IN | **Auto-DRAFT** → Contabilizar |
+| Ajuste manual de cuenta | — | Movimiento `ADJUSTMENT` confirmado | Según reglas (si aplica) |
+| Emparejar en conciliación | — | Movimiento → estado **Conciliado** | — |
+| Cerrar conciliación | — | Sesión `CLOSED`; matches congelados | — |
+| Cerrar período contable | Bloquea mutaciones del mes | No crea movimientos; **impide** crear/anular en fechas cerradas | Impide postear/anular/revertir asientos del mes |
 | Aprobar cert. de subcontrato | **Devengado** (factura proveedor DRAFT) | — | Al **emitir** la factura → Auto-DRAFT |
-| Imputar gasto general | Afecta rentabilidad neta | Según pago | — |
+| Imputar / cerrar GG (overhead) | Afecta rentabilidad neta | Según pago | Independiente del cierre de período GL |
 
 ### Diferencias entre estados económicos
 
@@ -896,8 +1075,8 @@ flowchart LR
 | Error | Consecuencia | Orden correcto |
 |-------|--------------|----------------|
 | Certificar sin presupuesto aprobado | Bloqueo o datos inválidos | Aprobar el presupuesto primero |
-| Modelar insumos (hierros, etc.) como hijos WBS | Partidas certificables falsas / doble multiplicación | Insumos en el **APU** de la partida (D-057); ver filas APU expandibles (D-059) |
-| Crear línea de compra o factura de obra sin WBS | El sistema lo rechaza | Imputar cada línea a una **partida hoja**; gastos generales → partida de indirectos |
+| Modelar insumos (hierros, etc.) como hijos EDT | Partidas certificables falsas / doble multiplicación | Insumos en el **APU** de la partida (D-057); ver filas APU expandibles (D-059) |
+| Crear línea de compra o factura de obra sin partida EDT | El sistema lo rechaza | Imputar cada línea a una **partida hoja**; gastos generales → partida de indirectos |
 | Aprobar tu propia OC cuando no corresponde | Sin segregación de funciones | Que apruebe otro; la autoaprobación depende de la política y del umbral |
 | Confundir avance de Gantt con certificado | Reportes incoherentes | Real = libro de obra; Certificado = certificaciones |
 | Sumar OC + factura como costo total | Doble conteo | Usar **exposición esperada** |
@@ -911,6 +1090,10 @@ flowchart LR
 | Pagar con cuenta sin fondos | Operación bloqueada | Verificar saldo de tesorería antes |
 | Esperar “Cobrar ahora” al crear factura de obra | No existe (diferido) | Cobrar desde CxC del proyecto |
 | Buscar Recepciones bajo Operación | No aparece | Menú **Compras → Recepciones** |
+| Cancelar pago/cobranza con movimiento **Conciliado** | Bloqueo | Desemparejar (o reabrir sesión) y recién entonces cancelar |
+| Operar caja en un mes **Cerrado** | Error `PERIOD_CLOSED` | Reabrir el período (OWNER/ADMIN + motivo) o usar fecha de mes abierto |
+| Confundir cierre de período con cierre de GG | Expectativa incorrecta | Cierres GL = `/contabilidad/cierres`; GG = `/finanzas/gastos-generales` |
+| Cerrar el mes antes de conciliar / postear | Correcciones bloqueadas | Conciliar + Contabilizar → recién ahí Cerrar |
 
 ---
 
@@ -922,13 +1105,15 @@ flowchart LR
 ### Dueño / Director
 
 - [ ] Usuarios y roles asignados (mínimo un `OWNER`/`ADMIN`); company finance solo a quien corresponda (D-056)
-- [ ] Módulos habilitados confirmados con el proveedor del servicio
+- [ ] Módulos habilitados confirmados con el proveedor del servicio (incl. Tesorería, Conciliación, Contabilidad, Cierre de períodos)
 - [ ] Cuentas de tesorería creadas con saldo de apertura
 - [ ] Contabilidad: **Aplicar plantilla AR** si el plan está vacío
 - [ ] Revisión periódica de finanzas corporativas (`/finanzas`) y rentabilidad neta
 - [ ] Campana / inbox y **Alertas operativas** revisadas (`/notificaciones/alertas`)
 - [ ] Reportes programados revisados
 - [ ] Comprender: los asientos **nacen en borrador** solos, pero hay que **Contabilizarlos**
+- [ ] Cierre de mes: cobros/pagos OK → borradores contabilizados → conciliaciones cerradas → **Cerrar período** (`/contabilidad/cierres`)
+- [ ] Si hay que corregir un mes cerrado: **Reabrir** con motivo auditado
 
 > **📷 Captura sugerida — Alertas · Última actividad**  
 > Ruta: `/notificaciones/alertas` · Mostrar card Última actividad · Tip: Lote 5 G-03; solo OWNER/ADMIN.
@@ -942,8 +1127,8 @@ flowchart LR
 - [ ] Presupuesto `APPROVED`/`CLOSED` (un solo APPROVED por obra)
 - [ ] Partidas medibles con APU; **insumos en APU**, no como hijos EDT (D-057)
 - [ ] Cronograma con fechas en hojas y dependencias FS
-- [ ] WBS/EDT primario en tareas críticas
-- [ ] Libro de obra al día y aprobado (materiales con WBS si hay varias partidas)
+- [ ] Partida EDT primaria en tareas críticas
+- [ ] Libro de obra al día y aprobado (materiales con partida EDT si hay varias partidas)
 - [ ] Tablero **Materiales** revisado (faltantes → Pedir)
 - [ ] Certificaciones periódicas (y CTA a factura cuando corresponda)
 - [ ] Recepciones (Compras) y consumos (Operación) al día
@@ -952,26 +1137,26 @@ flowchart LR
 
 ### Capataz
 
-- [ ] Parte diario cargado (clima, cuadrilla, avance por WBS, fotos)
+- [ ] Parte diario cargado (clima, cuadrilla, avance por partida EDT, fotos)
 - [ ] Parte enviado (`SUBMITTED`) para aprobación del PM
-- [ ] Materiales consumidos registrados (listado `/consumos`); WBS del material si el parte toca varias partidas
+- [ ] Materiales consumidos registrados (listado `/consumos`); partida EDT del material si el parte toca varias partidas
 
 ### Compras
 
 - [ ] Política de compras revisada en `/configuracion/compras`
 - [ ] Tablero **Materiales** / **Tablero de compras** como punto de partida del faltante
-- [ ] Todas las líneas con **WBS/partida** (indirectos → partida de gastos generales)
+- [ ] Todas las líneas con **partida EDT** (indirectos → partida de gastos generales)
 - [ ] Solicitudes cotizadas (mínimo según política), comparando **precio y plazo**
 - [ ] Desvíos de precio con **justificación** cuando corresponde
 - [ ] OC enviada → aprobada (o **devuelta con motivo**) → **confirmada** al proveedor
 - [ ] Recepciones registradas (menú **Compras → Recepciones** o desde la OC)
-- [ ] Facturas de proveedor con WBS (desde OC o alta manual)
+- [ ] Facturas de proveedor con partida EDT (desde OC o alta manual)
 - [ ] Tras emitir factura/pago: verificar partida en **EDT y costos** (no solo en Materiales)
 
 ### Administración / Finanzas / Tesorería
 
 - [ ] Facturas de venta emitidas desde certificaciones (o venta directa / anticipo)
-- [ ] Cobranzas de obra aplicadas desde CxC del proyecto (click en saldo para autocompletar)
+- [ ] Cobranzas de obra aplicadas desde CxC del proyecto (click en saldo para autocompletar); revisar avisos **Listo para cobrar** ([D-072]) tras emitir facturas
 - [ ] Ingresos corporativos con CxC desde Transacciones (Factura / cuenta por cobrar) cuando corresponde
 - [ ] Ingresos solo caja (sin CxC) solo cuando no hay obligación de cobro
 - [ ] CxC empresa revisadas en `/finanzas/cuentas-por-cobrar` (filas **Empresa**)
@@ -979,9 +1164,11 @@ flowchart LR
 - [ ] Gastos corporativos desde Facturas y gastos / Transacciones
 - [ ] CxP revisadas; pagos con saldo a 2 decimales; fondos suficientes en la cuenta
 - [ ] Exports CSV/PDF de CxP / facturas / transacciones corporativas cuando haga falta
-- [ ] Movimientos de caja conciliados manualmente (no hay conciliación bancaria automática)
+- [ ] **Conciliación bancaria** del mes: importar extracto → emparejar → **Cerrar conciliación** (§4.2)
+- [ ] Ajustes manuales de caja solo con motivo documentado (§4.3)
 - [ ] Reportes de flujo de caja y aging revisados
 - [ ] Si también tienen contabilidad: revisar **Borradores pendientes** del hub
+- [ ] Pedir a OWNER/ADMIN el **cierre de período** cuando el mes quedó cerrado (§15.3)
 
 ### Contabilidad
 
@@ -990,6 +1177,8 @@ flowchart LR
 - [ ] **Contabilizar** asientos DRAFT (y **Revertir** si hay corrección)
 - [ ] Correr Sumas y saldos / Libro diario / Situación / Resultados del período
 - [ ] Exportar libros cuando haga falta (CSV/PDF/XLSX)
+- [ ] Coordinar con tesorería: conciliación del mes antes del cierre
+- [ ] Pedir / ejecutar **Cerrar período** del mes (OWNER/ADMIN) en `/contabilidad/cierres` cuando corresponda
 - [ ] Recordar: gerencial ≠ AFIP; stock aún sin auto-asiento
 
 ---
@@ -998,17 +1187,17 @@ flowchart LR
 
 | Limitación | Detalle |
 |------------|---------|
-| **Contabilidad: sin auto-POST** | Los asientos **sí** se crean en `DRAFT` solos (D-061); hay que **Contabilizar** a mano. Stock/consumos aún **sin** auto-DRAFT. Sin cierre de ejercicio GL ni numeración correlativa. Reportes gerenciales ≠ AFIP. |
-| **Conciliación bancaria** | No implementada (módulo marcado no disponible en permisos). |
-| **Contratos, adendas y órdenes de cambio** | Documentados, sin entidad ni pantalla. Las adendas se manejan como presupuesto/adenda operativa sin vínculo automático (`v{n}` es solo presentación). |
+| **Contabilidad: sin auto-POST** | Los asientos **sí** se crean en `DRAFT` solos (D-061); hay que **Contabilizar** a mano. Stock/consumos aún **sin** auto-DRAFT. Hay **cierre mensual operativo** (§15.3); **no** hay cierre de ejercicio GL ni numeración correlativa. Reportes gerenciales ≠ AFIP. |
+| **Conciliación bancaria** | **Implementada** (manual + CSV/OFX, §4.2). **No** hay conexión API directa con el banco (integración futura). |
+| **Contratos, adendas y órdenes de cambio** | Entidades formales Contract/CO no implementadas (Q-057). Adenda operativa = presupuesto hijo con `parentBudgetId` (UI **Crear adenda / fase**). |
 | **RFIs** | No implementados. |
 | **Multi‑moneda en tesorería** | Cobros, pagos y transferencias exigen misma moneda. Contabilidad: bloques por moneda sin consolidación FX. |
 | **Valuación de inventario** | Sin política FIFO/promedio configurable; por eso el costeo de stock no auto-asienta aún. |
 | **Impuestos / retenciones** | Solo IVA por línea; retenciones manuales, sin módulo dedicado. |
 | **Documentos** | Si R2 no está configurado: metadata + badge **PLACEHOLDER**; la descarga explica el límite. |
 | **Anticipo a proveedor** | Servicio stub (ADR-013); **sin** CTA en UI. |
-| **Cobrar ahora en factura de obra** | Diferido (Q-055); cobrar desde CxC. Corporativo sí tiene cobro opcional en Transacciones. |
-| **Ajustes de stock/caja (`ADJUSTMENT`)** | Enum reservado; sin UI. |
+| **Cobrar ahora en factura de obra** | Disponible en alta manual de factura de proyecto ([D-077] / Q-055); requiere `EDIT TREASURY`. Certificación sigue: emitir → cobrar aparte. Corporativo: cobro opcional en Transacciones. |
+| **Ajustes de caja** | **Hay UI** de ajuste manual por cuenta (§4.3). Ajustes de **stock** siguen sin pantalla dedicada de ajuste genérico. |
 | **Notificaciones** | Sin Web Push / preferencias mute; polling 30 s en pestaña visible (D-054). |
 | **Permisos** | La matriz es de solo lectura; los roles son fijos. Techos “solo su proyecto” aún sin `ProjectMembership`. |
 | **Segundo factor (2FA)** | No disponible; acceso con Google o email/contraseña. |
@@ -1025,7 +1214,9 @@ flowchart LR
 - Plan de mejoras corto plazo: [`PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md`](./PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md)
 - Smoke por rol (J-02): [`08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md)
 - Changelog UI Lotes 1–6 (autores): [`guides/CHANGELOG_UI_LOTES_1_6.md`](./guides/CHANGELOG_UI_LOTES_1_6.md)
-- Decisiones recientes: [D-050](./00-product/DECISION_LOG.md)–[D-055](./00-product/DECISION_LOG.md) (compras/WBS/AR/AP/decimales/notif) · [D-056](./00-product/DECISION_LOG.md) (company vs project finance) · [D-057](./00-product/DECISION_LOG.md)–[D-060](./00-product/DECISION_LOG.md) (EDT/APU) · [D-061](./00-product/DECISION_LOG.md)–[D-063](./00-product/DECISION_LOG.md) (contabilidad) · [D-064](./00-product/DECISION_LOG.md) (invitación por email)
+- Decisiones recientes: [D-050](./00-product/DECISION_LOG.md)–[D-055](./00-product/DECISION_LOG.md) (compras/EDT/AR/AP/decimales/notif) · [D-056](./00-product/DECISION_LOG.md) (company vs project finance) · [D-057](./00-product/DECISION_LOG.md)–[D-060](./00-product/DECISION_LOG.md) (EDT/APU) · [D-061](./00-product/DECISION_LOG.md)–[D-063](./00-product/DECISION_LOG.md) (contabilidad) · [D-064](./00-product/DECISION_LOG.md) (invitación por email) · [D-072](./00-product/DECISION_LOG.md) (cobranza CxC) · [D-074](./00-product/DECISION_LOG.md) (método de liquidación) · [D-075](./00-product/DECISION_LOG.md)–[D-080](./00-product/DECISION_LOG.md) (conciliación / OFX / reapertura) · [D-078](./00-product/DECISION_LOG.md) (cierre de período)
+- Tesorería / conciliación: [`02-modules/TREASURY.md`](./02-modules/TREASURY.md), [`02-modules/BANK_RECONCILIATION.md`](./02-modules/BANK_RECONCILIATION.md), workflow [`05-workflows/RECONCILE_BANK.md`](./05-workflows/RECONCILE_BANK.md)
+- Cierre de período: [`03-finance/PERIOD_CLOSE_AND_LOCKS.md`](./03-finance/PERIOD_CLOSE_AND_LOCKS.md), workflow [`05-workflows/CLOSE_PERIOD.md`](./05-workflows/CLOSE_PERIOD.md)
 - Contabilidad: [`02-modules/ACCOUNTING.md`](./02-modules/ACCOUNTING.md), [`08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md`](./08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md)
 - Notificaciones: [`02-modules/NOTIFICATIONS.md`](./02-modules/NOTIFICATIONS.md)
 - Estados canónicos: [`01-domain/STATE_MACHINES.md`](./01-domain/STATE_MACHINES.md)
@@ -1036,12 +1227,13 @@ flowchart LR
 
 ## 21. Mantenimiento de esta guía (obligatorio para el equipo)
 
-1. **Fuente viva:** este archivo (`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`).
+1. **Fuente viva (única):** este archivo (`GUIA_OPERATIVA_BLOQER_V2.md`). Se **sobrescribe** en el mismo path ante cada cambio de producto — no crear variantes “_REVISADA”, “_v3”, etc.
 2. **Entregable cliente:** únicamente `docs/bloqer2.0/guides/Guía_Operativa_Bloqer_v2.docx` (no hay variante “PROFESIONAL”).
-3. **Cuándo actualizar:** todo PR que cambie rutas, menús, etiquetas, flujos de OC/CxP/CxC/tesorería/contabilidad, presupuesto/EDT, notificaciones, permisos visibles o reglas de montos.
+3. **Cuándo actualizar:** todo PR que cambie rutas, menús, etiquetas, flujos de OC/CxP/CxC/tesorería/conciliación/cierres/contabilidad, presupuesto/EDT, notificaciones, permisos visibles o reglas de montos.
 4. **Cómo regenerar el DOCX:** `cd docs/bloqer2.0/guides && node build_guide.js`.
-5. **Smoke:** validar con [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) si el cambio afecta operación diaria.
+5. **Capturas:** los bloques `📷 Captura sugerida` del DOCX aparecen como cajas grises con título y tip; **reemplazalos** con pantallazos reales del producto (no inventar UI). Priorizar las marcadas en §§4.2, 4.3 y 15.3 si el entregable incluye los módulos nuevos.
+6. **Smoke:** validar con [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) si el cambio afecta operación diaria.
 
 ---
 
-*Documento vivo. Actualizado julio 2026 (zona horaria empresa + registro de actividad; cronograma EDT/Gantt/Kanban; procedimientos UI presupuesto/EDT/APU, libro de obra, materiales, SC/OC, certificaciones, EDT y costos, contabilidad D-061…D-063; auth email/Google). Actualizar en el mismo PR que el cambio de producto.*
+*Documento vivo. Actualizado agosto 2026: conciliación bancaria (§4.2), ajuste manual de caja (§4.3), cierre de períodos (§15.3), métodos de liquidación, estados Confirmado/Conciliado, invitaciones sin token en URL, menús Tesorería/Contabilidad. Antes: julio 2026 (zona horaria, EDT/APU, contabilidad D-061…D-063, auth). Actualizar en el mismo PR que el cambio de producto.*

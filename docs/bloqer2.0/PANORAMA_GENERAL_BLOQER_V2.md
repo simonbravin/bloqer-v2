@@ -307,7 +307,7 @@ Gasto corporativo → imputación (manual o prorrateo) a obras → impacto en re
 
 | Limitación | Detalle |
 |------------|---------|
-| **Contabilidad automática** | No existe; los asientos se sugieren y se cargan/postean a mano. Asiento posteado no reversible; sin cierre de período GL. |
+| **Contabilidad automática** | No existe auto-POST; asientos DRAFT sugeridos/manuales. Hay reversa de posteados y cierre de período ([D-078]). |
 | **Conciliación bancaria** | No implementada. |
 | **Contratos/adendas y órdenes de cambio** | Documentados pero sin entidad/pantalla; las adendas se manejan como un presupuesto nuevo. |
 | **RFIs** | No implementados. |
@@ -419,6 +419,6 @@ flowchart LR
 
 Bloqer v2 ofrece hoy una **plataforma operativa y financiera completa para la gestión de obras**, con trazabilidad económica de punta a punta y controles de acceso maduros. Sus fortalezas están en el flujo obra→certificación→cobro y en el flujo compra→pago, con control de costos anti doble conteo.
 
-Las áreas a considerar antes de apoyarse en ellas como si fueran automáticas son **la contabilidad** (hoy mayormente manual), **la conciliación bancaria** (ausente) y **la operatoria multi-moneda en tesorería** (limitada). Estas no impiden el uso productivo, pero deben comunicarse con claridad a la dirección y a los clientes para alinear expectativas.
+Las áreas a considerar antes de apoyarse en ellas como si fueran automáticas son **la contabilidad** (auto-borrador + posteo manual; cierre mensual operativo disponible), **la conciliación bancaria** (manual / CSV / OFX; sin API bancaria directa) y **la operatoria multi-moneda en tesorería** (limitada a una moneda por operación). Estas no impiden el uso productivo, pero deben comunicarse con claridad a la dirección y a los clientes para alinear expectativas.
 
-Para el detalle técnico, clasificación por estado (A–G) y recomendaciones priorizadas, ver [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md). Para el uso operativo paso a paso, ver [`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](./GUIA_OPERATIVA_BLOQER_V2_REVISADA.md).
+Para el detalle técnico, clasificación por estado (A–G) y recomendaciones priorizadas, ver [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md). Para el uso operativo paso a paso, ver [`GUIA_OPERATIVA_BLOQER_V2.md`](./GUIA_OPERATIVA_BLOQER_V2.md).

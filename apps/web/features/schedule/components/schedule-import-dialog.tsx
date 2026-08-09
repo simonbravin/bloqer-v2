@@ -61,10 +61,10 @@ export function ScheduleImportDialog({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Importar WBS al cronograma</DialogTitle>
+          <DialogTitle>Importar EDT al cronograma</DialogTitle>
           <DialogDescription>
             Crea tareas enlazadas a ítems del presupuesto aprobado. Por defecto importa solo la
-            estructura, sin fechas. Podés agregar hitos y tareas sin WBS después.
+            estructura, sin fechas. Podés agregar hitos y tareas sin EDT después.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">

@@ -16,7 +16,11 @@ import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { isCrossCompany } from "../company-scope";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { ensureDraftJournalFromSalesInvoice } from "../accounting/accounting-auto-draft.service";
-import { syncJournalOnOperationalCancel } from "../accounting/accounting-cancel-sync.service";
+import {
+  assertJournalAllowsOperationalCancel,
+  cancelDraftJournalOnOperationalCancel,
+} from "../accounting/accounting-cancel-sync.service";
+import { notifyReceivableReadyToCollect } from "./ar-notifications.service";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -87,15 +91,43 @@ export async function getSalesInvoiceById(
 export async function getActiveInvoiceForCertification(
   certificationId: string,
   ctx: ServiceContext,
-): Promise<{ id: string; code: string } | null> {
+): Promise<{
+  id: string;
+  code: string;
+  status: SalesInvoiceStatus;
+  receivableId: string | null;
+  canCollect: boolean;
+} | null> {
   await assertArTenantModule(ctx);
   if (!canViewArProjectArea(ctx.roles)) return null;
   const inv = await prisma.salesInvoice.findFirst({
     where: { certificationId, tenantId: ctx.tenantId, status: { not: "CANCELLED" } },
-    select: { id: true, number: true },
+    select: { id: true, number: true, status: true },
   });
   if (!inv) return null;
-  return { id: inv.id, code: `FAC-${String(inv.number).padStart(5, "0")}` };
+
+  let receivableId: string | null = null;
+  let canCollect = false;
+  if (inv.status === "ISSUED") {
+    const receivable = await prisma.receivable.findFirst({
+      where: {
+        salesInvoiceId: inv.id,
+        tenantId: ctx.tenantId,
+        status: { in: ["OPEN", "PARTIAL", "OVERDUE"] },
+      },
+      select: { id: true },
+    });
+    receivableId = receivable?.id ?? null;
+    canCollect = Boolean(receivable);
+  }
+
+  return {
+    id: inv.id,
+    code: `FAC-${String(inv.number).padStart(5, "0")}`,
+    status: inv.status,
+    receivableId,
+    canCollect,
+  };
 }
 
 export type ProjectSalesInvoiceListFilters = {
@@ -302,87 +334,103 @@ export async function createInvoiceFromCertification(
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await assertProjectAllowsOperationalMutation(cert.projectId, ctx.tenantId);
-  if (cert.status !== "ISSUED" && cert.status !== "APPROVED") {
-    throw new ServiceError("CONFLICT", "Solo se pueden facturar certificaciones emitidas o aprobadas");
+  // Billing gate aligned with UI / STATE_MACHINES: APPROVED only.
+  if (cert.status !== "APPROVED") {
+    throw new ServiceError("CONFLICT", "Solo se pueden facturar certificaciones aprobadas");
   }
-
-  const existing = await prisma.salesInvoice.findFirst({
-    where: { certificationId: input.certificationId, status: { not: "CANCELLED" } },
-  });
-  if (existing) {
-    throw new ServiceError("CONFLICT", "Esta certificación ya tiene una factura activa");
+  if (cert.lines.length === 0) {
+    throw new ServiceError("CONFLICT", "La certificación no tiene líneas para facturar");
   }
 
   const companyId = await resolveCompanyId(cert.projectId, ctx);
 
-  const maxNum = await prisma.salesInvoice.aggregate({
-    where: { tenantId: ctx.tenantId, companyId },
-    _max: { number: true },
-  });
-  const number = (maxNum._max.number ?? 0) + 1;
+  // PU de certificación ya incluye impuestos del presupuesto (SALE_PRICE_FORMULAS).
+  // Default IVA factura = 0 para no duplicar; el usuario puede discriminar otro % si corresponde.
+  const taxRate = new Prisma.Decimal(input.taxRate ?? "0");
 
-  const taxRate = new Prisma.Decimal(input.taxRate ?? "21");
+  let inv;
+  try {
+    inv = await prisma.$transaction(async (tx) => {
+      const existing = await tx.salesInvoice.findFirst({
+        where: { certificationId: input.certificationId, status: { not: "CANCELLED" } },
+        select: { id: true },
+      });
+      if (existing) {
+        throw new ServiceError("CONFLICT", "Esta certificación ya tiene una factura activa");
+      }
 
-  const inv = await prisma.$transaction(async (tx) => {
-    const created = await tx.salesInvoice.create({
-      data: {
-        tenantId: ctx.tenantId,
-        companyId,
-        projectId: cert.projectId,
-        clientContactId: cert.project.clientContactId,
-        certificationId: cert.id,
-        number,
-        issueDate: new Date(input.issueDate),
-        dueDate: new Date(input.dueDate),
-        currency: cert.project.type === "PUBLIC" ? "ARS" : "ARS",
-        notes: input.notes ?? null,
-        internalNotes: input.internalNotes ?? null,
-        createdBy: ctx.actorUserId,
-        updatedBy: ctx.actorUserId,
-      },
-    });
+      const maxNum = await tx.salesInvoice.aggregate({
+        where: { tenantId: ctx.tenantId, companyId },
+        _max: { number: true },
+      });
+      const number = (maxNum._max.number ?? 0) + 1;
 
-    let sortIdx = 0;
-    for (const line of cert.lines) {
-      const qty   = line.currentQty;
-      const price = line.unitSalePriceSnapshot;
-      const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, taxRate);
-      await tx.salesInvoiceLine.create({
+      const created = await tx.salesInvoice.create({
         data: {
-          invoiceId: created.id,
-          description: `${line.wbsNode.code} - ${line.wbsNode.name}`,
-          quantity: qty,
-          unitPrice: price,
-          taxRate,
-          lineSubtotal,
-          lineTax,
-          lineTotal,
-          certificationLineId: line.id,
-          sortOrder: sortIdx++,
+          tenantId: ctx.tenantId,
+          companyId,
+          projectId: cert.projectId,
+          clientContactId: cert.project.clientContactId,
+          certificationId: cert.id,
+          number,
+          issueDate: new Date(input.issueDate),
+          dueDate: new Date(input.dueDate),
+          currency: cert.project.type === "PUBLIC" ? "ARS" : "ARS",
+          notes: input.notes ?? null,
+          internalNotes: input.internalNotes ?? null,
+          createdBy: ctx.actorUserId,
+          updatedBy: ctx.actorUserId,
         },
       });
-    }
 
-    await recalcInvoiceTotals(tx as never, created.id);
-    const inv = await tx.salesInvoice.findUniqueOrThrow({
-      where: { id: created.id },
-      include: {
-        lines: { orderBy: { sortOrder: "asc" } },
-        clientContact: { select: { legalName: true, fantasyName: true } },
-      },
+      let sortIdx = 0;
+      for (const line of cert.lines) {
+        const qty = line.currentQty;
+        const price = line.unitSalePriceSnapshot;
+        const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, taxRate);
+        await tx.salesInvoiceLine.create({
+          data: {
+            invoiceId: created.id,
+            description: `${line.wbsNode.code} - ${line.wbsNode.name}`,
+            quantity: qty,
+            unitPrice: price,
+            taxRate,
+            lineSubtotal,
+            lineTax,
+            lineTotal,
+            certificationLineId: line.id,
+            sortOrder: sortIdx++,
+          },
+        });
+      }
+
+      await recalcInvoiceTotals(tx as never, created.id);
+      const createdInv = await tx.salesInvoice.findUniqueOrThrow({
+        where: { id: created.id },
+        include: {
+          lines: { orderBy: { sortOrder: "asc" } },
+          clientContact: { select: { legalName: true, fantasyName: true } },
+        },
+      });
+
+      await auditAr(
+        ctx,
+        "sales_invoice.created_from_certification",
+        "SalesInvoice",
+        createdInv.id,
+        { projectId: createdInv.projectId, companyId: createdInv.companyId },
+        { after: { number: createdInv.number, certificationId: input.certificationId }, tx },
+      );
+
+      return createdInv;
     });
-
-    await auditAr(
-      ctx,
-      "sales_invoice.created_from_certification",
-      "SalesInvoice",
-      inv.id,
-      { projectId: inv.projectId, companyId: inv.companyId },
-      { after: { number: inv.number, certificationId: input.certificationId }, tx },
-    );
-
-    return inv;
-  });
+  } catch (err) {
+    if (err instanceof ServiceError) throw err;
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      throw new ServiceError("CONFLICT", "Esta certificación ya tiene una factura activa");
+    }
+    throw err;
+  }
 
   return serializeInvoice(inv);
 }
@@ -480,20 +528,20 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
     const { computeDocumentFxAmounts } = await import("../finance/fx-amount.service");
     const fx = computeDocumentFxAmounts(inv.currency, inv.totalAmount, inv.fxRate);
 
-    // Issue invoice
-    const issued = await tx.salesInvoice.update({
-      where: { id },
+    // Conditional flip prevents issue↔cancel races leaving orphan receivables.
+    const flipped = await tx.salesInvoice.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
       data: {
         status: "ISSUED",
         fxRate: fx.fxRate,
         amountArs: fx.amountArs,
         updatedBy: ctx.actorUserId,
       },
-      include: {
-        lines: { orderBy: { sortOrder: "asc" } },
-        clientContact: { select: { legalName: true, fantasyName: true } },
-      },
     });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "La factura ya no está en borrador. Recargá e intentá de nuevo.",
+    );
 
     // BR-AR-001: create Receivable 1:1
     await tx.receivable.create({
@@ -512,6 +560,14 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
       },
     });
 
+    const issued = await tx.salesInvoice.findUniqueOrThrow({
+      where: { id },
+      include: {
+        lines: { orderBy: { sortOrder: "asc" } },
+        clientContact: { select: { legalName: true, fantasyName: true } },
+      },
+    });
+
     await auditAr(
       ctx,
       "sales_invoice.issued",
@@ -525,6 +581,30 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
   });
 
   await ensureDraftJournalFromSalesInvoice(result.id, ctx);
+
+  if (result.projectId) {
+    const receivable = await prisma.receivable.findFirst({
+      where: { salesInvoiceId: result.id, tenantId: ctx.tenantId },
+      select: { id: true, status: true, originalAmount: true, paidAmount: true },
+    });
+    if (
+      receivable &&
+      receivable.status !== "CANCELLED" &&
+      receivable.status !== "PAID" &&
+      receivable.paidAmount.lt(receivable.originalAmount)
+    ) {
+      await notifyReceivableReadyToCollect({
+        ctx,
+        salesInvoiceId: result.id,
+        receivableId: receivable.id,
+        projectId: result.projectId,
+        companyId: result.companyId,
+        invoiceNumber: result.number,
+        amountLabel: `${serializeMoneyDecimal(result.totalAmount)} ${result.currency}`,
+      });
+    }
+  }
+
   return serializeInvoice(result);
 }
 
@@ -544,13 +624,21 @@ export async function cancelSalesInvoice(id: string, ctx: ServiceContext): Promi
     throw new ServiceError("FORBIDDEN", "Sin permisos para anular facturas");
   }
 
+  const glParams = {
+    companyId: invPreview.companyId,
+    sourceType: "SALES_INVOICE" as const,
+    sourceId: id,
+    sourceLabel: "la factura de venta",
+  };
+
+  if (invPreview.status === "CANCELLED") {
+    // Repair orphan DRAFT left if a prior cancel succeeded but GL cleanup failed.
+    await cancelDraftJournalOnOperationalCancel(ctx, glParams);
+    throw new ServiceError("CONFLICT", "La factura ya está anulada");
+  }
+
   if (invPreview.status === "ISSUED") {
-    await syncJournalOnOperationalCancel(ctx, {
-      companyId: invPreview.companyId,
-      sourceType: "SALES_INVOICE",
-      sourceId: id,
-      sourceLabel: "la factura de venta",
-    });
+    await assertJournalAllowsOperationalCancel(ctx, glParams);
   }
 
   const updated = await prisma.$transaction(async (tx) => {
@@ -614,10 +702,16 @@ export async function cancelSalesInvoice(id: string, ctx: ServiceContext): Promi
       );
     }
 
-    const updated = await tx.salesInvoice.update({
-      where: { id },
+    const flipped = await tx.salesInvoice.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: inv.status },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
     });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "La factura cambió de estado mientras la anulabas. Recargá e intentá de nuevo.",
+    );
+
+    const updated = await tx.salesInvoice.findUniqueOrThrow({ where: { id } });
 
     await auditAr(
       ctx,
@@ -630,6 +724,8 @@ export async function cancelSalesInvoice(id: string, ctx: ServiceContext): Promi
 
     return updated;
   });
+
+  await cancelDraftJournalOnOperationalCancel(ctx, glParams);
 
   return updated;
 }

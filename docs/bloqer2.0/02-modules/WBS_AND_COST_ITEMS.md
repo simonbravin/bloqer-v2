@@ -36,6 +36,10 @@ Ver [`../08-architecture/REPORTING_ERD_GUARDRAILS.md`](../08-architecture/REPORT
 ## 6. Entidades principales
 - **WbsNode**, **CostItem**, **CostAnalysisLine**.
 
+### Centro de costo = EDT / WBS (sin entidad aparte)
+
+En Bloqer **no** hay tabla `CostCenter`. El eje de imputación de costos e ingresos de obra es el **nodo WBS hoja** (`wbsNodeId` → partida del **EDT y costos**): compras, facturas de proveedor de proyecto, certificaciones, consumos de stock y control de costos. Los rubros APU (`CostAnalysisLine.category`) desagregan composición del ítem; no reemplazan la partida WBS.
+
 ## 7. Estados y transiciones
 Los ítems siguen el estado del Budget padre; no tienen máquina propia salvo líneas internas de borrador. Con `APPROVED`, el WBS económico está **congelado**; con `CLOSED`, los cambios contractuales van por **adenda** y **nuevo** budget complementario.
 

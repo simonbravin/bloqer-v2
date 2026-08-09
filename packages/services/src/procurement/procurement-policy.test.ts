@@ -79,7 +79,7 @@ test("assertSelfApprovalAllowed permits approval when actor is not originator", 
   });
 });
 
-test("assertDirectPoAllowed allows below threshold for non-bypass role", () => {
+test("assertDirectPoAllowed allows below threshold for PM when direct PO enabled", () => {
   assert.doesNotThrow(() => {
     assertDirectPoAllowed(
       { ...baseSettings, purchaseRequestRequiredAboveArs: "100000" },
@@ -89,10 +89,14 @@ test("assertDirectPoAllowed allows below threshold for non-bypass role", () => {
   });
 });
 
-test("assertDirectPoAllowed rejects when direct PO disabled", () => {
+test("assertDirectPoAllowed rejects when direct PO disabled below threshold", () => {
   assert.throws(
     () => {
-      assertDirectPoAllowed({ ...baseSettings, allowDirectPo: false }, new Prisma.Decimal("1000"), ctx(["PROJECT_MANAGER"]));
+      assertDirectPoAllowed(
+        { ...baseSettings, allowDirectPo: false },
+        new Prisma.Decimal("1000"),
+        ctx(["PROJECT_MANAGER"]),
+      );
     },
     (err) => err instanceof ServiceError && err.code === "CONFLICT",
   );
@@ -108,6 +112,66 @@ test("assertDirectPoAllowed rejects amount at/above PR threshold without emergen
       );
     },
     (err) => err instanceof ServiceError && err.code === "CONFLICT",
+  );
+});
+
+test("assertDirectPoAllowed rejects OWNER above PR threshold without emergency (no role bypass)", () => {
+  assert.throws(
+    () => {
+      assertDirectPoAllowed(
+        { ...baseSettings, purchaseRequestRequiredAboveArs: "100000", allowDirectPo: true },
+        new Prisma.Decimal("150000"),
+        ctx(["OWNER"]),
+      );
+    },
+    (err) => err instanceof ServiceError && err.code === "CONFLICT",
+  );
+});
+
+test("assertDirectPoAllowed rejects PROCUREMENT above PR threshold without emergency", () => {
+  assert.throws(
+    () => {
+      assertDirectPoAllowed(
+        { ...baseSettings, purchaseRequestRequiredAboveArs: "100000", allowDirectPo: true },
+        new Prisma.Decimal("150000"),
+        ctx(["PROCUREMENT"]),
+      );
+    },
+    (err) => err instanceof ServiceError && err.code === "CONFLICT",
+  );
+});
+
+test("assertDirectPoAllowed allows OWNER emergency above threshold even if allowDirectPo is false", () => {
+  assert.doesNotThrow(() => {
+    assertDirectPoAllowed(
+      {
+        ...baseSettings,
+        allowDirectPo: false,
+        allowEmergencyDirectPo: true,
+        purchaseRequestRequiredAboveArs: "100000",
+      },
+      new Prisma.Decimal("200000"),
+      ctx(["OWNER"]),
+      { emergencyReason: "Falla crítica en obra" },
+    );
+  });
+});
+
+test("assertDirectPoAllowed rejects PM emergency even when flag enabled", () => {
+  assert.throws(
+    () => {
+      assertDirectPoAllowed(
+        {
+          ...baseSettings,
+          allowEmergencyDirectPo: true,
+          purchaseRequestRequiredAboveArs: "100000",
+        },
+        new Prisma.Decimal("200000"),
+        ctx(["PROJECT_MANAGER"]),
+        { emergencyReason: "Urgente" },
+      );
+    },
+    (err) => err instanceof ServiceError && err.code === "FORBIDDEN",
   );
 });
 

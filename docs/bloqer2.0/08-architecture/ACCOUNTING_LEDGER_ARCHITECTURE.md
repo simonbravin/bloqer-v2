@@ -44,6 +44,7 @@ Neither replaces the other in 11A–11D.
 - **`ensureDraftJournal*`** after successful operational create (Collection, Payment, SalesInvoice issue, SupplierInvoice issue, InternalTransfer, corporate treasury inflow / MANUAL_ADJUSTMENT). Always `DRAFT`. Soft-fail (module off / no rule / errors → `journal_entry.auto_draft_skipped`). Does **not** require `EDIT ACCOUNTING`.
 - **Never** auto-`POST`.
 - Anti-double-count: skip treasury GL when `AccountMovement.sourceType ∈ {COLLECTION, PAYMENT, OPENING_BALANCE}`.
+- **Treasury cash/bank GL side (soft):** `TreasuryAccount` has no `glAccountId`. Auto-drafts override the mapping-rule cash side with CoA codes by type/currency heuristic (`suggestTreasuryGlAccountCode`: CASH→`1.1.01`, BANK+ARS→`1.1.02`, BANK+USD→`1.1.03`; else `1.1.02`). If the account code is missing/inactive, keep the mapping rule. Contador edits DRAFT before post. Formal FK mapping = product decision later.
 - Accrual events `SALES_INVOICE_ISSUED` / `SUPPLIER_INVOICE_ISSUED` on **`totalAmount`**.
 - Cancel sync: cancel linked DRAFT; block operational cancel if POSTED without reverse.
 - Partial unique index: one non-cancelled journal per `(tenantId, companyId, sourceType, sourceId)`.
@@ -66,7 +67,13 @@ Neither replaces the other in 11A–11D.
 ## Phase 11C+ / L remaining (not implemented)
 
 - Automatic **POST** without human review.
-- GL period close, AFIP / tax multi-line engine, bank reconciliation as GL, FX revaluation.
+- AFIP / tax multi-line engine, bank reconciliation as GL, FX revaluation.
+
+## Period close (implemented — [D-078])
+
+- Entity `Period` per company + `YYYY-MM`; closes block `AccountMovement.movementDate` and `JournalEntry.entryDate` mutations.
+- UI: `/contabilidad/cierres` (`PERIOD_CLOSE` / OWNER|ADMIN).
+- Distinct from overhead AUTO_WEIGHT freeze ([D-043]).
 
 ## Balancing rules (enforced in `journal-entry.service.ts`)
 

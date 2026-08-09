@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
+import { settlementMethodLabel } from "@/features/treasury/lib/settlement-method-label";
 import { getCurrentUser } from "@/lib/auth";
 import { generateJournalFromPaymentAction } from "@/app/(app)/contabilidad/source-draft-actions";
 import { getPaymentById, canRegisterApPayment, ServiceError } from "@bloqer/services";
@@ -76,6 +77,18 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
               {formatMoneyAmount(payment.amount, payment.currency)}
             </p>
           </div>
+          {settlementMethodLabel(payment.paymentMethod) && (
+            <div>
+              <p className="text-muted-foreground">Método</p>
+              <p className="font-medium">{settlementMethodLabel(payment.paymentMethod)}</p>
+            </div>
+          )}
+          {payment.reference && (
+            <div>
+              <p className="text-muted-foreground">Referencia</p>
+              <p className="font-medium font-mono">{payment.reference}</p>
+            </div>
+          )}
         </div>
 
         {payment.notes && (

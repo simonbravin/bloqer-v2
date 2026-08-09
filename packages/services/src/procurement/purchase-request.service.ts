@@ -4,6 +4,7 @@ import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseRequests, canViewPurchaseRequests } from "./procurement-access";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
 import {
@@ -243,14 +244,18 @@ export async function submitPurchaseRequest(id: string, ctx: ServiceContext): Pr
         },
       });
     }
-    await tx.purchaseRequest.update({
-      where: { id },
+    const flipped = await tx.purchaseRequest.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
       data: {
         status: "SUBMITTED",
         submittedAt: new Date(),
         updatedBy: ctx.actorUserId,
       },
     });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "La solicitud ya no está en borrador. Recargá e intentá de nuevo.",
+    );
     await auditProcurement(
       ctx,
       "purchase_request.submitted",
@@ -312,16 +317,36 @@ export async function cancelPurchaseRequest(id: string, ctx: ServiceContext): Pr
   const activePo = await prisma.purchaseOrder.count({
     where: {
       purchaseRequestId: id,
-      status: { notIn: ["CANCELLED", "DRAFT"] },
+      status: { not: "CANCELLED" },
     },
   });
   if (activePo > 0) {
-    throw new ServiceError("CONFLICT", "Hay órdenes de compra activas vinculadas a esta solicitud");
+    throw new ServiceError(
+      "CONFLICT",
+      "Hay órdenes de compra vinculadas a esta solicitud. Anulá la OC primero.",
+    );
   }
 
-  await prisma.purchaseRequest.update({
-    where: { id },
-    data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+  await prisma.$transaction(async (tx) => {
+    const flipped = await tx.purchaseRequest.updateMany({
+      where: {
+        id,
+        tenantId: ctx.tenantId,
+        status: { notIn: ["COMPLETED", "CANCELLED"] },
+      },
+      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+    });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "La solicitud cambió de estado. Recargá e intentá de nuevo.",
+    );
+    await tx.procurementQuote.updateMany({
+      where: {
+        purchaseRequestId: id,
+        status: { in: ["DRAFT", "RECEIVED", "SELECTED"] },
+      },
+      data: { status: "REJECTED" },
+    });
   });
   await auditProcurement(ctx, "purchase_request.cancelled", "PurchaseRequest", id, {
     projectId: existing.projectId,

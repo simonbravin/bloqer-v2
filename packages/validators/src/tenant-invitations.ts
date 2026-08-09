@@ -26,8 +26,11 @@ export const cancelTenantInvitationSchema = z.object({
   invitationId: z.string().uuid(),
 });
 
+/** Raw invite tokens are 32 random bytes hex-encoded (64 chars). */
 export const acceptTenantInvitationSchema = z.object({
-  token: z.string().min(32, "Token inválido"),
+  token: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/i, "Token inválido"),
 });
 
 export type CreateTenantInvitationInput = z.infer<typeof createTenantInvitationSchema>;

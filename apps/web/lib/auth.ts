@@ -1,4 +1,4 @@
-import { auth, signOut } from "@bloqer/auth";
+﻿import { auth, signOut } from "@bloqer/auth";
 import { getUserAuthGate, isLoginEligibleStatus } from "@bloqer/services";
 import type { Session } from "next-auth";
 import { resolveTenantContext, type TenantContext } from "./tenant";
@@ -18,9 +18,8 @@ export async function getSession(): Promise<Session | null> {
   try {
     gate = await getUserAuthGate(session.user.id);
   } catch {
-    // Transient DB errors: keep session for availability; retry on next request.
-    // Do not share this path with signOut / invalidation failures.
-    return session;
+    // Fail closed: DB errors must not skip User.status / pwdAt revocation checks.
+    return null;
   }
 
   if (!gate || !isLoginEligibleStatus(gate.status)) {
@@ -46,13 +45,18 @@ export async function getSession(): Promise<Session | null> {
   return session;
 }
 
+/** Session guaranteed to have `user.id` after `getCurrentUser` / `getSession` gates. */
+export type AuthenticatedSession = Session & {
+  user: NonNullable<Session["user"]> & { id: string };
+};
+
 export async function getCurrentUser(): Promise<{
-  session: Session;
+  session: AuthenticatedSession;
   tenantCtx: TenantContext | null;
 } | null> {
   const session = await getSession();
   if (!session?.user?.id) return null;
 
   const tenantCtx = await resolveTenantContext(session.user.id);
-  return { session, tenantCtx };
+  return { session: session as AuthenticatedSession, tenantCtx };
 }

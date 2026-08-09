@@ -37,10 +37,12 @@ Cerrar el **circuito dinero documentado**: cuentas de tesorería, ledger (`accou
 
 ## Criterios de aceptación
 
-- [ ] Nunca float en dinero; FX manual donde aplique ([D-008](../00-product/DECISION_LOG.md)).  
-- [ ] No borrar movimientos confirmados; solo cancel/compensate ([`SOFT_DELETE_STRATEGY.md`](./SOFT_DELETE_STRATEGY.md)).  
-- [ ] `payment_status` de certificación **derivado** desde AR/collections ([D-026](../00-product/DECISION_LOG.md)).  
-- [ ] Tests: cobranza parcial, transferencia interna, period close bloquea mutación.
+- [x] Nunca float en dinero; FX manual donde aplique ([D-008](../00-product/DECISION_LOG.md)). FX cobro multi-divisa diferido ([D-081](../00-product/DECISION_LOG.md) / P-TRZ-02).  
+- [x] No borrar movimientos confirmados; solo cancel/compensate ([`SOFT_DELETE_STRATEGY.md`](./SOFT_DELETE_STRATEGY.md)).  
+- [x] `payment_status` de certificación **derivado** desde AR/collections ([D-026](../00-product/DECISION_LOG.md)).  
+- [x] Tests: cobranza parcial (`obligation-balance.test.ts`), transferencia interna (`internal-transfer-legs.test.ts`), period close bloquea mutación (`period-lock-assert.test.ts`).  
+- [x] ERD cobros/pagos 1:1 sin `*_application`; saldos mantenidos; `BankStatementLine` ([D-081](../00-product/DECISION_LOG.md)).  
+- [x] Ajuste manual UI `/tesoreria/cuentas/[id]/ajuste` ([P-TRZ-04](./PENDING_ARCHITECTURE_ITEMS.md)).
 
 ## Riesgos
 

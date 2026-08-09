@@ -6,7 +6,12 @@ import type { ServiceContext } from "../types";
 export async function auditTreasury(
   ctx: ServiceContext,
   action: string,
-  entityType: "TreasuryAccount" | "InternalTransfer" | "AccountMovement" | "Collection",
+  entityType:
+    | "TreasuryAccount"
+    | "InternalTransfer"
+    | "AccountMovement"
+    | "Collection"
+    | "BankReconciliation",
   entityId: string,
   scope: AuditScope,
   options?: {

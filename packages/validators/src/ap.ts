@@ -8,6 +8,7 @@ import {
   qtyString,
   ratePctString,
 } from "./money";
+import { treasurySettlementFieldsSchema } from "./treasury-settlement";
 
 const supplierInvoiceLineSchema = z.object({
   description: z.string().min(1, "Descripción requerida"),
@@ -46,15 +47,17 @@ export const updateSupplierInvoiceSchema = z.object({
   lines:             z.array(supplierInvoiceLineSchema).min(1).optional(),
 });
 
-export const createPaymentFieldsSchema = z.object({
-  payableId:      z.string().uuid(),
-  accountId:      z.string().uuid(),
-  paymentDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  amount:         optionalMoneyAmountString,
-  /** Server applies stored balanceDue — [D-053]. */
-  payFullBalance: z.boolean().optional(),
-  notes:          z.string().optional().nullable(),
-});
+export const createPaymentFieldsSchema = z
+  .object({
+    payableId:      z.string().uuid(),
+    accountId:      z.string().uuid(),
+    paymentDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    amount:         optionalMoneyAmountString,
+    /** Server applies stored balanceDue — [D-053]. */
+    payFullBalance: z.boolean().optional(),
+    notes:          z.string().optional().nullable(),
+  })
+  .merge(treasurySettlementFieldsSchema);
 
 export const createPaymentSchema = createPaymentFieldsSchema.superRefine((val, ctx) => {
   if (!val.payFullBalance && val.amount == null) {
@@ -66,14 +69,25 @@ export const createPaymentSchema = createPaymentFieldsSchema.superRefine((val, c
   }
 });
 
-export const payNowSchema = z.object({
-  accountId:      z.string().uuid(),
-  paymentDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  amount:         optionalMoneyAmountString,
-  /** When true or amount omitted, server pays stored invoice total ([D-053]). */
-  payFullBalance: z.boolean().optional(),
-  notes:          z.string().optional().nullable(),
-});
+export const payNowSchema = z
+  .object({
+    accountId:      z.string().uuid(),
+    paymentDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    amount:         optionalMoneyAmountString,
+    /** When true or amount omitted, server pays stored invoice total ([D-053]). */
+    payFullBalance: z.boolean().optional(),
+    notes:          z.string().optional().nullable(),
+  })
+  .merge(treasurySettlementFieldsSchema)
+  .superRefine((val, ctx) => {
+    if (!val.payFullBalance && val.amount == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Monto inválido",
+        path: ["amount"],
+      });
+    }
+  });
 
 /** Corporate or project AP composite flow ([D-052]). */
 export const registerApExpenseSchema = createSupplierInvoiceSchema.extend({

@@ -20,6 +20,7 @@ import {
   ensureDraftJournalFromCollection,
   ensureDraftJournalFromSalesInvoice,
 } from "../accounting/accounting-auto-draft.service";
+import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
@@ -257,6 +258,14 @@ export async function registerArIncome(
           }
 
           const collectionFx = computeDocumentFxAmounts(receivable.currency, collectAmount);
+          await assertFinancialPeriodOpen(
+            {
+              tenantId: ctx.tenantId,
+              companyId: ctx.companyId ?? account.companyId ?? receivable.companyId,
+              date: input.collectNow.collectionDate,
+            },
+            tx,
+          );
           const collection = await tx.collection.create({
             data: {
               tenantId: ctx.tenantId,
@@ -271,6 +280,8 @@ export async function registerArIncome(
               amount: collectAmount,
               fxRate: collectionFx.fxRate,
               amountArs: collectionFx.amountArs,
+              paymentMethod: input.collectNow.paymentMethod ?? null,
+              reference: input.collectNow.reference ?? null,
               notes: input.collectNow.notes ?? null,
               status: "CONFIRMED",
               createdBy: ctx.actorUserId,

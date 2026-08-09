@@ -132,7 +132,7 @@ export function JobsiteLogPdfDocument({ payload, branding }: Props) {
         <SimpleTableSection
           title="Avance de obra"
           columns={[
-            { key: "wbs", label: "Partida WBS", flex: 1.4 },
+            { key: "wbs", label: "Partida EDT", flex: 1.4 },
             { key: "description", label: "Descripción", flex: 1 },
             { key: "quantity", label: "Cantidad", flex: 0.8 },
             { key: "pct", label: "% Físico", flex: 0.6 },

@@ -90,6 +90,8 @@ export async function registerArAdvance(
         collectionDate: input.collectNow.collectionDate,
         collectFullBalance: true,
         notes: input.collectNow.notes ?? "Cobro de anticipo",
+        paymentMethod: input.collectNow.paymentMethod ?? null,
+        reference: input.collectNow.reference ?? null,
       },
     },
     ctx,

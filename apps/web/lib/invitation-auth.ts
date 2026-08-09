@@ -13,8 +13,9 @@ export function isPlausibleInvitationEmail(email: string): boolean {
   return norm.length > 3 && norm.includes("@") && !norm.includes(" ");
 }
 
-export function buildInvitationAcceptCallbackUrl(token: string): string {
-  return `/invitaciones/aceptar?token=${encodeURIComponent(token)}`;
+/** Opaque accept URL — token is stashed in httpOnly cookie by middleware, never in the query. */
+export function buildInvitationAcceptCallbackUrl(_token?: string): string {
+  return "/invitaciones/aceptar";
 }
 
 export function buildInvitationLoginHref(callbackUrl: string, invitedEmail: string): string {

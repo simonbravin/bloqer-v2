@@ -8,11 +8,17 @@ import { ReceivableTable } from "./receivable-table";
 export function ReceivableListSection({
   receivables,
   showProjectColumn = false,
+  showInvoiceColumn = false,
+  canMutate = false,
   invoicesHref,
   invoicesActionLabel,
 }: {
   receivables: ReceivableListItem[];
   showProjectColumn?: boolean;
+  /** Show FAC-xxxxx column (project lists or company lists with codes). */
+  showInvoiceColumn?: boolean;
+  /** When true, show Cobrar CTA (requires EDIT AR upstream). */
+  canMutate?: boolean;
   invoicesHref?: string;
   invoicesActionLabel?: string;
 }) {
@@ -31,6 +37,8 @@ export function ReceivableListSection({
     <ReceivableTable
       receivables={receivables}
       showProjectColumn={showProjectColumn}
+      showInvoiceColumn={showInvoiceColumn || showProjectColumn}
+      canMutate={canMutate}
       invoicesHref={invoicesHref}
       invoicesActionLabel={invoicesActionLabel}
     />

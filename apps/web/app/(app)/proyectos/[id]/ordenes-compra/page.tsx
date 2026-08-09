@@ -129,7 +129,9 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
     }
     try {
       const settings = await getCompanyProcurementSettingsForProject(id, ctx);
-      allowEmergency = settings.allowEmergencyDirectPo;
+      allowEmergency =
+        settings.allowEmergencyDirectPo &&
+        current.tenantCtx.roles.some((r) => r === "OWNER" || r === "ADMIN");
     } catch {
       allowEmergency = false;
     }

@@ -52,6 +52,12 @@ export async function createWarehouse(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear depósitos");
   }
 
+  const company = await prisma.company.findFirst({
+    where: { id: input.companyId, tenantId: ctx.tenantId },
+    select: { id: true },
+  });
+  if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada en el tenant");
+
   const existing = await prisma.warehouse.findFirst({
     where: { tenantId: ctx.tenantId, companyId: input.companyId, name: input.name },
   });
@@ -63,6 +69,9 @@ export async function createWarehouse(
     const project = await prisma.project.findUnique({ where: { id: input.projectId } });
     if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
     if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    if (project.companyId && project.companyId !== input.companyId) {
+      throw new ServiceError("VALIDATION", "El proyecto no pertenece a la empresa seleccionada");
+    }
   }
 
   const wh = await prisma.warehouse.create({

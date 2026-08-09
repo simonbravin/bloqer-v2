@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // build_guide.js — Generador del DOCX "Guía Operativa Bloqer v2"
 //
-// FUENTE VIVA: ../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md
+// FUENTE VIVA: ../GUIA_OPERATIVA_BLOQER_V2.md
 // El contenido NO se hardcodea: se parsea el Markdown y se renderiza con `docx`.
 //
 // Salida (única):
@@ -435,7 +435,7 @@ if (!fs.existsSync(logoPath)) { console.error("ERROR: no se encontró el logo en
 const logoBuffer = fs.readFileSync(logoPath);
 
 // ─── LEER MARKDOWN FUENTE ──────────────────────────────────────────────────
-const mdPath = path.join(__dirname, "../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md");
+const mdPath = path.join(__dirname, "../GUIA_OPERATIVA_BLOQER_V2.md");
 if (!fs.existsSync(mdPath)) { console.error("ERROR: no se encontró la fuente MD en " + mdPath); process.exit(1); }
 const md = fs.readFileSync(mdPath, "utf8");
 const { elements, captureCount } = parseMarkdown(md);
@@ -578,7 +578,7 @@ const doc = new Document({
           children: [new ImageRun({ type: "png", data: logoBuffer, transformation: { width: 140, height: 38 },
             altText: { title: "Bloqer", description: "Logo Bloqer", name: "BloqerLogoFooter" } })] }),
         new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 },
-          children: [new TextRun({ text: "Documento vivo — regenerado desde GUIA_OPERATIVA_BLOQER_V2_REVISADA.md. Actualizar la MD ante cualquier cambio de UX.", size: 16, color: TEXT_MID, font: "Arial", italic: true })] }),
+          children: [new TextRun({ text: "Documento vivo — regenerado desde GUIA_OPERATIVA_BLOQER_V2.md. Actualizar la MD ante cualquier cambio de UX.", size: 16, color: TEXT_MID, font: "Arial", italic: true })] }),
         new Paragraph({ alignment: AlignmentType.CENTER,
           children: [new TextRun({ text: "Construido para el constructor moderno  ·  bloqer.com", size: 16, color: BLUE_ACCENT, font: "Arial" })] }),
       ],

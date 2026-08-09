@@ -16,10 +16,13 @@ import {
   getBudgetLifecycleLog,
   getWbsTree,
   isBudgetScheduleBaseline,
+  listBudgetsByProject,
   ServiceError,
+  type WbsViewNode,
 } from "@bloqer/services";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { PageShell } from "@/components/layout/page-shell";
+import { Button } from "@/components/ui/button";
 import {
   addWbsNodeAction,
   ensureWbsLeafForApuAction,
@@ -57,10 +60,11 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
-  let budget;
-  let tree;
+  let budget: Awaited<ReturnType<typeof getBudgetById>> | undefined;
+  let tree: WbsViewNode[] = [];
   let lifecycleLog;
   let scheduleBaseline = false;
+  let parentBudget: { id: string; name: string; versionNumber: number } | null = null;
   try {
     [budget, tree, lifecycleLog, scheduleBaseline] = await Promise.all([
       getBudgetById(budgetId, ctx),
@@ -68,15 +72,37 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
       getBudgetLifecycleLog(budgetId, ctx),
       isBudgetScheduleBaseline(budgetId, ctx.tenantId),
     ]);
+    if (budget.parentBudgetId) {
+      const siblings = await listBudgetsByProject(projectId, ctx);
+      const parent = siblings.find((b) => b.id === budget!.parentBudgetId);
+      if (parent) {
+        parentBudget = {
+          id: parent.id,
+          name: parent.name,
+          versionNumber: parent.versionNumber,
+        };
+      }
+    }
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     throw err;
   }
 
-  if (budget.projectId !== projectId) notFound();
+  if (!budget || budget.projectId !== projectId) notFound();
 
   const editable = budget.status === "DRAFT" || budget.status === "RETURNED_FOR_CHANGES";
   const wbsStructureEditable = editable && !scheduleBaseline;
+  const canCreateAddendum = budget.status === "APPROVED" || budget.status === "CLOSED";
+  const hasLeafItems = (() => {
+    function walk(nodes: WbsViewNode[]): boolean {
+      for (const n of nodes) {
+        if (n.type === "ITEM") return true;
+        if (walk(n.children)) return true;
+      }
+      return false;
+    }
+    return walk(tree);
+  })();
   const costStr = budget.totalCost.toString();
   const saleStr = budget.totalSalePrice.toString();
   const costN = parseFloat(costStr);
@@ -90,6 +116,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
   const settingsDefaults = {
     overheadPct: s ? parseFloat(s.overheadPct.toString()) : 0,
     financialCostPct: s ? parseFloat(s.financialCostPct.toString()) : 0,
+    financialDaysAvg: s?.financialDaysAvg ?? 0,
     profitPct: s ? parseFloat(s.profitPct.toString()) : 0,
     taxPct: s ? parseFloat(s.taxPct.toString()) : 0,
   };
@@ -106,11 +133,32 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
                 <BudgetStatusBadge status={budget.status} />
               </div>
               <p className="text-sm text-muted-foreground">Moneda: {budget.currency}</p>
+              {parentBudget && (
+                <p className="text-sm text-muted-foreground">
+                  Adenda de{" "}
+                  <Link
+                    href={`/proyectos/${projectId}/presupuestos/${parentBudget.id}`}
+                    className="font-medium text-foreground underline-offset-4 hover:underline"
+                  >
+                    v{parentBudget.versionNumber} — {parentBudget.name}
+                  </Link>
+                </p>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {canCreateAddendum && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link
+                    href={`/proyectos/${projectId}/presupuestos/nuevo?parentBudgetId=${budgetId}`}
+                  >
+                    Crear adenda / fase
+                  </Link>
+                </Button>
+              )}
               <BudgetLifecycleDialog
                 status={budget.status}
                 lifecycleLog={lifecycleLog}
+                warnEmptyOnApprove={!hasLeafItems}
                 onSubmitForReview={submitForReviewAction.bind(null, budgetId, projectId)}
                 onReturnForChanges={returnForChangesAction.bind(null, budgetId, projectId)}
                 onApprove={approveBudgetAction.bind(null, budgetId, projectId)}
@@ -150,7 +198,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
           structureEditable={wbsStructureEditable}
           structureLockedReason={
             editable && scheduleBaseline
-              ? "Este presupuesto es la base del cronograma. La estructura WBS está bloqueada; podés seguir editando APU y costos en los ítems."
+              ? "Este presupuesto es la base del cronograma. La estructura EDT está bloqueada; podés seguir editando APU y costos en los ítems."
               : undefined
           }
           onPreviewWbsImport={

@@ -23,7 +23,7 @@ export function CollectionTable({
   projectId: string;
 }) {
   if (collections.length === 0) {
-    return <ListEmptyState message="Sin cobranzas registradas para este proyecto." />;
+    return <ListEmptyState message="Sin cobranzas registradas." />;
   }
 
   return (

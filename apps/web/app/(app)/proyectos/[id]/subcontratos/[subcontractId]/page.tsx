@@ -69,7 +69,8 @@ export default async function SubcontratoPage({ params }: PageProps) {
     projectId,
   });
   const storageConfigured = isStorageConfigured();
-  const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "SUBCONTRACTS");
+  const canEditSubcontracts = can(current.tenantCtx.roles, "EDIT", "SUBCONTRACTS");
+  const canEditAttachments = canEditSubcontracts;
 
   const fmtMoney = (v: string) =>
     parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2 });
@@ -90,7 +91,7 @@ export default async function SubcontratoPage({ params }: PageProps) {
           </div>
         </div>
         <div className="flex gap-2">
-          {subcontract.status === "DRAFT" && (
+          {canEditSubcontracts && subcontract.status === "DRAFT" && (
             <>
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/proyectos/${projectId}/subcontratos/${subcontractId}/editar`}>
@@ -109,7 +110,7 @@ export default async function SubcontratoPage({ params }: PageProps) {
               </form>
             </>
           )}
-          {subcontract.status === "ACTIVE" && (
+          {canEditSubcontracts && subcontract.status === "ACTIVE" && (
             <>
               <Button variant="outline" size="sm" asChild>
                 <Link
@@ -130,7 +131,8 @@ export default async function SubcontratoPage({ params }: PageProps) {
               </form>
             </>
           )}
-          {(subcontract.status === "DRAFT" || subcontract.status === "ACTIVE") && (
+          {canEditSubcontracts &&
+            (subcontract.status === "DRAFT" || subcontract.status === "ACTIVE") && (
             <form
               action={async () => {
                 "use server";
@@ -179,7 +181,7 @@ export default async function SubcontratoPage({ params }: PageProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Descripción</TableHead>
-                <TableHead>WBS</TableHead>
+                <TableHead>EDT</TableHead>
                 <TableHead className="text-right">Unidad</TableHead>
                 <TableHead className="text-right">Cantidad</TableHead>
                 <TableHead className="text-right">Precio unit.</TableHead>
@@ -216,7 +218,7 @@ export default async function SubcontratoPage({ params }: PageProps) {
       <DataTableSection
         title="Certificaciones"
         actions={
-          subcontract.status === "ACTIVE" ? (
+          canEditSubcontracts && subcontract.status === "ACTIVE" ? (
             <Button size="sm" asChild>
               <Link
                 href={`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/nueva`}

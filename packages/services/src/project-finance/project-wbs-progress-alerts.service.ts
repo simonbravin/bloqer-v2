@@ -79,7 +79,7 @@ export async function getProjectWbsProgressAlerts(
   ctx: ServiceContext,
 ): Promise<ProjectWbsProgressResult> {
   if (!canViewProjectCostControlReport(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para alertas WBS");
+    throw new ServiceError("FORBIDDEN", "Sin permisos para alertas EDT");
   }
 
   const cc = await getProjectCostControl(projectId, filters, ctx);

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { InvitationAccountSwitch } from "@/features/auth/components/invitation-account-switch";
 import { InvitationLoginLink } from "@/features/auth/components/invitation-login-link";
 import { getCurrentUser } from "@/lib/auth";
-import { buildInvitationAcceptCallbackUrl, invitationEmailsMatch } from "@/lib/invitation-auth";
+import { invitationEmailsMatch } from "@/lib/invitation-auth";
+import { clearInviteAcceptToken, readInviteAcceptToken } from "@/lib/invitation-accept-token";
 import { peekTenantInvitationForAcceptPage } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { acceptTenantInvitationAction } from "./actions";
@@ -13,7 +14,9 @@ interface PageProps {
 
 export default async function InvitacionesAceptarPage({ searchParams }: PageProps) {
   const sp = await searchParams;
-  const token = (sp.token ?? "").trim();
+  // Token lives only in httpOnly cookie (middleware stashes ?token=). Never render it in HTML.
+  const token = (await readInviteAcceptToken()) || "";
+
   let errMsg: string | null = null;
   if (sp.err) {
     try {
@@ -27,7 +30,14 @@ export default async function InvitacionesAceptarPage({ searchParams }: PageProp
     return (
       <div className="mx-auto flex min-h-[50vh] max-w-md flex-col justify-center gap-4 px-4">
         <h1 className="text-xl font-semibold">Invitación</h1>
-        <p className="text-sm text-muted-foreground">Falta el enlace de invitación. Pedile al administrador que te lo reenvíe.</p>
+        <p className="text-sm text-muted-foreground">
+          Falta el enlace de invitación. Pedile al administrador que te lo reenvíe.
+        </p>
+        {errMsg ? (
+          <p className="text-sm text-destructive" role="alert">
+            {errMsg}
+          </p>
+        ) : null}
         <Button variant="outline" asChild>
           <Link href="/login">Ir a iniciar sesión</Link>
         </Button>
@@ -37,6 +47,7 @@ export default async function InvitacionesAceptarPage({ searchParams }: PageProp
 
   const peek = await peekTenantInvitationForAcceptPage(token);
   if (!peek) {
+    await clearInviteAcceptToken();
     return (
       <div className="mx-auto flex min-h-[50vh] max-w-md flex-col justify-center gap-4 px-4">
         <h1 className="text-xl font-semibold">Invitación no válida</h1>
@@ -49,7 +60,7 @@ export default async function InvitacionesAceptarPage({ searchParams }: PageProp
   }
 
   const current = await getCurrentUser();
-  const callbackUrl = buildInvitationAcceptCallbackUrl(token);
+  const callbackUrl = "/invitaciones/aceptar";
 
   if (!current?.session?.user?.id) {
     return (
@@ -96,7 +107,6 @@ export default async function InvitacionesAceptarPage({ searchParams }: PageProp
         </p>
       ) : null}
       <form action={acceptTenantInvitationAction} className="space-y-3">
-        <input type="hidden" name="token" value={token} />
         <Button type="submit" className="w-full">
           Confirmar y unirme
         </Button>

@@ -26,10 +26,23 @@ Transversal: todos los módulos ya implementados; foco en **calidad y operacione
 
 ## Criterios de aceptación
 
-- [ ] [`CODE_REVIEW_CHECKLIST.md`](./CODE_REVIEW_CHECKLIST.md) aplicable en cada PR release candidate.  
-- [ ] No hay endpoint crítico sin test de tenant isolation.  
-- [ ] TTFB / tiempos de reporte aceptables en datos de prueba realistas (umbrales definidos por equipo).  
-- [ ] Variables secretas solo en entorno Vercel/hosting; rotación documentada.
+- [x] [`CODE_REVIEW_CHECKLIST.md`](./CODE_REVIEW_CHECKLIST.md) aplicable en cada PR release candidate.  
+- [x] No hay endpoint crítico sin test de tenant isolation — suite `packages/services/src/security/finance-tenant-isolation.test.ts` (8 escenarios AR/AP/transfer/period/ajuste).  
+- [x] CI: lint + typecheck + `pnpm test` (domain/utils/services glob). E2E opcional con secrets.  
+- [x] E2E mínimo documentado en `apps/web/e2e` (P-REP-03).  
+- [x] Observabilidad MVP: `x-request-id` + JSON access log; helper `serverLog` con `tenantId`.  
+- [x] ASVS-lite + smoke: [`PHASE_5_ASVS_LITE.md`](./PHASE_5_ASVS_LITE.md) / [`DEPLOYMENT_SMOKE_TEST.md`](./DEPLOYMENT_SMOKE_TEST.md) — corrido 2026-08-08 (técnico PASS; UI auth pendiente).  
+- [ ] TTFB / tiempos de reporte aceptables en datos de prueba realistas (umbrales definidos por equipo) — medición en piloto.  
+- [x] Variables secretas solo en entorno Vercel/hosting; rotación documentada.
+
+## Phase 5 directed pass — permisos / auditoría (2026-08-08)
+
+| Área | Hallazgo | Acción |
+|---|---|---|
+| Nav vs `PERMISSIONS_MATRIX` | Shell ya gated por `can()` + tenant modules (`PERMISSIONS_ROUTE_MATRIX`) | Sin gap high-risk nuevo |
+| Mutaciones AR cobro / AP pago / ajuste tesorería | Gate tenant presente; centralizado vía `assertResourceTenant` en paths críticos | Parche aplicado |
+| Audit log cobro/pago/transfer | Cubierto por `auditAr` / `auditAp` / `auditTreasury` existentes | Sin parche adicional |
+| Period close | `period.closed` / `period.reopened` auditados ([D-078]) | OK |
 
 ## Riesgos
 

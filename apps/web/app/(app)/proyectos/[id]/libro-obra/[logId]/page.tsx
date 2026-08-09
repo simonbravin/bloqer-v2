@@ -221,7 +221,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Partida WBS</TableHead>
+                  <TableHead>Partida EDT</TableHead>
                   <TableHead>Descripción</TableHead>
                   <TableHead className="text-right">Cantidad</TableHead>
                   <TableHead className="text-right">% del día</TableHead>

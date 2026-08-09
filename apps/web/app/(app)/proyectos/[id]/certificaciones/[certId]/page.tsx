@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
@@ -48,7 +48,7 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
 
   let cert;
   let allItems: Awaited<ReturnType<typeof listCertificationWbsHints>> = [];
-  let existingInvoice: { id: string; code: string } | null = null;
+  let existingInvoice: Awaited<ReturnType<typeof getActiveInvoiceForCertification>> = null;
   try {
     cert = await getCertificationById(certId, ctx);
     [allItems, existingInvoice] = await Promise.all([
@@ -64,27 +64,30 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
 
   const certAttachments = await listEntityDocuments("CERTIFICATION", certId, ctx, { projectId });
   const storageConfigured = isStorageConfigured();
-  const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "CERTIFICATIONS");
+  const canEditCert = can(current.tenantCtx.roles, "EDIT", "CERTIFICATIONS");
+  const canApproveCert = can(current.tenantCtx.roles, "APPROVE", "CERTIFICATIONS");
+  const canEditAttachments = canEditCert;
+  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
 
-  const editable = cert.status === "DRAFT";
+  const editable = canEditCert && cert.status === "DRAFT";
+  const invoiceDraft = existingInvoice?.status === "DRAFT";
+  const invoiceIssued = existingInvoice?.status === "ISSUED";
 
   return (
     <PageShell variant="default" className="space-y-4" breadcrumbLabel={cert.code}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight">{cert.code}</h1>
-              <CertificationStatusBadge status={cert.status} />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {formatDate(cert.periodStart)}
-              {" — "}
-              {formatDate(cert.periodEnd)}
-            </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight">{cert.code}</h1>
+            <CertificationStatusBadge status={cert.status} />
           </div>
+          <p className="text-xs text-muted-foreground">
+            {formatDate(cert.periodStart)}
+            {" — "}
+            {formatDate(cert.periodEnd)}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {editable && (
             <Button variant="outline" size="sm" asChild>
               <Link href={`/proyectos/${projectId}/certificaciones/${certId}/editar`}>
@@ -92,19 +95,37 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
               </Link>
             </Button>
           )}
-          {cert.status === "APPROVED" && existingInvoice && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/proyectos/${projectId}/facturas/${existingInvoice.id}`}>
-                Ver factura ({existingInvoice.code})
+          {canEditAr && cert.status === "APPROVED" && !existingInvoice && (
+            <Button size="sm" asChild>
+              <Link href={`/proyectos/${projectId}/facturas/nueva?certificationId=${certId}`}>
+                Crear borrador de factura
               </Link>
             </Button>
           )}
-          {cert.status === "APPROVED" && !existingInvoice && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/proyectos/${projectId}/facturas/nueva?certificationId=${certId}`}>
-                Emitir factura
+          {canEditAr && cert.status === "APPROVED" && invoiceDraft && existingInvoice && (
+            <Button size="sm" asChild>
+              <Link href={`/proyectos/${projectId}/facturas/${existingInvoice.id}`}>
+                Emitir factura ({existingInvoice.code})
               </Link>
             </Button>
+          )}
+          {cert.status === "APPROVED" && invoiceIssued && existingInvoice && (
+            <>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/proyectos/${projectId}/facturas/${existingInvoice.id}`}>
+                  Ver factura ({existingInvoice.code})
+                </Link>
+              </Button>
+              {canEditAr && existingInvoice.canCollect && existingInvoice.receivableId ? (
+                <Button size="sm" asChild>
+                  <Link
+                    href={`/proyectos/${projectId}/cuentas-por-cobrar/${existingInvoice.receivableId}/cobrar`}
+                  >
+                    Registrar cobranza
+                  </Link>
+                </Button>
+              ) : null}
+            </>
           )}
         </div>
       </div>
@@ -113,27 +134,31 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950 dark:border-blue-900 dark:bg-blue-950/20 dark:text-blue-100">
           <p className="font-medium">Certificación aprobada pendiente de facturación</p>
           <p className="mt-1 text-xs">
-            La aprobación no emite una factura automáticamente. Usá “Emitir factura” para crear la
-            factura vinculada y habilitar la cuenta por cobrar.
+            La aprobación no acredita banco ni abre CxC. Creá un borrador de factura y después{" "}
+            <strong>Emití</strong> para abrir la cuenta por cobrar; la cobranza (con cuenta de
+            tesorería) es el paso que impacta caja/banco.
           </p>
         </div>
       )}
 
-      {cert.status === "APPROVED" && existingInvoice && (
+      {cert.status === "APPROVED" && invoiceDraft && existingInvoice && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
+          <p className="font-medium">Factura en borrador ({existingInvoice.code})</p>
+          <p className="mt-1 text-xs">
+            Todavía no hay CxC. Usá <strong>Emitir factura</strong> arriba para abrir la cuenta por
+            cobrar. La certificación no mueve tesorería.
+          </p>
+        </div>
+      )}
+
+      {cert.status === "APPROVED" && invoiceIssued && existingInvoice && (
         <div className="rounded-lg border bg-card px-4 py-3 text-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-medium">Factura vinculada</p>
-              <p className="text-xs text-muted-foreground">
-                Esta certificación ya tiene una factura activa: {existingInvoice.code}.
-              </p>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/proyectos/${projectId}/facturas/${existingInvoice.id}`}>
-                Ver factura
-              </Link>
-            </Button>
-          </div>
+          <p className="font-medium">Factura emitida ({existingInvoice.code})</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {existingInvoice.canCollect
+              ? "Hay CxC pendiente. Registrá la cobranza para acreditar la cuenta de tesorería."
+              : "La factura ya está emitida. Revisá la CxC vinculada si hace falta."}
+          </p>
         </div>
       )}
 
@@ -157,6 +182,8 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
             status={cert.status}
             currency={cert.currency}
             totalAmount={cert.totalAmount}
+            canEdit={canEditCert}
+            canApprove={canApproveCert}
             onIssue={issueCertificationAction.bind(null, certId)}
             onApprove={approveCertificationAction.bind(null, certId)}
             onReject={rejectCertificationAction.bind(null, certId)}

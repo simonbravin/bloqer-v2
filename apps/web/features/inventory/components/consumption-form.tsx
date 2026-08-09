@@ -165,7 +165,7 @@ export function ConsumptionForm({
 
         {wbsOptions.length > 0 && (
           <div className="space-y-1.5">
-            <Label>Partida WBS (opcional)</Label>
+            <Label>Partida EDT (opcional)</Label>
             <SearchableCombobox
               popoverWidth="wide"
               options={wbsComboboxOptions}

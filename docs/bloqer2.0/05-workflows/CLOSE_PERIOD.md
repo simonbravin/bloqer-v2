@@ -10,10 +10,10 @@ ADMIN / OWNER únicamente.
 - Todas las conciliaciones críticas completadas (recomendación proceso).
 
 ## 4. Pasos
-1. **Administración** → Cierre de períodos.
-2. Seleccionar mes/año.
-3. Validar que no existan borradores pendientes críticos (advertencia, no bloqueo duro opcional).
-4. **Cerrar** → `period.closed`.
+1. **Contabilidad** → Cierre de períodos (`/contabilidad/cierres`).
+2. Seleccionar mes/año (lista de períodos mensuales).
+3. Validar que no existan borradores pendientes críticos (advertencia de proceso; no bloqueo duro en Phase 1).
+4. **Cerrar** → `period.closed` (bloquea tesorería + asientos en el rango, [D-078]).
 5. Intentos de mutación en fechas cerradas → error `PERIOD_CLOSED`.
 
 ## 5. Reapertura

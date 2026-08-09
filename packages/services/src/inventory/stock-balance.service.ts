@@ -26,7 +26,26 @@ type StockBalanceDb = {
   stockMovement: {
     findMany: typeof prisma.stockMovement.findMany;
   };
+  $queryRaw?: typeof prisma.$queryRaw;
 };
+
+type StockLockTx = {
+  $queryRaw: typeof prisma.$queryRaw;
+};
+
+/**
+ * Serialize writers for a (warehouse, product) stock key (BR-INV-002).
+ * Call before `getStockBalance(..., tx)` inside the same write transaction.
+ * Parent rows always exist — unlike locking an empty stock_movements set.
+ */
+export async function lockStockBalanceKey(
+  tx: StockLockTx,
+  warehouseId: string,
+  productId: string,
+): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM warehouses WHERE id = ${warehouseId} FOR UPDATE`;
+  await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+}
 
 export async function getStockBalance(
   filters: {
@@ -35,7 +54,10 @@ export async function getStockBalance(
     productId: string;
     projectId?: string;
   },
-  /** Pass the transaction client when checking stock inside a write tx (race-safe). */
+  /**
+   * Pass the transaction client when checking stock inside a write tx.
+   * Not sufficient alone — callers must `lockStockBalanceKey` first for BR-INV-002.
+   */
   db: StockBalanceDb = prisma,
 ): Promise<Prisma.Decimal> {
   const rows = await db.stockMovement.findMany({

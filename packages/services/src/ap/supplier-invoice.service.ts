@@ -17,7 +17,10 @@ import { getCompanyProcurementSettingsForProject } from "../procurement/company-
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
 import { assertWbsLineForProject } from "../procurement/procurement-wbs";
 import { ensureDraftJournalFromSupplierInvoice } from "../accounting/accounting-auto-draft.service";
-import { syncJournalOnOperationalCancel } from "../accounting/accounting-cancel-sync.service";
+import {
+  assertJournalAllowsOperationalCancel,
+  cancelDraftJournalOnOperationalCancel,
+} from "../accounting/accounting-cancel-sync.service";
 
 const PO_AP_LINKABLE_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
 
@@ -81,7 +84,7 @@ export async function assertSupplierInvoiceLinesWbs(
       if (line.wbsNodeId) {
         throw new ServiceError(
           "CONFLICT",
-          "Las facturas corporativas (sin proyecto) no llevan partida WBS",
+          "Las facturas corporativas (sin proyecto) no llevan partida EDT",
         );
       }
     }
@@ -91,7 +94,7 @@ export async function assertSupplierInvoiceLinesWbs(
     if (!line.wbsNodeId) {
       throw new ServiceError(
         "VALIDATION",
-        "Cada línea de factura de proyecto debe imputar a una partida WBS",
+        "Cada línea de factura de proyecto debe imputar a una partida EDT",
       );
     }
     await assertWbsLineForProject(line.wbsNodeId, projectId, tenantId);
@@ -638,6 +641,24 @@ export async function updateSupplierInvoice(
         input.lines,
         ctx.tenantId,
       );
+    } else if (
+      input.purchaseOrderId !== undefined &&
+      input.purchaseOrderId !== existing.purchaseOrderId
+    ) {
+      // Header PO retarget without rewriting lines: clear stale D-066 FKs or reject if new PO set.
+      if (input.purchaseOrderId !== null) {
+        const existingLines = await prisma.supplierInvoiceLine.findMany({
+          where: { invoiceId: id },
+          select: { purchaseOrderLineId: true, wbsNodeId: true },
+        });
+        const linked = existingLines.filter((l) => l.purchaseOrderLineId);
+        if (linked.length > 0) {
+          throw new ServiceError(
+            "CONFLICT",
+            "Para cambiar la OC vinculada, reenviá las líneas de la factura (los ítems apuntan a otra orden).",
+          );
+        }
+      }
     }
 
   const inv = await prisma.$transaction(async (tx) => {
@@ -725,7 +746,7 @@ export async function issueSupplierInvoice(
 
   const invPreview = await prisma.supplierInvoice.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true, companyId: true },
+    select: { tenantId: true, projectId: true, companyId: true, purchaseOrderId: true },
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -738,6 +759,11 @@ export async function issueSupplierInvoice(
   if (invPreview.projectId) {
     await assertProjectAllowsOperationalMutation(invPreview.projectId, ctx.tenantId);
   }
+
+  const directSpendSettings =
+    invPreview.projectId && !invPreview.purchaseOrderId
+      ? await getCompanyProcurementSettingsForProject(invPreview.projectId, ctx)
+      : null;
 
   const result = await prisma.$transaction(async (tx) => {
     const inv = await tx.supplierInvoice.findUnique({ where: { id } });
@@ -769,8 +795,16 @@ export async function issueSupplierInvoice(
     const { computeDocumentFxAmounts } = await import("../finance/fx-amount.service");
     const fx = computeDocumentFxAmounts(refreshed.currency, refreshed.totalAmount, refreshed.fxRate);
 
-    await tx.supplierInvoice.update({
-      where: { id },
+    // Re-gate direct AP spend on issue ([BR-APR-005]) — create alone is not enough if lines were edited.
+    if (refreshed.projectId && !refreshed.purchaseOrderId) {
+      const settings =
+        directSpendSettings ??
+        (await getCompanyProcurementSettingsForProject(refreshed.projectId, ctx));
+      assertProjectApDirectSpendAllowed(settings, fx.amountArs, ctx);
+    }
+
+    const issued = await tx.supplierInvoice.updateMany({
+      where: { id, status: "DRAFT" },
       data: {
         status: "ISSUED",
         fxRate: fx.fxRate,
@@ -778,6 +812,9 @@ export async function issueSupplierInvoice(
         updatedBy: ctx.actorUserId,
       },
     });
+    if (issued.count !== 1) {
+      throw new ServiceError("CONFLICT", "La factura ya no está en borrador");
+    }
 
     // BR-AP-002: create Payable atomically
     await tx.payable.create({
@@ -875,13 +912,20 @@ export async function cancelSupplierInvoice(
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
 
+  const glParams = {
+    companyId: invPreview.companyId,
+    sourceType: "SUPPLIER_INVOICE" as const,
+    sourceId: id,
+    sourceLabel: "la factura de proveedor",
+  };
+
+  if (invPreview.status === "CANCELLED") {
+    await cancelDraftJournalOnOperationalCancel(ctx, glParams);
+    throw new ServiceError("CONFLICT", "La factura ya está cancelada");
+  }
+
   if (invPreview.status === "ISSUED") {
-    await syncJournalOnOperationalCancel(ctx, {
-      companyId: invPreview.companyId,
-      sourceType: "SUPPLIER_INVOICE",
-      sourceId: id,
-      sourceLabel: "la factura de proveedor",
-    });
+    await assertJournalAllowsOperationalCancel(ctx, glParams);
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -943,10 +987,14 @@ export async function cancelSupplierInvoice(
       }
     }
 
-    await tx.supplierInvoice.update({
-      where: { id },
+    const flipped = await tx.supplierInvoice.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: inv.status },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
     });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "La factura cambió de estado mientras la cancelabas. Recargá e intentá de nuevo.",
+    );
 
     const result = await tx.supplierInvoice.findUniqueOrThrow({
       where: { id },
@@ -967,6 +1015,8 @@ export async function cancelSupplierInvoice(
 
     return result;
   });
+
+  await cancelDraftJournalOnOperationalCancel(ctx, glParams);
 
   return serializeInvoice(result);
 }

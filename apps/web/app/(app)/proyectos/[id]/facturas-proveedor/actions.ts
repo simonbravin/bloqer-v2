@@ -17,6 +17,7 @@ import {
   updateSupplierInvoiceSchema,
   registerApExpenseSchema,
   type CreateSupplierInvoiceInput,
+  type RegisterApExpenseInput,
   type UpdateSupplierInvoiceInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
@@ -89,21 +90,9 @@ export async function getPurchaseOrderInvoiceDraftPreviewAction(
 
 export async function registerProjectApExpenseAction(
   projectId: string,
-  data: {
-    supplierContactId: string;
-    issueDate: string;
-    dueDate: string;
+  data: Omit<RegisterApExpenseInput, "projectId" | "internalNotes" | "currency"> & {
     currency?: string;
-    notes?: string | null;
-    purchaseOrderId?: string | null;
     lines: CreateSupplierInvoiceInput["lines"];
-    payNow?: {
-      accountId: string;
-      paymentDate: string;
-      amount?: string;
-      payFullBalance?: boolean;
-      notes?: string | null;
-    };
   },
 ): Promise<{ id: string; paymentId?: string } | { error: string }> {
   const ctx = await getCtx();

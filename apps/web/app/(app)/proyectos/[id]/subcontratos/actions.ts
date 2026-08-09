@@ -64,7 +64,7 @@ export async function createSubcontractAction(
       lines:                  JSON.parse(fd.get("lines") as string),
     };
     const parsed = createSubcontractSchema.safeParse(raw);
-    if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? "Datos inválidos" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     const result = await createSubcontract(parsed.data, ctx);
     revalidatePath(`/proyectos/${parsed.data.projectId}/subcontratos`);
     return { id: result.id };
@@ -88,7 +88,7 @@ export async function updateSubcontractAction(
       lines:           fd.get("lines") ? JSON.parse(fd.get("lines") as string) : undefined,
     };
     const parsed = updateSubcontractSchema.safeParse(raw);
-    if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? "Datos inválidos" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     const result = await updateSubcontract(id, parsed.data, ctx);
     revalidatePath(`/proyectos/${result.projectId}/subcontratos`);
     return { id };
@@ -109,7 +109,7 @@ export async function updateSubcontractMetaAction(
       startDate:       (fd.get("startDate") as string) || null,
     };
     const parsed = updateSubcontractMetaSchema.safeParse(raw);
-    if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? "Datos inválidos" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     await updateSubcontractMeta(id, parsed.data, ctx);
     revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
     return { ok: true };
@@ -141,16 +141,27 @@ export async function createSubcontractCertificationAction(
 ): Promise<{ error: string } | { id: string }> {
   try {
     const ctx = await getCtx();
+    const replacesRaw = fd.get("replacesCertificationId");
+    let lines: unknown;
+    try {
+      lines = JSON.parse(String(fd.get("lines") ?? ""));
+    } catch {
+      return { error: "Datos inválidos en líneas de certificación" };
+    }
     const raw = {
       subcontractId:     fd.get("subcontractId") as string,
       periodStart:       fd.get("periodStart") as string,
       periodEnd:         fd.get("periodEnd") as string,
       certificationDate: fd.get("certificationDate") as string,
       notes:             (fd.get("notes") as string) || null,
-      lines:             JSON.parse(fd.get("lines") as string),
+      replacesCertificationId:
+        typeof replacesRaw === "string" && replacesRaw.trim()
+          ? replacesRaw.trim()
+          : null,
+      lines,
     };
     const parsed = createSubcontractCertificationSchema.safeParse(raw);
-    if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? "Datos inválidos" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     const result = await createSubcontractCertification(parsed.data, ctx);
     revalidatePath(`/proyectos`);
     return { id: result.id };
@@ -171,7 +182,7 @@ export async function updateSubcontractCertificationAction(
       lines:             fd.get("lines") ? JSON.parse(fd.get("lines") as string) : undefined,
     };
     const parsed = updateSubcontractCertificationSchema.safeParse(raw);
-    if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? "Datos inválidos" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     await updateSubcontractCertification(id, parsed.data, ctx);
     revalidatePath(`/proyectos`);
     return { ok: true };

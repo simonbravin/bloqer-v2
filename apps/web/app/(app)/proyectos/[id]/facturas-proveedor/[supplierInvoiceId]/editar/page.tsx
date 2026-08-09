@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@bloqer/domain";
 import {
   getSupplierInvoiceById,
   listContacts,
@@ -19,6 +20,10 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
   if (!current?.tenantCtx) redirect("/login");
 
   const { id, supplierInvoiceId } = await params;
+  if (!can(current.tenantCtx.roles, "EDIT", "AP")) {
+    redirect(`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`);
+  }
+
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,

@@ -56,20 +56,26 @@ export function CompanyProcurementSettingsForm({
             startTransition(async () => {
               setError(null);
               setSuccess(false);
+              const soft = fd.get("varianceSoftAlertPct")?.toString() ?? "10";
+              const slaRaw = Number(fd.get("approvalSlaHours"));
+              const minQuotes = Number(fd.get("minQuotesRequired"));
+              const maxQuotes = Number(fd.get("maxQuotesAllowed"));
               const res = await updateCompanyProcurementSettingsAction(companyId, {
                 poApprovalThresholdArs: fd.get("poApprovalThresholdArs")?.toString() || null,
                 purchaseRequestRequiredAboveArs:
                   fd.get("purchaseRequestRequiredAboveArs")?.toString() || null,
-                minQuotesRequired: Number(fd.get("minQuotesRequired")),
-                maxQuotesAllowed: Number(fd.get("maxQuotesAllowed")),
+                minQuotesRequired: Number.isFinite(minQuotes) ? minQuotes : undefined,
+                maxQuotesAllowed: Number.isFinite(maxQuotes) ? maxQuotes : undefined,
                 allowDirectPo,
                 allowSelfApproval,
                 allowEmergencyDirectPo,
-                varianceSoftAlertPct: fd.get("varianceSoftAlertPct")?.toString() ?? "10",
-                varianceNoteRequiredPct: fd.get("varianceNoteRequiredPct")?.toString() ?? "25",
+                varianceSoftAlertPct: soft,
+                // Kept in sync with soft until Q-051 decides a distinct note tier ([BR-PUR-009]).
+                varianceNoteRequiredPct: soft,
                 varianceExtraApprovalPct: fd.get("varianceExtraApprovalPct")?.toString() ?? "25",
                 overReceiptTolerancePct: fd.get("overReceiptTolerancePct")?.toString() ?? "0",
                 invoiceMatchTolerancePct: fd.get("invoiceMatchTolerancePct")?.toString() ?? "0",
+                approvalSlaHours: Number.isFinite(slaRaw) && slaRaw > 0 ? slaRaw : 72,
                 apPaymentNotificationChannel,
               });
               if ("error" in res) {
@@ -109,6 +115,10 @@ export function CompanyProcurementSettingsForm({
                 placeholder="Opcional"
                 disabled={!canEdit || pending}
               />
+              <p className="text-xs text-muted-foreground">
+                Sobre este monto la OC directa exige solicitud con cotizaciones, salvo emergencia
+                documentada por OWNER/ADMIN ([BR-PUR-008]).
+              </p>
             </div>
           </div>
 
@@ -139,27 +149,22 @@ export function CompanyProcurementSettingsForm({
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="varianceSoftAlertPct">Alerta suave (%)</Label>
+              <Label htmlFor="varianceSoftAlertPct">Nota / alerta por desvío desde (%)</Label>
               <Input
                 id="varianceSoftAlertPct"
                 name="varianceSoftAlertPct"
                 defaultValue={settings.varianceSoftAlertPct}
                 disabled={!canEdit || pending}
               />
+              <p className="text-xs text-muted-foreground">
+                Desde este % hasta el de aprobación extra se exige justificación en la línea
+                ([BR-PUR-009]).
+              </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="varianceNoteRequiredPct">Nota obligatoria desde (%)</Label>
-              <Input
-                id="varianceNoteRequiredPct"
-                name="varianceNoteRequiredPct"
-                defaultValue={settings.varianceNoteRequiredPct}
-                disabled={!canEdit || pending}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="varianceExtraApprovalPct">Aprobación extra desde (%)</Label>
+              <Label htmlFor="varianceExtraApprovalPct">Aprobación administración desde (%)</Label>
               <Input
                 id="varianceExtraApprovalPct"
                 name="varianceExtraApprovalPct"
@@ -194,6 +199,23 @@ export function CompanyProcurementSettingsForm({
                 Aviso (no bloqueo) si factura supera recibido + tolerancia ([BR-PUR-012]).
               </p>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="approvalSlaHours">SLA recordatorio compras (horas)</Label>
+            <Input
+              id="approvalSlaHours"
+              name="approvalSlaHours"
+              type="number"
+              min={1}
+              max={720}
+              defaultValue={settings.approvalSlaHours}
+              disabled={!canEdit || pending}
+            />
+            <p className="text-xs text-muted-foreground">
+              Horas sin avance en OC enviada o SC sin cotizar antes de avisar a OWNER/ADMIN
+              ([BR-PUR-015]). Default 72.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -252,8 +274,12 @@ export function CompanyProcurementSettingsForm({
                 disabled={!canEdit || pending}
                 className="rounded border"
               />
-              Compra de emergencia sin solicitud (solo administración)
+              Compra de emergencia sin solicitud (solo OWNER/ADMIN, sobre el umbral)
             </label>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Permite OC directa por encima del umbral de solicitud con motivo obligatorio, aunque
+              la OC directa general esté deshabilitada.
+            </p>
           </div>
 
           {canEdit && (

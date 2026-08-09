@@ -34,7 +34,7 @@ export function BudgetTable({
     return (
       <ListEmptyState
         title="Sin presupuestos"
-        description="Creá el primer presupuesto del proyecto. Un presupuesto adicional puede usarse como adenda operativa (sin vínculo automático)."
+        description="Creá el primer presupuesto del proyecto. Después podés crear una adenda vinculada a uno aprobado o cerrado."
         action={
           <Button asChild size="sm">
             <Link href={`/proyectos/${projectId}/presupuestos/nuevo`}>Nuevo presupuesto</Link>
@@ -61,7 +61,15 @@ export function BudgetTable({
           {budgets.map((b) => (
             <TableRow key={b.id}>
               <TableCell className="font-mono text-sm text-muted-foreground">v{b.versionNumber}</TableCell>
-              <TableCell className="font-medium">{b.name}</TableCell>
+              <TableCell>
+                <div className="font-medium">{b.name}</div>
+                {b.parentBudgetId && b.parentVersionNumber != null && (
+                  <p className="text-xs text-muted-foreground">
+                    Adenda de v{b.parentVersionNumber}
+                    {b.parentName ? ` — ${b.parentName}` : ""}
+                  </p>
+                )}
+              </TableCell>
               <TableCell>
                 <BudgetStatusBadge status={b.status} />
               </TableCell>

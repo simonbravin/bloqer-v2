@@ -11,8 +11,20 @@ export interface SyncUserFromOAuthInput {
   image?: string | null;
 }
 
-export async function getUserById(id: string): Promise<User | null> {
-  return prisma.user.findUnique({ where: { id } });
+/** Public profile fields only — never expose passwordHash to callers. */
+export type UserPublicProfile = {
+  id: string;
+  email: string;
+  name: string | null;
+  image: string | null;
+  status: UserStatus;
+};
+
+export async function getUserById(id: string): Promise<UserPublicProfile | null> {
+  return prisma.user.findUnique({
+    where: { id },
+    select: { id: true, email: true, name: true, image: true, status: true },
+  });
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
@@ -76,6 +88,10 @@ export async function updateMyUserProfile(
   return user;
 }
 
+/**
+ * Global User.status affects login across all tenants. Prefer membership INACTIVE
+ * via team management. Only allowed when the user has no memberships outside this tenant.
+ */
 export async function updateUserStatus(
   userId: string,
   status: UserStatus,
@@ -89,6 +105,16 @@ export async function updateUserStatus(
     where: { userId, tenantId: ctx.tenantId },
   });
   if (!membership) throw new ServiceError("NOT_FOUND", "User not found in this tenant");
+
+  const otherMemberships = await prisma.userMembership.count({
+    where: { userId, tenantId: { not: ctx.tenantId } },
+  });
+  if (otherMemberships > 0) {
+    throw new ServiceError(
+      "CONFLICT",
+      "No se puede cambiar el estado global del usuario: pertenece a otros espacios. Desactivá la membresía en este tenant.",
+    );
+  }
 
   const before = await prisma.user.findUnique({ where: { id: userId }, select: { status: true } });
   const user = await prisma.user.update({ where: { id: userId }, data: { status } });

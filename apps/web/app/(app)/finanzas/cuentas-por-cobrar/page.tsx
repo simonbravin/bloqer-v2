@@ -17,6 +17,7 @@ import {
   parseAgingFilters,
   ServiceError,
 } from "@bloqer/services";
+import { can } from "@bloqer/domain";
 import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -97,6 +98,7 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
     projectName: r.projectName,
     salesInvoiceCode: r.salesInvoiceCode,
   }));
+  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
 
   function listHref(listStatus?: string) {
     const p = new URLSearchParams();
@@ -192,6 +194,7 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
             <ReceivableListSection
               receivables={items}
               showProjectColumn
+              canMutate={canEditAr}
               invoicesHref="/proyectos"
               invoicesActionLabel="Ir a proyectos"
             />

@@ -758,6 +758,7 @@ stateDiagram-v2
   DRAFT --> CANCELLED : cancelar
   IN_PROGRESS --> CLOSED : cerrar sesion
   IN_PROGRESS --> CANCELLED : anular
+  CLOSED --> IN_PROGRESS : reabrir con motivo
   CLOSED --> CANCELLED : anular sesion cerrada excepcional
   CLOSED --> [*]
   CANCELLED --> [*]
@@ -771,7 +772,8 @@ stateDiagram-v2
 | `DRAFT` | `CANCELLED` | Sin efecto contable |
 | `IN_PROGRESS` | `CLOSED` | Cuadre aceptado; matches finales |
 | `IN_PROGRESS` | `CANCELLED` | Abandono auditado |
-| `CLOSED` | `CANCELLED` | Solo proceso excepcional |
+| `CLOSED` | `IN_PROGRESS` | **Reapertura formal** con motivo obligatorio ([D-080]); matches/`RECONCILED` se conservan |
+| `CLOSED` | `CANCELLED` | Solo excepción excepcional |
 
 ### Eventos
 
@@ -779,11 +781,12 @@ stateDiagram-v2
 |---|---|
 | `bank_reconciliation.started` | `DRAFT` → `IN_PROGRESS` |
 | `bank_reconciliation.closed` | → `CLOSED` |
+| `bank_reconciliation.reopened` | `CLOSED` → `IN_PROGRESS` |
 | `bank_reconciliation.cancelled` | → `CANCELLED` |
 
 ### Reglas críticas
 
-- En **`CLOSED`**, no se editan **matches** manuales sin **reapertura formal** o **nueva sesión** (política tenant); evita romper trazabilidad de `RECONCILED` ([BR-TRZ-002]).
+- En **`CLOSED`**, no se editan **matches** manuales sin **reapertura formal** (`CLOSED` → `IN_PROGRESS` con motivo, [D-080]) o **nueva sesión** (si no hay otra abierta en la cuenta); evita romper trazabilidad de `RECONCILED` ([BR-TRZ-002]).
 - Los **`AccountMovement`** pasan a `RECONCILED` por el flujo de match, no por el estado `CLOSED` de la sesión solo.
 
 ---

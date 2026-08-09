@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { can } from "@bloqer/domain";
-import { canViewCompanyFinanceHub } from "@bloqer/services";
+import { canViewCompanyFinanceHub, getTenantModuleGate } from "@bloqer/services";
 import { ModuleSubnav } from "@/components/layout/module-subnav";
 import { SectionSubnavLayout } from "@/components/layout/section-subnav-layout";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
@@ -15,11 +15,17 @@ export default async function ContabilidadLayout({ children }: { children: React
     redirect("/dashboard");
   }
 
+  const gate = await getTenantModuleGate(ctx);
+  const links = CONTABILIDAD_SUBNAV_LINKS.filter((link) => {
+    if (link.href !== "/contabilidad/cierres") return true;
+    return gate.isEnabled("PERIOD_CLOSE") && can(ctx.roles, "VIEW", "PERIOD_CLOSE");
+  });
+
   return (
     <SectionSubnavLayout
       subnav={
         <ModuleSubnav
-          links={CONTABILIDAD_SUBNAV_LINKS}
+          links={links}
           ariaLabel="Navegación de contabilidad"
           sectionLabel="Contabilidad"
         />

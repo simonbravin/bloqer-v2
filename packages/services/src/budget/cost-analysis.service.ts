@@ -8,7 +8,6 @@ import {
   normalizeStoredApuLineForItemQuantity,
   recomputeLumpForItemQuantity,
   recomputeResourceForItemQuantity,
-  roundApuDecimal,
 } from "@bloqer/domain";
 import type {
   CreateCostAnalysisLineInput,
@@ -17,7 +16,8 @@ import type {
 } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
-import { assertBudgetEditable } from "./budget.service";
+import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
+import { assertBudgetEditable, lockBudgetForEconomicEdit } from "./budget.service";
 import { _recalcCostItemTotals, _recalcBudgetSummary } from "./budget-calc.service";
 
 type TxClient = Omit<
@@ -31,6 +31,7 @@ async function _guardLine(costItemId: string, ctx: ServiceContext) {
   const budget = await prisma.budget.findUniqueOrThrow({ where: { id: costItem.budgetId } });
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   assertBudgetEditable(budget);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
   return { costItem, budget };
 }
 
@@ -40,10 +41,12 @@ function resolveLineTotalCost(
   totalCost?: number,
 ): Prisma.Decimal {
   if (totalCost !== undefined && Number.isFinite(totalCost)) {
-    return new Prisma.Decimal(roundApuDecimal(totalCost));
+    return new Prisma.Decimal(totalCost).toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP);
   }
-  const product = new Prisma.Decimal(coefficient).times(unitCost);
-  return new Prisma.Decimal(roundApuDecimal(Number(product.toString())));
+  // Keep APU product on Decimal — avoid IEEE Number round-trip before persist.
+  return new Prisma.Decimal(coefficient)
+    .times(unitCost)
+    .toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP);
 }
 
 /** Recompute APU lines that were entered as Total partida when item qty changes. */
@@ -119,6 +122,7 @@ export async function addCostAnalysisLine(
   }
 
   const line = await prisma.$transaction(async (tx) => {
+    await lockBudgetForEconomicEdit(tx, budget.id, ctx.tenantId);
     const itemQtyN = Number(costItem.quantity.toString());
     const resolvedTotal = resolveLineTotalCost(input.coefficient, input.unitCost, input.totalCost);
     let stored = normalizeStoredApuLineForItemQuantity(
@@ -186,6 +190,7 @@ export async function updateCostAnalysisLine(
   await _guardLine(existing.costItemId, ctx);
 
   const updated = await prisma.$transaction(async (tx) => {
+    await lockBudgetForEconomicEdit(tx, existing.budgetId, ctx.tenantId);
     const costItemRow = await tx.costItem.findUniqueOrThrow({
       where: { id: existing.costItemId },
       select: { quantity: true },
@@ -271,6 +276,7 @@ export async function removeCostAnalysisLine(id: string, ctx: ServiceContext): P
   await _guardLine(existing.costItemId, ctx);
 
   await prisma.$transaction(async (tx) => {
+    await lockBudgetForEconomicEdit(tx, existing.budgetId, ctx.tenantId);
     await tx.costAnalysisLine.delete({ where: { id } });
     const settings = await tx.budgetSettings.findUniqueOrThrow({ where: { budgetId: existing.budgetId } });
     await _recalcCostItemTotals(tx, existing.costItemId, settings);
@@ -311,6 +317,7 @@ export async function saveCostItemApu(
   }
 
   await prisma.$transaction(async (tx) => {
+    await lockBudgetForEconomicEdit(tx, budget.id, ctx.tenantId);
     const newQty =
       input.quantity !== undefined ? new Prisma.Decimal(input.quantity) : costItem.quantity;
     const itemQtyN = Number(newQty.toString());

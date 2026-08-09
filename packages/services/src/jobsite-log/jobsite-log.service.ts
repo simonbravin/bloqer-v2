@@ -12,6 +12,7 @@ import {
   assertJobsiteLogTenantModule,
 } from "../tenant-modules/tenant-module-enforcement";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
 import {
   assertJobsiteLogApprovable,
@@ -317,12 +318,12 @@ async function assertWbsBelongsToProject(wbsNodeId: string, projectId: string, t
     where: { id: wbsNodeId, budget: { tenantId } },
     include: { budget: { select: { projectId: true, tenantId: true } } },
   });
-  if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo WBS no encontrado: ${wbsNodeId}`);
+  if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo EDT no encontrado: ${wbsNodeId}`);
   if (wbs.budget.tenantId !== tenantId || wbs.budget.projectId !== projectId) {
-    throw new ServiceError("CONFLICT", "La partida WBS no pertenece a este proyecto");
+    throw new ServiceError("CONFLICT", "La partida EDT no pertenece a este proyecto");
   }
   if (wbs.type !== "ITEM") {
-    throw new ServiceError("CONFLICT", `El nodo WBS "${wbs.name}" debe ser de tipo ITEM, no GROUP`);
+    throw new ServiceError("CONFLICT", `El nodo EDT "${wbs.name}" debe ser de tipo ITEM, no GROUP`);
   }
 }
 
@@ -985,9 +986,16 @@ export async function submitJobsiteLog(id: string, ctx: ServiceContext): Promise
 
   await validateJobsiteLogFromDb(id, existing.projectId, ctx.tenantId, ctx);
 
-  const updated = await prisma.jobsiteLog.update({
-    where: { id },
+  const flipped = await prisma.jobsiteLog.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
     data: { status: "SUBMITTED", returnNotes: null, updatedBy: ctx.actorUserId },
+  });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "El parte ya no está en borrador. Recargá e intentá de nuevo.",
+  );
+  const updated = await prisma.jobsiteLog.findUniqueOrThrow({
+    where: { id },
     include: logInclude,
   });
   await log({
@@ -1024,6 +1032,17 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
 
   let stockMovementsCreated = 0;
   const updated = await prisma.$transaction(async (tx) => {
+    // Claim SUBMITTED → APPROVED before stock/schedule side effects (TOCTOU-safe).
+    await tx.$queryRaw`SELECT id FROM jobsite_logs WHERE id = ${id} FOR UPDATE`;
+    const flipped = await tx.jobsiteLog.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },
+      data: { status: "APPROVED", updatedBy: ctx.actorUserId },
+    });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "El parte ya no está enviado. Recargá e intentá de nuevo.",
+    );
+
     if (gate.isEnabled("INVENTORY")) {
       const logWithMaterials = await tx.jobsiteLog.findUniqueOrThrow({
         where: { id },
@@ -1043,9 +1062,8 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
 
     await syncScheduleProgressFromJobsiteLog(id, existing.projectId, ctx, tx);
 
-    return tx.jobsiteLog.update({
+    return tx.jobsiteLog.findUniqueOrThrow({
       where: { id },
-      data: { status: "APPROVED", updatedBy: ctx.actorUserId },
       include: logInclude,
     });
   });
@@ -1095,9 +1113,16 @@ export async function returnJobsiteLog(
 
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
 
-  const updated = await prisma.jobsiteLog.update({
-    where: { id },
+  const flipped = await prisma.jobsiteLog.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },
     data: { status: "DRAFT", returnNotes: input.returnNotes, updatedBy: ctx.actorUserId },
+  });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "El parte ya no está enviado. Recargá e intentá de nuevo.",
+  );
+  const updated = await prisma.jobsiteLog.findUniqueOrThrow({
+    where: { id },
     include: logInclude,
   });
   await log({
@@ -1159,8 +1184,17 @@ export async function cancelJobsiteLog(id: string, ctx: ServiceContext): Promise
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `Solo los partes en borrador pueden cancelarse. Estado actual: "${existing.status}"`);
   }
-  const updated = await prisma.jobsiteLog.update({
-    where: { id }, data: { status: "CANCELLED", updatedBy: ctx.actorUserId }, include: logInclude,
+  const flipped = await prisma.jobsiteLog.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+    data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+  });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "El parte ya no está en borrador. Recargá e intentá de nuevo.",
+  );
+  const updated = await prisma.jobsiteLog.findUniqueOrThrow({
+    where: { id },
+    include: logInclude,
   });
   await log({
     tenantId: ctx.tenantId,

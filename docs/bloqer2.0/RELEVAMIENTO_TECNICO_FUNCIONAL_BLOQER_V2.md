@@ -17,7 +17,7 @@ Bloqer v2 es un **ERP SaaS multitenant para empresas constructoras**, implementa
 **Principales brechas detectadas (resumen):**
 
 1. **Contabilidad sin posteo automático.** El plan de cuentas, los asientos manuales y las reglas de mapeo existen, pero los cobros, pagos y movimientos de stock **no generan asientos automáticamente**: solo producen *sugerencias* que crean asientos en `DRAFT`. La contabilidad es hoy un **libro paralelo mayormente manual**.
-2. **Módulos documentados sin implementación:** Contratos y Adendas, Órdenes de Cambio (Change Orders), RFIs, Conciliación bancaria e Impuestos/Retenciones existen como **módulo de permiso y/o documento funcional**, pero **sin servicio ni pantalla operativa**.
+2. **Módulos documentados sin implementación (actualizado ago-2026):** Contratos y Adendas, Órdenes de Cambio (Change Orders), RFIs e Impuestos/Retenciones siguen **sin** pantalla operativa completa. **Conciliación bancaria** y **cierre de período** **sí** tienen servicio + UI (`/tesoreria/conciliacion`, `/contabilidad/cierres`) — ver guía operativa §§4.2 y 15.3. Filas E antiguas de este relevamiento sobre conciliación/cierre pueden estar desactualizadas.
 3. **Multi-moneda parcial:** cada documento guarda `currency` + `fxRate` + `amountArs`, pero **cobranzas, pagos y transferencias internas exigen misma moneda** (sin conversión FX en tesorería, "Phase 3C").
 4. **Almacenamiento de documentos en modo `PLACEHOLDER`** cuando Cloudflare R2 no está configurado: se guarda metadata sin archivo real.
 5. **Rutas no navegables** y **exports sin botón** (detalle en §14 y §8).
@@ -325,7 +325,7 @@ Elementos con lógica/endpoint pero sin acceso operativo claro desde la UI:
 
 ### 11.3 Contradicciones guía operativa ↔ código
 
-| Guía (`GUIA_OPERATIVA_PROYECTO.md`) | Código | Corrección |
+| Guía (`GUIA_OPERATIVA_BLOQER_V2.md`) | Código | Corrección |
 |-------------------------------------|--------|------------|
 | §10.2 "movimiento **INCOME**" / §10.3 "movimiento **OUTCOME**" | `AccountMovementType` = `INFLOW`/`OUTFLOW` | Usar `INFLOW`/`OUTFLOW` |
 | §3.5 estado `RETURNED_FOR_CHANGES` (correcto) vs DOCX "Devuelto (RETURNED)" | `BudgetStatus.RETURNED_FOR_CHANGES` | Unificar etiqueta |

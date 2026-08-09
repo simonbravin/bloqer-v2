@@ -3,8 +3,10 @@ import { canEditSubcontractsArea, canViewSubcontractsArea } from "./subcontract-
 import type { CreateSubcontractCertificationInput, UpdateSubcontractCertificationInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertSubcontractCertSuccessionAllowed } from "./subcontract-cert-succession";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -169,60 +171,99 @@ export async function createSubcontractCertification(
     }
   }
 
-  const maxNum = await prisma.subcontractCertification.aggregate({
-    where: { subcontractId: input.subcontractId },
-    _max: { number: true },
-  });
-  const number = (maxNum._max.number ?? 0) + 1;
+  const replacesCertificationId = input.replacesCertificationId?.trim() || null;
 
-  const result = await prisma.$transaction(async (tx) => {
-    const created = await tx.subcontractCertification.create({
-      data: {
-        tenantId:               sub.tenantId,
-        companyId:              sub.companyId,
-        projectId:              sub.projectId,
-        subcontractId:          input.subcontractId,
-        subcontractorContactId: sub.subcontractorContactId,
-        number,
-        periodStart:            new Date(input.periodStart),
-        periodEnd:              new Date(input.periodEnd),
-        certificationDate:      new Date(input.certificationDate),
-        notes:                  input.notes ?? null,
-        createdBy:              ctx.actorUserId,
-        updatedBy:              ctx.actorUserId,
-      },
-    });
+  let result;
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      if (replacesCertificationId) {
+        const predecessor = await tx.subcontractCertification.findUnique({
+          where: { id: replacesCertificationId },
+          select: { id: true, subcontractId: true, status: true, tenantId: true },
+        });
+        const existingSuccessor = await tx.subcontractCertification.findFirst({
+          where: {
+            replacesCertificationId,
+            status: { not: "CANCELLED" },
+          },
+          select: { id: true },
+        });
+        assertSubcontractCertSuccessionAllowed({
+          replacesCertificationId,
+          predecessor,
+          subcontractId: input.subcontractId,
+          tenantId: ctx.tenantId,
+          existingSuccessorId: existingSuccessor?.id ?? null,
+        });
+      }
 
-    for (let i = 0; i < input.lines.length; i++) {
-      const inputLine = input.lines[i]!;
-      const subLine   = sub.lines.find((l) => l.id === inputLine.subcontractLineId)!;
-      const currentQty    = new Prisma.Decimal(inputLine.currentQty);
-      const previousQty   = subLine.certifiedQuantity;
-      const cumulativeQty = previousQty.plus(currentQty);
-      const remainingQty  = subLine.quantity.minus(cumulativeQty);
-      await tx.subcontractCertificationLine.create({
+      const maxNum = await tx.subcontractCertification.aggregate({
+        where: { subcontractId: input.subcontractId },
+        _max: { number: true },
+      });
+      const number = (maxNum._max.number ?? 0) + 1;
+
+      const created = await tx.subcontractCertification.create({
         data: {
-          subcontractCertificationId: created.id,
-          subcontractLineId:          inputLine.subcontractLineId,
-          previousQty,
-          currentQty,
-          cumulativeQty,
-          remainingQty,
-          unitPriceSnapshot: subLine.unitPrice,
-          lineTotal:         currentQty.times(subLine.unitPrice),
-          notes:             inputLine.notes ?? null,
-          sortOrder:         i,
+          tenantId:               sub.tenantId,
+          companyId:              sub.companyId,
+          projectId:              sub.projectId,
+          subcontractId:          input.subcontractId,
+          subcontractorContactId: sub.subcontractorContactId,
+          number,
+          periodStart:            new Date(input.periodStart),
+          periodEnd:              new Date(input.periodEnd),
+          certificationDate:      new Date(input.certificationDate),
+          replacesCertificationId,
+          notes:                  input.notes ?? null,
+          createdBy:              ctx.actorUserId,
+          updatedBy:              ctx.actorUserId,
         },
       });
-    }
 
-    return tx.subcontractCertification.findUniqueOrThrow({ where: { id: created.id }, include: certInclude });
-  });
+      for (let i = 0; i < input.lines.length; i++) {
+        const inputLine = input.lines[i]!;
+        const subLine   = sub.lines.find((l) => l.id === inputLine.subcontractLineId)!;
+        const currentQty    = new Prisma.Decimal(inputLine.currentQty);
+        const previousQty   = subLine.certifiedQuantity;
+        const cumulativeQty = previousQty.plus(currentQty);
+        const remainingQty  = subLine.quantity.minus(cumulativeQty);
+        await tx.subcontractCertificationLine.create({
+          data: {
+            subcontractCertificationId: created.id,
+            subcontractLineId:          inputLine.subcontractLineId,
+            previousQty,
+            currentQty,
+            cumulativeQty,
+            remainingQty,
+            unitPriceSnapshot: subLine.unitPrice,
+            lineTotal:         currentQty.times(subLine.unitPrice),
+            notes:             inputLine.notes ?? null,
+            sortOrder:         i,
+          },
+        });
+      }
+
+      return tx.subcontractCertification.findUniqueOrThrow({ where: { id: created.id }, include: certInclude });
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      throw new ServiceError(
+        "CONFLICT",
+        "Ya existe una certificación sucesora activa para la certificación reemplazada.",
+      );
+    }
+    throw err;
+  }
 
   await log({
     tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
     action: "SUBCONTRACT_CERTIFICATION_CREATED", entityType: "SubcontractCertification", entityId: result.id,
-    after: { subcontractId: input.subcontractId, number },
+    after: {
+      subcontractId: input.subcontractId,
+      number: result.number,
+      replacesCertificationId,
+    },
   });
 
   return serializeCert(result);
@@ -335,9 +376,17 @@ export async function issueSubcontractCertification(
     throw new ServiceError("CONFLICT", "La certificación no tiene líneas");
   }
 
-  const updated = await prisma.subcontractCertification.update({
-    where: { id },
+  const flipped = await prisma.subcontractCertification.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
     data: { status: "ISSUED", updatedBy: ctx.actorUserId },
+  });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "La certificación ya no está en borrador. Recargá e intentá de nuevo.",
+  );
+
+  const updated = await prisma.subcontractCertification.findUniqueOrThrow({
+    where: { id },
     include: certInclude,
   });
 
@@ -378,13 +427,21 @@ export async function approveSubcontractCertification(
   }
 
   const companyId = existing.companyId;
-  const maxNum = await prisma.supplierInvoice.aggregate({
-    where: { tenantId: ctx.tenantId, companyId },
-    _max: { number: true },
-  });
-  const invoiceNumber = (maxNum._max.number ?? 0) + 1;
 
   const result = await prisma.$transaction(async (tx) => {
+    // Serialize invoice number allocation vs concurrent AP creates.
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} FOR UPDATE`;
+
+    // Claim ISSUED → APPROVED first to block concurrent approve/reject/cancel.
+    const flipped = await tx.subcontractCertification.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "ISSUED" },
+      data: { status: "APPROVED", updatedBy: ctx.actorUserId },
+    });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "La certificación ya no está emitida. Recargá e intentá de nuevo.",
+    );
+
     // Increment certifiedQuantity on each subcontract line
     for (const line of existing.lines) {
       await tx.subcontractLine.update({
@@ -392,6 +449,12 @@ export async function approveSubcontractCertification(
         data: { certifiedQuantity: { increment: line.currentQty } },
       });
     }
+
+    const maxNum = await tx.supplierInvoice.aggregate({
+      where: { tenantId: ctx.tenantId, companyId },
+      _max: { number: true },
+    });
+    const invoiceNumber = (maxNum._max.number ?? 0) + 1;
 
     // Create SupplierInvoice DRAFT
     const totalAmount = existing.lines.reduce(
@@ -434,10 +497,8 @@ export async function approveSubcontractCertification(
       });
     }
 
-    // Approve the certification
-    return tx.subcontractCertification.update({
+    return tx.subcontractCertification.findUniqueOrThrow({
       where: { id },
-      data: { status: "APPROVED", updatedBy: ctx.actorUserId },
       include: certInclude,
     });
   });
@@ -469,9 +530,17 @@ export async function rejectSubcontractCertification(
     throw new ServiceError("CONFLICT", `La certificación en estado "${existing.status}" no puede rechazarse. Solo pueden rechazarse certificaciones emitidas.`);
   }
 
-  const updated = await prisma.subcontractCertification.update({
-    where: { id },
+  const flipped = await prisma.subcontractCertification.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: "ISSUED" },
     data: { status: "REJECTED", updatedBy: ctx.actorUserId },
+  });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "La certificación ya no está emitida. Recargá e intentá de nuevo.",
+  );
+
+  const updated = await prisma.subcontractCertification.findUniqueOrThrow({
+    where: { id },
     include: certInclude,
   });
 
@@ -525,14 +594,31 @@ export async function cancelSubcontractCertification(
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    // Claim current status → CANCELLED before reversing side effects (TOCTOU-safe).
+    const flipped = await tx.subcontractCertification.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: existing.status },
+      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+    });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "La certificación cambió de estado. Recargá e intentá de nuevo.",
+    );
+
     if (existing.status === "APPROVED") {
-      // Reverse certifiedQuantity on each subcontract line
       for (const line of existing.lines) {
         const subLine = await tx.subcontractLine.findUnique({ where: { id: line.subcontractLineId } });
-        if (!subLine) throw new ServiceError("NOT_FOUND", "Línea de subcontrato no encontrada al revertir certificación");
+        if (!subLine) {
+          throw new ServiceError(
+            "NOT_FOUND",
+            "Línea de subcontrato no encontrada al revertir certificación",
+          );
+        }
         const newQty = subLine.certifiedQuantity.minus(line.currentQty);
         if (newQty.lessThan(0)) {
-          throw new ServiceError("CONFLICT", "Error de integridad: la reversión resultaría en cantidad negativa. Contacte soporte.");
+          throw new ServiceError(
+            "CONFLICT",
+            "Error de integridad: la reversión resultaría en cantidad negativa. Contacte soporte.",
+          );
         }
         await tx.subcontractLine.update({
           where: { id: line.subcontractLineId },
@@ -540,18 +626,26 @@ export async function cancelSubcontractCertification(
         });
       }
 
-      // Cancel linked supplier invoice if DRAFT
-      if (existing.supplierInvoice && existing.supplierInvoice.status === "DRAFT") {
-        await tx.supplierInvoice.update({
-          where: { id: existing.supplierInvoice.id },
+      if (existing.supplierInvoice) {
+        const invoiceCancel = await tx.supplierInvoice.updateMany({
+          where: {
+            id: existing.supplierInvoice.id,
+            tenantId: ctx.tenantId,
+            status: "DRAFT",
+          },
           data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
         });
+        if (invoiceCancel.count === 0 && existing.supplierInvoice.status === "DRAFT") {
+          throw new ServiceError(
+            "CONFLICT",
+            "La factura de proveedor vinculada ya no está en borrador. Anulá esa factura primero.",
+          );
+        }
       }
     }
 
-    return tx.subcontractCertification.update({
+    return tx.subcontractCertification.findUniqueOrThrow({
       where: { id },
-      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
       include: certInclude,
     });
   });

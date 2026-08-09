@@ -620,7 +620,7 @@
   6. **Legacy `isLumpSum` (Monto global UI):** dominio money-safe (`coef=1`, `unitCost = monto/Qty`) se conserva al leer; al editar/guardar desde UI se convierte a resource + `unit=gl`.
   7. Si `CostItem.quantity ≤ 0`, el modo Total partida no aplica. Al cambiar `Qty` con `partidaQuantity` set: recomputar coef/`totalCost` (resource). Lump legacy: `recomputeLumpForItemQuantity`.
 - **Implicancias:** schema `partidaQuantity` + `isLumpSum`; helper `isGlobalUnit`. Modal APU: Datos del ítem → costo por categoría → Insumos (alta arriba del listado).
-- **Documentos afectados:** [`04-formulas/BUDGET_FORMULAS.md`](../04-formulas/BUDGET_FORMULAS.md), [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md), [D-057](#d-057--partida-certificable-vs-insumo-apu), [D-058](#d-058--apu-muestra-costo-venta-en-tabla-edt).
+- **Documentos afectados:** [`04-formulas/BUDGET_FORMULAS.md`](../04-formulas/BUDGET_FORMULAS.md), [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md), [D-057](#d-057--partida-certificable-vs-insumo-apu), [D-058](#d-058--apu-muestra-costo-venta-en-tabla-edt).
 - **Amend (2026-07-26):** UI sin Monto global; Global (`gl`) = no comprable; `isLumpSum` solo legacy.
 
 ---
@@ -688,7 +688,7 @@
   4. `externalInvoiceRef` en `SalesInvoice` como puente a facturación oficial externa / ARCA futuro.
   5. Emisión legal ARCA **fuera de alcance** de esta decisión.
 - **Implicancias:** aging y listado `/finanzas/cuentas-por-cobrar` incluyen filas “Empresa”; numeración de facturas sigue por `(tenantId, companyId)`; reportes por obra excluyen `projectId` null.
-- **Documentos afectados:** [`03-finance/ACCOUNTS_RECEIVABLE.md`](../03-finance/ACCOUNTS_RECEIVABLE.md), [`02-modules/SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md), [`01-domain/STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md), [`01-domain/CORE_ENTITIES.md`](../01-domain/CORE_ENTITIES.md), [`08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md`](../08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md), [`08-architecture/ARCHITECTURE_DECISION_RECORDS.md`](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md), [`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md).
+- **Documentos afectados:** [`03-finance/ACCOUNTS_RECEIVABLE.md`](../03-finance/ACCOUNTS_RECEIVABLE.md), [`02-modules/SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md), [`01-domain/STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md), [`01-domain/CORE_ENTITIES.md`](../01-domain/CORE_ENTITIES.md), [`08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md`](../08-architecture/Q030_CORPORATE_INCOME_CHECKLIST.md), [`08-architecture/ARCHITECTURE_DECISION_RECORDS.md`](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md).
 
 ---
 
@@ -704,7 +704,7 @@
   3. El bloque “Pagar ahora” a nivel proyecto se muestra **solo** si el usuario tiene permiso `EDIT` sobre `TREASURY` (segregación de funciones; igual que empresa).
   4. Adjuntos (foto/copia de factura) en el **alta** (create-then-upload) y en el detalle; adjuntos habilitados también en facturas de venta (`SALES_INVOICE`).
   5. Todo **pago** (`createPayment` y pago inline) **bloquea** si la cuenta quedaría con saldo negativo, consistente con transferencias internas ([BR-TRZ-004]).
-  6. “Cobrar ahora” inline en facturas de venta **de proyecto** queda **diferido**; el AR corporativo ([D-051]) se mantiene.
+  6. “Cobrar ahora” inline en facturas de venta **de proyecto** queda **diferido**; el AR corporativo ([D-051]) se mantiene. → **Levantado por [D-077](./DECISION_LOG.md).**
 - **Implicancias:** sin migración de schema (`projectId` ya nullable); la lógica de pago se unifica en un helper compartido; los gaps de cost code / método de pago / retenciones quedan en [OPEN_QUESTIONS.md](./OPEN_QUESTIONS.md) (Q-053+).
 - **Documentos afectados:** [`02-modules/EXPENSES_AND_PAYMENTS.md`](../02-modules/EXPENSES_AND_PAYMENTS.md), [`02-modules/SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`00-product/OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md).
 
@@ -795,7 +795,7 @@
   3. **Insumos** (materiales, MO, equipos, subcontratos de composición): `CostAnalysisLine` bajo la partida — **nunca** nodos WBS hijos.
   4. Subdividir un `ITEM` convierte al padre en `GROUP` (migrar o descartar APU); sirve para partir **alcance de obra**, no para desglosar BOM.
 - **Implicancias:** copy en UI de subdivide/import; guía operativa; [D-047](#d-047--apu-persistencia-unitaria-entrada-opcional-por-total-de-partida) para carga de cantidades de recurso.
-- **Documentos afectados:** [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md).
+- **Documentos afectados:** [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md).
 
 ---
 
@@ -810,7 +810,7 @@
   2. Tabla EDT: Costo|Venta × Compacto|Desglose; toggle **Unitario** (aditivo) e **Incidencia** independientes. Los **totales siempre se muestran**; Unitario agrega columnas `/u` al lado (no reemplaza). Desglose por categoría solo en base Costo.
   3. Etiquetas de dinero en EDT/APU: **Costo directo** / **Costo dir. /u** (no “CD total”).
 - **Implicancias:** UX de `cost-item-apu-dialog` y toolbar `wbs-tree`.
-- **Documentos afectados:** [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md).
+- **Documentos afectados:** [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md).
 - **Amend (2026-07-24):** Unitario dejó de ser exclusivo vs Total; totales permanentes + unitario opcional.
 
 ---
@@ -829,7 +829,7 @@
   5. Totales / TOTAL GENERAL / export CSV·XLSX·PDF: **sin** filas APU (solo WBS). Board de materiales sigue siendo solo `category = MATERIAL`.
   6. Certificaciones, OC/SC, cronograma siguen imputando al `wbsNodeId` de la partida hoja.
 - **Implicancias:** UX `wbs-tree`; helpers de presentación; docs operativas. Sin migración Prisma.
-- **Documentos afectados:** [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`guides/GUIA_OPERATIVA_PROYECTO.md`](../guides/GUIA_OPERATIVA_PROYECTO.md).
+- **Documentos afectados:** [`02-modules/WBS_AND_COST_ITEMS.md`](../02-modules/WBS_AND_COST_ITEMS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md).
 
 ---
 
@@ -935,7 +935,7 @@
   4. La capa **Recibido** permanece informativa (físico); **no** entra en la exposición.
   5. Invalidar notas de SESSION_HANDOFF / RELEVAMIENTO R-06 que documentaban `max(...)` como mitigación canónica.
 - **Implicancias:** `cost-control.service` + helper `computeCostExposureLayers`; tooltips UI; PDF/CSV heredan el campo corregido.
-- **Documentos afectados:** [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md), [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) BR-COS-002, [`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md), [`SESSION_HANDOFF.md`](../SESSION_HANDOFF.md).
+- **Documentos afectados:** [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md), [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) BR-COS-002, [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md), [`SESSION_HANDOFF.md`](../SESSION_HANDOFF.md).
 
 ---
 
@@ -1032,7 +1032,208 @@
   4. **Fallback UI:** sin logo subido → logo Bloqer. **PDF:** con logo → encabezado; sin logo → solo texto (nunca logo Bloqer en PDF del cliente).
   5. **Aislamiento:** clave R2 bajo `{tenantId}/branding/…`; lectura/escritura/export solo con `ctx.tenantId` / sesión — nunca aceptar `logoKey`/`logoUrl` del cliente en export.
 - **Implicancias:** migración Prisma; upload R2; proxy autenticado para sidebar; `resolvePdfReportBranding` incluye data URI scoped.
-- **Documentos afectados:** [`CORE_ENTITIES.md`](../01-domain/CORE_ENTITIES.md), [`EXPORT_FORMATS.md`](../06-reports/EXPORT_FORMATS.md), [`REPORTING_ARCHITECTURE.md`](../08-architecture/REPORTING_ARCHITECTURE.md), [`FILE_STORAGE_ARCHITECTURE.md`](../08-architecture/FILE_STORAGE_ARCHITECTURE.md), [`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md) §1.3.
+- **Documentos afectados:** [`CORE_ENTITIES.md`](../01-domain/CORE_ENTITIES.md), [`EXPORT_FORMATS.md`](../06-reports/EXPORT_FORMATS.md), [`REPORTING_ARCHITECTURE.md`](../08-architecture/REPORTING_ARCHITECTURE.md), [`FILE_STORAGE_ARCHITECTURE.md`](../08-architecture/FILE_STORAGE_ARCHITECTURE.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §1.3.
+
+---
+
+### D-072 — Cobranza de CxC: solo Collection acredita banco + aviso a finanzas empresa
+
+- **Fecha:** 2026-08-07
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Audit de flujo financiero de obra: se pedía que certificación o cobro “acrediten banco”, o al menos avisar a roles de finanza **empresa** (no `PROJECT_FINANCE`) para aplicar el cobro.
+- **Decisión:**
+  1. **Quién acredita tesorería:** únicamente **`Collection` confirmada** (elige `TreasuryAccount` → `AccountMovement` INFLOW). Certificación ISSUED/APPROVED y factura de venta ISSUED **no** mueven caja/banco.
+  2. **Notificación `RECEIVABLE_READY_TO_COLLECT`:** al emitir factura de venta de **proyecto** con CxC aún con saldo (incluye alta “registrar venta” sin cobro total). CTA → registrar cobranza.
+  3. **Audiencia:** `OWNER` ∪ `ADMIN` ∪ `FINANCE` ∪ `TREASURER` (+ CC OWNER/ADMIN vía `resolveNotificationAudience`). **No** fan-out a `PROJECT_FINANCE` ni VIEWER.
+  4. **RBAC de cobranza:** sin cambio — PM / `PROJECT_FINANCE` con `EDIT AR` **pueden** seguir registrando cobranzas de obra (asimetría consciente vs D-069 de pagos AP).
+  5. **UI naming:** copy de usuario usa **EDT** (no “WBS”); código/Prisma siguen `wbs*`.
+- **Implicancias:** enum `NotificationType`; soft-fail notify; email best-effort.
+- **Documentos afectados:** [`NOTIFICATIONS_ARCHITECTURE.md`](../08-architecture/NOTIFICATIONS_ARCHITECTURE.md), [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md) §9.3b, [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md), [`GLOSSARY.md`](./GLOSSARY.md).
+
+---
+
+### D-073 — Costo financiero del presupuesto: tasa anual × días/365 (Q-011 opción 2)
+
+- **Fecha:** 2026-08-07
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (implementación alineada a `BUDGET_FORMULAS.md`)
+- **Contexto:** `BudgetSettings.financialCostPct` y `financialDaysAvg` existían; el motor aplicaba solo un % plano sobre (directo + GG), ignorando días.
+- **Decisión:**
+  1. Cierra [Q-011](./OPEN_QUESTIONS.md) con **opción 2**: tasa y días **por presupuesto** (`BudgetSettings`).
+  2. Fórmula Fase 1: \(CF = base \times r_{fin} \times d_{prom}/365\) donde `base` = costo directo + GG a nivel ítem (misma cascada de venta).
+  3. Si `financialDaysAvg = 0`: se mantiene el **% plano** legacy (compatibilidad con presupuestos que nunca cargaron días).
+  4. UI expone tasa anual % y días promedio; el preview muestra el % efectivo cuando hay días.
+- **Implicancias:** al guardar settings con días &gt; 0 se recalculan ítems; no hay migración de datos (días 0 = sin cambio de montos).
+- **Documentos afectados:** [`BUDGET_FORMULAS.md`](../04-formulas/BUDGET_FORMULAS.md), [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) Q-011.
+
+---
+
+### D-074 — Método de liquidación y referencia en Collection / Payment (Q-054)
+
+- **Fecha:** 2026-08-07
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (continuación backlog tesorería)
+- **Contexto:** cobros y pagos solo tenían `notes`; faltaba canal de liquidación y referencia bancaria para conciliación ([Q-007]).
+- **Decisión:**
+  1. Cierra [Q-054](./OPEN_QUESTIONS.md).
+  2. Enum `TreasurySettlementMethod`: `CASH | BANK_TRANSFER | CHECK | CARD | OTHER`.
+  3. Campos opcionales nullable en `Collection` y `Payment`: `paymentMethod`, `reference` (máx. 120 en validators).
+  4. Filas legacy quedan null; no backfill.
+  5. UI (ES-AR): Efectivo / Transferencia / Cheque / Tarjeta / Otro + referencia opcional en formularios de cobro/pago y en collectNow/payNow.
+- **Implicancias:** migración Prisma; no cambia saldos ni movimientos; facilita matching futuro en bank reconciliation.
+- **Documentos afectados:** [`CORE_ENTITIES.md`](../01-domain/CORE_ENTITIES.md), [`TREASURY.md`](../02-modules/TREASURY.md), [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) Q-054.
+
+---
+
+### D-075 — Conciliación bancaria Fase 1 manual (Q-007 opción 1)
+
+- **Fecha:** 2026-08-07
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (continuación backlog tesorería)
+- **Contexto:** no existía modelo/UI de conciliación; `AccountMovementStatus` no incluía `RECONCILED`; Q-007 pedía confirmar importación vs manual.
+- **Decisión:**
+  1. Cierra [Q-007](./OPEN_QUESTIONS.md) con **opción 1**: Fase 1 100% manual; CSV/OFX diferido.
+  2. Entidades: `BankReconciliation` (`DRAFT` → `IN_PROGRESS` → `CLOSED` | `CANCELLED` — [D-032]), `BankStatementLine` (crédito/débito + monto), `BankReconciliationMatch` (1:1 línea↔movimiento).
+  3. Match marca `AccountMovement` → `RECONCILED`; desconciliar / cancelar sesión vuelve a `CONFIRMED` ([BR-TRZ-002]).
+  4. Saldos y reportes de tesorería incluyen `CONFIRMED` **y** `RECONCILED`.
+  5. Cierre exige extracto que cuadre (inicial + créditos − débitos = final) y todas las líneas emparejadas.
+  6. Una sola sesión abierta (`DRAFT`/`IN_PROGRESS`) por cuenta.
+- **Fuera de alcance ahora:** import CSV/OFX; crear movimiento faltante desde diferencia; reapertura formal de sesión `CLOSED` (solo cancelación excepcional).
+- **Documentos afectados:** [`BANK_RECONCILIATION.md`](../02-modules/BANK_RECONCILIATION.md), [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) Q-007, [`PENDING_ARCHITECTURE_ITEMS.md`](../08-architecture/PENDING_ARCHITECTURE_ITEMS.md) P-TRZ-05.
+
+---
+
+### D-076 — Formato CSV de extracto bancario (Q-007 Fase 2 mínima)
+
+- **Fecha:** 2026-08-07
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (continuación conciliación)
+- **Contexto:** tras [D-075] hacía falta un formato de importación mínimo sin OFX ni API bancaria.
+- **Decisión:**
+  1. Completa la parte CSV de [Q-007](./OPEN_QUESTIONS.md); OFX e integración directa siguen diferidos.
+  2. CSV de texto (UTF-8, BOM opcional), separador `,` o `;` auto-detectado.
+  3. Encabezados (EN/ES): `date|fecha`, `description|descripcion`, `amount|monto|importe`, `direction|direccion|tipo`; opcional `reference|referencia`.
+  4. Monto siempre positivo; dirección `CREDIT`/`DEBIT` (aliases crédito/débito, C/D, ingreso/egreso).
+  5. Fechas `YYYY-MM-DD` o `DD/MM/YYYY`. Máx. 500 filas por import.
+  6. Filas fuera del período de la sesión se omiten (conteo en respuesta); no se crean matches automáticos.
+- **Implicancias:** UI en `/tesoreria/conciliacion/[id]`; parser puro en services con tests.
+- **Documentos afectados:** [`BANK_RECONCILIATION.md`](../02-modules/BANK_RECONCILIATION.md), [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) Q-007.
+
+---
+
+### D-077 — Cobrar ahora inline en facturas de venta de proyecto (Q-055)
+
+- **Fecha:** 2026-08-08
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (continuación paridad AP/AR)
+- **Contexto:** [D-052] difería el cobro inmediato en alta manual de factura de venta de obra; el service `registerArSale` ya soportaba `collectNow`.
+- **Decisión:**
+  1. Cierra [Q-055](./OPEN_QUESTIONS.md).
+  2. El alta de factura de venta **manual de proyecto** ofrece **“Emitir y cobrar ahora”** (checkbox + cuenta + fecha + método/referencia), simétrico a “Emitir y pagar ahora” de AP ([D-052]).
+  3. El bloque se muestra solo si el módulo `TREASURY` está activo y el usuario tiene `EDIT TREASURY` (misma segregación que el cobro en `registerArSale`).
+  4. Con cobro: `registerArSale` emite factura + CxC + Collection + movimiento. Sin cobro: sigue el borrador vía `createSalesInvoice`.
+  5. Factura desde **certificación** no cambia (sigue borrador → emitir → cobrar aparte / anticipo aparte).
+- **Implicancias:** sin migración; reutiliza validators `collectNow` / `registerArSaleSchema`.
+- **Documentos afectados:** [`SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) Q-055, [D-052](./DECISION_LOG.md) punto 6.
+
+---
+
+### D-078 — Cierre de período financiero (tesorería + GL)
+
+- **Fecha:** 2026-08-08
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (continuación backlog: F-49 / D-014)
+- **Contexto:** Existía [D-014] y docs de `Period`, pero no había modelo ni enforcement. El freeze de GG (`OverheadPeriodClose`) es otro producto. El ledger listaba “GL period close” como pendiente.
+- **Decisión:**
+  1. Entidad `Period` por `(tenantId, companyId, periodKey YYYY-MM)` con `startDate`/`endDate` UTC, estado `OPEN|CLOSED`.
+  2. Cerrar/reabrir: solo `OWNER`/`ADMIN` vía permiso `PERIOD_CLOSE` ([BR-PER-001]); reapertura exige motivo + audit `period.closed` / `period.reopened`.
+  3. Bloqueo transversal (`assertFinancialPeriodOpen`):
+     - `AccountMovement.movementDate` (equivalente operativo a `date_accounting` en docs).
+     - `JournalEntry.entryDate` (crear, editar, postear, anular borrador, revertir).
+  4. UI: `/contabilidad/cierres`.
+  5. Sin solapar con cierre AUTO_WEIGHT de GG ([D-043]).
+- **Implicancias:** migración `periods`; filas sin `companyId` en tesorería no aplican el lock (edge legacy).
+- **Documentos afectados:** [`PERIOD_CLOSE_AND_LOCKS.md`](../03-finance/PERIOD_CLOSE_AND_LOCKS.md), [`CLOSE_PERIOD.md`](../05-workflows/CLOSE_PERIOD.md), [`ACCOUNTING_LEDGER_ARCHITECTURE.md`](../08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md), [`ACCOUNTING.md`](../02-modules/ACCOUNTING.md).
+
+---
+
+### D-079 — Importación OFX/QFX de extracto bancario
+
+- **Fecha:** 2026-08-08
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (continuación post [D-076])
+- **Contexto:** CSV cubría import mínimo; muchos bancos exportan OFX/QFX.
+- **Decisión:**
+  1. Import OFX 1.x / QFX (SGML) en sesión `DRAFT`/`IN_PROGRESS`: bloques `<STMTTRN>` con `DTPOSTED`, `TRNAMT`, `NAME`/`MEMO`, `FITID`/`CHECKNUM`.
+  2. `TRNAMT` positivo → CREDIT; negativo → DEBIT; monto absoluto a 2 dp.
+  3. Mismas reglas que CSV: máx. 500 filas; fuera de período se omiten; sin match automático.
+  4. API bancaria directa queda fuera de fases 0–5 ([D-080] / `INTEGRATIONS_FUTURE`).
+- **Implicancias:** parser puro + `importBankStatementLinesFromOfx`; UI en workspace de conciliación.
+- **Documentos afectados:** [`BANK_RECONCILIATION.md`](../02-modules/BANK_RECONCILIATION.md), [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) Q-007, [`PENDING_ARCHITECTURE_ITEMS.md`](../08-architecture/PENDING_ARCHITECTURE_ITEMS.md) P-TRZ-05.
+
+---
+
+### D-080 — Reapertura formal de conciliación bancaria CLOSED
+
+- **Fecha:** 2026-08-08
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (cierre P-TRZ-05 operativo)
+- **Contexto:** [D-032]/[D-075] pedían reapertura formal; solo existía cancelar sesión.
+- **Decisión:**
+  1. Transición `CLOSED` → `IN_PROGRESS` con **motivo obligatorio** (≥3 chars) y audit `bank_reconciliation.reopened`.
+  2. Se conservan matches y movimientos `RECONCILED`; el operador puede desconciliar/editar de nuevo.
+  3. Bloqueado si ya hay otra sesión `DRAFT`/`IN_PROGRESS` en la misma cuenta.
+  4. **API bancaria directa** queda **fuera** de las fases de implementación 0–5 — ver [`INTEGRATIONS_FUTURE.md`](../07-non-functional/INTEGRATIONS_FUTURE.md). CSV+OFX cubren el alcance de extractos.
+- **Documentos afectados:** [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §24, [`BANK_RECONCILIATION.md`](../02-modules/BANK_RECONCILIATION.md), [`PENDING_ARCHITECTURE_ITEMS.md`](../08-architecture/PENDING_ARCHITECTURE_ITEMS.md) P-TRZ-05.
+
+---
+
+### D-081 — Cierre Phase 3: ERD cobros/pagos, saldos y deferrals FX/overdraft
+
+- **Fecha:** 2026-08-08
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (plan cierre Phases 3→4→5)
+- **Contexto:** Ítems `P-ERD-01/02/06` y `P-TRZ-02/03/04` abiertos bloqueaban el sign-off de Phase 3.
+- **Decisión:**
+  1. **P-ERD-01:** `Collection` 1:1 con un `Receivable` y `Payment` 1:1 con un `Payable`. **Sin** tablas `*_application`. Parcialidad = múltiples documentos sobre el mismo receivable/payable ([D-010]).
+  2. **P-ERD-02:** Saldos **mantenidos** en servicio (`paidAmount` / `originalAmount`); `balanceDue` derivado. `OVERDUE` on-read + alertas ([P-TRZ-01]); no columna `balance` persistida separada.
+  3. **P-ERD-06:** `BankStatementLine` ya modelada como entidad (tabla) — cierre.
+  4. **P-TRZ-04:** UI genérica `/tesoreria/cuentas/[id]/ajuste` con `MANUAL_ADJUSTMENT` INFLOW/OUTFLOW + `assertFinancialPeriodOpen` + auto-DRAFT GL.
+  5. **Fuera de cierre Phase 3:** FX cobro/pago ([P-TRZ-02]) y `allowOverdraft` ([P-TRZ-03]) — misma moneda + saldo no negativo. API bancaria ya fuera ([D-080]).
+- **Documentos afectados:** [`PENDING_ARCHITECTURE_ITEMS.md`](../08-architecture/PENDING_ARCHITECTURE_ITEMS.md), [`PHASE_3_FINANCE_TREASURY.md`](../08-architecture/PHASE_3_FINANCE_TREASURY.md), [`TREASURY.md`](../02-modules/TREASURY.md).
+
+---
+
+### D-082 — BR-SUB-005: `replacesCertificationId` + índices Phase 4
+
+- **Fecha:** 2026-08-08
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (cierre Phase 4)
+- **Contexto:** [D-033]/[BR-SUB-005] pedían sucesión tras `REJECTED`; el campo no estaba en Prisma. Índices multitenant listados en `INDEXING_STRATEGY` faltaban en listados pesados.
+- **Decisión:**
+  1. `SubcontractCertification.replacesCertificationId` (self-FK `SubcontractCertSuccession`); al crear, si se informa, el predecesor debe ser `REJECTED` del mismo subcontrato.
+  2. UI: desde certificado rechazado → “Nueva versión” (`?replaces=`).
+  3. Índices: `Receivable(tenantId, projectId, dueDate)`, `Payable(tenantId, supplierContactId, dueDate)`, `Certification(tenantId, projectId, periodStart)`, `StockMovement(tenantId, wbsNodeId)` y `(tenantId, projectId, wbsNodeId)`.
+- **Documentos afectados:** [`PHASE_4_REPORTING.md`](../08-architecture/PHASE_4_REPORTING.md), [`SUBCONTRACTS.md`](../02-modules/SUBCONTRACTS.md), [`INDEXING_STRATEGY.md`](../08-architecture/INDEXING_STRATEGY.md).
+
+---
+
+### D-083 — Diferimientos de alcance Phase 4 (inventario valuado / reservas / reportes nice-to-have)
+
+- **Fecha:** 2026-08-08
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (anti-scope infinito cierre Phase 4)
+- **Contexto:** Criterios de aceptación Phase 4 no requieren FIFO pleno ni reservas de stock ni todo el catálogo R-xxx.
+- **Decisión (fuera del cierre Phase 4):**
+  | Diferido | Motivo |
+  |---|---|
+  | Valuación stock FIFO / capas de costo ([D-007]) | Motor grande; `unitCost`/`totalCost` en movimiento alcanza piloto |
+  | `StockReservation` ([D-034]) | Módulo completo; no bloquea OC→stock→consumo actual |
+  | R-010 / R-011 | Nice-to-have del catálogo; no criterio de aceptación Phase 4 |
+  | R-014 “valorizado” pleno | Depende de D-007 |
+  R-014 qty-only y R-020 quedan como entregados / parcial documentado.
+- **Documentos afectados:** [`PHASE_4_REPORTING.md`](../08-architecture/PHASE_4_REPORTING.md), [`REPORT_CATALOG.md`](../06-reports/REPORT_CATALOG.md), [`INVENTORY.md`](../02-modules/INVENTORY.md).
 
 ---
 
@@ -1044,8 +1245,10 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-072`…).
+1. Tomar el siguiente ID disponible (`D-084`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.
 5. **Nunca** borrar decisiones; cambiar estado a `SUPERSEDED` y agregar la nueva.
+
+> Cierre Phases 3→4→5 (2026-08-08): [D-081] ERD Phase 3, [D-082] BR-SUB-005 + índices, [D-083] diferimientos inventario/reportes. Phase 5: CI+tests, isolation suite, E2E `apps/web/e2e`, ASVS-lite.

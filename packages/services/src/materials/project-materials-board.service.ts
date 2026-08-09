@@ -441,7 +441,7 @@ export async function getProjectMaterialsBoard(
 
   if (window !== "all" && scheduleLinks.length === 0) {
     warnings.push(
-      "Sin tareas de cronograma vinculadas a WBS: se muestran todas las partidas (bucket sin fecha).",
+      "Sin tareas de cronograma vinculadas a EDT: se muestran todas las partidas (bucket sin fecha).",
     );
   }
 

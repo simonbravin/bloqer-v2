@@ -79,7 +79,8 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
     projectId: id,
   });
   const storageConfigured = isStorageConfigured();
-  const canEditAttachments = can(current.tenantCtx.roles, "EDIT", "AP");
+  const canEditAp = can(current.tenantCtx.roles, "EDIT", "AP");
+  const canEditAttachments = canEditAp;
 
   const isDraft = invoice.status === "DRAFT";
   const isIssued = invoice.status === "ISSUED";
@@ -251,41 +252,43 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
         </Card>
       ) : null}
 
-      <div className="flex gap-2 flex-wrap">
-        {isDraft && (
-          <>
-            <Button asChild variant="outline">
-              <Link href={`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}/editar`}>
-                Editar
-              </Link>
-            </Button>
+      {canEditAp ? (
+        <div className="flex gap-2 flex-wrap">
+          {isDraft && (
+            <>
+              <Button asChild variant="outline">
+                <Link href={`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}/editar`}>
+                  Editar
+                </Link>
+              </Button>
+              <form
+                action={async () => {
+                  "use server";
+                  const result = await issueSupplierInvoiceAction(supplierInvoiceId, id);
+                  if ("error" in result) redirectWithActionError(detailPath, result.error);
+                  redirect(detailPath);
+                }}
+              >
+                <Button type="submit">Emitir factura</Button>
+              </form>
+            </>
+          )}
+          {(isDraft || isIssued) && !isCancelled && (
             <form
               action={async () => {
                 "use server";
-                const result = await issueSupplierInvoiceAction(supplierInvoiceId, id);
+                const result = await cancelSupplierInvoiceAction(supplierInvoiceId, id);
                 if ("error" in result) redirectWithActionError(detailPath, result.error);
                 redirect(detailPath);
               }}
             >
-              <Button type="submit">Emitir factura</Button>
+              <Button type="submit" variant="destructive">
+                Anular
+              </Button>
             </form>
-          </>
-        )}
-        {(isDraft || isIssued) && !isCancelled && (
-          <form
-            action={async () => {
-              "use server";
-              const result = await cancelSupplierInvoiceAction(supplierInvoiceId, id);
-              if ("error" in result) redirectWithActionError(detailPath, result.error);
-              redirect(detailPath);
-            }}
-          >
-            <Button type="submit" variant="destructive">
-              Anular
-            </Button>
-          </form>
-        )}
-      </div>
+          )}
+        </div>
+      ) : null}
 
       <EntityDocumentsPanel
         scope={{ kind: "project", projectId: id }}

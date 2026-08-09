@@ -13,7 +13,12 @@ import { canRegisterApPayment, canViewApProjectArea, canViewCompanyAp } from "./
 import { notifyPaymentConfirmed } from "./ap-notifications.service";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { ensureDraftJournalFromPayment } from "../accounting/accounting-auto-draft.service";
-import { syncJournalOnOperationalCancel } from "../accounting/accounting-cancel-sync.service";
+import {
+  assertJournalAllowsOperationalCancel,
+  cancelDraftJournalOnOperationalCancel,
+} from "../accounting/accounting-cancel-sync.service";
+import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import { assertResourceTenant } from "../security/tenant-isolation";
 
 export type PaymentView = Omit<Payment, "amount"> & {
   amount: string;
@@ -213,7 +218,7 @@ export async function createPayment(
     // Load payable inside txn for consistency
     const payable = await tx.payable.findUnique({ where: { id: input.payableId } });
     if (!payable) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
-    if (payable.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    assertResourceTenant(payable.tenantId, ctx.tenantId);
     if (projectScopeId !== undefined && payable.projectId !== projectScopeId) {
       throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
     }
@@ -257,6 +262,8 @@ export async function createPayment(
         amount,
         paymentDate: input.paymentDate,
         notes: input.notes ?? null,
+        paymentMethod: input.paymentMethod ?? null,
+        reference: input.reference ?? null,
       },
       ctx,
     );
@@ -310,7 +317,13 @@ export async function cancelPayment(
 
   const paymentPreview = await prisma.payment.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true, companyId: true },
+    select: {
+      tenantId: true,
+      projectId: true,
+      companyId: true,
+      paymentDate: true,
+      status: true,
+    },
   });
   if (!paymentPreview) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
   if (paymentPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -327,12 +340,37 @@ export async function cancelPayment(
     throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");
   }
 
-  await syncJournalOnOperationalCancel(ctx, {
+  const glParams = {
     companyId: paymentPreview.companyId,
-    sourceType: "PAYMENT",
+    sourceType: "PAYMENT" as const,
     sourceId: id,
     sourceLabel: "el pago",
+  };
+
+  if (paymentPreview.status === "CANCELLED") {
+    await cancelDraftJournalOnOperationalCancel(ctx, glParams);
+    throw new ServiceError("CONFLICT", "El pago ya está cancelado");
+  }
+
+  await assertFinancialPeriodOpen({
+    tenantId: ctx.tenantId,
+    companyId: paymentPreview.companyId,
+    date: paymentPreview.paymentDate,
   });
+
+  // Hard stops before GL cancel — avoid orphaning DRAFT journals on RECONCILED conflict.
+  const linkedMovementPreview = await prisma.accountMovement.findFirst({
+    where: { sourceType: "PAYMENT", sourceId: id, status: { in: ["CONFIRMED", "RECONCILED"] } },
+    select: { id: true, status: true },
+  });
+  if (linkedMovementPreview?.status === "RECONCILED") {
+    throw new ServiceError(
+      "CONFLICT",
+      "El movimiento de tesorería está conciliado. Desconciliá antes de cancelar el pago.",
+    );
+  }
+
+  await assertJournalAllowsOperationalCancel(ctx, glParams);
 
   const updated = await prisma.$transaction(async (tx) => {
     const p = await tx.payment.findUnique({ where: { id } });
@@ -345,6 +383,17 @@ export async function cancelPayment(
       throw new ServiceError("CONFLICT", "El pago ya está cancelado");
     }
 
+    const linkedMovement = await tx.accountMovement.findFirst({
+      where: { sourceType: "PAYMENT", sourceId: id, status: { in: ["CONFIRMED", "RECONCILED"] } },
+      select: { id: true, status: true },
+    });
+    if (linkedMovement?.status === "RECONCILED") {
+      throw new ServiceError(
+        "CONFLICT",
+        "El movimiento de tesorería está conciliado. Desconciliá antes de cancelar el pago.",
+      );
+    }
+
     const paymentCancel = await tx.payment.updateMany({
       where: { id, status: "CONFIRMED" },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
@@ -354,11 +403,23 @@ export async function cancelPayment(
       "El pago ya fue cancelado o modificado. Revisá e intentá de nuevo.",
     );
 
-    // Cancel linked AccountMovement
-    await tx.accountMovement.updateMany({
-      where: { sourceType: "PAYMENT", sourceId: id, status: "CONFIRMED" },
-      data: { status: "CANCELLED" },
-    });
+    // Cancel linked AccountMovement (tenant + optimistic claim if present)
+    if (linkedMovement) {
+      const movementCancel = await tx.accountMovement.updateMany({
+        where: {
+          id: linkedMovement.id,
+          tenantId: ctx.tenantId,
+          sourceType: "PAYMENT",
+          sourceId: id,
+          status: "CONFIRMED",
+        },
+        data: { status: "CANCELLED" },
+      });
+      assertOptimisticRowUpdate(
+        movementCancel.count,
+        "El movimiento de tesorería cambió (p. ej. conciliado). Recargá e intentá de nuevo.",
+      );
+    }
 
     // Reverse Payable.paidAmount
     const payable = await tx.payable.findUnique({ where: { id: p.payableId } });
@@ -397,6 +458,8 @@ export async function cancelPayment(
 
     return updated;
   });
+
+  await cancelDraftJournalOnOperationalCancel(ctx, glParams);
 
   return updated;
 }

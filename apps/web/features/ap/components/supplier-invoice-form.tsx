@@ -14,6 +14,8 @@ import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
+import { SettlementFields } from "@/features/treasury/components/settlement-fields";
+import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import {
   createSupplierInvoiceAction,
   getPurchaseOrderInvoiceDraftPreviewAction,
@@ -75,6 +77,7 @@ export function SupplierInvoiceForm({
   const [lines, setLines] = useState<InvoiceLine[]>([{ ...DEFAULT_LINE }]);
   const [payNow, setPayNow] = useState(false);
   const [payAccountId, setPayAccountId] = useState("");
+  const [payMethod, setPayMethod] = useState<SettlementMethodValue | "">("");
   const [attachment, setAttachment] = useState<File | null>(null);
   const [poPreview, setPoPreview] = useState<PurchaseOrderInvoiceDraftPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -247,6 +250,8 @@ export function SupplierInvoiceForm({
             paymentDate,
             payFullBalance: true,
             notes: null,
+            paymentMethod: payMethod || null,
+            reference: String(fd.get("reference") ?? "").trim() || null,
           },
         });
         if ("error" in res) {
@@ -412,6 +417,13 @@ export function SupplierInvoiceForm({
                   <div className="space-y-1">
                     <Label htmlFor="paymentDate">Fecha de pago</Label>
                     <Input id="paymentDate" name="paymentDate" type="date" required />
+                  </div>
+                  <div className="col-span-2">
+                    <SettlementFields
+                      idPrefix="supplier-pay-now"
+                      paymentMethod={payMethod}
+                      onPaymentMethodChange={setPayMethod}
+                    />
                   </div>
                 </div>
               )

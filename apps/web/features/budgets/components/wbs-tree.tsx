@@ -905,7 +905,7 @@ export function WbsTree({
           <div className="flex flex-wrap gap-2">
             {onPreviewWbsImport && onExecuteWbsImport && (
               <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-                <Upload className="h-3 w-3 mr-1" /> Importar WBS
+                <Upload className="h-3 w-3 mr-1" /> Importar EDT
               </Button>
             )}
             <Button
@@ -1203,7 +1203,7 @@ export function WbsTree({
         onOpenChange={(open) => {
           if (!open && !removePending) setDeleteTarget(null);
         }}
-        title="Eliminar nodo WBS"
+        title="Eliminar nodo EDT"
         description={
           deleteTarget ? (
             <>

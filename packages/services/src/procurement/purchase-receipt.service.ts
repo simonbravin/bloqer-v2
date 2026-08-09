@@ -111,7 +111,20 @@ async function recomputePOStatus(tx: TxClient, purchaseOrderId: string): Promise
       ? PurchaseOrderStatus.PARTIALLY_RECEIVED
       : PurchaseOrderStatus.CONFIRMED;
 
-  await tx.purchaseOrder.update({ where: { id: purchaseOrderId }, data: { status: newStatus } });
+  // Never resurrect CANCELLED / DRAFT / SUBMITTED / APPROVED via receipt recompute.
+  await tx.purchaseOrder.updateMany({
+    where: {
+      id: purchaseOrderId,
+      status: {
+        in: [
+          PurchaseOrderStatus.CONFIRMED,
+          PurchaseOrderStatus.PARTIALLY_RECEIVED,
+          PurchaseOrderStatus.RECEIVED,
+        ],
+      },
+    },
+    data: { status: newStatus },
+  });
 }
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
@@ -200,6 +213,41 @@ export async function createPurchaseReceipt(
   const settings = await getCompanyProcurementSettingsForProject(po.projectId, ctx);
   const tolerancePct = new Prisma.Decimal(settings.overReceiptTolerancePct);
 
+  if (input.warehouseId) {
+    const warehouse = await prisma.warehouse.findFirst({
+      where: {
+        id: input.warehouseId,
+        tenantId: ctx.tenantId,
+        status: "ACTIVE",
+      },
+      select: { id: true, companyId: true },
+    });
+    if (!warehouse) {
+      throw new ServiceError("NOT_FOUND", "Depósito no encontrado o inactivo");
+    }
+    if (warehouse.companyId !== po.companyId) {
+      throw new ServiceError("CONFLICT", "El depósito no pertenece a la misma empresa que la orden");
+    }
+  }
+
+  // Count qty already reserved on other DRAFT receipts so create cannot over-allocate.
+  const draftReservedRows = await prisma.purchaseReceiptLine.findMany({
+    where: {
+      purchaseOrderLineId: { in: po.lines.map((l) => l.id) },
+      purchaseReceipt: {
+        purchaseOrderId: po.id,
+        status: "DRAFT",
+        tenantId: ctx.tenantId,
+      },
+    },
+    select: { purchaseOrderLineId: true, quantityReceived: true },
+  });
+  const draftReservedByLine = new Map<string, Prisma.Decimal>();
+  for (const row of draftReservedRows) {
+    const prev = draftReservedByLine.get(row.purchaseOrderLineId) ?? new Prisma.Decimal(0);
+    draftReservedByLine.set(row.purchaseOrderLineId, prev.plus(row.quantityReceived));
+  }
+
   // Validate each line exists on PO and quantity > 0 within remaining + over-receipt tolerance ([D-067])
   for (const inputLine of input.lines) {
     const poLine = po.lines.find((l) => l.id === inputLine.purchaseOrderLineId);
@@ -207,10 +255,12 @@ export async function createPurchaseReceipt(
       throw new ServiceError("NOT_FOUND", `Línea de OC no encontrada: ${inputLine.purchaseOrderLineId}`);
     }
     const qtyReceived = new Prisma.Decimal(inputLine.quantityReceived);
-    const remaining = poLine.quantity.minus(poLine.receivedQuantity);
+    const draftReserved = draftReservedByLine.get(poLine.id) ?? new Prisma.Decimal(0);
+    const alreadyReceived = poLine.receivedQuantity.plus(draftReserved);
+    const remaining = poLine.quantity.minus(alreadyReceived);
     assertReceiptQtyWithinRemaining(qtyReceived, remaining, poLine.description, {
       orderQuantity: poLine.quantity,
-      alreadyReceived: poLine.receivedQuantity,
+      alreadyReceived,
       tolerancePct,
     });
   }
@@ -295,9 +345,20 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
   const tolerancePct = new Prisma.Decimal(settings.overReceiptTolerancePct);
 
   const receipt = await prisma.$transaction(async (tx) => {
-    // Re-check over-receipt against current PO line totals (TOCTOU vs create) [D-067]
+    // Lock PO lines then re-assert remaining (closes concurrent confirm race) [BR-PUR-006].
     for (const line of existing.lines) {
-      const poLine = line.purchaseOrderLine;
+      await tx.$queryRaw`
+        SELECT id FROM purchase_order_lines WHERE id = ${line.purchaseOrderLineId} FOR UPDATE
+      `;
+      const poLine = await tx.purchaseOrderLine.findUniqueOrThrow({
+        where: { id: line.purchaseOrderLineId },
+        select: {
+          id: true,
+          description: true,
+          quantity: true,
+          receivedQuantity: true,
+        },
+      });
       const remaining = poLine.quantity.minus(poLine.receivedQuantity);
       assertReceiptQtyWithinRemaining(line.quantityReceived, remaining, poLine.description, {
         orderQuantity: poLine.quantity,
@@ -339,9 +400,16 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
       }
     }
 
-    const receipt = await tx.purchaseReceipt.update({
-      where: { id },
+    const confirmed = await tx.purchaseReceipt.updateMany({
+      where: { id, status: "DRAFT" },
       data: { status: PurchaseReceiptStatus.CONFIRMED, updatedBy: ctx.actorUserId },
+    });
+    if (confirmed.count !== 1) {
+      throw new ServiceError("CONFLICT", "La recepción ya no está en borrador");
+    }
+
+    const receipt = await tx.purchaseReceipt.findUniqueOrThrow({
+      where: { id },
       include: receiptInclude,
     });
 
@@ -379,13 +447,34 @@ export async function cancelPurchaseReceipt(id: string, ctx: ServiceContext): Pr
   if (existing.status === "CANCELLED") {
     throw new ServiceError("CONFLICT", "La recepción ya está anulada");
   }
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
 
   const receipt = await prisma.$transaction(async (tx) => {
-    if (existing.status === "CONFIRMED") {
-      // Reverse exact quantities — no silent clamp per user spec
+    await tx.$queryRaw`SELECT id FROM purchase_receipts WHERE id = ${id} FOR UPDATE`;
+    const before = await tx.purchaseReceipt.findUniqueOrThrow({
+      where: { id },
+      select: { status: true },
+    });
+    if (before.status === "CANCELLED") {
+      throw new ServiceError("CONFLICT", "La recepción ya está anulada");
+    }
+
+    const cancelled = await tx.purchaseReceipt.updateMany({
+      where: { id, status: before.status },
+      data: { status: PurchaseReceiptStatus.CANCELLED, updatedBy: ctx.actorUserId },
+    });
+    if (cancelled.count !== 1) {
+      throw new ServiceError("CONFLICT", "La recepción ya no se puede anular (estado cambió)");
+    }
+
+    if (before.status === "CONFIRMED") {
       for (const line of existing.lines) {
-        const poLine = await tx.purchaseOrderLine.findUnique({ where: { id: line.purchaseOrderLineId } });
-        if (!poLine) throw new ServiceError("NOT_FOUND", "Línea de OC no encontrada al revertir recepción");
+        await tx.$queryRaw`
+          SELECT id FROM purchase_order_lines WHERE id = ${line.purchaseOrderLineId} FOR UPDATE
+        `;
+        const poLine = await tx.purchaseOrderLine.findUniqueOrThrow({
+          where: { id: line.purchaseOrderLineId },
+        });
         const newQty = poLine.receivedQuantity.minus(line.quantityReceived);
         if (newQty.lessThan(0)) {
           throw new ServiceError(
@@ -395,17 +484,15 @@ export async function cancelPurchaseReceipt(id: string, ctx: ServiceContext): Pr
         }
         await tx.purchaseOrderLine.update({
           where: { id: line.purchaseOrderLineId },
-          data: { receivedQuantity: newQty },
+          data: { receivedQuantity: { decrement: line.quantityReceived } },
         });
       }
       await recomputePOStatus(tx, existing.purchaseOrderId);
-      // Cancel linked stock movements atomically
-      await cancelReceiptStockMovements(tx, existing.id);
+      await cancelReceiptStockMovements(tx, existing.id, existing.tenantId);
     }
 
-    const receipt = await tx.purchaseReceipt.update({
+    const receipt = await tx.purchaseReceipt.findUniqueOrThrow({
       where: { id },
-      data: { status: PurchaseReceiptStatus.CANCELLED, updatedBy: ctx.actorUserId },
       include: receiptInclude,
     });
 
@@ -423,7 +510,7 @@ export async function cancelPurchaseReceipt(id: string, ctx: ServiceContext): Pr
         after: {
           purchaseOrderId: existing.purchaseOrderId,
           number: po?.number ?? null,
-          wasConfirmed: existing.status === "CONFIRMED",
+          wasConfirmed: before.status === "CONFIRMED",
         },
         tx,
       },

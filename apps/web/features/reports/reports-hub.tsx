@@ -99,7 +99,7 @@ export function ReportsHub({
     },
     {
       title: "Presupuesto vs real",
-      description: "Varianzas por partida WBS con capa de costo seleccionable y composición del presupuesto.",
+      description: "Varianzas por partida EDT con capa de costo seleccionable y composición del presupuesto.",
       href: `${base}/presupuesto-vs-real`,
       icon: <TrendingUp className="h-5 w-5" />,
       available: canCostReports,

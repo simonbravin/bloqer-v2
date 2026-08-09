@@ -19,8 +19,11 @@ FINANCE.
 ## 5. Postcondiciones
 - Saldo sistema alineado con banco a fecha valor.
 
+## 5b. Reapertura
+Sesión `CLOSED` → **Reabrir** con motivo → `IN_PROGRESS` ([D-080]); matches se conservan.
+
 ## 6. Eventos
-- `account_movement.reconciled`, `bank_reconciliation.closed`
+- `account_movement.reconciled`, `bank_reconciliation.closed`, `bank_reconciliation.reopened`
 
 ## Referencias
 - [`OPEN_QUESTIONS.md`](../00-product/OPEN_QUESTIONS.md) Q-007

@@ -236,7 +236,7 @@ Validar al menos una vez por tenant de capacitación (pueden repartirse entre ro
 |-----------|-----|
 | [`DEPLOYMENT_SMOKE_TEST.md`](./DEPLOYMENT_SMOKE_TEST.md) | Post-deploy técnico (cron, auth, PDF API) |
 | [`PROJECT_FINANCE_QA_UAT_BY_ROLE.md`](./PROJECT_FINANCE_QA_UAT_BY_ROLE.md) | Detalle AR/AP proyecto |
-| [`../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](../GUIA_OPERATIVA_BLOQER_V2_REVISADA.md) | Narrativa operativa (hábitos §18) |
+| [`../GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) | Narrativa operativa (hábitos §18) |
 | [`../guides/CHANGELOG_UI_LOTES_1_6.md`](../guides/CHANGELOG_UI_LOTES_1_6.md) | Diff UI para regenerar DOCX más adelante |
 | [`../00-product/USER_ROLES.md`](../00-product/USER_ROLES.md) | Definición de roles |
 | [`PERMISSIONS_ROUTE_MATRIX.md`](./PERMISSIONS_ROUTE_MATRIX.md) | Rutas × permisos |

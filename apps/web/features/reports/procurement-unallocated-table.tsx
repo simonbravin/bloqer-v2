@@ -31,7 +31,7 @@ export function ProcurementUnallocatedTable({ rows }: Props) {
   if (rows.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-4 text-center">
-        No hay líneas de compra sin partida WBS en el período.
+        No hay líneas de compra sin partida EDT en el período.
       </p>
     );
   }

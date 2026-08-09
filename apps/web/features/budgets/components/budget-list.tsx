@@ -9,4 +9,7 @@ export type BudgetListItem = {
   currency: string;
   totalCost: string;
   totalSalePrice: string;
+  parentBudgetId: string | null;
+  parentVersionNumber: number | null;
+  parentName: string | null;
 };

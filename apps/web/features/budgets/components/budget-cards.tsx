@@ -22,7 +22,7 @@ export function BudgetCards({
     return (
       <ListEmptyState
         title="Sin presupuestos"
-        description="Creá el primer presupuesto del proyecto. Un presupuesto adicional puede usarse como adenda operativa (sin vínculo automático)."
+        description="Creá el primer presupuesto del proyecto. Después podés crear una adenda vinculada a uno aprobado o cerrado."
         action={
           <Button asChild size="sm">
             <Link href={`/proyectos/${projectId}/presupuestos/nuevo`}>Nuevo presupuesto</Link>
@@ -45,6 +45,12 @@ export function BudgetCards({
             <BudgetStatusBadge status={b.status} />
           </div>
           <h3 className="mt-2 line-clamp-2 font-semibold leading-snug">{b.name}</h3>
+          {b.parentBudgetId && b.parentVersionNumber != null && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Adenda de v{b.parentVersionNumber}
+              {b.parentName ? ` — ${b.parentName}` : ""}
+            </p>
+          )}
           <div className="mt-3 space-y-1 text-sm">
             <div className="flex justify-between gap-2 tabular-nums">
               <span className="text-muted-foreground">Costo directo</span>

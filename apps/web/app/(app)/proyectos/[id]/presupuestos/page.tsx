@@ -35,17 +35,24 @@ export default async function PresupuestosPage({ params }: PageProps) {
   }
 
   const budgets = await listBudgetsByProject(id, ctx);
+  const byId = new Map(budgets.map((b) => [b.id, b]));
 
-  const serialized = budgets.map((b) => ({
-    id: b.id,
-    projectId: b.projectId,
-    versionNumber: b.versionNumber,
-    name: b.name,
-    status: b.status,
-    currency: b.currency,
-    totalCost: b.totalCost.toString(),
-    totalSalePrice: b.totalSalePrice.toString(),
-  }));
+  const serialized = budgets.map((b) => {
+    const parent = b.parentBudgetId ? byId.get(b.parentBudgetId) : undefined;
+    return {
+      id: b.id,
+      projectId: b.projectId,
+      versionNumber: b.versionNumber,
+      name: b.name,
+      status: b.status,
+      currency: b.currency,
+      totalCost: b.totalCost.toString(),
+      totalSalePrice: b.totalSalePrice.toString(),
+      parentBudgetId: b.parentBudgetId,
+      parentVersionNumber: parent?.versionNumber ?? null,
+      parentName: parent?.name ?? null,
+    };
+  });
 
   return (
     <PageShell variant="default" className="space-y-6">

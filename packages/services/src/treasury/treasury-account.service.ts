@@ -7,6 +7,7 @@ import { canRegisterApPayment } from "../ap/ap-access";
 import { ServiceContext, ServiceError } from "../types";
 import { getAccountBalance, AccountBalanceSummary } from "./balance.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
 
 export type TreasuryAccountView = Omit<TreasuryAccount, "openingBalance"> & {
   openingBalance: string;
@@ -121,6 +122,14 @@ export async function createTreasuryAccount(
   const openingBalance = new Prisma.Decimal(input.openingBalance ?? "0");
   const companyId = input.companyId ?? ctx.companyId ?? null;
 
+  // Period lock cannot apply without a company; require one when creating money.
+  if (openingBalance.greaterThan(0) && !companyId) {
+    throw new ServiceError(
+      "VALIDATION",
+      "El saldo inicial requiere una empresa en el contexto o en la cuenta",
+    );
+  }
+
   const acc = await prisma.$transaction(async (tx) => {
     const created = await tx.treasuryAccount.create({
       data: {
@@ -141,12 +150,23 @@ export async function createTreasuryAccount(
 
     // D6: create OPENING_BALANCE movement if openingBalance > 0
     if (openingBalance.greaterThan(0)) {
+      // Calendar UTC date (same convention as adjustments / recon) — avoid wall-clock TZ drift.
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const movementDate = new Date(`${todayIso}T00:00:00.000Z`);
+      await assertFinancialPeriodOpen(
+        {
+          tenantId: ctx.tenantId,
+          companyId,
+          date: movementDate,
+        },
+        tx,
+      );
       await tx.accountMovement.create({
         data: {
           tenantId: ctx.tenantId,
           companyId,
           accountId: created.id,
-          movementDate: new Date(),
+          movementDate,
           type: "INFLOW",
           sourceType: "OPENING_BALANCE",
           sourceId: created.id,

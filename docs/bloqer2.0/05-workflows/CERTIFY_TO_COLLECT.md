@@ -7,13 +7,13 @@ Encadenar **certificación aprobada → factura venta → receivable → cobranz
 FINANCE (+ PM para hitos intermedios).
 
 ## 3. Precondiciones
-- Certificación `APPROVED` (o `ISSUED` si la política comercial lo permite **antes** de aprobación cliente — no confundir con estado `INVOICED`, que **no** existe en `Certification.status` — [BR-CERT-007]).
+- Certificación `APPROVED` (facturación desde certificación; la UI y el service gateean en `APPROVED`).
 - Datos fiscales cliente completos.
 
 ## 4. Pasos
-1. Generar **SalesInvoice** desde certificación (o manual).
-2. Estado factura `ISSUED` → crea **Receivable** (`receivable.created`).
-3. Registrar **Collection**: seleccionar cuenta destino, montos, FX.
+1. Generar **SalesInvoice** desde certificación (o manual). A lo sumo **una factura activa** (no `CANCELLED`) por `certificationId` — guard en service + índice parcial DB `sales_invoices_one_active_per_certification_key`.
+2. Estado factura `ISSUED` → crea **Receivable** (`receivable.created`) y aviso `RECEIVABLE_READY_TO_COLLECT` a finanzas empresa ([D-072]).
+3. Registrar **Collection**: seleccionar cuenta destino, montos, FX. Solo la cobranza acredita tesorería ([D-072]).
 4. Aplicar cobranza a factura(s); permite parciales ([D-010]).
 5. Confirmar → **AccountMovement INCOME** + actualización `paid_amount`.
 

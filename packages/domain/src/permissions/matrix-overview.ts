@@ -70,7 +70,6 @@ export const MODULES_UNAVAILABLE_IN_THIS_VERSION: readonly PermissionModule[] = 
   "CONTRACTS",
   "CHANGE_ORDERS",
   "RFIS",
-  "BANK_RECONCILIATION",
   "TAXES",
 ] as const;
 

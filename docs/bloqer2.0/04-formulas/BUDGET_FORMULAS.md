@@ -69,7 +69,11 @@ La UI puede cargar una línea en modo **Total partida** ([D-047] enmendada):
 CF_{pres} = \text{CostoTotalProyectado} \times r_{fin} \times \frac{d_{prom}}{365}
 \]
 
-Donde \(r_{fin}\) es tasa anual configurada en **BudgetSettings** ([Q-011]) y \(d_{prom}\) días promedio de financiamiento estimado.
+Donde \(r_{fin}\) es tasa anual y \(d_{prom}\) días promedio de financiamiento en **BudgetSettings** ([D-073] / Q-011 opción 2).
+
+En el motor de ítems, la base es el **subtotal 1** (costo directo unitario + GG) de cada partida; el mismo factor se aplica en cascada de precio de venta.
+
+**Compatibilidad:** si \(d_{prom} = 0\), se aplica \(CF = base \times r_{fin}\) como % plano (presupuestos legacy sin días cargados).
 
 ### Ejemplo numérico
 

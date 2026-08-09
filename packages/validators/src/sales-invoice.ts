@@ -5,6 +5,7 @@ import {
   qtyString,
   ratePctString,
 } from "./money";
+import { treasurySettlementFieldsSchema } from "./treasury-settlement";
 
 const invoiceLineSchema = z.object({
   description: z.string().min(1),
@@ -39,7 +40,7 @@ export const createInvoiceFromCertificationSchema = z.object({
   certificationId: z.string().uuid(),
   issueDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dueDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  taxRate:         ratePctString.optional().default("21.0000"),
+  taxRate:         ratePctString.optional().default("0.0000"),
   notes:           z.string().optional().nullable(),
   internalNotes:   z.string().optional().nullable(),
 });
@@ -53,14 +54,16 @@ export const updateSalesInvoiceSchema = z.object({
 
 
 
-export const collectNowSchema = z.object({
-  accountId:            z.string().uuid(),
-  collectionDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  amount:               optionalMoneyAmountString,
-  /** When true or amount omitted, server collects stored total ([D-053]). */
-  collectFullBalance:   z.boolean().optional(),
-  notes:                z.string().optional().nullable(),
-});
+export const collectNowSchema = z
+  .object({
+    accountId:            z.string().uuid(),
+    collectionDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    amount:               optionalMoneyAmountString,
+    /** When true or amount omitted, server collects stored total ([D-053]). */
+    collectFullBalance:   z.boolean().optional(),
+    notes:                z.string().optional().nullable(),
+  })
+  .merge(treasurySettlementFieldsSchema);
 
 export const registerArSaleSchema = createSalesInvoiceSchema.extend({
   collectNow: collectNowSchema.optional(),

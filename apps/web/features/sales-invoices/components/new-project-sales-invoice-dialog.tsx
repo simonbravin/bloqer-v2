@@ -11,11 +11,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ManualInvoiceForm, type ClientOption } from "./manual-invoice-form";
+import {
+  ManualInvoiceForm,
+  type ClientOption,
+  type TreasuryAccountOption,
+} from "./manual-invoice-form";
 
 interface Props {
   projectId: string;
   clients: ClientOption[];
+  treasuryAccounts?: TreasuryAccountOption[];
+  canCollectNow?: boolean;
   storageConfigured?: boolean;
   defaultOpen?: boolean;
 }
@@ -23,6 +29,8 @@ interface Props {
 export function NewProjectSalesInvoiceDialog({
   projectId,
   clients,
+  treasuryAccounts = [],
+  canCollectNow = false,
   storageConfigured = false,
   defaultOpen = false,
 }: Props) {
@@ -75,6 +83,8 @@ export function NewProjectSalesInvoiceDialog({
           <ManualInvoiceForm
             projectId={projectId}
             clients={clients}
+            treasuryAccounts={treasuryAccounts}
+            canCollectNow={canCollectNow}
             storageConfigured={storageConfigured}
             variant="plain"
             onCancel={closeDialog}

@@ -23,6 +23,7 @@ import {
   canViewProcurementProjectArea,
   canViewPurchaseRequests,
 } from "../procurement/procurement-access";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024;
 
@@ -561,7 +562,14 @@ export async function archiveDocument(id: string, ctx: ServiceContext): Promise<
   const doc = await getOwned(id, ctx, gate);
   if (doc.status !== "ACTIVE") throw new ServiceError("CONFLICT", "Solo se pueden archivar documentos activos (no UPLOADING ni ARCHIVED)");
 
-  await prisma.documentAttachment.update({ where: { id }, data: { status: "ARCHIVED" } });
+  const flipped = await prisma.documentAttachment.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: "ACTIVE" },
+    data: { status: "ARCHIVED" },
+  });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "El documento ya no está activo. Recargá e intentá de nuevo.",
+  );
 
   await log({
     tenantId:    ctx.tenantId,
@@ -578,7 +586,14 @@ export async function restoreDocument(id: string, ctx: ServiceContext): Promise<
   const doc = await getOwned(id, ctx, gate);
   if (doc.status !== "ARCHIVED") throw new ServiceError("CONFLICT", "Solo se pueden restaurar documentos archivados");
 
-  await prisma.documentAttachment.update({ where: { id }, data: { status: "ACTIVE" } });
+  const flipped = await prisma.documentAttachment.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: "ARCHIVED" },
+    data: { status: "ACTIVE" },
+  });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "El documento ya no está archivado. Recargá e intentá de nuevo.",
+  );
 
   await log({
     tenantId:    ctx.tenantId,
@@ -595,7 +610,14 @@ export async function softDeleteDocument(id: string, ctx: ServiceContext): Promi
   const doc = await getOwned(id, ctx, gate);
   if (doc.status === "DELETED") throw new ServiceError("CONFLICT", "El documento ya está eliminado");
 
-  await prisma.documentAttachment.update({ where: { id }, data: { status: "DELETED" } });
+  const flipped = await prisma.documentAttachment.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: { not: "DELETED" } },
+    data: { status: "DELETED" },
+  });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "El documento ya está eliminado o fue modificado. Recargá e intentá de nuevo.",
+  );
 
   await log({
     tenantId:    ctx.tenantId,

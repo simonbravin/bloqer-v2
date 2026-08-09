@@ -12,6 +12,8 @@ import { updateBudgetSettingsSchema, type UpdateBudgetSettingsInput } from "@blo
 export type SettingsDefaults = {
   overheadPct: number;
   financialCostPct: number;
+  /** Average financing days; 0 = flat % (legacy). */
+  financialDaysAvg: number;
   profitPct: number;
   taxPct: number;
 };
@@ -32,6 +34,7 @@ export function BudgetSettingsForm({ defaults, onSubmit }: BudgetSettingsFormPro
     defaultValues: {
       overheadPct: defaults.overheadPct,
       financialCostPct: defaults.financialCostPct,
+      financialDaysAvg: defaults.financialDaysAvg,
       profitPct: defaults.profitPct,
       taxPct: defaults.taxPct,
     },
@@ -64,7 +67,7 @@ export function BudgetSettingsForm({ defaults, onSubmit }: BudgetSettingsFormPro
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Costo financiero (%)</Label>
+          <Label>Costo financiero — tasa anual (%)</Label>
           <Input
             type="number"
             step="0.01"
@@ -72,6 +75,19 @@ export function BudgetSettingsForm({ defaults, onSubmit }: BudgetSettingsFormPro
             max="100"
             {...form.register("financialCostPct", { valueAsNumber: true })}
           />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Días promedio de financiamiento</Label>
+          <Input
+            type="number"
+            step="1"
+            min="0"
+            {...form.register("financialDaysAvg", { valueAsNumber: true })}
+          />
+          <p className="text-xs text-muted-foreground">
+            Con días &gt; 0: CF = base × tasa × días/365. Con 0: se aplica la tasa como % plano
+            (comportamiento anterior).
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label>Utilidad (%)</Label>

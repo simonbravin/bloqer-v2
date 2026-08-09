@@ -12,9 +12,9 @@ ADMIN / PM con permiso.
 - Un **Change Order** aprobado puede ser el **origen documental** del pedido de adenda, pero la adenda es quien formaliza el impacto contractual.
 
 ## 4. Pasos
-1. **Contratos** → registrar **Addendum** con monto y alcance ([`CONTRACTS_AND_ADDENDUMS.md`](../02-modules/CONTRACTS_AND_ADDENDUMS.md)).
-2. Crear **nuevo Budget** con `parent_budget_id` apuntando al activo (`CLOSED` o cadena vigente).
-3. Construir WBS incremental (solo ítems nuevos o ajustes contractuales).
+1. **Contratos** → registrar **Addendum** con monto y alcance ([`CONTRACTS_AND_ADDENDUMS.md`](../02-modules/CONTRACTS_AND_ADDENDUMS.md)) — módulo formal diferido ([Q-057](../00-product/OPEN_QUESTIONS.md)); hoy se omite o queda fuera de Bloqer.
+2. Crear **nuevo Budget** con `parent_budget_id` apuntando al activo (`CLOSED` o cadena vigente). La UI prellena **BudgetSettings** (% GG / financiero / utilidad / impuesto) y moneda del padre.
+3. Construir WBS/EDT incremental (solo ítems nuevos o ajustes contractuales) — no se copia automáticamente el árbol del padre.
 4. Aprobar nuevo budget complementario.
 5. Marcar como **fase activa** conjunta: sistema interpreta presupuesto proyecto = suma versiones activas ([D-002]).
 

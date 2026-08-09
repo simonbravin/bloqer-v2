@@ -17,30 +17,38 @@ export async function getSessionTenantContext(
   userId: string,
   options?: { preferredTenantId?: string | null },
 ): Promise<SessionTenantContext | null> {
-  let membership: UserMembership | null = null;
-
   const preferred = options?.preferredTenantId?.trim();
   if (preferred && isUuid(preferred)) {
     const preferredMembership = await prisma.userMembership.findUnique({
       where: { userId_tenantId: { userId, tenantId: preferred } },
     });
     if (preferredMembership?.status === "ACTIVE") {
-      membership = preferredMembership;
+      const preferredTenant = await prisma.tenant.findUnique({
+        where: { id: preferredMembership.tenantId },
+        select: { name: true, status: true },
+      });
+      if (preferredTenant?.status === "ACTIVE") {
+        return {
+          tenantId: preferredMembership.tenantId,
+          tenantName: preferredTenant.name,
+          companyId: preferredMembership.companyId,
+          roles: preferredMembership.roles as DomainUserRole[],
+        };
+      }
+      // Suspended preferred tenant: fall through (do not lock out other workspaces).
     }
   }
 
-  if (!membership) {
-    membership = await getMembershipByUserId(userId);
-  }
-  if (!membership) return null;
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: membership.tenantId },
-    select: { name: true },
+  // First ACTIVE membership whose tenant is still ACTIVE.
+  const membership = await prisma.userMembership.findFirst({
+    where: { userId, status: "ACTIVE", tenant: { status: "ACTIVE" } },
+    orderBy: { createdAt: "asc" },
+    include: { tenant: { select: { name: true, status: true } } },
   });
-  if (!tenant) return null;
+  if (!membership) return null;
   return {
     tenantId: membership.tenantId,
-    tenantName: tenant.name,
+    tenantName: membership.tenant.name,
     companyId: membership.companyId,
     roles: membership.roles as DomainUserRole[],
   };
@@ -83,6 +91,16 @@ export async function createMembership(
   }
   if (input.tenantId !== ctx.tenantId) {
     throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  }
+
+  if (input.companyId) {
+    const company = await prisma.company.findFirst({
+      where: { id: input.companyId, tenantId: ctx.tenantId },
+      select: { id: true },
+    });
+    if (!company) {
+      throw new ServiceError("VALIDATION", "La empresa no pertenece a este espacio de trabajo");
+    }
   }
 
   const existing = await getMembership(input.userId, input.tenantId);

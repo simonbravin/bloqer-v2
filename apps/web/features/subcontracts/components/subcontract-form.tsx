@@ -78,7 +78,7 @@ export function SubcontractForm({
   const [pending, setPending]             = useState(false);
   const appliedInitialWbs = useRef(false);
   const wbsComboboxOptions = useMemo(
-    () => withNoneOption(wbsToSearchableOptions(wbsOptions), { label: "Sin WBS" }),
+    () => withNoneOption(wbsToSearchableOptions(wbsOptions), { label: "Sin EDT" }),
     [wbsOptions],
   );
 
@@ -235,7 +235,7 @@ export function SubcontractForm({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>WBS (ITEM)</TableHead>
+                  <TableHead>Ítem EDT</TableHead>
                   <TableHead>Descripción *</TableHead>
                   <TableHead>Unidad</TableHead>
                   <TableHead className="text-right">Cantidad *</TableHead>
@@ -256,7 +256,7 @@ export function SubcontractForm({
                         options={wbsComboboxOptions}
                         value={line.wbsNodeId}
                         onValueChange={(v) => handleWbsChange(i, v)}
-                        placeholder="Sin WBS"
+                        placeholder="Sin EDT"
                         searchPlaceholder="Buscar partida…"
                       />
                       </TableCell>

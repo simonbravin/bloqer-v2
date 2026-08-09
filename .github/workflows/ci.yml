@@ -9,9 +9,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  typecheck:
+  quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
 
@@ -28,5 +28,60 @@ jobs:
       - name: Prisma generate (no DB required)
         run: pnpm ci:prisma
 
+      - name: Lint
+        run: pnpm lint
+
       - name: Typecheck monorepo
         run: pnpm typecheck
+
+      - name: Unit tests (domain / utils / services)
+        run: pnpm test
+
+  # Job-level `if` cannot reference `secrets` (GitHub rejects the workflow).
+  # Probe secrets inside a step and expose a boolean output instead.
+  check-e2e-secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.probe.outputs.ready }}
+    steps:
+      - id: probe
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+          E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+        run: |
+          if [ -n "$E2E_BASE_URL" ] && [ -n "$E2E_USER_EMAIL" ] && [ -n "$E2E_USER_PASSWORD" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  e2e:
+    needs: check-e2e-secrets
+    if: needs.check-e2e-secrets.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run E2E smoke
+        working-directory: apps/web
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+          E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+        run: pnpm test:e2e

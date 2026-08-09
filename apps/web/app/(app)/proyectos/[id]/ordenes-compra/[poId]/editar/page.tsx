@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   getPurchaseOrderById,
+  getCompanyProcurementSettingsForProject,
   listProcurementWbsOptions,
   listContacts,
   listProducts,
@@ -70,6 +71,16 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
     unit: p.unit,
   }));
 
+  let allowEmergency = false;
+  try {
+    const settings = await getCompanyProcurementSettingsForProject(id, ctx);
+    allowEmergency =
+      settings.allowEmergencyDirectPo &&
+      current.tenantCtx.roles.some((r) => r === "OWNER" || r === "ADMIN");
+  } catch {
+    allowEmergency = false;
+  }
+
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={order.code}>
       <div className="flex items-center gap-4">
@@ -82,6 +93,7 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
         suppliers={suppliers}
         wbsOptions={wbsOptions}
         productOptions={productOptions}
+        allowEmergencyDirectPo={allowEmergency}
       />
     </PageShell>
   );

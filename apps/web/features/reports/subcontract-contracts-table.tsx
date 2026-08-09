@@ -36,7 +36,7 @@ export function SubcontractContractsTable({ rows, projectId }: Props) {
             <TableHead className="text-right">Valor</TableHead>
             <TableHead className="text-right">Certificado</TableHead>
             <TableHead className="w-24">Estado</TableHead>
-            <TableHead className="w-20">WBS</TableHead>
+            <TableHead className="w-20">EDT</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

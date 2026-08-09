@@ -106,14 +106,12 @@
 ### Q-007 — Conciliación bancaria: importación de extractos
 
 - **Categoría:** Tesorería
-- **Estado:** ABIERTA
+- **Estado:** RESUELTA → [D-075](./DECISION_LOG.md) + [D-076](./DECISION_LOG.md)
 - **Impacto:** define si Fase 1 es 100% manual.
-- **Opciones:**
-  1. Manual completa en Fase 1, importación CSV/OFX en Fase 2.
-  2. Importación CSV mínima desde Fase 1.
-  3. Integración bancaria directa en Fase 3 (post-fase 2).
-- **Recomendación:** opción 1 (lockeada como predeterminada). Confirmar.
-- **Bloquea:** [`02-modules/BANK_RECONCILIATION.md`](../02-modules/BANK_RECONCILIATION.md).
+- **Resolución:**
+  1. **Opción 1** ([D-075]): Fase 1 manual (sesión + líneas + match → `RECONCILED`).
+  2. **CSV** ([D-076]) + **OFX/QFX** ([D-079]) + **reapertura formal** ([D-080]). Integración API bancaria → [`INTEGRATIONS_FUTURE.md`](../07-non-functional/INTEGRATIONS_FUTURE.md) (fuera de fases 0–5).
+- **Documentos:** [`02-modules/BANK_RECONCILIATION.md`](../02-modules/BANK_RECONCILIATION.md).
 
 ### Q-008 — Documentos: versionado y check-in/check-out
 
@@ -151,14 +149,9 @@
 ### Q-011 — Costo financiero del presupuesto
 
 - **Categoría:** Fórmulas / presupuesto
-- **Estado:** ABIERTA
+- **Estado:** RESUELTA → [D-073](./DECISION_LOG.md)
 - **Impacto:** afecta cálculo de costo total y precio de venta.
-- **Opciones:**
-  1. Tasa fija anual cargada por empresa (simple).
-  2. Tasa fija por presupuesto (más flexible).
-  3. Curva de tasa según mes/avance (avanzado).
-- **Recomendación:** opción 2 en Fase 1.
-- **Bloquea:** [`04-formulas/BUDGET_FORMULAS.md`](../04-formulas/BUDGET_FORMULAS.md).
+- **Resolución:** opción 2 — tasa anual y días promedio en `BudgetSettings`; CF = base × r × d/365 cuando d > 0; d = 0 conserva % plano legacy.
 
 ### Q-012 — Subcontratos: avance certificado igual que proyecto, o por hitos
 
@@ -456,22 +449,34 @@
 ### Q-054 — Método de pago y referencia/comprobante en Payment / Collection
 
 - **Categoría:** Tesorería / AP-AR
-- **Estado:** ABIERTA
-- **Contexto:** `Payment` y `Collection` no tienen `paymentMethod` (efectivo / transferencia / cheque / tarjeta) ni `reference` (nro de transferencia o cheque). Hoy solo `notes`. Estándar en QuickBooks/Xero; útil para conciliación ([Q-007]).
-- **Bloquea:** UX de conciliación y trazabilidad bancaria fina. Requiere migración.
+- **Estado:** RESUELTA → [D-074](./DECISION_LOG.md)
+- **Contexto:** `Payment` y `Collection` no tenían `paymentMethod` (efectivo / transferencia / cheque / tarjeta) ni `reference` (nro de transferencia o cheque). Hoy solo `notes`. Estándar en QuickBooks/Xero; útil para conciliación ([Q-007]).
+- **Resolución:** campos opcionales `paymentMethod` (`TreasurySettlementMethod`) + `reference` en Collection y Payment; UI en cobro/pago y flujos collectNow/payNow.
 
 ### Q-055 — Cobrar ahora inline en facturas de venta de proyecto
 
 - **Categoría:** AR / UX
-- **Estado:** ABIERTA — diferida conscientemente en [D-052](./DECISION_LOG.md)
-- **Contexto:** a nivel empresa ya existe `collectNow` ([D-051]). En obra la CxC suele venir de certificaciones; el alta manual de factura de venta de proyecto no ofrece cobro inmediato.
-- **Bloquea:** paridad UX AP/AR a nivel proyecto (no bloquea el flujo de cobro posterior ni anticipos).
+- **Estado:** RESUELTA → [D-077](./DECISION_LOG.md)
+- **Contexto:** a nivel empresa ya existía `collectNow` ([D-051]). En obra la CxC suele venir de certificaciones; el alta manual de factura de venta de proyecto no ofrecía cobro inmediato.
+- **Resolución:** paridad con AP proyecto ([D-052]): checkbox “Emitir y cobrar ahora” (cuenta + fecha + método) vía `registerArSale`; visible solo con `EDIT TREASURY`.
 
 ### Q-056 — Quién elige la cuenta de tesorería al pagar CxP de proyecto
 
 - **Categoría:** AP / Tesorería / RBAC
 - **Estado:** RESUELTA → [D-069](./DECISION_LOG.md)
 - **Resolución:** opción 2 — `canRegisterApPayment` (company-finance + `EDIT AP`, o `EDIT TREASURY`). Notificaciones `PAYABLE_READY_TO_PAY` / `PAYMENT_CONFIRMED`; canal por empresa `apPaymentNotificationChannel` ([D-070]: in-app o in-app+email, default email). Compras/PM emiten factura/CxP; finanzas/tesorería eligen cuenta y pagan.
+
+### Q-057 — Módulo Contract / Addendum / ChangeOrder (entidades legales)
+
+- **Categoría:** Contratos / presupuesto
+- **Estado:** ABIERTA — diferida
+- **Contexto:** docs de dominio mencionan `Contract`, adendas legales y change orders; en Prisma hoy solo existe `Budget.parentBudgetId` (adenda/fase económica). No hay tablas ni services de contrato comercial.
+- **Impacto si no se resuelve:** no se implementa el flujo documental cliente↔obra más allá del budget hijo; riesgo de inventar entidades si se “completa” el audit sin decisión.
+- **Opciones identificadas:**
+  1. Modelar `Contract` + `Addendum` + `ChangeOrder` como módulo propio (migración + estados).
+  2. Seguir solo con **budget complementario** (`parentBudgetId`) como adenda económica (status quo operativo).
+  3. Contratos fuera de Bloqer (PDF externo) + budget hijo interno.
+- **Recomendación inicial:** opción 2 hasta priorizar fase de contratos; no inventar el módulo en código.
 
 ---
 

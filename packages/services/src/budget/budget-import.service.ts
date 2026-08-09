@@ -1,11 +1,17 @@
 // Budget CSV/XLSX import — server-side execute and preview with tenant checks.
 
-import { prisma } from "@bloqer/database";
+import { Prisma, prisma } from "@bloqer/database";
 import type { BudgetImportRow } from "@bloqer/validators";
 import { can } from "@bloqer/domain";
 import { log } from "../audit/audit.service";
+import { toMoneyDecimal } from "../finance/money-decimal";
 import { ServiceContext, ServiceError } from "../types";
-import { assertBudgetEditable, assertBudgetWbsStructureMutable } from "./budget.service";
+import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
+import {
+  assertBudgetEditable,
+  assertBudgetWbsStructureMutable,
+  lockBudgetForEconomicEdit,
+} from "./budget.service";
 import { _recalcAllItems, _recalcBudgetSummary } from "./budget-calc.service";
 import {
   detectProfileFromImportRows,
@@ -35,6 +41,7 @@ export async function previewImport(
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   assertBudgetEditable(budget);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
 
   const existingNodes = await prisma.wbsNode.findMany({
     where: { budgetId },
@@ -60,6 +67,7 @@ export async function executeImport(
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   assertBudgetEditable(budget);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
   await assertBudgetWbsStructureMutable(budget, ctx);
 
   const existingNodes = await prisma.wbsNode.findMany({
@@ -71,7 +79,7 @@ export async function executeImport(
   if (existingCodes.length > 0 && !options?.replaceExisting) {
     throw new ServiceError(
       "CONFLICT",
-      "El presupuesto ya tiene nodos WBS. Eliminá la estructura existente o usá reemplazar en la importación.",
+      "El presupuesto ya tiene nodos EDT. Eliminá la estructura existente o usá reemplazar en la importación.",
     );
   }
 
@@ -100,12 +108,14 @@ export async function executeImport(
     if (certLines > 0 || poLines > 0 || jobsiteRefs > 0) {
       throw new ServiceError(
         "CONFLICT",
-        "No se puede reemplazar el WBS: hay certificaciones, compras o libro de obra vinculados a ítems existentes.",
+        "No se puede reemplazar la EDT: hay certificaciones, compras o libro de obra vinculados a ítems existentes.",
       );
     }
   }
 
   await prisma.$transaction(async (tx) => {
+    await lockBudgetForEconomicEdit(tx, budgetId, ctx.tenantId);
+
     if (options?.replaceExisting && existingNodes.length > 0) {
       await tx.costAnalysisLine.deleteMany({ where: { budgetId } });
       await tx.costItem.deleteMany({ where: { budgetId } });
@@ -141,7 +151,7 @@ export async function executeImport(
             budgetId,
             wbsNodeId: node.id,
             unit: row.unit ?? "",
-            quantity: row.quantity ?? 0,
+            quantity: new Prisma.Decimal(String(row.quantity ?? 0)),
             notes: row.notes ?? null,
           },
         });
@@ -159,6 +169,7 @@ export async function executeImport(
           let sortOrder = 0;
           for (const entry of categoryAmounts) {
             if (!(entry.amount > 0)) continue;
+            const money = toMoneyDecimal(entry.amount);
             await tx.costAnalysisLine.create({
               data: {
                 costItemId: costItem.id,
@@ -167,8 +178,8 @@ export async function executeImport(
                 description: entry.label,
                 unit: row.unit?.trim() || "un",
                 coefficient: 1,
-                unitCost: entry.amount,
-                totalCost: entry.amount,
+                unitCost: money,
+                totalCost: money,
                 partidaQuantity: null,
                 isLumpSum: false,
                 sortOrder: sortOrder++,

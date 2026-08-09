@@ -305,6 +305,11 @@ export function PurchaseOrderLinesEditor({
                       {wbs.wouldExceedBudget ? " (alerta)" : ""}
                     </button>
                   )}
+                  {wbs?.wouldExceedBudget ? (
+                    <p className="text-[10px] text-destructive">
+                      Esta partida ya está cerca o por encima del saldo disponible (aviso; no bloquea).
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Insumo APU</Label>

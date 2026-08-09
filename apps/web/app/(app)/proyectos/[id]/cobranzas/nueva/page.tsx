@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { CollectionForm } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
+import { can } from "@bloqer/domain";
 import {
   listCollectibleReceivablesByProject,
   listSelectableTreasuryAccounts,
@@ -20,6 +21,10 @@ export default async function NuevaCobranzaPage({ params, searchParams }: PagePr
   if (!current?.tenantCtx) redirect("/login");
 
   const { id } = await params;
+  if (!can(current.tenantCtx.roles, "EDIT", "AR")) {
+    redirect(`/proyectos/${id}/cobranzas`);
+  }
+
   const { receivableId: preSelectedId } = await searchParams;
 
   const ctx = {

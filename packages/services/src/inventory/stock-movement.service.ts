@@ -9,7 +9,7 @@ import { can } from "@bloqer/domain";
 import type { CreateStockConsumptionInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { assertInventoryTenantModule } from "../tenant-modules/tenant-module-enforcement";
-import { getStockBalance } from "./stock-balance.service";
+import { getStockBalance, lockStockBalanceKey } from "./stock-balance.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
@@ -176,19 +176,19 @@ export async function createStockConsumption(
         },
       },
     });
-    if (!wbs) throw new ServiceError("NOT_FOUND", "Nodo WBS no encontrado");
+    if (!wbs) throw new ServiceError("NOT_FOUND", "Nodo EDT no encontrado");
     if (wbs.budget.tenantId !== ctx.tenantId) {
       throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
     }
     if (wbs.budget.projectId !== input.projectId) {
-      throw new ServiceError("CONFLICT", "El nodo WBS no pertenece al proyecto del consumo");
+      throw new ServiceError("CONFLICT", "El nodo EDT no pertenece al proyecto del consumo");
     }
     if (wbs.type !== "ITEM")
-      throw new ServiceError("CONFLICT", "El nodo WBS debe ser de tipo ITEM");
+      throw new ServiceError("CONFLICT", "El nodo EDT debe ser de tipo ITEM");
     if (wbs.budget.status !== "APPROVED" && wbs.budget.status !== "CLOSED") {
       throw new ServiceError(
         "CONFLICT",
-        "El nodo WBS debe pertenecer a un presupuesto aprobado o cerrado",
+        "El nodo EDT debe pertenecer a un presupuesto aprobado o cerrado",
       );
     }
   }
@@ -199,12 +199,15 @@ export async function createStockConsumption(
   }
 
   const movement = await prisma.$transaction(async (tx) => {
-    // Check stock balance inside transaction
-    const balance = await getStockBalance({
-      tenantId: ctx.tenantId,
-      warehouseId: input.warehouseId,
-      productId: input.productId,
-    });
+    await lockStockBalanceKey(tx, input.warehouseId, input.productId);
+    const balance = await getStockBalance(
+      {
+        tenantId: ctx.tenantId,
+        warehouseId: input.warehouseId,
+        productId: input.productId,
+      },
+      tx,
+    );
     if (qty.greaterThan(balance)) {
       throw new ServiceError(
         "CONFLICT",
@@ -294,7 +297,38 @@ export async function createReceiptStockMovement(
 export async function cancelReceiptStockMovements(
   tx: TxClient,
   purchaseReceiptId: string,
+  tenantId: string,
 ): Promise<void> {
+  const movements = await tx.stockMovement.findMany({
+    where: { purchaseReceiptId, status: "CONFIRMED", type: "IN" },
+    select: {
+      id: true,
+      warehouseId: true,
+      productId: true,
+      quantity: true,
+      product: { select: { name: true, sku: true } },
+    },
+  });
+
+  for (const m of movements) {
+    await lockStockBalanceKey(tx, m.warehouseId, m.productId);
+    const balance = await getStockBalance(
+      {
+        tenantId,
+        warehouseId: m.warehouseId,
+        productId: m.productId,
+      },
+      tx,
+    );
+    if (balance.lessThan(m.quantity)) {
+      const label = m.product?.sku ? `${m.product.sku} — ${m.product.name}` : m.productId;
+      throw new ServiceError(
+        "CONFLICT",
+        `No se puede anular la recepción: el stock de "${label}" ya fue consumido (disponible ${balance.toString()}, se revertiría ${m.quantity.toString()}).`,
+      );
+    }
+  }
+
   await tx.stockMovement.updateMany({
     where: { purchaseReceiptId, status: "CONFIRMED" },
     data: { status: "CANCELLED" },
@@ -312,12 +346,12 @@ export function resolveJobsiteLogMaterialWbs(
   if (unique.length === 0) {
     throw new ServiceError(
       "CONFLICT",
-      "Los materiales con producto requieren partida WBS (indicá la partida en la línea o cargá avance en una sola partida)",
+      "Los materiales con producto requieren partida EDT (indicá la partida en la línea o cargá avance en una sola partida)",
     );
   }
   throw new ServiceError(
     "CONFLICT",
-    "Hay varias partidas de avance: indicá la partida WBS en cada línea de material con producto",
+    "Hay varias partidas de avance: indicá la partida EDT en cada línea de material con producto",
   );
 }
 
@@ -366,6 +400,7 @@ export async function createJobsiteLogMaterialStockMovements(
   }
 
   for (const { productId, warehouseId, qty } of qtyByPair.values()) {
+    await lockStockBalanceKey(tx, warehouseId, productId);
     const balance = await getStockBalance(
       {
         tenantId: params.tenantId,

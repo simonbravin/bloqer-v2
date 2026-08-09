@@ -7,9 +7,11 @@ import {
   canApprovePurchaseOrders,
   canEditPurchaseOrders,
 } from "./procurement-access";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import {
+  assertDirectPoAllowed,
   assertHighLevelApprover,
   assertSelfApprovalAllowed,
   assertStandardApprover,
@@ -18,7 +20,10 @@ import {
 } from "./procurement-policy.service";
 import { evaluateLineVariance, poRequiresHighLevelApproval } from "./purchase-variance.service";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
-import { onPurchaseOrderConfirmed } from "./purchase-request-to-po.service";
+import {
+  assertPoLinesWithinSelectedQuote,
+  onPurchaseOrderConfirmed,
+} from "./purchase-request-to-po.service";
 import {
   notifyPurchaseOrderApproved,
   notifyPurchaseOrderConfirmed,
@@ -176,14 +181,35 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
       throw new ServiceError("CONFLICT", "El monto total debe ser mayor a cero");
     }
 
+    const fx = computeDocumentFxAmounts(po.currency, po.totalAmount, po.fxRate);
+    const totalArs = fx.amountArs;
+
+    // Re-gate direct PO on submit ([BR-PUR-008]) — create alone is not enough if lines were edited.
+    if (!po.purchaseRequestId) {
+      assertDirectPoAllowed(settings, totalArs, ctx, {
+        emergencyReason: po.emergencyReason,
+      });
+    }
+
+    // Quote-sourced OC: cannot inflate past selected competitive quote.
+    const currentLines = await tx.purchaseOrderLine.findMany({
+      where: { purchaseOrderId: id },
+      select: {
+        description: true,
+        wbsNodeId: true,
+        quantity: true,
+        unitPrice: true,
+        sortOrder: true,
+      },
+    });
+    await assertPoLinesWithinSelectedQuote(id, currentLines, ctx.tenantId, tx);
+
     const { requiresExtraApproval, requiresJustification, saldoWarnings } =
       await applyVarianceSnapshots(tx, id, ctx.tenantId, settings);
     if (requiresJustification) {
       throw new ServiceError("CONFLICT", "Completá la justificación de desvío presupuestario en las líneas");
     }
 
-    const fx = computeDocumentFxAmounts(po.currency, po.totalAmount, po.fxRate);
-    const totalArs = fx.amountArs;
     const highLevel = poRequiresHighLevelApproval(totalArs, settings) || requiresExtraApproval;
 
     let nextStatus: PurchaseOrderStatus = "SUBMITTED";
@@ -202,8 +228,8 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
       }
     }
 
-    await tx.purchaseOrder.update({
-      where: { id },
+    const flipped = await tx.purchaseOrder.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
       data: {
         status: nextStatus,
         fxRate: fx.fxRate,
@@ -216,6 +242,10 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
         updatedBy: ctx.actorUserId,
       },
     });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "La orden ya no está en borrador. Recargá e intentá de nuevo.",
+    );
 
     await auditProcurement(
       ctx,
@@ -304,15 +334,18 @@ export async function approvePurchaseOrder(id: string, ctx: ServiceContext): Pro
   const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
 
   await prisma.$transaction(async (tx) => {
+    await recalcPurchaseOrderTotals(tx, id);
+    const poBefore = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
+    const fx = computeDocumentFxAmounts(poBefore.currency, poBefore.totalAmount, poBefore.fxRate);
+
     const { requiresExtraApproval } = await applyVarianceSnapshots(
       tx,
       id,
       ctx.tenantId,
       settings,
     );
-    const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
-    const highLevel =
-      poRequiresHighLevelApproval(po.totalAmountArs, settings) || requiresExtraApproval;
+    const requiresHighLevelAmount = poRequiresHighLevelApproval(fx.amountArs, settings);
+    const highLevel = requiresHighLevelAmount || requiresExtraApproval;
 
     if (highLevel) {
       assertHighLevelApprover(ctx.roles, true, requiresExtraApproval);
@@ -324,17 +357,30 @@ export async function approvePurchaseOrder(id: string, ctx: ServiceContext): Pro
       ...existing,
       purchaseRequest: existing.purchaseRequest,
     });
-    assertSelfApprovalAllowed(settings, originId, ctx.actorUserId, requiresExtraApproval, highLevel);
+    assertSelfApprovalAllowed(
+      settings,
+      originId,
+      ctx.actorUserId,
+      requiresExtraApproval,
+      requiresHighLevelAmount,
+    );
 
-    await tx.purchaseOrder.update({
-      where: { id },
+    const approved = await tx.purchaseOrder.updateMany({
+      where: { id, status: "SUBMITTED" },
       data: {
         status: "APPROVED",
+        fxRate: fx.fxRate,
+        totalAmountArs: fx.amountArs,
         approvedByUserId: ctx.actorUserId,
         approvedAt: new Date(),
         updatedBy: ctx.actorUserId,
       },
     });
+    if (approved.count !== 1) {
+      throw new ServiceError("CONFLICT", "La orden ya no está pendiente de aprobación");
+    }
+
+    const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
 
     await auditProcurement(
       ctx,
@@ -403,8 +449,8 @@ export async function returnPurchaseOrder(
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.purchaseOrder.update({
-      where: { id },
+    const returned = await tx.purchaseOrder.updateMany({
+      where: { id, status: "SUBMITTED" },
       data: {
         status: "DRAFT",
         returnReason: trimmed,
@@ -415,6 +461,9 @@ export async function returnPurchaseOrder(
         updatedBy: ctx.actorUserId,
       },
     });
+    if (returned.count !== 1) {
+      throw new ServiceError("CONFLICT", "La orden ya no está pendiente de aprobación");
+    }
 
     await auditProcurement(
       ctx,
@@ -462,6 +511,11 @@ export async function confirmPurchaseOrder(
   }
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
 
+  // Load policy outside the interactive transaction (avoids extra pool hop while holding locks).
+  const settings = !existing.purchaseRequestId
+    ? await getCompanyProcurementSettingsForProject(existing.projectId, ctx)
+    : null;
+
   await prisma.$transaction(async (tx) => {
     await recalcPurchaseOrderTotals(tx, id);
     const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
@@ -471,8 +525,15 @@ export async function confirmPurchaseOrder(
       options?.fxRate ? new Prisma.Decimal(options.fxRate) : po.fxRate,
     );
 
-    await tx.purchaseOrder.update({
-      where: { id },
+    // Defense in depth ([BR-PUR-008]): block confirm of direct OC over threshold without emergency.
+    if (!po.purchaseRequestId && settings) {
+      assertDirectPoAllowed(settings, fx.amountArs, ctx, {
+        emergencyReason: po.emergencyReason,
+      });
+    }
+
+    const confirmed = await tx.purchaseOrder.updateMany({
+      where: { id, status: "APPROVED" },
       data: {
         status: "CONFIRMED",
         fxRate: fx.fxRate,
@@ -482,6 +543,9 @@ export async function confirmPurchaseOrder(
         updatedBy: ctx.actorUserId,
       },
     });
+    if (confirmed.count !== 1) {
+      throw new ServiceError("CONFLICT", "La orden ya no está aprobada para confirmar");
+    }
 
     await onPurchaseOrderConfirmed(id, ctx, tx);
 

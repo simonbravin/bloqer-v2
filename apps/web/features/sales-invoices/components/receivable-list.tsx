@@ -24,6 +24,13 @@ export function receivableDetailHref(r: Pick<ReceivableListItem, "id" | "project
   return `/finanzas/cuentas-por-cobrar/${r.id}`;
 }
 
+export function receivableCollectHref(r: Pick<ReceivableListItem, "id" | "projectId">): string {
+  if (r.projectId) {
+    return `/proyectos/${r.projectId}/cuentas-por-cobrar/${r.id}/cobrar`;
+  }
+  return `/finanzas/cuentas-por-cobrar/${r.id}/cobrar`;
+}
+
 export function receivableInvoiceHref(
   r: Pick<ReceivableListItem, "projectId" | "salesInvoiceId">,
 ): string | null {

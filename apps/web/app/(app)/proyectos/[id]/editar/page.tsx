@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { ProjectForm } from "@/features/projects";
 import { getCurrentUser } from "@/lib/auth";
-import { getProjectById, listContacts, ServiceError } from "@bloqer/services";
+import { getProjectById, isProjectTypeLocked, listContacts, ServiceError } from "@bloqer/services";
 import { updateProjectAction } from "../../actions";
 import type { ProjectFormInput } from "@bloqer/validators";
 import { toDateInput } from "@/lib/date-input";
@@ -35,10 +35,10 @@ export default async function EditarProyectoPage({ params }: PageProps) {
   if (project.status === "COMPLETED" || project.status === "CANCELLED")
     redirect(`/proyectos/${id}`);
 
-  const { data: clients } = await listContacts(
-    { role: "CLIENT", status: "ACTIVE", pageSize: 100 },
-    ctx,
-  );
+  const [{ data: clients }, typeLocked] = await Promise.all([
+    listContacts({ role: "CLIENT", status: "ACTIVE", pageSize: 100 }, ctx),
+    isProjectTypeLocked(id, ctx),
+  ]);
 
   const defaultValues: Partial<ProjectFormInput> = {
     code: project.code,
@@ -69,6 +69,7 @@ export default async function EditarProyectoPage({ params }: PageProps) {
           defaultValues={defaultValues}
           submitLabel="Guardar cambios"
           successRedirect={`/proyectos/${id}`}
+          typeLocked={typeLocked}
           onSubmit={updateProjectAction.bind(null, id)}
         />
       </div>

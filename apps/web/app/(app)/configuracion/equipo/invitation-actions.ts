@@ -41,6 +41,7 @@ export async function createTenantInvitationAction(formData: FormData) {
         maxAge:     120,
         httpOnly:   true,
         sameSite:   "lax",
+        secure:     process.env.NODE_ENV === "production",
         path:       flashPath,
       });
       if (result.emailFailureMessage) {
@@ -48,6 +49,7 @@ export async function createTenantInvitationAction(formData: FormData) {
           maxAge:     120,
           httpOnly:   true,
           sameSite:   "lax",
+          secure:     process.env.NODE_ENV === "production",
           path:       flashPath,
         });
       }

@@ -31,6 +31,8 @@ interface ProjectFormProps {
   defaultValues?: Partial<ProjectFormInput>;
   submitLabel?: string;
   successRedirect?: string;
+  /** BR-PROJ-002: lock PUBLIC/PRIVATE after first APPROVED/CLOSED budget. */
+  typeLocked?: boolean;
   onSubmit: (data: CreateProjectInput) => Promise<{ id: string } | { ok: true } | { error: string }>;
 }
 
@@ -39,6 +41,7 @@ export function ProjectForm({
   defaultValues,
   submitLabel = "Crear proyecto",
   successRedirect,
+  typeLocked = false,
   onSubmit,
 }: ProjectFormProps) {
   const router = useRouter();
@@ -95,6 +98,7 @@ export function ProjectForm({
           <Select
             value={form.watch("type")}
             onValueChange={(v) => form.setValue("type", v as "PUBLIC" | "PRIVATE")}
+            disabled={typeLocked}
           >
             <SelectTrigger>
               <SelectValue />
@@ -104,6 +108,11 @@ export function ProjectForm({
               <SelectItem value="PUBLIC">Público</SelectItem>
             </SelectContent>
           </Select>
+          {typeLocked ? (
+            <p className="text-xs text-muted-foreground">
+              El tipo no se puede cambiar después de un presupuesto aprobado o cerrado.
+            </p>
+          ) : null}
         </div>
       </div>
 

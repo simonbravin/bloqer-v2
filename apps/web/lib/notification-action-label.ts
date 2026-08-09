@@ -8,6 +8,8 @@ export function notificationActionLinkLabel(
   switch (type) {
     case "PAYABLE_READY_TO_PAY":
       return actionUrl?.includes("/pagar") ? "Registrar pago" : "Ver cuenta por pagar";
+    case "RECEIVABLE_READY_TO_COLLECT":
+      return actionUrl?.includes("/cobrar") ? "Registrar cobranza" : "Ver cuenta por cobrar";
     case "PAYMENT_CONFIRMED":
       return "Ver factura";
     case "PURCHASE_ORDER_PENDING_APPROVAL":
@@ -20,7 +22,7 @@ export function notificationActionLinkLabel(
     case "PROCUREMENT_SLA_REMINDER":
       return "Revisar pendientes";
     case "RECEIVABLE_OVERDUE":
-      return "Ver cobranza";
+      return "Ver cuenta por cobrar";
     case "PAYABLE_OVERDUE":
       return "Ver cuenta por pagar";
     default:

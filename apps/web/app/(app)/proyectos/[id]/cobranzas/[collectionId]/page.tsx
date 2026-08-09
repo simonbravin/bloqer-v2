@@ -3,17 +3,20 @@ import { formatMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { CollectionStatusBadge } from "@/features/collections";
+import { settlementMethodLabel } from "@/features/treasury/lib/settlement-method-label";
 import { getCurrentUser } from "@/lib/auth";
 import { generateJournalFromCollectionAction } from "@/app/(app)/contabilidad/source-draft-actions";
 import { getCollectionById, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { cancelCollectionAction } from "../actions";
+import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; collectionId: string }>;
-  searchParams: Promise<{ contabilidad?: string }>;
+  searchParams: Promise<{ contabilidad?: string; actionError?: string }>;
 }
 
 export default async function CollectionDetailPage({ params, searchParams }: PageProps) {
@@ -38,11 +41,7 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
     throw err;
   }
 
-  const doCancel = async () => {
-    "use server";
-    await cancelCollectionAction(collectionId, id);
-  };
-
+  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
   const returnPath = `/proyectos/${id}/cobranzas/${collectionId}`;
 
@@ -56,14 +55,23 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
           </div>
         </div>
 
-        {collection.status === "CONFIRMED" && (
-          <form action={doCancel}>
+        {canEditAr && collection.status === "CONFIRMED" && (
+          <form
+            action={async () => {
+              "use server";
+              const result = await cancelCollectionAction(collectionId, id);
+              if ("error" in result) redirectWithActionError(returnPath, result.error);
+              redirect(returnPath);
+            }}
+          >
             <Button variant="ghost" size="sm" className="text-muted-foreground">
               Cancelar
             </Button>
           </form>
         )}
       </div>
+
+      <ActionErrorBanner message={sp.actionError} />
 
       <div className="rounded-lg border bg-card">
         <div className="border-b px-6 py-4">
@@ -88,6 +96,18 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
               {formatMoneyAmount(collection.amount, collection.currency)}
             </dd>
           </div>
+          {settlementMethodLabel(collection.paymentMethod) && (
+            <div>
+              <dt className="text-muted-foreground">Método</dt>
+              <dd className="font-medium">{settlementMethodLabel(collection.paymentMethod)}</dd>
+            </div>
+          )}
+          {collection.reference && (
+            <div>
+              <dt className="text-muted-foreground">Referencia</dt>
+              <dd className="font-medium font-mono">{collection.reference}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-muted-foreground">Cuenta por cobrar</dt>
             <dd className="font-medium">

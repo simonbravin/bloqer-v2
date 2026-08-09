@@ -1,41 +1,48 @@
 import { Prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CompanyProcurementSettingsView } from "./company-procurement-settings.service";
-import { canBypassDirectPoPolicy } from "./procurement-access";
 import { ServiceError } from "../types";
 import type { ServiceContext } from "../types";
 
+/**
+ * Direct PO gate ([BR-PUR-008] / REGISTER_PURCHASE Camino B).
+ * - Above `purchaseRequestRequiredAboveArs`: only emergency (OWNER/ADMIN + reason + flag).
+ * - Otherwise: requires `allowDirectPo`.
+ * No role bypass of the PR threshold (OWNER/ADMIN/PROCUREMENT must use SC or emergency).
+ */
 export function assertDirectPoAllowed(
   settings: CompanyProcurementSettingsView,
   totalAmountArs: Prisma.Decimal,
   ctx: ServiceContext,
   options?: { emergencyReason?: string | null },
 ): void {
-  if (canBypassDirectPoPolicy(ctx.roles) && settings.allowDirectPo) {
-    return;
-  }
-
-  if (!settings.allowDirectPo) {
-    throw new ServiceError(
-      "CONFLICT",
-      "La política de la empresa exige solicitud de compra previa. No se permite OC directa.",
-    );
-  }
-
   const requiredAbove = settings.purchaseRequestRequiredAboveArs
     ? new Prisma.Decimal(settings.purchaseRequestRequiredAboveArs)
     : null;
 
-  if (requiredAbove && totalAmountArs.greaterThanOrEqualTo(requiredAbove)) {
+  const overThreshold =
+    requiredAbove != null && totalAmountArs.greaterThanOrEqualTo(requiredAbove);
+
+  if (overThreshold) {
     if (settings.allowEmergencyDirectPo && options?.emergencyReason?.trim()) {
       if (!ctx.roles.some((r) => r === "OWNER" || r === "ADMIN")) {
-        throw new ServiceError("FORBIDDEN", "Solo administración puede autorizar compra de emergencia sin solicitud");
+        throw new ServiceError(
+          "FORBIDDEN",
+          "Solo administración puede autorizar compra de emergencia sin solicitud",
+        );
       }
       return;
     }
     throw new ServiceError(
       "CONFLICT",
       `Compras desde ${settings.purchaseRequestRequiredAboveArs} ARS requieren solicitud de compra con cotizaciones.`,
+    );
+  }
+
+  if (!settings.allowDirectPo) {
+    throw new ServiceError(
+      "CONFLICT",
+      "La política de la empresa exige solicitud de compra previa. No se permite OC directa.",
     );
   }
 }

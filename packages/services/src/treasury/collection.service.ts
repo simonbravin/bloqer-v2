@@ -15,7 +15,12 @@ import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { ensureDraftJournalFromCollection } from "../accounting/accounting-auto-draft.service";
-import { syncJournalOnOperationalCancel } from "../accounting/accounting-cancel-sync.service";
+import {
+  assertJournalAllowsOperationalCancel,
+  cancelDraftJournalOnOperationalCancel,
+} from "../accounting/accounting-cancel-sync.service";
+import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
+import { assertResourceTenant } from "../security/tenant-isolation";
 
 export type CollectionView = Omit<Collection, "amount"> & {
   amount: string;
@@ -99,9 +104,7 @@ export async function listCollectionsByReceivable(
     select: { tenantId: true, projectId: true },
   });
   if (!receivable) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
-  if (receivable.tenantId !== ctx.tenantId) {
-    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  }
+  assertResourceTenant(receivable.tenantId, ctx.tenantId);
 
   if (projectScopeId !== undefined) {
     if (!canViewArProjectArea(ctx.roles)) {
@@ -158,7 +161,7 @@ export async function createCollection(
     // Load receivable inside txn for consistency
     const receivable = await tx.receivable.findUnique({ where: { id: input.receivableId } });
     if (!receivable) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
-    if (receivable.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    assertResourceTenant(receivable.tenantId, ctx.tenantId);
     if (receivable.status === "CANCELLED") {
       throw new ServiceError("CONFLICT", "No se puede cobrar una cuenta por cobrar cancelada");
     }
@@ -197,16 +200,41 @@ export async function createCollection(
       );
     }
 
-    // Currency guard
+    // Currency + company scope guard (mirror AP payment)
     const account = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
     if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
-    if (account.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    assertResourceTenant(account.tenantId, ctx.tenantId);
+    if (isCrossCompany(account.companyId, ctx)) {
+      throw new ServiceError(
+        "FORBIDDEN",
+        "La cuenta de tesorería no pertenece a la empresa activa.",
+      );
+    }
+    if (
+      account.companyId
+      && receivable.companyId
+      && account.companyId !== receivable.companyId
+    ) {
+      throw new ServiceError(
+        "FORBIDDEN",
+        "La cuenta de tesorería pertenece a otra empresa que la cuenta por cobrar.",
+      );
+    }
     if (account.status !== "ACTIVE") {
       throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
     }
     assertTreasuryAccountCurrencyMatches(account.currency, receivable.currency);
 
     const companyId = ctx.companyId ?? account.companyId ?? receivable.companyId;
+
+    await assertFinancialPeriodOpen(
+      {
+        tenantId: ctx.tenantId,
+        companyId,
+        date: input.collectionDate,
+      },
+      tx,
+    );
     const fx = computeDocumentFxAmounts(receivable.currency, amount);
 
     // Create Collection
@@ -224,6 +252,8 @@ export async function createCollection(
         amount,
         fxRate:         fx.fxRate,
         amountArs:      fx.amountArs,
+        paymentMethod:  input.paymentMethod ?? null,
+        reference:      input.reference ?? null,
         notes:          input.notes ?? null,
         status:         "CONFIRMED",
         createdBy:      ctx.actorUserId,
@@ -308,7 +338,13 @@ export async function cancelCollection(
 
   const collectionPreview = await prisma.collection.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true, companyId: true },
+    select: {
+      tenantId: true,
+      projectId: true,
+      companyId: true,
+      collectionDate: true,
+      status: true,
+    },
   });
   if (!collectionPreview) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
   if (collectionPreview.tenantId !== ctx.tenantId) {
@@ -324,12 +360,37 @@ export async function cancelCollection(
     throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a este proyecto");
   }
 
-  await syncJournalOnOperationalCancel(ctx, {
+  const glParams = {
     companyId: collectionPreview.companyId,
-    sourceType: "COLLECTION",
+    sourceType: "COLLECTION" as const,
     sourceId: id,
     sourceLabel: "la cobranza",
+  };
+
+  if (collectionPreview.status === "CANCELLED") {
+    await cancelDraftJournalOnOperationalCancel(ctx, glParams);
+    throw new ServiceError("CONFLICT", "La cobranza ya está cancelada");
+  }
+
+  await assertFinancialPeriodOpen({
+    tenantId: ctx.tenantId,
+    companyId: collectionPreview.companyId,
+    date: collectionPreview.collectionDate,
   });
+
+  // Hard stops before GL cancel — avoid orphaning DRAFT journals on RECONCILED conflict.
+  const linkedMovementPreview = await prisma.accountMovement.findFirst({
+    where: { sourceType: "COLLECTION", sourceId: id, status: { in: ["CONFIRMED", "RECONCILED"] } },
+    select: { id: true, status: true },
+  });
+  if (linkedMovementPreview?.status === "RECONCILED") {
+    throw new ServiceError(
+      "CONFLICT",
+      "El movimiento de tesorería está conciliado. Desconciliá antes de cancelar la cobranza.",
+    );
+  }
+
+  await assertJournalAllowsOperationalCancel(ctx, glParams);
 
   const updated = await prisma.$transaction(async (tx) => {
     const c = await tx.collection.findUnique({ where: { id } });
@@ -342,6 +403,17 @@ export async function cancelCollection(
       throw new ServiceError("CONFLICT", "La cobranza ya está cancelada");
     }
 
+    const linkedMovement = await tx.accountMovement.findFirst({
+      where: { sourceType: "COLLECTION", sourceId: id, status: { in: ["CONFIRMED", "RECONCILED"] } },
+      select: { id: true, status: true },
+    });
+    if (linkedMovement?.status === "RECONCILED") {
+      throw new ServiceError(
+        "CONFLICT",
+        "El movimiento de tesorería está conciliado. Desconciliá antes de cancelar la cobranza.",
+      );
+    }
+
     const collectionCancel = await tx.collection.updateMany({
       where: { id, status: "CONFIRMED" },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
@@ -351,11 +423,23 @@ export async function cancelCollection(
       "La cobranza ya fue cancelada o modificada. Revisá e intentá de nuevo.",
     );
 
-    // Cancel linked AccountMovement
-    await tx.accountMovement.updateMany({
-      where: { sourceType: "COLLECTION", sourceId: id, status: "CONFIRMED" },
-      data: { status: "CANCELLED" },
-    });
+    // Cancel linked AccountMovement (tenant + optimistic claim if present)
+    if (linkedMovement) {
+      const movementCancel = await tx.accountMovement.updateMany({
+        where: {
+          id: linkedMovement.id,
+          tenantId: ctx.tenantId,
+          sourceType: "COLLECTION",
+          sourceId: id,
+          status: "CONFIRMED",
+        },
+        data: { status: "CANCELLED" },
+      });
+      assertOptimisticRowUpdate(
+        movementCancel.count,
+        "El movimiento de tesorería cambió (p. ej. conciliado). Recargá e intentá de nuevo.",
+      );
+    }
 
     // Reverse Receivable.paidAmount
     const receivable = await tx.receivable.findUnique({ where: { id: c.receivableId } });
@@ -394,6 +478,8 @@ export async function cancelCollection(
 
     return updated;
   });
+
+  await cancelDraftJournalOnOperationalCancel(ctx, glParams);
 
   return updated;
 }

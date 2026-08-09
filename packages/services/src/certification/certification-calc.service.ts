@@ -1,5 +1,6 @@
 // Internal calculation helpers — NOT exported from services/index.ts
 import { Prisma, prisma } from "@bloqer/database";
+import { toMoneyDecimal } from "../finance/money-decimal";
 
 type TxClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -7,12 +8,16 @@ export async function _computePreviousQty(
   tx: TxClient,
   wbsNodeId: string,
   excludeCertId: string,
+  tenantId?: string,
 ): Promise<Prisma.Decimal> {
   const rows = await tx.certificationLine.findMany({
     where: {
       wbsNodeId,
       certificationId: { not: excludeCertId },
-      certification: { status: { in: ["ISSUED", "APPROVED"] } },
+      certification: {
+        status: { in: ["ISSUED", "APPROVED"] },
+        ...(tenantId ? { tenantId } : {}),
+      },
     },
     select: { currentQty: true },
   });
@@ -30,9 +35,11 @@ export async function _recalcCertificationTotals(
     where: { certificationId },
     select: { periodAmount: true },
   });
-  const total = lines.reduce(
-    (sum: Prisma.Decimal, l: { periodAmount: Prisma.Decimal }) => sum.plus(l.periodAmount),
-    new Prisma.Decimal(0),
+  const total = toMoneyDecimal(
+    lines.reduce(
+      (sum: Prisma.Decimal, l: { periodAmount: Prisma.Decimal }) => sum.plus(l.periodAmount),
+      new Prisma.Decimal(0),
+    ),
   );
   await tx.certification.update({
     where: { id: certificationId },

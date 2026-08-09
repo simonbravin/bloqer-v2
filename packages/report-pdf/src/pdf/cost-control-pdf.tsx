@@ -8,7 +8,7 @@ function costControlFiltersLine(f: CostControlFilters): string {
   const parts: string[] = [];
   if (f.dateFrom) parts.push(`Desde: ${f.dateFrom}`);
   if (f.dateTo) parts.push(`Hasta: ${f.dateTo}`);
-  if (f.wbsSearch) parts.push(`WBS: ${truncateText(f.wbsSearch, 60)}`);
+  if (f.wbsSearch) parts.push(`EDT: ${truncateText(f.wbsSearch, 60)}`);
   return parts.length > 0 ? parts.join(" · ") : "Ninguno";
 }
 
@@ -40,7 +40,7 @@ export function CostControlReportPdfDocument(props: Props) {
     truncated
       ? `Truncado: ${props.report.rows.length - MAX_COST_CONTROL_PDF_ROWS} filas omitidas (límite ${MAX_COST_CONTROL_PDF_ROWS}). CSV para detalle completo.`
       : null,
-    `Costos no asignados WBS: comprom. ${props.report.unallocatedCommittedCost}, recib. ${props.report.unallocatedReceivedCost}, deveng. ${props.report.unallocatedAccruedCost}, pag. ${props.report.unallocatedPaidCost}, inv. ${props.report.unallocatedInventoryConsumedCost}`,
+    `Costos no asignados EDT: comprom. ${props.report.unallocatedCommittedCost}, recib. ${props.report.unallocatedReceivedCost}, deveng. ${props.report.unallocatedAccruedCost}, pag. ${props.report.unallocatedPaidCost}, inv. ${props.report.unallocatedInventoryConsumedCost}`,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -82,7 +82,7 @@ export function CostControlReportPdfDocument(props: Props) {
         <Text style={reportPdfStyles.meta}>Restante presupuesto costo: {props.report.totals.remainingBudgetCost}</Text>
 
         <Text style={reportPdfStyles.sectionTitle}>
-          Líneas WBS ({truncated ? `primeras ${MAX_COST_CONTROL_PDF_ROWS}` : `${slice.length}`} de {props.report.rows.length})
+          Líneas EDT ({truncated ? `primeras ${MAX_COST_CONTROL_PDF_ROWS}` : `${slice.length}`} de {props.report.rows.length})
         </Text>
         <View style={reportPdfStyles.headerRow}>
           <Text style={[reportPdfStyles.cell, f1]}>Cód.</Text>

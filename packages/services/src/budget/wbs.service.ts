@@ -8,6 +8,7 @@ import {
   assertBudgetEditable,
   assertBudgetWbsStructureMutable,
   canViewBudgetsArea,
+  lockBudgetForEconomicEdit,
 } from "./budget.service";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
 import { _recalcBudgetSummary } from "./budget-calc.service";
@@ -140,7 +141,7 @@ type InternalNode = {
 
 export async function getWbsTree(budgetId: string, ctx: ServiceContext): Promise<WbsViewNode[]> {
   if (!canViewBudgetsArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Insufficient permissions to view WBS");
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver la EDT");
   }
   const budget = await prisma.budget.findUnique({ where: { id: budgetId } });
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
@@ -280,7 +281,7 @@ export async function ensureWbsLeafForApu(
     select: { id: true, budgetId: true, code: true, type: true },
   });
   if (!node || node.budgetId !== budgetId) {
-    throw new ServiceError("NOT_FOUND", "Nodo WBS no encontrado");
+    throw new ServiceError("NOT_FOUND", "Nodo EDT no encontrado");
   }
   if (isDisciplineRootCode(node.code)) {
     throw new ServiceError("CONFLICT", "El rubro agrupa capítulos; agregá un ítem bajo el rubro");
@@ -292,6 +293,7 @@ export async function ensureWbsLeafForApu(
   }
 
   await prisma.$transaction(async (tx) => {
+    await lockBudgetForEconomicEdit(tx, budgetId, ctx.tenantId);
     if (node.type === "GROUP") {
       await tx.wbsNode.update({ where: { id: nodeId }, data: { type: "ITEM" } });
     }
@@ -306,7 +308,7 @@ export async function ensureWbsLeafForApu(
 
   const tree = await getWbsTree(budgetId, ctx);
   const view = findNodeInTree(tree, nodeId);
-  if (!view) throw new ServiceError("NOT_FOUND", "Nodo WBS no encontrado");
+  if (!view) throw new ServiceError("NOT_FOUND", "Nodo EDT no encontrado");
   return view;
 }
 
@@ -394,6 +396,7 @@ export async function addWbsNode(
   const subdivideApu = input.subdivideApu ?? "discard";
 
   const node = await prisma.$transaction(async (tx) => {
+    await lockBudgetForEconomicEdit(tx, budgetId, ctx.tenantId);
     let movedCostItem = false;
 
     const n = await tx.wbsNode.create({
@@ -491,7 +494,7 @@ export async function updateWbsNode(
     throw new ServiceError("FORBIDDEN", "Insufficient permissions");
   }
   const node = await prisma.wbsNode.findUnique({ where: { id } });
-  if (!node) throw new ServiceError("NOT_FOUND", "Nodo WBS no encontrado");
+  if (!node) throw new ServiceError("NOT_FOUND", "Nodo EDT no encontrado");
 
   const budget = await prisma.budget.findUniqueOrThrow({ where: { id: node.budgetId } });
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -509,7 +512,10 @@ export async function updateWbsNode(
     if (conflict) throw new ServiceError("CONFLICT", `Ya existe un nodo con el código "${input.code}"`);
   }
 
-  await prisma.wbsNode.update({ where: { id }, data: input });
+  await prisma.$transaction(async (tx) => {
+    await lockBudgetForEconomicEdit(tx, node.budgetId, ctx.tenantId);
+    await tx.wbsNode.update({ where: { id }, data: input });
+  });
 
   await log({
     tenantId: ctx.tenantId,
@@ -620,7 +626,7 @@ export async function removeWbsNode(id: string, ctx: ServiceContext): Promise<vo
     where: { id },
     select: { id: true, budgetId: true, parentId: true, code: true, name: true },
   });
-  if (!node) throw new ServiceError("NOT_FOUND", "Nodo WBS no encontrado");
+  if (!node) throw new ServiceError("NOT_FOUND", "Nodo EDT no encontrado");
 
   const budget = await prisma.budget.findUniqueOrThrow({ where: { id: node.budgetId } });
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -642,6 +648,8 @@ export async function removeWbsNode(id: string, ctx: ServiceContext): Promise<vo
   const costItemIds = costItems.map((c) => c.id);
 
   await prisma.$transaction(async (tx) => {
+    await lockBudgetForEconomicEdit(tx, node.budgetId, ctx.tenantId);
+
     if (costItemIds.length > 0) {
       await tx.costAnalysisLine.deleteMany({ where: { costItemId: { in: costItemIds } } });
       await tx.costItem.deleteMany({ where: { id: { in: costItemIds } } });
@@ -749,6 +757,8 @@ export async function reorderWbsNodes(
   });
 
   await prisma.$transaction(async (tx) => {
+    await lockBudgetForEconomicEdit(tx, budgetId, ctx.tenantId);
+
     for (let idx = 0; idx < input.orderedNodeIds.length; idx++) {
       await tx.wbsNode.update({
         where: { id: input.orderedNodeIds[idx]! },

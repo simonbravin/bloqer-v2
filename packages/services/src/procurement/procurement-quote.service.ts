@@ -22,7 +22,7 @@ export async function createProcurementQuote(
     include: { lines: true },
   });
   if (!pr || pr.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
-  if (!["SUBMITTED", "QUOTE_SELECTED"].includes(pr.status)) {
+  if (pr.status !== "SUBMITTED") {
     throw new ServiceError("CONFLICT", "La solicitud no admite nuevas cotizaciones en este estado");
   }
 

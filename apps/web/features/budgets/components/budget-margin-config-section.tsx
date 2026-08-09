@@ -49,6 +49,7 @@ export function BudgetMarginConfigSection({
     defaultValues: {
       overheadPct: defaults.overheadPct,
       financialCostPct: defaults.financialCostPct,
+      financialDaysAvg: defaults.financialDaysAvg,
       profitPct: defaults.profitPct,
       taxPct: defaults.taxPct,
     },
@@ -58,6 +59,7 @@ export function BudgetMarginConfigSection({
   const directCost = parseFloat(totalDirectCost) || 0;
   const overheadPct = pctLabel(watched.overheadPct);
   const financialCostPct = pctLabel(watched.financialCostPct);
+  const financialDaysAvg = Math.max(0, Math.trunc(pctLabel(watched.financialDaysAvg)));
   const profitPct = pctLabel(watched.profitPct);
   const taxPct = pctLabel(watched.taxPct);
 
@@ -66,10 +68,11 @@ export function BudgetMarginConfigSection({
       computeBudgetSaleBreakdown(directCost, {
         overheadPct,
         financialCostPct,
+        financialDaysAvg,
         profitPct,
         taxPct,
       }),
-    [directCost, overheadPct, financialCostPct, profitPct, taxPct],
+    [directCost, overheadPct, financialCostPct, financialDaysAvg, profitPct, taxPct],
   );
 
   const handleSubmit = form.handleSubmit((data) => {
@@ -93,8 +96,9 @@ export function BudgetMarginConfigSection({
       <div className="border-b px-4 py-3">
         <h2 className="text-base font-semibold">Configuración de márgenes</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Modo simple: un solo juego de porcentajes (GG, GF, utilidad, IVA) se aplica a todas las partidas.
-          Los gastos financieros (GF) se calculan sobre el subtotal 1 (costo directo + GG).
+          Modo simple: un solo juego de parámetros (GG, GF, utilidad, IVA) se aplica a todas las
+          partidas. Los gastos financieros se calculan sobre el subtotal 1 (costo directo + GG):
+          con días &gt; 0 usan tasa anual × días/365; con 0 días, % plano.
         </p>
       </div>
 
@@ -117,7 +121,7 @@ export function BudgetMarginConfigSection({
               <p className="text-xs font-mono text-muted-foreground">{fmt(breakdown.overhead, currency)}</p>
             </div>
             <div className="space-y-1.5">
-              <Label>Gastos financieros %</Label>
+              <Label>Gastos financieros — tasa anual %</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -127,6 +131,21 @@ export function BudgetMarginConfigSection({
                 {...form.register("financialCostPct", { valueAsNumber: true })}
               />
               <p className="text-xs font-mono text-muted-foreground">{fmt(breakdown.financialCost, currency)}</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Días promedio financiamiento</Label>
+              <Input
+                type="number"
+                step="1"
+                min="0"
+                disabled={!editable}
+                {...form.register("financialDaysAvg", { valueAsNumber: true })}
+              />
+              <p className="text-xs text-muted-foreground">
+                {financialDaysAvg > 0
+                  ? `Efectivo ≈ ${breakdown.financialEffectivePct.toFixed(2)}% del subtotal 1`
+                  : "0 = % plano (sin prorrateo anual)"}
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>Utilidad %</Label>
@@ -179,7 +198,13 @@ export function BudgetMarginConfigSection({
               <dd className="font-mono tabular-nums">{fmt(breakdown.subtotal1, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">+ GF ({financialCostPct}%)</dt>
+              <dt className="text-muted-foreground">
+                + GF (
+                {financialDaysAvg > 0
+                  ? `${financialCostPct}% × ${financialDaysAvg}/365 ≈ ${breakdown.financialEffectivePct.toFixed(2)}%`
+                  : `${financialCostPct}%`}
+                )
+              </dt>
               <dd className="font-mono tabular-nums">{fmt(breakdown.financialCost, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2 font-medium">

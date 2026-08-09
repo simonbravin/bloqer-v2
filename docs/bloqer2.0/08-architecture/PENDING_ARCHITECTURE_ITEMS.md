@@ -7,12 +7,12 @@
 
 | ID | Tema | Acción sugerida |
 |---|---|---|
-| P-ERD-01 | Forma del puente **collection/payment → AR/AP** (`*_application` vs líneas embebidas) | Elegir en Prisma + documentar en ADR |
-| P-ERD-02 | Columna **`balance`** en `receivable`/`payable`**: solo derivada vs mantenida por servicio | Definir + tests de conciliación |
+| P-ERD-01 | Forma del puente **collection/payment → AR/AP** (`*_application` vs líneas embebidas) | **HECHO 2026-08-08** — 1:1 sin `*_application`; parcialidad = múltiples docs ([D-081]) |
+| P-ERD-02 | Columna **`balance`** en `receivable`/`payable`**: solo derivada vs mantenida por servicio | **HECHO 2026-08-08** — `paidAmount`/`originalAmount` mantenidos; balanceDue derivado; OVERDUE on-read ([D-081]) |
 | P-ERD-03 | Tabla explícita **`direct_sale`** vs solo `sales_invoice` sin `certification_id` | Alinear con venta directa |
 | P-ERD-04 | **Numeración correlativa** ([Q-002](../00-product/OPEN_QUESTIONS.md)) | Tabla `number_sequence` vs advisory lock |
 | P-ERD-05 | Modelo fino de **`tax_line`** y polimorfismos | Normalización vs pragmatismo Fase 1 |
-| P-ERD-06 | Entidad **línea de extracto** en conciliación bancaria | Tabla vs JSON versionado |
+| P-ERD-06 | Entidad **línea de extracto** en conciliación bancaria | **HECHO 2026-08-08** — tabla `BankStatementLine` ([D-081]) |
 | P-ERD-07 | **UUID v4 vs v7** | **HECHO 2026-05-07** — UUID v4 elegido. Ver ADR-Phase1-01. |
 
 ## Gastos generales → obra (D-040)
@@ -44,7 +44,7 @@
 |---|---|---|
 | P-REP-01 | Nombres exactos de paquetes (`@bloqer/*`) | Definir al crear `pnpm-workspace.yaml` |
 | P-REP-02 | **Turborepo** on/off ([ADR-006](./ARCHITECTURE_DECISION_RECORDS.md)) | Decidir al segundo paquete compilable |
-| P-REP-03 | Ubicación de **E2E** (`apps/web/e2e` vs root) | Convención en README del repo |
+| P-REP-03 | Ubicación de **E2E** (`apps/web/e2e` vs root) | **HECHO 2026-08-08** — `apps/web/e2e` + Playwright; CI job opcional con secrets |
 
 ## Certificaciones / concurrencia
 
@@ -57,10 +57,10 @@
 | ID | Tema | Acción sugerida |
 |---|---|---|
 | P-TRZ-01 | **OVERDUE derivado en lectura** — `serializeReceivable` computa `OVERDUE` en cada `getReceivableById` / `listReceivablesByProject`. Costoso a escala pero correcto | Agregar background job / cron que persiste `status = OVERDUE` en DB cuando haya > 10k cuentas |
-| P-TRZ-02 | **FX collections no soportado** — `createCollection` valida `account.currency === receivable.currency`. Multi-divisa requiere tipo de cambio negociado | Diseñar `ExchangeRate` + `exchangeRateId` en `Collection`; validar en Phase 4/5 |
-| P-TRZ-03 | **Política de saldo negativo** — `createInternalTransfer` bloquea si `sourceBalance < amount` (D4). No hay "overdraft autorizado" | Agregar flag `allowOverdraft` en `TreasuryAccount` + límite si se necesita para cuentas corrientes |
-| P-TRZ-04 | **Ajustes manuales** — `AccountMovementSourceType.MANUAL_ADJUSTMENT` existe en schema pero no hay UI ni acción para crearlo | Exponer en `/tesoreria/cuentas/[id]/ajuste` con doble autorización en Phase 4 |
-| P-TRZ-05 | **Conciliación bancaria** — `AccountMovementStatus` tiene solo CONFIRMED/CANCELLED. Sin estado RECONCILED ni entidad `BankStatement` | Diseñar en Phase 4; reservar `P-ERD-06` ya documentado |
+| P-TRZ-02 | **FX collections no soportado** — `createCollection` valida `account.currency === receivable.currency`. Multi-divisa requiere tipo de cambio negociado | **DIFERIDO** cierre Phase 3 ([D-081]) — misma moneda; `ExchangeRate` fuera de fases 0–5 |
+| P-TRZ-03 | **Política de saldo negativo** — `createInternalTransfer` bloquea si `sourceBalance < amount` (D4). No hay "overdraft autorizado" | **DIFERIDO** cierre Phase 3 ([D-081]) — saldo no negativo; sin `allowOverdraft` |
+| P-TRZ-04 | **Ajustes manuales** — UI genérica `/tesoreria/cuentas/[id]/ajuste` | **HECHO 2026-08-08** — `registerManualTreasuryAdjustment` + UI ([D-081]); también vía conciliación [D-075] |
+| P-TRZ-05 | **Conciliación bancaria** — manual + CSV + OFX + ajuste desde extracto + reapertura formal ([D-080]). API bancaria → `INTEGRATIONS_FUTURE` | **HECHO 2026-08-08** (API banco fuera de fases 0–5) |
 | P-TRZ-06 | **Doble conteo saldo inicial** — `getAccountBalance` sumaba `TreasuryAccount.openingBalance` **y** movimientos `OPENING_BALANCE` | **HECHO 2026-05-29** — `resolveOpeningBase` + `getAccountBalanceAsOf` en `balance.service.ts`; reportes tesorería migrados. Cuentas legacy sin movimiento siguen usando el campo. |
 | P-TRZ-07 | **Tests e2e de concurrencia** — locking optimista en create/cancel payment/collection | **HECHO 2026-05-29** — `assertOptimisticRowUpdate` centraliza contrato (`count === 1`); 76 tests unitarios cubren guards + locking + balance. Tests DB paralelos diferidos hasta CI con infra dedicada (no blocker Fase A). |
 

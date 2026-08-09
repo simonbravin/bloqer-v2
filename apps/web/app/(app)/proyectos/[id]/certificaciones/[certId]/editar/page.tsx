@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { CertificationStatusBadge, CertificationEditForm } from "@/features/certifications";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@bloqer/domain";
 import { getCertificationById, ServiceError } from "@bloqer/services";
 import { updateCertificationAction } from "../../actions";
 import { PageShell } from "@/components/layout/page-shell";
@@ -14,6 +15,10 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId, certId } = await params;
+  if (!can(current.tenantCtx.roles, "EDIT", "CERTIFICATIONS")) {
+    redirect(`/proyectos/${projectId}/certificaciones/${certId}`);
+  }
+
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,

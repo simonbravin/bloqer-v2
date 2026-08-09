@@ -4,25 +4,41 @@ export const certificationStatusSchema = z.enum([
   "DRAFT", "ISSUED", "APPROVED", "REJECTED", "CANCELLED",
 ]);
 
-export const createCertificationSchema = z.object({
-  projectId:     z.string().uuid("Proyecto inválido"),
-  budgetId:      z.string().uuid("Presupuesto inválido"),
-  periodStart:   z.string().min(1, "La fecha de inicio es obligatoria"),
-  periodEnd:     z.string().min(1, "La fecha de fin es obligatoria"),
-  notes:         z.string().max(2000).optional(),
-  internalNotes: z.string().max(2000).optional(),
-});
+export const createCertificationSchema = z
+  .object({
+    projectId:     z.string().uuid("Proyecto inválido"),
+    budgetId:      z.string().uuid("Presupuesto inválido"),
+    periodStart:   z.string().min(1, "La fecha de inicio es obligatoria"),
+    periodEnd:     z.string().min(1, "La fecha de fin es obligatoria"),
+    notes:         z.string().max(2000).optional(),
+    internalNotes: z.string().max(2000).optional(),
+  })
+  .refine((v) => v.periodEnd >= v.periodStart, {
+    message: "La fecha de fin del período no puede ser anterior al inicio",
+    path: ["periodEnd"],
+  });
 
-export const updateCertificationSchema = z.object({
-  periodStart:   z.string().optional(),
-  periodEnd:     z.string().optional(),
-  notes:         z.string().max(2000).optional(),
-  internalNotes: z.string().max(2000).optional(),
-});
+export const updateCertificationSchema = z
+  .object({
+    periodStart:   z.string().optional(),
+    periodEnd:     z.string().optional(),
+    notes:         z.string().max(2000).optional(),
+    internalNotes: z.string().max(2000).optional(),
+  })
+  .refine(
+    (v) =>
+      v.periodStart == null
+      || v.periodEnd == null
+      || v.periodEnd >= v.periodStart,
+    {
+      message: "La fecha de fin del período no puede ser anterior al inicio",
+      path: ["periodEnd"],
+    },
+  );
 
 export const addCertificationLineSchema = z.object({
   certificationId: z.string().uuid(),
-  wbsNodeId:       z.string().uuid("Nodo WBS inválido"),
+  wbsNodeId:       z.string().uuid("Nodo EDT inválido"),
   physicalPct:     z.number().min(0).max(100),
   currentQty:      z.number().min(0),
   notes:           z.string().max(2000).optional(),

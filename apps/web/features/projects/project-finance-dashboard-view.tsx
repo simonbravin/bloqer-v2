@@ -382,7 +382,7 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
         <div className="grid gap-4 lg:grid-cols-2">
           {wbs.nearCompletion.length > 0 ? (
             <WbsTable
-              title="WBS cerca de completarse"
+              title="EDT cerca de completarse"
               rows={wbs.nearCompletion}
               valueColumn="progressPct"
               valueSuffix="%"

@@ -3,35 +3,17 @@ import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { cancelJournalEntryAsAutomation } from "./journal-entry.service";
 
-/**
- * Before cancelling an operational source that may have a GL journal:
- * - DRAFT → auto-cancel journal
- * - POSTED (without reverse) → block operational cancel [D-061]
- *
- * Company-scoped sources (AR/AP invoices, collections, payments) enforce
- * `isCrossCompany` so a membership anchored to company A cannot cancel (and
- * thus soft-cancel GL of) company B. Tenant-wide treasury sources may pass
- * `enforceCompanyScope: false` (see TENANT_COMPANY_SCOPING §2.1).
- */
-export async function syncJournalOnOperationalCancel(
-  ctx: ServiceContext,
-  params: {
-    companyId: string;
-    sourceType: JournalEntrySourceType;
-    sourceId: string;
-    sourceLabel: string;
-    /** Default true. Set false for tenant-wide treasury (e.g. InternalTransfer). */
-    enforceCompanyScope?: boolean;
-  },
-): Promise<void> {
-  if (params.enforceCompanyScope !== false && isCrossCompany(params.companyId, ctx)) {
-    throw new ServiceError(
-      "FORBIDDEN",
-      `No se puede anular ${params.sourceLabel}: pertenece a otra empresa`,
-    );
-  }
+type CancelSyncParams = {
+  companyId: string;
+  sourceType: JournalEntrySourceType;
+  sourceId: string;
+  sourceLabel: string;
+  /** Default true. Set false for tenant-wide treasury (e.g. InternalTransfer). */
+  enforceCompanyScope?: boolean;
+};
 
-  const entry = await prisma.journalEntry.findFirst({
+async function findLinkedJournal(ctx: ServiceContext, params: CancelSyncParams) {
+  return prisma.journalEntry.findFirst({
     where: {
       tenantId: ctx.tenantId,
       companyId: params.companyId,
@@ -41,18 +23,74 @@ export async function syncJournalOnOperationalCancel(
     },
     select: { id: true, status: true, reversedByEntry: { select: { id: true } } },
   });
-  if (!entry) return;
+}
 
-  if (entry.status === "DRAFT") {
-    await cancelJournalEntryAsAutomation(entry.id, ctx);
-    return;
+function assertCompanyScope(ctx: ServiceContext, params: CancelSyncParams): void {
+  if (params.enforceCompanyScope !== false && isCrossCompany(params.companyId, ctx)) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      `No se puede anular ${params.sourceLabel}: pertenece a otra empresa`,
+    );
   }
+}
 
-  if (entry.status === "POSTED") {
-    if (entry.reversedByEntry) return;
+/**
+ * Pre-check before mutating operational cash: block if a non-reversed POSTED journal exists.
+ * Does not cancel DRAFT journals — call {@link cancelDraftJournalOnOperationalCancel} after
+ * the operational txn succeeds so a failed ops cancel cannot orphan a cancelled draft.
+ */
+export async function assertJournalAllowsOperationalCancel(
+  ctx: ServiceContext,
+  params: CancelSyncParams,
+): Promise<void> {
+  assertCompanyScope(ctx, params);
+  const entry = await findLinkedJournal(ctx, params);
+  if (!entry) return;
+  if (entry.status === "POSTED" && !entry.reversedByEntry) {
     throw new ServiceError(
       "CONFLICT",
       `No se puede anular ${params.sourceLabel}: tiene un asiento contabilizado. Revertí el asiento en Contabilidad primero.`,
     );
   }
+}
+
+/**
+ * Cancel a linked DRAFT journal after operational cancel committed.
+ * No-op if none / already CANCELLED. Throws CONFLICT if a non-reversed POSTED journal
+ * appeared after the pre-check (race) — never silently leave books linked to cancelled cash.
+ */
+export async function cancelDraftJournalOnOperationalCancel(
+  ctx: ServiceContext,
+  params: CancelSyncParams,
+): Promise<void> {
+  assertCompanyScope(ctx, params);
+  const entry = await findLinkedJournal(ctx, params);
+  if (!entry) return;
+  if (entry.status === "POSTED" && !entry.reversedByEntry) {
+    throw new ServiceError(
+      "CONFLICT",
+      `No se pudo completar la anulación de ${params.sourceLabel}: el asiento se contabilizó mientras se anulaba. Revertí el asiento en Contabilidad y contactá soporte si el documento operativo quedó anulado.`,
+    );
+  }
+  if (entry.status !== "DRAFT") return;
+  await cancelJournalEntryAsAutomation(entry.id, ctx, { skipPeriodLock: true });
+}
+
+/**
+ * @deprecated Prefer the split path:
+ * `assertJournalAllowsOperationalCancel` → ops txn → `cancelDraftJournalOnOperationalCancel`.
+ * This thin wrapper remains for docs/tests; production callers should not use it
+ * (cancelling the DRAFT before a failed ops txn can leave GL inconsistent).
+ *
+ * Company-scoped sources (AR/AP invoices, collections, payments) enforce
+ * `isCrossCompany` so a membership anchored to company A cannot cancel (and
+ * thus soft-cancel GL of) company B. Tenant-wide treasury sources may pass
+ * `enforceCompanyScope: false` (see TENANT_COMPANY_SCOPING §2.1).
+ */
+export async function syncJournalOnOperationalCancel(
+  ctx: ServiceContext,
+  params: CancelSyncParams,
+): Promise<void> {
+  await assertJournalAllowsOperationalCancel(ctx, params);
+  await cancelDraftJournalOnOperationalCancel(ctx, params);
 }

@@ -17,6 +17,10 @@ interface CertificationTotalsPanelProps {
   status: CertificationStatus;
   currency: string;
   totalAmount: string;
+  /** EDIT CERTIFICATIONS — emitir / cancelar */
+  canEdit?: boolean;
+  /** APPROVE CERTIFICATIONS — aprobar / rechazar */
+  canApprove?: boolean;
   onIssue:   () => Promise<{ ok: true } | { error: string }>;
   onApprove: () => Promise<{ ok: true } | { error: string }>;
   onReject:  () => Promise<{ ok: true } | { error: string }>;
@@ -25,6 +29,8 @@ interface CertificationTotalsPanelProps {
 
 export function CertificationTotalsPanel({
   status, currency, totalAmount,
+  canEdit = false,
+  canApprove = false,
   onIssue, onApprove, onReject, onCancel,
 }: CertificationTotalsPanelProps) {
   const [isPending, startTransition] = useTransition();
@@ -39,6 +45,11 @@ export function CertificationTotalsPanel({
   }
 
   const isTerminal = status === "REJECTED" || status === "CANCELLED";
+  const showIssue = canEdit && status === "DRAFT";
+  const showReview = canApprove && status === "ISSUED";
+  const showCancel =
+    canEdit && (status === "DRAFT" || status === "ISSUED" || status === "APPROVED");
+  const showActions = showIssue || showReview || showCancel;
 
   return (
     <div className="rounded-lg border bg-card p-4 space-y-4">
@@ -51,18 +62,18 @@ export function CertificationTotalsPanel({
         </div>
       </dl>
 
-      {!isTerminal && <Separator />}
+      {!isTerminal && showActions && <Separator />}
 
-      {!isTerminal && (
+      {!isTerminal && showActions && (
         <div className="space-y-2">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Acciones</p>
           <div className="flex flex-col gap-2">
-            {status === "DRAFT" && (
+            {showIssue && (
               <Button size="sm" disabled={isPending} onClick={() => run(onIssue)}>
                 Emitir certificación
               </Button>
             )}
-            {status === "ISSUED" && (
+            {showReview && (
               <>
                 <Button size="sm" disabled={isPending} onClick={() => run(onApprove)}>
                   Aprobar
@@ -72,7 +83,7 @@ export function CertificationTotalsPanel({
                 </Button>
               </>
             )}
-            {(status === "DRAFT" || status === "ISSUED" || status === "APPROVED") && (
+            {showCancel && (
               <Button
                 size="sm"
                 variant="ghost"

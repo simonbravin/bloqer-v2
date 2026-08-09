@@ -375,7 +375,7 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Origen:** [D-014].
 
 ### BR-PER-002 — Cierre bloquea edición de movimientos
-- **Regla:** cerrar un `Period` impide editar/anular `AccountMovement`s con `date_accounting` dentro del rango.
+- **Regla:** cerrar un `Period` impide crear/editar/anular `AccountMovement`s con `movementDate` dentro del rango, y crear/editar/postear/anular/revertir `JournalEntry`s con `entryDate` en el rango ([D-078]).
 
 ### BR-PER-003 — Reapertura queda auditada
 - **Regla:** reabrir un periodo cerrado registra usuario, motivo, timestamp.

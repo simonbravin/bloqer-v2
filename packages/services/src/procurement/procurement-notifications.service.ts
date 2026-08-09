@@ -72,13 +72,15 @@ export async function notifyPurchaseRequestSubmitted(params: {
   companyId: string;
   code: string;
 }): Promise<void> {
+  // Compras / aprobadores OC ([BR-PUR-015]) — not bare EDIT PROCUREMENT (that includes PMs).
   const recipients = await resolveNotificationAudience({
     tenantId: params.ctx.tenantId,
     permissionTargets: [
-      { action: "EDIT", module: "PROCUREMENT" },
+      { action: "APPROVE", module: "PURCHASE_REQUESTS" },
       { action: "APPROVE", module: "PURCHASE_ORDERS" },
     ],
     excludeUserId: params.ctx.actorUserId,
+    alwaysCcOwnerAdmin: true,
   });
 
   await notifyRecipients({
@@ -108,14 +110,12 @@ export async function notifyPurchaseOrderPendingApproval(params: {
   requiresVarianceExtra: boolean;
 }): Promise<void> {
   const recipients = params.requiresHighLevel
-    ? await resolveNotificationAudience({
-        tenantId: params.ctx.tenantId,
-        excludeUserId: params.ctx.actorUserId,
-      })
+    ? await findActiveOwnerAdminUserIds(params.ctx.tenantId)
     : await resolveNotificationAudience({
         tenantId: params.ctx.tenantId,
         permissionTargets: [{ action: "APPROVE", module: "PURCHASE_ORDERS" }],
         excludeUserId: params.ctx.actorUserId,
+        alwaysCcOwnerAdmin: true,
       });
 
   const reason = params.requiresVarianceExtra

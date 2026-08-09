@@ -24,6 +24,8 @@ import { cn } from "@/lib/utils";
 import { InvoiceLinesEditor } from "@/features/ap/components/invoice-lines-editor";
 import type { InvoiceLine } from "@/features/ap/components/invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
+import { SettlementFields } from "@/features/treasury/components/settlement-fields";
+import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
 import { registerTransactionAction } from "@/app/(app)/finanzas/transacciones/actions";
 
@@ -119,6 +121,8 @@ export function NewTransactionDialog({
   const [collectNow, setCollectNow] = useState(false);
   const [payAccountId, setPayAccountId] = useState("");
   const [collectAccountId, setCollectAccountId] = useState("");
+  const [payMethod, setPayMethod] = useState<SettlementMethodValue | "">("");
+  const [collectMethod, setCollectMethod] = useState<SettlementMethodValue | "">("");
 
   const [inflowAccountId, setInflowAccountId] = useState("");
   const [counterpartyContactId, setCounterpartyContactId] = useState<string | null>(null);
@@ -163,6 +167,8 @@ export function NewTransactionDialog({
     setCollectNow(false);
     setPayAccountId("");
     setCollectAccountId("");
+    setPayMethod("");
+    setCollectMethod("");
     setInflowAccountId("");
     setCounterpartyContactId(null);
     setInflowMode(canAr ? "AR_INVOICE" : "CASH_ONLY");
@@ -269,6 +275,8 @@ export function NewTransactionDialog({
                 paymentDate,
                 payFullBalance: true,
                 notes: null,
+                paymentMethod: payMethod || null,
+                reference: String(fd.get("reference") ?? "").trim() || null,
               }
             : undefined,
         });
@@ -336,6 +344,8 @@ export function NewTransactionDialog({
                 collectionDate,
                 collectFullBalance: true,
                 notes: null,
+                paymentMethod: collectMethod || null,
+                reference: String(fd.get("reference") ?? "").trim() || null,
               }
             : undefined,
         });
@@ -509,6 +519,13 @@ export function NewTransactionDialog({
                         <Label htmlFor="paymentDate">Fecha de pago</Label>
                         <Input id="paymentDate" name="paymentDate" type="date" />
                       </div>
+                      <div className="col-span-2">
+                        <SettlementFields
+                          idPrefix="pay-now"
+                          paymentMethod={payMethod}
+                          onPaymentMethodChange={setPayMethod}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -617,6 +634,13 @@ export function NewTransactionDialog({
                           <div className="space-y-1">
                             <Label htmlFor="collectionDate">Fecha de cobro</Label>
                             <Input id="collectionDate" name="collectionDate" type="date" />
+                          </div>
+                          <div className="col-span-2">
+                            <SettlementFields
+                              idPrefix="collect-now"
+                              paymentMethod={collectMethod}
+                              onPaymentMethodChange={setCollectMethod}
+                            />
                           </div>
                         </div>
                       )}

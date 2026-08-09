@@ -3,7 +3,12 @@ import { notFound, redirect } from "next/navigation";
 import { CertificationInvoiceForm } from "@/features/sales-invoices";
 import type { CertSummary } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
-import { canEditArArea, getCertificationById, ServiceError } from "@bloqer/services";
+import {
+  canEditArArea,
+  getActiveInvoiceForCertification,
+  getCertificationById,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
@@ -25,6 +30,14 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
     roles: current.tenantCtx.roles,
   };
 
+  if (!canEditArArea(current.tenantCtx.roles)) {
+    redirect(
+      certificationId
+        ? `/proyectos/${projectId}/certificaciones/${certificationId}`
+        : `/proyectos/${projectId}/facturas`,
+    );
+  }
+
   // Certification-based flow stays full-page (special wizard).
   if (certificationId) {
     let cert;
@@ -36,15 +49,28 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
     }
 
     if (cert.projectId !== projectId) notFound();
+
+    const existingInvoice = await getActiveInvoiceForCertification(certificationId, ctx);
+    if (existingInvoice) {
+      redirect(`/proyectos/${projectId}/facturas/${existingInvoice.id}`);
+    }
+
     if (cert.status !== "APPROVED") {
+      const statusEs: Record<string, string> = {
+        DRAFT: "Borrador",
+        ISSUED: "Emitida",
+        APPROVED: "Aprobada",
+        REJECTED: "Rechazada",
+        CANCELLED: "Anulada",
+      };
       return (
         <PageShell variant="default" className="space-y-4">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold tracking-tight">Generar factura</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Crear factura desde certificación</h1>
           </div>
           <p className="rounded border bg-card p-4 text-sm text-muted-foreground">
             Solo se pueden facturar certificaciones en estado <strong>Aprobada</strong>. Esta
-            certificación está en estado &quot;{cert.status}&quot;.
+            certificación está en estado &quot;{statusEs[cert.status] ?? cert.status}&quot;.
           </p>
         </PageShell>
       );
@@ -62,7 +88,7 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
     return (
       <PageShell variant="default" className="space-y-6">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold tracking-tight">Generar factura desde certificación</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Crear borrador de factura desde certificación</h1>
         </div>
         <CertificationInvoiceForm projectId={projectId} cert={certSummary} />
       </PageShell>
@@ -70,8 +96,5 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
   }
 
   // Manual create → list dialog
-  if (!canEditArArea(current.tenantCtx.roles)) {
-    redirect(`/proyectos/${projectId}/facturas`);
-  }
   redirect(`/proyectos/${projectId}/facturas?create=1`);
 }

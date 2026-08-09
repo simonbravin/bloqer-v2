@@ -8,7 +8,10 @@ const purchaseRequestLineSchema = z.object({
   lineType: z.enum(["MATERIAL", "SERVICE", "OTHER"]).default("MATERIAL"),
   description: z.string().min(1, "Descripción requerida"),
   unit: z.string().default(""),
-  quantity: z.string().regex(/^\d+(\.\d+)?$/, "Cantidad inválida"),
+  quantity: z
+    .string()
+    .regex(/^\d+(\.\d+)?$/, "Cantidad inválida")
+    .refine((v) => Number(v) > 0, { message: "La cantidad debe ser mayor a cero" }),
   sortOrder: z.number().int().default(0),
 });
 

@@ -24,11 +24,9 @@ function normalizeUnit(u: string): string {
 
 export function evaluateLineVariance(
   line: VarianceLineInput,
-  settings: Pick<
-    CompanyProcurementSettingsView,
-    "varianceSoftAlertPct" | "varianceNoteRequiredPct" | "varianceExtraApprovalPct"
-  >,
+  settings: Pick<CompanyProcurementSettingsView, "varianceSoftAlertPct" | "varianceExtraApprovalPct">,
 ): VarianceLineResult {
+  // NOTE_REQUIRED starts at soft ([BR-PUR-009]); varianceNoteRequiredPct is unused until Q-051.
   const soft = new Prisma.Decimal(settings.varianceSoftAlertPct);
   const extra = new Prisma.Decimal(settings.varianceExtraApprovalPct);
 

@@ -171,7 +171,7 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
 
       {wbsLoadError && (
         <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
-          No se pudieron cargar las partidas WBS para el filtro.
+          No se pudieron cargar las partidas EDT para el filtro.
         </p>
       )}
 

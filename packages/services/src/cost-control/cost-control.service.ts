@@ -276,7 +276,7 @@ export async function getProjectCostControl(
       section: "stock_consumption",
       reason:  "TENANT_MODULE_DISABLED",
     });
-    warnings.push("Inventario deshabilitado: se excluye consumo de stock por WBS.");
+    warnings.push("Inventario deshabilitado: se excluye consumo de stock por partida EDT.");
   }
   if (!incJl) {
     sectionsExcluded.push({
@@ -644,7 +644,7 @@ export async function getProjectCostControl(
     (inv) => inv.lines.every((l) => !l.wbsNodeId),
   );
   if (unallocWithoutLineWbs.length > 0) {
-    warnings.push(`${unallocWithoutLineWbs.length} factura(s) de proveedor sin OC ni WBS en líneas — costo no asignado a WBS.`);
+    warnings.push(`${unallocWithoutLineWbs.length} factura(s) de proveedor sin OC ni EDT en líneas — costo no asignado a partida EDT.`);
   }
 
   // G. Paid cost (CONFIRMED payments) — prefer invoice line → PO line WBS when present
@@ -889,7 +889,7 @@ export async function getWbsItemCostDetail(
     where: { id: wbsNodeId },
     include: { costItem: true, budget: { select: { projectId: true, tenantId: true } } },
   });
-  if (!node) throw new ServiceError("NOT_FOUND", "Nodo WBS no encontrado");
+  if (!node) throw new ServiceError("NOT_FOUND", "Nodo EDT no encontrado");
   if (node.budget.tenantId !== ctx.tenantId || node.budget.projectId !== projectId) {
     throw new ServiceError("FORBIDDEN", "Acceso denegado");
   }

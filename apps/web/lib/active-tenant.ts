@@ -19,6 +19,7 @@ export async function setActiveTenantCookie(tenantId: string): Promise<void> {
   c.set(ACTIVE_TENANT_COOKIE, tenantId, {
     httpOnly: true,
     sameSite: "lax",
+    secure:   process.env.NODE_ENV === "production",
     path:     "/",
     maxAge:   COOKIE_MAX_AGE_SEC,
   });

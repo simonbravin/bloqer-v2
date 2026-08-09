@@ -4,7 +4,8 @@ import { can } from "@bloqer/domain";
 import type { UpdateBudgetSettingsInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
-import { assertBudgetEditable } from "./budget.service";
+import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
+import { assertBudgetEditable, lockBudgetForEconomicEdit } from "./budget.service";
 import { _recalcAllItems } from "./budget-calc.service";
 
 export async function updateBudgetSettings(
@@ -19,8 +20,10 @@ export async function updateBudgetSettings(
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   assertBudgetEditable(budget);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
 
   const settings = await prisma.$transaction(async (tx) => {
+    await lockBudgetForEconomicEdit(tx, budgetId, ctx.tenantId);
     const updated = await tx.budgetSettings.update({
       where: { budgetId },
       data: input,

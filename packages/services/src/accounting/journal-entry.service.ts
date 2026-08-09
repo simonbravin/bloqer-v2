@@ -20,6 +20,8 @@ import {
   naturalBalanceSignedString,
 } from "./accounting-natural-balance";
 import { entryDateGte, entryDateLte, sanitizeIsoDate } from "./accounting-date";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
 
 /** Sourced journals mirror an operational document [D-063]. */
 export function isSourcedJournalEntry(entry: {
@@ -508,6 +510,11 @@ async function persistJournalEntryCreate(
   await validateAccountsAndProjects(companyId, ctx.tenantId, parsed, headerProjectId);
 
   const entryDate = new Date(`${input.entryDate}T00:00:00.000Z`);
+  await assertFinancialPeriodOpen({
+    tenantId: ctx.tenantId,
+    companyId,
+    date: entryDate,
+  });
   const sourceType = input.sourceType ?? "MANUAL";
   const sourceId = input.sourceId ?? null;
 
@@ -647,6 +654,18 @@ export async function updateJournalEntry(
   const entryDate = input.entryDate
     ? new Date(`${input.entryDate}T00:00:00.000Z`)
     : existing.entryDate;
+  await assertFinancialPeriodOpen({
+    tenantId: ctx.tenantId,
+    companyId: existing.companyId,
+    date: existing.entryDate,
+  });
+  if (input.entryDate) {
+    await assertFinancialPeriodOpen({
+      tenantId: ctx.tenantId,
+      companyId: existing.companyId,
+      date: entryDate,
+    });
+  }
   const description = input.description?.trim() ?? existing.description;
   const reference = input.reference === undefined ? existing.reference : input.reference?.trim() ?? null;
   // Sourced journals keep header project from the operational document [D-063].
@@ -692,6 +711,22 @@ export async function updateJournalEntry(
   }
 
   await prisma.$transaction(async (tx) => {
+    // Claim DRAFT so concurrent post/cancel cannot race line edits.
+    const claimed = await tx.journalEntry.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+      data: {
+        entryDate,
+        description,
+        reference,
+        projectId,
+        updatedByUserId: ctx.actorUserId,
+      },
+    });
+    assertOptimisticRowUpdate(
+      claimed.count,
+      "El asiento ya no está en borrador. Recargá e intentá de nuevo.",
+    );
+
     if (parsed) {
       if (sourced && sourcedExistingLines) {
         // In-place updates keep line ids/order stable (delete+create reshuffles UUID order).
@@ -721,16 +756,6 @@ export async function updateJournalEntry(
         });
       }
     }
-    await tx.journalEntry.update({
-      where: { id },
-      data: {
-        entryDate,
-        description,
-        reference,
-        projectId,
-        updatedByUserId: ctx.actorUserId,
-      },
-    });
   });
 
   await log({
@@ -771,23 +796,43 @@ export async function postJournalEntry(id: string, ctx: ServiceContext): Promise
   }));
   assertBalancedJournalEntry(parsed);
 
-  await prisma.journalEntry.update({
-    where: { id },
-    data: {
-      status:          "POSTED",
-      postedAt:        new Date(),
-      updatedByUserId: ctx.actorUserId,
-    },
-  });
+  // Serialize vs period close: company row FOR UPDATE + re-check period inside the same txn.
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${existing.companyId} FOR UPDATE`;
+    await assertFinancialPeriodOpen(
+      {
+        tenantId: ctx.tenantId,
+        companyId: existing.companyId,
+        date: existing.entryDate,
+      },
+      tx,
+    );
 
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "journal_entry.posted",
-    entityType:  "JournalEntry",
-    entityId:    id,
-    after:       { status: "POSTED" },
-    ipAddress:   ctx.ipAddress,
+    const flipped = await tx.journalEntry.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+      data: {
+        status:          "POSTED",
+        postedAt:        new Date(),
+        updatedByUserId: ctx.actorUserId,
+      },
+    });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "El asiento ya no está en borrador. Recargá e intentá de nuevo.",
+    );
+
+    await log(
+      {
+        tenantId:    ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        action:      "journal_entry.posted",
+        entityType:  "JournalEntry",
+        entityId:    id,
+        after:       { status: "POSTED" },
+        ipAddress:   ctx.ipAddress,
+      },
+      tx,
+    );
   });
 
   return loadJournalEntryView(id, ctx.tenantId, existing.companyId);
@@ -797,19 +842,34 @@ async function cancelDraftJournalEntryCore(
   id: string,
   ctx: ServiceContext,
   existing: JournalEntry,
+  opts?: { skipPeriodLock?: boolean },
 ): Promise<JournalEntryView> {
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", "Solo se pueden anular borradores");
   }
 
-  await prisma.journalEntry.update({
-    where: { id },
+  // Operational cancel-sync [D-061] must still clear DRAFT after cash/doc cancel even if
+  // the period was closed in the gap (cleanup must not leave a postable orphan).
+  if (!opts?.skipPeriodLock) {
+    await assertFinancialPeriodOpen({
+      tenantId: ctx.tenantId,
+      companyId: existing.companyId,
+      date: existing.entryDate,
+    });
+  }
+
+  const flipped = await prisma.journalEntry.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
     data: {
       status:          "CANCELLED",
       cancelledAt:     new Date(),
       updatedByUserId: ctx.actorUserId,
     },
   });
+  assertOptimisticRowUpdate(
+    flipped.count,
+    "El asiento ya no está en borrador. Recargá e intentá de nuevo.",
+  );
 
   await log({
     tenantId:    ctx.tenantId,
@@ -817,7 +877,7 @@ async function cancelDraftJournalEntryCore(
     action:      "journal_entry.cancelled",
     entityType:  "JournalEntry",
     entityId:    id,
-    after:       { status: "CANCELLED" },
+    after:       { status: "CANCELLED", ...(opts?.skipPeriodLock ? { via: "operational_cancel_sync" } : {}) },
     ipAddress:   ctx.ipAddress,
   });
 
@@ -839,10 +899,11 @@ export async function cancelJournalEntry(id: string, ctx: ServiceContext): Promi
 export async function cancelJournalEntryAsAutomation(
   id: string,
   ctx: ServiceContext,
+  opts?: { skipPeriodLock?: boolean },
 ): Promise<JournalEntryView> {
   const existing = await prisma.journalEntry.findFirst({ where: { id, tenantId: ctx.tenantId } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Asiento no encontrado");
-  return cancelDraftJournalEntryCore(id, ctx, existing);
+  return cancelDraftJournalEntryCore(id, ctx, existing, opts);
 }
 
 /**
@@ -879,6 +940,17 @@ export async function reversePostedJournalEntry(
   const entryDateStr =
     opts?.entryDate ?? new Date().toISOString().slice(0, 10);
   const entryDate = new Date(`${entryDateStr}T00:00:00.000Z`);
+
+  await assertFinancialPeriodOpen({
+    tenantId: ctx.tenantId,
+    companyId: existing.companyId,
+    date: existing.entryDate,
+  });
+  await assertFinancialPeriodOpen({
+    tenantId: ctx.tenantId,
+    companyId: existing.companyId,
+    date: entryDate,
+  });
 
   const reverse = await prisma.$transaction(async (tx) => {
     const created = await tx.journalEntry.create({

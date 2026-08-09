@@ -1,11 +1,22 @@
 # Fórmulas — Certificación
 
 ## Monto económico del período por ítem
+
+En producto el monto se calcula por **cantidad del período × precio unitario de venta** (snapshot del `CostItem` al armar la línea):
+
 \[
-M_{item} = \Delta \%_{econ} \times \text{PrecioTotalPresupuestado}_{item}
+M_{item} = q_{período} \times PU_{venta}
 \]
 
-Donde \(\Delta \%_{econ}\) es el **incremento de avance económico** del período (no necesariamente igual al físico).
+Equivalente a la forma porcentual cuando \(PU_{venta} = \frac{\text{PrecioTotalPresupuestado}_{item}}{q_{presupuesto}}\):
+
+\[
+M_{item} = \Delta \%_{econ} \times \text{PrecioTotalPresupuestado}_{item}
+\quad\text{con}\quad
+\Delta \%_{econ} = \frac{q_{período}}{q_{presupuesto}}
+\]
+
+Donde \(\Delta \%_{econ}\) es el **incremento de avance económico** del período (no necesariamente igual al físico). El código redondea \(M_{item}\) a 2 dp half-up ([D-053]).
 
 ## Acumulado económico
 \[
@@ -19,9 +30,9 @@ Acc_{fis} = \sum_{certificaciones \le t} \Delta \%_{fis}
 
 ### Ejemplo numérico
 
-| Ítem | Precio presupuestado | Δ% econ período | Monto período |
-|---|---:|---:|---:|
-| Mampostería | ARS 2.000.000 | 10% | ARS 200.000 |
+| Ítem | Precio presupuestado | Cant. presup. | PU venta | Δ qty período | Δ% econ | Monto período |
+|---|---:|---:|---:|---:|---:|---:|
+| Mampostería | ARS 2.000.000 | 100 | 20.000 | 10 | 10% | ARS 200.000 |
 
 ## Validación obra pública ([D-004])
 Si \(Acc_{econ} > \text{PrecioTotalPresupuestado}_{item}\) → **bloquear emisión** salvo adenda.

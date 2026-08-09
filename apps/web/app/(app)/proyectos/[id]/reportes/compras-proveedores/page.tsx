@@ -137,7 +137,7 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Sin imputación WBS</CardTitle>
+              <CardTitle className="text-base">Sin imputación EDT</CardTitle>
             </CardHeader>
             <CardContent>
               <ProcurementUnallocatedTable rows={report.unallocated} />

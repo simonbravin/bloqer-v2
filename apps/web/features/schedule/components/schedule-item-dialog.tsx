@@ -155,7 +155,7 @@ export function ScheduleItemDialog({
   function copyPhysical() {
     const pct = m?.operationalProgressPct;
     if (!pct) {
-      toast.error("Sin avance operativo (cantidad) para este WBS");
+      toast.error("Sin avance operativo (cantidad) para esta partida EDT");
       return;
     }
     startTransition(async () => {
@@ -171,7 +171,7 @@ export function ScheduleItemDialog({
   function copyJobsitePhysicalPct() {
     const pct = context?.jobsitePhysicalPctCumulative;
     if (!pct) {
-      toast.error("Sin % físico acumulado en libro de obra para este WBS");
+      toast.error("Sin % físico acumulado en libro de obra para esta partida EDT");
       return;
     }
     startTransition(async () => {
@@ -695,7 +695,7 @@ export function ScheduleItemDialog({
                 . El avance operativo del cronograma también puede usar cantidades.
               </p>
               {!context?.jobsiteEntries.length ? (
-                <p className="text-muted-foreground text-xs">Sin partes aprobados en el WBS primario.</p>
+                <p className="text-muted-foreground text-xs">Sin partes aprobados en la partida EDT primaria.</p>
               ) : (
                 <ul className="space-y-2">
                   {context.jobsiteEntries.map((j) => (
@@ -717,7 +717,7 @@ export function ScheduleItemDialog({
                 No actualizan el avance Real del cronograma (BR-SCH-002).
               </p>
               {!context?.certificationEntries.length ? (
-                <p className="text-muted-foreground text-xs">Sin líneas certificadas en el WBS.</p>
+                <p className="text-muted-foreground text-xs">Sin líneas certificadas en la partida EDT.</p>
               ) : (
                 <ul className="space-y-2">
                   {context.certificationEntries.map((c) => (

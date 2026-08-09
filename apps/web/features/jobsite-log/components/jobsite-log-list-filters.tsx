@@ -108,7 +108,7 @@ export function JobsiteLogListFilters({ wbsOptions }: Props) {
         />
       </div>
       <div className="space-y-1 min-w-[14rem] flex-1 max-w-md">
-        <Label className="text-xs">Partida WBS afectada</Label>
+        <Label className="text-xs">Partida EDT afectada</Label>
         <SearchableCombobox
           popoverWidth="wide"
           className="h-8 text-xs"

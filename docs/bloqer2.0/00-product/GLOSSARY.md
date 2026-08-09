@@ -148,7 +148,7 @@ Conjunto único de **contactos** de la empresa, con roles múltiples. Ver [Conta
 Movimiento de **salida de dinero** desde una cuenta de tesorería. Puede ser un pago, una transferencia interna o un gasto.
 
 ### EDT — Estructura de Desglose de Trabajo
-**Label de UI (es-AR)** para la [WBS](#wbs--work-breakdown-structure). En pantallas y navegación se usa **EDT** / **EDT y costos** (título largo: *Estructura de Desglose de Trabajo y Costos*). En código, Prisma, APIs y campos (`wbsNode`, `wbsNodeId`, etc.) se mantiene **WBS** — no duplicar entidades ni tablas.
+**Label de UI (es-AR)** para la [WBS](#wbs--work-breakdown-structure). En pantallas y navegación se usa **EDT** / **EDT y costos** (título largo: *Estructura de Desglose de Trabajo y Costos*). En código, Prisma, APIs y campos (`wbsNode`, `wbsNodeId`, etc.) se mantiene **WBS** — no duplicar entidades ni tablas. Es el **centro de costo de obra** (no hay entidad `CostCenter` aparte).
 
 ### Empresa
 Sinónimo conversacional de **razón social** dentro de un tenant. Pendiente: ¿un tenant puede tener varias empresas o son 1:1? — ver [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md).

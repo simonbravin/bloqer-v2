@@ -52,7 +52,7 @@ export function BudgetWbsPreloadSection({ disabled, onPendingRowsChange }: Props
         onClick={() => setExpanded((v) => !v)}
         disabled={disabled}
       >
-        Precargar estructura WBS (opcional)
+        Precargar estructura EDT (opcional)
         <span className="text-muted-foreground text-xs">{expanded ? "▲" : "▼"}</span>
       </button>
 

@@ -15,17 +15,17 @@
 | R-007 | Aging cuentas por cobrar | FIN | Buckets por cliente/proyecto | 1 |
 | R-008 | Aging cuentas por pagar | FIN | Buckets por proveedor | 1 |
 | R-009 | Compras por proveedor | OP | Monto y documentos; capas comprometido/devengado/pagado según [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md) | 1 |
-| R-010 | Compras multi-proyecto | OP | Matriz proyecto × proveedor (misma convención anti doble conteo) | 1 |
-| R-011 | Materiales más caros | OP | Ranking por variación precio o monto | 1 |
+| R-010 | Compras multi-proyecto | OP | Matriz proyecto × proveedor (misma convención anti doble conteo). **Diferido cierre Phase 4** ([D-083](../00-product/DECISION_LOG.md)) | 1 |
+| R-011 | Materiales más caros | OP | Ranking por variación precio o monto. **Diferido cierre Phase 4** ([D-083](../00-product/DECISION_LOG.md)) | 1 |
 | R-012 | Evolución certificaciones | PRJ | Serie mensual certificado / facturado / cobrado: **facturado** = existe `SalesInvoice`/`Receivable` vinculada ([BR-CERT-007]); cobrado vía AR+tesorería; `payment_status` derivado; columnas no usan `INVOICED` como estado de certificación | 1 |
 | R-013 | Materiales por proyecto | INV / OP | Consumo/stock imputado | 1 |
-| R-014 | Inventario valorizado | INV | Por depósito y consolidado | 1 |
+| R-014 | Inventario valorizado | INV | Por depósito y consolidado. Qty-only en piloto; **valorizado pleno diferido** (depende [D-007]/[D-083](../00-product/DECISION_LOG.md)) | 1 |
 | R-015 | Libro de obra export | PRJ | PDF parte diarios | 1 |
 | R-016 | Directorio de contactos | OP | Export maestro | 1 |
 | R-017 | Auditoría de movimientos | FIN | Log filtrable | 1 |
 | R-018 | Query builder ad-hoc | ALL | Filtros + columnas ([Q-010]) | 1 |
 | R-019 | Dashboard ejecutivo | FIN | KPIs consolidados | 1 |
-| R-020 | Conciliación bancaria | FIN | Estado por cuenta/mes | 1 |
+| R-020 | Conciliación bancaria | FIN | Estado por cuenta/período (sesión); CSV en `/api/reports/tesoreria/conciliacion.csv` | 1 |
 
 ### Extensiones hub proyecto (baseline vs ejecución)
 
@@ -84,6 +84,15 @@ Solo asientos `POSTED`; saldos naturales; multi-moneda por bloque; gerencial (no
 | R-SCC-*, R-SUB-* | `/api/reports/proyectos/[projectId]/subcontratos.csv` |
 | Control costos (detalle) | `/api/reports/proyectos/[projectId]/control-costos.csv` |
 | R-005 | `/api/reports/proyectos/[projectId]/flujo-caja.csv` |
+
+## Rutas API tesorería (CSV)
+
+| Reporte | Ruta |
+|---------|------|
+| R-020 | `/api/reports/tesoreria/conciliacion.csv` |
+| Movimientos | `/api/reports/tesoreria/movimientos.csv` |
+| Flujo de caja | `/api/reports/tesoreria/flujo-caja.csv` |
+| Posición de caja | `/api/reports/tesoreria/posicion-caja.csv` |
 
 ## Referencias
 - [`EXPORT_FORMATS.md`](./EXPORT_FORMATS.md)

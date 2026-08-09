@@ -1,7 +1,7 @@
 # Plan de mejoras a corto plazo — Bloqer v2
 
 > **Objetivo de esta etapa:** mejorar Bloqer v2 como producto operativo (estabilidad, claridad, coherencia, usabilidad, permisos, navegación, reportes existentes, limpieza técnica y tests), **sin** desarrollar contabilidad completa.
-> **Fuentes:** [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md), [`PANORAMA_GENERAL_BLOQER_V2.md`](./PANORAMA_GENERAL_BLOQER_V2.md), [`GUIA_OPERATIVA_BLOQER_V2_REVISADA.md`](./GUIA_OPERATIVA_BLOQER_V2_REVISADA.md).
+> **Fuentes:** [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md), [`PANORAMA_GENERAL_BLOQER_V2.md`](./PANORAMA_GENERAL_BLOQER_V2.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](./GUIA_OPERATIVA_BLOQER_V2.md).
 > **Estado:** plan de trabajo — **Lotes 1–4 implementados** (ver §Resultado). Lotes 5+ pendientes de aprobación.
 > **Alcance excluido:** posteo contable automático, cierres contables, reversión avanzada de asientos, conciliación bancaria, motor de impuestos, retenciones fiscales completas, reportes contables avanzados e integración contable definitiva (ver §L).
 

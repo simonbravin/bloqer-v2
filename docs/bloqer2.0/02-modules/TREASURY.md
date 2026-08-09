@@ -19,6 +19,7 @@ Confundir banco, contabilidad y obligaciones pendientes; necesidad de ver **caja
 
 ## 6. Entidades principales
 - **Account**, **AccountMovement**, **InternalTransfer**, categorías movimiento.
+- **Collection** / **Payment** (origen de movimientos): opcionalmente `paymentMethod` + `reference` para trazabilidad bancaria ([D-074] / Q-054).
 
 ## 7. Estados y transiciones
 Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § AccountMovement.

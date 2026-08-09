@@ -372,7 +372,7 @@ async function VarianzaTab({
       </KpiStatGrid>
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Por partida WBS</CardTitle>
+          <CardTitle className="text-base">Por partida EDT</CardTitle>
         </CardHeader>
         <CardContent>
           <MaterialWbsTable rows={report.byWbs} />

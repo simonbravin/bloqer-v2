@@ -36,7 +36,8 @@ Ver máquinas SalesInvoice y Receivable.
 - Registro cobranza con aplicación de montos a facturas.
 - Venta directa simplificada (sin certificación).
 - **Adjuntos** en el alta (create-then-upload) y en el detalle de factura de venta (`SALES_INVOICE`) — foto/copia del comprobante ([D-052]). Aplica a obra y a ingresos corporativos (`projectId` null; panel en CxC empresa).
-- AR corporativo: alta rápida con cobro opcional vía Registrar transacción ([D-051]); “Cobrar ahora” inline en facturas de venta **de proyecto** diferido ([Q-055]).
+- AR corporativo: alta rápida con cobro opcional vía Registrar transacción ([D-051]).
+- Factura de venta **manual de proyecto**: “Emitir y cobrar ahora” opcional ([D-077] / Q-055); visible con `EDIT TREASURY`.
 
 > Ver [D-051](../00-product/DECISION_LOG.md), [D-052](../00-product/DECISION_LOG.md).
 

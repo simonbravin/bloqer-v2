@@ -58,7 +58,18 @@ export const upsertCompanyProcurementSettingsSchema = z
     ) {
       ctx.addIssue({
         code: "custom",
-        message: "El umbral de alerta debe ser menor al de nota obligatoria",
+        message: "El umbral de alerta debe ser menor o igual al de nota obligatoria",
+        path: ["varianceSoftAlertPct"],
+      });
+    }
+    if (
+      data.varianceSoftAlertPct != null &&
+      data.varianceExtraApprovalPct != null &&
+      Number(data.varianceSoftAlertPct) >= Number(data.varianceExtraApprovalPct)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "El umbral de nota/alerta debe ser menor al de aprobación administración",
         path: ["varianceSoftAlertPct"],
       });
     }

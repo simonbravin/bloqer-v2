@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
+import { SettlementFields } from "@/features/treasury/components/settlement-fields";
+import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { registerArAdvanceAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 import type { ClientOption } from "./manual-invoice-form";
 
@@ -34,6 +36,7 @@ export function AdvanceInvoiceForm({
   const [error, setError] = useState<string | null>(null);
   const [clientContactId, setClientContactId] = useState(defaultClientId ?? "");
   const [accountId, setAccountId] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<SettlementMethodValue | "">("");
 
   const selectedAccount = useMemo(
     () => accounts.find((a) => a.id === accountId),
@@ -74,6 +77,8 @@ export function AdvanceInvoiceForm({
           collectionDate,
           collectFullBalance: true,
           notes: "Cobro de anticipo",
+          paymentMethod: paymentMethod || null,
+          reference: String(fd.get("reference") ?? "").trim() || null,
         },
       });
       if ("error" in res) {
@@ -167,6 +172,14 @@ export function AdvanceInvoiceForm({
               placeholder="0.00"
               required
               disabled={!accountId}
+            />
+          </div>
+
+          <div className="col-span-2">
+            <SettlementFields
+              idPrefix="advance"
+              paymentMethod={paymentMethod}
+              onPaymentMethodChange={setPaymentMethod}
             />
           </div>
 

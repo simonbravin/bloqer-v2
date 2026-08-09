@@ -3,6 +3,21 @@ import assert from "node:assert/strict";
 import { ServiceError } from "../types";
 import { assertCanCancelAccountMovement } from "./account-movement-cancel-guards";
 
+test("assertCanCancelAccountMovement rejects RECONCILED with unmatch guidance", () => {
+  assert.throws(
+    () =>
+      assertCanCancelAccountMovement({
+        status: "RECONCILED",
+        sourceType: "MANUAL_ADJUSTMENT",
+        transferId: null,
+      }),
+    (e: unknown) =>
+      e instanceof ServiceError
+      && e.code === "CONFLICT"
+      && e.message.includes("Desconciliá"),
+  );
+});
+
 test("assertCanCancelAccountMovement rejects non-CONFIRMED", () => {
   assert.throws(
     () =>

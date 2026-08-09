@@ -123,7 +123,7 @@ export function WbsImportDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Importar estructura WBS</DialogTitle>
+          <DialogTitle>Importar estructura EDT</DialogTitle>
           <DialogDescription>
             Columna A: numeración (ej. ARQ 1, ARQ 1.1) o fila de rubro (ARQ + nombre en B).
             Columna B: descripción. No se importan unidades ni importes (la unidad se carga en el APU).
@@ -187,7 +187,7 @@ export function WbsImportDialog({
                 onChange={(e) => setReplaceExisting(e.target.checked)}
               />
               <Label htmlFor="replace-wbs" className="text-sm leading-snug cursor-pointer">
-                Reemplazar toda la estructura WBS existente (no se puede deshacer)
+                Reemplazar toda la estructura EDT existente (no se puede deshacer)
               </Label>
             </div>
           )}

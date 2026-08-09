@@ -29,7 +29,8 @@ const DEFAULTS = {
   allowSelfApproval: true,
   allowEmergencyDirectPo: false,
   varianceSoftAlertPct: new Prisma.Decimal(10),
-  varianceNoteRequiredPct: new Prisma.Decimal(25),
+  // Kept equal to soft until Q-051 ([BR-PUR-009] uses soft → NOTE_REQUIRED).
+  varianceNoteRequiredPct: new Prisma.Decimal(10),
   varianceExtraApprovalPct: new Prisma.Decimal(25),
   overReceiptTolerancePct: new Prisma.Decimal(0),
   invoiceMatchTolerancePct: new Prisma.Decimal(0),
@@ -74,6 +75,19 @@ function serialize(row: {
     approvalSlaHours: row.approvalSlaHours ?? 72,
     apPaymentNotificationChannel: row.apPaymentNotificationChannel ?? DEFAULTS.apPaymentNotificationChannel,
   };
+}
+
+function parseNullableMoney(value: string | null | undefined): Prisma.Decimal | null {
+  if (value == null || value === "") return null;
+  return new Prisma.Decimal(value);
+}
+
+function parsePctOrDefault(
+  value: string | undefined,
+  fallback: Prisma.Decimal,
+): Prisma.Decimal {
+  if (value === undefined || value === "") return fallback;
+  return new Prisma.Decimal(value);
 }
 
 export async function getCompanyProcurementSettings(
@@ -157,14 +171,10 @@ export async function upsertCompanyProcurementSettings(
 
   const createData: Prisma.CompanyProcurementSettingsUpsertArgs["create"] = {
     companyId,
-    poApprovalThresholdArs:
-      input.poApprovalThresholdArs != null && input.poApprovalThresholdArs !== ""
-        ? new Prisma.Decimal(input.poApprovalThresholdArs)
-        : null,
-    purchaseRequestRequiredAboveArs:
-      input.purchaseRequestRequiredAboveArs != null && input.purchaseRequestRequiredAboveArs !== ""
-        ? new Prisma.Decimal(input.purchaseRequestRequiredAboveArs)
-        : null,
+    poApprovalThresholdArs: parseNullableMoney(input.poApprovalThresholdArs ?? null),
+    purchaseRequestRequiredAboveArs: parseNullableMoney(
+      input.purchaseRequestRequiredAboveArs ?? null,
+    ),
     minQuotesRequired: input.minQuotesRequired ?? DEFAULTS.minQuotesRequired,
     maxQuotesAllowed: input.maxQuotesAllowed ?? DEFAULTS.maxQuotesAllowed,
     quoteRequiredCategories:
@@ -176,44 +186,91 @@ export async function upsertCompanyProcurementSettings(
     allowDirectPo: input.allowDirectPo ?? DEFAULTS.allowDirectPo,
     allowSelfApproval: input.allowSelfApproval ?? DEFAULTS.allowSelfApproval,
     allowEmergencyDirectPo: input.allowEmergencyDirectPo ?? DEFAULTS.allowEmergencyDirectPo,
-    varianceSoftAlertPct: input.varianceSoftAlertPct
-      ? new Prisma.Decimal(input.varianceSoftAlertPct)
-      : DEFAULTS.varianceSoftAlertPct,
-    varianceNoteRequiredPct: input.varianceNoteRequiredPct
-      ? new Prisma.Decimal(input.varianceNoteRequiredPct)
-      : DEFAULTS.varianceNoteRequiredPct,
-    varianceExtraApprovalPct: input.varianceExtraApprovalPct
-      ? new Prisma.Decimal(input.varianceExtraApprovalPct)
-      : DEFAULTS.varianceExtraApprovalPct,
-    overReceiptTolerancePct: input.overReceiptTolerancePct
-      ? new Prisma.Decimal(input.overReceiptTolerancePct)
-      : DEFAULTS.overReceiptTolerancePct,
-    invoiceMatchTolerancePct: input.invoiceMatchTolerancePct
-      ? new Prisma.Decimal(input.invoiceMatchTolerancePct)
-      : DEFAULTS.invoiceMatchTolerancePct,
+    varianceSoftAlertPct: parsePctOrDefault(
+      input.varianceSoftAlertPct,
+      DEFAULTS.varianceSoftAlertPct,
+    ),
+    varianceNoteRequiredPct: parsePctOrDefault(
+      input.varianceNoteRequiredPct,
+      DEFAULTS.varianceNoteRequiredPct,
+    ),
+    varianceExtraApprovalPct: parsePctOrDefault(
+      input.varianceExtraApprovalPct,
+      DEFAULTS.varianceExtraApprovalPct,
+    ),
+    overReceiptTolerancePct: parsePctOrDefault(
+      input.overReceiptTolerancePct,
+      DEFAULTS.overReceiptTolerancePct,
+    ),
+    invoiceMatchTolerancePct: parsePctOrDefault(
+      input.invoiceMatchTolerancePct,
+      DEFAULTS.invoiceMatchTolerancePct,
+    ),
     approvalSlaHours: input.approvalSlaHours ?? DEFAULTS.approvalSlaHours,
     apPaymentNotificationChannel:
       input.apPaymentNotificationChannel ?? DEFAULTS.apPaymentNotificationChannel,
   };
 
-  // Update only fields present in the payload so omitted keys (e.g. approvalSlaHours)
-  // keep their stored values instead of resetting to defaults.
-  const updateData: Prisma.CompanyProcurementSettingsUncheckedUpdateInput = {
-    poApprovalThresholdArs: createData.poApprovalThresholdArs,
-    purchaseRequestRequiredAboveArs: createData.purchaseRequestRequiredAboveArs,
-    minQuotesRequired: createData.minQuotesRequired,
-    maxQuotesAllowed: createData.maxQuotesAllowed,
-    allowDirectPo: createData.allowDirectPo,
-    allowSelfApproval: createData.allowSelfApproval,
-    allowEmergencyDirectPo: createData.allowEmergencyDirectPo,
-    varianceSoftAlertPct: createData.varianceSoftAlertPct,
-    varianceNoteRequiredPct: createData.varianceNoteRequiredPct,
-    varianceExtraApprovalPct: createData.varianceExtraApprovalPct,
-    overReceiptTolerancePct: createData.overReceiptTolerancePct,
-    invoiceMatchTolerancePct: createData.invoiceMatchTolerancePct,
-  };
+  // True partial update: only keys present in the payload are written.
+  const updateData: Prisma.CompanyProcurementSettingsUncheckedUpdateInput = {};
+  if (input.poApprovalThresholdArs !== undefined) {
+    updateData.poApprovalThresholdArs = parseNullableMoney(input.poApprovalThresholdArs);
+  }
+  if (input.purchaseRequestRequiredAboveArs !== undefined) {
+    updateData.purchaseRequestRequiredAboveArs = parseNullableMoney(
+      input.purchaseRequestRequiredAboveArs,
+    );
+  }
+  if (input.minQuotesRequired !== undefined) {
+    updateData.minQuotesRequired = input.minQuotesRequired;
+  }
+  if (input.maxQuotesAllowed !== undefined) {
+    updateData.maxQuotesAllowed = input.maxQuotesAllowed;
+  }
   if (input.quoteRequiredCategories !== undefined) {
-    updateData.quoteRequiredCategories = createData.quoteRequiredCategories;
+    updateData.quoteRequiredCategories =
+      input.quoteRequiredCategories === null
+        ? Prisma.JsonNull
+        : input.quoteRequiredCategories;
+  }
+  if (input.allowDirectPo !== undefined) {
+    updateData.allowDirectPo = input.allowDirectPo;
+  }
+  if (input.allowSelfApproval !== undefined) {
+    updateData.allowSelfApproval = input.allowSelfApproval;
+  }
+  if (input.allowEmergencyDirectPo !== undefined) {
+    updateData.allowEmergencyDirectPo = input.allowEmergencyDirectPo;
+  }
+  if (input.varianceSoftAlertPct !== undefined) {
+    updateData.varianceSoftAlertPct = parsePctOrDefault(
+      input.varianceSoftAlertPct,
+      DEFAULTS.varianceSoftAlertPct,
+    );
+  }
+  if (input.varianceNoteRequiredPct !== undefined) {
+    updateData.varianceNoteRequiredPct = parsePctOrDefault(
+      input.varianceNoteRequiredPct,
+      DEFAULTS.varianceNoteRequiredPct,
+    );
+  }
+  if (input.varianceExtraApprovalPct !== undefined) {
+    updateData.varianceExtraApprovalPct = parsePctOrDefault(
+      input.varianceExtraApprovalPct,
+      DEFAULTS.varianceExtraApprovalPct,
+    );
+  }
+  if (input.overReceiptTolerancePct !== undefined) {
+    updateData.overReceiptTolerancePct = parsePctOrDefault(
+      input.overReceiptTolerancePct,
+      DEFAULTS.overReceiptTolerancePct,
+    );
+  }
+  if (input.invoiceMatchTolerancePct !== undefined) {
+    updateData.invoiceMatchTolerancePct = parsePctOrDefault(
+      input.invoiceMatchTolerancePct,
+      DEFAULTS.invoiceMatchTolerancePct,
+    );
   }
   if (input.approvalSlaHours !== undefined) {
     updateData.approvalSlaHours = input.approvalSlaHours;

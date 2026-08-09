@@ -8,6 +8,10 @@ import { AccountMovementTypeBadge } from "./account-movement-type-badge";
 import type { AccountMovementType, AccountMovementStatus } from "@bloqer/database";
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
+import {
+  accountMovementStatusBadgeVariant,
+  accountMovementStatusLabel,
+} from "../lib/account-movement-status-label";
 
 export type AccountMovementListItem = {
   id: string;
@@ -62,8 +66,8 @@ export function AccountMovementList({ movements }: AccountMovementListProps) {
                 {isOutflow ? "−" : "+"}{formatMoneyAmount(m.amount)}
               </TableCell>
               <TableCell>
-                <Badge variant={m.status === "CONFIRMED" ? "default" : "secondary"}>
-                  {m.status === "CONFIRMED" ? "Confirmado" : "Cancelado"}
+                <Badge variant={accountMovementStatusBadgeVariant(m.status)}>
+                  {accountMovementStatusLabel(m.status)}
                 </Badge>
               </TableCell>
             </TableRow>

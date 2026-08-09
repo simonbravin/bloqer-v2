@@ -11,6 +11,7 @@
     "dev": "turbo dev --parallel",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "test": "turbo test --filter=@bloqer/domain --filter=@bloqer/utils --filter=@bloqer/services",
     "db:generate": "dotenv -e .env -- pnpm --filter @bloqer/database exec prisma generate",
     "db:migrate": "dotenv -e .env -- pnpm --filter @bloqer/database exec prisma migrate dev",
     "db:migrate:deploy": "dotenv -e .env -- pnpm --filter @bloqer/database exec prisma migrate deploy",

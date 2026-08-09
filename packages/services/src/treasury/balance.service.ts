@@ -2,6 +2,7 @@ import { Prisma, prisma } from "@bloqer/database";
 import type { ServiceContext } from "../types";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { BALANCE_AFFECTING_MOVEMENT_STATUSES } from "./balance-affecting-statuses";
 
 type TxClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -30,7 +31,11 @@ export async function getAccountBalanceAsOf(
   if (!account) return new Prisma.Decimal(0);
 
   const openingMovement = await tx.accountMovement.findFirst({
-    where: { accountId, status: "CONFIRMED", sourceType: "OPENING_BALANCE" },
+    where: {
+      accountId,
+      status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] },
+      sourceType: "OPENING_BALANCE",
+    },
     select: { id: true },
   });
   const base = resolveOpeningBase(account.openingBalance, openingMovement != null);
@@ -38,7 +43,7 @@ export async function getAccountBalanceAsOf(
   const movements = await tx.accountMovement.findMany({
     where: {
       accountId,
-      status: "CONFIRMED",
+      status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] },
       ...(options?.beforeDate ? { movementDate: { lt: options.beforeDate } } : {}),
     },
     select: { type: true, amount: true },

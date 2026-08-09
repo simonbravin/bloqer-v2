@@ -282,6 +282,8 @@ export async function registerApExpense(
               amount: payAmount,
               paymentDate: input.payNow.paymentDate,
               notes: input.payNow.notes ?? null,
+              paymentMethod: input.payNow.paymentMethod ?? null,
+              reference: input.payNow.reference ?? null,
             },
             ctx,
           );

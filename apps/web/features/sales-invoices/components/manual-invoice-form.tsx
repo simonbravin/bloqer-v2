@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,25 +10,43 @@ import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
-import { createSalesInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
+import { SettlementFields } from "@/features/treasury/components/settlement-fields";
+import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
+import {
+  createSalesInvoiceAction,
+  registerProjectArSaleAction,
+} from "@/app/(app)/proyectos/[id]/facturas/actions";
 
 export type ClientOption = {
   id: string;
   label: string;
 };
 
+export type TreasuryAccountOption = {
+  id: string;
+  label: string;
+  currency: string;
+};
+
 interface Props {
   projectId: string;
   clients: ClientOption[];
+  treasuryAccounts?: TreasuryAccountOption[];
+  /** Show emit+collect when user can EDIT TREASURY ([D-077]). */
+  canCollectNow?: boolean;
   storageConfigured?: boolean;
   variant?: "card" | "plain";
   onCancel?: () => void;
   onSuccess?: () => void;
 }
 
+const INVOICE_CURRENCY = "ARS";
+
 export function ManualInvoiceForm({
   projectId,
   clients,
+  treasuryAccounts = [],
+  canCollectNow = false,
   storageConfigured = false,
   variant = "card",
   onCancel,
@@ -39,6 +57,19 @@ export function ManualInvoiceForm({
   const [error, setError] = useState<string | null>(null);
   const [clientContactId, setClientContactId] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [collectNow, setCollectNow] = useState(false);
+  const [collectAccountId, setCollectAccountId] = useState("");
+  const [collectMethod, setCollectMethod] = useState<SettlementMethodValue | "">("");
+
+  const showCollectNow = canCollectNow;
+  const compatibleAccounts = useMemo(
+    () => treasuryAccounts.filter((a) => a.currency === INVOICE_CURRENCY),
+    [treasuryAccounts],
+  );
+  const treasuryOptions = useMemo(
+    () => toSearchableOptions(compatibleAccounts.map((a) => ({ id: a.id, label: a.label }))),
+    [compatibleAccounts],
+  );
 
   async function uploadAttachmentIfAny(invoiceId: string) {
     if (!attachment || !storageConfigured) return null;
@@ -53,17 +84,73 @@ export function ManualInvoiceForm({
     return uploadDocumentAction(fd);
   }
 
+  function notifyAttachFailure(uploadError: string, collected: boolean) {
+    toast.warning(
+      collected
+        ? `Factura emitida y cobrada, pero no se pudo adjuntar el archivo: ${uploadError}. Podés reintentar desde el detalle.`
+        : `Factura creada, pero no se pudo adjuntar el archivo: ${uploadError}. Podés reintentar desde el detalle.`,
+    );
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!clientContactId) { setError("Debe seleccionar un cliente"); return; }
+    if (collectNow && showCollectNow && !collectAccountId) {
+      setError("Seleccioná la cuenta de cobro");
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
+      if (collectNow && showCollectNow) {
+        const issueDate = fd.get("issueDate") as string;
+        const collectionDate = (fd.get("collectionDate") as string) || issueDate;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(collectionDate)) {
+          setError("Fecha de cobro inválida");
+          return;
+        }
+        const res = await registerProjectArSaleAction(projectId, {
+          projectId,
+          clientContactId,
+          issueDate,
+          dueDate: fd.get("dueDate") as string,
+          currency: INVOICE_CURRENCY,
+          notes: (fd.get("notes") as string) || null,
+          externalInvoiceRef: null,
+          lines: [{
+            description: fd.get("description") as string,
+            quantity: fd.get("quantity") as string,
+            unitPrice: fd.get("unitPrice") as string,
+            taxRate: (fd.get("taxRate") as string) || "0",
+            sortOrder: 0,
+          }],
+          collectNow: {
+            accountId: collectAccountId,
+            collectionDate,
+            collectFullBalance: true,
+            notes: null,
+            paymentMethod: collectMethod || null,
+            reference: String(fd.get("reference") ?? "").trim() || null,
+          },
+        });
+        if ("error" in res) {
+          setError(res.error);
+          return;
+        }
+        const uploadRes = await uploadAttachmentIfAny(res.id);
+        if (uploadRes && "error" in uploadRes) {
+          notifyAttachFailure(uploadRes.error, true);
+        }
+        onSuccess?.();
+        router.push(`/proyectos/${projectId}/facturas/${res.id}`);
+        return;
+      }
+
       const res = await createSalesInvoiceAction(projectId, {
         projectId,
         clientContactId,
         issueDate:  fd.get("issueDate")  as string,
         dueDate:    fd.get("dueDate")    as string,
-        currency:   "ARS",
+        currency:   INVOICE_CURRENCY,
         notes:      (fd.get("notes") as string) || null,
         externalInvoiceRef: null,
         lines: [{
@@ -80,9 +167,7 @@ export function ManualInvoiceForm({
       }
       const uploadRes = await uploadAttachmentIfAny(res.id);
       if (uploadRes && "error" in uploadRes) {
-        toast.warning(
-          `Factura creada, pero no se pudo adjuntar el archivo: ${uploadRes.error}. Podés reintentar desde el detalle.`,
-        );
+        notifyAttachFailure(uploadRes.error, false);
       }
       onSuccess?.();
       router.push(`/proyectos/${projectId}/facturas/${res.id}`);
@@ -167,6 +252,56 @@ export function ManualInvoiceForm({
           </div>
         )}
 
+        {showCollectNow && (
+          <div className="rounded-md border p-3 space-y-3">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={collectNow}
+                onChange={(e) => setCollectNow(e.target.checked)}
+                disabled={isPending}
+              />
+              Emitir y cobrar ahora (ingreso a caja)
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Emite la factura, crea la cuenta por cobrar y registra el cobro total en la misma
+              operación. Sin esta opción se guarda como borrador.
+            </p>
+            {collectNow && (
+              compatibleAccounts.length === 0 ? (
+                <p className="text-sm text-amber-800 dark:text-amber-200 rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-2">
+                  No hay cuentas de tesorería activas en {INVOICE_CURRENCY}. Creá una caja o banco
+                  en esa moneda para poder cobrar ahora.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 space-y-1">
+                    <Label>Cuenta de cobro</Label>
+                    <SearchableCombobox
+                      options={treasuryOptions}
+                      value={collectAccountId}
+                      onValueChange={setCollectAccountId}
+                      placeholder="Cuenta…"
+                      searchPlaceholder="Buscar cuenta…"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="collectionDate">Fecha de cobro</Label>
+                    <Input id="collectionDate" name="collectionDate" type="date" required />
+                  </div>
+                  <div className="col-span-2">
+                    <SettlementFields
+                      idPrefix="project-collect-now"
+                      paymentMethod={collectMethod}
+                      onPaymentMethodChange={setCollectMethod}
+                    />
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+        )}
+
         <div className="flex justify-end gap-2">
           <Button
             type="button"
@@ -175,8 +310,19 @@ export function ManualInvoiceForm({
           >
             Cancelar
           </Button>
-          <Button type="submit" disabled={isPending || clients.length === 0}>
-            {isPending ? "Guardando…" : "Crear factura"}
+          <Button
+            type="submit"
+            disabled={
+              isPending
+              || clients.length === 0
+              || (collectNow && showCollectNow && compatibleAccounts.length === 0)
+            }
+          >
+            {isPending
+              ? "Guardando…"
+              : collectNow && showCollectNow
+                ? "Emitir y cobrar"
+                : "Crear factura"}
           </Button>
         </div>
       </form>

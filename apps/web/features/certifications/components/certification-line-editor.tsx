@@ -276,7 +276,7 @@ function AddLineForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1.5">
-        <Label>Ítem WBS *</Label>
+        <Label>Ítem EDT *</Label>
         <SearchableCombobox
           popoverWidth="wide"
           options={wbsOptions}

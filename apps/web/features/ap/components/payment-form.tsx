@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { SettlementFields } from "@/features/treasury/components/settlement-fields";
+import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { createPaymentAction } from "@/app/(app)/proyectos/[id]/cuentas-por-pagar/actions";
 import { createCompanyPaymentAction } from "@/app/(app)/finanzas/cuentas-por-pagar/actions";
 
@@ -49,6 +51,7 @@ export function PaymentForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [accountId, setAccountId] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<SettlementMethodValue | "">("");
 
   const matchingAccounts = accounts.filter((a) => a.currency === payableCurrency);
   const balanceSerialized = serializeMoney(payableBalance);
@@ -69,7 +72,7 @@ export function PaymentForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!accountId) { setError("Seleccione una cuenta de tesorería"); return; }
+    if (!accountId) { setError("Seleccioná una cuenta de tesorería"); return; }
     const fd = new FormData(e.currentTarget);
     const rawAmount = String(fd.get("amount") ?? "").trim();
     let rounded: string;
@@ -82,12 +85,15 @@ export function PaymentForm({
     // D-053: full balance uses stored balanceDue server-side (avoid round-then-reapply).
     const payFullBalance =
       rounded === balanceSerialized || rawAmount === payableBalance || rawAmount === balanceSerialized;
+    const rawRef = String(fd.get("reference") ?? "").trim();
     const payload = {
       payableId,
       accountId,
       paymentDate: fd.get("paymentDate") as string,
       amount: payFullBalance ? undefined : rounded,
       payFullBalance: payFullBalance || undefined,
+      paymentMethod: paymentMethod || null,
+      reference: rawRef || null,
       notes: (fd.get("notes") as string) || null,
     };
     startTransition(async () => {
@@ -119,7 +125,7 @@ export function PaymentForm({
     return (
       <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
         <p className="text-sm text-muted-foreground">
-          No hay cuentas de tesorería activas en {payableCurrency}. Cree una cuenta con esa moneda primero.
+          No hay cuentas de tesorería activas en {payableCurrency}. Creá una cuenta con esa moneda primero.
         </p>
         {onCancel ? (
           <div className="mt-4 flex justify-end">
@@ -189,6 +195,12 @@ export function PaymentForm({
             />
           </div>
         </div>
+
+        <SettlementFields
+          idPrefix="payment"
+          paymentMethod={paymentMethod}
+          onPaymentMethodChange={setPaymentMethod}
+        />
 
         <div className="space-y-1">
           <Label htmlFor="notes">Notas (opcional)</Label>
