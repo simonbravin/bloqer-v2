@@ -39,6 +39,11 @@ export default async function DirectorioPage({ searchParams }: PageProps) {
 
   const { data, total } = await listContacts({ role, status, search: sp.search, page, pageSize: PAGE_SIZE }, ctx);
 
+  // Strip Prisma profiles (Decimal creditLimit) before Client Components — RSC serialization.
+  const contacts = data.map(
+    ({ clientProfile: _c, supplierProfile: _s, subcontractorProfile: _sc, ...contact }) => contact,
+  );
+
   return (
     <PageShell variant="default" className="space-y-6">
       <PageListHeader
@@ -46,7 +51,7 @@ export default async function DirectorioPage({ searchParams }: PageProps) {
         subtitle={`${total} ${total === 1 ? "contacto" : "contactos"}`}
         actions={
           <>
-            <ContactListExportButton contacts={data} />
+            <ContactListExportButton contacts={contacts} />
             <Button asChild>
               <Link href="/directorio/nuevo">+ Nuevo contacto</Link>
             </Button>
@@ -61,7 +66,7 @@ export default async function DirectorioPage({ searchParams }: PageProps) {
         </Suspense>
       </div>
       <Suspense fallback={<ListSectionSkeleton />}>
-        <ContactListSection contacts={data} />
+        <ContactListSection contacts={contacts} />
       </Suspense>
       <Pagination page={page} pageSize={PAGE_SIZE} total={total} />
     </PageShell>

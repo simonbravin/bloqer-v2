@@ -4,6 +4,7 @@ import {
   optionalMoneyAmountString,
   qtyString,
   ratePctString,
+  unitPriceString,
 } from "./money";
 import { treasurySettlementFieldsSchema } from "./treasury-settlement";
 import { invoiceLetterSchema } from "./contact";
@@ -11,7 +12,7 @@ import { invoiceLetterSchema } from "./contact";
 const invoiceLineSchema = z.object({
   description: z.string().min(1),
   quantity:    qtyString,
-  unitPrice:   moneyAmountString,
+  unitPrice:   unitPriceString,
   taxRate:     ratePctString.optional().default("0.0000"),
   sortOrder:   z.number().int().min(0).optional().default(0),
   certificationLineId: z.string().uuid().optional().nullable(),
@@ -27,6 +28,11 @@ export const createSalesInvoiceSchema = z.object({
   currency:            z.string().length(3).default("ARS"),
   /** Letra A/B/C/E ([D-084]); required on issue when AR. */
   invoiceLetter:       invoiceLetterSchema.optional().nullable(),
+  /**
+   * When true, line `unitPrice` values are gross (IVA incluido) and are converted to net on save ([D-086]).
+   * Typical for Factura B; ignored when taxRate is 0.
+   */
+  pricesIncludeTax:    z.boolean().optional(),
   notes:               z.string().optional().nullable(),
   internalNotes:       z.string().optional().nullable(),
   externalInvoiceRef:  z
@@ -45,6 +51,8 @@ export const createInvoiceFromCertificationSchema = z.object({
   dueDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   taxRate:         ratePctString.optional().default("0.0000"),
   invoiceLetter:   invoiceLetterSchema.optional().nullable(),
+  /** Gross certification amount already embeds tax; usually leave false. */
+  pricesIncludeTax: z.boolean().optional(),
   notes:           z.string().optional().nullable(),
   internalNotes:   z.string().optional().nullable(),
 });
@@ -53,6 +61,7 @@ export const updateSalesInvoiceSchema = z.object({
   issueDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   dueDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   invoiceLetter: invoiceLetterSchema.optional().nullable(),
+  pricesIncludeTax: z.boolean().optional(),
   notes:         z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
 });

@@ -146,7 +146,7 @@ export function RoleManager({
       const result = await assignContactRoleAction(contactId, {
         role: selectedRole,
         paymentTermsDays: paymentTermsDays ? Number(paymentTermsDays) : undefined,
-        creditLimit: creditLimit ? Number(creditLimit) : undefined,
+        creditLimit: creditLimit.trim() ? creditLimit.trim() : undefined,
         bankAccount: bankAccount || undefined,
         specialty: specialty || undefined,
       });
@@ -177,7 +177,7 @@ export function RoleManager({
       if (editTarget === "CLIENT") {
         result = await updateClientProfileAction(contactId, {
           paymentTermsDays: editPaymentTermsDays ? Number(editPaymentTermsDays) : undefined,
-          creditLimit: editCreditLimit ? Number(editCreditLimit) : null,
+          creditLimit: editCreditLimit.trim() ? editCreditLimit.trim() : null,
           defaultCurrency: editDefaultCurrency || undefined,
           notes: editNotes || undefined,
         });

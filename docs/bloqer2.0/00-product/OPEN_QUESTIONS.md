@@ -480,6 +480,19 @@
 
 ---
 
+### Q-040 — TaxType / TaxLine normalizados + libro IVA
+
+- **Categoría:** Impuestos / contabilidad
+- **Estado:** ABIERTA — diferida (status quo operativo = [D-085])
+- **Contexto:** `MASTER_DATA` describe `TaxType` (IVA_21, IVA_10_5, …) y `TaxLine` polimórfico; Prisma aún no los tiene. Hoy el IVA vive en `taxRate` de líneas de factura y el asiento puede discriminar IVA vía CoA ([D-085]).
+- **Impacto si no se resuelve:** no hay catálogo tenant-editable de impuestos, ni retenciones/percepciones estructuradas, ni libro IVA / DDJJ.
+- **Opciones identificadas:**
+  1. Implementar P-ERD-05 (`TaxType` + `TaxLine`) + reportes fiscales.
+  2. Seguir solo con `taxRate` en líneas + split GL (status quo [D-085]).
+- **Recomendación inicial:** opción 2 hasta priorizar compliance AFIP; no inventar TaxLine en código sin ADR.
+
+---
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

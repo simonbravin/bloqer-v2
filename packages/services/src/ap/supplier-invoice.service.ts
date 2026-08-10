@@ -2,6 +2,7 @@ import { Prisma, prisma, SupplierInvoice } from "@bloqer/database";
 import type { CreateSupplierInvoiceInput, UpdateSupplierInvoiceInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
+import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
 import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
@@ -12,9 +13,10 @@ import { resolvePagination } from "../finance/pagination";
 import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { notifyPayableReadyToPay } from "./ap-notifications.service";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
+import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
-import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
 import { assertWbsLineForProject } from "../procurement/procurement-wbs";
@@ -480,12 +482,31 @@ export async function createSupplierInvoice(
     }
   }
 
+  const companyId = await resolveCompanyIdForAp(projectId, ctx);
+
+  const suggestedLetter =
+    input.invoiceLetter ??
+    (await resolveSuggestedApInvoiceLetter({
+      companyId,
+      supplierContactId: input.supplierContactId,
+      tenantId: ctx.tenantId,
+    }));
+  const forceZeroTax = suggestedLetter === "C" || suggestedLetter === "E";
+  const pricesIncludeTax = forceZeroTax ? false : Boolean(input.pricesIncludeTax);
+
   let invoiceTotal = new Prisma.Decimal(0);
   for (const line of input.lines) {
     const qty = new Prisma.Decimal(line.quantity);
     const price = new Prisma.Decimal(line.unitPrice);
-    const rate = new Prisma.Decimal(line.taxRate ?? "0");
-    invoiceTotal = invoiceTotal.plus(calcLine(qty, price, rate).lineTotal);
+    const rate = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
+    invoiceTotal = invoiceTotal.plus(
+      resolveInvoiceLineMoney({
+        quantity: qty,
+        unitPrice: price,
+        taxRate: rate,
+        pricesIncludeTax,
+      }).lineTotal,
+    );
   }
   const estimatedFx = computeDocumentFxAmounts(
     input.currency ?? "ARS",
@@ -504,16 +525,6 @@ export async function createSupplierInvoice(
     input.lines,
     ctx.tenantId,
   );
-
-  const companyId = await resolveCompanyIdForAp(projectId, ctx);
-
-  const suggestedLetter =
-    input.invoiceLetter ??
-    (await resolveSuggestedApInvoiceLetter({
-      companyId,
-      supplierContactId: input.supplierContactId,
-      tenantId: ctx.tenantId,
-    }));
 
   const maxNum = await prisma.supplierInvoice.aggregate({
     where: { tenantId: ctx.tenantId, companyId },
@@ -545,8 +556,13 @@ export async function createSupplierInvoice(
     for (const line of input.lines) {
       const qty   = new Prisma.Decimal(line.quantity);
       const price = new Prisma.Decimal(line.unitPrice);
-      const rate  = new Prisma.Decimal(line.taxRate ?? "0");
-      const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, rate);
+      const rate  = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
+      const { unitPriceNet, lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+        quantity: qty,
+        unitPrice: price,
+        taxRate: rate,
+        pricesIncludeTax,
+      });
       await tx.supplierInvoiceLine.create({
         data: {
           invoiceId:   created.id,
@@ -554,7 +570,7 @@ export async function createSupplierInvoice(
           purchaseOrderLineId: line.purchaseOrderLineId ?? null,
           description: line.description,
           quantity:    qty,
-          unitPrice:   price,
+          unitPrice:   unitPriceNet,
           taxRate:     rate,
           lineSubtotal,
           lineTax,
@@ -704,13 +720,23 @@ export async function updateSupplierInvoice(
       });
     }
 
+    const effectiveLetter =
+      input.invoiceLetter !== undefined ? input.invoiceLetter : existing.invoiceLetter;
+    const forceZeroTax = effectiveLetter === "C" || effectiveLetter === "E";
+
     if (input.lines) {
       await tx.supplierInvoiceLine.deleteMany({ where: { invoiceId: id } });
+      const pricesIncludeTax = Boolean(input.pricesIncludeTax);
       for (const line of input.lines) {
         const qty   = new Prisma.Decimal(line.quantity);
         const price = new Prisma.Decimal(line.unitPrice);
-        const rate  = new Prisma.Decimal(line.taxRate ?? "0");
-        const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, rate);
+        const rate  = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
+        const { unitPriceNet, lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+          quantity: qty,
+          unitPrice: price,
+          taxRate: rate,
+          pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
+        });
         await tx.supplierInvoiceLine.create({
           data: {
             invoiceId: id,
@@ -718,7 +744,7 @@ export async function updateSupplierInvoice(
             purchaseOrderLineId: line.purchaseOrderLineId ?? null,
             description: line.description,
             quantity: qty,
-            unitPrice: price,
+            unitPrice: unitPriceNet,
             taxRate: rate,
             lineSubtotal,
             lineTax,
@@ -728,6 +754,26 @@ export async function updateSupplierInvoice(
         });
       }
       await recalcSupplierInvoiceTotals(tx, id);
+    } else if (forceZeroTax && input.invoiceLetter !== undefined) {
+      // Header-only letter patch to C/E: zero existing line IVA ([D-084]).
+      const existingLines = await tx.supplierInvoiceLine.findMany({ where: { invoiceId: id } });
+      let changed = false;
+      for (const line of existingLines) {
+        if (line.taxRate.equals(0)) continue;
+        changed = true;
+        const { lineSubtotal, lineTax, lineTotal } = calcLine(
+          line.quantity,
+          line.unitPrice,
+          new Prisma.Decimal(0),
+        );
+        await tx.supplierInvoiceLine.update({
+          where: { id: line.id },
+          data: { taxRate: new Prisma.Decimal(0), lineSubtotal, lineTax, lineTotal },
+        });
+      }
+      if (changed) {
+        await recalcSupplierInvoiceTotals(tx, id);
+      }
     }
 
     const inv = await tx.supplierInvoice.findUniqueOrThrow({
@@ -821,6 +867,10 @@ export async function issueSupplierInvoice(
     if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
       throw new ServiceError("CONFLICT", "El total de la factura debe ser mayor a 0");
     }
+    assertInvoiceLetterTaxConsistencyOnIssue({
+      invoiceLetter: inv.invoiceLetter,
+      taxAmount: refreshed.taxAmount,
+    });
 
     const { computeDocumentFxAmounts } = await import("../finance/fx-amount.service");
     const fx = computeDocumentFxAmounts(refreshed.currency, refreshed.totalAmount, refreshed.fxRate);
@@ -1110,7 +1160,7 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
       purchaseOrderLineId: l.purchaseOrderLineId,
       description: l.description,
       quantity:    l.quantity.toString(),
-      unitPrice:   serializeMoneyDecimal(l.unitPrice),
+      unitPrice:   serializeUnitPriceDecimal(l.unitPrice),
       taxRate:     l.taxRate.toString(),
       lineSubtotal: serializeMoneyDecimal(l.lineSubtotal),
       lineTax:     serializeMoneyDecimal(l.lineTax),

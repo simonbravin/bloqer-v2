@@ -52,9 +52,15 @@ export {
   roundQty,
   roundRatePct,
   serializeMoney,
+  serializeUnitPrice,
   multiplyDecimal,
   addDecimal,
   divideDecimal,
 } from "./money";
+export {
+  calcLineAmountsFromGrossInclusive,
+  netUnitFromGrossInclusive,
+  type GrossInclusiveLineAmounts,
+} from "./tax-inclusive";
 export { isUuid } from "./uuid";
 export { sortTreeOrder } from "./sort-tree-order";

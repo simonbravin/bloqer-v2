@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { moneyAmountString, optionalMoneyAmountString } from "./money";
 
 export const contactRoleTypeSchema = z.enum([
   "CLIENT",
@@ -65,7 +66,7 @@ export const assignContactRoleSchema = z.object({
   notes: z.string().max(500).optional(),
   // Profile-specific fields
   paymentTermsDays: z.number().int().min(0).optional(),
-  creditLimit: z.number().min(0).optional(),
+  creditLimit: optionalMoneyAmountString,
   defaultCurrency: z.string().length(3).optional(),
   bankAccount: z.string().max(50).optional(),
   specialty: z.string().max(255).optional(),
@@ -80,7 +81,7 @@ export const listContactsSchema = z.object({
 });
 
 export const updateClientProfileSchema = z.object({
-  creditLimit: z.number().min(0).nullable().optional(),
+  creditLimit: z.union([moneyAmountString, z.null()]).optional(),
   paymentTermsDays: z.number().int().min(0).optional(),
   defaultCurrency: z.string().length(3).optional(),
   notes: z.string().max(2000).optional(),

@@ -1255,6 +1255,39 @@
 
 ---
 
+### D-085 — Alícuotas IVA operativas + asiento con IVA discriminado (sin TaxLine / AFIP)
+
+- **Fecha:** 2026-08-10
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (pedido de cerrar gaps post [D-084])
+- **Contexto:** Tras [D-084], el asiento automático de facturas usaba solo `totalAmount` (2 líneas) y la UI no ofrecía presets 10,5%/27%. CoA ya tenía `1.1.20` IVA Crédito y `2.1.10` IVA Débito sin uso.
+- **Decisión:**
+  1. Presets de alícuota en dominio: `0`, `10.5`, `21`, `27` (UX + hints de obra vivienda). Sigue siendo carga manual por línea ([D-011]); **no** hay motor que elija 10,5% automáticamente.
+  2. Al emitir / sugerir asiento de `SalesInvoice` / `SupplierInvoice` con `taxAmount > 0` y cuentas IVA activas: asiento **3 líneas** (neto + IVA + CxC/CxP). Si no hay cuenta IVA o tax=0 → fallback 2 líneas con total.
+  3. Consistencia letra↔IVA: **bloqueo** al emitir si letra C/E con `taxAmount > 0`; **warnings** UX si A/B con IVA 0 (certificación puede quedar en 0% a conciencia).
+  4. Fuera de alcance: tablas `TaxType`/`TaxLine` (P-ERD-05), libro IVA / posición fiscal AFIP. (Precio IVA incluido → [D-086].)
+- **Implicancias:** `ensureDraftJournalFrom*Invoice`, `suggestJournalFrom*Invoice`, formularios de alícuota, guards de emisión.
+- **Documentos afectados:** [`TAXES_AND_WITHHOLDINGS.md`](../03-finance/TAXES_AND_WITHHOLDINGS.md), [`ACCOUNTING_LEDGER_ARCHITECTURE.md`](../08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md), [`MASTER_DATA.md`](../01-domain/MASTER_DATA.md).
+
+---
+
+### D-086 — Factura B: precio unitario con IVA incluido (sin tablas nuevas)
+
+- **Fecha:** 2026-08-10
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (recomendación aceptada post [D-085])
+- **Contexto:** En la práctica argentina, Factura B se carga con **precio final** (IVA incluido). Con [D-084]/[D-085] el `unitPrice` persistido era siempre neto y la alícuota se sumaba, lo que duplicaba IVA si el operador pegaba el total del ticket.
+- **Decisión:**
+  1. Flag de entrada `pricesIncludeTax` (opcional, default `false`) en create/update/register de facturas AR/AP. **No** se persiste en DB.
+  2. Si `true`: `lineTotal = round(qty × unitPriceGross)`; neto = `round(total / (1 + rate/100))`; IVA = `total − neto`; se persiste `unitPrice` **neto** + componentes de línea ([D-053]).
+  3. UX: checkbox “El precio unitario incluye IVA”; default **on** al sugerir/elegir letra B en altas; en edición DRAFT default **off** (precios ya netos) con hint.
+  4. Certificación / OC: sin cambio de default (suelen traer neto o 0% a conciencia); el operador puede activar el flag si reingresa precios brutos.
+  5. Fuera de alcance: persistir el flag, TaxLine, AFIP.
+- **Implicancias:** `@bloqer/utils` `calcLineAmountsFromGrossInclusive`; `resolveInvoiceLineMoney` en services; formularios AR/AP y registro de transacciones.
+- **Documentos afectados:** [`TAX_FORMULAS.md`](../04-formulas/TAX_FORMULAS.md), [`TAXES_AND_WITHHOLDINGS.md`](../03-finance/TAXES_AND_WITHHOLDINGS.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1263,7 +1296,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-085`…).
+1. Tomar el siguiente ID disponible (`D-087`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

@@ -6,6 +6,8 @@ import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/register-transaction.types";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
+import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
+import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
 import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { isCrossCompany } from "../company-scope";
@@ -156,12 +158,21 @@ export async function registerApExpense(
     select: { country: true },
   });
 
+  const forceZeroTaxEarly = input.invoiceLetter === "C" || input.invoiceLetter === "E";
+  const pricesIncludeTaxEarly = forceZeroTaxEarly ? false : Boolean(input.pricesIncludeTax);
   let invoiceTotal = new Prisma.Decimal(0);
   for (const line of input.lines) {
     const qty = new Prisma.Decimal(line.quantity);
     const price = new Prisma.Decimal(line.unitPrice);
-    const rate = new Prisma.Decimal(line.taxRate ?? "0");
-    invoiceTotal = invoiceTotal.plus(calcLine(qty, price, rate).lineTotal);
+    const rate = new Prisma.Decimal(forceZeroTaxEarly ? "0" : (line.taxRate ?? "0"));
+    invoiceTotal = invoiceTotal.plus(
+      resolveInvoiceLineMoney({
+        quantity: qty,
+        unitPrice: price,
+        taxRate: rate,
+        pricesIncludeTax: pricesIncludeTaxEarly,
+      }).lineTotal,
+    );
   }
   const estimatedFx = computeDocumentFxAmounts(
     input.currency ?? "ARS",
@@ -191,6 +202,28 @@ export async function registerApExpense(
     companyCountry: company?.country,
     counterpartyCountry: supplier?.country,
     documentLabel: "factura de proveedor",
+  });
+  const forceZeroTax = forceZeroTaxEarly;
+  const pricesIncludeTax = pricesIncludeTaxEarly;
+  assertInvoiceLetterTaxConsistencyOnIssue({
+    invoiceLetter: input.invoiceLetter,
+    taxAmount: (() => {
+      let tax = new Prisma.Decimal(0);
+      for (const line of input.lines) {
+        const qty = new Prisma.Decimal(line.quantity);
+        const price = new Prisma.Decimal(line.unitPrice);
+        const rate = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
+        tax = tax.plus(
+          resolveInvoiceLineMoney({
+            quantity: qty,
+            unitPrice: price,
+            taxRate: rate,
+            pricesIncludeTax,
+          }).lineTax,
+        );
+      }
+      return tax;
+    })(),
   });
 
   let outcome!: ApExpenseOutcome;
@@ -226,8 +259,13 @@ export async function registerApExpense(
         for (const line of input.lines) {
           const qty = new Prisma.Decimal(line.quantity);
           const price = new Prisma.Decimal(line.unitPrice);
-          const rate = new Prisma.Decimal(line.taxRate ?? "0");
-          const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, rate);
+          const rate = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
+          const { unitPriceNet, lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+            quantity: qty,
+            unitPrice: price,
+            taxRate: rate,
+            pricesIncludeTax,
+          });
           await tx.supplierInvoiceLine.create({
             data: {
               invoiceId: created.id,
@@ -235,7 +273,7 @@ export async function registerApExpense(
               purchaseOrderLineId: line.purchaseOrderLineId ?? null,
               description: line.description,
               quantity: qty,
-              unitPrice: price,
+              unitPrice: unitPriceNet,
               taxRate: rate,
               lineSubtotal,
               lineTax,

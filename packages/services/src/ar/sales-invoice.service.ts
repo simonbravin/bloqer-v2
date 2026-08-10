@@ -8,13 +8,15 @@ import { auditAr } from "./ar-audit";
 import { assertCanCancelSalesInvoice } from "./sales-invoice-cancel-guards";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
+import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
 import { resolveSuggestedArInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea, canMutateArForScope, canViewArProjectArea } from "./ar-access";
 import { resolvePagination } from "../finance/pagination";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
-import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
+import { serializeMoneyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { isCrossCompany } from "../company-scope";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { ensureDraftJournalFromSalesInvoice } from "../accounting/accounting-auto-draft.service";
@@ -253,6 +255,8 @@ export async function createSalesInvoice(
       clientContactId: input.clientContactId,
       tenantId: ctx.tenantId,
     }));
+  const forceZeroTax = suggestedLetter === "C" || suggestedLetter === "E";
+  const pricesIncludeTax = forceZeroTax ? false : Boolean(input.pricesIncludeTax);
 
   const maxNum = await prisma.salesInvoice.aggregate({
     where: { tenantId: ctx.tenantId, companyId },
@@ -284,14 +288,19 @@ export async function createSalesInvoice(
     for (const line of input.lines) {
       const qty   = new Prisma.Decimal(line.quantity);
       const price = new Prisma.Decimal(line.unitPrice);
-      const rate  = new Prisma.Decimal(line.taxRate ?? "0");
-      const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, rate);
+      const rate  = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
+      const { unitPriceNet, lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+        quantity: qty,
+        unitPrice: price,
+        taxRate: rate,
+        pricesIncludeTax,
+      });
       await tx.salesInvoiceLine.create({
         data: {
           invoiceId: created.id,
           description: line.description,
           quantity: qty,
-          unitPrice: price,
+          unitPrice: unitPriceNet,
           taxRate: rate,
           lineSubtotal,
           lineTax,
@@ -355,10 +364,6 @@ export async function createInvoiceFromCertification(
 
   const companyId = await resolveCompanyId(cert.projectId, ctx);
 
-  // PU de certificación ya incluye impuestos del presupuesto (SALE_PRICE_FORMULAS).
-  // Default IVA factura = 0 para no duplicar; el usuario puede discriminar otro % si corresponde.
-  const taxRate = new Prisma.Decimal(input.taxRate ?? "0");
-
   const suggestedLetter =
     input.invoiceLetter ??
     (await resolveSuggestedArInvoiceLetter({
@@ -366,6 +371,11 @@ export async function createInvoiceFromCertification(
       clientContactId: cert.project.clientContactId,
       tenantId: ctx.tenantId,
     }));
+  // PU de certificación ya incluye impuestos del presupuesto (SALE_PRICE_FORMULAS).
+  // Default IVA factura = 0 para no duplicar; el usuario puede discriminar otro % si corresponde.
+  // Letter C/E always force 0 ([D-084]).
+  const forceZeroTax = suggestedLetter === "C" || suggestedLetter === "E";
+  const taxRate = new Prisma.Decimal(forceZeroTax ? "0" : (input.taxRate ?? "0"));
 
   let inv;
   try {
@@ -470,6 +480,9 @@ export async function updateSalesInvoice(
   await assertProjectGuardIfPresent(inv.projectId, ctx.tenantId);
   assertInvoiceEditable(inv);
 
+  const zeroTaxForLetter =
+    input.invoiceLetter === "C" || input.invoiceLetter === "E";
+
   const updated = await prisma.$transaction(async (tx) => {
     const updatedInvoice = await tx.salesInvoice.update({
       where: { id },
@@ -487,6 +500,22 @@ export async function updateSalesInvoice(
       },
     });
 
+    // Header-only edit can set letter C/E while lines still carry IVA — zero rates ([D-084]).
+    if (zeroTaxForLetter && updatedInvoice.lines.some((l) => !l.taxRate.equals(0))) {
+      for (const line of updatedInvoice.lines) {
+        const { lineSubtotal, lineTax, lineTotal } = calcLine(
+          line.quantity,
+          line.unitPrice,
+          new Prisma.Decimal(0),
+        );
+        await tx.salesInvoiceLine.update({
+          where: { id: line.id },
+          data: { taxRate: new Prisma.Decimal(0), lineSubtotal, lineTax, lineTotal },
+        });
+      }
+      await recalcInvoiceTotals(tx as never, id);
+    }
+
     await auditAr(
       ctx,
       "sales_invoice.updated",
@@ -501,12 +530,19 @@ export async function updateSalesInvoice(
           ...(input.invoiceLetter !== undefined ? { invoiceLetter: input.invoiceLetter } : {}),
           ...(input.notes !== undefined ? { notes: input.notes } : {}),
           ...(input.internalNotes !== undefined ? { internalNotes: input.internalNotes } : {}),
+          ...(zeroTaxForLetter ? { taxRatesZeroedForLetter: input.invoiceLetter } : {}),
         },
         tx,
       },
     );
 
-    return updatedInvoice;
+    return tx.salesInvoice.findUniqueOrThrow({
+      where: { id },
+      include: {
+        lines: { orderBy: { sortOrder: "asc" } },
+        clientContact: { select: { legalName: true, fantasyName: true } },
+      },
+    });
   });
 
   return serializeInvoice(updated);
@@ -553,6 +589,10 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
       companyCountry: inv.company.country,
       counterpartyCountry: inv.clientContact.country,
       documentLabel: "factura de venta",
+    });
+    assertInvoiceLetterTaxConsistencyOnIssue({
+      invoiceLetter: inv.invoiceLetter,
+      taxAmount: inv.taxAmount,
     });
 
     const { computeDocumentFxAmounts } = await import("../finance/fx-amount.service");
@@ -807,7 +847,7 @@ function serializeInvoice(inv: RawInvoice): SalesInvoiceWithLines {
       invoiceId: l.invoiceId,
       description: l.description,
       quantity: l.quantity.toString(),
-      unitPrice: serializeMoneyDecimal(l.unitPrice),
+      unitPrice: serializeUnitPriceDecimal(l.unitPrice),
       taxRate: l.taxRate.toString(),
       lineSubtotal: serializeMoneyDecimal(l.lineSubtotal),
       lineTax: serializeMoneyDecimal(l.lineTax),

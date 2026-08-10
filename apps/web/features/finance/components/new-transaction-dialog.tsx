@@ -3,7 +3,14 @@
 import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
+import {
+  defaultTaxRateForInvoiceLetter,
+  invoiceLetterHint,
+  requiresArInvoiceLetter,
+  suggestInvoiceLetter,
+  type InvoiceLetterCode,
+  type IvaConditionCode,
+} from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,8 +28,7 @@ import { cn } from "@/lib/utils";
 import { InvoiceLinesEditor } from "@/features/ap/components/invoice-lines-editor";
 import type { InvoiceLine } from "@/features/ap/components/invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
-import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
-
+import { InvoiceLetterSelect, PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
@@ -131,6 +137,8 @@ export function NewTransactionDialog({
   const [clientContactId, setClientContactId] = useState("");
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(null);
   const [letterTouched, setLetterTouched] = useState(false);
+  const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
+  const [pricesIncludeTaxTouched, setPricesIncludeTaxTouched] = useState(false);
   const [lines, setLines] = useState<InvoiceLine[]>([{ ...DEFAULT_LINE }]);
   const [payNow, setPayNow] = useState(false);
   const [collectNow, setCollectNow] = useState(false);
@@ -156,23 +164,34 @@ export function NewTransactionDialog({
 
   useEffect(() => {
     if (letterTouched) return;
+    let suggested: InvoiceLetterCode | null = null;
     if (kind === "AP_EXPENSE" && supplierContactId) {
-      setInvoiceLetter(
-        suggestInvoiceLetter({
-          issuerIvaCondition: (selectedSupplier?.ivaCondition as IvaConditionCode | null | undefined) ?? null,
-          receiverIvaCondition: (companyIvaCondition as IvaConditionCode | null) ?? null,
-          receiverCountry: companyCountry,
-        }),
-      );
+      suggested = suggestInvoiceLetter({
+        issuerIvaCondition: (selectedSupplier?.ivaCondition as IvaConditionCode | null | undefined) ?? null,
+        receiverIvaCondition: (companyIvaCondition as IvaConditionCode | null) ?? null,
+        receiverCountry: companyCountry,
+      });
     } else if (kind === "AR_INCOME" && clientContactId) {
-      setInvoiceLetter(
-        suggestInvoiceLetter({
-          issuerIvaCondition: (companyIvaCondition as IvaConditionCode | null) ?? null,
-          receiverIvaCondition: (selectedClient?.ivaCondition as IvaConditionCode | null | undefined) ?? null,
-          receiverCountry: selectedClient?.country,
-        }),
-      );
+      suggested = suggestInvoiceLetter({
+        issuerIvaCondition: (companyIvaCondition as IvaConditionCode | null) ?? null,
+        receiverIvaCondition: (selectedClient?.ivaCondition as IvaConditionCode | null | undefined) ?? null,
+        receiverCountry: selectedClient?.country,
+      });
     }
+    setInvoiceLetter(suggested);
+    if (!suggested) return;
+    const nextRate = defaultTaxRateForInvoiceLetter(suggested);
+    setLines((prev) =>
+      prev.map((l) => ({
+        ...l,
+        taxRate:
+          suggested === "C" || suggested === "E"
+            ? "0"
+            : l.taxRate === "0"
+              ? nextRate
+              : l.taxRate,
+      })),
+    );
   }, [
     kind,
     supplierContactId,
@@ -183,6 +202,11 @@ export function NewTransactionDialog({
     companyCountry,
     letterTouched,
   ]);
+
+  useEffect(() => {
+    if (pricesIncludeTaxTouched) return;
+    setPricesIncludeTax(invoiceLetter === "B");
+  }, [invoiceLetter, pricesIncludeTaxTouched]);
 
   useEffect(() => {
     if (defaultOpen) setOpen(true);
@@ -221,6 +245,8 @@ export function NewTransactionDialog({
     setClientContactId("");
     setInvoiceLetter(null);
     setLetterTouched(false);
+    setPricesIncludeTax(false);
+    setPricesIncludeTaxTouched(false);
     setLines([{ ...DEFAULT_LINE }]);
     setPayNow(false);
     setCollectNow(false);
@@ -323,6 +349,7 @@ export function NewTransactionDialog({
         const issueDate = fd.get("issueDate") as string;
         const dueDate = fd.get("dueDate") as string;
         const paymentDate = (fd.get("paymentDate") as string) || issueDate;
+        const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
         const res = await registerTransactionAction({
           kind: "AP_EXPENSE",
           supplierContactId,
@@ -330,9 +357,14 @@ export function NewTransactionDialog({
           dueDate,
           currency: "ARS",
           invoiceLetter: showLetterAp ? invoiceLetter : null,
+          pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
           notes: (fd.get("notes") as string) || null,
           internalNotes: null,
-          lines: lines.map((l, i) => ({ ...l, sortOrder: i })),
+          lines: lines.map((l, i) => ({
+            ...l,
+            taxRate: forceZeroTax ? "0" : l.taxRate,
+            sortOrder: i,
+          })),
           payNow: payNow
             ? {
                 accountId: payAccountId,
@@ -396,6 +428,7 @@ export function NewTransactionDialog({
         const issueDate = fd.get("arIssueDate") as string;
         const dueDate = fd.get("arDueDate") as string;
         const collectionDate = (fd.get("collectionDate") as string) || issueDate;
+        const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
         const res = await registerTransactionAction({
           kind: "AR_INCOME",
           clientContactId,
@@ -403,10 +436,15 @@ export function NewTransactionDialog({
           dueDate,
           currency: "ARS",
           invoiceLetter: showLetterAr ? invoiceLetter : null,
+          pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
           notes: (fd.get("arNotes") as string) || null,
           internalNotes: null,
           externalInvoiceRef: ((fd.get("arExternalInvoiceRef") as string) || "").trim() || null,
-          lines: lines.map((l, i) => ({ ...l, sortOrder: i })),
+          lines: lines.map((l, i) => ({
+            ...l,
+            taxRate: forceZeroTax ? "0" : l.taxRate,
+            sortOrder: i,
+          })),
           collectNow: collectNow
             ? {
                 accountId: collectAccountId,
@@ -537,17 +575,49 @@ export function NewTransactionDialog({
                 />
               </div>
               {showLetterAp ? (
-                <InvoiceLetterSelect
-                  id="apInvoiceLetter"
-                  value={invoiceLetter}
-                  required
-                  onValueChange={(v) => {
-                    setLetterTouched(true);
-                    setInvoiceLetter(v);
+                <div className="space-y-3">
+                  <InvoiceLetterSelect
+                    id="apInvoiceLetter"
+                    value={invoiceLetter}
+                    required
+                    onValueChange={(v) => {
+                      setLetterTouched(true);
+                      setInvoiceLetter(v);
+                      if (!pricesIncludeTaxTouched) setPricesIncludeTax(v === "B");
+                      if (v) {
+                        const nextRate = defaultTaxRateForInvoiceLetter(v);
+                        setLines((prev) =>
+                          prev.map((l) => ({
+                            ...l,
+                            taxRate:
+                              v === "C" || v === "E"
+                                ? "0"
+                                : l.taxRate === "0"
+                                  ? nextRate
+                                  : l.taxRate,
+                          })),
+                        );
+                      }
+                    }}
+                    hint={invoiceLetterHint(invoiceLetter)}
+                  />
+                  <PricesIncludeTaxCheckbox
+                    checked={pricesIncludeTax}
+                    onCheckedChange={(v) => {
+                      setPricesIncludeTaxTouched(true);
+                      setPricesIncludeTax(v);
+                    }}
+                  />
+                </div>
+              ) : (
+                <PricesIncludeTaxCheckbox
+                  checked={pricesIncludeTax}
+                  onCheckedChange={(v) => {
+                    setPricesIncludeTaxTouched(true);
+                    setPricesIncludeTax(v);
                   }}
-                  hint={invoiceLetterHint(invoiceLetter)}
                 />
-              ) : null}
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label htmlFor="issueDate">Fecha de emisión</Label>
@@ -558,7 +628,11 @@ export function NewTransactionDialog({
                   <Input id="dueDate" name="dueDate" type="date" required />
                 </div>
               </div>
-              <InvoiceLinesEditor lines={lines} onChange={setLines} />
+              <InvoiceLinesEditor
+                lines={lines}
+                onChange={setLines}
+                pricesIncludeTax={pricesIncludeTax}
+              />
               <div className="space-y-1">
                 <Label htmlFor="notes">Notas (opcional)</Label>
                 <Textarea id="notes" name="notes" rows={2} />
@@ -659,17 +733,49 @@ export function NewTransactionDialog({
                     />
                   </div>
                   {showLetterAr ? (
-                    <InvoiceLetterSelect
-                      id="arInvoiceLetter"
-                      value={invoiceLetter}
-                      required
-                      onValueChange={(v) => {
-                        setLetterTouched(true);
-                        setInvoiceLetter(v);
+                    <div className="space-y-3">
+                      <InvoiceLetterSelect
+                        id="arInvoiceLetter"
+                        value={invoiceLetter}
+                        required
+                        onValueChange={(v) => {
+                          setLetterTouched(true);
+                          setInvoiceLetter(v);
+                          if (!pricesIncludeTaxTouched) setPricesIncludeTax(v === "B");
+                          if (v) {
+                            const nextRate = defaultTaxRateForInvoiceLetter(v);
+                            setLines((prev) =>
+                              prev.map((l) => ({
+                                ...l,
+                                taxRate:
+                                  v === "C" || v === "E"
+                                    ? "0"
+                                    : l.taxRate === "0"
+                                      ? nextRate
+                                      : l.taxRate,
+                              })),
+                            );
+                          }
+                        }}
+                        hint={invoiceLetterHint(invoiceLetter)}
+                      />
+                      <PricesIncludeTaxCheckbox
+                        checked={pricesIncludeTax}
+                        onCheckedChange={(v) => {
+                          setPricesIncludeTaxTouched(true);
+                          setPricesIncludeTax(v);
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <PricesIncludeTaxCheckbox
+                      checked={pricesIncludeTax}
+                      onCheckedChange={(v) => {
+                        setPricesIncludeTaxTouched(true);
+                        setPricesIncludeTax(v);
                       }}
-                      hint={invoiceLetterHint(invoiceLetter)}
                     />
-                  ) : null}
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <Label htmlFor="arIssueDate">Fecha de emisión</Label>
@@ -680,7 +786,11 @@ export function NewTransactionDialog({
                       <Input id="arDueDate" name="arDueDate" type="date" required />
                     </div>
                   </div>
-                  <InvoiceLinesEditor lines={lines} onChange={setLines} />
+                  <InvoiceLinesEditor
+                    lines={lines}
+                    onChange={setLines}
+                    pricesIncludeTax={pricesIncludeTax}
+                  />
                   <div className="space-y-1">
                     <Label htmlFor="arExternalInvoiceRef">N° de comprobante externo (opcional)</Label>
                     <Input

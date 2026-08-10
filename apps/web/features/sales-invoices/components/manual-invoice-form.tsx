@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, evaluateInvoiceLetterTaxConsistency, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,8 +12,7 @@ import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { toSearchableOptions } from "@/lib/searchable-options";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
-import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
-
+import { InvoiceLetterSelect, PricesIncludeTaxCheckbox, TaxRateSelect } from "@/features/finance/components/invoice-letter-fields";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import {
@@ -69,6 +68,8 @@ export function ManualInvoiceForm({
   const [clientContactId, setClientContactId] = useState("");
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(null);
   const [letterTouched, setLetterTouched] = useState(false);
+  const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
+  const [pricesIncludeTaxTouched, setPricesIncludeTaxTouched] = useState(false);
   const [taxRate, setTaxRate] = useState("21");
   const [attachment, setAttachment] = useState<File | null>(null);
   const [collectNow, setCollectNow] = useState(false);
@@ -90,9 +91,13 @@ export function ManualInvoiceForm({
       receiverCountry: selectedClient?.country,
     });
     setInvoiceLetter(suggested);
-    if (suggested === "A") setTaxRate("21");
-    if (suggested === "C" || suggested === "E") setTaxRate("0");
+    if (suggested) setTaxRate(defaultTaxRateForInvoiceLetter(suggested));
   }, [clientContactId, companyIvaCondition, selectedClient, letterTouched]);
+
+  useEffect(() => {
+    if (pricesIncludeTaxTouched) return;
+    setPricesIncludeTax(invoiceLetter === "B");
+  }, [invoiceLetter, pricesIncludeTaxTouched]);
 
   const showCollectNow = canCollectNow;
   const compatibleAccounts = useMemo(
@@ -145,6 +150,7 @@ export function ManualInvoiceForm({
           setError("Fecha de cobro inválida");
           return;
         }
+        const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
         const res = await registerProjectArSaleAction(projectId, {
           projectId,
           clientContactId,
@@ -152,13 +158,14 @@ export function ManualInvoiceForm({
           dueDate: fd.get("dueDate") as string,
           currency: INVOICE_CURRENCY,
           invoiceLetter: showLetter ? invoiceLetter : null,
+          pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
           notes: (fd.get("notes") as string) || null,
           externalInvoiceRef: null,
           lines: [{
             description: fd.get("description") as string,
             quantity: fd.get("quantity") as string,
             unitPrice: fd.get("unitPrice") as string,
-            taxRate: taxRate || "0",
+            taxRate: forceZeroTax ? "0" : (taxRate || "0"),
             sortOrder: 0,
           }],
           collectNow: {
@@ -183,6 +190,7 @@ export function ManualInvoiceForm({
         return;
       }
 
+      const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
       const res = await createSalesInvoiceAction(projectId, {
         projectId,
         clientContactId,
@@ -190,13 +198,14 @@ export function ManualInvoiceForm({
         dueDate:    fd.get("dueDate")    as string,
         currency:   INVOICE_CURRENCY,
         invoiceLetter: showLetter ? invoiceLetter : null,
+        pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
         notes:      (fd.get("notes") as string) || null,
         externalInvoiceRef: null,
         lines: [{
           description: fd.get("description") as string,
           quantity:    fd.get("quantity")    as string,
           unitPrice:   fd.get("unitPrice")   as string,
-          taxRate:     taxRate || "0",
+          taxRate:     forceZeroTax ? "0" : (taxRate || "0"),
           sortOrder:   0,
         }],
       });
@@ -243,7 +252,7 @@ export function ManualInvoiceForm({
           </div>
 
           {showLetter ? (
-            <div className="col-span-2">
+            <div className="col-span-2 space-y-3">
               <InvoiceLetterSelect
                 id="invoiceLetter"
                 value={invoiceLetter}
@@ -251,13 +260,30 @@ export function ManualInvoiceForm({
                 onValueChange={(v) => {
                   setLetterTouched(true);
                   setInvoiceLetter(v);
-                  if (v === "A") setTaxRate("21");
-                  if (v === "C" || v === "E") setTaxRate("0");
+                  if (v) setTaxRate(defaultTaxRateForInvoiceLetter(v));
+                  if (!pricesIncludeTaxTouched) setPricesIncludeTax(v === "B");
                 }}
                 hint={invoiceLetterHint(invoiceLetter)}
               />
+              <PricesIncludeTaxCheckbox
+                checked={pricesIncludeTax}
+                onCheckedChange={(v) => {
+                  setPricesIncludeTaxTouched(true);
+                  setPricesIncludeTax(v);
+                }}
+              />
             </div>
-          ) : null}
+          ) : (
+            <div className="col-span-2">
+              <PricesIncludeTaxCheckbox
+                checked={pricesIncludeTax}
+                onCheckedChange={(v) => {
+                  setPricesIncludeTaxTouched(true);
+                  setPricesIncludeTax(v);
+                }}
+              />
+            </div>
+          )}
 
           <div className="space-y-1">
             <Label htmlFor="issueDate">Fecha de emisión</Label>
@@ -282,22 +308,33 @@ export function ManualInvoiceForm({
             <Input id="quantity" name="quantity" required defaultValue="1" />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="unitPrice">Precio unitario</Label>
+            <Label htmlFor="unitPrice">
+              {pricesIncludeTax ? "Precio unitario (c/IVA)" : "Precio unitario"}
+            </Label>
             <Input id="unitPrice" name="unitPrice" required placeholder="0.00" />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="taxRate">Alícuota IVA (%)</Label>
-            <Input
+            <TaxRateSelect
               id="taxRate"
-              name="taxRate"
               value={taxRate}
-              onChange={(e) => setTaxRate(e.target.value)}
+              onValueChange={setTaxRate}
+              showConstructionHint
             />
-            {invoiceLetter === "B" && taxRate === "0" ? (
-              <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                Factura B suele incluir IVA en el precio; revisá la alícuota.
-              </p>
-            ) : null}
+            {evaluateInvoiceLetterTaxConsistency({
+              invoiceLetter,
+              taxAmount: taxRate === "0" ? "0" : "1",
+            }).map((i) => (
+                <p
+                  key={i.message}
+                  className={
+                    i.severity === "error"
+                      ? "text-[11px] text-destructive"
+                      : "text-[11px] text-amber-700 dark:text-amber-300"
+                  }
+                >
+                  {i.message}
+                </p>
+              ))}
           </div>
         </div>
 

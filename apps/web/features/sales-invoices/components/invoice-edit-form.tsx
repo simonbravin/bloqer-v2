@@ -74,8 +74,18 @@ export function InvoiceEditForm({
           id="invoiceLetter"
           value={invoiceLetter}
           required
-          onValueChange={setInvoiceLetter}
-          hint={invoiceLetterHint(invoiceLetter)}
+          onValueChange={(v) => {
+            setInvoiceLetter(v);
+            if (v === "C" || v === "E") {
+              // Lines are not editable here; server zeros tax rates on save ([D-084]).
+              setError(null);
+            }
+          }}
+          hint={
+            invoiceLetter === "C" || invoiceLetter === "E"
+              ? `${invoiceLetterHint(invoiceLetter) ?? ""} Al guardar, las alícuotas de línea pasan a 0%.`.trim()
+              : invoiceLetterHint(invoiceLetter)
+          }
         />
       ) : null}
 

@@ -2,15 +2,21 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
+import {
+  defaultTaxRateForInvoiceLetter,
+  invoiceLetterHint,
+  requiresArInvoiceLetter,
+  suggestInvoiceLetter,
+  type InvoiceLetterCode,
+  type IvaConditionCode,
+} from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
-import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
-
+import { InvoiceLetterSelect, PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { updateSupplierInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
@@ -52,6 +58,8 @@ export function SupplierInvoiceEditForm({
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(
     (invoice.invoiceLetter as InvoiceLetterCode | null) ?? null,
   );
+  /** Stored unit prices are net — keep off unless user re-enters gross ([D-086]). */
+  const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
   const [purchaseOrderId, setPurchaseOrderId] = useState<string | null>(invoice.purchaseOrderId ?? null);
 
   function onPurchaseOrderChange(nextId: string | null) {
@@ -118,16 +126,19 @@ export function SupplierInvoiceEditForm({
       return;
     }
     const fd = new FormData(e.currentTarget);
+    const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
     const payload = {
       supplierContactId,
       issueDate:       fd.get("issueDate") as string,
       dueDate:         fd.get("dueDate")   as string,
       // Only patch letter when AR gating is known; avoid wiping on failed country load.
       ...(showLetter ? { invoiceLetter } : {}),
+      pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
       notes:           (fd.get("notes") as string) || null,
       purchaseOrderId: companyFinanzas ? null : purchaseOrderId ?? null,
       lines:           lines.map((l, i) => ({
         ...l,
+        taxRate: forceZeroTax ? "0" : l.taxRate,
         wbsNodeId: companyFinanzas ? null : l.wbsNodeId,
         purchaseOrderLineId: companyFinanzas ? null : l.purchaseOrderLineId,
         sortOrder: i,
@@ -170,7 +181,7 @@ export function SupplierInvoiceEditForm({
           </div>
 
           {showLetter ? (
-            <div className="col-span-2">
+            <div className="col-span-2 space-y-3">
               <InvoiceLetterSelect
                 id="invoiceLetter"
                 value={invoiceLetter}
@@ -178,11 +189,37 @@ export function SupplierInvoiceEditForm({
                 onValueChange={(v) => {
                   setLetterTouched(true);
                   setInvoiceLetter(v);
+                  if (!v) return;
+                  const nextRate = defaultTaxRateForInvoiceLetter(v);
+                  setLines((prev) =>
+                    prev.map((l) => ({
+                      ...l,
+                      taxRate:
+                        v === "C" || v === "E"
+                          ? "0"
+                          : l.taxRate === "0"
+                            ? nextRate
+                            : l.taxRate,
+                    })),
+                  );
                 }}
                 hint={invoiceLetterHint(invoiceLetter)}
               />
+              <PricesIncludeTaxCheckbox
+                checked={pricesIncludeTax}
+                onCheckedChange={setPricesIncludeTax}
+                editModeHint
+              />
             </div>
-          ) : null}
+          ) : (
+            <div className="col-span-2">
+              <PricesIncludeTaxCheckbox
+                checked={pricesIncludeTax}
+                onCheckedChange={setPricesIncludeTax}
+                editModeHint
+              />
+            </div>
+          )}
 
           {!companyFinanzas && filteredPOs.length > 0 && (
             <div className="col-span-2 space-y-1">
@@ -221,6 +258,7 @@ export function SupplierInvoiceEditForm({
           onChange={setLines}
           requireWbs={!companyFinanzas && Boolean(projectId)}
           wbsOptions={wbsOptions}
+          pricesIncludeTax={pricesIncludeTax}
         />
 
         <div className="space-y-1">

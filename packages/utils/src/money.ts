@@ -120,6 +120,14 @@ export function serializeMoney(raw: string | number): string {
   return roundToDecimals(raw, MONEY_DECIMALS);
 }
 
+/**
+ * Invoice/PO line unit prices (schema Decimal 18,4).
+ * Keep 4 dp so inclusive→exclusive round-trips do not drift ([D-086]).
+ */
+export function serializeUnitPrice(raw: string | number): string {
+  return roundToDecimals(raw, QTY_DECIMALS);
+}
+
 /** Multiply two decimal strings exactly (BigInt), return unrounded product string. */
 export function multiplyDecimal(a: string | number, b: string | number): string {
   const as = normalizeDecimalString(a);

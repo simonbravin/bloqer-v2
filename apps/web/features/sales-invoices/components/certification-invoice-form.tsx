@@ -2,13 +2,12 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, evaluateInvoiceLetterTaxConsistency, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
-
+import { InvoiceLetterSelect, TaxRateSelect } from "@/features/finance/components/invoice-letter-fields";
 import { createInvoiceFromCertificationAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 
 export type CertSummary = {
@@ -52,9 +51,8 @@ export function CertificationInvoiceForm({
     [companyIvaCondition, clientIvaCondition, clientCountry],
   );
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(suggested);
-  const [taxRate, setTaxRate] = useState(
-    suggested === "A" ? "21" : suggested === "C" || suggested === "E" ? "0" : "0",
-  );
+  // Certification PU already includes budget taxes — default 0; user may discriminate IVA.
+  const [taxRate, setTaxRate] = useState("0");
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -66,11 +64,12 @@ export function CertificationInvoiceForm({
     }
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
+      const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
       const res = await createInvoiceFromCertificationAction(projectId, {
         certificationId: cert.id,
         issueDate: fd.get("issueDate") as string,
         dueDate:   fd.get("dueDate")   as string,
-        taxRate: taxRate || "0",
+        taxRate: forceZeroTax ? "0" : (taxRate || "0"),
         invoiceLetter: showLetter ? invoiceLetter : null,
         notes:     (fd.get("notes") as string) || null,
       });
@@ -112,7 +111,6 @@ export function CertificationInvoiceForm({
                 required
                 onValueChange={(v) => {
                   setInvoiceLetter(v);
-                  if (v === "A") setTaxRate("21");
                   if (v === "C" || v === "E") setTaxRate("0");
                 }}
                 hint={invoiceLetterHint(invoiceLetter)}
@@ -127,18 +125,32 @@ export function CertificationInvoiceForm({
             <Label htmlFor="dueDate">Fecha de vencimiento</Label>
             <Input id="dueDate" name="dueDate" type="date" required defaultValue={today} />
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="taxRate">Alícuota IVA (%)</Label>
-            <Input
+          <div className="space-y-1 col-span-2">
+            <TaxRateSelect
               id="taxRate"
-              name="taxRate"
               value={taxRate}
-              onChange={(e) => setTaxRate(e.target.value)}
+              onValueChange={setTaxRate}
+              showConstructionHint
             />
             <p className="text-[11px] text-muted-foreground">
-              El PU de la certificación ya incluye impuestos del presupuesto. Dejá 0 salvo que
-              necesites discriminar IVA adicional en la factura.
+              El PU de la certificación ya incluye impuestos del presupuesto. Dejá 0% salvo que
+              necesites discriminar IVA adicional (p. ej. Factura A al 21% o 10,5%).
             </p>
+            {evaluateInvoiceLetterTaxConsistency({
+              invoiceLetter,
+              taxAmount: taxRate === "0" ? "0" : "1",
+            }).map((i) => (
+              <p
+                key={i.message}
+                className={
+                  i.severity === "error"
+                    ? "text-[11px] text-destructive"
+                    : "text-[11px] text-amber-700 dark:text-amber-300"
+                }
+              >
+                {i.message}
+              </p>
+            ))}
           </div>
         </div>
 

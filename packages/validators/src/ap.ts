@@ -7,6 +7,7 @@ import {
   positiveMoneyAmountString,
   qtyString,
   ratePctString,
+  unitPriceString,
 } from "./money";
 import { treasurySettlementFieldsSchema } from "./treasury-settlement";
 import { invoiceLetterSchema } from "./contact";
@@ -14,7 +15,7 @@ import { invoiceLetterSchema } from "./contact";
 const supplierInvoiceLineSchema = z.object({
   description: z.string().min(1, "Descripción requerida"),
   quantity:    qtyString,
-  unitPrice:   moneyAmountString,
+  unitPrice:   unitPriceString,
   taxRate:     ratePctString.optional().default("0.0000"),
   sortOrder:   z.number().int().min(0).optional().default(0),
   /** Required when invoice has projectId ([D-055]). */
@@ -33,6 +34,8 @@ export const createSupplierInvoiceSchema = z.object({
   fxRate:            optionalFxRateString,
   /** Letra A/B/C/E del comprobante recibido ([D-084]). */
   invoiceLetter:     invoiceLetterSchema.optional().nullable(),
+  /** When true, line unit prices are gross (IVA incluido) — [D-086]. */
+  pricesIncludeTax:  z.boolean().optional(),
   notes:             z.string().optional().nullable(),
   internalNotes:     z.string().optional().nullable(),
   purchaseOrderId:   z.string().uuid().optional().nullable(),
@@ -45,6 +48,7 @@ export const updateSupplierInvoiceSchema = z.object({
   dueDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   fxRate:            optionalFxRateString,
   invoiceLetter:     invoiceLetterSchema.optional().nullable(),
+  pricesIncludeTax:  z.boolean().optional(),
   notes:             z.string().optional().nullable(),
   internalNotes:     z.string().optional().nullable(),
   purchaseOrderId:   z.string().uuid().optional().nullable(),
@@ -115,4 +119,11 @@ export type CreateSupplierInvoiceFromPurchaseOrderInput = z.infer<
 >;
 
 // Re-export money helpers used by AP forms/tests
-export { moneyAmountString, positiveMoneyAmountString, fxRateString, qtyString, ratePctString };
+export {
+  moneyAmountString,
+  positiveMoneyAmountString,
+  fxRateString,
+  qtyString,
+  ratePctString,
+  unitPriceString,
+};

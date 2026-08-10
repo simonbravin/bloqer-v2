@@ -482,6 +482,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
     supplierContactId: po.supplierContactId,
     tenantId: ctx.tenantId,
   });
+  const zeroTax = suggestedLetter === "C" || suggestedLetter === "E";
 
   return createSupplierInvoice(
     {
@@ -496,7 +497,12 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
       notes: input.purchaseReceiptId
         ? `Generada desde recepción vinculada a ${po.number}`
         : `Generada desde OC-${String(po.number).padStart(3, "0")}`,
-      lines: draftLines.map((l, i) => ({ ...l, sortOrder: i })),
+      lines: draftLines.map((l, i) => ({
+        ...l,
+        // Monotributo/Exento → Factura C: OC often has 21%; force 0 so DRAFT/issue stay consistent ([D-084]).
+        taxRate: zeroTax ? "0" : l.taxRate,
+        sortOrder: i,
+      })),
     },
     ctx,
   );

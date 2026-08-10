@@ -11,6 +11,8 @@ import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/register-transaction.types";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
+import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
+import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
 import { assertArTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
@@ -143,6 +145,28 @@ export async function registerArIncome(
     counterpartyCountry: contact.country,
     documentLabel: "factura de venta",
   });
+  const forceZeroTax = input.invoiceLetter === "C" || input.invoiceLetter === "E";
+  const pricesIncludeTaxForGuard = forceZeroTax ? false : Boolean(input.pricesIncludeTax);
+  assertInvoiceLetterTaxConsistencyOnIssue({
+    invoiceLetter: input.invoiceLetter,
+    taxAmount: (() => {
+      let tax = new Prisma.Decimal(0);
+      for (const line of input.lines) {
+        const qty = new Prisma.Decimal(line.quantity);
+        const price = new Prisma.Decimal(line.unitPrice);
+        const rate = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
+        tax = tax.plus(
+          resolveInvoiceLineMoney({
+            quantity: qty,
+            unitPrice: price,
+            taxRate: rate,
+            pricesIncludeTax: pricesIncludeTaxForGuard,
+          }).lineTax,
+        );
+      }
+      return tax;
+    })(),
+  });
 
   let outcome!: ArIncomeOutcome;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -174,17 +198,23 @@ export async function registerArIncome(
           },
         });
 
+        const pricesIncludeTax = pricesIncludeTaxForGuard;
         for (const line of input.lines) {
           const qty = new Prisma.Decimal(line.quantity);
           const price = new Prisma.Decimal(line.unitPrice);
-          const rate = new Prisma.Decimal(line.taxRate ?? "0");
-          const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, rate);
+          const rate = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
+          const { unitPriceNet, lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+            quantity: qty,
+            unitPrice: price,
+            taxRate: rate,
+            pricesIncludeTax,
+          });
           await tx.salesInvoiceLine.create({
             data: {
               invoiceId: created.id,
               description: line.description,
               quantity: qty,
-              unitPrice: price,
+              unitPrice: unitPriceNet,
               taxRate: rate,
               lineSubtotal,
               lineTax,

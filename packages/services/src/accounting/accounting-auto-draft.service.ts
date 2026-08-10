@@ -1,6 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { JournalEntrySourceType, AccountingMappingEventType } from "@bloqer/database";
-import { roundMoney } from "@bloqer/utils";
 import type { CreateJournalEntryInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { isTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
@@ -15,6 +14,13 @@ import {
 import { treasuryMovementSupportsAccountingDraft } from "./accounting-treasury-gl-eligibility";
 import { notifyAccountingDraftsPendingSoft } from "./accounting-draft-notifications.service";
 import { suggestTreasuryGlAccountCode } from "./treasury-gl-account-hint";
+import {
+  buildSalesInvoiceJournalInput,
+  buildSupplierInvoiceJournalInput,
+  buildTwoLineJournalInput,
+  COA_IVA_CREDIT_FISCAL,
+  COA_IVA_DEBIT_FISCAL,
+} from "./accounting-invoice-journal-lines";
 
 type EnsureResult =
   | { status: "created" | "existing"; entry: JournalEntryView }
@@ -30,54 +36,6 @@ async function resolveActiveGlAccountId(
     select: { id: true },
   });
   return acc?.id ?? null;
-}
-
-function moneyAmountString(d: Prisma.Decimal): string {
-  return roundMoney(d.toString());
-}
-
-function buildTwoLineDraftInput(params: {
-  companyId: string;
-  projectId: string | null;
-  entryDate: string;
-  description: string;
-  reference: string | null;
-  currency: string;
-  amountStr: string;
-  debitAccountId: string;
-  creditAccountId: string;
-  lineDescriptionDebit: string;
-  lineDescriptionCredit: string;
-  sourceType: JournalEntrySourceType;
-  sourceId: string;
-}): CreateJournalEntryInput {
-  return {
-    companyId: params.companyId,
-    projectId: params.projectId,
-    entryDate: params.entryDate,
-    description: params.description,
-    reference: params.reference,
-    sourceType: params.sourceType,
-    sourceId: params.sourceId,
-    lines: [
-      {
-        accountId: params.debitAccountId,
-        projectId: params.projectId,
-        description: params.lineDescriptionDebit,
-        debit: params.amountStr,
-        credit: "0",
-        currency: params.currency,
-      },
-      {
-        accountId: params.creditAccountId,
-        projectId: params.projectId,
-        description: params.lineDescriptionCredit,
-        debit: "0",
-        credit: params.amountStr,
-        currency: params.currency,
-      },
-    ],
-  };
 }
 
 async function auditSkip(
@@ -175,14 +133,14 @@ async function ensureFromRule(params: {
   const creditAccountId = params.creditAccountIdOverride ?? rule.creditAccountId;
 
   try {
-    const input = buildTwoLineDraftInput({
+    const input = buildTwoLineJournalInput({
       companyId: params.companyId,
       projectId: params.projectId,
       entryDate: params.entryDate,
       description: params.description,
       reference: params.reference,
       currency: params.currency,
-      amountStr: moneyAmountString(params.amount),
+      amount: params.amount,
       debitAccountId,
       creditAccountId,
       lineDescriptionDebit: params.lineDebit,
@@ -234,6 +192,49 @@ async function ensureFromRule(params: {
   }
 }
 
+async function createDraftFromInput(
+  ctx: ServiceContext,
+  companyId: string,
+  sourceType: JournalEntrySourceType,
+  sourceId: string,
+  input: CreateJournalEntryInput,
+): Promise<EnsureResult> {
+  try {
+    const entry = await createJournalEntryAsAutomation(input, ctx, companyId);
+    try {
+      await log({
+        tenantId: ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        action: "journal_entry.auto_draft_created",
+        entityType: "JournalEntry",
+        entityId: entry.id,
+        after: { sourceType, sourceId, companyId },
+        ipAddress: ctx.ipAddress,
+      });
+    } catch {
+      // ignore
+    }
+    await notifyAccountingDraftsPendingSoft(ctx, { companyId });
+    return { status: "created", entry };
+  } catch (err) {
+    const existingAfterRace = await lookupNonCancelledJournalEntryIdBySource(ctx, {
+      companyId,
+      sourceType,
+      sourceId,
+    });
+    if (existingAfterRace) {
+      const entry = await getJournalEntryByIdUnchecked(existingAfterRace, ctx.tenantId, companyId);
+      return { status: "existing", entry };
+    }
+    await auditSkip(ctx, {
+      companyId,
+      sourceType,
+      sourceId,
+      reason: err instanceof Error ? err.message.slice(0, 200) : "create_failed",
+    });
+    return { status: "skipped", reason: "create_failed" };
+  }
+}
 /** Best-effort: never throws to caller. Call only after operational commit. */
 export async function ensureDraftJournalFromCollection(
   collectionId: string,
@@ -459,21 +460,69 @@ export async function ensureDraftJournalFromSalesInvoice(
     if (!inv || inv.status !== "ISSUED") {
       return { status: "skipped", reason: "not_found_or_not_issued" };
     }
-    return ensureFromRule({
-      ctx,
+
+    const moduleOn = await isTenantModuleEnabled(ctx, "ACCOUNTING");
+    if (!moduleOn) {
+      await auditSkip(ctx, {
+        companyId: inv.companyId,
+        sourceType: "SALES_INVOICE",
+        sourceId: inv.id,
+        reason: "module_disabled",
+      });
+      return { status: "skipped", reason: "module_disabled" };
+    }
+
+    const existingId = await lookupNonCancelledJournalEntryIdBySource(ctx, {
       companyId: inv.companyId,
-      projectId: inv.projectId,
-      eventType: "SALES_INVOICE_ISSUED",
       sourceType: "SALES_INVOICE",
       sourceId: inv.id,
+    });
+    if (existingId) {
+      const entry = await getJournalEntryByIdUnchecked(existingId, ctx.tenantId, inv.companyId);
+      return { status: "existing", entry };
+    }
+
+    const rule = await findActiveMappingRule(ctx.tenantId, inv.companyId, "SALES_INVOICE_ISSUED");
+    if (!rule) {
+      await auditSkip(ctx, {
+        companyId: inv.companyId,
+        sourceType: "SALES_INVOICE",
+        sourceId: inv.id,
+        reason: "no_mapping_rule",
+      });
+      return { status: "skipped", reason: "no_mapping_rule" };
+    }
+    if (inv.totalAmount.lte(0)) {
+      await auditSkip(ctx, {
+        companyId: inv.companyId,
+        sourceType: "SALES_INVOICE",
+        sourceId: inv.id,
+        reason: "non_positive_amount",
+      });
+      return { status: "skipped", reason: "non_positive_amount" };
+    }
+
+    const ivaDebitAccountId = await resolveActiveGlAccountId(
+      ctx.tenantId,
+      inv.companyId,
+      COA_IVA_DEBIT_FISCAL,
+    );
+    const { input } = buildSalesInvoiceJournalInput({
+      companyId: inv.companyId,
+      projectId: inv.projectId,
       entryDate: inv.issueDate.toISOString().slice(0, 10),
       description: `Asiento automático — factura venta ${inv.number}`,
       reference: String(inv.number),
       currency: inv.currency,
-      amount: inv.totalAmount,
-      lineDebit: "Debe — clientes",
-      lineCredit: "Haber — ingresos",
+      subtotal: inv.subtotal,
+      taxAmount: inv.taxAmount,
+      totalAmount: inv.totalAmount,
+      clientsAccountId: rule.debitAccountId,
+      incomeAccountId: rule.creditAccountId,
+      ivaDebitAccountId,
+      sourceId: inv.id,
     });
+    return createDraftFromInput(ctx, inv.companyId, "SALES_INVOICE", inv.id, input);
   } catch {
     return { status: "skipped", reason: "unexpected_error" };
   }
@@ -490,21 +539,69 @@ export async function ensureDraftJournalFromSupplierInvoice(
     if (!inv || inv.status !== "ISSUED") {
       return { status: "skipped", reason: "not_found_or_not_issued" };
     }
-    return ensureFromRule({
-      ctx,
+
+    const moduleOn = await isTenantModuleEnabled(ctx, "ACCOUNTING");
+    if (!moduleOn) {
+      await auditSkip(ctx, {
+        companyId: inv.companyId,
+        sourceType: "SUPPLIER_INVOICE",
+        sourceId: inv.id,
+        reason: "module_disabled",
+      });
+      return { status: "skipped", reason: "module_disabled" };
+    }
+
+    const existingId = await lookupNonCancelledJournalEntryIdBySource(ctx, {
       companyId: inv.companyId,
-      projectId: inv.projectId,
-      eventType: "SUPPLIER_INVOICE_ISSUED",
       sourceType: "SUPPLIER_INVOICE",
       sourceId: inv.id,
+    });
+    if (existingId) {
+      const entry = await getJournalEntryByIdUnchecked(existingId, ctx.tenantId, inv.companyId);
+      return { status: "existing", entry };
+    }
+
+    const rule = await findActiveMappingRule(ctx.tenantId, inv.companyId, "SUPPLIER_INVOICE_ISSUED");
+    if (!rule) {
+      await auditSkip(ctx, {
+        companyId: inv.companyId,
+        sourceType: "SUPPLIER_INVOICE",
+        sourceId: inv.id,
+        reason: "no_mapping_rule",
+      });
+      return { status: "skipped", reason: "no_mapping_rule" };
+    }
+    if (inv.totalAmount.lte(0)) {
+      await auditSkip(ctx, {
+        companyId: inv.companyId,
+        sourceType: "SUPPLIER_INVOICE",
+        sourceId: inv.id,
+        reason: "non_positive_amount",
+      });
+      return { status: "skipped", reason: "non_positive_amount" };
+    }
+
+    const ivaCreditAccountId = await resolveActiveGlAccountId(
+      ctx.tenantId,
+      inv.companyId,
+      COA_IVA_CREDIT_FISCAL,
+    );
+    const { input } = buildSupplierInvoiceJournalInput({
+      companyId: inv.companyId,
+      projectId: inv.projectId,
       entryDate: inv.issueDate.toISOString().slice(0, 10),
       description: `Asiento automático — factura proveedor ${inv.number}`,
       reference: String(inv.number),
       currency: inv.currency,
-      amount: inv.totalAmount,
-      lineDebit: "Debe — gasto/costo",
-      lineCredit: "Haber — proveedores",
+      subtotal: inv.subtotal,
+      taxAmount: inv.taxAmount,
+      totalAmount: inv.totalAmount,
+      expenseAccountId: rule.debitAccountId,
+      suppliersAccountId: rule.creditAccountId,
+      ivaCreditAccountId,
+      sourceId: inv.id,
     });
+    return createDraftFromInput(ctx, inv.companyId, "SUPPLIER_INVOICE", inv.id, input);
   } catch {
     return { status: "skipped", reason: "unexpected_error" };
   }

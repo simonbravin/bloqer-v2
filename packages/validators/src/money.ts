@@ -55,6 +55,16 @@ export const qtyString = z
   .regex(LOOSE_DECIMAL, "Cantidad inválida")
   .transform((v) => roundQty(v));
 
+/**
+ * Line unit price: 4 dp (schema Decimal 18,4).
+ * Needed so Factura B inclusive nets survive DRAFT re-save ([D-086]).
+ */
+export const unitPriceString = z
+  .string()
+  .trim()
+  .regex(LOOSE_DECIMAL, "Precio inválido")
+  .transform((v) => roundQty(v));
+
 /** Tax / rate percentage: round to 4 dp. */
 export const ratePctString = z
   .string()

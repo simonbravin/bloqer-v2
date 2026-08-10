@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { PurchaseOrderInvoiceDraftPreview } from "@bloqer/services";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,8 +16,7 @@ import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
-import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
-
+import { InvoiceLetterSelect, PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import {
@@ -88,6 +87,8 @@ export function SupplierInvoiceForm({
   const [supplierContactId, setSupplierContactId] = useState("");
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(null);
   const [letterTouched, setLetterTouched] = useState(false);
+  const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
+  const [pricesIncludeTaxTouched, setPricesIncludeTaxTouched] = useState(false);
   const [purchaseOrderId, setPurchaseOrderId] = useState<string | null>(null);
   const [lines, setLines] = useState<InvoiceLine[]>([{ ...DEFAULT_LINE }]);
   const [payNow, setPayNow] = useState(false);
@@ -112,13 +113,25 @@ export function SupplierInvoiceForm({
       receiverCountry: companyCountry,
     });
     setInvoiceLetter(suggested);
-    if (suggested === "A") {
-      setLines((prev) => prev.map((l) => ({ ...l, taxRate: l.taxRate === "0" ? "21" : l.taxRate })));
-    }
-    if (suggested === "C" || suggested === "E") {
-      setLines((prev) => prev.map((l) => ({ ...l, taxRate: "0" })));
-    }
+    if (!suggested) return;
+    const nextRate = defaultTaxRateForInvoiceLetter(suggested);
+    setLines((prev) =>
+      prev.map((l) => ({
+        ...l,
+        taxRate:
+          suggested === "C" || suggested === "E"
+            ? "0"
+            : l.taxRate === "0"
+              ? nextRate
+              : l.taxRate,
+      })),
+    );
   }, [supplierContactId, selectedSupplier, companyIvaCondition, companyCountry, letterTouched]);
+
+  useEffect(() => {
+    if (pricesIncludeTaxTouched) return;
+    setPricesIncludeTax(invoiceLetter === "B");
+  }, [invoiceLetter, pricesIncludeTaxTouched]);
 
   const supportsPoPreview = Boolean(projectId) && !companyFinanzas;
 
@@ -147,12 +160,16 @@ export function SupplierInvoiceForm({
 
   function bringPoLines() {
     if (!poPreview || poPreview.lines.length === 0) return;
+    // OC lines are net ([D-086]); never treat them as gross after import.
+    setPricesIncludeTaxTouched(true);
+    setPricesIncludeTax(false);
+    const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
     setLines(
       poPreview.lines.map((l) => ({
         description: l.description,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
-        taxRate: l.taxRate,
+        taxRate: forceZeroTax ? "0" : l.taxRate,
         wbsNodeId: l.wbsNodeId ?? null,
         purchaseOrderLineId: l.purchaseOrderLineId ?? null,
       })),
@@ -253,6 +270,7 @@ export function SupplierInvoiceForm({
           dueDate:       fd.get("dueDate") as string,
           currency:      INVOICE_CURRENCY,
           invoiceLetter: letterPayload,
+          pricesIncludeTax,
           notes:         (fd.get("notes") as string) || null,
           internalNotes: null,
           lines:         lines.map((l, i) => ({ ...l, sortOrder: i })),
@@ -287,6 +305,7 @@ export function SupplierInvoiceForm({
           dueDate: fd.get("dueDate") as string,
           currency: INVOICE_CURRENCY,
           invoiceLetter: letterPayload,
+          pricesIncludeTax,
           notes: (fd.get("notes") as string) || null,
           purchaseOrderId: purchaseOrderId ?? null,
           lines: lines.map((l, i) => ({ ...l, sortOrder: i })),
@@ -319,6 +338,7 @@ export function SupplierInvoiceForm({
         dueDate:         fd.get("dueDate")    as string,
         currency:        INVOICE_CURRENCY,
         invoiceLetter:   letterPayload,
+        pricesIncludeTax,
         notes:           (fd.get("notes") as string) || null,
         internalNotes:   null,
         purchaseOrderId: purchaseOrderId ?? null,
@@ -367,7 +387,7 @@ export function SupplierInvoiceForm({
           </div>
 
           {showLetter ? (
-            <div className="col-span-2">
+            <div className="col-span-2 space-y-3">
               <InvoiceLetterSelect
                 id="invoiceLetter"
                 value={invoiceLetter}
@@ -375,19 +395,42 @@ export function SupplierInvoiceForm({
                 onValueChange={(v) => {
                   setLetterTouched(true);
                   setInvoiceLetter(v);
-                  if (v === "A") {
-                    setLines((prev) =>
-                      prev.map((l) => ({ ...l, taxRate: l.taxRate === "0" ? "21" : l.taxRate })),
-                    );
-                  }
-                  if (v === "C" || v === "E") {
-                    setLines((prev) => prev.map((l) => ({ ...l, taxRate: "0" })));
-                  }
+                  if (!pricesIncludeTaxTouched) setPricesIncludeTax(v === "B");
+                  if (!v) return;
+                  const nextRate = defaultTaxRateForInvoiceLetter(v);
+                  setLines((prev) =>
+                    prev.map((l) => ({
+                      ...l,
+                      taxRate:
+                        v === "C" || v === "E"
+                          ? "0"
+                          : l.taxRate === "0"
+                            ? nextRate
+                            : l.taxRate,
+                    })),
+                  );
                 }}
                 hint={invoiceLetterHint(invoiceLetter)}
               />
+              <PricesIncludeTaxCheckbox
+                checked={pricesIncludeTax}
+                onCheckedChange={(v) => {
+                  setPricesIncludeTaxTouched(true);
+                  setPricesIncludeTax(v);
+                }}
+              />
             </div>
-          ) : null}
+          ) : (
+            <div className="col-span-2">
+              <PricesIncludeTaxCheckbox
+                checked={pricesIncludeTax}
+                onCheckedChange={(v) => {
+                  setPricesIncludeTaxTouched(true);
+                  setPricesIncludeTax(v);
+                }}
+              />
+            </div>
+          )}
 
           {filteredPOs.length > 0 && !companyFinanzas && (
             <div className="col-span-2 space-y-1">
@@ -429,6 +472,7 @@ export function SupplierInvoiceForm({
           onChange={setLines}
           requireWbs={Boolean(projectId) && !companyFinanzas}
           wbsOptions={wbsOptions}
+          pricesIncludeTax={pricesIncludeTax}
         />
 
         <hr />

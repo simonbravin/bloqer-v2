@@ -6,6 +6,7 @@ import {
   divideDecimal,
   multiplyDecimal,
   roundMoney,
+  calcLineAmountsFromGrossInclusive,
 } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,14 @@ import { Label } from "@/components/ui/label";
 import { formatDecimalArFromString } from "@/lib/format-money";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, wbsToSearchableOptions } from "@/lib/searchable-options";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { IVA_RATE_PRESETS, IVA_RATE_LABEL_ES, normalizeIvaRatePreset } from "@bloqer/domain";
 
 export type InvoiceLine = {
   description: string;
@@ -40,11 +49,19 @@ function safeDecimal(v: string): string {
   return t;
 }
 
-/** Client preview aligned with server calcLine [D-053] (round each money component). */
-function linePreview(l: InvoiceLine) {
+/** Client preview aligned with server calc ([D-053] / [D-086]). */
+function linePreview(l: InvoiceLine, pricesIncludeTax: boolean) {
   const qty = safeDecimal(l.quantity);
   const price = safeDecimal(l.unitPrice);
   const rate = safeDecimal(l.taxRate);
+  if (pricesIncludeTax) {
+    const r = calcLineAmountsFromGrossInclusive({
+      quantity: qty,
+      unitPriceGross: price,
+      taxRatePercent: rate,
+    });
+    return { subtotal: r.lineSubtotal, tax: r.lineTax, total: r.lineTotal };
+  }
   const subtotal = roundMoney(multiplyDecimal(qty, price));
   const tax = roundMoney(divideDecimal(multiplyDecimal(subtotal, rate), "100"));
   const total = roundMoney(addDecimal(subtotal, tax));
@@ -57,6 +74,8 @@ interface Props {
   /** When set, each line must pick a WBS ITEM ([D-055]). */
   requireWbs?: boolean;
   wbsOptions?: InvoiceWbsOption[];
+  /** Factura B: unit price is gross ([D-086]). */
+  pricesIncludeTax?: boolean;
 }
 
 export function InvoiceLinesEditor({
@@ -64,6 +83,7 @@ export function InvoiceLinesEditor({
   onChange,
   requireWbs = false,
   wbsOptions = [],
+  pricesIncludeTax = false,
 }: Props) {
   const wbsCombobox = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
   const [lineKeys, setLineKeys] = useState<string[]>(() =>
@@ -114,7 +134,7 @@ export function InvoiceLinesEditor({
 
   const totals = lines.reduce(
     (acc, l) => {
-      const p = linePreview(l);
+      const p = linePreview(l, pricesIncludeTax);
       return {
         subtotal: roundMoney(addDecimal(acc.subtotal, p.subtotal)),
         tax: roundMoney(addDecimal(acc.tax, p.tax)),
@@ -136,7 +156,7 @@ export function InvoiceLinesEditor({
       <div className="space-y-3">
         {lines.map((line, i) => {
           const lineKey = lineKeys[i] ?? String(i);
-          const p = linePreview(line);
+          const p = linePreview(line, pricesIncludeTax);
           const descriptionId = `invoice-line-${lineKey}-description`;
           const quantityId = `invoice-line-${lineKey}-quantity`;
           const unitPriceId = `invoice-line-${lineKey}-unit-price`;
@@ -215,7 +235,7 @@ export function InvoiceLinesEditor({
                 </div>
                 <div className="space-y-1 min-w-0">
                   <Label htmlFor={unitPriceId} className="text-xs">
-                    Precio unit.
+                    {pricesIncludeTax ? "Precio unit. (c/IVA)" : "Precio unit."}
                   </Label>
                   <Input
                     id={unitPriceId}
@@ -231,14 +251,21 @@ export function InvoiceLinesEditor({
                   <Label htmlFor={taxRateId} className="text-xs">
                     IVA %
                   </Label>
-                  <Input
-                    id={taxRateId}
-                    value={line.taxRate}
-                    onChange={(e) => update(i, "taxRate", e.target.value)}
-                    placeholder="21"
-                    inputMode="decimal"
-                    className="h-9 text-sm tabular-nums"
-                  />
+                  <Select
+                    value={normalizeIvaRatePreset(line.taxRate) ?? undefined}
+                    onValueChange={(v) => update(i, "taxRate", v)}
+                  >
+                    <SelectTrigger id={taxRateId} className="h-9 text-sm">
+                      <SelectValue placeholder={line.taxRate || "21"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {IVA_RATE_PRESETS.map((rate) => (
+                        <SelectItem key={rate} value={rate}>
+                          {IVA_RATE_LABEL_ES[rate]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Subtotal</Label>

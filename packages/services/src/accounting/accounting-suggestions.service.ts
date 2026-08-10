@@ -18,6 +18,12 @@ import {
   treasuryMovementTypeSupportsAccountingDraft,
 } from "./accounting-treasury-gl-eligibility";
 import { suggestTreasuryGlAccountCode } from "./treasury-gl-account-hint";
+import {
+  buildSalesInvoiceJournalInput,
+  buildSupplierInvoiceJournalInput,
+  COA_IVA_CREDIT_FISCAL,
+  COA_IVA_DEBIT_FISCAL,
+} from "./accounting-invoice-journal-lines";
 
 async function resolveActiveGlAccountId(
   tenantId: string,
@@ -460,19 +466,24 @@ export async function suggestJournalFromSalesInvoice(
   const rule = await findActiveMappingRule(ctx.tenantId, inv.companyId, "SALES_INVOICE_ISSUED");
   if (!rule) throw noRuleError("factura de venta emitida");
 
-  const input = buildTwoLineDraftInput({
+  const ivaDebitAccountId = await resolveActiveGlAccountId(
+    ctx.tenantId,
+    inv.companyId,
+    COA_IVA_DEBIT_FISCAL,
+  );
+  const { input } = buildSalesInvoiceJournalInput({
     companyId: inv.companyId,
     projectId: inv.projectId,
     entryDate: inv.issueDate.toISOString().slice(0, 10),
     description: `Asiento sugerido — factura venta ${inv.number}`,
     reference: String(inv.number),
     currency: inv.currency,
-    amountStr: decimalToAmountString(inv.totalAmount),
-    debitAccountId: rule.debitAccountId,
-    creditAccountId: rule.creditAccountId,
-    lineDescriptionDebit: "Debe — clientes",
-    lineDescriptionCredit: "Haber — ingresos",
-    sourceType: "SALES_INVOICE",
+    subtotal: inv.subtotal,
+    taxAmount: inv.taxAmount,
+    totalAmount: inv.totalAmount,
+    clientsAccountId: rule.debitAccountId,
+    incomeAccountId: rule.creditAccountId,
+    ivaDebitAccountId,
     sourceId: inv.id,
   });
   return createJournalEntry(input, ctx);
@@ -503,19 +514,24 @@ export async function suggestJournalFromSupplierInvoice(
   const rule = await findActiveMappingRule(ctx.tenantId, inv.companyId, "SUPPLIER_INVOICE_ISSUED");
   if (!rule) throw noRuleError("factura de proveedor emitida");
 
-  const input = buildTwoLineDraftInput({
+  const ivaCreditAccountId = await resolveActiveGlAccountId(
+    ctx.tenantId,
+    inv.companyId,
+    COA_IVA_CREDIT_FISCAL,
+  );
+  const { input } = buildSupplierInvoiceJournalInput({
     companyId: inv.companyId,
     projectId: inv.projectId,
     entryDate: inv.issueDate.toISOString().slice(0, 10),
     description: `Asiento sugerido — factura proveedor ${inv.number}`,
     reference: String(inv.number),
     currency: inv.currency,
-    amountStr: decimalToAmountString(inv.totalAmount),
-    debitAccountId: rule.debitAccountId,
-    creditAccountId: rule.creditAccountId,
-    lineDescriptionDebit: "Debe — gasto/costo",
-    lineDescriptionCredit: "Haber — proveedores",
-    sourceType: "SUPPLIER_INVOICE",
+    subtotal: inv.subtotal,
+    taxAmount: inv.taxAmount,
+    totalAmount: inv.totalAmount,
+    expenseAccountId: rule.debitAccountId,
+    suppliersAccountId: rule.creditAccountId,
+    ivaCreditAccountId,
     sourceId: inv.id,
   });
   return createJournalEntry(input, ctx);

@@ -101,3 +101,14 @@ export {
   type IvaConditionCode,
   type SuggestInvoiceLetterInput,
 } from "./finance/suggest-invoice-letter";
+
+export {
+  IVA_RATE_PRESETS,
+  IVA_RATE_LABEL_ES,
+  IVA_RATE_CONSTRUCTION_HINT_ES,
+  defaultTaxRateForInvoiceLetter,
+  evaluateInvoiceLetterTaxConsistency,
+  normalizeIvaRatePreset,
+  type IvaRatePreset,
+  type InvoiceLetterTaxIssue,
+} from "./finance/iva-rates";

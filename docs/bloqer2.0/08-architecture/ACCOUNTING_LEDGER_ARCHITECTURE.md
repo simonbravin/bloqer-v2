@@ -45,7 +45,7 @@ Neither replaces the other in 11A–11D.
 - **Never** auto-`POST`.
 - Anti-double-count: skip treasury GL when `AccountMovement.sourceType ∈ {COLLECTION, PAYMENT, OPENING_BALANCE}`.
 - **Treasury cash/bank GL side (soft):** `TreasuryAccount` has no `glAccountId`. Auto-drafts override the mapping-rule cash side with CoA codes by type/currency heuristic (`suggestTreasuryGlAccountCode`: CASH→`1.1.01`, BANK+ARS→`1.1.02`, BANK+USD→`1.1.03`; else `1.1.02`). If the account code is missing/inactive, keep the mapping rule. Contador edits DRAFT before post. Formal FK mapping = product decision later.
-- Accrual events `SALES_INVOICE_ISSUED` / `SUPPLIER_INVOICE_ISSUED` on **`totalAmount`**.
+- Accrual events `SALES_INVOICE_ISSUED` / `SUPPLIER_INVOICE_ISSUED`: with `taxAmount > 0` and active CoA IVA accounts (`1.1.20` / `2.1.10`), draft is **3 lines** (net + IVA + AR/AP); otherwise **2 lines** on `totalAmount` ([D-085]).
 - Cancel sync: cancel linked DRAFT; block operational cancel if POSTED without reverse.
 - Partial unique index: one non-cancelled journal per `(tenantId, companyId, sourceType, sourceId)`.
 - `reversePostedJournalEntry` (counter-entry + `reversesEntryId`); trial balance; running balance on account ledger.
