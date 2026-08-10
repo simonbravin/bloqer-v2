@@ -22,7 +22,7 @@ import { PageListHeader } from "@/components/ui/page-list-header";
 import { DetailField, DetailFieldGrid } from "@/components/ui/detail-field-grid";
 import { TenantDisplaySettingsForm } from "@/features/tenant-config/tenant-display-settings-form";
 import { TenantLogoSettings } from "@/features/tenant-config/tenant-logo-settings";
-import { formatIvaConditionLabel } from "@/features/finance/components/invoice-letter-fields";
+import { formatIvaConditionLabel } from "@bloqer/domain";
 import {
   updateTenantDisplaySettingsAction,
   uploadTenantLogoAction,

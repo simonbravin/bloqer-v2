@@ -4,7 +4,7 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { SupplierInvoiceStatusBadge } from "./supplier-invoice-status-badge";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { SupplierInvoiceListItem } from "./supplier-invoice-list";
-import { formatInvoiceLetterBadge } from "@/features/finance/components/invoice-letter-fields";
+import { formatInvoiceLetterBadge } from "@bloqer/domain";
 
 const PAYABLE_OPEN = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
 

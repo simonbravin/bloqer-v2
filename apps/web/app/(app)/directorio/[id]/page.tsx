@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { RoleManager } from "@/features/directory/components/role-manager";
-import { formatIvaConditionLabel } from "@/features/finance/components/invoice-letter-fields";
 import { getCurrentUser } from "@/lib/auth";
+import { formatIvaConditionLabel } from "@bloqer/domain";
 import { getContactById, ServiceError } from "@bloqer/services";
 import { archiveContactAction, reactivateContactAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";

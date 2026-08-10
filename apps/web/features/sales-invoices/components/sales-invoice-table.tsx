@@ -13,7 +13,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { SalesInvoiceStatusBadge } from "./sales-invoice-status-badge";
 import type { SalesInvoiceListItem } from "./sales-invoice-list";
 import { formatMoneyAmount } from "@/lib/format-money";
-import { formatInvoiceLetterBadge } from "@/features/finance/components/invoice-letter-fields";
+import { formatInvoiceLetterBadge } from "@bloqer/domain";
 
 export function SalesInvoiceTable({
   invoices,

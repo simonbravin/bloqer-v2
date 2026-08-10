@@ -13,7 +13,7 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SupplierInvoiceStatusBadge } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
-import { formatInvoiceLetterBadge } from "@/features/finance/components/invoice-letter-fields";
+import { formatInvoiceLetterBadge } from "@bloqer/domain";
 
 function ggPeriodFromIssueDate(issueDate: string | Date): string {
   const d = typeof issueDate === "string" ? new Date(issueDate) : issueDate;

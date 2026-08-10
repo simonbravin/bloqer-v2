@@ -136,23 +136,3 @@ export function invoiceLetterHint(letter: InvoiceLetterCode | null | undefined):
       return null;
   }
 }
-
-export function formatIvaConditionLabel(
-  code: string | null | undefined,
-): string {
-  if (!code) return "—";
-  if ((IVA_CONDITION_CODES as string[]).includes(code)) {
-    return IVA_CONDITION_LABEL_ES[code as IvaConditionCode];
-  }
-  return code;
-}
-
-export function formatInvoiceLetterBadge(
-  letter: string | null | undefined,
-): string | null {
-  if (!letter) return null;
-  if ((INVOICE_LETTER_CODES as string[]).includes(letter)) {
-    return INVOICE_LETTER_LABEL_ES[letter as InvoiceLetterCode];
-  }
-  return `Factura ${letter}`;
-}

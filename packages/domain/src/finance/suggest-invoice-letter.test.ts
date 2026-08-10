@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  formatInvoiceLetterBadge,
+  formatIvaConditionLabel,
   requiresArInvoiceLetter,
   suggestInvoiceLetter,
 } from "./suggest-invoice-letter";
@@ -134,5 +136,19 @@ describe("suggestInvoiceLetter", () => {
       }),
       "B",
     );
+  });
+});
+
+describe("formatIvaConditionLabel / formatInvoiceLetterBadge", () => {
+  it("formats known IVA condition and empty", () => {
+    assert.equal(formatIvaConditionLabel("MONOTAX"), "Monotributo");
+    assert.equal(formatIvaConditionLabel(null), "—");
+    assert.equal(formatIvaConditionLabel("CUSTOM"), "CUSTOM");
+  });
+
+  it("formats known invoice letter and empty", () => {
+    assert.equal(formatInvoiceLetterBadge("A"), "Factura A");
+    assert.equal(formatInvoiceLetterBadge(null), null);
+    assert.equal(formatInvoiceLetterBadge("Z"), "Factura Z");
   });
 });

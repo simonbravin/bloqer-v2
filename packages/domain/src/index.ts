@@ -92,6 +92,8 @@ export {
   INVOICE_LETTER_LABEL_ES,
   IVA_CONDITION_CODES,
   IVA_CONDITION_LABEL_ES,
+  formatInvoiceLetterBadge,
+  formatIvaConditionLabel,
   requiresArInvoiceLetter,
   suggestInvoiceLetter,
   type InvoiceLetterCode,

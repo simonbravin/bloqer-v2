@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PayableStatusBadge, SupplierInvoiceStatusBadge } from "@/features/ap";
-import { formatInvoiceLetterBadge } from "@/features/finance/components/invoice-letter-fields";
+import { formatInvoiceLetterBadge } from "@bloqer/domain";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";

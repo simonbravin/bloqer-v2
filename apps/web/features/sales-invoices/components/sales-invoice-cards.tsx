@@ -4,7 +4,7 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { SalesInvoiceStatusBadge } from "./sales-invoice-status-badge";
 import type { SalesInvoiceListItem } from "./sales-invoice-list";
 import { formatMoneyAmount } from "@/lib/format-money";
-import { formatInvoiceLetterBadge } from "@/features/finance/components/invoice-letter-fields";
+import { formatInvoiceLetterBadge } from "@bloqer/domain";
 
 export function SalesInvoiceCards({
   invoices,
