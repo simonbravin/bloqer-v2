@@ -11,10 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  SearchableCombobox,
-  wbsToSearchableOptions,
-} from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { wbsToSearchableOptions } from "@/lib/searchable-options";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";

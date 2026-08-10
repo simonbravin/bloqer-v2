@@ -88,6 +88,19 @@ Excepciones aceptables: scripts **ya existentes** de build/CI (`package.json`, T
 - **No importar** el barrel `@bloqer/services` desde archivos con `"use client"` (ni helpers usados solo por el cliente). Eso puede arrastrar `crypto`, Prisma o email al bundle de Webpack y romper el build en Vercel (`UnhandledSchemeError: node:crypto`).
 - Usar tipos locales en `apps/web/features/.../types.ts`, subpaths documentados (`@bloqer/services/...`) solo en **Server Components** / route handlers / server actions, o duplicar helpers puramente de UI (p. ej. `buildAuditEntityHref`).
 
+## Next.js RSC — helpers fuera de `"use client"` (obligatorio)
+
+En App Router, **llamar** una función exportada desde un módulo `"use client"` dentro de un Server Component **rompe producción** con:
+
+`Attempted to call X() from the server but X is on the client`
+
+Reglas:
+
+- Archivos `"use client"` exportan **solo** componentes React, hooks y contexto. **No** `format*`, labels, mappers, ni builders puros.
+- Esos helpers van a `@bloqer/domain`, `@bloqer/utils`, o `apps/web/lib/*` / `features/*/lib/*` **sin** `"use client"`.
+- Al pasar props a Client Components: **nunca** `Prisma.Decimal` (ni objetos con Decimals). Serializar a `string` / DTO plano en la page/server.
+- Antes de mergear UI D-0xx: grep de helpers exportados desde `"use client"` y de imports de esos helpers desde `app/**/page.tsx`.
+
 ## Referencias
 
 - [`../AGENTS.md`](../AGENTS.md)  

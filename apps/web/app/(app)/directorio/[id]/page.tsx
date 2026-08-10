@@ -90,10 +90,42 @@ export default async function ContactoDetailPage({ params }: PageProps) {
         <div className="px-6 py-4">
           <RoleManager
             contactId={id}
-            roles={contact.roles}
-            clientProfile={contact.clientProfile}
-            supplierProfile={contact.supplierProfile}
-            subcontractorProfile={contact.subcontractorProfile}
+            roles={contact.roles.map((r) => ({
+              id: r.id,
+              role: r.role,
+              status: r.status,
+            }))}
+            clientProfile={
+              contact.clientProfile
+                ? {
+                    paymentTermsDays: contact.clientProfile.paymentTermsDays,
+                    defaultCurrency: contact.clientProfile.defaultCurrency,
+                    creditLimit:
+                      contact.clientProfile.creditLimit != null
+                        ? contact.clientProfile.creditLimit.toString()
+                        : null,
+                    notes: contact.clientProfile.notes,
+                  }
+                : null
+            }
+            supplierProfile={
+              contact.supplierProfile
+                ? {
+                    paymentTermsDays: contact.supplierProfile.paymentTermsDays,
+                    defaultCurrency: contact.supplierProfile.defaultCurrency,
+                    bankAccount: contact.supplierProfile.bankAccount,
+                    notes: contact.supplierProfile.notes,
+                  }
+                : null
+            }
+            subcontractorProfile={
+              contact.subcontractorProfile
+                ? {
+                    specialty: contact.subcontractorProfile.specialty,
+                    notes: contact.subcontractorProfile.notes,
+                  }
+                : null
+            }
           />
         </div>
       </div>

@@ -9,17 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  SearchableCombobox,
-  chartAccountsToSearchableOptions,
-} from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { chartAccountsToSearchableOptions } from "@/lib/searchable-options";
 import {
   createAccountingMappingRuleAction,
   updateAccountingMappingRuleAction,
 } from "@/app/(app)/contabilidad/actions";
 import type { AccountingMappingEventType } from "@bloqer/database";
 import type { AccountingMappingRuleView } from "@bloqer/services";
-import type { AccountPick } from "./journal-entry-lines-editor";
+import type { AccountPick } from "../lib/journal-entry-lines";
 import { ACCOUNTING_EVENT_TYPE_OPTIONS } from "./accounting-event-type-badge";
 
 interface Props {

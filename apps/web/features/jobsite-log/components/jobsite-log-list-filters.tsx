@@ -12,11 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  SearchableCombobox,
-  withNoneOption,
-  wbsToSearchableOptions,
-} from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 
 export type JobsiteLogListWbsOption = {
   id: string;

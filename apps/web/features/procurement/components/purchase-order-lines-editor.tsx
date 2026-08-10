@@ -6,14 +6,8 @@ import { divideDecimal, roundQty, QTY_DECIMALS } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  SearchableCombobox,
-  SEARCHABLE_NONE,
-  productsToSearchableOptions,
-  toSearchableOptions,
-  withNoneOption,
-  wbsToSearchableOptions,
-} from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { SEARCHABLE_NONE, productsToSearchableOptions, toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { formatDecimalAr } from "@/lib/format-money";

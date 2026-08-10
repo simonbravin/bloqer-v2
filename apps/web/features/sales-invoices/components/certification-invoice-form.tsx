@@ -2,20 +2,13 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  requiresArInvoiceLetter,
-  suggestInvoiceLetter,
-  type InvoiceLetterCode,
-  type IvaConditionCode,
-} from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  InvoiceLetterSelect,
-  invoiceLetterHint,
-} from "@/features/finance/components/invoice-letter-fields";
+import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
+
 import { createInvoiceFromCertificationAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 
 export type CertSummary = {

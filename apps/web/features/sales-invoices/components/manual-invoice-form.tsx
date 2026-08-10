@@ -3,23 +3,17 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import {
-  requiresArInvoiceLetter,
-  suggestInvoiceLetter,
-  type InvoiceLetterCode,
-  type IvaConditionCode,
-} from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { toSearchableOptions } from "@/lib/searchable-options";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
-import {
-  InvoiceLetterSelect,
-  invoiceLetterHint,
-} from "@/features/finance/components/invoice-letter-fields";
+import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
+
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import {

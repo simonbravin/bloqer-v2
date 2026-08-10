@@ -2,18 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  requiresArInvoiceLetter,
-  type InvoiceLetterCode,
-} from "@bloqer/domain";
+import { requiresArInvoiceLetter, type InvoiceLetterCode, invoiceLetterHint } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  InvoiceLetterSelect,
-  invoiceLetterHint,
-} from "@/features/finance/components/invoice-letter-fields";
+import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
 import { updateSalesInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 
 interface Props {

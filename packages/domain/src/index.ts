@@ -94,6 +94,7 @@ export {
   IVA_CONDITION_LABEL_ES,
   formatInvoiceLetterBadge,
   formatIvaConditionLabel,
+  invoiceLetterHint,
   requiresArInvoiceLetter,
   suggestInvoiceLetter,
   type InvoiceLetterCode,

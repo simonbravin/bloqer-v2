@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { contactsToSearchableOptions, SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { contactsToSearchableOptions } from "@/lib/searchable-options";
 import { createProjectSchema, type CreateProjectInput, type ProjectFormInput } from "@bloqer/validators";
 import { invalidateProjectShellCache } from "@/lib/project-shell-context";
 

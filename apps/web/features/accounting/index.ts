@@ -12,8 +12,12 @@ export type {
 } from "./components/accounting-account-form";
 export { JournalEntryTable } from "./components/journal-entry-table";
 export { JournalEntryForm } from "./components/journal-entry-form";
-export { JournalEntryLinesEditor, initialJournalLines, linesFromJournalEntry } from "./components/journal-entry-lines-editor";
-export type { AccountPick, LineEditorRow } from "./components/journal-entry-lines-editor";
+export { JournalEntryLinesEditor } from "./components/journal-entry-lines-editor";
+export {
+  initialJournalLines,
+  linesFromJournalEntry,
+} from "./lib/journal-entry-lines";
+export type { AccountPick, LineEditorRow } from "./lib/journal-entry-lines";
 export { AccountLedgerTable } from "./components/account-ledger-table";
 export { JournalEntryDetailActions } from "./components/journal-entry-detail-actions";
 export { JournalEntrySourcePanel } from "./components/journal-entry-source-panel";

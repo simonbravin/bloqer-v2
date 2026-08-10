@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   formatInvoiceLetterBadge,
   formatIvaConditionLabel,
+  invoiceLetterHint,
   requiresArInvoiceLetter,
   suggestInvoiceLetter,
 } from "./suggest-invoice-letter";
@@ -150,5 +151,11 @@ describe("formatIvaConditionLabel / formatInvoiceLetterBadge", () => {
     assert.equal(formatInvoiceLetterBadge("A"), "Factura A");
     assert.equal(formatInvoiceLetterBadge(null), null);
     assert.equal(formatInvoiceLetterBadge("Z"), "Factura Z");
+  });
+
+  it("invoiceLetterHint covers A/B/C/E", () => {
+    assert.match(invoiceLetterHint("A") ?? "", /IVA discriminado/);
+    assert.match(invoiceLetterHint("B") ?? "", /incluye IVA|precio final/i);
+    assert.equal(invoiceLetterHint(null), null);
   });
 });

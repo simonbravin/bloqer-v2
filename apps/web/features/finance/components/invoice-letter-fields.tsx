@@ -121,18 +121,3 @@ export function InvoiceLetterSelect({
     </div>
   );
 }
-
-export function invoiceLetterHint(letter: InvoiceLetterCode | null | undefined): string | null {
-  switch (letter) {
-    case "A":
-      return "IVA discriminado. Suele usar alícuota 21% (crédito fiscal para RI).";
-    case "B":
-      return "IVA incluido en el precio. No genera crédito fiscal al receptor.";
-    case "C":
-      return "Sin IVA (emisor Monotributo o Exento).";
-    case "E":
-      return "Exportación: sin IVA.";
-    default:
-      return null;
-  }
-}

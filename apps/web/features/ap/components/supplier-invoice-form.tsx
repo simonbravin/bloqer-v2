@@ -4,26 +4,20 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { PurchaseOrderInvoiceDraftPreview } from "@bloqer/services";
-import {
-  requiresArInvoiceLetter,
-  suggestInvoiceLetter,
-  type InvoiceLetterCode,
-  type IvaConditionCode,
-} from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { SearchableCombobox, SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
-import {
-  InvoiceLetterSelect,
-  invoiceLetterHint,
-} from "@/features/finance/components/invoice-letter-fields";
+import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
+
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import {

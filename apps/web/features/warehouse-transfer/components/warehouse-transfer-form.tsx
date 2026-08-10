@@ -13,7 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { toSearchableOptions } from "@/lib/searchable-options";
 
 interface Warehouse { id: string; name: string }
 interface Product   { id: string; name: string; unit: string }

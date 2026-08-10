@@ -8,12 +8,8 @@ import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  SearchableCombobox,
-  toSearchableOptions,
-  withNoneOption,
-  wbsToSearchableOptions,
-} from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { WbsIncrementalProgressSnapshot } from "@bloqer/services";
 import {

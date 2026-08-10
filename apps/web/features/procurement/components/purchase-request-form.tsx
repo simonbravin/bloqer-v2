@@ -6,13 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  SearchableCombobox,
-  SEARCHABLE_NONE,
-  toSearchableOptions,
-  withNoneOption,
-  wbsToSearchableOptions,
-} from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { formatDecimalAr } from "@/lib/format-money";

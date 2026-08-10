@@ -126,3 +126,21 @@ export function formatInvoiceLetterBadge(
   }
   return `Factura ${letter}`;
 }
+
+/** Short UI hint for invoice letter choice (es-AR). Safe for server and client. */
+export function invoiceLetterHint(
+  letter: InvoiceLetterCode | null | undefined,
+): string | null {
+  switch (letter) {
+    case "A":
+      return "IVA discriminado (p. ej. 21% o 10,5% en obra vivienda). Genera crédito fiscal al RI receptor.";
+    case "B":
+      return "IVA incluido para el receptor. Podés cargar el precio final (c/IVA) y Bloqer desglosa neto + IVA al guardar.";
+    case "C":
+      return "Sin IVA (emisor Monotributo o Exento).";
+    case "E":
+      return "Exportación: sin IVA.";
+    default:
+      return null;
+  }
+}

@@ -14,13 +14,13 @@ import {
 } from "@/app/(app)/contabilidad/actions";
 import type { JournalEntryView } from "@bloqer/services";
 import type { CompanyOption } from "./accounting-account-form";
+import { JournalEntryLinesEditor } from "./journal-entry-lines-editor";
 import {
-  JournalEntryLinesEditor,
   initialJournalLines,
   linesFromJournalEntry,
   type AccountPick,
   type LineEditorRow,
-} from "./journal-entry-lines-editor";
+} from "../lib/journal-entry-lines";
 
 interface Props {
   mode: "create" | "edit";

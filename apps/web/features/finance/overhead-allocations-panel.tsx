@@ -25,10 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  projectsToSearchableOptions,
-  SearchableCombobox,
-} from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { projectsToSearchableOptions } from "@/lib/searchable-options";
 import {
   Table,
   TableBody,

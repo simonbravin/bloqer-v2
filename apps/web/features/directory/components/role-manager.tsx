@@ -20,13 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RoleBadge } from "./role-badge";
-import type {
-  ContactRole,
-  ContactRoleType,
-  ClientProfile,
-  SupplierProfile,
-  SubcontractorProfile,
-} from "@bloqer/database";
+import type { ContactRoleType } from "@bloqer/database";
 import {
   assignContactRoleAction,
   removeContactRoleAction,
@@ -53,12 +47,38 @@ const ROLE_LABELS: Record<ContactRoleType, string> = {
 
 type EditTarget = "CLIENT" | "SUPPLIER" | "SUBCONTRACTOR";
 
+/** Plain props only — never pass Prisma Decimal across the RSC boundary. */
+export type RoleManagerRole = {
+  id: string;
+  role: ContactRoleType;
+  status: string;
+};
+
+export type RoleManagerClientProfile = {
+  paymentTermsDays: number;
+  defaultCurrency: string;
+  creditLimit: string | null;
+  notes: string | null;
+};
+
+export type RoleManagerSupplierProfile = {
+  paymentTermsDays: number;
+  defaultCurrency: string;
+  bankAccount: string | null;
+  notes: string | null;
+};
+
+export type RoleManagerSubcontractorProfile = {
+  specialty: string | null;
+  notes: string | null;
+};
+
 interface RoleManagerProps {
   contactId: string;
-  roles: ContactRole[];
-  clientProfile: ClientProfile | null;
-  supplierProfile: SupplierProfile | null;
-  subcontractorProfile: SubcontractorProfile | null;
+  roles: RoleManagerRole[];
+  clientProfile: RoleManagerClientProfile | null;
+  supplierProfile: RoleManagerSupplierProfile | null;
+  subcontractorProfile: RoleManagerSubcontractorProfile | null;
 }
 
 export function RoleManager({

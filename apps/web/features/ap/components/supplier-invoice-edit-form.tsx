@@ -2,21 +2,15 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  requiresArInvoiceLetter,
-  suggestInvoiceLetter,
-  type InvoiceLetterCode,
-  type IvaConditionCode,
-} from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { SearchableCombobox, SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/components/ui/searchable-combobox";
-import {
-  InvoiceLetterSelect,
-  invoiceLetterHint,
-} from "@/features/finance/components/invoice-letter-fields";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
+import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
+
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { updateSupplierInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";

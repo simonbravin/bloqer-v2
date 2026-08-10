@@ -9,13 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  SearchableCombobox,
-  SEARCHABLE_NONE,
-  productsToSearchableOptions,
-  withNoneOption,
-  wbsToSearchableOptions,
-} from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { SEARCHABLE_NONE, productsToSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { createStockConsumptionAction } from "@/app/(app)/proyectos/[id]/consumos/actions";
 
 export type ProductOption   = { id: string; name: string; sku: string; unit: string };

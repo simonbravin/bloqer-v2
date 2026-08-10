@@ -17,12 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import {
-  contactsToSearchableOptions,
-  SearchableCombobox,
-  withNoneOption,
-  wbsToSearchableOptions,
-} from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { contactsToSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
 import type { WbsSubcontractBudgetHint } from "@bloqer/services";

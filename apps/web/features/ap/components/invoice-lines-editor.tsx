@@ -11,11 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDecimalArFromString } from "@/lib/format-money";
-import {
-  SearchableCombobox,
-  SEARCHABLE_NONE,
-  wbsToSearchableOptions,
-} from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { SEARCHABLE_NONE, wbsToSearchableOptions } from "@/lib/searchable-options";
 
 export type InvoiceLine = {
   description: string;

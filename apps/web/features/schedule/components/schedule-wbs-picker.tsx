@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { SearchableCombobox, toSearchableOptions } from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { toSearchableOptions } from "@/lib/searchable-options";
 import { Label } from "@/components/ui/label";
 import { listScheduleLinkableWbsOptionsAction } from "../actions/schedule-actions";
 

@@ -5,36 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CurrencySelect } from "@/components/ui/currency-select";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { chartAccountsToSearchableOptions } from "@/lib/searchable-options";
 import {
-  SearchableCombobox,
-  chartAccountsToSearchableOptions,
-} from "@/components/ui/searchable-combobox";
+  createEmptyJournalLine,
+  type AccountPick,
+  type LineEditorRow,
+} from "../lib/journal-entry-lines";
 
-export interface LineEditorRow {
-  key:         string;
-  accountId:   string;
-  debit:       string;
-  credit:      string;
-  currency:    string;
-  description: string;
-}
-
-export interface AccountPick {
-  id:   string;
-  code: string;
-  name: string;
-}
-
-function newRow(): LineEditorRow {
-  return {
-    key:         crypto.randomUUID(),
-    accountId:   "",
-    debit:       "0",
-    credit:      "0",
-    currency:    "ARS",
-    description: "",
-  };
-}
+export type { AccountPick, LineEditorRow };
 
 interface Props {
   accounts: AccountPick[];
@@ -69,7 +48,7 @@ export function JournalEntryLinesEditor({
 
   function addRow() {
     if (sourcedLock) return;
-    onChange([...lines, newRow()]);
+    onChange([...lines, createEmptyJournalLine(lines[0]?.currency ?? "ARS")]);
   }
 
   function removeRow(idx: number) {
@@ -164,21 +143,4 @@ export function JournalEntryLinesEditor({
       </div>
     </div>
   );
-}
-
-export function initialJournalLines(): LineEditorRow[] {
-  return [newRow(), newRow()];
-}
-
-export function linesFromJournalEntry(
-  lines: { accountId: string; debit: string; credit: string; currency: string; description: string | null }[],
-): LineEditorRow[] {
-  return lines.map((l) => ({
-    key:         crypto.randomUUID(),
-    accountId:   l.accountId,
-    debit:       l.debit,
-    credit:      l.credit,
-    currency:    l.currency,
-    description: l.description ?? "",
-  }));
 }
