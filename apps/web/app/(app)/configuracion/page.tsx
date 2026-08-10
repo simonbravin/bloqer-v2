@@ -22,6 +22,7 @@ import { PageListHeader } from "@/components/ui/page-list-header";
 import { DetailField, DetailFieldGrid } from "@/components/ui/detail-field-grid";
 import { TenantDisplaySettingsForm } from "@/features/tenant-config/tenant-display-settings-form";
 import { TenantLogoSettings } from "@/features/tenant-config/tenant-logo-settings";
+import { formatIvaConditionLabel } from "@/features/finance/components/invoice-letter-fields";
 import {
   updateTenantDisplaySettingsAction,
   uploadTenantLogoAction,
@@ -85,6 +86,9 @@ export default async function ConfiguracionHomePage() {
             <DetailField label="Nombre a mostrar">{tenant.name}</DetailField>
             <DetailField label="Razón social">{legalName ?? "—"}</DetailField>
             <DetailField label="CUIT / identificador fiscal">{fiscalId ?? "—"}</DetailField>
+            <DetailField label="Condición frente al IVA">
+              {formatIvaConditionLabel(company?.ivaCondition)}
+            </DetailField>
             <DetailField label="Slug (interno)">
               <span className="font-mono text-xs">{tenant.slug}</span>
             </DetailField>

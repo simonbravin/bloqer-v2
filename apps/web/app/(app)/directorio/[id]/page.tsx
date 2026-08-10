@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { RoleManager } from "@/features/directory/components/role-manager";
+import { formatIvaConditionLabel } from "@/features/finance/components/invoice-letter-fields";
 import { getCurrentUser } from "@/lib/auth";
 import { getContactById, ServiceError } from "@bloqer/services";
 import { archiveContactAction, reactivateContactAction } from "../actions";
@@ -110,6 +111,14 @@ export default async function ContactoDetailPage({ params }: PageProps) {
           <div>
             <dt className="text-muted-foreground">Tipo ID</dt>
             <dd className="font-medium">{contact.taxIdType ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Condición frente al IVA</dt>
+            <dd className="font-medium">{formatIvaConditionLabel(contact.ivaCondition)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">País</dt>
+            <dd className="font-medium">{contact.country ?? "—"}</dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Email</dt>

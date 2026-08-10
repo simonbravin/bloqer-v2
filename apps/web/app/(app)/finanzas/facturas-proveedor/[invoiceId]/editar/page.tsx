@@ -3,26 +3,24 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import {
   getCompanyById,
-  getSupplierInvoiceById,
+  getCompanySupplierInvoiceById,
   listContacts,
-  listLinkablePurchaseOrders,
-  listProcurementWbsOptions,
   ServiceError,
 } from "@bloqer/services";
 import { SupplierInvoiceEditForm } from "@/features/ap";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
-  params: Promise<{ id: string; supplierInvoiceId: string }>;
+  params: Promise<{ invoiceId: string }>;
 }
 
-export default async function EditarFacturaProveedorPage({ params }: PageProps) {
+export default async function EditarFacturaProveedorCorporativaPage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
-  const { id, supplierInvoiceId } = await params;
+  const { invoiceId } = await params;
   if (!can(current.tenantCtx.roles, "EDIT", "AP")) {
-    redirect(`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`);
+    redirect(`/finanzas/facturas-proveedor/${invoiceId}`);
   }
 
   const ctx = {
@@ -32,21 +30,23 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
     roles: current.tenantCtx.roles,
   };
 
-  let invoice, suppliersResult, linkablePOs, wbsNodes;
+  let invoice;
+  let suppliersResult;
   try {
-    [invoice, suppliersResult, linkablePOs, wbsNodes] = await Promise.all([
-      getSupplierInvoiceById(supplierInvoiceId, ctx, id),
+    [invoice, suppliersResult] = await Promise.all([
+      getCompanySupplierInvoiceById(invoiceId, ctx),
       listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
-      listLinkablePurchaseOrders(id, ctx),
-      listProcurementWbsOptions(id, ctx),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
   }
 
+  if (invoice.projectId) {
+    redirect(`/proyectos/${invoice.projectId}/facturas-proveedor/${invoiceId}/editar`);
+  }
   if (invoice.status !== "DRAFT") {
-    redirect(`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`);
+    redirect(`/finanzas/facturas-proveedor/${invoiceId}`);
   }
 
   const suppliers = suppliersResult.data.map((c) => ({
@@ -56,26 +56,15 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
     ivaCondition: c.ivaCondition,
   }));
 
-  const poOptions = linkablePOs.map((po) => ({
-    id: po.id,
-    code: po.code,
-    supplierContactId: po.supplierContactId,
-    currency: po.currency,
-  }));
-
-  const wbsOptions = wbsNodes.map((n) => ({
-    id: n.id,
-    code: n.code,
-    name: n.name,
-  }));
-
   let companyCountry: string | null = null;
   let companyIvaCondition: string | null = null;
   try {
     const company = await getCompanyById(invoice.companyId, ctx);
     companyCountry = company.country;
     companyIvaCondition = company.ivaCondition;
-  } catch { /* optional */ }
+  } catch {
+    /* optional fiscal context */
+  }
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={invoice.code}>
@@ -84,13 +73,11 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
       </div>
 
       <SupplierInvoiceEditForm
-        projectId={id}
+        companyFinanzas
         invoice={invoice}
         suppliers={suppliers}
         companyCountry={companyCountry}
         companyIvaCondition={companyIvaCondition}
-        poOptions={poOptions}
-        wbsOptions={wbsOptions}
       />
     </PageShell>
   );

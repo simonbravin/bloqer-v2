@@ -9,6 +9,7 @@ import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/register-transaction.types";
+import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
 import { assertArTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
@@ -114,7 +115,7 @@ export async function registerArSale(
 
   const contact = await prisma.contact.findUnique({
     where: { id: input.clientContactId },
-    select: { id: true, tenantId: true, status: true },
+    select: { id: true, tenantId: true, status: true, country: true },
   });
   if (!contact || contact.tenantId !== ctx.tenantId) {
     throw new ServiceError("NOT_FOUND", "Cliente no encontrado");
@@ -148,6 +149,16 @@ export async function registerArSale(
   await assertProjectAllowsOperationalMutation(projectId, ctx.tenantId);
 
   const companyId = await resolveCompanyId(projectId, ctx);
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { country: true },
+  });
+  assertInvoiceLetterOnIssue({
+    invoiceLetter: input.invoiceLetter,
+    companyCountry: company?.country,
+    counterpartyCountry: contact.country,
+    documentLabel: "factura de venta",
+  });
 
   let outcome!: ArSaleOutcome;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -170,6 +181,7 @@ export async function registerArSale(
             issueDate: new Date(input.issueDate),
             dueDate: new Date(input.dueDate),
             currency: input.currency ?? "ARS",
+            invoiceLetter: input.invoiceLetter ?? null,
             notes: input.notes ?? null,
             internalNotes: input.internalNotes ?? null,
             externalInvoiceRef: input.externalInvoiceRef ?? null,

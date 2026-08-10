@@ -44,6 +44,11 @@ export async function updateTenantDisplaySettingsAction(formData: FormData) {
     const w = String(websiteRaw).trim();
     payload.website = w === "" ? null : w;
   }
+  const ivaConditionRaw = formData.get("ivaCondition");
+  if (ivaConditionRaw !== null) {
+    const v = String(ivaConditionRaw).trim();
+    payload.ivaCondition = v === "" ? null : v;
+  }
 
   try {
     await updateTenantDisplaySettings(payload, ctx);

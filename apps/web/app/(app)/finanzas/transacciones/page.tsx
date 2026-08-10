@@ -15,6 +15,7 @@ import {
   DEFAULT_PAGE_SIZE,
   defaultDateRangeDays,
   getAccountMovementReport,
+  getCompanyById,
   getTenantModuleGate,
   listContacts,
   listProjects,
@@ -136,10 +137,30 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
   const canEditAp = gate.isEnabled("AP") && can(ctx.roles, "EDIT", "AP");
   const canEditTreasury = treasuryModuleOn && can(ctx.roles, "EDIT", "TREASURY");
 
-  let suppliersForDialog: { id: string; label: string }[] = [];
-  let clientsForDialog: { id: string; label: string }[] = [];
+  let suppliersForDialog: {
+    id: string;
+    label: string;
+    country?: string;
+    ivaCondition?: string | null;
+  }[] = [];
+  let clientsForDialog: {
+    id: string;
+    label: string;
+    country?: string;
+    ivaCondition?: string | null;
+  }[] = [];
   let treasuryAccountsForDialog: { id: string; label: string; currency: string }[] = [];
   let projectOptions: { id: string; name: string }[] = [];
+  let companyCountry: string | null = null;
+  let companyIvaCondition: string | null = null;
+
+  if (ctx.companyId) {
+    try {
+      const company = await getCompanyById(ctx.companyId, ctx);
+      companyCountry = company.country;
+      companyIvaCondition = company.ivaCondition;
+    } catch { /* defaults */ }
+  }
 
   if (canEditAp) {
     try {
@@ -150,6 +171,8 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
       suppliersForDialog = suppliersResult.data.map((c) => ({
         id: c.id,
         label: c.fantasyName ?? c.legalName,
+        country: c.country,
+        ivaCondition: c.ivaCondition,
       }));
     } catch {
       // VIEW DIRECTORY may be missing; keep AP dialog usable without supplier list
@@ -165,6 +188,8 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
       clientsForDialog = clientsResult.data.map((c) => ({
         id: c.id,
         label: c.fantasyName ?? c.legalName,
+        country: c.country,
+        ivaCondition: c.ivaCondition,
       }));
     } catch {
       // VIEW DIRECTORY may be missing
@@ -224,6 +249,8 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
               <NewTransactionDialog
                 suppliers={suppliersForDialog}
                 clients={clientsForDialog}
+                companyCountry={companyCountry}
+                companyIvaCondition={companyIvaCondition}
                 treasuryAccounts={treasuryAccountsForDialog}
                 canAp={canEditAp}
                 canTreasury={canEditTreasury}

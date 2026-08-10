@@ -1,6 +1,6 @@
 import { prisma } from "@bloqer/database";
 import type { Prisma } from "@bloqer/database";
-import { can, type OverviewPermissionModule } from "@bloqer/domain";
+import { can, type IvaConditionCode, type OverviewPermissionModule } from "@bloqer/domain";
 import { OVERVIEW_MODULES } from "@bloqer/domain";
 import { resolveDisplayTimeZone } from "@bloqer/utils";
 import { isTenantLogoStorageKey } from "@bloqer/storage";
@@ -23,6 +23,7 @@ export type TenantPrimaryCompanyView = {
   country: string;
   phone: string | null;
   website: string | null;
+  ivaCondition: IvaConditionCode | null;
 };
 
 export type TenantSettingsView = {
@@ -88,6 +89,7 @@ export async function getTenantSettings(ctx: ServiceContext): Promise<TenantSett
           country: true,
           phone: true,
           website: true,
+          ivaCondition: true,
         },
       },
     },
@@ -104,7 +106,12 @@ export async function getTenantSettings(ctx: ServiceContext): Promise<TenantSett
     ...tenant,
     hasLogo,
     logoVersion,
-    primaryCompany: companies[0] ?? null,
+    primaryCompany: companies[0]
+      ? {
+          ...companies[0],
+          ivaCondition: companies[0].ivaCondition as IvaConditionCode | null,
+        }
+      : null,
   };
 }
 
@@ -117,7 +124,7 @@ export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceCont
     const msg = parsed.error.issues.map((i) => i.message).join("; ") || "validación";
     throw new ServiceError("VALIDATION", msg);
   }
-  const { address, city, country, phone, website, ...tenantFields } = parsed.data;
+  const { address, city, country, phone, website, ivaCondition, ...tenantFields } = parsed.data;
 
   const before = await prisma.tenant.findFirst({
     where: { id: ctx.tenantId },
@@ -136,6 +143,7 @@ export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceCont
           country: true,
           phone: true,
           website: true,
+          ivaCondition: true,
         },
       },
     },
@@ -148,7 +156,8 @@ export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceCont
     city !== undefined ||
     country !== undefined ||
     phone !== undefined ||
-    website !== undefined;
+    website !== undefined ||
+    ivaCondition !== undefined;
 
   if (hasContactPatch && !primary) {
     throw new ServiceError("VALIDATION", "No hay empresa activa para actualizar datos de contacto");
@@ -171,12 +180,14 @@ export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceCont
         country?: string;
         phone?: string;
         website?: string | null;
+        ivaCondition?: typeof ivaCondition;
       } = {};
       if (address !== undefined) companyData.address = address;
       if (city !== undefined) companyData.city = city;
       if (country !== undefined) companyData.country = country;
       if (phone !== undefined) companyData.phone = phone;
       if (website !== undefined) companyData.website = website;
+      if (ivaCondition !== undefined) companyData.ivaCondition = ivaCondition;
 
       await tx.company.update({
         where: { id: primary.id },
@@ -198,6 +209,7 @@ export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceCont
             country: primary.country,
             phone: primary.phone,
             website: primary.website,
+            ivaCondition: primary.ivaCondition,
           },
         }
       : {}),
@@ -215,6 +227,7 @@ export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceCont
             country: country ?? primary.country,
             phone: phone ?? primary.phone,
             website: website === undefined ? primary.website : website,
+            ivaCondition: ivaCondition === undefined ? primary.ivaCondition : ivaCondition,
           },
         }
       : {}),

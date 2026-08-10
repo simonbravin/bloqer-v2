@@ -14,12 +14,16 @@ import { SupplierInvoiceForm, type SupplierOption } from "./supplier-invoice-for
 
 interface Props {
   suppliers: SupplierOption[];
+  companyCountry?: string | null;
+  companyIvaCondition?: string | null;
   defaultOpen?: boolean;
   storageConfigured?: boolean;
 }
 
 export function NewCompanySupplierInvoiceDialog({
   suppliers,
+  companyCountry,
+  companyIvaCondition,
   defaultOpen = false,
   storageConfigured = false,
 }: Props) {
@@ -69,6 +73,8 @@ export function NewCompanySupplierInvoiceDialog({
           <SupplierInvoiceForm
             companyFinanzas
             suppliers={suppliers}
+            companyCountry={companyCountry}
+            companyIvaCondition={companyIvaCondition}
             poOptions={[]}
             storageConfigured={storageConfigured}
             variant="plain"

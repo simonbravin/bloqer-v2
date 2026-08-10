@@ -17,6 +17,7 @@ import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import {
   canEditArArea,
+  getCompanyById,
   getProjectShellInfo,
   getTenantModuleGate,
   listContacts,
@@ -77,19 +78,34 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
     totalAmount: inv.totalAmount,
     currency: inv.currency,
     clientName: inv.clientName,
+    invoiceLetter: inv.invoiceLetter,
   }));
 
   const canCreate = canEditArArea(ctx.roles);
   let clients: ClientOption[] = [];
   let treasuryAccounts: TreasuryAccountOption[] = [];
   let canCollectNow = false;
+  let companyCountry: string | null = null;
+  let companyIvaCondition: string | null = null;
 
   if (canCreate) {
     const { data: contacts } = await listContacts({ role: "CLIENT", status: "ACTIVE" }, ctx);
     clients = contacts.map((c) => ({
       id: c.id,
       label: c.fantasyName ?? c.legalName,
+      country: c.country,
+      ivaCondition: c.ivaCondition,
     }));
+
+    try {
+      if (ctx.companyId) {
+        const company = await getCompanyById(ctx.companyId, ctx);
+        companyCountry = company.country;
+        companyIvaCondition = company.ivaCondition;
+      }
+    } catch {
+      /* keep defaults */
+    }
 
     try {
       const gate = await getTenantModuleGate(ctx);
@@ -133,6 +149,8 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
                   <NewProjectSalesInvoiceDialog
                     projectId={id}
                     clients={clients}
+                    companyCountry={companyCountry}
+                    companyIvaCondition={companyIvaCondition}
                     treasuryAccounts={treasuryAccounts}
                     canCollectNow={canCollectNow}
                     storageConfigured={isStorageConfigured()}

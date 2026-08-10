@@ -7,6 +7,8 @@ import type {
 import { auditAr } from "./ar-audit";
 import { assertCanCancelSalesInvoice } from "./sales-invoice-cancel-guards";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
+import { resolveSuggestedArInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea, canMutateArForScope, canViewArProjectArea } from "./ar-access";
@@ -244,6 +246,14 @@ export async function createSalesInvoice(
 
   const companyId = await resolveCompanyId(input.projectId, ctx);
 
+  const suggestedLetter =
+    input.invoiceLetter ??
+    (await resolveSuggestedArInvoiceLetter({
+      companyId,
+      clientContactId: input.clientContactId,
+      tenantId: ctx.tenantId,
+    }));
+
   const maxNum = await prisma.salesInvoice.aggregate({
     where: { tenantId: ctx.tenantId, companyId },
     _max: { number: true },
@@ -262,6 +272,7 @@ export async function createSalesInvoice(
         issueDate: new Date(input.issueDate),
         dueDate: new Date(input.dueDate),
         currency: input.currency ?? "ARS",
+        invoiceLetter: suggestedLetter,
         notes: input.notes ?? null,
         internalNotes: input.internalNotes ?? null,
         externalInvoiceRef: input.externalInvoiceRef ?? null,
@@ -348,6 +359,14 @@ export async function createInvoiceFromCertification(
   // Default IVA factura = 0 para no duplicar; el usuario puede discriminar otro % si corresponde.
   const taxRate = new Prisma.Decimal(input.taxRate ?? "0");
 
+  const suggestedLetter =
+    input.invoiceLetter ??
+    (await resolveSuggestedArInvoiceLetter({
+      companyId,
+      clientContactId: cert.project.clientContactId,
+      tenantId: ctx.tenantId,
+    }));
+
   let inv;
   try {
     inv = await prisma.$transaction(async (tx) => {
@@ -376,6 +395,7 @@ export async function createInvoiceFromCertification(
           issueDate: new Date(input.issueDate),
           dueDate: new Date(input.dueDate),
           currency: cert.project.type === "PUBLIC" ? "ARS" : "ARS",
+          invoiceLetter: suggestedLetter,
           notes: input.notes ?? null,
           internalNotes: input.internalNotes ?? null,
           createdBy: ctx.actorUserId,
@@ -456,6 +476,7 @@ export async function updateSalesInvoice(
       data: {
         issueDate:     input.issueDate ? new Date(input.issueDate) : undefined,
         dueDate:       input.dueDate   ? new Date(input.dueDate)   : undefined,
+        ...(input.invoiceLetter !== undefined ? { invoiceLetter: input.invoiceLetter } : {}),
         notes:         input.notes         ?? undefined,
         internalNotes: input.internalNotes ?? undefined,
         updatedBy: ctx.actorUserId,
@@ -477,6 +498,7 @@ export async function updateSalesInvoice(
           number: updatedInvoice.number,
           ...(input.issueDate !== undefined ? { issueDate: input.issueDate } : {}),
           ...(input.dueDate !== undefined ? { dueDate: input.dueDate } : {}),
+          ...(input.invoiceLetter !== undefined ? { invoiceLetter: input.invoiceLetter } : {}),
           ...(input.notes !== undefined ? { notes: input.notes } : {}),
           ...(input.internalNotes !== undefined ? { internalNotes: input.internalNotes } : {}),
         },
@@ -514,7 +536,8 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
       where: { id },
       include: {
         lines: true,
-        clientContact: { select: { legalName: true, fantasyName: true } },
+        clientContact: { select: { legalName: true, fantasyName: true, country: true } },
+        company: { select: { country: true } },
       },
     });
     if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
@@ -524,6 +547,13 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
     if (inv.lines.length === 0) {
       throw new ServiceError("CONFLICT", "No se puede emitir una factura sin líneas");
     }
+
+    assertInvoiceLetterOnIssue({
+      invoiceLetter: inv.invoiceLetter,
+      companyCountry: inv.company.country,
+      counterpartyCountry: inv.clientContact.country,
+      documentLabel: "factura de venta",
+    });
 
     const { computeDocumentFxAmounts } = await import("../finance/fx-amount.service");
     const fx = computeDocumentFxAmounts(inv.currency, inv.totalAmount, inv.fxRate);

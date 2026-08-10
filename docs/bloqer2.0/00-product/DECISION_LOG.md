@@ -1237,6 +1237,24 @@
 
 ---
 
+### D-084 — Letra de factura A/B/C/E + condición frente al IVA (sin motor AFIP)
+
+- **Fecha:** 2026-08-10
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** El dominio ya citaba `SalesInvoice.type` A/B/C/E y condición IVA en Directorio, pero no estaban persistidos. Se necesita tipificar comprobantes argentinos sin construir motor fiscal ni emisión ARCA ([D-011], [D-051]).
+- **Decisión:**
+  1. Persistir `ivaCondition` en `Company` (emisor) y `Contact` (cliente/proveedor): `RESPONSIBLE_INSCRIPTO` | `MONOTAX` | `EXEMPT` | `FINAL_CONSUMER` | `NOT_CATEGORIZED` | `FOREIGN`.
+  2. Persistir `invoiceLetter` (`A`|`B`|`C`|`E`) en `SalesInvoice` y `SupplierInvoice` (implementación de compra).
+  3. Si la operación es AR (`Company.country = AR` o contraparte `country = AR`), la letra es **requerida al emitir**; en `DRAFT` puede faltar. Históricos existentes quedan con `null`.
+  4. El sistema **sugiere** la letra con matriz emisor×receptor (editable). No bloquea overrides. No hay integración AFIP/CAE.
+  5. El cálculo de montos sigue siendo `taxRate` por línea + `roundMoney` ([D-011]/[D-053]); la letra solo guía UX (defaults/warnings).
+  6. Fuera de alcance: Factura M/T, FCE MiPyME, numeración por PV, tabla `DocumentType` / `TaxLine` normalizada (P-ERD-05).
+- **Implicancias:** UI de contacto, configuración de empresa, formularios AR/AP y validación en `issue*`. Helper puro `suggestInvoiceLetter` en `@bloqer/domain`.
+- **Documentos afectados:** [`CORE_ENTITIES.md`](../01-domain/CORE_ENTITIES.md), [`MASTER_DATA.md`](../01-domain/MASTER_DATA.md), [`DIRECTORY.md`](../02-modules/DIRECTORY.md), [`SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`EXPENSES_AND_PAYMENTS.md`](../02-modules/EXPENSES_AND_PAYMENTS.md), [`TAXES_AND_WITHHOLDINGS.md`](../03-finance/TAXES_AND_WITHHOLDINGS.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1245,7 +1263,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-084`…).
+1. Tomar el siguiente ID disponible (`D-085`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

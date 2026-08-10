@@ -1,6 +1,7 @@
 import { OVERVIEW_MODULE_KEYS_FOR_ZOD } from "@bloqer/domain";
 import { isValidIanaTimeZone } from "@bloqer/utils";
 import { z } from "zod";
+import { ivaConditionSchema } from "./contact";
 
 /** ISO 4217 codes supported in UI (`AMERICAS_CURRENCY_OPTIONS` in `@bloqer/utils`). */
 export const AMERICAS_CURRENCY_CODES = [
@@ -55,6 +56,11 @@ export const updateTenantDisplaySettingsInputSchema = z.object({
   website: z.preprocess(
     emptyToUndefined,
     z.union([z.null(), z.string().trim().url("URL inválida").max(512)]).optional(),
+  ),
+  /** Condición frente al IVA de la empresa emisora ([D-084]). */
+  ivaCondition: z.preprocess(
+    emptyToUndefined,
+    ivaConditionSchema.nullable().optional(),
   ),
 });
 

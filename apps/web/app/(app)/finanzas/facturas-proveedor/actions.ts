@@ -2,13 +2,17 @@
 
 import {
   createSupplierInvoice,
+  getCompanySupplierInvoiceById,
   issueSupplierInvoice,
   cancelSupplierInvoice,
+  updateSupplierInvoice,
   ServiceError,
 } from "@bloqer/services";
 import {
   createSupplierInvoiceSchema,
+  updateSupplierInvoiceSchema,
   type CreateSupplierInvoiceInput,
+  type UpdateSupplierInvoiceInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -42,6 +46,25 @@ export async function createCompanySupplierInvoiceAction(
   try {
     const inv = await createSupplierInvoice(parsed.data, ctx);
     revalidatePath(FIN_LIST);
+    return { id: inv.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function updateCompanySupplierInvoiceAction(
+  invoiceId: string,
+  data: UpdateSupplierInvoiceInput,
+): Promise<{ id: string } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = updateSupplierInvoiceSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    await getCompanySupplierInvoiceById(invoiceId, ctx);
+    const inv = await updateSupplierInvoice(invoiceId, parsed.data, ctx);
+    revalidatePath(FIN_LIST);
+    revalidatePath(`${FIN_LIST}/${invoiceId}`);
+    revalidatePath("/finanzas/transacciones");
     return { id: inv.id };
   } catch (err) {
     return handle(err);

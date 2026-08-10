@@ -7,6 +7,7 @@ import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { assertSubcontractCertSuccessionAllowed } from "./subcontract-cert-succession";
+import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -428,6 +429,12 @@ export async function approveSubcontractCertification(
 
   const companyId = existing.companyId;
 
+  const suggestedLetter = await resolveSuggestedApInvoiceLetter({
+    companyId,
+    supplierContactId: existing.subcontractorContactId,
+    tenantId: ctx.tenantId,
+  });
+
   const result = await prisma.$transaction(async (tx) => {
     // Serialize invoice number allocation vs concurrent AP creates.
     await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} FOR UPDATE`;
@@ -472,6 +479,7 @@ export async function approveSubcontractCertification(
         issueDate:                 existing.certificationDate,
         dueDate:                   existing.certificationDate,
         currency:                  existing.subcontract.currency,
+        invoiceLetter:             suggestedLetter,
         subtotal:                  totalAmount,
         taxAmount:                 new Prisma.Decimal(0),
         totalAmount,

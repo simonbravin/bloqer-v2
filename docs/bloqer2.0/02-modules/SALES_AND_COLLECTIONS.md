@@ -21,7 +21,8 @@ Desconexión entre lo certificado/facturado y lo cobrado (avance financiero).
 - Si la factura referencia **`certification_id`**, actualización del **`payment_status` derivado** de esa certificación vía AR (**sin** `Certification.status = INVOICED` — [BR-CERT-007], [BR-CERT-PAYMENT-001]; eventos en [`EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md) §3.2–3.3b).
 
 ## 6. Entidades principales
-- **SalesInvoice**, **Receivable**, **Collection**, **TaxLine**.
+- **SalesInvoice** (incluye `invoice_letter` A/B/C/E — [D-084]), **Receivable**, **Collection**, **TaxLine**.
+- Condición IVA del emisor (`Company.iva_condition`) y del cliente (`Contact.iva_condition`) alimentan la sugerencia de letra.
 
 ## 7. Estados y transiciones
 Ver máquinas SalesInvoice y Receivable.
@@ -44,10 +45,12 @@ Ver máquinas SalesInvoice y Receivable.
 ## 10. Reglas de negocio
 - Retenciones/percepciones manuales por línea ([D-011]).
 - AR puede existir sin proyecto ([D-009]).
+- Letra de comprobante A/B/C/E sugerida y editable; requerida al emitir si operación AR ([D-084]).
 
 ## 11. Validaciones
 - Suma aplicaciones cobranza ≤ saldo factura.
 - FX si cobranza en moneda distinta a factura.
+- `invoice_letter` presente al emitir si empresa o cliente tienen `country = AR` ([D-084]).
 
 ## 12. Fórmulas relacionadas
 - [`TAX_FORMULAS.md`](../04-formulas/TAX_FORMULAS.md), [`CURRENCY_CONVERSION_FORMULAS.md`](../04-formulas/CURRENCY_CONVERSION_FORMULAS.md).

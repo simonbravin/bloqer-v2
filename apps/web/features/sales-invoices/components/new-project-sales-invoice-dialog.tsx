@@ -20,6 +20,8 @@ import {
 interface Props {
   projectId: string;
   clients: ClientOption[];
+  companyCountry?: string | null;
+  companyIvaCondition?: string | null;
   treasuryAccounts?: TreasuryAccountOption[];
   canCollectNow?: boolean;
   storageConfigured?: boolean;
@@ -29,6 +31,8 @@ interface Props {
 export function NewProjectSalesInvoiceDialog({
   projectId,
   clients,
+  companyCountry,
+  companyIvaCondition,
   treasuryAccounts = [],
   canCollectNow = false,
   storageConfigured = false,
@@ -83,6 +87,8 @@ export function NewProjectSalesInvoiceDialog({
           <ManualInvoiceForm
             projectId={projectId}
             clients={clients}
+            companyCountry={companyCountry}
+            companyIvaCondition={companyIvaCondition}
             treasuryAccounts={treasuryAccounts}
             canCollectNow={canCollectNow}
             storageConfigured={storageConfigured}

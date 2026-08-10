@@ -10,7 +10,7 @@ export default function NuevoContactoPage() {
       </div>
 
       <div className="rounded-lg border bg-card p-6">
-        <ContactForm onSubmit={createContactAction} defaultValues={{ initialRole: "CLIENT" }} />
+        <ContactForm onSubmit={createContactAction} defaultValues={{ initialRole: "CLIENT", country: "AR" }} />
       </div>
     </PageShell>
   );

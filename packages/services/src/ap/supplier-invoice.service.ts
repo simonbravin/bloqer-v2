@@ -1,6 +1,8 @@
 import { Prisma, prisma, SupplierInvoice } from "@bloqer/database";
 import type { CreateSupplierInvoiceInput, UpdateSupplierInvoiceInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
+import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
+import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
@@ -505,6 +507,14 @@ export async function createSupplierInvoice(
 
   const companyId = await resolveCompanyIdForAp(projectId, ctx);
 
+  const suggestedLetter =
+    input.invoiceLetter ??
+    (await resolveSuggestedApInvoiceLetter({
+      companyId,
+      supplierContactId: input.supplierContactId,
+      tenantId: ctx.tenantId,
+    }));
+
   const maxNum = await prisma.supplierInvoice.aggregate({
     where: { tenantId: ctx.tenantId, companyId },
     _max: { number: true },
@@ -523,6 +533,7 @@ export async function createSupplierInvoice(
         dueDate:           new Date(input.dueDate),
         currency:          input.currency ?? "ARS",
         fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : new Prisma.Decimal(1),
+        invoiceLetter:     suggestedLetter,
         notes:             input.notes ?? null,
         internalNotes:     input.internalNotes ?? null,
         purchaseOrderId:   input.purchaseOrderId ?? null,
@@ -676,6 +687,7 @@ export async function updateSupplierInvoice(
         internalNotes:   input.internalNotes,
         purchaseOrderId: nextPurchaseOrderId,
         fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : undefined,
+        ...(input.invoiceLetter !== undefined ? { invoiceLetter: input.invoiceLetter } : {}),
         updatedBy:       ctx.actorUserId,
       },
     });
@@ -771,7 +783,13 @@ export async function issueSupplierInvoice(
       : null;
 
   const result = await prisma.$transaction(async (tx) => {
-    const inv = await tx.supplierInvoice.findUnique({ where: { id } });
+    const inv = await tx.supplierInvoice.findUnique({
+      where: { id },
+      include: {
+        supplierContact: { select: { country: true } },
+        company: { select: { country: true } },
+      },
+    });
     if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
     if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
     if (projectScopeId !== undefined && inv.projectId !== projectScopeId) {
@@ -780,6 +798,13 @@ export async function issueSupplierInvoice(
     if (inv.status !== "DRAFT") {
       throw new ServiceError("CONFLICT", "Solo se pueden emitir facturas en estado Borrador");
     }
+
+    assertInvoiceLetterOnIssue({
+      invoiceLetter: inv.invoiceLetter,
+      companyCountry: inv.company.country,
+      counterpartyCountry: inv.supplierContact.country,
+      documentLabel: "factura de proveedor",
+    });
 
     const lines = await tx.supplierInvoiceLine.findMany({
       where: { invoiceId: id },

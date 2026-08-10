@@ -22,6 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { IvaConditionSelect } from "@/features/finance/components/invoice-letter-fields";
+import type { IvaConditionCode } from "@bloqer/domain";
 
 interface ContactFormProps {
   onSubmit: (data: CreateContactInput) => Promise<{ id?: string; ok?: true; error?: string }>;
@@ -140,6 +142,23 @@ export function ContactForm({ onSubmit, defaultValues, submitLabel = "Crear cont
           />
         </div>
 
+        <FormField
+          control={form.control}
+          name="ivaCondition"
+          render={({ field }) => (
+            <FormItem>
+              <FormControl>
+                <IvaConditionSelect
+                  id="ivaCondition"
+                  value={(field.value as IvaConditionCode | null | undefined) ?? null}
+                  onValueChange={(v) => field.onChange(v)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField
             control={form.control}
@@ -198,7 +217,7 @@ export function ContactForm({ onSubmit, defaultValues, submitLabel = "Crear cont
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <FormField
             control={form.control}
             name="province"
@@ -207,6 +226,25 @@ export function ContactForm({ onSubmit, defaultValues, submitLabel = "Crear cont
                 <FormLabel>Provincia</FormLabel>
                 <FormControl>
                   <Input placeholder="Buenos Aires" {...field} value={field.value ?? ""} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="country"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>País (ISO)</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="AR"
+                    maxLength={2}
+                    {...field}
+                    value={field.value ?? "AR"}
+                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

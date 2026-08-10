@@ -35,7 +35,7 @@ export type {
 } from "@prisma/client";
 export {
   UserStatus, TenantStatus, CompanyStatus, MembershipStatus, UserRole,
-  ContactStatus, ContactRoleType, ContactRoleStatus, TaxIdType,
+  ContactStatus, ContactRoleType, ContactRoleStatus, TaxIdType, IvaCondition, InvoiceLetter,
   ProjectStatus, ProjectType,
   ScheduleType, ScheduleItemType, ScheduleItemStatus, ScheduleDependencyType,
   BudgetStatus, WbsNodeType, CostCategory,

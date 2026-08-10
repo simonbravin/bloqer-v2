@@ -1,8 +1,14 @@
 import { notFound, redirect } from "next/navigation";
+import type { InvoiceLetterCode } from "@bloqer/domain";
 import { InvoiceEditForm } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
-import { getSalesInvoiceById, ServiceError } from "@bloqer/services";
+import {
+  getCompanyById,
+  getContactById,
+  getSalesInvoiceById,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
@@ -51,6 +57,17 @@ export default async function EditarFacturaPage({ params }: PageProps) {
     );
   }
 
+  let companyCountry: string | null = null;
+  let clientCountry: string | null = null;
+  try {
+    const company = await getCompanyById(invoice.companyId, ctx);
+    companyCountry = company.country;
+  } catch { /* optional */ }
+  try {
+    const client = await getContactById(invoice.clientContactId, ctx);
+    clientCountry = client.country;
+  } catch { /* optional */ }
+
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={invoice.code}>
       <div className="flex items-center gap-4">
@@ -64,11 +81,14 @@ export default async function EditarFacturaPage({ params }: PageProps) {
         <InvoiceEditForm
           projectId={id}
           invoiceId={invoiceId}
+          companyCountry={companyCountry}
+          clientCountry={clientCountry}
           defaults={{
             issueDate: toDateInput(invoice.issueDate),
             dueDate: toDateInput(invoice.dueDate),
             notes: invoice.notes ?? "",
             internalNotes: invoice.internalNotes ?? "",
+            invoiceLetter: (invoice.invoiceLetter as InvoiceLetterCode | null) ?? null,
           }}
         />
       </div>

@@ -5,6 +5,7 @@ import { applyPaymentToPayable } from "./apply-payment-to-payable";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/register-transaction.types";
+import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
 import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { isCrossCompany } from "../company-scope";
@@ -150,6 +151,11 @@ export async function registerApExpense(
     throw new ServiceError("CONFLICT", "El contacto seleccionado no tiene rol de proveedor activo");
   }
 
+  const supplier = await prisma.contact.findUnique({
+    where: { id: input.supplierContactId },
+    select: { country: true },
+  });
+
   let invoiceTotal = new Prisma.Decimal(0);
   for (const line of input.lines) {
     const qty = new Prisma.Decimal(line.quantity);
@@ -176,6 +182,16 @@ export async function registerApExpense(
   );
 
   const companyId = await resolveCompanyIdForAp(projectId, ctx);
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { country: true },
+  });
+  assertInvoiceLetterOnIssue({
+    invoiceLetter: input.invoiceLetter,
+    companyCountry: company?.country,
+    counterpartyCountry: supplier?.country,
+    documentLabel: "factura de proveedor",
+  });
 
   let outcome!: ApExpenseOutcome;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -198,6 +214,7 @@ export async function registerApExpense(
             dueDate: new Date(input.dueDate),
             currency: input.currency ?? "ARS",
             fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : new Prisma.Decimal(1),
+            invoiceLetter: input.invoiceLetter ?? null,
             notes: input.notes ?? null,
             internalNotes: input.internalNotes ?? null,
             purchaseOrderId: input.purchaseOrderId ?? null,

@@ -7,6 +7,9 @@ import {
   canEditArArea,
   getActiveInvoiceForCertification,
   getCertificationById,
+  getCompanyById,
+  getContactById,
+  getProjectById,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -85,12 +88,37 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
       currency: cert.currency,
     };
 
+    let companyCountry: string | null = null;
+    let companyIvaCondition: string | null = null;
+    let clientCountry: string | null = null;
+    let clientIvaCondition: string | null = null;
+    try {
+      if (ctx.companyId) {
+        const company = await getCompanyById(ctx.companyId, ctx);
+        companyCountry = company.country;
+        companyIvaCondition = company.ivaCondition;
+      }
+    } catch { /* defaults */ }
+    try {
+      const project = await getProjectById(projectId, ctx);
+      const client = await getContactById(project.clientContactId, ctx);
+      clientCountry = client.country;
+      clientIvaCondition = client.ivaCondition;
+    } catch { /* defaults */ }
+
     return (
       <PageShell variant="default" className="space-y-6">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold tracking-tight">Crear borrador de factura desde certificación</h1>
         </div>
-        <CertificationInvoiceForm projectId={projectId} cert={certSummary} />
+        <CertificationInvoiceForm
+          projectId={projectId}
+          cert={certSummary}
+          companyCountry={companyCountry}
+          companyIvaCondition={companyIvaCondition}
+          clientCountry={clientCountry}
+          clientIvaCondition={clientIvaCondition}
+        />
       </PageShell>
     );
   }

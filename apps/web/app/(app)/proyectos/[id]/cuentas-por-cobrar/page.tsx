@@ -114,6 +114,7 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
     totalAmount: inv.totalAmount,
     currency: inv.currency,
     clientName: inv.clientName,
+    invoiceLetter: inv.invoiceLetter,
   }));
   const collections: CollectionListItem[] = collectionsResult.data.map((c) => ({
     id: c.id,

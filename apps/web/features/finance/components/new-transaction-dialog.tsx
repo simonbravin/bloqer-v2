@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import {
+  requiresArInvoiceLetter,
+  suggestInvoiceLetter,
+  type InvoiceLetterCode,
+  type IvaConditionCode,
+} from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,13 +30,27 @@ import { cn } from "@/lib/utils";
 import { InvoiceLinesEditor } from "@/features/ap/components/invoice-lines-editor";
 import type { InvoiceLine } from "@/features/ap/components/invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
+import {
+  InvoiceLetterSelect,
+  invoiceLetterHint,
+} from "@/features/finance/components/invoice-letter-fields";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
 import { registerTransactionAction } from "@/app/(app)/finanzas/transacciones/actions";
 
-export type SupplierOption = { id: string; label: string };
-export type ClientOption = { id: string; label: string };
+export type SupplierOption = {
+  id: string;
+  label: string;
+  country?: string;
+  ivaCondition?: string | null;
+};
+export type ClientOption = {
+  id: string;
+  label: string;
+  country?: string;
+  ivaCondition?: string | null;
+};
 export type TreasuryAccountOption = { id: string; label: string; currency: string };
 
 type TransactionKind = "AP_EXPENSE" | "AR_INCOME" | "TREASURY_INFLOW";
@@ -41,6 +61,8 @@ type TraceLink = { entityType: string; entityId: string };
 interface Props {
   suppliers: SupplierOption[];
   clients?: ClientOption[];
+  companyCountry?: string | null;
+  companyIvaCondition?: string | null;
   treasuryAccounts: TreasuryAccountOption[];
   canAp: boolean;
   canTreasury: boolean;
@@ -97,6 +119,8 @@ function SegmentedOption({
 export function NewTransactionDialog({
   suppliers,
   clients = [],
+  companyCountry = null,
+  companyIvaCondition = null,
   treasuryAccounts,
   canAp,
   canTreasury,
@@ -116,6 +140,8 @@ export function NewTransactionDialog({
 
   const [supplierContactId, setSupplierContactId] = useState("");
   const [clientContactId, setClientContactId] = useState("");
+  const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(null);
+  const [letterTouched, setLetterTouched] = useState(false);
   const [lines, setLines] = useState<InvoiceLine[]>([{ ...DEFAULT_LINE }]);
   const [payNow, setPayNow] = useState(false);
   const [collectNow, setCollectNow] = useState(false);
@@ -126,6 +152,48 @@ export function NewTransactionDialog({
 
   const [inflowAccountId, setInflowAccountId] = useState("");
   const [counterpartyContactId, setCounterpartyContactId] = useState<string | null>(null);
+
+  const selectedSupplier = useMemo(
+    () => suppliers.find((s) => s.id === supplierContactId),
+    [suppliers, supplierContactId],
+  );
+  const selectedClient = useMemo(
+    () => clients.find((c) => c.id === clientContactId),
+    [clients, clientContactId],
+  );
+
+  const showLetterAp = requiresArInvoiceLetter(companyCountry, selectedSupplier?.country ?? null);
+  const showLetterAr = requiresArInvoiceLetter(companyCountry, selectedClient?.country ?? null);
+
+  useEffect(() => {
+    if (letterTouched) return;
+    if (kind === "AP_EXPENSE" && supplierContactId) {
+      setInvoiceLetter(
+        suggestInvoiceLetter({
+          issuerIvaCondition: (selectedSupplier?.ivaCondition as IvaConditionCode | null | undefined) ?? null,
+          receiverIvaCondition: (companyIvaCondition as IvaConditionCode | null) ?? null,
+          receiverCountry: companyCountry,
+        }),
+      );
+    } else if (kind === "AR_INCOME" && clientContactId) {
+      setInvoiceLetter(
+        suggestInvoiceLetter({
+          issuerIvaCondition: (companyIvaCondition as IvaConditionCode | null) ?? null,
+          receiverIvaCondition: (selectedClient?.ivaCondition as IvaConditionCode | null | undefined) ?? null,
+          receiverCountry: selectedClient?.country,
+        }),
+      );
+    }
+  }, [
+    kind,
+    supplierContactId,
+    clientContactId,
+    selectedSupplier,
+    selectedClient,
+    companyIvaCondition,
+    companyCountry,
+    letterTouched,
+  ]);
 
   useEffect(() => {
     if (defaultOpen) setOpen(true);
@@ -162,6 +230,8 @@ export function NewTransactionDialog({
     setAttachment(null);
     setSupplierContactId("");
     setClientContactId("");
+    setInvoiceLetter(null);
+    setLetterTouched(false);
     setLines([{ ...DEFAULT_LINE }]);
     setPayNow(false);
     setCollectNow(false);
@@ -249,6 +319,10 @@ export function NewTransactionDialog({
           setError("Debe seleccionar un proveedor");
           return;
         }
+        if (showLetterAp && !invoiceLetter) {
+          setError("Seleccioná el tipo de factura (A, B, C o E)");
+          return;
+        }
         if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {
           setError("Completá descripción, cantidad y precio en todas las líneas");
           return;
@@ -266,6 +340,7 @@ export function NewTransactionDialog({
           issueDate,
           dueDate,
           currency: "ARS",
+          invoiceLetter: showLetterAp ? invoiceLetter : null,
           notes: (fd.get("notes") as string) || null,
           internalNotes: null,
           lines: lines.map((l, i) => ({ ...l, sortOrder: i })),
@@ -313,6 +388,10 @@ export function NewTransactionDialog({
           setError("Debe seleccionar un cliente");
           return;
         }
+        if (showLetterAr && !invoiceLetter) {
+          setError("Seleccioná el tipo de factura (A, B, C o E)");
+          return;
+        }
         if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {
           setError("Completá descripción, cantidad y precio en todas las líneas");
           return;
@@ -334,6 +413,7 @@ export function NewTransactionDialog({
           issueDate,
           dueDate,
           currency: "ARS",
+          invoiceLetter: showLetterAr ? invoiceLetter : null,
           notes: (fd.get("arNotes") as string) || null,
           internalNotes: null,
           externalInvoiceRef: ((fd.get("arExternalInvoiceRef") as string) || "").trim() || null,
@@ -458,12 +538,27 @@ export function NewTransactionDialog({
                 <SearchableCombobox
                   options={toSearchableOptions(suppliers)}
                   value={supplierContactId}
-                  onValueChange={setSupplierContactId}
+                  onValueChange={(id) => {
+                    setSupplierContactId(id);
+                    setLetterTouched(false);
+                  }}
                   placeholder="Seleccionar proveedor..."
                   searchPlaceholder="Buscar proveedor..."
                   emptyText="Ningún proveedor coincide."
                 />
               </div>
+              {showLetterAp ? (
+                <InvoiceLetterSelect
+                  id="apInvoiceLetter"
+                  value={invoiceLetter}
+                  required
+                  onValueChange={(v) => {
+                    setLetterTouched(true);
+                    setInvoiceLetter(v);
+                  }}
+                  hint={invoiceLetterHint(invoiceLetter)}
+                />
+              ) : null}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label htmlFor="issueDate">Fecha de emisión</Label>
@@ -565,12 +660,27 @@ export function NewTransactionDialog({
                     <SearchableCombobox
                       options={clientOptionsRequired}
                       value={clientContactId}
-                      onValueChange={setClientContactId}
+                      onValueChange={(id) => {
+                        setClientContactId(id);
+                        setLetterTouched(false);
+                      }}
                       placeholder="Seleccionar cliente..."
                       searchPlaceholder="Buscar cliente..."
                       emptyText="Ningún cliente coincide."
                     />
                   </div>
+                  {showLetterAr ? (
+                    <InvoiceLetterSelect
+                      id="arInvoiceLetter"
+                      value={invoiceLetter}
+                      required
+                      onValueChange={(v) => {
+                        setLetterTouched(true);
+                        setInvoiceLetter(v);
+                      }}
+                      hint={invoiceLetterHint(invoiceLetter)}
+                    />
+                  ) : null}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <Label htmlFor="arIssueDate">Fecha de emisión</Label>

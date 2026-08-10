@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from "react";
 import type { TenantPrimaryCompanyView, TenantSettingsView } from "@bloqer/services";
+import type { IvaConditionCode } from "@bloqer/domain";
 import { formatCurrencyLabel, listTenantTimezoneSelectOptions, resolveDisplayTimeZone } from "@bloqer/utils";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { IvaConditionSelect } from "@/features/finance/components/invoice-letter-fields";
 import { cn } from "@/lib/utils";
 
 const COUNTRY_OPTIONS: { value: string; label: string }[] = [
@@ -37,6 +39,9 @@ type Props = {
 
 export function TenantDisplaySettingsForm({ tenant, company, action }: Props) {
   const [baseCurrency, setBaseCurrency] = useState(tenant.baseCurrency);
+  const [ivaCondition, setIvaCondition] = useState<IvaConditionCode | null>(
+    (company?.ivaCondition as IvaConditionCode | null | undefined) ?? null,
+  );
   const safeTimezone = resolveDisplayTimeZone(tenant.timezone);
   const timezoneInvalid =
     Boolean(tenant.timezone?.trim()) && tenant.timezone.trim() !== safeTimezone;
@@ -152,6 +157,13 @@ export function TenantDisplaySettingsForm({ tenant, company, action }: Props) {
               </select>
             </div>
           </div>
+          <IvaConditionSelect
+            id="ivaCondition"
+            name="ivaCondition"
+            value={ivaCondition}
+            onValueChange={setIvaCondition}
+            label="Condición frente al IVA"
+          />
           <div className="space-y-2">
             <Label htmlFor="phone">Teléfono</Label>
             <Input

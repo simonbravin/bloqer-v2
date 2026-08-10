@@ -15,6 +15,7 @@ import { UrlSortableTableHead } from "@/components/ui/url-sortable-table-head";
 import { SupplierInvoiceStatusBadge } from "./supplier-invoice-status-badge";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { SupplierInvoiceListItem } from "./supplier-invoice-list";
+import { formatInvoiceLetterBadge } from "@/features/finance/components/invoice-letter-fields";
 
 const PAYABLE_OPEN = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
 
@@ -43,6 +44,7 @@ export function SupplierInvoiceTable({
         <TableHeader>
           <TableRow>
             <TableHead>Código</TableHead>
+            <TableHead className="w-16">Tipo</TableHead>
             <TableHead>Proveedor</TableHead>
             <Suspense fallback={<TableHead>Emisión</TableHead>}>
               <UrlSortableTableHead label="Emisión" defaultDir="desc" />
@@ -61,6 +63,7 @@ export function SupplierInvoiceTable({
               inv.payableId &&
               inv.payableStatus &&
               PAYABLE_OPEN.has(inv.payableStatus);
+            const letter = formatInvoiceLetterBadge(inv.invoiceLetter);
             return (
               <TableRow key={inv.id}>
                 <TableCell className="font-mono text-sm">
@@ -70,6 +73,9 @@ export function SupplierInvoiceTable({
                   >
                     {inv.code}
                   </Link>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {letter ?? "—"}
                 </TableCell>
                 <TableCell className="font-medium">{inv.supplierName}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">

@@ -13,6 +13,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { SalesInvoiceStatusBadge } from "./sales-invoice-status-badge";
 import type { SalesInvoiceListItem } from "./sales-invoice-list";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { formatInvoiceLetterBadge } from "@/features/finance/components/invoice-letter-fields";
 
 export function SalesInvoiceTable({
   invoices,
@@ -33,6 +34,7 @@ export function SalesInvoiceTable({
         <TableHeader>
           <TableRow>
             <TableHead className="w-28">N°</TableHead>
+            <TableHead className="w-16">Tipo</TableHead>
             <TableHead>Cliente</TableHead>
             <TableHead>Emisión / Vto.</TableHead>
             <TableHead>Estado</TableHead>
@@ -40,28 +42,34 @@ export function SalesInvoiceTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {invoices.map((inv) => (
-            <TableRow key={inv.id}>
-              <TableCell className="font-mono text-sm font-medium">
-                <Link
-                  href={`/proyectos/${projectId}/facturas/${inv.id}`}
-                  className="text-primary hover:underline"
-                >
-                  {inv.code}
-                </Link>
-              </TableCell>
-              <TableCell className="text-sm">{inv.clientName}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {formatDate(inv.issueDate)} / {formatDate(inv.dueDate)}
-              </TableCell>
-              <TableCell>
-                <SalesInvoiceStatusBadge status={inv.status} />
-              </TableCell>
-              <TableCell className="text-right font-mono text-sm">
-                {formatMoneyAmount(inv.totalAmount)} {inv.currency}
-              </TableCell>
-            </TableRow>
-          ))}
+          {invoices.map((inv) => {
+            const letter = formatInvoiceLetterBadge(inv.invoiceLetter);
+            return (
+              <TableRow key={inv.id}>
+                <TableCell className="font-mono text-sm font-medium">
+                  <Link
+                    href={`/proyectos/${projectId}/facturas/${inv.id}`}
+                    className="text-primary hover:underline"
+                  >
+                    {inv.code}
+                  </Link>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {letter ?? "—"}
+                </TableCell>
+                <TableCell className="text-sm">{inv.clientName}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {formatDate(inv.issueDate)} / {formatDate(inv.dueDate)}
+                </TableCell>
+                <TableCell>
+                  <SalesInvoiceStatusBadge status={inv.status} />
+                </TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {formatMoneyAmount(inv.totalAmount)} {inv.currency}
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </TableScroll>

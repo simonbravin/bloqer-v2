@@ -109,6 +109,7 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
     totalAmount: inv.totalAmount,
     currency: inv.currency,
     status: inv.status,
+    invoiceLetter: inv.invoiceLetter,
   }));
   const payments: PaymentListItem[] = paymentsResult.data.map((p) => ({
     id: p.id,

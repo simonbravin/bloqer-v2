@@ -19,7 +19,8 @@ Impagos y falta de visibilidad de obligaciones futuras (AP aging).
 - Actualización estado factura `PAID/OVERDUE`.
 
 ## 6. Entidades principales
-- **PurchaseInvoice**, **Payable**, **Payment**, **TaxLine**.
+- **PurchaseInvoice** / implementación `SupplierInvoice` (incluye `invoice_letter` A/B/C/E — [D-084]), **Payable**, **Payment**, **TaxLine**.
+- Condición IVA del proveedor y de la empresa alimentan la sugerencia de letra del comprobante recibido.
 
 ## 7. Estados y transiciones
 Ver PurchaseInvoice, Payable en [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md).
@@ -45,10 +46,12 @@ Ver PurchaseInvoice, Payable en [`STATE_MACHINES.md`](../01-domain/STATE_MACHINE
 ## 10. Reglas de negocio
 - **BR-PAY-001**: pago no excede saldo Payable ([BR-TRZ-005]).
 - AP sin proyecto permitido ([D-009]).
+- Letra de comprobante A/B/C/E sugerida y editable; requerida al emitir si operación AR ([D-084]).
 
 ## 11. Validaciones
 - Proveedor coherente en factura y pago.
 - Periodo abierto ([BR-TRZ-003]).
+- `invoice_letter` presente al emitir si empresa o proveedor tienen `country = AR` ([D-084]).
 
 ## 12. Fórmulas relacionadas
 - [`TAX_FORMULAS.md`](../04-formulas/TAX_FORMULAS.md), [`TREASURY_BALANCE_FORMULAS.md`](../04-formulas/TREASURY_BALANCE_FORMULAS.md).

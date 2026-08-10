@@ -22,6 +22,8 @@ import type { InvoiceWbsOption } from "./invoice-lines-editor";
 interface Props {
   projectId: string;
   suppliers: SupplierOption[];
+  companyCountry?: string | null;
+  companyIvaCondition?: string | null;
   poOptions: POOption[];
   wbsOptions: InvoiceWbsOption[];
   treasuryAccounts?: TreasuryAccountOption[];
@@ -33,6 +35,8 @@ interface Props {
 export function NewProjectSupplierInvoiceDialog({
   projectId,
   suppliers,
+  companyCountry,
+  companyIvaCondition,
   poOptions,
   wbsOptions,
   treasuryAccounts = [],
@@ -93,6 +97,8 @@ export function NewProjectSupplierInvoiceDialog({
           <SupplierInvoiceForm
             projectId={projectId}
             suppliers={suppliers}
+            companyCountry={companyCountry}
+            companyIvaCondition={companyIvaCondition}
             poOptions={poOptions}
             wbsOptions={wbsOptions}
             treasuryAccounts={treasuryAccounts}

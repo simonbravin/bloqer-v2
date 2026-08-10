@@ -9,4 +9,5 @@ export type SupplierInvoiceListItem = {
   status: string;
   payableId?: string | null;
   payableStatus?: string | null;
+  invoiceLetter?: string | null;
 };

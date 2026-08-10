@@ -18,6 +18,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import {
+  getCompanyById,
   getProjectShellInfo,
   getTenantModuleGate,
   listContacts,
@@ -95,6 +96,7 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
     status: inv.status,
     payableId: inv.payable?.id ?? null,
     payableStatus: inv.payable?.status ?? null,
+    invoiceLetter: inv.invoiceLetter,
   }));
 
   const canCreateInvoice = can(ctx.roles, "EDIT", "AP");
@@ -103,6 +105,8 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
   let wbsOptions: { id: string; code: string; name: string }[] = [];
   let treasuryAccounts: TreasuryAccountOption[] = [];
   let canPayNow = false;
+  let companyCountry: string | null = null;
+  let companyIvaCondition: string | null = null;
 
   if (canCreateInvoice) {
     const gate = await getTenantModuleGate(ctx);
@@ -117,6 +121,8 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
       suppliers = suppliersResult.data.map((c) => ({
         id: c.id,
         label: c.fantasyName ?? c.legalName,
+        country: c.country,
+        ivaCondition: c.ivaCondition,
       }));
       poOptions = linkablePOs.map((po) => ({
         id: po.id,
@@ -129,6 +135,13 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
         code: n.code,
         name: n.name,
       }));
+      if (ctx.companyId) {
+        try {
+          const company = await getCompanyById(ctx.companyId, ctx);
+          companyCountry = company.country;
+          companyIvaCondition = company.ivaCondition;
+        } catch { /* defaults */ }
+      }
     } catch (err) {
       if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
       throw err;
@@ -165,6 +178,8 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
                   <NewProjectSupplierInvoiceDialog
                     projectId={id}
                     suppliers={suppliers}
+                    companyCountry={companyCountry}
+                    companyIvaCondition={companyIvaCondition}
                     poOptions={poOptions}
                     wbsOptions={wbsOptions}
                     treasuryAccounts={treasuryAccounts}

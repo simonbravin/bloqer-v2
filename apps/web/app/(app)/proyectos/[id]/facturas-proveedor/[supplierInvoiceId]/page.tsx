@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PayableStatusBadge, SupplierInvoiceStatusBadge } from "@/features/ap";
+import { formatInvoiceLetterBadge } from "@/features/finance/components/invoice-letter-fields";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
@@ -97,6 +98,11 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
         <SupplierInvoiceStatusBadge status={invoice.status} />
+        {formatInvoiceLetterBadge(invoice.invoiceLetter) ? (
+          <span className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground">
+            {formatInvoiceLetterBadge(invoice.invoiceLetter)}
+          </span>
+        ) : null}
       </div>
 
       <ActionErrorBanner message={sp.actionError} />

@@ -51,15 +51,16 @@ export default async function EditarContactoPage({ params }: PageProps) {
             fantasyName: contact.fantasyName ?? undefined,
             taxId: contact.taxId ?? undefined,
             taxIdType: contact.taxIdType ?? undefined,
+            ivaCondition: contact.ivaCondition ?? null,
             address: contact.address ?? undefined,
             city: contact.city ?? undefined,
             province: contact.province ?? undefined,
+            country: contact.country,
             phone: contact.phone ?? undefined,
             email: contact.email ?? undefined,
             notes: contact.notes ?? undefined,
           }}
-        />
-      </div>
+        />      </div>
     </PageShell>
   );
 }

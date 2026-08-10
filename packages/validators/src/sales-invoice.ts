@@ -6,6 +6,7 @@ import {
   ratePctString,
 } from "./money";
 import { treasurySettlementFieldsSchema } from "./treasury-settlement";
+import { invoiceLetterSchema } from "./contact";
 
 const invoiceLineSchema = z.object({
   description: z.string().min(1),
@@ -24,6 +25,8 @@ export const createSalesInvoiceSchema = z.object({
   issueDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dueDate:             z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   currency:            z.string().length(3).default("ARS"),
+  /** Letra A/B/C/E ([D-084]); required on issue when AR. */
+  invoiceLetter:       invoiceLetterSchema.optional().nullable(),
   notes:               z.string().optional().nullable(),
   internalNotes:       z.string().optional().nullable(),
   externalInvoiceRef:  z
@@ -41,6 +44,7 @@ export const createInvoiceFromCertificationSchema = z.object({
   issueDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dueDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   taxRate:         ratePctString.optional().default("0.0000"),
+  invoiceLetter:   invoiceLetterSchema.optional().nullable(),
   notes:           z.string().optional().nullable(),
   internalNotes:   z.string().optional().nullable(),
 });
@@ -48,6 +52,7 @@ export const createInvoiceFromCertificationSchema = z.object({
 export const updateSalesInvoiceSchema = z.object({
   issueDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   dueDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  invoiceLetter: invoiceLetterSchema.optional().nullable(),
   notes:         z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
 });

@@ -1,11 +1,21 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import {
+  requiresArInvoiceLetter,
+  suggestInvoiceLetter,
+  type InvoiceLetterCode,
+  type IvaConditionCode,
+} from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  InvoiceLetterSelect,
+  invoiceLetterHint,
+} from "@/features/finance/components/invoice-letter-fields";
 import { createInvoiceFromCertificationAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 
 export type CertSummary = {
@@ -20,24 +30,55 @@ export type CertSummary = {
 interface Props {
   projectId: string;
   cert: CertSummary;
+  companyCountry?: string | null;
+  companyIvaCondition?: string | null;
+  clientCountry?: string | null;
+  clientIvaCondition?: string | null;
 }
 
-export function CertificationInvoiceForm({ projectId, cert }: Props) {
+export function CertificationInvoiceForm({
+  projectId,
+  cert,
+  companyCountry = null,
+  companyIvaCondition = null,
+  clientCountry = null,
+  clientIvaCondition = null,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const showLetter = requiresArInvoiceLetter(companyCountry, clientCountry);
+  const suggested = useMemo(
+    () =>
+      suggestInvoiceLetter({
+        issuerIvaCondition: (companyIvaCondition as IvaConditionCode | null) ?? null,
+        receiverIvaCondition: (clientIvaCondition as IvaConditionCode | null) ?? null,
+        receiverCountry: clientCountry,
+      }),
+    [companyIvaCondition, clientIvaCondition, clientCountry],
+  );
+  const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(suggested);
+  const [taxRate, setTaxRate] = useState(
+    suggested === "A" ? "21" : suggested === "C" || suggested === "E" ? "0" : "0",
+  );
 
   const today = new Date().toISOString().slice(0, 10);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (showLetter && !invoiceLetter) {
+      setError("Seleccioná el tipo de factura (A, B, C o E)");
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
       const res = await createInvoiceFromCertificationAction(projectId, {
         certificationId: cert.id,
         issueDate: fd.get("issueDate") as string,
         dueDate:   fd.get("dueDate")   as string,
-        taxRate: (fd.get("taxRate") as string) || "0",
+        taxRate: taxRate || "0",
+        invoiceLetter: showLetter ? invoiceLetter : null,
         notes:     (fd.get("notes") as string) || null,
       });
       if ("error" in res) {
@@ -70,6 +111,21 @@ export function CertificationInvoiceForm({ projectId, cert }: Props) {
         )}
 
         <div className="grid grid-cols-2 gap-4">
+          {showLetter ? (
+            <div className="col-span-2">
+              <InvoiceLetterSelect
+                id="invoiceLetter"
+                value={invoiceLetter}
+                required
+                onValueChange={(v) => {
+                  setInvoiceLetter(v);
+                  if (v === "A") setTaxRate("21");
+                  if (v === "C" || v === "E") setTaxRate("0");
+                }}
+                hint={invoiceLetterHint(invoiceLetter)}
+              />
+            </div>
+          ) : null}
           <div className="space-y-1">
             <Label htmlFor="issueDate">Fecha de emisión</Label>
             <Input id="issueDate" name="issueDate" type="date" required defaultValue={today} />
@@ -80,7 +136,12 @@ export function CertificationInvoiceForm({ projectId, cert }: Props) {
           </div>
           <div className="space-y-1">
             <Label htmlFor="taxRate">Alícuota IVA (%)</Label>
-            <Input id="taxRate" name="taxRate" defaultValue="0" />
+            <Input
+              id="taxRate"
+              name="taxRate"
+              value={taxRate}
+              onChange={(e) => setTaxRate(e.target.value)}
+            />
             <p className="text-[11px] text-muted-foreground">
               El PU de la certificación ya incluye impuestos del presupuesto. Dejá 0 salvo que
               necesites discriminar IVA adicional en la factura.

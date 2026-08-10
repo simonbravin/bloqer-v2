@@ -10,4 +10,5 @@ export type SalesInvoiceListItem = {
   totalAmount: string;
   currency: string;
   clientName: string;
+  invoiceLetter?: string | null;
 };

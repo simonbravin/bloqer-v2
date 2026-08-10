@@ -27,6 +27,7 @@ import {
   evaluateThreeWayLineQtyMatch,
   invoiceExceedsReceivedWithTolerance,
 } from "../procurement/three-way-match-pure";
+import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 
 const LINKABLE_PO_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
 
@@ -476,6 +477,12 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
     throw new ServiceError("CONFLICT", "No hay líneas pendientes de facturación para esta OC");
   }
 
+  const suggestedLetter = await resolveSuggestedApInvoiceLetter({
+    companyId: po.companyId,
+    supplierContactId: po.supplierContactId,
+    tenantId: ctx.tenantId,
+  });
+
   return createSupplierInvoice(
     {
       projectId: input.projectId,
@@ -483,6 +490,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
       issueDate: toIsoDateLocal(),
       dueDate: defaultDueDate(),
       currency: po.currency,
+      invoiceLetter: suggestedLetter,
       purchaseOrderId: input.purchaseOrderId,
       internalNotes,
       notes: input.purchaseReceiptId

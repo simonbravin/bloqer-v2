@@ -9,6 +9,7 @@ import {
   ratePctString,
 } from "./money";
 import { treasurySettlementFieldsSchema } from "./treasury-settlement";
+import { invoiceLetterSchema } from "./contact";
 
 const supplierInvoiceLineSchema = z.object({
   description: z.string().min(1, "Descripción requerida"),
@@ -30,6 +31,8 @@ export const createSupplierInvoiceSchema = z.object({
   dueDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   currency:          z.string().length(3).default("ARS"),
   fxRate:            optionalFxRateString,
+  /** Letra A/B/C/E del comprobante recibido ([D-084]). */
+  invoiceLetter:     invoiceLetterSchema.optional().nullable(),
   notes:             z.string().optional().nullable(),
   internalNotes:     z.string().optional().nullable(),
   purchaseOrderId:   z.string().uuid().optional().nullable(),
@@ -41,6 +44,7 @@ export const updateSupplierInvoiceSchema = z.object({
   issueDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   dueDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   fxRate:            optionalFxRateString,
+  invoiceLetter:     invoiceLetterSchema.optional().nullable(),
   notes:             z.string().optional().nullable(),
   internalNotes:     z.string().optional().nullable(),
   purchaseOrderId:   z.string().uuid().optional().nullable(),

@@ -4,6 +4,12 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { PurchaseOrderInvoiceDraftPreview } from "@bloqer/services";
+import {
+  requiresArInvoiceLetter,
+  suggestInvoiceLetter,
+  type InvoiceLetterCode,
+  type IvaConditionCode,
+} from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +20,10 @@ import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
+import {
+  InvoiceLetterSelect,
+  invoiceLetterHint,
+} from "@/features/finance/components/invoice-letter-fields";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import {
@@ -23,7 +33,12 @@ import {
 } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
 import { createCompanySupplierInvoiceAction } from "@/app/(app)/finanzas/facturas-proveedor/actions";
 
-export type SupplierOption = { id: string; label: string };
+export type SupplierOption = {
+  id: string;
+  label: string;
+  country?: string;
+  ivaCondition?: string | null;
+};
 export type POOption = { id: string; code: string; supplierContactId: string; currency: string };
 export type TreasuryAccountOption = { id: string; label: string; currency: string };
 
@@ -32,6 +47,8 @@ interface Props {
   projectId?: string;
   companyFinanzas?: boolean;
   suppliers: SupplierOption[];
+  companyCountry?: string | null;
+  companyIvaCondition?: string | null;
   poOptions?: POOption[];
   /** Project WBS items for line imputation ([D-055]). */
   wbsOptions?: InvoiceWbsOption[];
@@ -60,6 +77,8 @@ export function SupplierInvoiceForm({
   projectId,
   companyFinanzas = false,
   suppliers,
+  companyCountry = null,
+  companyIvaCondition = null,
   poOptions = [],
   wbsOptions = [],
   treasuryAccounts = [],
@@ -73,6 +92,8 @@ export function SupplierInvoiceForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [supplierContactId, setSupplierContactId] = useState("");
+  const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(null);
+  const [letterTouched, setLetterTouched] = useState(false);
   const [purchaseOrderId, setPurchaseOrderId] = useState<string | null>(null);
   const [lines, setLines] = useState<InvoiceLine[]>([{ ...DEFAULT_LINE }]);
   const [payNow, setPayNow] = useState(false);
@@ -81,6 +102,29 @@ export function SupplierInvoiceForm({
   const [attachment, setAttachment] = useState<File | null>(null);
   const [poPreview, setPoPreview] = useState<PurchaseOrderInvoiceDraftPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  const selectedSupplier = useMemo(
+    () => suppliers.find((s) => s.id === supplierContactId),
+    [suppliers, supplierContactId],
+  );
+  const showLetter = requiresArInvoiceLetter(companyCountry, selectedSupplier?.country ?? null);
+
+  useEffect(() => {
+    if (!supplierContactId || letterTouched) return;
+    // Compra: emisor = proveedor, receptor = empresa
+    const suggested = suggestInvoiceLetter({
+      issuerIvaCondition: (selectedSupplier?.ivaCondition as IvaConditionCode | null | undefined) ?? null,
+      receiverIvaCondition: (companyIvaCondition as IvaConditionCode | null) ?? null,
+      receiverCountry: companyCountry,
+    });
+    setInvoiceLetter(suggested);
+    if (suggested === "A") {
+      setLines((prev) => prev.map((l) => ({ ...l, taxRate: l.taxRate === "0" ? "21" : l.taxRate })));
+    }
+    if (suggested === "C" || suggested === "E") {
+      setLines((prev) => prev.map((l) => ({ ...l, taxRate: "0" })));
+    }
+  }, [supplierContactId, selectedSupplier, companyIvaCondition, companyCountry, letterTouched]);
 
   const supportsPoPreview = Boolean(projectId) && !companyFinanzas;
 
@@ -189,6 +233,10 @@ export function SupplierInvoiceForm({
     e.preventDefault();
     setError(null);
     if (!supplierContactId) { setError("Debe seleccionar un proveedor"); return; }
+    if (showLetter && !invoiceLetter) {
+      setError("Seleccioná el tipo de factura (A, B, C o E)");
+      return;
+    }
     if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {
       setError("Completar descripción, cantidad y precio en todas las líneas");
       return;
@@ -202,6 +250,7 @@ export function SupplierInvoiceForm({
       return;
     }
     const fd = new FormData(e.currentTarget);
+    const letterPayload = showLetter ? invoiceLetter : null;
     startTransition(async () => {
       if (companyFinanzas) {
         const res = await createCompanySupplierInvoiceAction({
@@ -209,6 +258,7 @@ export function SupplierInvoiceForm({
           issueDate:     fd.get("issueDate") as string,
           dueDate:       fd.get("dueDate") as string,
           currency:      INVOICE_CURRENCY,
+          invoiceLetter: letterPayload,
           notes:         (fd.get("notes") as string) || null,
           internalNotes: null,
           lines:         lines.map((l, i) => ({ ...l, sortOrder: i })),
@@ -242,6 +292,7 @@ export function SupplierInvoiceForm({
           issueDate,
           dueDate: fd.get("dueDate") as string,
           currency: INVOICE_CURRENCY,
+          invoiceLetter: letterPayload,
           notes: (fd.get("notes") as string) || null,
           purchaseOrderId: purchaseOrderId ?? null,
           lines: lines.map((l, i) => ({ ...l, sortOrder: i })),
@@ -273,6 +324,7 @@ export function SupplierInvoiceForm({
         issueDate:       fd.get("issueDate")  as string,
         dueDate:         fd.get("dueDate")    as string,
         currency:        INVOICE_CURRENCY,
+        invoiceLetter:   letterPayload,
         notes:           (fd.get("notes") as string) || null,
         internalNotes:   null,
         purchaseOrderId: purchaseOrderId ?? null,
@@ -309,13 +361,39 @@ export function SupplierInvoiceForm({
               <SearchableCombobox
                 options={toSearchableOptions(suppliers)}
                 value={supplierContactId}
-                onValueChange={setSupplierContactId}
+                onValueChange={(id) => {
+                  setSupplierContactId(id);
+                  setLetterTouched(false);
+                }}
                 placeholder="Seleccionar proveedor…"
                 searchPlaceholder="Buscar proveedor…"
                 emptyText="Ningún proveedor coincide."
               />
             )}
           </div>
+
+          {showLetter ? (
+            <div className="col-span-2">
+              <InvoiceLetterSelect
+                id="invoiceLetter"
+                value={invoiceLetter}
+                required
+                onValueChange={(v) => {
+                  setLetterTouched(true);
+                  setInvoiceLetter(v);
+                  if (v === "A") {
+                    setLines((prev) =>
+                      prev.map((l) => ({ ...l, taxRate: l.taxRate === "0" ? "21" : l.taxRate })),
+                    );
+                  }
+                  if (v === "C" || v === "E") {
+                    setLines((prev) => prev.map((l) => ({ ...l, taxRate: "0" })));
+                  }
+                }}
+                hint={invoiceLetterHint(invoiceLetter)}
+              />
+            </div>
+          ) : null}
 
           {filteredPOs.length > 0 && !companyFinanzas && (
             <div className="col-span-2 space-y-1">

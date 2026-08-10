@@ -162,6 +162,24 @@ enum TaxIdType {
   FINAL_CONSUMER
 }
 
+/// Condición frente al IVA (Argentina) — [D-084].
+enum IvaCondition {
+  RESPONSIBLE_INSCRIPTO
+  MONOTAX
+  EXEMPT
+  FINAL_CONSUMER
+  NOT_CATEGORIZED
+  FOREIGN
+}
+
+/// Letra de comprobante argentino A/B/C/E — [D-084].
+enum InvoiceLetter {
+  A
+  B
+  C
+  E
+}
+
 enum ProjectStatus {
   DRAFT
   ACTIVE
@@ -702,6 +720,8 @@ model Company {
   address                String?
   city                   String?
   country                String                 @default("AR")
+  /// Condición frente al IVA del emisor ([D-084]).
+  ivaCondition           IvaCondition?
   phone                  String?
   website                String?                @db.VarChar(512)
   industry               String?                @db.VarChar(128)
@@ -940,6 +960,8 @@ model Contact {
   fantasyName String?
   taxId       String?
   taxIdType   TaxIdType?
+  /// Condición frente al IVA ([D-084]).
+  ivaCondition IvaCondition?
   address     String?
   city        String?
   province    String?
@@ -1438,6 +1460,8 @@ model SalesInvoice {
   /// Not a Prisma @@unique (that would incorrectly block CANCELLED rows).
   certificationId    String?
   number             Int
+  /// Letra de comprobante A/B/C/E ([D-084]); required on issue when operation is AR.
+  invoiceLetter      InvoiceLetter?
   issueDate          DateTime           @db.Date
   dueDate            DateTime           @db.Date
   currency           String             @default("ARS")
@@ -1469,6 +1493,7 @@ model SalesInvoice {
   @@index([tenantId, projectId])
   @@index([tenantId, certificationId])
   @@index([tenantId, status])
+  @@index([tenantId, invoiceLetter])
   @@map("sales_invoices")
 }
 
@@ -1885,6 +1910,8 @@ model SupplierInvoice {
   projectId         String?
   supplierContactId String
   number            Int
+  /// Letra de comprobante A/B/C/E del comprobante recibido ([D-084]).
+  invoiceLetter     InvoiceLetter?
   issueDate         DateTime              @db.Date
   dueDate           DateTime              @db.Date
   currency          String                @default("ARS")
@@ -1921,6 +1948,7 @@ model SupplierInvoice {
   @@index([tenantId, projectId])
   @@index([tenantId, status])
   @@index([tenantId, supplierContactId])
+  @@index([tenantId, invoiceLetter])
   @@map("supplier_invoices")
 }
 

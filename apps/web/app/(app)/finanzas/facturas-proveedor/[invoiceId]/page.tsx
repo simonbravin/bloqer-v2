@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PayableStatusBadge, SupplierInvoiceStatusBadge } from "@/features/ap";
+import { formatInvoiceLetterBadge } from "@/features/finance/components/invoice-letter-fields";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { getCurrentUser } from "@/lib/auth";
@@ -91,6 +92,11 @@ export default async function FinanzasFacturaProveedorDetailPage({
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
         <SupplierInvoiceStatusBadge status={invoice.status} />
+        {formatInvoiceLetterBadge(invoice.invoiceLetter) ? (
+          <span className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground">
+            {formatInvoiceLetterBadge(invoice.invoiceLetter)}
+          </span>
+        ) : null}
       </div>
 
       <ActionErrorBanner message={sp.actionError} />
@@ -169,6 +175,11 @@ export default async function FinanzasFacturaProveedorDetailPage({
 
       {canEditAp ? (
         <div className="flex flex-wrap gap-2">
+          {isDraft && (
+            <Button asChild variant="outline">
+              <Link href={`/finanzas/facturas-proveedor/${invoiceId}/editar`}>Editar</Link>
+            </Button>
+          )}
           {isDraft && (
             <form
               action={async () => {

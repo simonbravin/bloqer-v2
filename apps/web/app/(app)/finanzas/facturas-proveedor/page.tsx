@@ -15,7 +15,7 @@ import { ReportExportActions } from "@/features/reports";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
-import { listCompanySupplierInvoices, listContacts, canRegisterApPayment, ServiceError } from "@bloqer/services";
+import { listCompanySupplierInvoices, listContacts, getCompanyById, canRegisterApPayment, ServiceError } from "@bloqer/services";
 import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -95,11 +95,24 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     status: inv.status,
     payableId: inv.payable?.id ?? null,
     payableStatus: inv.payable?.status ?? null,
+    invoiceLetter: inv.invoiceLetter,
   }));
   const suppliers: SupplierOption[] = (suppliersResult?.data ?? []).map((contact) => ({
     id: contact.id,
     label: contact.fantasyName ?? contact.legalName,
+    country: contact.country,
+    ivaCondition: contact.ivaCondition,
   }));
+
+  let companyCountry: string | null = null;
+  let companyIvaCondition: string | null = null;
+  if (ctx.companyId) {
+    try {
+      const company = await getCompanyById(ctx.companyId, ctx);
+      companyCountry = company.country;
+      companyIvaCondition = company.ivaCondition;
+    } catch { /* defaults */ }
+  }
 
   function q(next: Record<string, string | undefined>) {
     const p = new URLSearchParams();
@@ -133,6 +146,8 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
             <Suspense fallback={null}>
               <NewCompanySupplierInvoiceDialog
                 suppliers={suppliers}
+                companyCountry={companyCountry}
+                companyIvaCondition={companyIvaCondition}
                 defaultOpen={sp.create === "1"}
                 storageConfigured={isStorageConfigured()}
               />

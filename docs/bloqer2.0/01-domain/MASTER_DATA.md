@@ -123,6 +123,31 @@ Otros
 
 **Defaults precargados:** Factura A/B/C/E, Nota de crédito A/B/C, Nota de débito A/B/C, Recibo, OC, Orden de pago, Certificado, Contrato, Adenda, Change Order, RFI.
 
+> En Fase actual la letra de factura se persiste como `invoice_letter` en `SalesInvoice` / `SupplierInvoice` ([D-084]); la tabla `DocumentType` sigue como catálogo futuro (impresión / numeración).
+
+### 2.6b IvaCondition (Condición frente al IVA — Argentina)
+
+Catálogo enum en `Company` y `Contact` ([D-084]). Labels UI es-AR:
+
+| Canonical | UI (es-AR) |
+|---|---|
+| `RESPONSIBLE_INSCRIPTO` | Responsable Inscripto |
+| `MONOTAX` | Monotributo |
+| `EXEMPT` | Exento |
+| `FINAL_CONSUMER` | Consumidor Final |
+| `NOT_CATEGORIZED` | No categorizado |
+| `FOREIGN` | Sujeto del exterior |
+
+**Matriz de sugerencia de `invoice_letter`** (editable; no bloquea):
+
+| Emisor → Receptor | Letra |
+|---|---|
+| Monotributo / Exento → cualquiera | C |
+| RI → RI | A |
+| RI → CF / Monotributo / Exento / No categorizado | B |
+| RI → Exterior (`FOREIGN` o `country ≠ AR`) | E |
+| Datos insuficientes | sin sugerencia (selección manual) |
+
 ---
 
 ### 2.7 Account (Cuentas — semilla)

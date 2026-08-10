@@ -4,6 +4,7 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { SupplierInvoiceStatusBadge } from "./supplier-invoice-status-badge";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { SupplierInvoiceListItem } from "./supplier-invoice-list";
+import { formatInvoiceLetterBadge } from "@/features/finance/components/invoice-letter-fields";
 
 const PAYABLE_OPEN = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
 
@@ -34,6 +35,7 @@ export function SupplierInvoiceCards({
           inv.payableId &&
           inv.payableStatus &&
           PAYABLE_OPEN.has(inv.payableStatus);
+        const letter = formatInvoiceLetterBadge(inv.invoiceLetter);
         return (
           <div
             key={inv.id}
@@ -41,7 +43,10 @@ export function SupplierInvoiceCards({
           >
             <Link href={`${hrefPrefix}/${inv.id}`} className="flex flex-col min-w-0">
               <div className="flex items-start justify-between gap-2">
-                <span className="font-mono text-xs text-muted-foreground">{inv.code}</span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {inv.code}
+                  {letter ? ` · ${letter}` : ""}
+                </span>
                 <SupplierInvoiceStatusBadge status={inv.status} />
               </div>
               <p className="mt-2 font-semibold">{inv.supplierName}</p>

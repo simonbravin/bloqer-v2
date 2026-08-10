@@ -47,7 +47,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Contact: `ACTIVE` �
 ## 11. Validaciones
 - Formato CUIT/CUIL (11 dígitos + dígito verificador recomendado).
 - Email y teléfono en formato estándar.
-- Condición de IVA / categoría fiscal según país (Argentina: responsable inscripto, monotributo, etc., como catálogo).
+- Condición frente al IVA (`iva_condition`) según catálogo argentino ([D-084] / [`MASTER_DATA.md`](../01-domain/MASTER_DATA.md) §2.6b): Responsable Inscripto, Monotributo, Exento, Consumidor Final, No categorizado, Sujeto del exterior.
 
 ## 12. Fórmulas relacionadas
 _No aplica directamente._ Reportes agregan datos de contacto vía joins.

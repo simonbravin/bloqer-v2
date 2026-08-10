@@ -16,11 +16,25 @@ export const taxIdTypeSchema = z.enum([
   "FINAL_CONSUMER",
 ]);
 
+/** Condición frente al IVA — [D-084]. */
+export const ivaConditionSchema = z.enum([
+  "RESPONSIBLE_INSCRIPTO",
+  "MONOTAX",
+  "EXEMPT",
+  "FINAL_CONSUMER",
+  "NOT_CATEGORIZED",
+  "FOREIGN",
+]);
+
+/** Letra de comprobante A/B/C/E — [D-084]. */
+export const invoiceLetterSchema = z.enum(["A", "B", "C", "E"]);
+
 export const createContactSchema = z.object({
   legalName: z.string().min(1, "La razón social es obligatoria").max(255),
   fantasyName: z.string().max(255).optional(),
   taxId: z.string().max(20).optional(),
   taxIdType: taxIdTypeSchema.optional(),
+  ivaCondition: ivaConditionSchema.optional().nullable(),
   address: z.string().max(500).optional(),
   city: z.string().max(100).optional(),
   province: z.string().max(100).optional(),
@@ -36,6 +50,7 @@ export const updateContactSchema = z.object({
   fantasyName: z.string().max(255).optional(),
   taxId: z.string().max(20).optional(),
   taxIdType: taxIdTypeSchema.optional(),
+  ivaCondition: ivaConditionSchema.optional().nullable(),
   address: z.string().max(500).optional(),
   city: z.string().max(100).optional(),
   province: z.string().max(100).optional(),

@@ -29,7 +29,7 @@
 ### Company
 - **Propósito:** razón social dentro de un tenant. Pendiente decidir si es 1:1 con tenant o N:1 ([Q-001]).
 - **Identidad:** `company_id`.
-- **Atributos clave:** nombre legal, CUIT, dirección fiscal, datos bancarios.
+- **Atributos clave:** nombre legal, CUIT, dirección fiscal, `country`, `iva_condition` (condición frente al IVA — [D-084]), datos bancarios.
 - **Tenant-scoped:** sí.
 
 ### User
@@ -111,7 +111,7 @@
 ### Contact
 - **Propósito:** entidad raíz del directorio. Persona física o jurídica.
 - **Identidad:** CUIT/CUIL único por tenant (validación recomendada).
-- **Atributos clave:** legal_name, fantasy_name, tax_id, address, phone, email, contact_persons[], notes.
+- **Atributos clave:** legal_name, fantasy_name, tax_id, tax_id_type, `country`, `iva_condition` (condición frente al IVA — [D-084]), address, phone, email, contact_persons[], notes.
 - **Tenant-scoped:** sí.
 
 ### ContactRole
@@ -216,7 +216,7 @@
 
 ### SalesInvoice
 - **Propósito:** factura de venta emitida al cliente.
-- **Atributos clave:** project_id (opcional para venta general), client_id, type (`A`/`B`/`C`/`E`), number, issue_date, due_date, items[], subtotal, taxes[], total, currency, status, certification_id (opcional), document_id.
+- **Atributos clave:** project_id (opcional para venta general), client_id, `invoice_letter` (`A`/`B`/`C`/`E` — [D-084]; requerido al emitir si operación AR), number, issue_date, due_date, items[], subtotal, taxes[], total, currency, status, certification_id (opcional), `external_invoice_ref`, document_id.
 - **Estados:** `DRAFT | ISSUED | PAID | OVERDUE | CANCELLED`.
 
 ### DirectSale
@@ -247,8 +247,9 @@
 
 ### PurchaseInvoice
 - **Propósito:** factura recibida del proveedor.
-- **Atributos clave:** supplier_id, project_id (opcional), po_id (opcional), number (proveedor), issue_date, due_date, items[], subtotal, taxes[], retentions[], total, currency, status, document_id.
+- **Atributos clave:** supplier_id, project_id (opcional), po_id (opcional), number (proveedor), `invoice_letter` (`A`/`B`/`C`/`E` — [D-084]; requerido al emitir si operación AR), issue_date, due_date, items[], subtotal, taxes[], retentions[], total, currency, status, document_id.
 - **Estados:** `DRAFT | ISSUED | APPROVED | PAID | OVERDUE | CANCELLED`.
+- **Nota implementación:** en Prisma/código la entidad se llama `SupplierInvoice`.
 
 ### PurchaseInvoiceLine
 - **Propósito:** línea de factura de compra.
