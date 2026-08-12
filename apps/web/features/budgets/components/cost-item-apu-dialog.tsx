@@ -636,7 +636,7 @@ export function CostItemApuDialog({
                       onChange={handleEntryModeChange}
                       totalDisabled={!canUseTotalPartidaMode(parseFloat(quantity) || 0)}
                       unitTooltip={`Consumo y precio por cada 1 ${itemUnitLabel}. Total partida = aporte × ${fmtNum(quantity)} ${itemUnitLabel}.`}
-                      totalTooltip={`Cantidad total del recurso para esta partida. No se multiplica de nuevo por ${fmtNum(quantity)} ${itemUnitLabel}. Para importes sin compra usá unidad Global.`}
+                      totalTooltip={`Cantidad total del recurso para esta partida. No se multiplica otra vez por ${fmtNum(quantity)} ${itemUnitLabel}. Importes sin compra: unidad Global.`}
                     />
                   </div>
                   <p className="text-[10px] leading-snug text-muted-foreground">
