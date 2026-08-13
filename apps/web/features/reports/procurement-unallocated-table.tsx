@@ -10,13 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-
-function fmt(value: string) {
-  return parseFloat(value).toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 const DOC_LABELS: Record<ProcurementUnallocatedRow["documentType"], string> = {
   PO_LINE: "OC",
@@ -59,7 +53,7 @@ export function ProcurementUnallocatedTable({ rows }: Props) {
               <TableCell className="max-w-[min(16rem,30vw)] truncate" title={row.description}>
                 {row.description}
               </TableCell>
-              <TableCell className="text-right font-mono">{fmt(row.amount)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.amount)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

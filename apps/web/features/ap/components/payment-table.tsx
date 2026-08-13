@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,10 +44,7 @@ export function PaymentTable({
               <TableCell className="text-sm">{formatDate(p.paymentDate)}</TableCell>
               <TableCell className="text-sm">{p.accountName}</TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">
-                {Number(p.amount).toLocaleString("es-AR", {
-                  style: "currency",
-                  currency: p.currency,
-                })}
+                {formatMoneyAmount(p.amount, p.currency)}
               </TableCell>
               <TableCell>
                 <Badge variant={p.status === "CANCELLED" ? "destructive" : "default"}>

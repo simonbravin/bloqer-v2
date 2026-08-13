@@ -20,6 +20,7 @@ import {
   ServiceError,
   type WbsViewNode,
 } from "@bloqer/services";
+import { addDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
@@ -105,14 +106,12 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
     }
     return walk(tree);
   })();
-  const costStr = budget.totalCost.toString();
-  const saleStr = budget.totalSalePrice.toString();
-  const costN = parseFloat(costStr);
-  const saleN = parseFloat(saleStr);
-  const marginStr =
-    Number.isFinite(costN) && Number.isFinite(saleN)
-      ? formatMoneyAmount(String(saleN - costN), budget.currency)
-      : "—";
+  const costStr = serializeMoney(budget.totalCost.toString());
+  const saleStr = serializeMoney(budget.totalSalePrice.toString());
+  const marginStr = formatMoneyAmount(
+    serializeMoney(addDecimal(saleStr, multiplyDecimal(costStr, "-1"))),
+    budget.currency,
+  );
 
   const s = budget.settings;
   const settingsDefaults = {

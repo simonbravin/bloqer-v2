@@ -10,13 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-
-function formatAmount(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 interface Props {
   payments: PaymentDetail[];
@@ -50,7 +44,7 @@ export function PaymentDetailTable({ payments, currency }: Props) {
                 <TableCell className="text-muted-foreground">#{p.supplierInvoiceNumber}</TableCell>
                 <TableCell className="text-muted-foreground text-xs">{p.accountName}</TableCell>
                 <TableCell className="text-right tabular-nums font-mono text-red-600 dark:text-red-400">
-                  {formatAmount(p.amount)}
+                  {formatMoneyAmount(p.amount)}
                 </TableCell>
               </TableRow>
             ))}

@@ -10,13 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-
-function fmt(value: string) {
-  return parseFloat(value).toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 type Props = { rows: MaterialWbsRow[] };
 
@@ -40,9 +34,9 @@ export function MaterialWbsTable({ rows }: Props) {
               <TableCell className="max-w-[min(18rem,35vw)] truncate" title={row.wbsName}>
                 {row.wbsName}
               </TableCell>
-              <TableCell className="text-right font-mono">{fmt(row.budgetMaterial)}</TableCell>
-              <TableCell className="text-right font-mono">{fmt(row.consumedCost)}</TableCell>
-              <TableCell className="text-right font-mono">{fmt(row.variance)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.budgetMaterial)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.consumedCost)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.variance)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

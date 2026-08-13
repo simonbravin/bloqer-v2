@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { createPurchaseReceiptAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 import type { PurchaseOrderLineView } from "@bloqer/services";
+import { formatQtyFromString, isPositiveQty, compareQty } from "@/lib/format-money";
 
 export type WarehouseOption = { id: string; name: string };
 
@@ -47,7 +48,7 @@ export function ReceiptForm({ projectId, purchaseOrderId, purchaseOrderCode, poL
 
   const [lines, setLines] = useState<ReceiptLine[]>(
     poLines
-      .filter((l) => parseFloat(l.remainingQuantity) > 0)
+      .filter((l) => isPositiveQty(l.remainingQuantity))
       .map((l) => ({
         purchaseOrderLineId: l.id,
         description:         l.description,
@@ -63,16 +64,16 @@ export function ReceiptForm({ projectId, purchaseOrderId, purchaseOrderCode, poL
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const activeLines = lines.filter((l) => parseFloat(l.quantityReceived) > 0);
+    const activeLines = lines.filter((l) => isPositiveQty(l.quantityReceived));
     if (activeLines.length === 0) {
       setError("Debe ingresar al menos una cantidad mayor a cero");
       return;
     }
     for (const l of activeLines) {
-      const qty = parseFloat(l.quantityReceived);
-      const rem = parseFloat(l.remaining);
-      if (qty > rem) {
-        setError(`La cantidad de "${l.description}" excede la cantidad pendiente (${rem})`);
+      if (compareQty(l.quantityReceived, l.remaining) > 0) {
+        setError(
+          `La cantidad de "${l.description}" excede la cantidad pendiente (${formatQtyFromString(l.remaining)})`,
+        );
         return;
       }
     }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
 import { PurchaseOrderReceiptBadge } from "./purchase-order-receipt-badge";
@@ -44,10 +45,7 @@ export function PurchaseOrderCards({
             </p>
           ) : null}
           <p className="mt-3 text-lg font-semibold tabular-nums">
-            {Number(order.totalAmount).toLocaleString("es-AR", {
-              style: "currency",
-              currency: order.currency,
-            })}
+            {formatMoneyAmount(order.totalAmount, order.currency)}
           </p>
         </Link>
       ))}

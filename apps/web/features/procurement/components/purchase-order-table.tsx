@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import {
   Table,
   TableBody,
@@ -60,10 +61,7 @@ export function PurchaseOrderTable({
                 <PurchaseOrderReceiptBadge status={order.status} />
               </TableCell>
               <TableCell className="text-right tabular-nums font-medium">
-                {Number(order.totalAmount).toLocaleString("es-AR", {
-                  style: "currency",
-                  currency: order.currency,
-                })}
+                {formatMoneyAmount(order.totalAmount, order.currency)}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {order.approvedByName ?? "—"}

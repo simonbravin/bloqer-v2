@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyFromString } from "@/lib/format-money";
 import { CATEGORY_LABELS, VISIBLE_COST_CATEGORIES, type VisibleCostCategory } from "@/lib/budget-categories";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { UnitSelect } from "./unit-select";
@@ -76,10 +76,7 @@ function parseQuantityInput(quantity: string): number | undefined {
 }
 
 function fmtNum(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  }).format(parseFloat(value) || 0);
+  return formatQtyFromString(value);
 }
 
 function fmtMoney(value: string, currency: string) {

@@ -5,6 +5,7 @@ import { SupplierInvoiceStatusBadge } from "./supplier-invoice-status-badge";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { SupplierInvoiceListItem } from "./supplier-invoice-list";
 import { formatInvoiceLetterBadge } from "@bloqer/domain";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 const PAYABLE_OPEN = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
 
@@ -54,10 +55,7 @@ export function SupplierInvoiceCards({
                 Vence {formatDate(inv.dueDate)}
               </p>
               <p className="mt-3 text-lg font-semibold tabular-nums">
-                {Number(inv.totalAmount).toLocaleString("es-AR", {
-                  style: "currency",
-                  currency: inv.currency,
-                })}
+                {formatMoneyAmount(inv.totalAmount, inv.currency)}
               </p>
             </Link>
             <div className="mt-3 flex items-center gap-2 border-t pt-3">

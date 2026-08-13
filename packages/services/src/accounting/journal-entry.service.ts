@@ -49,8 +49,8 @@ export function assertSourcedLineMoneyUnchanged(
   for (let i = 0; i < existing.length; i++) {
     const ex = existing[i]!;
     const nw = incoming[i]!;
-    const exDebit = serializeMoneyDecimal(typeof ex.debit === "string" ? ex.debit : ex.debit);
-    const exCredit = serializeMoneyDecimal(typeof ex.credit === "string" ? ex.credit : ex.credit);
+    const exDebit = serializeMoneyDecimal(ex.debit);
+    const exCredit = serializeMoneyDecimal(ex.credit);
     const nwDebit = serializeMoneyDecimal(nw.debit);
     const nwCredit = serializeMoneyDecimal(nw.credit);
     if (exDebit !== nwDebit || exCredit !== nwCredit || ex.currency !== nw.currency) {

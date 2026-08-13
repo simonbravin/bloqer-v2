@@ -18,14 +18,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { CostVarianceBadge } from "./cost-variance-badge";
-
-function formatAmount(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
 
 const COLUMN_HINTS: Record<string, string> = {
   committed:
@@ -112,39 +106,39 @@ export function CostControlTable({ rows, totals, projectId }: Props) {
                     <span className="ml-1 text-yellow-600 text-xs">(sin análisis)</span>
                   )}
                 </TableCell>
-                <TableCell className="text-right">{formatAmount(row.budgetTotalCost)}</TableCell>
+                <TableCell className="text-right">{formatMoneyAmount(row.budgetTotalCost)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {formatAmount(row.budgetTotalSale)}
+                  {formatMoneyAmount(row.budgetTotalSale)}
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatAmount(row.certifiedApproved)}
+                  {formatMoneyAmount(row.certifiedApproved)}
                   {row.flags.overCertified && <span className="ml-1 text-destructive">!</span>}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {formatAmount(row.committedCost)}
+                  {formatMoneyAmount(row.committedCost)}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {formatAmount(row.receivedCost)}
+                  {formatMoneyAmount(row.receivedCost)}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {formatAmount(row.accruedCost)}
+                  {formatMoneyAmount(row.accruedCost)}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {formatAmount(row.paidCost)}
+                  {formatMoneyAmount(row.paidCost)}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {formatAmount(row.inventoryConsumedCost)}
+                  {formatMoneyAmount(row.inventoryConsumedCost)}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {formatAmount(row.openCommittedCost)}
+                  {formatMoneyAmount(row.openCommittedCost)}
                 </TableCell>
                 <TableCell className="text-right font-medium">
-                  {formatAmount(row.expectedCostExposure)}
+                  {formatMoneyAmount(row.expectedCostExposure)}
                 </TableCell>
                 <TableCell className="text-right">
                   <CostVarianceBadge
                     variance={row.costVariance}
-                    label={formatAmount(row.costVariance)}
+                    label={formatMoneyAmount(row.costVariance)}
                   />
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
@@ -156,17 +150,17 @@ export function CostControlTable({ rows, totals, projectId }: Props) {
           <TableFooter>
             <TableRow className="font-semibold">
               <TableCell colSpan={2}>Total</TableCell>
-              <TableCell className="text-right">{formatAmount(totals.budgetTotalCost)}</TableCell>
-              <TableCell className="text-right">{formatAmount(totals.budgetTotalSale)}</TableCell>
-              <TableCell className="text-right">{formatAmount(totals.certifiedApproved)}</TableCell>
-              <TableCell className="text-right">{formatAmount(totals.committedCost)}</TableCell>
-              <TableCell className="text-right">{formatAmount(totals.receivedCost)}</TableCell>
-              <TableCell className="text-right">{formatAmount(totals.accruedCost)}</TableCell>
-              <TableCell className="text-right">{formatAmount(totals.paidCost)}</TableCell>
-              <TableCell className="text-right">{formatAmount(totals.inventoryConsumedCost)}</TableCell>
-              <TableCell className="text-right">{formatAmount(totals.openCommittedCost)}</TableCell>
-              <TableCell className="text-right">{formatAmount(totals.expectedCostExposure)}</TableCell>
-              <TableCell className="text-right">{formatAmount(totals.costVariance)}</TableCell>
+              <TableCell className="text-right">{formatMoneyAmount(totals.budgetTotalCost)}</TableCell>
+              <TableCell className="text-right">{formatMoneyAmount(totals.budgetTotalSale)}</TableCell>
+              <TableCell className="text-right">{formatMoneyAmount(totals.certifiedApproved)}</TableCell>
+              <TableCell className="text-right">{formatMoneyAmount(totals.committedCost)}</TableCell>
+              <TableCell className="text-right">{formatMoneyAmount(totals.receivedCost)}</TableCell>
+              <TableCell className="text-right">{formatMoneyAmount(totals.accruedCost)}</TableCell>
+              <TableCell className="text-right">{formatMoneyAmount(totals.paidCost)}</TableCell>
+              <TableCell className="text-right">{formatMoneyAmount(totals.inventoryConsumedCost)}</TableCell>
+              <TableCell className="text-right">{formatMoneyAmount(totals.openCommittedCost)}</TableCell>
+              <TableCell className="text-right">{formatMoneyAmount(totals.expectedCostExposure)}</TableCell>
+              <TableCell className="text-right">{formatMoneyAmount(totals.costVariance)}</TableCell>
               <TableCell />
             </TableRow>
           </TableFooter>

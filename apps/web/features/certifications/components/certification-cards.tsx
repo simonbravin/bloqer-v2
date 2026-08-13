@@ -3,16 +3,7 @@ import { formatDate } from "@/lib/format";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { CertificationStatusBadge } from "./certification-status-badge";
 import type { CertificationListItem } from "./certification-list";
-
-function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      parseFloat(value),
-    ) +
-    " " +
-    currency
-  );
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 export function CertificationCards({
   certifications,
@@ -43,7 +34,7 @@ export function CertificationCards({
             {formatDate(c.periodStart)} — {formatDate(c.periodEnd)}
           </p>
           <p className="mt-3 text-lg font-semibold tabular-nums">
-            {fmtMoney(c.totalAmount, c.currency)}
+            {formatMoneyAmount(c.totalAmount, c.currency)}
           </p>
         </Link>
       ))}

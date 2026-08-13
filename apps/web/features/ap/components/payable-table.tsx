@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { UrlSortableTableHead } from "@/components/ui/url-sortable-table-head";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { PayableListItem } from "./payable-list";
@@ -76,10 +77,7 @@ export function PayableTable({
                 )}
               </TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">
-                {Number(p.balanceDue).toLocaleString("es-AR", {
-                  style: "currency",
-                  currency: p.currency,
-                })}
+                {formatMoneyAmount(p.balanceDue, p.currency)}
               </TableCell>
               <TableCell>
                 <ObligationSettledCell status={p.status} balanceDue={p.balanceDue} />

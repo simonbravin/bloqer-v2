@@ -10,18 +10,19 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatCurrencyDisplay } from "@/lib/format";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 
 function formatAmount(value: string) {
-  const n = parseFloat(value);
-  if (n === 0) return "—";
+  if (isZeroMoneyAmount(value)) return "—";
   return formatMoneyAmount(value);
 }
 
 function fmtNet(value: string) {
-  const n = parseFloat(value);
-  const formatted = formatMoneyAmount(String(Math.abs(n)));
-  return n >= 0 ? `+${formatted}` : `-${formatted}`;
+  const formatted = formatMoneyAmount(value);
+  if (isZeroMoneyAmount(value) || formatted.startsWith("-") || formatted.startsWith("+")) {
+    return formatted;
+  }
+  return `+${formatted}`;
 }
 
 interface Props {
@@ -72,8 +73,10 @@ export function CashFlowTable({ data }: Props) {
               </TableHeader>
               <TableBody>
                 {buckets.map((b) => {
-                  const netOp = parseFloat(b.netOperatingCashFlow);
-                  const netAll = parseFloat(b.netCashFlow);
+                  const netOpPositive = isPositiveMoneyAmount(b.netOperatingCashFlow);
+                  const netOpZero = isZeroMoneyAmount(b.netOperatingCashFlow);
+                  const netAllPositive = isPositiveMoneyAmount(b.netCashFlow);
+                  const netAllZero = isZeroMoneyAmount(b.netCashFlow);
                   return (
                     <TableRow key={b.period}>
                       <TableCell className="font-mono text-xs">{b.period}</TableCell>
@@ -85,9 +88,11 @@ export function CashFlowTable({ data }: Props) {
                       </TableCell>
                       <TableCell
                         className={`text-right tabular-nums font-mono font-medium ${
-                          netOp >= 0
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-red-600 dark:text-red-400"
+                          netOpZero
+                            ? "text-muted-foreground"
+                            : netOpPositive
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-red-600 dark:text-red-400"
                         }`}
                       >
                         {fmtNet(b.netOperatingCashFlow)}
@@ -103,9 +108,11 @@ export function CashFlowTable({ data }: Props) {
                       </TableCell>
                       <TableCell
                         className={`text-right tabular-nums font-mono font-medium ${
-                          netAll >= 0
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-red-600 dark:text-red-400"
+                          netAllZero
+                            ? "text-muted-foreground"
+                            : netAllPositive
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-red-600 dark:text-red-400"
                         }`}
                       >
                         {fmtNet(b.netCashFlow)}

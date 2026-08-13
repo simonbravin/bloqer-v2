@@ -1,4 +1,12 @@
-import { serializeMoney } from "@bloqer/utils";
+import { compareDecimal, roundQty, serializeMoney, serializeUnitPrice } from "@bloqer/utils";
+
+function formatFixedDecimalString(s: string): string {
+  const sign = s.startsWith("-") ? "-" : "";
+  const abs = sign ? s.slice(1) : s;
+  const [intPart, decPart = ""] = abs.split(".");
+  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return decPart ? `${sign}${withThousands},${decPart}` : `${sign}${withThousands}`;
+}
 
 /** Decimal estilo AR sin depender del locale del runtime (seguro para SSR + cliente). */
 export function formatDecimalAr(n: number): string {
@@ -13,11 +21,30 @@ export function formatDecimalArFromString(raw: string): string {
   } catch {
     return raw;
   }
-  const sign = s.startsWith("-") ? "-" : "";
-  const abs = sign ? s.slice(1) : s;
-  const [intPart, decPart = "00"] = abs.split(".");
-  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `${sign}${withThousands},${decPart}`;
+  return formatFixedDecimalString(s);
+}
+
+/** Cantidades inventario / cómputo (4 dp, D-053). */
+export function formatQtyFromString(raw: string): string {
+  try {
+    return formatFixedDecimalString(roundQty(raw));
+  } catch {
+    return raw;
+  }
+}
+
+/** Precios unitarios de línea (4 dp, D-086). */
+export function formatUnitPriceFromString(raw: string): string {
+  try {
+    return formatFixedDecimalString(serializeUnitPrice(raw));
+  } catch {
+    return raw;
+  }
+}
+
+/** Tooltip/eje de chart: Recharts entrega number; el texto sale por el kernel. */
+export function formatChartMoney(value: number | string, currency?: string): string {
+  return formatMoneyAmount(String(value), currency);
 }
 
 /** Formatea un monto decimal string con moneda ISO (es-AR). */
@@ -60,6 +87,48 @@ export function isZeroMoneyAmount(raw: string | null | undefined): boolean {
   try {
     return serializeMoney(raw) === "0.00";
   } catch {
-    return raw === "0" || raw === "0.0" || raw === "0.00" || Number(raw) === 0;
+    return raw === "0" || raw === "0.0" || raw === "0.00";
   }
+}
+
+export function isZeroQty(raw: string | null | undefined): boolean {
+  if (raw == null || raw === "") return true;
+  try {
+    return roundQty(raw) === "0.0000";
+  } catch {
+    return false;
+  }
+}
+
+export function isPositiveQty(raw: string | null | undefined): boolean {
+  if (raw == null || raw === "") return false;
+  try {
+    const s = roundQty(raw);
+    return s !== "0.0000" && !s.startsWith("-");
+  } catch {
+    return false;
+  }
+}
+
+export function isNegativeQty(raw: string | null | undefined): boolean {
+  if (raw == null || raw === "") return false;
+  try {
+    return roundQty(raw).startsWith("-");
+  } catch {
+    return false;
+  }
+}
+
+/** Compare quantities at 4 dp without IEEE float. */
+export function compareQty(a: string, b: string): -1 | 0 | 1 {
+  try {
+    return compareDecimal(roundQty(a || "0"), roundQty(b || "0"));
+  } catch {
+    return 0;
+  }
+}
+
+export function moneyAmountTone(raw: string): "success" | "danger" | "muted" {
+  if (isZeroMoneyAmount(raw)) return "muted";
+  return isPositiveMoneyAmount(raw) ? "success" : "danger";
 }

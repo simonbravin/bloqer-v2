@@ -10,6 +10,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import {
+  formatQtyFromString,
+  formatUnitPriceFromString,
+  isPositiveQty,
+  isZeroQty,
+} from "@/lib/format-money";
 
 const TYPE_LABELS: Record<string, string> = {
   IN: "Ingreso",
@@ -19,16 +25,10 @@ const TYPE_LABELS: Record<string, string> = {
   ADJUSTMENT: "Ajuste",
 };
 
-function formatAmount(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
-
 function fmtQty(v: string, unit: string) {
-  const n = parseFloat(v);
-  return (n >= 0 ? "+" : "") + formatAmount(v) + (unit ? ` ${unit}` : "");
+  const body = formatQtyFromString(v);
+  const signed = isPositiveQty(v) || isZeroQty(v) ? (body.startsWith("-") ? body : `+${body}`) : body;
+  return signed + (unit ? ` ${unit}` : "");
 }
 
 interface Props {
@@ -63,8 +63,8 @@ export function StockMovementReportTable({
           </TableHeader>
           <TableBody>
             {rows.map((m) => {
-              const signed = parseFloat(m.signedQuantity);
               const isAdj = m.type === "ADJUSTMENT";
+              const qtyPositive = isPositiveQty(m.signedQuantity) || isZeroQty(m.signedQuantity);
               return (
                 <TableRow key={m.id}>
                   <TableCell className="whitespace-nowrap">{formatDate(m.movementDate)}</TableCell>
@@ -93,15 +93,15 @@ export function StockMovementReportTable({
                     className={`text-right tabular-nums font-mono ${
                       isAdj
                         ? "text-yellow-600 dark:text-yellow-400"
-                        : signed >= 0
+                        : qtyPositive
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-red-600 dark:text-red-400"
                     }`}
                   >
-                    {isAdj ? `${formatAmount(m.quantity)}⚠` : fmtQty(m.signedQuantity, m.productUnit)}
+                    {isAdj ? `${formatQtyFromString(m.quantity)}⚠` : fmtQty(m.signedQuantity, m.productUnit)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums font-mono text-muted-foreground text-xs">
-                    {m.unitCost ? formatAmount(m.unitCost) : "—"}
+                    {m.unitCost ? formatUnitPriceFromString(m.unitCost) : "—"}
                   </TableCell>
                 </TableRow>
               );

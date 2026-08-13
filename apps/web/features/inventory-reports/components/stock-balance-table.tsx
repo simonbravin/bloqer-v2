@@ -10,16 +10,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-
-function formatAmount(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
+import { formatQtyFromString } from "@/lib/format-money";
 
 function fmtQty(v: string, unit: string) {
-  return formatAmount(v) + (unit ? ` ${unit}` : "");
+  return formatQtyFromString(v) + (unit ? ` ${unit}` : "");
 }
 
 interface Props {

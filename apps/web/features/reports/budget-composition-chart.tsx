@@ -4,11 +4,12 @@ import { useMemo } from "react";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { BudgetCompositionReport } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatChartMoney } from "@/lib/format-money";
 
 const COLORS = ["#2563eb", "#16a34a", "#ca8a04", "#9333ea"];
 
 function moneyTooltip(value: number) {
-  return value.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatChartMoney(value);
 }
 
 type Props = {
@@ -47,7 +48,7 @@ export function BudgetCompositionChart({ composition }: Props) {
         <CardTitle className="text-base">Composición del presupuesto</CardTitle>
         <CardDescription>
           Costo directo planificado · Total{" "}
-          {moneyTooltip(parseFloat(composition.totalDirectCost))}
+          {formatChartMoney(composition.totalDirectCost)}
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -10,19 +10,12 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatCurrencyDisplay } from "@/lib/format";
-
-function formatAmount(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
+import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 
 function colorClass(v: string) {
-  const n = parseFloat(v);
-  if (n > 0) return "text-emerald-600 dark:text-emerald-400";
-  if (n < 0) return "text-red-600 dark:text-red-400";
-  return "text-muted-foreground";
+  if (isZeroMoneyAmount(v)) return "text-muted-foreground";
+  if (isPositiveMoneyAmount(v)) return "text-emerald-600 dark:text-emerald-400";
+  return "text-red-600 dark:text-red-400";
 }
 
 interface Props {
@@ -54,20 +47,20 @@ export function ProjectCashFlowTable({ periods, currency }: Props) {
               <TableRow key={p.periodKey}>
                 <TableCell className="font-medium">{p.periodLabel}</TableCell>
                 <TableCell className="text-right tabular-nums font-mono text-emerald-600 dark:text-emerald-400">
-                  {formatAmount(p.inflows)}
+                  {formatMoneyAmount(p.inflows)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums font-mono text-red-600 dark:text-red-400">
-                  {formatAmount(p.outflows)}
+                  {formatMoneyAmount(p.outflows)}
                 </TableCell>
                 <TableCell
                   className={`text-right tabular-nums font-mono font-medium ${colorClass(p.netCashFlow)}`}
                 >
-                  {formatAmount(p.netCashFlow)}
+                  {formatMoneyAmount(p.netCashFlow)}
                 </TableCell>
                 <TableCell
                   className={`text-right tabular-nums font-mono ${colorClass(p.cumulativeNetCashFlow)}`}
                 >
-                  {formatAmount(p.cumulativeNetCashFlow)}
+                  {formatMoneyAmount(p.cumulativeNetCashFlow)}
                 </TableCell>
               </TableRow>
             ))}

@@ -14,7 +14,7 @@ import { getProjectShellInfo } from "../project/project.service";
 import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import { getTenantModuleGate, type TenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { ServiceContext } from "../types";
-import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { isPositiveMoneyDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
 
 export { canShowProjectFinanzasNavLink } from "../project/project-nav-guards";
 
@@ -172,13 +172,13 @@ export async function getProjectFinanceOverview(
         if (can(ctx.roles, "VIEW", "AR")) {
           const report = await getReceivableAgingReport({ projectId }, ctx);
           totalReceivableByCurrency = Object.entries(report.byCurrency)
-            .filter(([, t]) => Number(t.totalBalance) > 0)
+            .filter(([, t]) => isPositiveMoneyDecimal(t.totalBalance))
             .map(([currency, t]) => ({
               currency,
               amount: t.totalBalance,
             }));
           overdueByCurrency = Object.entries(report.byCurrency)
-            .filter(([, t]) => Number(t.totalOverdue) > 0)
+            .filter(([, t]) => isPositiveMoneyDecimal(t.totalOverdue))
             .map(([currency, t]) => ({
               currency,
               amount: t.totalOverdue,
@@ -246,13 +246,13 @@ export async function getProjectFinanceOverview(
         if (can(ctx.roles, "VIEW", "AP")) {
           const report = await getPayableAgingReport({ projectId }, ctx);
           totalPayableByCurrency = Object.entries(report.byCurrency)
-            .filter(([, t]) => Number(t.totalBalance) > 0)
+            .filter(([, t]) => isPositiveMoneyDecimal(t.totalBalance))
             .map(([currency, t]) => ({
               currency,
               amount: t.totalBalance,
             }));
           overdueByCurrency = Object.entries(report.byCurrency)
-            .filter(([, t]) => Number(t.totalOverdue) > 0)
+            .filter(([, t]) => isPositiveMoneyDecimal(t.totalOverdue))
             .map(([currency, t]) => ({
               currency,
               amount: t.totalOverdue,

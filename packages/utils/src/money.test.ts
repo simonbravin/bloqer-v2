@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  compareDecimal,
   divideDecimal,
   multiplyDecimal,
   resolveFxAmounts,
@@ -61,6 +62,20 @@ describe("resolveFxAmounts", () => {
 describe("sumAmountArsStrings", () => {
   it("sums and rounds to 2", () => {
     assert.equal(sumAmountArsStrings([{ amountArs: "1.10" }, { amountArs: "2.01" }]), "3.11");
+  });
+});
+
+describe("compareDecimal", () => {
+  it("treats padded and unpadded zeros as equal", () => {
+    assert.equal(compareDecimal("0.00", "0"), 0);
+    assert.equal(compareDecimal("0.0000", "0.00"), 0);
+  });
+
+  it("orders by magnitude, not lexicographic string", () => {
+    assert.equal(compareDecimal("9.00", "10.00"), -1);
+    assert.equal(compareDecimal("10.00", "9.99"), 1);
+    assert.equal(compareDecimal("-1", "0"), -1);
+    assert.equal(compareDecimal("0.01", "0.010"), 0);
   });
 });
 

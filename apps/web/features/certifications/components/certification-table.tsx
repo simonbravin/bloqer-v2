@@ -13,16 +13,7 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { CertificationStatusBadge } from "./certification-status-badge";
 import type { CertificationListItem } from "./certification-list";
-
-function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      parseFloat(value),
-    ) +
-    " " +
-    currency
-  );
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 export function CertificationTable({
   certifications,
@@ -67,7 +58,7 @@ export function CertificationTable({
                 <CertificationStatusBadge status={c.status} />
               </TableCell>
               <TableCell className="text-right font-mono text-sm">
-                {fmtMoney(c.totalAmount, c.currency)}
+                {formatMoneyAmount(c.totalAmount, c.currency)}
               </TableCell>
               <TableCell>
                 <Button variant="ghost" size="sm" asChild>

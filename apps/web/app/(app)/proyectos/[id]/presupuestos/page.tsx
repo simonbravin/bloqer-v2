@@ -7,6 +7,7 @@ import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { BudgetListSection } from "@/features/budgets";
 import { getCurrentUser } from "@/lib/auth";
+import { serializeMoney } from "@bloqer/utils";
 import { listBudgetsByProject, getProjectShellInfo, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -46,8 +47,8 @@ export default async function PresupuestosPage({ params }: PageProps) {
       name: b.name,
       status: b.status,
       currency: b.currency,
-      totalCost: b.totalCost.toString(),
-      totalSalePrice: b.totalSalePrice.toString(),
+      totalCost: serializeMoney(b.totalCost.toString()),
+      totalSalePrice: serializeMoney(b.totalSalePrice.toString()),
       parentBudgetId: b.parentBudgetId,
       parentVersionNumber: parent?.versionNumber ?? null,
       parentName: parent?.name ?? null,

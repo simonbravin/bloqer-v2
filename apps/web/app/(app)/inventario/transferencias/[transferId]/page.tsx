@@ -16,6 +16,7 @@ import { WarehouseTransferStatusBadge } from "@/features/warehouse-transfer";
 import { cancelWarehouseTransferAction } from "../actions";
 import { ConfirmActionButton } from "@/components/feedback/confirm-action-button";
 import { PageShell } from "@/components/layout/page-shell";
+import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
 
 interface PageProps {
   params: Promise<{ transferId: string }>;
@@ -30,10 +31,6 @@ const MOVEMENT_STATUS_LABELS: Record<string, string> = {
   CONFIRMED: "Confirmado",
   CANCELLED: "Cancelado",
 };
-
-function fmt(v: string) {
-  return parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2 });
-}
 
 function fmtDate(d: string) {
   return formatDate(d);
@@ -108,19 +105,19 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
           <div>
             <dt className="text-muted-foreground">Cantidad</dt>
             <dd className="font-medium">
-              {fmt(transfer.quantity)} {transfer.productUnit}
+              {formatQtyFromString(transfer.quantity)} {transfer.productUnit}
             </dd>
           </div>
           {transfer.unitCost && (
             <div>
               <dt className="text-muted-foreground">Costo unitario</dt>
-              <dd className="font-medium">{fmt(transfer.unitCost)}</dd>
+              <dd className="font-medium">{formatUnitPriceFromString(transfer.unitCost)}</dd>
             </div>
           )}
           {transfer.totalCost && (
             <div>
               <dt className="text-muted-foreground">Costo total</dt>
-              <dd className="font-medium">{fmt(transfer.totalCost)}</dd>
+              <dd className="font-medium">{formatMoneyAmount(transfer.totalCost)}</dd>
             </div>
           )}
           {transfer.notes && (
@@ -150,7 +147,7 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
                   <TableCell>{TYPE_LABELS[m.type] ?? m.type}</TableCell>
                   <TableCell>{m.warehouseName}</TableCell>
                   <TableCell>{fmtDate(m.movementDate)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmt(m.quantity)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatQtyFromString(m.quantity)}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {MOVEMENT_STATUS_LABELS[m.status] ?? m.status}
                   </TableCell>

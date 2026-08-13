@@ -20,11 +20,10 @@ import type {
   ProjectOverviewCashFlowMini,
 } from "@bloqer/services";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatChartMoney } from "@/lib/format-money";
 
 function moneyTooltip(value: number | string) {
-  const n = typeof value === "string" ? Number(value) : value;
-  if (Number.isNaN(n)) return value;
-  return n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatChartMoney(value);
 }
 
 export function ProjectOverviewCharts({

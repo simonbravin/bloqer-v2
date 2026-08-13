@@ -13,14 +13,8 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { CostVarianceBadge } from "@/features/cost-control/components/cost-variance-badge";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
-
-function formatAmount(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
 
 const STATUS_LABEL: Record<BudgetVarianceRow["varianceStatus"], string> = {
   favorable: "A favor",
@@ -79,10 +73,10 @@ export function BudgetVarianceTable({ report, projectId }: Props) {
                   <span className="whitespace-nowrap pr-1">{row.wbsName}</span>
                 </div>
               </TableCell>
-              <TableCell className="text-right">{formatAmount(row.budgetTotalCost)}</TableCell>
-              <TableCell className="text-right font-medium">{formatAmount(row.actualCost)}</TableCell>
+              <TableCell className="text-right">{formatMoneyAmount(row.budgetTotalCost)}</TableCell>
+              <TableCell className="text-right font-medium">{formatMoneyAmount(row.actualCost)}</TableCell>
               <TableCell className="text-right">
-                <CostVarianceBadge variance={row.costVariance} label={formatAmount(row.costVariance)} />
+                <CostVarianceBadge variance={row.costVariance} label={formatMoneyAmount(row.costVariance)} />
               </TableCell>
               <TableCell className="text-right text-muted-foreground">
                 {row.variancePct != null ? `${row.variancePct}%` : "—"}
@@ -106,10 +100,10 @@ export function BudgetVarianceTable({ report, projectId }: Props) {
         <TableFooter className="bg-muted/40 font-semibold">
           <TableRow>
             <TableCell colSpan={2}>Total</TableCell>
-            <TableCell className="text-right">{formatAmount(totals.budgetTotalCost)}</TableCell>
-            <TableCell className="text-right">{formatAmount(totals.actualCost)}</TableCell>
+            <TableCell className="text-right">{formatMoneyAmount(totals.budgetTotalCost)}</TableCell>
+            <TableCell className="text-right">{formatMoneyAmount(totals.actualCost)}</TableCell>
             <TableCell className="text-right">
-              <CostVarianceBadge variance={totals.costVariance} label={formatAmount(totals.costVariance)} />
+              <CostVarianceBadge variance={totals.costVariance} label={formatMoneyAmount(totals.costVariance)} />
             </TableCell>
             <TableCell className="text-right text-muted-foreground">
               {totals.variancePct != null ? `${totals.variancePct}%` : "—"}

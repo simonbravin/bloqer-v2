@@ -19,7 +19,8 @@ import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { addDecimal, divideDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
+import { formatMoneyAmount, moneyAmountTone } from "@/lib/format-money";
 import { formatDateRange } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ProjectCashFlowCurrency } from "@bloqer/services";
@@ -48,17 +49,20 @@ const LAST_BUCKET_LABELS: Record<string, string> = {
 };
 
 function pctDelta(current: string, previous: string): string {
-  const cur = Number.parseFloat(current);
-  const prev = Number.parseFloat(previous);
-  if (!Number.isFinite(cur) || !Number.isFinite(prev) || prev === 0) return "0.0%";
-  return `${(((cur - prev) / Math.abs(prev)) * 100).toFixed(1)}%`;
+  try {
+    const prev = serializeMoney(previous);
+    if (prev === "0.00") return "0.0%";
+    const cur = serializeMoney(current);
+    const diff = addDecimal(cur, multiplyDecimal(prev, -1));
+    const absPrev = prev.startsWith("-") ? prev.slice(1) : prev;
+    return `${divideDecimal(multiplyDecimal(diff, "100"), absPrev, 1)}%`;
+  } catch {
+    return "0.0%";
+  }
 }
 
 function toneByAmount(value: string): "success" | "danger" | "muted" {
-  const num = Number.parseFloat(value);
-  if (num > 0) return "success";
-  if (num < 0) return "danger";
-  return "muted";
+  return moneyAmountTone(value);
 }
 
 function emptyCashCurrency(currency: string): ProjectCashFlowCurrency {
@@ -208,15 +212,23 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
         const pendingHelperPrefix = userSetDateFilter ? "Pendientes" : "Pendientes (90 d)";
         const netPeriod = current.netCashFlow;
         const avgInflows = current.periods.length
-          ? (Number.parseFloat(current.totalInflows) / current.periods.length).toFixed(2)
-          : "0";
+          ? divideDecimal(current.totalInflows, String(current.periods.length), 2)
+          : "0.00";
         const avgOutflows = current.periods.length
-          ? (Number.parseFloat(current.totalOutflows) / current.periods.length).toFixed(2)
-          : "0";
-        const marginPct =
-          Number.parseFloat(current.totalInflows) > 0
-            ? ((Number.parseFloat(netPeriod) / Number.parseFloat(current.totalInflows)) * 100).toFixed(1)
-            : "0.0";
+          ? divideDecimal(current.totalOutflows, String(current.periods.length), 2)
+          : "0.00";
+        let marginPct = "0.0";
+        try {
+          if (serializeMoney(current.totalInflows) !== "0.00") {
+            marginPct = divideDecimal(
+              multiplyDecimal(netPeriod, "100"),
+              current.totalInflows,
+              1,
+            );
+          }
+        } catch {
+          marginPct = "0.0";
+        }
 
         const lastBucketLabel = LAST_BUCKET_LABELS[report.period] ?? "Flujo del período";
         const lastPeriodInflowsLabel =

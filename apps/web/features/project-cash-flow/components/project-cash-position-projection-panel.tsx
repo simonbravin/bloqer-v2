@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { formatDate } from "@/lib/format";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, moneyAmountTone } from "@/lib/format-money";
 import type { ProjectCashPositionProjectionReport } from "@bloqer/services";
 
 const PROJECTION_ANCHOR = "proyeccion-caja";
@@ -29,10 +29,7 @@ type Props = {
 };
 
 function toneByAmount(value: string): "success" | "danger" | "muted" {
-  const num = Number.parseFloat(value);
-  if (num > 0) return "success";
-  if (num < 0) return "danger";
-  return "muted";
+  return moneyAmountTone(value);
 }
 
 export function ProjectCashPositionProjectionPanel({

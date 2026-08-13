@@ -25,20 +25,7 @@ import { CATEGORY_LABELS } from "@/lib/budget-categories";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { UnitSelect } from "./unit-select";
 import { apuResourceQtyDisplay } from "../lib/wbs-apu-detail";
-
-function fmt(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  }).format(parseFloat(value));
-}
-
-function fmt2(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
+import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
 
 interface CostItemPanelProps {
   costItem: CostItemView;
@@ -159,23 +146,23 @@ export function CostItemPanel({
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Cantidad</dt>
-              <dd className="font-mono font-medium">{fmt(costItem.quantity)}</dd>
+              <dd className="font-mono font-medium">{formatQtyFromString(costItem.quantity)}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Costo unit. directo</dt>
-              <dd className="font-mono font-medium">{fmt2(costItem.unitCostDirect)} {currency}</dd>
+              <dd className="font-mono font-medium">{formatUnitPriceFromString(costItem.unitCostDirect)} {currency}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Precio unit. venta</dt>
-              <dd className="font-mono font-medium">{fmt2(costItem.unitSalePrice)} {currency}</dd>
+              <dd className="font-mono font-medium">{formatUnitPriceFromString(costItem.unitSalePrice)} {currency}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Total costo directo</dt>
-              <dd className="font-mono font-semibold">{fmt2(costItem.totalCostDirect)} {currency}</dd>
+              <dd className="font-mono font-semibold">{formatMoneyAmount(costItem.totalCostDirect, currency)}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Total precio venta</dt>
-              <dd className="font-mono font-semibold">{fmt2(costItem.totalSalePrice)} {currency}</dd>
+              <dd className="font-mono font-semibold">{formatMoneyAmount(costItem.totalSalePrice, currency)}</dd>
             </div>
           </dl>
         )}
@@ -230,10 +217,10 @@ export function CostItemPanel({
                   <TableCell className="text-right font-mono text-sm">
                     {qtyDisp.kind === "lump"
                       ? "—"
-                      : qtyDisp.qty.toLocaleString("es-AR", { maximumFractionDigits: 4 })}
+                      : formatQtyFromString(String(qtyDisp.qty))}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">{fmt2(line.unitCost)}</TableCell>
-                  <TableCell className="text-right font-mono text-sm font-medium">{fmt2(line.totalCost)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">{formatUnitPriceFromString(line.unitCost)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm font-medium">{formatUnitPriceFromString(line.totalCost)}</TableCell>
                   {editable && (
                     <TableCell>
                       <div className="flex items-center gap-1">

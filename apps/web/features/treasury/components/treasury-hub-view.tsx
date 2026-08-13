@@ -9,11 +9,10 @@ import { KpiStatCard, type KpiStatTone } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { formatDate } from "@/lib/format";
+import { moneyAmountTone } from "@/lib/format-money";
 
 function moneyTone(raw: string): KpiStatTone {
-  const n = Number.parseFloat(raw);
-  if (!Number.isFinite(n) || n === 0) return "muted";
-  return n > 0 ? "success" : "danger";
+  return moneyAmountTone(raw);
 }
 
 function formatMoneyBucket(rows: TreasuryMoneyByCurrency[], empty = "$ 0,00"): {

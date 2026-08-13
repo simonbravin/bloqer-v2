@@ -25,7 +25,7 @@ import {
   FinanceLayerBadge,
 } from "@/features/finance/components/project-finance-layers-guide";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 
 function warningText(w: { module: string; section: string; reason: string }): string {
   if (w.reason === "TENANT_MODULE_DISABLED") return `Módulo ${w.module} deshabilitado (${w.section}).`;
@@ -134,7 +134,11 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
                   )}
                   helper="MB devengado del último mes"
                   tone={
-                    parseFloat(dashboard.monthBalance.grossMarginAccrued) >= 0 ? "success" : "danger"
+                    isZeroMoneyAmount(dashboard.monthBalance.grossMarginAccrued)
+                      ? "muted"
+                      : isPositiveMoneyAmount(dashboard.monthBalance.grossMarginAccrued)
+                        ? "success"
+                        : "danger"
                   }
                 />
                 <KpiStatCard
@@ -162,7 +166,11 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
                 )}
                 helper={`Entradas ${formatMoneyAmount(dashboard.monthCashFlow.inflows, dashboard.monthCashFlow.currency)} · Salidas ${formatMoneyAmount(dashboard.monthCashFlow.outflows, dashboard.monthCashFlow.currency)}`}
                 tone={
-                  parseFloat(dashboard.monthCashFlow.netCashFlow) >= 0 ? "success" : "danger"
+                  isZeroMoneyAmount(dashboard.monthCashFlow.netCashFlow)
+                    ? "muted"
+                    : isPositiveMoneyAmount(dashboard.monthCashFlow.netCashFlow)
+                      ? "success"
+                      : "danger"
                 }
               />
             ) : null}

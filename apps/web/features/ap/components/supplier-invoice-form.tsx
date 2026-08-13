@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
@@ -590,7 +590,7 @@ function PoBillingReference({
   if (!preview) return null;
 
   const { summary, currency } = preview;
-  const hasPending = preview.lines.length > 0 && Number.parseFloat(summary.pendingToInvoice) > 0;
+  const hasPending = preview.lines.length > 0 && isPositiveMoneyAmount(summary.pendingToInvoice);
 
   return (
     <div className="rounded-lg border bg-muted/30 p-4 space-y-3">

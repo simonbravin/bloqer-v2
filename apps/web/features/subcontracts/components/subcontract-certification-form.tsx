@@ -17,7 +17,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { addDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
 import type { SubcontractLineView } from "@bloqer/services";
+import {
+  formatMoneyAmount,
+  formatQtyFromString,
+  formatUnitPriceFromString,
+  isPositiveQty,
+} from "@/lib/format-money";
 
 type Props = {
   subcontractId: string;
@@ -42,11 +49,18 @@ export function SubcontractCertificationForm({
   const [error, setPendingError]    = useState<string | null>(null);
   const [pending, setPending]       = useState(false);
 
-  const totalAmount = subcontractLines.reduce((sum, l) => {
-    const qty   = parseFloat(quantities[l.id] ?? "0") || 0;
-    const price = parseFloat(l.unitPrice) || 0;
-    return sum + qty * price;
-  }, 0);
+  function previewLineMoney(qty: string, price: string): string {
+    try {
+      return serializeMoney(multiplyDecimal(qty.trim() || "0", price.trim() || "0"));
+    } catch {
+      return "0.00";
+    }
+  }
+
+  const totalAmount = subcontractLines.reduce(
+    (sum, l) => addDecimal(sum, previewLineMoney(quantities[l.id] ?? "0", l.unitPrice)),
+    "0",
+  );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -54,7 +68,7 @@ export function SubcontractCertificationForm({
     setPendingError(null);
 
     const activeLines = subcontractLines
-      .filter((l) => parseFloat(quantities[l.id] ?? "0") > 0)
+      .filter((l) => isPositiveQty(quantities[l.id] ?? "0"))
       .map((l) => ({ subcontractLineId: l.id, currentQty: quantities[l.id] ?? "0" }));
 
     if (activeLines.length === 0) {
@@ -135,24 +149,23 @@ export function SubcontractCertificationForm({
             </TableHeader>
             <TableBody>
               {subcontractLines.map((l) => {
-                const qty       = parseFloat(quantities[l.id] ?? "0") || 0;
-                const importe   = qty * parseFloat(l.unitPrice);
-                const remaining = parseFloat(l.remainingQty);
+                const importe = previewLineMoney(quantities[l.id] ?? "0", l.unitPrice);
+                const remainingOpen = isPositiveQty(l.remainingQty);
                 return (
                   <TableRow key={l.id}>
                     <TableCell>{l.description}</TableCell>
                     <TableCell className="text-right text-muted-foreground">{l.unit}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {parseFloat(l.quantity).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                      {formatQtyFromString(l.quantity)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {parseFloat(l.certifiedQuantity).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                      {formatQtyFromString(l.certifiedQuantity)}
                     </TableCell>
-                    <TableCell className={`text-right tabular-nums ${remaining <= 0 ? "text-muted-foreground line-through" : ""}`}>
-                      {remaining.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                    <TableCell className={`text-right tabular-nums ${remainingOpen ? "" : "text-muted-foreground line-through"}`}>
+                      {formatQtyFromString(l.remainingQty)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {parseFloat(l.unitPrice).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                      {formatUnitPriceFromString(l.unitPrice)}
                     </TableCell>
                     <TableCell>
                       <Input
@@ -163,11 +176,11 @@ export function SubcontractCertificationForm({
                         max={l.remainingQty}
                         value={quantities[l.id] ?? ""}
                         onChange={(e) => setQuantities((prev) => ({ ...prev, [l.id]: e.target.value }))}
-                        disabled={remaining <= 0}
+                        disabled={!remainingOpen}
                       />
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums">
-                      {importe > 0 ? importe.toLocaleString("es-AR", { minimumFractionDigits: 2 }) : "—"}
+                      {isPositiveQty(quantities[l.id] ?? "0") ? formatMoneyAmount(importe) : "—"}
                     </TableCell>
                   </TableRow>
                 );
@@ -179,7 +192,7 @@ export function SubcontractCertificationForm({
                   Total certificado:
                 </TableCell>
                 <TableCell className="text-right font-semibold tabular-nums">
-                  {totalAmount.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                  {formatMoneyAmount(totalAmount)}
                 </TableCell>
               </TableRow>
             </TableFooter>

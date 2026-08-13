@@ -15,9 +15,12 @@ import {
 } from "recharts";
 import type { IncomeExpensePoint } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatChartMoney } from "@/lib/format-money";
 
-function fmt(v: number) {
-  return v.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+function fmtAxis(v: number) {
+  if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+  return formatChartMoney(v);
 }
 
 type Props = {
@@ -84,8 +87,8 @@ export function IncomeExpenseChart({
                   textAnchor="end"
                   height={56}
                 />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} width={64} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtAxis(v)} width={64} />
+                <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Line
                   type="monotone"
@@ -132,8 +135,8 @@ export function IncomeExpenseChart({
             <ComposedChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={56} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} width={64} />
-              <Tooltip formatter={(v: number) => fmt(v)} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtAxis(v)} width={64} />
+              <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="Certificado" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} />
               <Bar dataKey="Costo devengado" fill="hsl(var(--chart-4))" radius={[2, 2, 0, 0]} />

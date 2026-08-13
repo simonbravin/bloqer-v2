@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ProjectProfitabilityReport } from "@bloqer/services";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const LAYER_LABELS: Record<ProjectProfitabilityReport["costLayer"], string> = {
@@ -24,12 +24,11 @@ function ggDisplayCurrency(report: ProjectProfitabilityReport): string {
 }
 
 export function ProfitabilitySummary({ report }: Props) {
-  const gmTone =
-    parseFloat(report.grossMargin) > 0
+  const gmTone = isZeroMoneyAmount(report.grossMargin)
+    ? "muted"
+    : isPositiveMoneyAmount(report.grossMargin)
       ? "success"
-      : parseFloat(report.grossMargin) < 0
-        ? "danger"
-        : "muted";
+      : "danger";
 
   const ggCurrency = ggDisplayCurrency(report);
   const isAutoWeight = report.overheadManualAmount == null && report.overheadCalculatedAmount != null;
@@ -114,14 +113,14 @@ export function ProfitabilitySummary({ report }: Props) {
                 {formatMoneyAmount(report.overheadAmount, ggCurrency)}
               </p>
               {report.overheadManualAmount != null &&
-              parseFloat(report.overheadManualAmount) > 0 ? (
+              isPositiveMoneyAmount(report.overheadManualAmount) ? (
                 <p className="text-muted-foreground">
                   · Manual:{" "}
                   {formatMoneyAmount(report.overheadManualAmount, report.currency)}
                 </p>
               ) : null}
               {report.overheadCalculatedAmount != null &&
-              parseFloat(report.overheadCalculatedAmount) > 0 ? (
+              isPositiveMoneyAmount(report.overheadCalculatedAmount) ? (
                 <p className="text-muted-foreground">
                   ·{" "}
                   {isAutoWeight

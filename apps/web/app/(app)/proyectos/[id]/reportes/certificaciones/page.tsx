@@ -16,6 +16,7 @@ import {
 } from "@/features/reports";
 import { ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,7 +71,7 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
         title="Certificaciones — evolución y estado"
         subtitle={
           report.type === "REPORT"
-            ? `${report.budgetName} · venta presup. ${parseFloat(report.budgetTotalSale).toLocaleString("es-AR")}`
+            ? `${report.budgetName} · venta presup. ${formatMoneyAmount(report.budgetTotalSale)}`
             : undefined
         }
         actions={

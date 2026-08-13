@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
 const PAYMENT_LABEL: Record<CertificationPortfolioRow["paymentStatus"], string> = {
@@ -20,13 +21,6 @@ const PAYMENT_LABEL: Record<CertificationPortfolioRow["paymentStatus"], string> 
   PAID: "Cobrado",
   OVERDUE: "Vencido",
 };
-
-function fmt(value: string) {
-  return parseFloat(value).toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 type Props = {
   rows: CertificationPortfolioRow[];
@@ -71,12 +65,12 @@ export function CertificationPortfolioTable({ rows, projectId }: Props) {
                 {row.periodStart} → {row.periodEnd}
               </TableCell>
               <TableCell>{row.status}</TableCell>
-              <TableCell className="text-right font-mono">{fmt(row.totalAmount)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.totalAmount)}</TableCell>
               <TableCell className="text-right font-mono text-muted-foreground">
-                {fmt(row.invoicedAmount)}
+                {formatMoneyAmount(row.invoicedAmount)}
               </TableCell>
               <TableCell className="text-right font-mono text-muted-foreground">
-                {fmt(row.collectedAmount)}
+                {formatMoneyAmount(row.collectedAmount)}
               </TableCell>
               <TableCell>
                 <span

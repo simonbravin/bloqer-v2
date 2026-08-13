@@ -17,7 +17,8 @@ import {
 } from "../project-cash-flow/project-cash-flow.service";
 import { canViewProjectCostControlReport } from "../cost-control/cost-control.service";
 import { getProjectProfitabilityKpi } from "../reports/project-profitability.service";
-import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { isPositiveMoneyDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
+import { compareDecimal } from "@bloqer/utils";
 import { computeProjectScheduleProgressPct } from "../schedule/schedule-workspace.service";
 import { canViewArProjectArea } from "../ar/ar-access";
 import { canViewApProjectArea } from "../ap/ap-access";
@@ -264,7 +265,7 @@ export async function getProjectOverviewDashboard(
       href: ar.links.receivables,
     };
     for (const row of ar.overdueByCurrency) {
-      if (Number(row.amount) > 0) {
+      if (isPositiveMoneyDecimal(row.amount)) {
         alerts.push({
           label: "Cuentas por cobrar vencidas",
           description: `Hay saldo vencido en ${row.currency}.`,
@@ -310,7 +311,7 @@ export async function getProjectOverviewDashboard(
       href: ap.links.payables,
     };
     for (const row of ap.overdueByCurrency) {
-      if (Number(row.amount) > 0) {
+      if (isPositiveMoneyDecimal(row.amount)) {
         alerts.push({
           label: "Cuentas por pagar vencidas",
           description: `Hay saldo vencido en ${row.currency}.`,
@@ -597,9 +598,9 @@ export async function getProjectOverviewDashboard(
         value: pk.grossMarginPct != null ? `${pk.grossMarginPct}%` : "Ver",
         href: pk.href,
         tone:
-          pk.grossMarginPct != null && parseFloat(pk.grossMarginPct) < 0
+          pk.grossMarginPct != null && compareDecimal(pk.grossMarginPct, "0") < 0
             ? "danger"
-            : pk.grossMarginPct != null && parseFloat(pk.grossMarginPct) > 0
+            : pk.grossMarginPct != null && compareDecimal(pk.grossMarginPct, "0") > 0
               ? "success"
               : "default",
       });

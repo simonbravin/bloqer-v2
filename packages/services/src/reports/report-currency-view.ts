@@ -1,3 +1,5 @@
+import { serializeMoney } from "@bloqer/utils";
+
 export type CurrencyView = "original" | "ARS";
 
 export function parseCurrencyView(value: string | null | undefined): CurrencyView {
@@ -19,8 +21,12 @@ export function canConsolidateInvoicesToArs(
   return rows.every((r) => {
     const cur = r.currency.trim().toUpperCase();
     if (cur === "ARS") return true;
-    const ars = parseFloat(String(r.amountArs));
-    return Number.isFinite(ars) && ars > 0;
+    try {
+      const s = serializeMoney(String(r.amountArs));
+      return s !== "0.00" && !s.startsWith("-");
+    } catch {
+      return false;
+    }
   });
 }
 

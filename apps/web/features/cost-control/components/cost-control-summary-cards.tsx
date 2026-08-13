@@ -1,49 +1,49 @@
 import type { CostControlTotals } from "@bloqer/services";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
-
-function fmt(v: string) {
-  return parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 
 type Props = { totals: CostControlTotals };
 
 export function CostControlSummaryCards({ totals }: Props) {
-  const variance = parseFloat(totals.costVariance);
-  const varianceTone = variance >= 0 ? "success" : "danger";
+  const varianceTone = isZeroMoneyAmount(totals.costVariance)
+    ? "muted"
+    : isPositiveMoneyAmount(totals.costVariance)
+      ? "success"
+      : "danger";
 
   return (
     <KpiStatGrid title={null} columns={5}>
       <KpiStatCard
         iconKey="cost_budget"
         label="Presupuesto costo"
-        value={fmt(totals.budgetTotalCost)}
-        subtitle={`Venta: ${fmt(totals.budgetTotalSale)}`}
+        value={formatMoneyAmount(totals.budgetTotalCost)}
+        subtitle={`Venta: ${formatMoneyAmount(totals.budgetTotalSale)}`}
       />
       <KpiStatCard
         iconKey="cost_exposure"
         label="Exposición esperada"
-        value={fmt(totals.expectedCostExposure)}
-        subtitle={`Comp. abierto: ${fmt(totals.openCommittedCost)} · Devengado + abierto`}
+        value={formatMoneyAmount(totals.expectedCostExposure)}
+        subtitle={`Comp. abierto: ${formatMoneyAmount(totals.openCommittedCost)} · Devengado + abierto`}
       />
       <KpiStatCard
         iconKey="cost_certified"
         label="Certificado aprobado"
-        value={fmt(totals.certifiedApproved)}
-        subtitle={`Emitido: ${fmt(totals.certifiedIssued)}`}
+        value={formatMoneyAmount(totals.certifiedApproved)}
+        subtitle={`Emitido: ${formatMoneyAmount(totals.certifiedIssued)}`}
       />
       <KpiStatCard
         iconKey="cost_variance"
         label="Variación de costo"
-        value={fmt(totals.costVariance)}
-        subtitle={`Margen proyectado: ${fmt(totals.projectedMargin)}`}
+        value={formatMoneyAmount(totals.costVariance)}
+        subtitle={`Margen proyectado: ${formatMoneyAmount(totals.projectedMargin)}`}
         tone={varianceTone}
       />
       <KpiStatCard
         iconKey="cost_budget"
         label="Consumo inventario"
-        value={fmt(totals.inventoryConsumedCost)}
-        subtitle={`Devengado: ${fmt(totals.accruedCost)} · Pagado: ${fmt(totals.paidCost)}`}
+        value={formatMoneyAmount(totals.inventoryConsumedCost)}
+        subtitle={`Devengado: ${formatMoneyAmount(totals.accruedCost)} · Pagado: ${formatMoneyAmount(totals.paidCost)}`}
       />
     </KpiStatGrid>
   );

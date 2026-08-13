@@ -55,6 +55,7 @@ export {
   serializeUnitPrice,
   multiplyDecimal,
   addDecimal,
+  compareDecimal,
   divideDecimal,
 } from "./money";
 export {

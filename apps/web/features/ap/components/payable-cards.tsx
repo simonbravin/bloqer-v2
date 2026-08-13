@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
@@ -55,10 +56,7 @@ export function PayableCards({
           <div className="mt-3 flex justify-between gap-2 text-sm tabular-nums">
             <span className="text-muted-foreground">Saldo</span>
             <span className="font-medium">
-              {Number(p.balanceDue).toLocaleString("es-AR", {
-                style: "currency",
-                currency: p.currency,
-              })}
+              {formatMoneyAmount(p.balanceDue, p.currency)}
             </span>
           </div>
         </Link>

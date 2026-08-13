@@ -16,6 +16,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { listWarehouseTransfers } from "@bloqer/services";
 import { WarehouseTransferStatusBadge } from "@/features/warehouse-transfer";
 import { PageShell } from "@/components/layout/page-shell";
+import { formatQtyFromString } from "@/lib/format-money";
 
 export default async function TransferenciasPage() {
   const current = await getCurrentUser();
@@ -31,7 +32,7 @@ export default async function TransferenciasPage() {
   const transfers = await listWarehouseTransfers({}, ctx);
 
   function fmt(v: string) {
-    return parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2 });
+    return formatQtyFromString(v);
   }
 
   return (

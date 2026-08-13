@@ -10,20 +10,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-
-function fmt(value: string) {
-  return parseFloat(value).toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
+import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   rows: CertificationVsBudgetRow[];
 };
 
 export function CertificationVsBudgetTable({ rows }: Props) {
-  const pending = rows.filter((r) => parseFloat(r.pendingCertify) > 0.01);
+  const pending = rows.filter((r) => isPositiveMoneyAmount(r.pendingCertify));
 
   return (
     <div className="space-y-3">
@@ -51,13 +45,13 @@ export function CertificationVsBudgetTable({ rows }: Props) {
                 <TableCell className="max-w-[min(18rem,35vw)] truncate" title={row.wbsName}>
                   {row.wbsName}
                 </TableCell>
-                <TableCell className="text-right font-mono">{fmt(row.budgetSale)}</TableCell>
-                <TableCell className="text-right font-mono">{fmt(row.certifiedCumulative)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.budgetSale)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.certifiedCumulative)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">
                   {row.certifiedPct != null ? `${row.certifiedPct}%` : "—"}
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {parseFloat(row.pendingCertify) > 0.01 ? fmt(row.pendingCertify) : "—"}
+                  {isPositiveMoneyAmount(row.pendingCertify) ? formatMoneyAmount(row.pendingCertify) : "—"}
                 </TableCell>
               </TableRow>
             ))}

@@ -14,7 +14,7 @@ import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 import { formatDateRange } from "@/lib/format";
 
 interface PageProps {
@@ -129,7 +129,7 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
         <KpiStatCard
           label="MB devengado"
           value={formatMoneyAmount(report.totals.grossMarginAccrued, report.displayCurrency)}
-          tone={parseFloat(report.totals.grossMarginAccrued) >= 0 ? "success" : "danger"}
+          tone={isZeroMoneyAmount(report.totals.grossMarginAccrued) ? "muted" : isPositiveMoneyAmount(report.totals.grossMarginAccrued) ? "success" : "danger"}
         />
         <KpiStatCard
           label="MB devengado %"
@@ -149,7 +149,7 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
         <KpiStatCard
           label="MB caja"
           value={formatMoneyAmount(report.totals.grossMarginCash, report.displayCurrency)}
-          tone={parseFloat(report.totals.grossMarginCash) >= 0 ? "success" : "danger"}
+          tone={isZeroMoneyAmount(report.totals.grossMarginCash) ? "muted" : isPositiveMoneyAmount(report.totals.grossMarginCash) ? "success" : "danger"}
         />
       </KpiStatGrid>
 

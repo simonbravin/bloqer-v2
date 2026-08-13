@@ -11,13 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-
-function fmt(value: string) {
-  return parseFloat(value).toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   rows: SubcontractContractRow[];
@@ -56,8 +50,8 @@ export function SubcontractContractsTable({ rows, projectId }: Props) {
               <TableCell className="max-w-[min(12rem,24vw)] truncate" title={row.subcontractorName}>
                 {row.subcontractorName}
               </TableCell>
-              <TableCell className="text-right font-mono">{fmt(row.totalValue)}</TableCell>
-              <TableCell className="text-right font-mono">{fmt(row.certifiedCost)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.totalValue)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.certifiedCost)}</TableCell>
               <TableCell className="text-muted-foreground">{row.status}</TableCell>
               <TableCell>{row.wbsLinked ? "Sí" : "—"}</TableCell>
             </TableRow>

@@ -23,13 +23,21 @@ import type { CertificationLineView } from "@bloqer/services";
 import type {
   AddCertificationLineInput, UpdateCertificationLineInput,
 } from "@bloqer/validators";
+import { addDecimal, multiplyDecimal, roundQty } from "@bloqer/utils";
+import {
+  compareQty,
+  formatMoneyAmount,
+  formatQtyFromString,
+  formatUnitPriceFromString,
+  isNegativeQty,
+} from "@/lib/format-money";
 
 function fmt4(v: string) {
-  return new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(parseFloat(v));
+  return formatQtyFromString(v);
 }
 
 function fmt2(v: string) {
-  return new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(v));
+  return formatMoneyAmount(v);
 }
 
 export type WbsItemOption = {
@@ -141,7 +149,7 @@ export function CertificationLineEditor({
             </TableHeader>
             <TableBody>
               {lines.map((line) => {
-                const isOverCert = parseFloat(line.cumulativeQty) > parseFloat(line.budgetQty);
+                const isOverCert = compareQty(line.cumulativeQty, line.budgetQty) > 0;
                 return (
                   <TableRow
                     key={line.id}
@@ -162,7 +170,7 @@ export function CertificationLineEditor({
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className={cn("text-right font-mono text-sm", parseFloat(line.remainingQty) < 0 && "text-amber-600 dark:text-amber-400")}>
+                    <TableCell className={cn("text-right font-mono text-sm", isNegativeQty(line.remainingQty) && "text-amber-600 dark:text-amber-400")}>
                       {fmt4(line.remainingQty)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm font-medium">
@@ -270,10 +278,15 @@ function AddLineForm({
     }
   }
 
-  const previewCumulative =
-    (parseFloat(selected?.previousQty ?? "0") + (parseFloat(currentQty) || 0)).toFixed(4);
+  const previewCumulative = (() => {
+    try {
+      return roundQty(addDecimal(selected?.previousQty ?? "0", currentQty || "0"));
+    } catch {
+      return selected?.previousQty ?? "0.0000";
+    }
+  })();
   const budgetQty = selected?.budgetQty ?? "0";
-  const isOver = selected != null && parseFloat(previewCumulative) > parseFloat(budgetQty);
+  const isOver = selected != null && compareQty(previewCumulative, budgetQty) > 0;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -310,7 +323,7 @@ function AddLineForm({
           <p className="text-xs text-muted-foreground">
             Unidad: {selected.unit || "—"}
             {selected.unitSalePrice != null
-              ? ` · PU venta ${fmt2(selected.unitSalePrice)}`
+              ? ` · PU venta ${formatUnitPriceFromString(selected.unitSalePrice)}`
               : ""}
           </p>
         ) : null}
@@ -410,13 +423,23 @@ function EditLineForm({
   const [notes, setNotes] = useState(line.notes ?? "");
 
   // Client-side preview of cumulative
-  const previewCumulative = (parseFloat(line.previousQty) + (parseFloat(currentQty) || 0)).toFixed(4);
-  const isOver = parseFloat(previewCumulative) > parseFloat(line.budgetQty);
+  const previewCumulative = (() => {
+    try {
+      return roundQty(addDecimal(line.previousQty, currentQty || "0"));
+    } catch {
+      return line.previousQty;
+    }
+  })();
+  const isOver = compareQty(previewCumulative, line.budgetQty) > 0;
   // Ceiling for this period = ppto − previa (not post-line remainingQty).
-  const periodRemaining = Math.max(
-    0,
-    parseFloat(line.budgetQty) - parseFloat(line.previousQty),
-  ).toFixed(4);
+  const periodRemaining = (() => {
+    try {
+      const rem = roundQty(addDecimal(line.budgetQty, multiplyDecimal(line.previousQty, -1)));
+      return rem.startsWith("-") ? "0.0000" : rem;
+    } catch {
+      return "0.0000";
+    }
+  })();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

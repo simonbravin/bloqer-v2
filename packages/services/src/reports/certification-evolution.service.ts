@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
+import { compareDecimal } from "@bloqer/utils";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
@@ -404,7 +405,7 @@ export async function getCertificationEvolutionReport(
     };
   });
 
-  const pendingCount = vsBudget.filter((r) => parseFloat(r.pendingCertify) > 0.01).length;
+  const pendingCount = vsBudget.filter((r) => compareDecimal(r.pendingCertify, "0.01") > 0).length;
 
   return {
     type: "REPORT",

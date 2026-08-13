@@ -17,6 +17,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import { getJobsiteLogById, getJobsiteLogActivityLog, getWbsIncrementalProgressSnapshot, listEntityDocuments, listStockMovements, ServiceError } from "@bloqer/services";
+import { formatQtyFromString } from "@/lib/format-money";
 import {
   JobsiteLogStatusBadge,
   JobsiteLogIssueSeverityBadge,
@@ -239,9 +240,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{p.description ?? "—"}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {parseFloat(p.quantityCompleted).toLocaleString("es-AR", {
-                        minimumFractionDigits: 2,
-                      })}{" "}
+                      {formatQtyFromString(p.quantityCompleted)}{" "}
                       {p.wbsNode.unit}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
@@ -322,7 +321,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                       {m.warehouseName ?? "—"}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {parseFloat(m.quantity).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                      {formatQtyFromString(m.quantity)}
                     </TableCell>
                     <TableCell className="text-xs">
                       {!showConsumption ? (

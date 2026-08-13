@@ -34,17 +34,11 @@ import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { ConfirmActionButton } from "@/components/feedback/confirm-action-button";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { Button } from "@/components/ui/button";
+import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
 
 interface PageProps {
   params: Promise<{ id: string; subcontractId: string; certId: string }>;
   searchParams: Promise<{ actionError?: string }>;
-}
-
-function formatAmount(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
 }
 
 export default async function CertificacionPage({ params, searchParams }: PageProps) {
@@ -213,7 +207,7 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
         </div>
         <div className="rounded-lg border bg-card p-4">
           <p className="text-xs text-muted-foreground uppercase">Total certificado</p>
-          <p className="text-xl font-semibold mt-1">{formatAmount(cert.totalAmount)}</p>
+          <p className="text-xl font-semibold mt-1">{formatMoneyAmount(cert.totalAmount)}</p>
         </div>
       </div>
 
@@ -280,19 +274,19 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
                   <TableCell className="text-right text-muted-foreground">
                     {l.subcontractLine.unit || "—"}
                   </TableCell>
-                  <TableCell className="text-right">{formatAmount(l.unitPriceSnapshot)}</TableCell>
+                  <TableCell className="text-right">{formatUnitPriceFromString(l.unitPriceSnapshot)}</TableCell>
                   <TableCell className="text-right text-muted-foreground">
-                    {formatAmount(l.previousQty)}
+                    {formatQtyFromString(l.previousQty)}
                   </TableCell>
                   <TableCell className="text-right font-medium">
-                    {formatAmount(l.currentQty)}
+                    {formatQtyFromString(l.currentQty)}
                   </TableCell>
-                  <TableCell className="text-right">{formatAmount(l.cumulativeQty)}</TableCell>
+                  <TableCell className="text-right">{formatQtyFromString(l.cumulativeQty)}</TableCell>
                   <TableCell className="text-right text-muted-foreground">
-                    {formatAmount(l.remainingQty)}
+                    {formatQtyFromString(l.remainingQty)}
                   </TableCell>
                   <TableCell className="text-right font-semibold">
-                    {formatAmount(l.lineTotal)}
+                    {formatMoneyAmount(l.lineTotal)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -303,7 +297,7 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
                   Total:
                 </TableCell>
                 <TableCell className="text-right font-bold">
-                  {formatAmount(cert.totalAmount)}
+                  {formatMoneyAmount(cert.totalAmount)}
                 </TableCell>
               </TableRow>
             </TableFooter>

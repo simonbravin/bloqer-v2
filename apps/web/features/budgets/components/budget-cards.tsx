@@ -1,15 +1,9 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { BudgetStatusBadge } from "./budget-status-badge";
 import type { BudgetListItem } from "./budget-list";
-
-function fmt(value: string, currency: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value)) + " " + currency;
-}
 
 export function BudgetCards({
   budgets,
@@ -54,11 +48,11 @@ export function BudgetCards({
           <div className="mt-3 space-y-1 text-sm">
             <div className="flex justify-between gap-2 tabular-nums">
               <span className="text-muted-foreground">Costo directo</span>
-              <span>{fmt(b.totalCost, b.currency)}</span>
+              <span>{formatMoneyAmount(b.totalCost, b.currency)}</span>
             </div>
             <div className="flex justify-between gap-2 tabular-nums">
               <span className="text-muted-foreground">Precio venta</span>
-              <span className="font-medium">{fmt(b.totalSalePrice, b.currency)}</span>
+              <span className="font-medium">{formatMoneyAmount(b.totalSalePrice, b.currency)}</span>
             </div>
           </div>
         </Link>

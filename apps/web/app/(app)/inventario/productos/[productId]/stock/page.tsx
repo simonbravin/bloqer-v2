@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { getProductStockDetail, ServiceError } from "@bloqer/services";
 import { StockBalanceTable, StockMovementReportTable } from "@/features/inventory-reports";
 import { PageShell } from "@/components/layout/page-shell";
+import { formatQtyFromString } from "@/lib/format-money";
+import { addDecimal } from "@bloqer/utils";
 
 interface PageProps {
   params: Promise<{ productId: string }>;
@@ -35,7 +37,7 @@ export default async function ProductoStockPage({ params, searchParams }: PagePr
   }
 
   const { product, balancesByWarehouse, movements } = detail;
-  const totalOnHand = balancesByWarehouse.reduce((s, r) => s + parseFloat(r.quantityOnHand), 0);
+  const totalOnHand = balancesByWarehouse.reduce((s, r) => addDecimal(s, r.quantityOnHand), "0");
   const hasNegative = balancesByWarehouse.some((r) => r.flags.negativeStock);
 
   return (
@@ -51,7 +53,7 @@ export default async function ProductoStockPage({ params, searchParams }: PagePr
           <p
             className={`text-2xl font-bold font-mono mt-1 tabular-nums ${hasNegative ? "text-red-600 dark:text-red-400" : ""}`}
           >
-            {totalOnHand.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+            {formatQtyFromString(totalOnHand)}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">{product.unit}</p>
         </div>

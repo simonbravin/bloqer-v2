@@ -10,6 +10,7 @@ import {
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import type { SubcontractView } from "@bloqer/services";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { SubcontractStatusBadge } from "./subcontract-status-badge";
 
 export function SubcontractTable({
@@ -54,10 +55,10 @@ export function SubcontractTable({
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">{s.subcontractorName}</TableCell>
               <TableCell className="text-right tabular-nums">
-                {parseFloat(s.totalValue).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                {formatMoneyAmount(s.totalValue, s.currency)}
               </TableCell>
               <TableCell className="text-right tabular-nums text-muted-foreground">
-                {parseFloat(s.totalCertified).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                {formatMoneyAmount(s.totalCertified, s.currency)}
               </TableCell>
               <TableCell>
                 <SubcontractStatusBadge status={s.status} />

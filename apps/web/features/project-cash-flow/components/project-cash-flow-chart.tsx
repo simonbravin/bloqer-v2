@@ -14,6 +14,7 @@ import {
   YAxis,
 } from "recharts";
 import type { ProjectCashFlowPeriod } from "@bloqer/services";
+import { formatChartMoney } from "@/lib/format-money";
 
 interface Props {
   periods: ProjectCashFlowPeriod[];
@@ -39,7 +40,7 @@ export function ProjectCashFlowChart({ periods, currency, variant = "trend" }: P
   }
 
   function fmtTooltip(v: number) {
-    return v.toLocaleString("es-AR", { minimumFractionDigits: 2 });
+    return formatChartMoney(v, currency);
   }
 
   if (variant === "trend") {
@@ -51,7 +52,7 @@ export function ProjectCashFlowChart({ periods, currency, variant = "trend" }: P
             <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
             <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={52} />
             <Tooltip
-              formatter={(value) => [`${fmtTooltip(Number(value))} ${currency}`, "Neto"]}
+              formatter={(value) => [fmtTooltip(Number(value)), "Neto"]}
               contentStyle={{
                 fontSize: 12,
                 borderRadius: 8,
@@ -88,7 +89,7 @@ export function ProjectCashFlowChart({ periods, currency, variant = "trend" }: P
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
           <XAxis dataKey="name" tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} />
-          <Tooltip formatter={(value) => [Number(value).toLocaleString("es-AR", { minimumFractionDigits: 2 }) + " " + currency]} />
+          <Tooltip formatter={(value) => [fmtTooltip(Number(value))]} />
           <Legend />
           <Bar dataKey="Ingresos" fill="#10b981" radius={[2, 2, 0, 0]} />
           <Bar dataKey="Egresos" fill="#ef4444" radius={[2, 2, 0, 0]} />

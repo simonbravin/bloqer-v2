@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { can } from "@bloqer/domain";
 import { createSupplierInvoiceFromPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
 import type { PurchaseOrderBillingSummary } from "@bloqer/services";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   projectId: string;
@@ -23,8 +23,8 @@ export function PoBillingNextStepPanel({
   canEditAp,
   errorReturnPath,
 }: Props) {
-  const pending = Number.parseFloat(billing.pendingToInvoice);
-  const showAction = billing.hasReceivedQuantity && pending > 0;
+  const pending = isPositiveMoneyAmount(billing.pendingToInvoice);
+  const showAction = billing.hasReceivedQuantity && pending;
 
   return (
     <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
@@ -37,7 +37,7 @@ export function PoBillingNextStepPanel({
             {billing.draftInvoiceCount > 0
               ? ` · ${billing.draftInvoiceCount} borrador(es)`
               : null}
-            {pending > 0
+            {pending
               ? ` · Pendiente de facturar: ${formatMoneyAmount(billing.pendingToInvoice)}`
               : null}
           </p>

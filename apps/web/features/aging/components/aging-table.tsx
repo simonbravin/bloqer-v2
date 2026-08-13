@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { AgingReport, AgingRow, AgingItem } from "@bloqer/services";
 import { formatCurrencyDisplay, formatDate } from "@/lib/format";
-import { formatDecimalAr } from "@/lib/format-money";
+import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
 import {
   Table,
   TableBody,
@@ -21,8 +21,7 @@ interface Props {
 }
 
 function formatAmount(value: string) {
-  const n = Number(value);
-  return formatDecimalAr(Number.isFinite(n) ? n : 0);
+  return formatMoneyAmount(value);
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -121,19 +120,19 @@ function GroupRow({
           {formatCurrencyDisplay(row.currency)}
         </TableCell>
         <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-          {parseFloat(row.current) > 0 ? formatAmount(row.current) : "—"}
+          {isPositiveMoneyAmount(row.current) ? formatAmount(row.current) : "—"}
         </TableCell>
         <TableCell className="text-right tabular-nums text-yellow-700 dark:text-yellow-400">
-          {parseFloat(row.bucket1_30) > 0 ? formatAmount(row.bucket1_30) : "—"}
+          {isPositiveMoneyAmount(row.bucket1_30) ? formatAmount(row.bucket1_30) : "—"}
         </TableCell>
         <TableCell className="text-right tabular-nums text-orange-700 dark:text-orange-400">
-          {parseFloat(row.bucket31_60) > 0 ? formatAmount(row.bucket31_60) : "—"}
+          {isPositiveMoneyAmount(row.bucket31_60) ? formatAmount(row.bucket31_60) : "—"}
         </TableCell>
         <TableCell className="text-right tabular-nums text-red-600 dark:text-red-400">
-          {parseFloat(row.bucket61_90) > 0 ? formatAmount(row.bucket61_90) : "—"}
+          {isPositiveMoneyAmount(row.bucket61_90) ? formatAmount(row.bucket61_90) : "—"}
         </TableCell>
         <TableCell className="text-right tabular-nums text-red-700 dark:text-red-300 font-medium">
-          {parseFloat(row.bucket90Plus) > 0 ? formatAmount(row.bucket90Plus) : "—"}
+          {isPositiveMoneyAmount(row.bucket90Plus) ? formatAmount(row.bucket90Plus) : "—"}
         </TableCell>
         <TableCell className="text-right tabular-nums font-semibold">
           {formatAmount(row.totalBalance)}

@@ -23,7 +23,7 @@ import {
 import { canViewCompanyFinanceHub, canViewCompanyTreasury } from "./finance-access";
 import { canViewCompanyAp } from "../ap/ap-access";
 import { canViewCompanyAr } from "../ar/ar-access";
-import { serializeMoneyDecimal } from "./money-decimal";
+import { isPositiveMoneyDecimal, serializeMoneyDecimal } from "./money-decimal";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -31,7 +31,7 @@ function countOverdueFromAgingReport(report: { rows: { items: { daysOverdue: num
   let n = 0;
   for (const row of report.rows) {
     for (const item of row.items) {
-      if (item.daysOverdue > 0 && Number(item.balanceDue) > 0) n += 1;
+      if (item.daysOverdue > 0 && isPositiveMoneyDecimal(item.balanceDue)) n += 1;
     }
   }
   return n;

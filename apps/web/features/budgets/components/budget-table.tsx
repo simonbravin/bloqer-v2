@@ -10,18 +10,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { BudgetStatusBadge } from "./budget-status-badge";
 import type { BudgetListItem } from "./budget-list";
-
-function fmt(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      parseFloat(value),
-    ) +
-    " " +
-    currency
-  );
-}
 
 export function BudgetTable({
   budgets,
@@ -73,9 +64,11 @@ export function BudgetTable({
               <TableCell>
                 <BudgetStatusBadge status={b.status} />
               </TableCell>
-              <TableCell className="text-right font-mono text-sm">{fmt(b.totalCost, b.currency)}</TableCell>
               <TableCell className="text-right font-mono text-sm">
-                {fmt(b.totalSalePrice, b.currency)}
+                {formatMoneyAmount(b.totalCost, b.currency)}
+              </TableCell>
+              <TableCell className="text-right font-mono text-sm">
+                {formatMoneyAmount(b.totalSalePrice, b.currency)}
               </TableCell>
               <TableCell>
                 <Button variant="ghost" size="sm" asChild>

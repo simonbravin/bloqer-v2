@@ -13,10 +13,7 @@ import {
 } from "recharts";
 import type { SubcontractCertEvolutionPoint } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-function fmt(v: number) {
-  return v.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { formatChartMoney } from "@/lib/format-money";
 
 type Props = {
   series: SubcontractCertEvolutionPoint[];
@@ -59,8 +56,8 @@ export function SubcontractCertChart({ series }: Props) {
             <BarChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} width={72} />
-              <Tooltip formatter={(v: number) => fmt(v)} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatChartMoney(v)} width={72} />
+              <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="Certificado" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} />
               <Bar dataKey="Pagado" fill="hsl(var(--chart-2))" radius={[2, 2, 0, 0]} />

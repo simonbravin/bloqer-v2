@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { UrlSortableTableHead } from "@/components/ui/url-sortable-table-head";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 import { accountMovementStatusLabel } from "@/features/treasury/lib/account-movement-status-label";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -29,8 +29,11 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 function fmtSigned(signed: string) {
-  const n = parseFloat(signed);
-  return (n >= 0 ? "+" : "") + formatMoneyAmount(signed);
+  const formatted = formatMoneyAmount(signed);
+  if (isZeroMoneyAmount(signed) || formatted.startsWith("-") || formatted.startsWith("+")) {
+    return formatted;
+  }
+  return `+${formatted}`;
 }
 
 function safeDetailHref(url: string | null): string | null {
@@ -84,7 +87,7 @@ export function MovementLedgerTable({
           </TableHeader>
           <TableBody>
             {rows.map((m) => {
-              const signed = parseFloat(m.signedAmount);
+              const inflow = isPositiveMoneyAmount(m.signedAmount) || isZeroMoneyAmount(m.signedAmount);
               const detailHref = safeDetailHref(m.detailHref);
               return (
                 <TableRow key={m.id}>
@@ -131,7 +134,7 @@ export function MovementLedgerTable({
                   <TableCell>{m.currency}</TableCell>
                   <TableCell
                     className={`text-right tabular-nums font-mono ${
-                      signed >= 0
+                      inflow
                         ? "text-emerald-600 dark:text-emerald-400"
                         : "text-red-600 dark:text-red-400"
                     }`}

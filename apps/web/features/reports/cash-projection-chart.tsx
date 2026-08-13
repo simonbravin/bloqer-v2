@@ -13,10 +13,7 @@ import {
 } from "recharts";
 import type { CashProjectionBucket } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-function fmt(v: number) {
-  return v.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { formatChartMoney } from "@/lib/format-money";
 
 type Props = {
   buckets: CashProjectionBucket[];
@@ -63,8 +60,8 @@ export function CashProjectionChart({ buckets, currency }: Props) {
             <BarChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} width={72} />
-              <Tooltip formatter={(v: number) => `${fmt(v)} ${currency}`} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatChartMoney(v)} width={72} />
+              <Tooltip formatter={(v) => formatChartMoney(Number(v), currency)} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="Cobros" fill="hsl(var(--chart-2))" radius={[2, 2, 0, 0]} />
               <Bar dataKey="Pagos" fill="hsl(var(--chart-4))" radius={[2, 2, 0, 0]} />

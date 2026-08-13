@@ -16,6 +16,7 @@ import { SupplierInvoiceStatusBadge } from "./supplier-invoice-status-badge";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { SupplierInvoiceListItem } from "./supplier-invoice-list";
 import { formatInvoiceLetterBadge } from "@bloqer/domain";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 const PAYABLE_OPEN = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
 
@@ -85,10 +86,7 @@ export function SupplierInvoiceTable({
                   {formatDate(inv.dueDate)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums font-medium">
-                  {Number(inv.totalAmount).toLocaleString("es-AR", {
-                    style: "currency",
-                    currency: inv.currency,
-                  })}
+                  {formatMoneyAmount(inv.totalAmount, inv.currency)}
                 </TableCell>
                 <TableCell>
                   <SupplierInvoiceStatusBadge status={inv.status} />

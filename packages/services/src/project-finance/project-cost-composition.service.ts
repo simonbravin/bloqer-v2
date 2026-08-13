@@ -7,6 +7,7 @@ import {
 } from "../cost-control/cost-control.service";
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { ServiceContext, ServiceError } from "../types";
+import { isPositiveMoneyDecimal } from "../finance/money-decimal";
 
 const VISIBLE_CATEGORIES: CostCategory[] = ["MATERIAL", "LABOR", "EQUIPMENT", "SUBCONTRACT"];
 
@@ -102,7 +103,7 @@ export async function getProjectCostCompositionReport(
       amount: amount.toFixed(2),
       percent,
     };
-  }).filter((s) => parseFloat(s.amount) > 0);
+  }).filter((s) => isPositiveMoneyDecimal(s.amount));
 
   return {
     type: "COMPOSITION",

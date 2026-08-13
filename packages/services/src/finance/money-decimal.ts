@@ -46,3 +46,22 @@ export function serializeFxRateDecimal(value: DecimalInput): string {
 export function serializeRatePctDecimal(value: DecimalInput): string {
   return roundRatePct(toPlainDecimalInput(value));
 }
+
+/** True when serialized money is strictly greater than zero. */
+export function isPositiveMoneyDecimal(value: DecimalInput): boolean {
+  try {
+    const s = serializeMoneyDecimal(value);
+    return s !== "0.00" && !s.startsWith("-");
+  } catch {
+    return false;
+  }
+}
+
+/** True for 0 / 0.0 / 0.00 after D-053 money serialization. */
+export function isZeroMoneyDecimal(value: DecimalInput): boolean {
+  try {
+    return serializeMoneyDecimal(value) === "0.00";
+  } catch {
+    return false;
+  }
+}

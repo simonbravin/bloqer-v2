@@ -14,6 +14,7 @@ import {
   YAxis,
 } from "recharts";
 import type { CashFlowCurrency } from "@bloqer/services";
+import { formatChartMoney } from "@/lib/format-money";
 
 interface Props {
   data: CashFlowCurrency;
@@ -38,7 +39,7 @@ export function CashFlowChart({ data, variant = "bars" }: Props) {
   }
 
   function fmtTooltip(v: number) {
-    return v.toLocaleString("es-AR", { minimumFractionDigits: 2 });
+    return formatChartMoney(v, data.currency);
   }
 
   if (variant === "trend") {
@@ -64,7 +65,7 @@ export function CashFlowChart({ data, variant = "bars" }: Props) {
             />
             <Tooltip
               formatter={(value, name) => [
-                `${fmtTooltip(Number(value))} ${data.currency}`,
+                fmtTooltip(Number(value)),
                 name === "netOperativo" ? "Neto operativo" : String(name),
               ]}
               contentStyle={{
@@ -121,7 +122,7 @@ export function CashFlowChart({ data, variant = "bars" }: Props) {
           />
           <Tooltip
             formatter={(value) => [
-              fmtTooltip(Number(value)) + " " + data.currency,
+              fmtTooltip(Number(value)),
             ]}
             contentStyle={{ fontSize: 12 }}
           />

@@ -7,13 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { CertificationStatus } from "@bloqer/database";
 
-function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      parseFloat(value),
-    ) + " " + currency
-  );
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 interface CertificationTotalsPanelProps {
   status: CertificationStatus;
@@ -67,7 +61,7 @@ export function CertificationTotalsPanel({
       <dl className="space-y-2 text-sm">
         <div className="flex justify-between">
           <dt className="text-muted-foreground">Monto certificado</dt>
-          <dd className="font-mono font-semibold">{fmtMoney(totalAmount, currency)}</dd>
+          <dd className="font-mono font-semibold">{formatMoneyAmount(totalAmount, currency)}</dd>
         </div>
       </dl>
 

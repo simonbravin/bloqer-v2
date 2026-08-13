@@ -48,7 +48,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { WbsNodeForm } from "./wbs-node-form";
@@ -102,6 +102,10 @@ import type { WbsCreatePreset } from "./wbs-node-form";
 
 function fmt(value: number, currency: string) {
   return formatMoneyAmount(String(value), currency);
+}
+
+function fmtUnitPrice(value: number) {
+  return formatUnitPriceFromString(String(value));
 }
 
 /** Min width for the item name column (wider than before; scroll inside cell if longer). */
@@ -616,13 +620,13 @@ export function WbsTree({
                   key={`u-${cat}`}
                   className="py-0.5 text-right font-mono text-xs text-muted-foreground w-28"
                 >
-                  {line.category === cat ? fmt(unitContribution, currency) : "—"}
+                  {line.category === cat ? fmtUnitPrice(unitContribution) : "—"}
                 </TableCell>
               ))
             : null}
           {showUnit ? (
             <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-28">
-              {fmt(unitContribution, currency)}
+              {fmtUnitPrice(unitContribution)}
             </TableCell>
           ) : null}
           {VISIBLE_COST_CATEGORIES.map((cat) => (
@@ -644,7 +648,7 @@ export function WbsTree({
       <>
         {showUnit ? (
           <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-28">
-            {fmt(unitContribution, currency)}
+            {fmtUnitPrice(unitContribution)}
           </TableCell>
         ) : null}
         <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-32">
@@ -657,8 +661,8 @@ export function WbsTree({
   function renderNodeMoneyCells(node: WbsViewNode, metrics: ReturnType<typeof computeWbsRowMetrics>): ReactNode {
     const isLeaf = node.children.length === 0 && !!node.costItem;
     const unitCats = isLeaf ? computeUnitCategoryCosts(node) : null;
-    const unitCd = isLeaf ? parseFloat(node.costItem!.unitCostDirect) || 0 : null;
-    const unitSale = isLeaf ? parseFloat(node.costItem!.unitSalePrice) || 0 : null;
+    const unitCd = isLeaf ? node.costItem!.unitCostDirect : null;
+    const unitSale = isLeaf ? node.costItem!.unitSalePrice : null;
     const showUnit = viewMode.showUnit;
 
     if (viewMode.base === "sale") {
@@ -666,7 +670,7 @@ export function WbsTree({
         <>
           {showUnit ? (
             <TableCell className="py-0.5 text-right font-mono text-sm w-28">
-              {unitSale != null ? fmt(unitSale, currency) : "—"}
+              {unitSale != null ? formatUnitPriceFromString(unitSale) : "—"}
             </TableCell>
           ) : null}
           <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-32">
@@ -682,19 +686,19 @@ export function WbsTree({
           {showUnit ? (
             <>
               <TableCell className="py-0.5 text-right font-mono text-xs w-28">
-                {unitCats ? fmt(unitCats.MATERIAL, currency) : "—"}
+                {unitCats ? fmtUnitPrice(unitCats.MATERIAL) : "—"}
               </TableCell>
               <TableCell className="py-0.5 text-right font-mono text-xs w-28">
-                {unitCats ? fmt(unitCats.LABOR, currency) : "—"}
+                {unitCats ? fmtUnitPrice(unitCats.LABOR) : "—"}
               </TableCell>
               <TableCell className="py-0.5 text-right font-mono text-xs w-28">
-                {unitCats ? fmt(unitCats.EQUIPMENT, currency) : "—"}
+                {unitCats ? fmtUnitPrice(unitCats.EQUIPMENT) : "—"}
               </TableCell>
               <TableCell className="py-0.5 text-right font-mono text-xs w-28">
-                {unitCats ? fmt(unitCats.SUBCONTRACT, currency) : "—"}
+                {unitCats ? fmtUnitPrice(unitCats.SUBCONTRACT) : "—"}
               </TableCell>
               <TableCell className="py-0.5 text-right font-mono text-sm w-28">
-                {unitCd != null ? fmt(unitCd, currency) : "—"}
+                {unitCd != null ? formatUnitPriceFromString(unitCd) : "—"}
               </TableCell>
             </>
           ) : null}
@@ -721,7 +725,7 @@ export function WbsTree({
       <>
         {showUnit ? (
           <TableCell className="py-0.5 text-right font-mono text-sm w-28">
-            {unitCd != null ? fmt(unitCd, currency) : "—"}
+            {unitCd != null ? formatUnitPriceFromString(unitCd) : "—"}
           </TableCell>
         ) : null}
         <TableCell className="py-0.5 text-right font-mono text-sm font-semibold w-32">
@@ -808,7 +812,7 @@ export function WbsTree({
             {metrics.unit ? budgetUnitLabel(metrics.unit) : "—"}
           </TableCell>
           <TableCell className="py-0.5 text-right font-mono text-sm w-24">
-            {metrics.quantity != null ? metrics.quantity.toLocaleString("es-AR") : "—"}
+            {metrics.quantity != null ? formatQtyFromString(String(metrics.quantity)) : "—"}
           </TableCell>
 
           {renderNodeMoneyCells(node, metrics)}
@@ -881,9 +885,7 @@ export function WbsTree({
               <TableCell className="py-0.5 text-right font-mono text-xs text-muted-foreground w-24">
                 {qtyDisp.kind === "lump"
                   ? "—"
-                  : qtyDisp.qty.toLocaleString("es-AR", {
-                      maximumFractionDigits: 4,
-                    })}
+                  : formatQtyFromString(String(qtyDisp.qty))}
               </TableCell>
               {renderApuMoneyCells(line, itemQty)}
               {incidenceCell(metrics, { empty: true, muted: true })}

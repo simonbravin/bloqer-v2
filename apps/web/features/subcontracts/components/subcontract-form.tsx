@@ -21,7 +21,9 @@ import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { contactsToSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
+import { addDecimal, divideDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
 import type { WbsSubcontractBudgetHint } from "@bloqer/services";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { SubcontractBudgetHints } from "./subcontract-budget-hints";
 
 export type SubcontractorOption = { id: string; legalName: string; fantasyName: string | null };
@@ -91,9 +93,12 @@ export function SubcontractForm({
   }
 
   function applyBudgetHint(hint: WbsSubcontractBudgetHint) {
-    const q = parseFloat(hint.quantity) || 1;
-    const total = parseFloat(hint.budgetSubcontractTotal) || 0;
-    const unitPrice = q > 0 ? (total / q).toFixed(4) : hint.unitSubcontractCost;
+    let unitPrice = hint.unitSubcontractCost;
+    try {
+      unitPrice = divideDecimal(hint.budgetSubcontractTotal, hint.quantity || "1", 4);
+    } catch {
+      /* keep snapshot unit cost */
+    }
     const newLine: LineState = {
       wbsNodeId: hint.wbsNodeId,
       description: hint.name,
@@ -123,11 +128,18 @@ export function SubcontractForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- apply once when hint list is ready
   }, [initialWbsNodeId, budgetHints]);
 
-  const totalValue = lines.reduce((sum, l) => {
-    const qty = parseFloat(l.quantity) || 0;
-    const price = parseFloat(l.unitPrice) || 0;
-    return sum + qty * price;
-  }, 0);
+  function previewLineMoney(qty: string, price: string): string {
+    try {
+      return serializeMoney(multiplyDecimal(qty.trim() || "0", price.trim() || "0"));
+    } catch {
+      return "0.00";
+    }
+  }
+
+  const totalValue = lines.reduce(
+    (sum, l) => addDecimal(sum, previewLineMoney(l.quantity, l.unitPrice)),
+    "0",
+  );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -242,7 +254,7 @@ export function SubcontractForm({
               </TableHeader>
               <TableBody>
                 {lines.map((line, i) => {
-                  const sub = (parseFloat(line.quantity) || 0) * (parseFloat(line.unitPrice) || 0);
+                  const sub = previewLineMoney(line.quantity, line.unitPrice);
                   return (
                     <TableRow key={i}>
                       <TableCell className="min-w-[160px]">
@@ -273,7 +285,7 @@ export function SubcontractForm({
                         <Input className="h-8 text-xs text-right" type="number" step="any" min="0.0001" value={line.unitPrice} onChange={(e) => updateLine(i, "unitPrice", e.target.value)} required />
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
-                        {sub.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                        {formatMoneyAmount(sub)}
                       </TableCell>
                       <TableCell>
                       {lines.length > 1 && (
@@ -290,7 +302,7 @@ export function SubcontractForm({
                     Total del contrato:
                   </TableCell>
                   <TableCell className="text-right font-semibold">
-                    {totalValue.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                    {formatMoneyAmount(totalValue)}
                   </TableCell>
                   <TableCell />
                 </TableRow>

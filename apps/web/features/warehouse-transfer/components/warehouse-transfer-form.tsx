@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { toSearchableOptions } from "@/lib/searchable-options";
+import { formatQtyFromString } from "@/lib/format-money";
 
 interface Warehouse { id: string; name: string }
 interface Product   { id: string; name: string; unit: string }
@@ -125,7 +126,7 @@ export function WarehouseTransferForm({
           <p className="text-xs text-muted-foreground">
             Stock disponible en origen:{" "}
             <span className="font-medium">
-              {parseFloat(sourceStockBalance).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+              {formatQtyFromString(sourceStockBalance)}
             </span>
           </p>
         )}

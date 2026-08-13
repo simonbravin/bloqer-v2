@@ -10,13 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-
-function fmt(value: string) {
-  return parseFloat(value).toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
+import { formatMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   rows: ProcurementSupplierRow[];
@@ -41,10 +35,10 @@ export function ProcurementSupplierTable({ rows }: Props) {
               <TableCell className="max-w-[min(14rem,30vw)] truncate" title={row.supplierName}>
                 {row.supplierName}
               </TableCell>
-              <TableCell className="text-right font-mono">{fmt(row.committedCost)}</TableCell>
-              <TableCell className="text-right font-mono">{fmt(row.accruedCost)}</TableCell>
-              <TableCell className="text-right font-mono">{fmt(row.paidCost)}</TableCell>
-              <TableCell className="text-right font-mono">{fmt(row.openCommitted)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.committedCost)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.accruedCost)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.paidCost)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.openCommitted)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

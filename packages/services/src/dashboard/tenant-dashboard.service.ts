@@ -13,7 +13,7 @@ import { getCashFlowReport, type CashFlowReport } from "../treasury-reports/trea
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
-import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { isPositiveMoneyDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
 import { formatDashboardMoney } from "./dashboard-format";
 
 export { formatDashboardMoney };
@@ -149,7 +149,7 @@ function countOverdueFromAgingReport(report: { rows: { items: { daysOverdue: num
   let n = 0;
   for (const row of report.rows) {
     for (const item of row.items) {
-      if (item.daysOverdue > 0 && Number(item.balanceDue) > 0) n += 1;
+      if (item.daysOverdue > 0 && isPositiveMoneyDecimal(item.balanceDue)) n += 1;
     }
   }
   return n;
@@ -163,7 +163,7 @@ function countDueSoonFromAgingReport(report: AgingReport, withinDays: number): n
   let n = 0;
   for (const row of report.rows) {
     for (const item of row.items) {
-      if (Number(item.balanceDue) <= 0) continue;
+      if (!isPositiveMoneyDecimal(item.balanceDue)) continue;
       const due = new Date(`${item.dueDate}T12:00:00`);
       if (due > asOf && due <= end) n += 1;
     }

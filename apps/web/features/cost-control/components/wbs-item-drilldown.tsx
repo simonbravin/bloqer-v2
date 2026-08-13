@@ -13,14 +13,13 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { budgetUnitLabel } from "@/lib/budget-units";
+import { formatMoneyAmount, formatQtyFromString } from "@/lib/format-money";
 
 function fmt(v: string) {
-  return parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatMoneyAmount(v);
 }
 function fmtQty(v: string) {
-  const n = parseFloat(v);
-  if (!Number.isFinite(n)) return v;
-  return n.toLocaleString("es-AR", { maximumFractionDigits: 4 });
+  return formatQtyFromString(v);
 }
 function fmtDate(d: Date) {
   return formatDate(d);

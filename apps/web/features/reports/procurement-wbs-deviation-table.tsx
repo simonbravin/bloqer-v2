@@ -10,13 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-
-function fmt(value: string) {
-  return parseFloat(value).toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
+import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   rows: ProcurementWbsDeviationRow[];
@@ -39,20 +33,21 @@ export function ProcurementWbsDeviationTable({ rows }: Props) {
         </TableHeader>
         <TableBody>
           {rows.map((row) => {
-            const v = parseFloat(row.varianceAmount);
+            const over = isPositiveMoneyAmount(row.varianceAmount);
+            const zero = isZeroMoneyAmount(row.varianceAmount);
             return (
               <TableRow key={row.wbsNodeId}>
                 <TableCell className="font-mono">{row.wbsCode}</TableCell>
                 <TableCell className="max-w-[min(18rem,35vw)] truncate" title={row.wbsName}>
                   {row.wbsName}
                 </TableCell>
-                <TableCell className="text-right font-mono">{fmt(row.budgetMaterial)}</TableCell>
-                <TableCell className="text-right font-mono">{fmt(row.committedCost)}</TableCell>
-                <TableCell className="text-right font-mono">{fmt(row.accruedCost)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.budgetMaterial)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.committedCost)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.accruedCost)}</TableCell>
                 <TableCell
-                  className={`text-right font-mono ${v > 0.01 ? "text-destructive" : v < -0.01 ? "text-emerald-600" : ""}`}
+                  className={`text-right font-mono ${zero ? "" : over ? "text-destructive" : "text-emerald-600"}`}
                 >
-                  {fmt(row.varianceAmount)}
+                  {formatMoneyAmount(row.varianceAmount)}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
                   {row.variancePct != null ? `${row.variancePct}%` : "—"}

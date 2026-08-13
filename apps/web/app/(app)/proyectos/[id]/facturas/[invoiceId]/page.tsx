@@ -28,6 +28,7 @@ import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
+import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
 
 interface PageProps {
   params: Promise<{ id: string; invoiceId: string }>;
@@ -39,13 +40,7 @@ function fmtDate(d: Date) {
 }
 
 function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      parseFloat(value),
-    ) +
-    " " +
-    currency
-  );
+  return formatMoneyAmount(value, currency);
 }
 
 export default async function FacturaDetailPage({ params, searchParams }: PageProps) {
@@ -238,9 +233,9 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
               {invoice.lines.map((l) => (
                 <TableRow key={l.id}>
                   <TableCell>{l.description}</TableCell>
-                  <TableCell className="text-right font-mono">{l.quantity}</TableCell>
+                  <TableCell className="text-right font-mono">{formatQtyFromString(l.quantity)}</TableCell>
                   <TableCell className="text-right font-mono">
-                    {fmtMoney(l.unitPrice, invoice.currency)}
+                    {formatUnitPriceFromString(l.unitPrice)}
                   </TableCell>
                   <TableCell className="text-right font-mono">{l.taxRate}%</TableCell>
                   <TableCell className="text-right font-mono">

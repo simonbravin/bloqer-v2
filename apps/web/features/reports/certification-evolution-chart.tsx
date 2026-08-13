@@ -13,10 +13,7 @@ import {
 } from "recharts";
 import type { CertificationEvolutionPoint } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-function fmt(v: number) {
-  return v.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { formatChartMoney } from "@/lib/format-money";
 
 type Props = {
   series: CertificationEvolutionPoint[];
@@ -60,8 +57,8 @@ export function CertificationEvolutionChart({ series }: Props) {
             <BarChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
-              <Tooltip formatter={(v: number) => fmt(v)} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatChartMoney(v)} />
+              <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
               <Legend />
               <Bar dataKey="Certificado" fill="#2563eb" radius={[2, 2, 0, 0]} />
               <Bar dataKey="Facturado" fill="#16a34a" radius={[2, 2, 0, 0]} />

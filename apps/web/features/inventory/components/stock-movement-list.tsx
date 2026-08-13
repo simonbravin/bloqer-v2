@@ -14,20 +14,18 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { StockMovementAccountingButton } from "@/features/accounting";
 import { formatDate } from "@/lib/format";
+import {
+  formatQtyFromString,
+  formatUnitPriceFromString,
+  isPositiveMoneyAmount,
+  isPositiveQty,
+} from "@/lib/format-money";
 import { StockMovementTypeBadge } from "./stock-movement-type-badge";
 
-function formatAmount(value: string) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
-
 function consumptionCostOk(m: StockMovementView): boolean {
-  const tc = m.totalCost ? parseFloat(m.totalCost) : NaN;
-  const uc = m.unitCost ? parseFloat(m.unitCost) : NaN;
-  const amount = Number.isFinite(tc) && tc > 0 ? tc : Number.isFinite(uc) && uc > 0 ? uc : 0;
-  return amount > 0;
+  if (m.totalCost && isPositiveMoneyAmount(m.totalCost)) return true;
+  if (m.unitCost && isPositiveQty(m.unitCost)) return true;
+  return false;
 }
 
 interface Props {
@@ -78,9 +76,9 @@ export function StockMovementList({
               </TableCell>
               <TableCell>{m.productName}</TableCell>
               <TableCell>{m.warehouseName}</TableCell>
-              <TableCell className="text-right tabular-nums">{m.quantity}</TableCell>
+              <TableCell className="text-right tabular-nums">{formatQtyFromString(m.quantity)}</TableCell>
               <TableCell className="text-right tabular-nums">
-                {m.unitCost ? `$${formatAmount(m.unitCost)}` : "—"}
+                {m.unitCost ? formatUnitPriceFromString(m.unitCost) : "—"}
               </TableCell>
               <TableCell>
                 <span

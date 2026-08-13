@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { InvoiceLetterSelect, TaxRateSelect } from "@/features/finance/components/invoice-letter-fields";
 import { createInvoiceFromCertificationAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 export type CertSummary = {
   id: string;
@@ -89,7 +90,7 @@ export function CertificationInvoiceForm({
           Período: {cert.periodStart} — {cert.periodEnd}
         </p>
         <p className="text-muted-foreground">
-          Monto: {new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2 }).format(parseFloat(cert.totalAmount))} {cert.currency}
+          Monto: {formatMoneyAmount(cert.totalAmount, cert.currency)}
         </p>
         <p className="text-xs text-muted-foreground pt-1">
           Se crea un <strong>borrador</strong>. Después tenés que <strong>Emitir</strong> la factura

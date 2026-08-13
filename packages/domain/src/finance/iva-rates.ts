@@ -60,6 +60,13 @@ export type InvoiceLetterTaxIssue = {
   message: string;
 };
 
+function isZeroMoneyLike(value: string | number | null | undefined): boolean {
+  if (value == null || value === "") return true;
+  const s = typeof value === "number" ? String(value) : String(value).trim();
+  if (!s) return true;
+  return /^-?0+(\.0+)?$/.test(s);
+}
+
 /**
  * Soft/hard consistency between letter and aggregated tax amount.
  * Callers decide whether to block on `error` (issue) or only warn in UI.
@@ -69,11 +76,11 @@ export function evaluateInvoiceLetterTaxConsistency(params: {
   taxAmount: string | number | null | undefined;
 }): InvoiceLetterTaxIssue[] {
   const letter = params.invoiceLetter;
-  const tax = Number(params.taxAmount ?? 0);
+  const taxIsZero = isZeroMoneyLike(params.taxAmount);
   const issues: InvoiceLetterTaxIssue[] = [];
   if (!letter) return issues;
 
-  if ((letter === "C" || letter === "E") && tax > 0) {
+  if ((letter === "C" || letter === "E") && !taxIsZero) {
     issues.push({
       severity: "error",
       message:
@@ -83,7 +90,7 @@ export function evaluateInvoiceLetterTaxConsistency(params: {
     });
   }
 
-  if (letter === "A" && tax === 0) {
+  if (letter === "A" && taxIsZero) {
     issues.push({
       severity: "warning",
       message:
@@ -91,7 +98,7 @@ export function evaluateInvoiceLetterTaxConsistency(params: {
     });
   }
 
-  if (letter === "B" && tax === 0) {
+  if (letter === "B" && taxIsZero) {
     issues.push({
       severity: "warning",
       message:

@@ -68,7 +68,9 @@ export function getEnv(): DocsEnv {
     poId: pick(ids, "confirmedPoId", "DOCS_PO_ID"),
     budgetId: pick(ids, "budgetId", "DOCS_BUDGET_ID"),
     accountId: pick(ids, "treasuryAccountId", "DOCS_ACCOUNT_ID") || pick(ids, "accountId", "DOCS_ACCOUNT_ID"),
-    reconciliationId: pick(ids, "reconciliationId", "DOCS_RECONCILIATION_ID"),
+    reconciliationId:
+      pick(ids, "reconciliationId", "DOCS_RECONCILIATION_ID") ||
+      pick(ids, "reconciliationInProgressId", "DOCS_RECONCILIATION_ID"),
     reconciliationCloseReadyId: pick(ids, "reconciliationCloseReadyId", "DOCS_RECONCILIATION_CLOSE_ID"),
     certificationId: pick(ids, "certificationId", "DOCS_CERTIFICATION_ID"),
     salesInvoiceId: pick(ids, "salesInvoiceId", "DOCS_SALES_INVOICE_ID"),

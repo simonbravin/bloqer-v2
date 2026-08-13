@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { Badge } from "@/components/ui/badge";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { PaymentListItem } from "./payment-list";
@@ -33,10 +34,7 @@ export function PaymentCards({
           <div className="mt-3 flex justify-between gap-2 text-sm tabular-nums">
             <span className="text-muted-foreground">Monto</span>
             <span className="font-medium">
-              {Number(p.amount).toLocaleString("es-AR", {
-                style: "currency",
-                currency: p.currency,
-              })}
+              {formatMoneyAmount(p.amount, p.currency)}
             </span>
           </div>
         </Link>

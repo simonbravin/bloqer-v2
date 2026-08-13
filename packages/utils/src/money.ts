@@ -177,6 +177,21 @@ export function multiplyDecimal(a: string | number, b: string | number): string 
   return `${sign}${intPart}.${fracPart}`;
 }
 
+/** Compare two decimal strings without IEEE float. Returns -1, 0, or 1. */
+export function compareDecimal(a: string | number, b: string | number): -1 | 0 | 1 {
+  const as = normalizeDecimalString(a);
+  const bs = normalizeDecimalString(b);
+  const aAbs = as.startsWith("-") ? as.slice(1) : as;
+  const bAbs = bs.startsWith("-") ? bs.slice(1) : bs;
+  const [, aFrac = ""] = aAbs.split(".");
+  const [, bFrac = ""] = bAbs.split(".");
+  const scale = Math.max(aFrac.length, bFrac.length);
+  const diff = toScaledBigInt(as, scale) - toScaledBigInt(bs, scale);
+  if (diff < BigInt(0)) return -1;
+  if (diff > BigInt(0)) return 1;
+  return 0;
+}
+
 /** Add two decimal strings exactly (unrounded). */
 export function addDecimal(a: string | number, b: string | number): string {
   const as = normalizeDecimalString(a);

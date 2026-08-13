@@ -13,6 +13,7 @@ import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 interface PageProps {
   params: Promise<{ id: string; receivableId: string }>;
@@ -24,13 +25,7 @@ function fmtDate(d: Date) {
 }
 
 function fmtMoney(value: string, currency: string) {
-  return (
-    new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      parseFloat(value),
-    ) +
-    " " +
-    currency
-  );
+  return formatMoneyAmount(value, currency);
 }
 
 const OPEN_STATUSES = new Set(["OPEN", "PARTIAL", "OVERDUE"]);

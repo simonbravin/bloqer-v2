@@ -46,6 +46,8 @@ describe("evaluateInvoiceLetterTaxConsistency", () => {
     const a = evaluateInvoiceLetterTaxConsistency({ invoiceLetter: "A", taxAmount: "0" });
     assert.equal(a.some((i) => i.severity === "warning"), true);
     assert.equal(a.some((i) => i.severity === "error"), false);
+    const padded = evaluateInvoiceLetterTaxConsistency({ invoiceLetter: "A", taxAmount: "0.00" });
+    assert.equal(padded.some((i) => i.severity === "warning"), true);
   });
 
   it("ok when A has tax", () => {

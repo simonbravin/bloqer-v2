@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { SubcontractView } from "@bloqer/services";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { SubcontractStatusBadge } from "./subcontract-status-badge";
 
 export function SubcontractCards({
@@ -31,7 +32,7 @@ export function SubcontractCards({
           <div className="mt-3 flex justify-between gap-2 text-sm tabular-nums">
             <span className="text-muted-foreground">Total</span>
             <span className="font-medium">
-              {parseFloat(s.totalValue).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+              {formatMoneyAmount(s.totalValue, s.currency)}
             </span>
           </div>
         </Link>

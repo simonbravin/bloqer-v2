@@ -12,13 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-
-function fmt(value: string) {
-  return parseFloat(value).toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
+import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 
 const STATUS_LABELS: Record<SubcontractWbsVarianceRow["status"], string> = {
   OK: "OK",
@@ -51,20 +45,21 @@ export function SubcontractWbsVarianceTable({ rows, projectId }: Props) {
         </TableHeader>
         <TableBody>
           {rows.map((row) => {
-            const v = parseFloat(row.varianceCommitted);
+            const over = isPositiveMoneyAmount(row.varianceCommitted);
+            const zero = isZeroMoneyAmount(row.varianceCommitted);
             return (
               <TableRow key={row.wbsNodeId}>
                 <TableCell className="font-mono">{row.wbsCode}</TableCell>
                 <TableCell className="max-w-[min(18rem,35vw)] truncate" title={row.wbsName}>
                   {row.wbsName}
                 </TableCell>
-                <TableCell className="text-right font-mono">{fmt(row.budgetSubcontract)}</TableCell>
-                <TableCell className="text-right font-mono">{fmt(row.committedCost)}</TableCell>
-                <TableCell className="text-right font-mono">{fmt(row.certifiedCost)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.budgetSubcontract)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.committedCost)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.certifiedCost)}</TableCell>
                 <TableCell
-                  className={`text-right font-mono ${v > 0.01 ? "text-destructive" : v < -0.01 ? "text-emerald-600" : ""}`}
+                  className={`text-right font-mono ${zero ? "" : over ? "text-destructive" : "text-emerald-600"}`}
                 >
-                  {fmt(row.varianceCommitted)}
+                  {formatMoneyAmount(row.varianceCommitted)}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{STATUS_LABELS[row.status]}</TableCell>
                 <TableCell>

@@ -1,8 +1,5 @@
-import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { EntityDocumentsPanel } from "@/features/documents";
-import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import {
@@ -11,6 +8,11 @@ import {
   listEntityDocuments,
   ServiceError,
 } from "@bloqer/services";
+import { addDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
+import { EntityDocumentsPanel } from "@/features/documents";
+import { getCurrentUser } from "@/lib/auth";
+import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import {
   SubcontractStatusBadge,
   SubcontractCertificationStatusBadge,
@@ -78,8 +80,9 @@ export default async function SubcontratoPage({ params, searchParams }: PageProp
   const canEditSubcontracts = can(current.tenantCtx.roles, "EDIT", "SUBCONTRACTS");
   const canEditAttachments = canEditSubcontracts;
 
-  const fmtMoney = (v: string) =>
-    parseFloat(v).toLocaleString("es-AR", { minimumFractionDigits: 2 });
+  const remainingToCertify = serializeMoney(
+    addDecimal(subcontract.totalValue, multiplyDecimal(subcontract.totalCertified, "-1")),
+  );
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={subcontract.code}>
@@ -169,19 +172,17 @@ export default async function SubcontratoPage({ params, searchParams }: PageProp
       <KpiStatGrid columns={3}>
         <KpiStatCard
           label="Valor del contrato"
-          value={fmtMoney(subcontract.totalValue)}
+          value={formatMoneyAmount(subcontract.totalValue, subcontract.currency)}
           subtitle={subcontract.currency}
         />
         <KpiStatCard
           label="Certificado"
-          value={fmtMoney(subcontract.totalCertified)}
+          value={formatMoneyAmount(subcontract.totalCertified, subcontract.currency)}
           subtitle={subcontract.currency}
         />
         <KpiStatCard
           label="Saldo a certificar"
-          value={fmtMoney(
-            String(parseFloat(subcontract.totalValue) - parseFloat(subcontract.totalCertified)),
-          )}
+          value={formatMoneyAmount(remainingToCertify, subcontract.currency)}
           subtitle={subcontract.currency}
         />
       </KpiStatGrid>
@@ -212,13 +213,15 @@ export default async function SubcontratoPage({ params, searchParams }: PageProp
                   <TableCell className="text-right text-muted-foreground">
                     {l.unit || "—"}
                   </TableCell>
-                  <TableCell className="text-right">{fmtMoney(l.quantity)}</TableCell>
-                  <TableCell className="text-right">{fmtMoney(l.unitPrice)}</TableCell>
-                  <TableCell className="text-right font-medium">{fmtMoney(l.lineTotal)}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {fmtMoney(l.certifiedQuantity)}
+                  <TableCell className="text-right tabular-nums">{l.quantity}</TableCell>
+                  <TableCell className="text-right tabular-nums">{l.unitPrice}</TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {formatMoneyAmount(l.lineTotal, subcontract.currency)}
                   </TableCell>
-                  <TableCell className="text-right">{fmtMoney(l.remainingQty)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {l.certifiedQuantity}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{l.remainingQty}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -272,7 +275,7 @@ export default async function SubcontratoPage({ params, searchParams }: PageProp
                   </TableCell>
                   <TableCell className="text-xs">{formatDate(c.certificationDate)}</TableCell>
                   <TableCell className="text-right font-medium">
-                    {fmtMoney(c.totalAmount)}
+                    {formatMoneyAmount(c.totalAmount, subcontract.currency)}
                   </TableCell>
                   <TableCell>
                     <SubcontractCertificationStatusBadge status={c.status} />

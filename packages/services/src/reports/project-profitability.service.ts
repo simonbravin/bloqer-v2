@@ -20,6 +20,8 @@ import {
   type ProfitabilityCurrencySlice,
 } from "./report-currency-view";
 import { getProjectOverheadAmount } from "../finance/project-overhead.service";
+import { isPositiveMoneyDecimal } from "../finance/money-decimal";
+import { compareDecimal } from "@bloqer/utils";
 
 export type ProfitabilityFilters = {
   budgetId?: string;
@@ -264,7 +266,7 @@ export async function getProjectProfitabilityReport(
     if (oh.allocationMode === "AUTO_WEIGHT") {
       overheadCalculatedAmount = oh.autoWeightAmount;
       overheadCompanyPct = oh.autoWeightPct;
-      if (parseFloat(oh.autoWeightAmount) > 0) {
+      if (isPositiveMoneyDecimal(oh.autoWeightAmount)) {
         warnings.push(
           `GG prorrateados por peso del CD (suma de períodos con facturas corporativas, ARS): ${oh.autoWeightAmount} ARS.`,
         );
@@ -281,12 +283,12 @@ export async function getProjectProfitabilityReport(
       overheadManualAmount = oh.manualTotal;
       overheadCalculatedAmount = oh.calculatedAmount;
       overheadCompanyPct = oh.calculatedPct;
-      if (parseFloat(oh.manualTotal) > 0) {
+      if (isPositiveMoneyDecimal(oh.manualTotal)) {
         warnings.push(
           "GG manual: suma de imputaciones por período cargadas a la obra (según filtro de período, o histórico si no hay filtro).",
         );
       }
-      if (parseFloat(oh.calculatedPct) > 0) {
+      if (compareDecimal(oh.calculatedPct, "0") > 0) {
         warnings.push(
           `GG % empresa (${oh.calculatedPct}% sobre CD devengado): ${oh.calculatedAmount} ${oh.currency}.`,
         );

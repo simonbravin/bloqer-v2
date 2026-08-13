@@ -10,7 +10,8 @@ import {
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { ServiceContext, ServiceError } from "../types";
-import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import { addDecimal, compareDecimal, divideDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
+import { isPositiveMoneyDecimal, serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 
 /** Capa de costo para comparar contra presupuesto ([D-021]). */
 export type CostVarianceLayer = "exposure" | "committed" | "accrued" | "paid";
@@ -97,11 +98,20 @@ function getActualCost(row: CostControlRow, layer: CostVarianceLayer): string {
   }
 }
 
+function absDecimal(value: string): string {
+  return value.startsWith("-") ? value.slice(1) : value;
+}
+
 function computeVariancePct(budgetTotal: string, actual: string): string | null {
-  const b = parseFloat(budgetTotal);
-  const a = parseFloat(actual);
-  if (!Number.isFinite(b) || b === 0) return null;
-  return (((a - b) / b) * 100).toFixed(2);
+  try {
+    const b = serializeMoney(budgetTotal);
+    if (b === "0.00") return null;
+    const a = serializeMoney(actual);
+    const diff = addDecimal(a, multiplyDecimal(b, -1));
+    return divideDecimal(multiplyDecimal(diff, "100"), b, 2);
+  } catch {
+    return null;
+  }
 }
 
 function resolveVarianceStatus(
@@ -109,23 +119,29 @@ function resolveVarianceStatus(
   variance: string,
   variancePct: string | null,
 ): VarianceStatus {
-  const b = parseFloat(budgetTotal);
-  if (!Number.isFinite(b) || b === 0) return "no_baseline";
-  const v = parseFloat(variance);
-  if (!Number.isFinite(v)) return "no_baseline";
-  if (Math.abs(v) < 0.01) return "on_budget";
-  if (variancePct !== null && Math.abs(parseFloat(variancePct)) < 0.5) return "on_budget";
-  return v >= 0 ? "favorable" : "unfavorable";
+  try {
+    const b = serializeMoney(budgetTotal);
+    if (b === "0.00") return "no_baseline";
+    const v = serializeMoney(variance);
+    if (v === "0.00") return "on_budget";
+    if (variancePct !== null && compareDecimal(absDecimal(variancePct), "0.5") < 0) {
+      return "on_budget";
+    }
+    return compareDecimal(v, "0") >= 0 ? "favorable" : "unfavorable";
+  } catch {
+    return "no_baseline";
+  }
 }
 
 function enrichRow(row: CostControlRow, layer: CostVarianceLayer): BudgetVarianceRow {
   const actualCost = getActualCost(row, layer);
   const budget = row.budgetTotalCost;
-  const actual = parseFloat(actualCost);
-  const b = parseFloat(budget);
-  const variance = Number.isFinite(b) && Number.isFinite(actual)
-    ? (b - actual).toFixed(2)
-    : row.costVariance;
+  let variance = row.costVariance;
+  try {
+    variance = serializeMoney(addDecimal(budget, multiplyDecimal(actualCost, -1)));
+  } catch {
+    /* keep persisted costVariance */
+  }
   const variancePct = computeVariancePct(budget, actualCost);
   return {
     ...row,
@@ -251,7 +267,7 @@ export async function getBudgetCompositionReport(
       amount: amount.toFixed(2),
       percent,
     };
-  }).filter((s) => parseFloat(s.amount) > 0);
+  }).filter((s) => isPositiveMoneyDecimal(s.amount));
 
   return {
     type: "COMPOSITION",
