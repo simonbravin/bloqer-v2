@@ -1,5 +1,7 @@
 import { Prisma } from "@bloqer/database";
 import type { DashboardKpi } from "./tenant-dashboard.service";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { formatDashboardMoney } from "./dashboard-format";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -22,20 +24,7 @@ function moneyKpiTone(key: string, amount: Prisma.Decimal): DashboardKpi["tone"]
 }
 
 export function fmtDecimalEs(value: string, currencyCode?: string): string {
-  const n = Number(value);
-  if (Number.isNaN(n)) return value;
-  if (currencyCode) {
-    try {
-      return new Intl.NumberFormat("es-AR", {
-        style:                 "currency",
-        currency:              currencyCode,
-        maximumFractionDigits: 2,
-      }).format(n);
-    } catch {
-      return `${value} ${currencyCode}`;
-    }
-  }
-  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(n);
+  return formatDashboardMoney(value, currencyCode);
 }
 
 export function pushMoneyKpi(
@@ -56,7 +45,7 @@ export function pushMoneyKpi(
     kpis.push({
       key,
       label,
-      value: fmtDecimalEs(amount.toString(), currency),
+      value: fmtDecimalEs(serializeMoneyDecimal(amount), currency),
       href,
       tone: moneyKpiTone(key, amount),
     });
@@ -100,7 +89,7 @@ export function pushSignedNetMoneyKpi(
     kpis.push({
       key,
       label,
-      value: fmtDecimalEs(amount.toString(), currency),
+      value: fmtDecimalEs(serializeMoneyDecimal(amount), currency),
       href,
       tone: amount.lessThan(ZERO) ? "danger" : amount.greaterThan(ZERO) ? "success" : "muted",
     });

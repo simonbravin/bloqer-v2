@@ -23,6 +23,7 @@ import {
 } from "./jobsite-log-guards";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { sortTreeOrder } from "@bloqer/utils";
+import { serializeQtyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
 
 export type WbsIncrementalProgressSnapshot = JobsiteLogProgressSnapshot;
 export { hasLegacyPhysicalPctOverflow, remainingPhysicalPct, buildProgressSnapshotEntry };
@@ -194,8 +195,8 @@ function serializeLog(l: LogWithRelations): JobsiteLogView {
     progress: l.progress.map((p) => ({
       id: p.id, jobsiteLogId: p.jobsiteLogId, wbsNodeId: p.wbsNodeId,
       description: p.description,
-      quantityCompleted: p.quantityCompleted.toString(),
-      physicalPct: p.physicalPct?.toString() ?? null,
+      quantityCompleted: serializeQtyDecimal(p.quantityCompleted),
+      physicalPct: p.physicalPct != null ? serializeRatePctDecimal(p.physicalPct) : null,
       notes: p.notes, sortOrder: p.sortOrder,
       wbsNode: { code: p.wbsNode.code, name: p.wbsNode.name, unit: p.wbsNode.costItem?.unit ?? "" },
     })),
@@ -203,7 +204,7 @@ function serializeLog(l: LogWithRelations): JobsiteLogView {
       id: lb.id, jobsiteLogId: lb.jobsiteLogId, contactId: lb.contactId,
       subcontractId: lb.subcontractId, crewDescription: lb.crewDescription,
       workersCount: lb.workersCount,
-      hoursWorked: lb.hoursWorked?.toString() ?? null,
+      hoursWorked: lb.hoursWorked != null ? serializeQtyDecimal(lb.hoursWorked) : null,
       notes: lb.notes, sortOrder: lb.sortOrder,
       contactName: lb.contact ? (lb.contact.fantasyName ?? lb.contact.legalName) : null,
       subcontractCode: lb.subcontract ? `SC-${String(lb.subcontract.number).padStart(3, "0")}` : null,
@@ -211,7 +212,7 @@ function serializeLog(l: LogWithRelations): JobsiteLogView {
     materials: l.materials.map((m) => ({
       id: m.id, jobsiteLogId: m.jobsiteLogId, wbsNodeId: m.wbsNodeId,
       productId: m.productId, warehouseId: m.warehouseId,
-      description: m.description, quantity: m.quantity.toString(),
+      description: m.description, quantity: serializeQtyDecimal(m.quantity),
       notes: m.notes, sortOrder: m.sortOrder,
       productName: m.product?.name ?? null,
       warehouseName: m.warehouse?.name ?? null,
@@ -424,7 +425,7 @@ async function validateJobsiteLogBusinessRules(
       if (qty.greaterThan(balance)) {
         throw new ServiceError(
           "CONFLICT",
-          `Stock insuficiente. Disponible: ${balance.toString()}, solicitado: ${qty.toString()}`,
+          `Stock insuficiente. Disponible: ${serializeQtyDecimal(balance)}, solicitado: ${serializeQtyDecimal(qty)}`,
         );
       }
     }
@@ -481,8 +482,8 @@ async function validateJobsiteLogFromDb(
       progress: existing.progress.map((p) => ({
         wbsNodeId: p.wbsNodeId,
         description: p.description,
-        quantityCompleted: p.quantityCompleted.toString(),
-        physicalPct: p.physicalPct?.toString() ?? null,
+        quantityCompleted: serializeQtyDecimal(p.quantityCompleted),
+        physicalPct: p.physicalPct != null ? serializeRatePctDecimal(p.physicalPct) : null,
         notes: p.notes,
         sortOrder: p.sortOrder,
       })),
@@ -491,7 +492,7 @@ async function validateJobsiteLogFromDb(
         subcontractId: lb.subcontractId,
         crewDescription: lb.crewDescription,
         workersCount: lb.workersCount,
-        hoursWorked: lb.hoursWorked?.toString() ?? null,
+        hoursWorked: lb.hoursWorked != null ? serializeQtyDecimal(lb.hoursWorked) : null,
         notes: lb.notes,
         sortOrder: lb.sortOrder,
       })),
@@ -500,7 +501,7 @@ async function validateJobsiteLogFromDb(
         warehouseId: m.warehouseId,
         wbsNodeId: m.wbsNodeId,
         description: m.description,
-        quantity: m.quantity.toString(),
+        quantity: serializeQtyDecimal(m.quantity),
         notes: m.notes,
         sortOrder: m.sortOrder,
       })),

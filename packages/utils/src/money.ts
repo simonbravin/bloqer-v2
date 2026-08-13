@@ -15,6 +15,25 @@ function assertDecimals(decimals: number): void {
   }
 }
 
+/**
+ * Coerce Prisma.Decimal / decimal.js to text.
+ * `instanceof` is unreliable: Next.js/webpack can load duplicate decimal.js copies.
+ * Rejects arrays and plain objects (`Object.prototype.toString`).
+ */
+function decimalLikeToString(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("INVALID_AMOUNT");
+  }
+  const toStr = (raw as { toString?: unknown }).toString;
+  if (typeof toStr !== "function" || toStr === Object.prototype.toString) {
+    throw new Error("INVALID_AMOUNT");
+  }
+  const s = (toStr as () => unknown).call(raw);
+  if (typeof s !== "string") throw new Error("INVALID_AMOUNT");
+  return s;
+}
+
 /** Normalize input to a plain decimal string (no exponent). */
 export function normalizeDecimalString(raw: string | number): string {
   if (typeof raw === "number") {
@@ -24,7 +43,7 @@ export function normalizeDecimalString(raw: string | number): string {
     if (!/[eE]/.test(s)) return s;
     return expandScientific(s);
   }
-  const s = raw.trim();
+  const s = decimalLikeToString(raw).trim();
   if (!s) throw new Error("INVALID_AMOUNT");
   if (/[eE]/.test(s)) return expandScientific(s);
   if (!DECIMAL_RE.test(s)) throw new Error("INVALID_AMOUNT");

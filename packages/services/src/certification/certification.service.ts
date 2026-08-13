@@ -1,10 +1,9 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { Certification, CertificationStatus } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import { roundQty } from "@bloqer/utils";
 import type { CreateCertificationInput, UpdateCertificationInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
-import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { createSystemNotification } from "../notifications/notification.service";
 import { resolveNotificationAudience } from "../notifications/notification-audience.service";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
@@ -478,13 +477,13 @@ function serializeCertification(cert: RawCert): CertificationWithLines {
         id: l.id,
         certificationId: l.certificationId,
         wbsNodeId: l.wbsNodeId,
-        unitSalePriceSnapshot: serializeMoneyDecimal(l.unitSalePriceSnapshot),
-        budgetQty: roundQty(l.budgetQty.toString()),
-        physicalPct: roundQty(l.physicalPct.toString()),
-        previousQty: roundQty(l.previousQty.toString()),
-        currentQty: roundQty(l.currentQty.toString()),
-        cumulativeQty: roundQty(l.cumulativeQty.toString()),
-        remainingQty: roundQty(remaining.toString()),
+        unitSalePriceSnapshot: serializeUnitPriceDecimal(l.unitSalePriceSnapshot),
+        budgetQty: serializeQtyDecimal(l.budgetQty),
+        physicalPct: serializeRatePctDecimal(l.physicalPct),
+        previousQty: serializeQtyDecimal(l.previousQty),
+        currentQty: serializeQtyDecimal(l.currentQty),
+        cumulativeQty: serializeQtyDecimal(l.cumulativeQty),
+        remainingQty: serializeQtyDecimal(remaining),
         periodAmount: serializeMoneyDecimal(l.periodAmount),
         notes: l.notes,
         sortOrder: l.sortOrder,

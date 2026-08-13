@@ -22,6 +22,7 @@ import { ReportExportActions } from "@/features/reports";
 import { AccountingReportFilters } from "@/features/accounting/components/accounting-report-filters";
 import { AccountingGerencialDisclaimer } from "@/features/accounting/components/accounting-gerencial-disclaimer";
 import { accountingAccountHref } from "@/lib/accounting-query";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 function PlSection({
   title,
@@ -66,7 +67,7 @@ function PlSection({
                     )}
                   </TableCell>
                   <TableCell>{r.accountName}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">{r.balance}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">{formatMoneyAmount(r.balance)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -155,15 +156,15 @@ export default async function EstadoResultadosPage({
               <div className="grid gap-2 sm:grid-cols-3 text-sm rounded-md border p-3">
                 <div>
                   <p className="text-muted-foreground">Total ingresos</p>
-                  <p className="font-mono font-medium">{block.totalIncome}</p>
+                  <p className="font-mono font-medium">{formatMoneyAmount(block.totalIncome)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Total gastos</p>
-                  <p className="font-mono font-medium">{block.totalExpenses}</p>
+                  <p className="font-mono font-medium">{formatMoneyAmount(block.totalExpenses)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Resultado</p>
-                  <p className="font-mono font-medium">{block.netResult}</p>
+                  <p className="font-mono font-medium">{formatMoneyAmount(block.netResult)}</p>
                 </div>
               </div>
             </div>

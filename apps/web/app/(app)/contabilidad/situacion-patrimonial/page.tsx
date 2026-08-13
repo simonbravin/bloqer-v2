@@ -22,6 +22,7 @@ import { ReportExportActions } from "@/features/reports";
 import { AccountingReportFilters } from "@/features/accounting/components/accounting-report-filters";
 import { AccountingGerencialDisclaimer } from "@/features/accounting/components/accounting-gerencial-disclaimer";
 import { accountingAccountHref } from "@/lib/accounting-query";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 function SectionTable({
   title,
@@ -68,7 +69,7 @@ function SectionTable({
                 <TableCell className={r.synthetic ? "italic text-muted-foreground" : undefined}>
                   {r.accountName}
                 </TableCell>
-                <TableCell className="text-right font-mono text-sm">{r.balance}</TableCell>
+                <TableCell className="text-right font-mono text-sm">{formatMoneyAmount(r.balance)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -138,8 +139,8 @@ export default async function SituacionPatrimonialPage({
               <h2 className="text-lg font-semibold tracking-tight">{currency}</h2>
               {!block.balanced ? (
                 <p className="text-sm text-amber-700 dark:text-amber-400 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-                  Activo ({block.totalAssets}) no cuadra con Pasivo + PN ({block.totalLiabilities} +{" "}
-                  {block.totalEquity}). Revisá asientos o monedas.
+                  Activo ({formatMoneyAmount(block.totalAssets)}) no cuadra con Pasivo + PN ({formatMoneyAmount(block.totalLiabilities)} +{" "}
+                  {formatMoneyAmount(block.totalEquity)}). Revisá asientos o monedas.
                 </p>
               ) : null}
               <SectionTable title="Activo" rows={block.assets} empresa={cf.companyId} />
@@ -148,15 +149,15 @@ export default async function SituacionPatrimonialPage({
               <div className="grid gap-2 sm:grid-cols-3 text-sm rounded-md border p-3">
                 <div>
                   <p className="text-muted-foreground">Total activo</p>
-                  <p className="font-mono font-medium">{block.totalAssets}</p>
+                  <p className="font-mono font-medium">{formatMoneyAmount(block.totalAssets)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Total pasivo</p>
-                  <p className="font-mono font-medium">{block.totalLiabilities}</p>
+                  <p className="font-mono font-medium">{formatMoneyAmount(block.totalLiabilities)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Total patrimonio</p>
-                  <p className="font-mono font-medium">{block.totalEquity}</p>
+                  <p className="font-mono font-medium">{formatMoneyAmount(block.totalEquity)}</p>
                 </div>
               </div>
             </div>

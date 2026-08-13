@@ -17,6 +17,7 @@ import {
 } from "../project-cash-flow/project-cash-flow.service";
 import { canViewProjectCostControlReport } from "../cost-control/cost-control.service";
 import { getProjectProfitabilityKpi } from "../reports/project-profitability.service";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { computeProjectScheduleProgressPct } from "../schedule/schedule-workspace.service";
 import { canViewArProjectArea } from "../ar/ar-access";
 import { canViewApProjectArea } from "../ap/ap-access";
@@ -180,7 +181,7 @@ function addMoneyMap(m: Map<string, Prisma.Decimal>, currency: string, amount: P
 function mapMoneyMap(m: Map<string, Prisma.Decimal>): ProjectOverviewMoneyRow[] {
   return [...m.entries()]
     .filter(([, v]) => v.greaterThan(ZERO))
-    .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
+    .map(([currency, amount]) => ({ currency, amount: serializeMoneyDecimal(amount) }))
     .sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
@@ -236,7 +237,7 @@ export async function getProjectOverviewDashboard(
       const pick =
         approved.length === 0 ? null : approved.reduce((a, b) => (a.versionNumber >= b.versionNumber ? a : b));
       const amountByCurrency: ProjectOverviewMoneyRow[] = pick
-        ? [{ currency: pick.currency, amount: pick.totalSalePrice.toString() }]
+        ? [{ currency: pick.currency, amount: serializeMoneyDecimal(pick.totalSalePrice) }]
         : [];
       budgetPickId = pick?.id ?? null;
       budgetPickCurrency = pick?.currency ?? null;

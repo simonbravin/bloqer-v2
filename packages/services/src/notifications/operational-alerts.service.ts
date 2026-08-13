@@ -1,6 +1,6 @@
 import type { EmailDeliveryStatus, LinkedEntityType, NotificationSeverity, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
-import { roundQty, serializeMoney } from "@bloqer/utils";
+import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
 import { listNegativeStockBalancesForTenant } from "../inventory/stock-balance.service";
 import { hasOpenObligationBalance, isObligationOverdue } from "../finance/obligation-date";
 import { ServiceContext, ServiceError } from "../types";
@@ -148,7 +148,7 @@ export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<O
     }
 
     const clientName = r.clientContact.fantasyName ?? r.clientContact.legalName;
-    const body = `Cliente: ${clientName}. Saldo vencido: ${serializeMoney(balanceDue.toString())} (venc. ${r.dueDate.toISOString().slice(0, 10)}).`;
+    const body = `Cliente: ${clientName}. Saldo vencido: ${serializeMoneyDecimal(balanceDue)} (venc. ${r.dueDate.toISOString().slice(0, 10)}).`;
 
     if (recipients.length === 0) continue;
 
@@ -228,7 +228,7 @@ export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<Oper
     }
 
     const supplierName = p.supplierContact.fantasyName ?? p.supplierContact.legalName;
-    const body = `Proveedor: ${supplierName}. Saldo vencido: ${serializeMoney(balanceDue.toString())} (venc. ${p.dueDate.toISOString().slice(0, 10)}).`;
+    const body = `Proveedor: ${supplierName}. Saldo vencido: ${serializeMoneyDecimal(balanceDue)} (venc. ${p.dueDate.toISOString().slice(0, 10)}).`;
 
     if (recipients.length === 0) continue;
 
@@ -276,7 +276,7 @@ export async function runNegativeStockAlert(ctx: ServiceContext): Promise<Operat
   for (const row of negatives) {
     summary.checkedCount += 1;
     const linkedId = negativeStockLinkedEntityId(row);
-    const body = `Producto ${row.productId}, depósito ${row.warehouseId}. Cantidad: ${roundQty(row.totalQuantity)}.`;
+    const body = `Producto ${row.productId}, depósito ${row.warehouseId}. Cantidad: ${serializeQtyDecimal(row.totalQuantity)}.`;
 
     if (recipients.length === 0) continue;
 

@@ -1,6 +1,6 @@
 import { Prisma } from "@bloqer/database";
 import { physicalNeedQty } from "@bloqer/domain";
-import { roundQty, serializeMoney } from "@bloqer/utils";
+import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
 
 /** PO statuses that count as committed demand (materials board / SC-OC prefill). */
 export const MATERIAL_ORDERED_PO_STATUSES = [
@@ -61,7 +61,10 @@ export type MaterialOrderedInput = {
 };
 
 function toDec(v: number | string | Prisma.Decimal): Prisma.Decimal {
-  return v instanceof Prisma.Decimal ? v : new Prisma.Decimal(v);
+  if (typeof v === "string" || typeof v === "number") return new Prisma.Decimal(v);
+  // Never `instanceof Prisma.Decimal`: duplicate decimal.js copies make it fail,
+  // and `new Decimal(foreign)` may coerce via valueOf() (IEEE float).
+  return new Prisma.Decimal(v.toString());
 }
 
 /**
@@ -162,11 +165,11 @@ export function serializeApuCommitment(agg: MaterialCommitmentAgg): MaterialApuC
     description: agg.description,
     unit: agg.unit,
     unitCost: agg.unitCost,
-    needQty: roundQty(agg.needQty.toString()),
-    needCost: serializeMoney(agg.needCost.toString()),
-    orderedQty: roundQty(agg.orderedQty.toString()),
-    receivedQty: roundQty(agg.receivedQty.toString()),
-    shortfallQty: roundQty(shortfall.toString()),
+    needQty: serializeQtyDecimal(agg.needQty),
+    needCost: serializeMoneyDecimal(agg.needCost),
+    orderedQty: serializeQtyDecimal(agg.orderedQty),
+    receivedQty: serializeQtyDecimal(agg.receivedQty),
+    shortfallQty: serializeQtyDecimal(shortfall),
     overCommitted: agg.orderedQty.greaterThan(agg.needQty) && agg.needQty.greaterThan(0),
   };
 }

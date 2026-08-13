@@ -17,6 +17,7 @@ import {
 import type { SupplierOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import {
   canEditPurchaseRequests,
   canManageProcurementQuotes,
@@ -233,7 +234,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
                         <ProcurementQuoteStatusBadge status={q.status} />
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {q.totalAmount} {q.currency}
+                        {formatMoneyAmount(q.totalAmount, q.currency)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {q.leadTimeDays ?? "—"}

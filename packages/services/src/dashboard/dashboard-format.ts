@@ -1,6 +1,14 @@
+import { serializeMoney } from "@bloqer/utils";
+
 function formatDecimalEs(value: string, currencyCode?: string): string {
-  const number = Number(value);
-  if (Number.isNaN(number)) return value;
+  let s = value;
+  try {
+    s = serializeMoney(value);
+  } catch {
+    return value;
+  }
+  const number = Number(s);
+  if (Number.isNaN(number)) return s;
   if (currencyCode) {
     try {
       return new Intl.NumberFormat("es-AR", {
@@ -10,7 +18,7 @@ function formatDecimalEs(value: string, currencyCode?: string): string {
         maximumFractionDigits: 2,
       }).format(number);
     } catch {
-      return `${value} ${currencyCode}`;
+      return `${s} ${currencyCode}`;
     }
   }
   return new Intl.NumberFormat("es-AR", {

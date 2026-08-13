@@ -1,6 +1,7 @@
 import { Prisma } from "@bloqer/database";
 import { resolveFxAmounts } from "@bloqer/utils";
 import { ServiceError } from "../types";
+import { serializeFxRateDecimal, serializeMoneyDecimal } from "./money-decimal";
 
 export function computeDocumentFxAmounts(
   currency: string,
@@ -10,8 +11,8 @@ export function computeDocumentFxAmounts(
   try {
     const { fxRate: fx, amountArs } = resolveFxAmounts({
       currency,
-      amount: totalAmount.toString(),
-      fxRate: fxRate?.toString(),
+      amount: serializeMoneyDecimal(totalAmount),
+      fxRate: fxRate != null ? serializeFxRateDecimal(fxRate) : undefined,
     });
     return { fxRate: new Prisma.Decimal(fx), amountArs: new Prisma.Decimal(amountArs) };
   } catch (e) {

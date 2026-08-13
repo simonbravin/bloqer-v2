@@ -418,7 +418,7 @@ export async function registerArSale(
               after: {
                 number,
                 receivableId: receivable.id,
-                amount: collectAmount.toString(),
+                amount: serializeMoneyDecimal(collectAmount),
               },
               tx,
             },

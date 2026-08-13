@@ -53,3 +53,13 @@ export function isPositiveMoneyAmount(raw: string | null | undefined): boolean {
     return false;
   }
 }
+
+/** True for 0 / 0.0 / 0.00 after D-053 money serialization. */
+export function isZeroMoneyAmount(raw: string | null | undefined): boolean {
+  if (raw == null || raw === "") return true;
+  try {
+    return serializeMoney(raw) === "0.00";
+  } catch {
+    return raw === "0" || raw === "0.0" || raw === "0.00" || Number(raw) === 0;
+  }
+}

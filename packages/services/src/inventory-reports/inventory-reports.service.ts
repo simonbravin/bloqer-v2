@@ -2,6 +2,7 @@ import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { assertInventoryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -210,9 +211,9 @@ export async function getStockBalanceReport(
       companyName:       acc.companyName,
       projectId:         acc.projectId,
       projectName:       acc.projectName,
-      quantityOnHand:    acc.balance.toString(),
+      quantityOnHand:    serializeQtyDecimal(acc.balance),
       quantityReserved:  null,
-      quantityAvailable: acc.balance.toString(),
+      quantityAvailable: serializeQtyDecimal(acc.balance),
       lastMovementDate:  acc.lastMovementDate?.toISOString().slice(0, 10) ?? null,
       flags: { zeroStock: isZero, negativeStock: isNeg, adjustmentPresent: acc.adjustmentPresent },
     });
@@ -277,10 +278,10 @@ export async function getStockMovementReport(
     type:           m.type as string,
     sourceType:     m.sourceType as string,
     sourceLabel:    SOURCE_LABELS[m.sourceType as string] ?? (m.sourceType as string),
-    quantity:       m.quantity.toString(),
-    signedQuantity: movementSignedQty(m.type as string, m.quantity).toString(),
-    unitCost:       m.unitCost?.toString()   ?? null,
-    totalCost:      m.totalCost?.toString()  ?? null,
+    quantity:       serializeQtyDecimal(m.quantity),
+    signedQuantity: serializeQtyDecimal(movementSignedQty(m.type as string, m.quantity)),
+    unitCost:       m.unitCost != null ? serializeUnitPriceDecimal(m.unitCost) : null,
+    totalCost:      m.totalCost != null ? serializeMoneyDecimal(m.totalCost) : null,
     notes:          m.notes,
   }));
 }

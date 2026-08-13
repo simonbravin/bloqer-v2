@@ -1,5 +1,6 @@
 import { evaluateInvoiceLetterTaxConsistency } from "@bloqer/domain";
 import { ServiceError } from "../types";
+import { serializeMoneyDecimal } from "./money-decimal";
 
 /**
  * Block issue when letter C/E has positive tax ([D-085]).
@@ -10,12 +11,7 @@ export function assertInvoiceLetterTaxConsistencyOnIssue(params: {
   taxAmount: { toString(): string } | string | number | null | undefined;
   documentLabel?: string;
 }): void {
-  const taxStr =
-    params.taxAmount == null
-      ? "0"
-      : typeof params.taxAmount === "string" || typeof params.taxAmount === "number"
-        ? String(params.taxAmount)
-        : params.taxAmount.toString();
+  const taxStr = params.taxAmount == null ? "0.00" : serializeMoneyDecimal(params.taxAmount);
   const issues = evaluateInvoiceLetterTaxConsistency({
     invoiceLetter: params.invoiceLetter,
     taxAmount: taxStr,

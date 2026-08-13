@@ -12,6 +12,7 @@ import {
   budgetBaselineForPurchaseLine,
 } from "./procurement-budget-baseline";
 import { notifyPurchaseRequestSubmitted } from "./procurement-notifications.service";
+import { serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import {
   resolveUserDisplayNames,
   userDisplayNameFromMap,
@@ -105,8 +106,8 @@ export async function listPurchaseRequestsByProject(
           lineType: l.lineType,
           description: l.description,
           unit: l.unit,
-          quantity: l.quantity.toString(),
-          budgetUnitCostSnapshot: l.budgetUnitCostSnapshot?.toString() ?? null,
+          quantity: serializeQtyDecimal(l.quantity),
+          budgetUnitCostSnapshot: l.budgetUnitCostSnapshot != null ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot) : null,
         })),
       },
       userDisplayNameFromMap(nameById, r.requestedByUserId),
@@ -136,8 +137,8 @@ export async function getPurchaseRequestById(id: string, ctx: ServiceContext): P
         lineType: l.lineType,
         description: l.description,
         unit: l.unit,
-        quantity: l.quantity.toString(),
-        budgetUnitCostSnapshot: l.budgetUnitCostSnapshot?.toString() ?? null,
+        quantity: serializeQtyDecimal(l.quantity),
+        budgetUnitCostSnapshot: l.budgetUnitCostSnapshot != null ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot) : null,
       })),
     },
     userDisplayNameFromMap(nameById, pr.requestedByUserId),

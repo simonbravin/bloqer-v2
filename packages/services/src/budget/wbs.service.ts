@@ -13,6 +13,7 @@ import {
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
 import { _recalcBudgetSummary } from "./budget-calc.service";
 import { isDisciplineRootCode, validateManualNodeCode } from "./wbs-code-rules";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import {
   buildRenumberPlan,
   countCodeSegments,
@@ -216,21 +217,21 @@ export async function getWbsTree(budgetId: string, ctx: ServiceContext): Promise
         ? {
             id: n.costItem.id,
             unit: n.costItem.unit,
-            quantity: n.costItem.quantity.toString(),
-            unitCostDirect: n.costItem.unitCostDirect.toString(),
-            unitSalePrice: n.costItem.unitSalePrice.toString(),
-            totalCostDirect: n.costItem.totalCostDirect.toString(),
-            totalSalePrice: n.costItem.totalSalePrice.toString(),
+            quantity: serializeQtyDecimal(n.costItem.quantity),
+            unitCostDirect: serializeUnitPriceDecimal(n.costItem.unitCostDirect),
+            unitSalePrice: serializeUnitPriceDecimal(n.costItem.unitSalePrice),
+            totalCostDirect: serializeMoneyDecimal(n.costItem.totalCostDirect),
+            totalSalePrice: serializeMoneyDecimal(n.costItem.totalSalePrice),
             notes: n.costItem.notes,
             analysisLines: n.costItem.analysisLines.map((l) => ({
               id: l.id,
               category: l.category,
               description: l.description,
               unit: l.unit,
-              coefficient: l.coefficient.toString(),
-              unitCost: l.unitCost.toString(),
-              totalCost: l.totalCost.toString(),
-              partidaQuantity: l.partidaQuantity?.toString() ?? null,
+              coefficient: serializeQtyDecimal(l.coefficient),
+              unitCost: serializeUnitPriceDecimal(l.unitCost),
+              totalCost: serializeUnitPriceDecimal(l.totalCost),
+              partidaQuantity: l.partidaQuantity != null ? serializeQtyDecimal(l.partidaQuantity) : null,
               isLumpSum: l.isLumpSum,
               productId: l.productId ?? null,
               sortOrder: l.sortOrder,
@@ -240,8 +241,8 @@ export async function getWbsTree(budgetId: string, ctx: ServiceContext): Promise
           }
         : null,
       children: n.children.map(serialize),
-      totalCostDirect: n.totalCostDirect.toString(),
-      totalSalePrice: n.totalSalePrice.toString(),
+      totalCostDirect: serializeMoneyDecimal(n.totalCostDirect),
+      totalSalePrice: serializeMoneyDecimal(n.totalSalePrice),
     };
   }
 

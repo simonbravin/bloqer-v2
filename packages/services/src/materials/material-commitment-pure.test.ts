@@ -24,6 +24,20 @@ const seed = (over: Partial<MaterialNeedSeed> = {}): MaterialNeedSeed => ({
 });
 
 describe("material-commitment-pure", () => {
+  it("accepts Decimal-like quantity that fails instanceof Prisma.Decimal", () => {
+    const map = buildApuCommitmentMap([seed()]);
+    const index = buildFallbackIndex(map);
+    const foreign = { toString: () => "8" };
+    applyOrderedToApuMap(map, index, {
+      wbsNodeId: "wbs-1",
+      costAnalysisLineId: "apu-1",
+      productId: "prod-1",
+      description: "Cemento",
+      quantity: foreign as unknown as Prisma.Decimal,
+    });
+    assert.equal(serializeApuCommitment(map.get("apu-1")!).orderedQty, "8.0000");
+  });
+
   it("10 need − OC CONFIRMED 8 → shortfall 2", () => {
     const map = buildApuCommitmentMap([seed()]);
     const index = buildFallbackIndex(map);

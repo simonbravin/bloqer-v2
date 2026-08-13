@@ -2,6 +2,7 @@ import { prisma, PurchaseOrderStatus } from "@bloqer/database";
 import { canViewProcurementProjectArea } from "../procurement/procurement-access";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 
 export type PurchaseOrderVarianceRow = {
   purchaseOrderId: string;
@@ -68,9 +69,11 @@ export async function getPurchaseOrderVarianceReport(
       description: l.description,
       wbsCode: l.wbsNode?.code ?? null,
       unit: l.unit,
-      unitPrice: l.unitPrice.toString(),
-      budgetUnitCostSnapshot: l.budgetUnitCostSnapshot?.toString() ?? null,
-      variancePct: l.variancePct?.toString() ?? null,
+      unitPrice: serializeUnitPriceDecimal(l.unitPrice),
+      budgetUnitCostSnapshot: l.budgetUnitCostSnapshot != null
+        ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot)
+        : null,
+      variancePct: l.variancePct != null ? serializeRatePctDecimal(l.variancePct) : null,
       varianceTier: l.varianceTier,
       varianceJustification: l.varianceJustification,
     })),

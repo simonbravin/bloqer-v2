@@ -1,9 +1,8 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import { roundQty } from "@bloqer/utils";
 import type { AddCertificationLineInput, UpdateCertificationLineInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
-import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
+import { serializeQtyDecimal, serializeUnitPriceDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { assertCertificationEditable } from "./certification.service";
@@ -81,10 +80,10 @@ export async function listCertificationWbsHints(
       code: n.code,
       name: n.name,
       unit: n.costItem.unit,
-      budgetQty: roundQty(budgetQty.toString()),
-      previousQty: roundQty(previousQty.toString()),
-      remainingQty: roundQty(remaining.toString()),
-      unitSalePrice: serializeMoneyDecimal(n.costItem.unitSalePrice),
+      budgetQty: serializeQtyDecimal(budgetQty),
+      previousQty: serializeQtyDecimal(previousQty),
+      remainingQty: serializeQtyDecimal(remaining),
+      unitSalePrice: serializeUnitPriceDecimal(n.costItem.unitSalePrice),
     });
   }
   return hints;

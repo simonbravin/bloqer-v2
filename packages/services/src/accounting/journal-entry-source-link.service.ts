@@ -5,6 +5,7 @@ import { canViewApProjectArea, canViewCompanyAp } from "../ap/ap-access";
 import { canViewArProjectArea, canViewCompanyAr } from "../ar/ar-access";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext } from "../types";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 /** Read-only traceability for journal detail (Phase 11D). No mutations. */
 export type JournalEntrySourceLink = {
@@ -23,10 +24,11 @@ function fmtDate(d: Date): string {
 }
 
 function fmtMoneyAr(amount: { toString(): string }, currency: string): string {
-  const n = parseFloat(amount.toString());
+  const s = serializeMoneyDecimal(amount);
+  const n = Number(s);
   const num = Number.isFinite(n)
     ? n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : amount.toString();
+    : s;
   return `${num} ${currency}`;
 }
 

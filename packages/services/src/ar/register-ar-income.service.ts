@@ -17,7 +17,7 @@ import { assertArTenantModule, assertTreasuryTenantModule } from "../tenant-modu
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
-import { toMoneyDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { resolveCompanyIdForAr } from "./sales-invoice.service";
 import {
   ensureDraftJournalFromCollection,
@@ -404,7 +404,7 @@ export async function registerArIncome(
               after: {
                 number,
                 receivableId: receivable.id,
-                amount: collectAmount.toString(),
+                amount: serializeMoneyDecimal(collectAmount),
               },
               tx,
             },

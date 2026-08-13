@@ -16,7 +16,7 @@ import { canEditArArea, canMutateArForScope, canViewArProjectArea } from "./ar-a
 import { resolvePagination } from "../finance/pagination";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
-import { serializeMoneyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { isCrossCompany } from "../company-scope";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { ensureDraftJournalFromSalesInvoice } from "../accounting/accounting-auto-draft.service";
@@ -846,9 +846,9 @@ function serializeInvoice(inv: RawInvoice): SalesInvoiceWithLines {
       id: l.id,
       invoiceId: l.invoiceId,
       description: l.description,
-      quantity: l.quantity.toString(),
+      quantity: serializeQtyDecimal(l.quantity),
       unitPrice: serializeUnitPriceDecimal(l.unitPrice),
-      taxRate: l.taxRate.toString(),
+      taxRate: serializeRatePctDecimal(l.taxRate),
       lineSubtotal: serializeMoneyDecimal(l.lineSubtotal),
       lineTax: serializeMoneyDecimal(l.lineTax),
       lineTotal: serializeMoneyDecimal(l.lineTotal),

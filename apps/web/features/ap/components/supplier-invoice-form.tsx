@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { PurchaseOrderInvoiceDraftPreview } from "@bloqer/services";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -121,7 +121,7 @@ export function SupplierInvoiceForm({
         taxRate:
           suggested === "C" || suggested === "E"
             ? "0"
-            : l.taxRate === "0"
+            : isZeroIvaRate(l.taxRate)
               ? nextRate
               : l.taxRate,
       })),
@@ -404,7 +404,7 @@ export function SupplierInvoiceForm({
                       taxRate:
                         v === "C" || v === "E"
                           ? "0"
-                          : l.taxRate === "0"
+                          : isZeroIvaRate(l.taxRate)
                             ? nextRate
                             : l.taxRate,
                     })),

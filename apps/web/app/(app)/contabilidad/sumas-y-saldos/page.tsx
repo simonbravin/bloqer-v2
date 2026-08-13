@@ -22,6 +22,7 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { ReportExportActions } from "@/features/reports";
 import { AccountingReportFilters } from "@/features/accounting/components/accounting-report-filters";
 import { AccountingGerencialDisclaimer } from "@/features/accounting/components/accounting-gerencial-disclaimer";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 export default async function TrialBalancePage({
   searchParams,
@@ -136,9 +137,9 @@ export default async function TrialBalancePage({
                     <TableCell>{r.accountName}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{r.accountType}</TableCell>
                     <TableCell>{r.currency}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{r.debit}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{r.credit}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{r.balance}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{formatMoneyAmount(r.debit)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{formatMoneyAmount(r.credit)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{formatMoneyAmount(r.balance)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

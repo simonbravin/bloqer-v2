@@ -22,6 +22,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ReportExportActions } from "@/features/reports";
 import { AccountingReportFilters } from "@/features/accounting/components/accounting-report-filters";
 import { AccountingGerencialDisclaimer } from "@/features/accounting/components/accounting-gerencial-disclaimer";
+import { formatMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 
 const PAGE_SIZE = 50;
 
@@ -117,8 +118,8 @@ export default async function LibroDiarioPage({
                     </TableHeader>
                     <TableBody>
                       {e.lines.map((l, i) => {
-                        const zeroDebit = l.debit === "0" || l.debit === "0.00" || Number(l.debit) === 0;
-                        const zeroCredit = l.credit === "0" || l.credit === "0.00" || Number(l.credit) === 0;
+                        const zeroDebit = isZeroMoneyAmount(l.debit);
+                        const zeroCredit = isZeroMoneyAmount(l.credit);
                         return (
                         <TableRow key={`${e.id}-${i}`}>
                           <TableCell className="font-mono text-sm">
@@ -129,10 +130,10 @@ export default async function LibroDiarioPage({
                             {l.description ?? "—"}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm">
-                            {!zeroDebit ? l.debit : "—"}
+                            {!zeroDebit ? formatMoneyAmount(l.debit) : "—"}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm">
-                            {!zeroCredit ? l.credit : "—"}
+                            {!zeroCredit ? formatMoneyAmount(l.credit) : "—"}
                           </TableCell>
                           <TableCell className="text-sm">{l.currency}</TableCell>
                         </TableRow>

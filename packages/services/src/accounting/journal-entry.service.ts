@@ -8,7 +8,7 @@ import type {
   ListJournalEntriesInput,
   UpdateJournalEntryInput,
 } from "@bloqer/validators";
-import { roundMoney } from "@bloqer/utils";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { log } from "../audit/audit.service";
 import { isCrossCompany } from "../company-scope";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
@@ -49,10 +49,10 @@ export function assertSourcedLineMoneyUnchanged(
   for (let i = 0; i < existing.length; i++) {
     const ex = existing[i]!;
     const nw = incoming[i]!;
-    const exDebit = roundMoney(typeof ex.debit === "string" ? ex.debit : ex.debit.toString());
-    const exCredit = roundMoney(typeof ex.credit === "string" ? ex.credit : ex.credit.toString());
-    const nwDebit = roundMoney(nw.debit.toString());
-    const nwCredit = roundMoney(nw.credit.toString());
+    const exDebit = serializeMoneyDecimal(typeof ex.debit === "string" ? ex.debit : ex.debit);
+    const exCredit = serializeMoneyDecimal(typeof ex.credit === "string" ? ex.credit : ex.credit);
+    const nwDebit = serializeMoneyDecimal(nw.debit);
+    const nwCredit = serializeMoneyDecimal(nw.credit);
     if (exDebit !== nwDebit || exCredit !== nwCredit || ex.currency !== nw.currency) {
       throw new ServiceError(
         "VALIDATION",
@@ -193,8 +193,8 @@ function serializeLine(
 ): JournalEntryView["lines"][number] {
   return {
     ...line,
-    debit:       line.debit.toString(),
-    credit:      line.credit.toString(),
+    debit:       serializeMoneyDecimal(line.debit),
+    credit:      serializeMoneyDecimal(line.credit),
     accountCode: line.account.code,
     accountName: line.account.name,
   };
@@ -464,10 +464,10 @@ export async function getAccountLedger(
         entryReference: null,
         entryDescription: "Saldo inicial",
         lineDescription: null,
-        debit: "0",
-        credit: "0",
+        debit: serializeMoneyDecimal(0),
+        credit: serializeMoneyDecimal(0),
         currency,
-        runningBalance: bal.toString(),
+        runningBalance: serializeMoneyDecimal(bal),
         isOpening: true,
       });
     }
@@ -485,10 +485,10 @@ export async function getAccountLedger(
       entryReference:   l.journalEntry.reference,
       entryDescription: l.journalEntry.description,
       lineDescription:  l.description,
-      debit:            l.debit.toString(),
-      credit:           l.credit.toString(),
+      debit:            serializeMoneyDecimal(l.debit),
+      credit:           serializeMoneyDecimal(l.credit),
       currency:         l.currency,
-      runningBalance:   next.toString(),
+      runningBalance:   serializeMoneyDecimal(next),
     };
   });
 
@@ -1086,8 +1086,8 @@ export async function getTrialBalance(
       accountName: r.accountName,
       accountType: r.accountType,
       currency: r.currency,
-      debit: r.debit.toString(),
-      credit: r.credit.toString(),
+      debit: serializeMoneyDecimal(r.debit),
+      credit: serializeMoneyDecimal(r.credit),
       balance: naturalBalanceSignedString(r.accountType, r.debit, r.credit),
     }));
 }

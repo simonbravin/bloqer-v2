@@ -1,7 +1,7 @@
 import { Prisma } from "@bloqer/database";
-import { roundQty, roundToDecimals } from "@bloqer/utils";
+import { roundToDecimals } from "@bloqer/utils";
 import { remainingPhysicalPct } from "../jobsite-log/jobsite-log-guards";
-import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -64,12 +64,12 @@ export function buildWbsProgressSummary(input: {
 
   return {
     physicalPctAcum: roundToDecimals(physPct.toString(), 2),
-    physicalQtyAcum: roundQty(physQty.toString()),
+    physicalQtyAcum: serializeQtyDecimal(physQty),
     physicalRemainingPct: remainingPhysicalPct(physPct.toFixed(2)),
-    certifiedQty: roundQty(certQty.toString()),
+    certifiedQty: serializeQtyDecimal(certQty),
     certifiedAmount: serializeMoneyDecimal(certAmt),
     economicPctOfSale: pctOf(certAmt, sale),
-    remainingCertQty: roundQty(remainingCert.toString()),
+    remainingCertQty: serializeQtyDecimal(remainingCert),
     committedPctOfCost: costLayersAvailable
       ? pctOf(new Prisma.Decimal(input.committedCost!), cost)
       : null,

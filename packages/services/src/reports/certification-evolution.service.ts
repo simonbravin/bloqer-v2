@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 
@@ -361,7 +362,7 @@ export async function getCertificationEvolutionReport(
       periodStart: cert.periodStart.toISOString().slice(0, 10),
       periodEnd: cert.periodEnd.toISOString().slice(0, 10),
       status: cert.status,
-      totalAmount: cert.totalAmount.toString(),
+      totalAmount: serializeMoneyDecimal(cert.totalAmount),
       invoicedAmount: invoiced.toFixed(2),
       collectedAmount: collected.toFixed(2),
       paymentStatus: derivePaymentStatus(invoiced, collected, cert.salesInvoices.length > 0, overdue),

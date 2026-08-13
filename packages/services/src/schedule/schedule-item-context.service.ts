@@ -2,8 +2,7 @@ import { Prisma, prisma } from "@bloqer/database";
 import { canViewScheduleArea } from "./schedule-access";
 import { ServiceError } from "../types";
 import type { ServiceContext } from "../types";
-import { serializeMoneyDecimal } from "../finance/money-decimal";
-import { roundQty } from "@bloqer/utils";
+import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
 
 export type ScheduleItemJobsiteEntry = {
@@ -111,7 +110,7 @@ export async function getScheduleItemContext(
       logDate: p.jobsiteLog.logDate.toISOString().slice(0, 10),
       status: p.jobsiteLog.status,
       quantityCompleted: p.quantityCompleted
-        ? roundQty(p.quantityCompleted.toString())
+        ? serializeQtyDecimal(p.quantityCompleted)
         : null,
       physicalPct: p.physicalPct ? serializeProgressPct(p.physicalPct.toString()) : null,
       href: `${base}/libro-obra/${p.jobsiteLog.id}`,

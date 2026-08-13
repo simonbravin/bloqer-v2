@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, evaluateInvoiceLetterTaxConsistency, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -322,7 +322,7 @@ export function ManualInvoiceForm({
             />
             {evaluateInvoiceLetterTaxConsistency({
               invoiceLetter,
-              taxAmount: taxRate === "0" ? "0" : "1",
+              taxAmount: isZeroIvaRate(taxRate) ? "0" : "1",
             }).map((i) => (
                 <p
                   key={i.message}

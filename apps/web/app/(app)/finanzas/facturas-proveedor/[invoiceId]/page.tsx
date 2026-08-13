@@ -141,7 +141,7 @@ export default async function FinanzasFacturaProveedorDetailPage({
                   <TableCell className="text-right tabular-nums">{line.quantity}</TableCell>
                   <TableCell className="text-right tabular-nums">{line.unitPrice}</TableCell>
                   <TableCell className="text-right tabular-nums">{line.taxRate}</TableCell>
-                  <TableCell className="text-right tabular-nums">{line.lineTotal}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatMoneyAmount(line.lineTotal)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -151,16 +151,16 @@ export default async function FinanzasFacturaProveedorDetailPage({
         <div className="flex justify-end gap-8 text-sm">
           <div className="text-right">
             <p className="text-muted-foreground">Subtotal</p>
-            <p className="tabular-nums">{invoice.subtotal}</p>
+            <p className="tabular-nums">{formatMoneyAmount(invoice.subtotal)}</p>
           </div>
           <div className="text-right">
             <p className="text-muted-foreground">IVA</p>
-            <p className="tabular-nums">{invoice.taxAmount}</p>
+            <p className="tabular-nums">{formatMoneyAmount(invoice.taxAmount)}</p>
           </div>
           <div className="text-right">
             <p className="font-semibold">Total</p>
             <p className="font-semibold tabular-nums">
-              {invoice.totalAmount} {invoice.currency}
+              {formatMoneyAmount(invoice.totalAmount, invoice.currency)}
             </p>
           </div>
         </div>

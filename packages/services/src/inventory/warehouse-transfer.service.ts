@@ -6,6 +6,7 @@ import { assertInventoryTenantModule } from "../tenant-modules/tenant-module-enf
 import { getStockBalance, lockStockBalanceKey } from "./stock-balance.service";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -49,9 +50,9 @@ type RawTransfer = WarehouseTransfer & {
 function serialize(t: RawTransfer): WarehouseTransferView {
   return {
     ...t,
-    quantity:                 t.quantity.toString(),
-    unitCost:                 t.unitCost?.toString() ?? null,
-    totalCost:                t.totalCost?.toString() ?? null,
+    quantity:                 serializeQtyDecimal(t.quantity),
+    unitCost:                 t.unitCost != null ? serializeUnitPriceDecimal(t.unitCost) : null,
+    totalCost:                t.totalCost != null ? serializeMoneyDecimal(t.totalCost) : null,
     sourceWarehouseName:      t.sourceWarehouse.name,
     destinationWarehouseName: t.destinationWarehouse.name,
     productName:              t.product.name,
@@ -61,7 +62,7 @@ function serialize(t: RawTransfer): WarehouseTransferView {
       type:         m.type,
       warehouseId:  m.warehouseId,
       warehouseName: m.warehouse.name,
-      quantity:     m.quantity.toString(),
+      quantity:     serializeQtyDecimal(m.quantity),
       status:       m.status,
       movementDate: m.movementDate.toISOString().slice(0, 10),
     })),
@@ -166,7 +167,7 @@ export async function getSourceStockPreview(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver stock");
   }
   const balance = await getStockBalance({ tenantId: ctx.tenantId, warehouseId, productId });
-  return balance.toString();
+  return serializeQtyDecimal(balance);
 }
 
 // ─── Create ───────────────────────────────────────────────────────────────────
@@ -235,7 +236,7 @@ export async function createWarehouseTransfer(
     if (qty.greaterThan(srcBalance)) {
       throw new ServiceError(
         "CONFLICT",
-        `Stock insuficiente en depósito origen. Disponible: ${srcBalance.toString()}, solicitado: ${qty.toString()}`,
+        `Stock insuficiente en depósito origen. Disponible: ${serializeQtyDecimal(srcBalance)}, solicitado: ${serializeQtyDecimal(qty)}`,
       );
     }
 
@@ -357,7 +358,7 @@ export async function cancelWarehouseTransfer(
     if (dstBalance.lessThan(t.quantity)) {
       throw new ServiceError(
         "CONFLICT",
-        `No es posible anular la transferencia: el stock en el depósito destino fue consumido. Disponible: ${dstBalance.toString()}, requerido: ${t.quantity.toString()}`,
+        `No es posible anular la transferencia: el stock en el depósito destino fue consumido. Disponible: ${serializeQtyDecimal(dstBalance)}, requerido: ${serializeQtyDecimal(t.quantity)}`,
       );
     }
 

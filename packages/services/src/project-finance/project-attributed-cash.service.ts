@@ -4,6 +4,7 @@ import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export type ProjectAttributedCashByCurrency = {
   currency: string;
@@ -157,9 +158,9 @@ export async function getProjectAttributedCashBalance(
       const net = inf.minus(out);
       return {
         currency,
-        totalInflows: inf.toString(),
-        totalOutflows: out.toString(),
-        netBalance: net.toString(),
+        totalInflows: serializeMoneyDecimal(inf),
+        totalOutflows: serializeMoneyDecimal(out),
+        netBalance: serializeMoneyDecimal(net),
         isNegative: net.lessThan(0),
       };
     });

@@ -1,6 +1,7 @@
 import { Prisma, prisma, type ApPaymentNotificationChannel } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
+import { serializeMoneyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
 
 export type CompanyProcurementSettingsView = {
   companyId: string;
@@ -59,19 +60,21 @@ function serialize(row: {
   const cats = row.quoteRequiredCategories;
   return {
     companyId: row.companyId,
-    poApprovalThresholdArs: row.poApprovalThresholdArs?.toString() ?? null,
-    purchaseRequestRequiredAboveArs: row.purchaseRequestRequiredAboveArs?.toString() ?? null,
+    poApprovalThresholdArs: row.poApprovalThresholdArs != null ? serializeMoneyDecimal(row.poApprovalThresholdArs) : null,
+    purchaseRequestRequiredAboveArs: row.purchaseRequestRequiredAboveArs != null
+      ? serializeMoneyDecimal(row.purchaseRequestRequiredAboveArs)
+      : null,
     minQuotesRequired: row.minQuotesRequired,
     maxQuotesAllowed: row.maxQuotesAllowed,
     quoteRequiredCategories: Array.isArray(cats) ? (cats as string[]) : null,
     allowDirectPo: row.allowDirectPo,
     allowSelfApproval: row.allowSelfApproval,
     allowEmergencyDirectPo: row.allowEmergencyDirectPo,
-    varianceSoftAlertPct: row.varianceSoftAlertPct.toString(),
-    varianceNoteRequiredPct: row.varianceNoteRequiredPct.toString(),
-    varianceExtraApprovalPct: row.varianceExtraApprovalPct.toString(),
-    overReceiptTolerancePct: row.overReceiptTolerancePct.toString(),
-    invoiceMatchTolerancePct: row.invoiceMatchTolerancePct.toString(),
+    varianceSoftAlertPct: serializeRatePctDecimal(row.varianceSoftAlertPct),
+    varianceNoteRequiredPct: serializeRatePctDecimal(row.varianceNoteRequiredPct),
+    varianceExtraApprovalPct: serializeRatePctDecimal(row.varianceExtraApprovalPct),
+    overReceiptTolerancePct: serializeRatePctDecimal(row.overReceiptTolerancePct),
+    invoiceMatchTolerancePct: serializeRatePctDecimal(row.invoiceMatchTolerancePct),
     approvalSlaHours: row.approvalSlaHours ?? 72,
     apPaymentNotificationChannel: row.apPaymentNotificationChannel ?? DEFAULTS.apPaymentNotificationChannel,
   };
@@ -111,11 +114,11 @@ export async function getCompanyProcurementSettings(
       allowDirectPo: DEFAULTS.allowDirectPo,
       allowSelfApproval: DEFAULTS.allowSelfApproval,
       allowEmergencyDirectPo: DEFAULTS.allowEmergencyDirectPo,
-      varianceSoftAlertPct: DEFAULTS.varianceSoftAlertPct.toString(),
-      varianceNoteRequiredPct: DEFAULTS.varianceNoteRequiredPct.toString(),
-      varianceExtraApprovalPct: DEFAULTS.varianceExtraApprovalPct.toString(),
-      overReceiptTolerancePct: DEFAULTS.overReceiptTolerancePct.toString(),
-      invoiceMatchTolerancePct: DEFAULTS.invoiceMatchTolerancePct.toString(),
+      varianceSoftAlertPct: serializeRatePctDecimal(DEFAULTS.varianceSoftAlertPct),
+      varianceNoteRequiredPct: serializeRatePctDecimal(DEFAULTS.varianceNoteRequiredPct),
+      varianceExtraApprovalPct: serializeRatePctDecimal(DEFAULTS.varianceExtraApprovalPct),
+      overReceiptTolerancePct: serializeRatePctDecimal(DEFAULTS.overReceiptTolerancePct),
+      invoiceMatchTolerancePct: serializeRatePctDecimal(DEFAULTS.invoiceMatchTolerancePct),
       approvalSlaHours: DEFAULTS.approvalSlaHours,
       apPaymentNotificationChannel: DEFAULTS.apPaymentNotificationChannel,
     };

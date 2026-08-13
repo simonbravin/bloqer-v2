@@ -1,5 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import {
   applyOrderedToApuMap,
   buildApuCommitmentMap,
@@ -105,7 +105,7 @@ export async function loadMaterialApuCommitments(
         productId: line.productId,
         description: line.description,
         unit: line.unit,
-        unitCost: line.unitCost.toString(),
+        unitCost: serializeUnitPriceDecimal(line.unitCost),
         needQty: need,
         needCost: Number(needCost.toString()),
       });

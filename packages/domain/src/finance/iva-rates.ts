@@ -50,6 +50,11 @@ export function normalizeIvaRatePreset(
   return null;
 }
 
+/** True for 0 / 0.00 / 0.0000 after D-053 rate serialization. */
+export function isZeroIvaRate(value: string | null | undefined): boolean {
+  return normalizeIvaRatePreset(value) === "0";
+}
+
 export type InvoiceLetterTaxIssue = {
   severity: "error" | "warning";
   message: string;

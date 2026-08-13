@@ -7,6 +7,7 @@ import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -54,19 +55,19 @@ function serializeSubcontract(s: SubcontractWithRelations): SubcontractView {
     ...s,
     code:              `SC-${String(s.number).padStart(3, "0")}`,
     subcontractorName: s.subcontractorContact.fantasyName ?? s.subcontractorContact.legalName,
-    totalValue:        totalValue.toString(),
-    totalCertified:    totalCertified.toString(),
+    totalValue:        serializeMoneyDecimal(totalValue),
+    totalCertified:    serializeMoneyDecimal(totalCertified),
     lines: s.lines.map((l) => ({
       id:                l.id,
       subcontractId:     l.subcontractId,
       wbsNodeId:         l.wbsNodeId,
       description:       l.description,
       unit:              l.unit,
-      quantity:          l.quantity.toString(),
-      unitPrice:         l.unitPrice.toString(),
-      lineTotal:         l.lineTotal.toString(),
-      certifiedQuantity: l.certifiedQuantity.toString(),
-      remainingQty:      l.quantity.minus(l.certifiedQuantity).toString(),
+      quantity:          serializeQtyDecimal(l.quantity),
+      unitPrice:         serializeUnitPriceDecimal(l.unitPrice),
+      lineTotal:         serializeMoneyDecimal(l.lineTotal),
+      certifiedQuantity: serializeQtyDecimal(l.certifiedQuantity),
+      remainingQty:      serializeQtyDecimal(l.quantity.minus(l.certifiedQuantity)),
       notes:             l.notes,
       sortOrder:         l.sortOrder,
       wbsNode:           l.wbsNode,

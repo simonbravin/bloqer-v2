@@ -23,6 +23,7 @@ import {
 import { canViewCompanyFinanceHub, canViewCompanyTreasury } from "./finance-access";
 import { canViewCompanyAp } from "../ap/ap-access";
 import { canViewCompanyAr } from "../ar/ar-access";
+import { serializeMoneyDecimal } from "./money-decimal";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -260,9 +261,9 @@ function aggregateAgingByCurrency(
         : null;
       return {
         currency,
-        openTotal: agg.open.toString(),
-        overdueTotal: agg.overdue.toString(),
-        currentOrNotDueTotal: agg.current.toString(),
+        openTotal: serializeMoneyDecimal(agg.open),
+        overdueTotal: serializeMoneyDecimal(agg.overdue),
+        currentOrNotDueTotal: serializeMoneyDecimal(agg.current),
         openLineCount: agg.openLines,
         overdueLineCount: agg.overdueLines,
         overdueShareOfOpen,
@@ -413,11 +414,11 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
         }
         multicurrency = byCur.size > 1;
         for (const [cur, dec] of byCur) {
-          balancesByCurrency[cur] = dec.toString();
+          balancesByCurrency[cur] = serializeMoneyDecimal(dec);
         }
         if (byCur.size === 1) {
           const [only] = [...byCur.entries()];
-          displayHeadline = fmtDecimalEs(only![1].toString(), only![0].length === 3 ? only![0] : undefined);
+          displayHeadline = fmtDecimalEs(serializeMoneyDecimal(only![1]), only![0].length === 3 ? only![0] : undefined);
         } else {
           displayHeadline = "Multimoneda";
         }

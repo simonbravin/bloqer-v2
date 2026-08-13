@@ -4,6 +4,7 @@ import { pushMoneyKpi } from "../dashboard/kpi-helpers";
 import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { ServiceContext } from "../types";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export type TreasuryAttributionByCurrency = {
   currency: string;
@@ -78,10 +79,10 @@ export async function getTreasuryAttributionSummary(
     .sort(([a], [b]) => (a === "ARS" ? -1 : b === "ARS" ? 1 : a.localeCompare(b)))
     .map(([currency, agg]) => ({
       currency,
-      projectOutflows: agg.projectOut.toString(),
-      corporateOutflows: agg.corpOut.toString(),
-      projectInflows: agg.projectIn.toString(),
-      corporateInflows: agg.corpIn.toString(),
+      projectOutflows: serializeMoneyDecimal(agg.projectOut),
+      corporateOutflows: serializeMoneyDecimal(agg.corpOut),
+      projectInflows: serializeMoneyDecimal(agg.projectIn),
+      corporateInflows: serializeMoneyDecimal(agg.corpIn),
     }));
 
   return { visible: byCurrency.length > 0, byCurrency };

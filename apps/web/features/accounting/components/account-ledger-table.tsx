@@ -4,10 +4,7 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import type { AccountLedgerRowView } from "@bloqer/services";
-
-function isZeroAmount(v: string): boolean {
-  return v === "0" || v === "0.00" || v === "0.0" || Number(v) === 0;
-}
+import { formatMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 
 export function AccountLedgerTable({
   rows,
@@ -63,13 +60,13 @@ export function AccountLedgerTable({
                   {r.lineDescription ? ` — ${r.lineDescription}` : ""}
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">
-                  {r.isOpening || isZeroAmount(r.debit) ? "—" : r.debit}
+                  {r.isOpening || isZeroMoneyAmount(r.debit) ? "—" : formatMoneyAmount(r.debit)}
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">
-                  {r.isOpening || isZeroAmount(r.credit) ? "—" : r.credit}
+                  {r.isOpening || isZeroMoneyAmount(r.credit) ? "—" : formatMoneyAmount(r.credit)}
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                  {r.runningBalance}
+                  {formatMoneyAmount(r.runningBalance)}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">{r.currency}</TableCell>
               </TableRow>

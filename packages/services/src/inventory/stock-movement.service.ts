@@ -12,6 +12,7 @@ import { assertInventoryTenantModule } from "../tenant-modules/tenant-module-enf
 import { getStockBalance, lockStockBalanceKey } from "./stock-balance.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -33,9 +34,9 @@ function serializeMovement(
 ): StockMovementView {
   return {
     ...m,
-    quantity: m.quantity.toString(),
-    unitCost: m.unitCost?.toString() ?? null,
-    totalCost: m.totalCost?.toString() ?? null,
+    quantity: serializeQtyDecimal(m.quantity),
+    unitCost: m.unitCost != null ? serializeUnitPriceDecimal(m.unitCost) : null,
+    totalCost: m.totalCost != null ? serializeMoneyDecimal(m.totalCost) : null,
     productName: m.product.name,
     warehouseName: m.warehouse.name,
   };
@@ -211,7 +212,7 @@ export async function createStockConsumption(
     if (qty.greaterThan(balance)) {
       throw new ServiceError(
         "CONFLICT",
-        `Stock insuficiente. Disponible: ${balance.toString()}, solicitado: ${qty.toString()}`,
+        `Stock insuficiente. Disponible: ${serializeQtyDecimal(balance)}, solicitado: ${serializeQtyDecimal(qty)}`,
       );
     }
 
@@ -324,7 +325,7 @@ export async function cancelReceiptStockMovements(
       const label = m.product?.sku ? `${m.product.sku} — ${m.product.name}` : m.productId;
       throw new ServiceError(
         "CONFLICT",
-        `No se puede anular la recepción: el stock de "${label}" ya fue consumido (disponible ${balance.toString()}, se revertiría ${m.quantity.toString()}).`,
+        `No se puede anular la recepción: el stock de "${label}" ya fue consumido (disponible ${serializeQtyDecimal(balance)}, se revertiría ${serializeQtyDecimal(m.quantity)}).`,
       );
     }
   }
@@ -412,7 +413,7 @@ export async function createJobsiteLogMaterialStockMovements(
     if (qty.greaterThan(balance)) {
       throw new ServiceError(
         "CONFLICT",
-        `Stock insuficiente al aprobar el parte. Disponible: ${balance.toString()}, solicitado: ${qty.toString()}`,
+        `Stock insuficiente al aprobar el parte. Disponible: ${serializeQtyDecimal(balance)}, solicitado: ${serializeQtyDecimal(qty)}`,
       );
     }
   }

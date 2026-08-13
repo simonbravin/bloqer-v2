@@ -6,6 +6,7 @@ import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-e
 import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseOrders, canViewPurchaseRequests } from "./procurement-access";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 
 export async function createProcurementQuote(
@@ -167,8 +168,8 @@ export async function listProcurementQuotesForRequest(
     id: q.id,
     supplierName: q.supplierContact.fantasyName ?? q.supplierContact.legalName,
     status: q.status,
-    totalAmount: q.totalAmount.toString(),
-    totalAmountArs: q.totalAmountArs.toString(),
+    totalAmount: serializeMoneyDecimal(q.totalAmount),
+    totalAmountArs: serializeMoneyDecimal(q.totalAmountArs),
     currency: q.currency,
     validUntil: q.validUntil?.toISOString().slice(0, 10) ?? null,
     leadTimeDays: q.leadTimeDays,
@@ -225,17 +226,19 @@ export async function listProcurementQuotesDetailedForRequest(
     id: q.id,
     supplierName: q.supplierContact.fantasyName ?? q.supplierContact.legalName,
     status: q.status,
-    totalAmount: q.totalAmount.toString(),
-    totalAmountArs: q.totalAmountArs.toString(),
+    totalAmount: serializeMoneyDecimal(q.totalAmount),
+    totalAmountArs: serializeMoneyDecimal(q.totalAmountArs),
     currency: q.currency,
     validUntil: q.validUntil?.toISOString().slice(0, 10) ?? null,
     leadTimeDays: q.leadTimeDays,
     lines: q.lines.map((l) => ({
       description: l.purchaseRequestLine.description,
       unit: l.purchaseRequestLine.unit,
-      quantity: l.purchaseRequestLine.quantity.toString(),
-      unitPrice: l.unitPrice.toString(),
-      budgetUnitCostSnapshot: l.purchaseRequestLine.budgetUnitCostSnapshot?.toString() ?? null,
+      quantity: serializeQtyDecimal(l.purchaseRequestLine.quantity),
+      unitPrice: serializeUnitPriceDecimal(l.unitPrice),
+      budgetUnitCostSnapshot: l.purchaseRequestLine.budgetUnitCostSnapshot != null
+        ? serializeUnitPriceDecimal(l.purchaseRequestLine.budgetUnitCostSnapshot)
+        : null,
     })),
   }));
 }

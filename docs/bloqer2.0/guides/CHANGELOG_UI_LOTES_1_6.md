@@ -83,11 +83,21 @@
 
 **Capturas prioritarias a fotografiar (agosto 2026):** workspace de conciliación (dos columnas), import CSV/OFX, listado de cierres + diálogos Cerrar/Reabrir, ajuste manual, aceptar invitación sin token en barra.
 
+### Agosto 2026 (v2.3) — Facturas AR/AP + pagos + IVA
+
+| Tema | Impacto en guía |
+|------|-----------------|
+| D-065…D-068 exposición EDT, OC↔factura, tolerancias, hint APU / faltante | §9.2 · §13.1 |
+| D-069 / D-070 pago CxP solo finanzas + canal avisos | §1.3 · §12.2 · §17 |
+| D-073 costo financiero tasa anual × días/365 | §6.0 |
+| D-077 Emitir y cobrar ahora (factura obra) | §11.3 · §12.1 · §19 (corrige contradicción previa) |
+| D-084…D-086 letra A/B/C/E, alícuotas, precio c/IVA, asiento 3 líneas | §1.3 · §3 · §12.1a · §15.2 · §17 · §19 |
+
 ---
 
 ## DOCX
 
 - Regenerar: `cd docs/bloqer2.0/guides && node build_guide.js`
-- Salida: **`Guía_Operativa_Bloqer_v2.docx`** únicamente.
+- Salida: **`Guía_Operativa_Bloqer_v2.docx`** únicamente (portada **v2.3 — Agosto 2026**).
 
 > Si cambian rutas, `DECISION_LOG` o la MD: actualizar la MD **en el mismo PR** y volver a correr `build_guide.js`.

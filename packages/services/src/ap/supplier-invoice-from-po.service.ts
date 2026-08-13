@@ -3,6 +3,12 @@ import { can } from "@bloqer/domain";
 import { toIsoDateLocal } from "@bloqer/utils";
 import type { CreateSupplierInvoiceFromPurchaseOrderInput } from "@bloqer/validators";
 import { ServiceContext, ServiceError } from "../types";
+import {
+  serializeMoneyDecimal,
+  serializeQtyDecimal,
+  serializeRatePctDecimal,
+  serializeUnitPriceDecimal,
+} from "../finance/money-decimal";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { canViewApProjectArea } from "./ap-access";
 import { canViewProcurementProjectArea } from "../procurement/procurement-access";
@@ -84,11 +90,11 @@ function toPoLineDraft(
   return {
     id: line.id,
     description: line.description,
-    unitPrice: line.unitPrice.toString(),
-    taxRate: line.taxRate.toString(),
-    orderQuantity: line.quantity.toString(),
-    receivedQuantity: line.receivedQuantity.toString(),
-    lineTotal: line.lineTotal.toString(),
+    unitPrice: serializeUnitPriceDecimal(line.unitPrice),
+    taxRate: serializeRatePctDecimal(line.taxRate),
+    orderQuantity: serializeQtyDecimal(line.quantity),
+    receivedQuantity: serializeQtyDecimal(line.receivedQuantity),
+    lineTotal: serializeMoneyDecimal(line.lineTotal),
     wbsNodeId: line.wbsNodeId,
   };
 }
@@ -240,9 +246,9 @@ export async function listSupplierInvoicesByPurchaseOrder(
 
   return invoices.map((inv) => ({
     ...inv,
-    subtotal: inv.subtotal.toString(),
-    taxAmount: inv.taxAmount.toString(),
-    totalAmount: inv.totalAmount.toString(),
+    subtotal: serializeMoneyDecimal(inv.subtotal),
+    taxAmount: serializeMoneyDecimal(inv.taxAmount),
+    totalAmount: serializeMoneyDecimal(inv.totalAmount),
     code: `FP-${String(inv.number).padStart(5, "0")}`,
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
     subcontractCertificationCode: null,
@@ -421,7 +427,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
       throw new ServiceError("CONFLICT", "Solo se puede facturar desde recepciones confirmadas");
     }
     receiptQuantities = new Map(
-      receipt.lines.map((l) => [l.purchaseOrderLineId, l.quantityReceived.toString()]),
+      receipt.lines.map((l) => [l.purchaseOrderLineId, serializeQtyDecimal(l.quantityReceived)]),
     );
   }
 

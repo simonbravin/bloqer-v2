@@ -4,6 +4,7 @@ import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enfo
 import { ServiceContext, ServiceError } from "../types";
 import { DEFAULT_CASH_DATE_RANGE_DAYS, defaultDateRangeDays, MAX_CORPORATE_PAYMENT_FILTER_IDS, resolvePagination } from "../finance/pagination";
 import { buildFinancialHref } from "../finance/financial-trace.service";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getAccountBalance, getAccountBalanceAsOf } from "../treasury/balance.service";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -235,7 +236,7 @@ export async function getCashPositionReport(
       status:      acc.status as string,
       companyId:   acc.companyId,
       companyName: acc.company?.name ?? null,
-      balance:     balance.toString(),
+      balance:     serializeMoneyDecimal(balance),
     });
   }
 
@@ -247,7 +248,7 @@ export async function getCashPositionReport(
   }
   const byCurrency: CashPositionByCurrency[] = [...currencyMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([currency, total]) => ({ currency, totalBalance: total.toString() }));
+    .map(([currency, total]) => ({ currency, totalBalance: serializeMoneyDecimal(total) }));
 
   // Group by company
   const companyMap = new Map<string | null, {
@@ -268,7 +269,7 @@ export async function getCashPositionReport(
     companyName: e.companyName,
     byCurrency:  [...e.currencies.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([currency, total]) => ({ currency, totalBalance: total.toString() })),
+      .map(([currency, total]) => ({ currency, totalBalance: serializeMoneyDecimal(total) })),
   }));
 
   return { accounts: accountRows, byCurrency, byCompany };
@@ -548,8 +549,8 @@ export async function getAccountMovementReport(
         counterpartyName,
         m.externalInvoiceRef,
       ),
-      amount: m.amount.toString(),
-      signedAmount: signed.toString(),
+      amount: serializeMoneyDecimal(m.amount),
+      signedAmount: serializeMoneyDecimal(signed),
       currency: m.currency,
       description: m.description,
       detailHref: resolveMovementDetailHref({
@@ -565,7 +566,7 @@ export async function getAccountMovementReport(
       projectName: resolvedProjectId ? (projectNames.get(resolvedProjectId) ?? null) : null,
       counterpartyName,
       externalInvoiceRef: m.externalInvoiceRef,
-      ...(runningBalance !== undefined ? { runningBalance: runningBalance.toString() } : {}),
+      ...(runningBalance !== undefined ? { runningBalance: serializeMoneyDecimal(runningBalance) } : {}),
     };
   });
 
@@ -671,20 +672,20 @@ export async function getCashFlowReport(
       running = running.plus(netAll);
       return {
         period:               key,
-        inflow:               b.inflow.toString(),
-        outflow:              b.outflow.toString(),
-        internalTransferIn:   b.internalTransferIn.toString(),
-        internalTransferOut:  b.internalTransferOut.toString(),
-        adjustments:          b.adjustments.toString(),
-        netOperatingCashFlow: netOp.toString(),
-        netCashFlow:          netAll.toString(),
+        inflow:               serializeMoneyDecimal(b.inflow),
+        outflow:              serializeMoneyDecimal(b.outflow),
+        internalTransferIn:   serializeMoneyDecimal(b.internalTransferIn),
+        internalTransferOut:  serializeMoneyDecimal(b.internalTransferOut),
+        adjustments:          serializeMoneyDecimal(b.adjustments),
+        netOperatingCashFlow: serializeMoneyDecimal(netOp),
+        netCashFlow:          serializeMoneyDecimal(netAll),
       };
     });
 
     result.push({
       currency,
-      openingBalance: openingBalance.toString(),
-      closingBalance: running.toString(),
+      openingBalance: serializeMoneyDecimal(openingBalance),
+      closingBalance: serializeMoneyDecimal(running),
       buckets,
     });
   }

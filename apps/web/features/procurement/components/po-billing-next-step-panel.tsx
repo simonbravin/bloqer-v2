@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { can } from "@bloqer/domain";
 import { createSupplierInvoiceFromPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
 import type { PurchaseOrderBillingSummary } from "@bloqer/services";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   projectId: string;
@@ -31,12 +32,14 @@ export function PoBillingNextStepPanel({
         <p className="font-medium">Facturación de la OC</p>
         {billing.hasReceivedQuantity ? (
           <p className="text-muted-foreground text-xs">
-            Recibido: {billing.receivedAmount} · Facturado (emitido): {billing.invoicedAmount} · Pagado:{" "}
-            {billing.paidAmount}
+            Recibido: {formatMoneyAmount(billing.receivedAmount)} · Facturado (emitido):{" "}
+            {formatMoneyAmount(billing.invoicedAmount)} · Pagado: {formatMoneyAmount(billing.paidAmount)}
             {billing.draftInvoiceCount > 0
               ? ` · ${billing.draftInvoiceCount} borrador(es)`
               : null}
-            {pending > 0 ? ` · Pendiente de facturar: ${billing.pendingToInvoice}` : null}
+            {pending > 0
+              ? ` · Pendiente de facturar: ${formatMoneyAmount(billing.pendingToInvoice)}`
+              : null}
           </p>
         ) : (
           <p className="text-muted-foreground text-xs">

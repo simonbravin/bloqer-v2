@@ -17,6 +17,12 @@ import { getCompanyProcurementSettingsForProject } from "./company-procurement-s
 import { assertDirectPoAllowed } from "./procurement-policy.service";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import {
+  serializeMoneyDecimal,
+  serializeQtyDecimal,
+  serializeRatePctDecimal,
+  serializeUnitPriceDecimal,
+} from "../finance/money-decimal";
+import {
   assertPoLinesWithinSelectedQuote,
   onPurchaseOrderCancelledLinkedToRequest,
 } from "./purchase-request-to-po.service";
@@ -103,18 +109,18 @@ function serializeLine(
     costAnalysisLineId: l.costAnalysisLineId,
     description:       l.description,
     unit:              l.unit,
-    quantity:          l.quantity.toString(),
-    unitPrice:         l.unitPrice.toString(),
-    taxRate:           l.taxRate.toString(),
-    lineSubtotal:      l.lineSubtotal.toString(),
-    lineTax:           l.lineTax.toString(),
-    lineTotal:         l.lineTotal.toString(),
-    receivedQuantity:  l.receivedQuantity.toString(),
-    remainingQuantity: remaining.lessThan(0) ? "0" : remaining.toString(),
+    quantity:          serializeQtyDecimal(l.quantity),
+    unitPrice:         serializeUnitPriceDecimal(l.unitPrice),
+    taxRate:           serializeRatePctDecimal(l.taxRate),
+    lineSubtotal:      serializeMoneyDecimal(l.lineSubtotal),
+    lineTax:           serializeMoneyDecimal(l.lineTax),
+    lineTotal:         serializeMoneyDecimal(l.lineTotal),
+    receivedQuantity:  serializeQtyDecimal(l.receivedQuantity),
+    remainingQuantity: remaining.lessThan(0) ? serializeQtyDecimal(0) : serializeQtyDecimal(remaining),
     sortOrder:         l.sortOrder,
-    budgetUnitCostSnapshot: l.budgetUnitCostSnapshot?.toString() ?? null,
+    budgetUnitCostSnapshot: l.budgetUnitCostSnapshot != null ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot) : null,
     varianceTier:      l.varianceTier,
-    variancePct:       l.variancePct?.toString() ?? null,
+    variancePct:       l.variancePct != null ? serializeRatePctDecimal(l.variancePct) : null,
     varianceJustification: l.varianceJustification,
   };
 }
@@ -129,9 +135,9 @@ function serializePO(
   const supplierName = po.supplierContact.fantasyName ?? po.supplierContact.legalName;
   return {
     ...po,
-    subtotal:    po.subtotal.toString(),
-    taxAmount:   po.taxAmount.toString(),
-    totalAmount: po.totalAmount.toString(),
+    subtotal:    serializeMoneyDecimal(po.subtotal),
+    taxAmount:   serializeMoneyDecimal(po.taxAmount),
+    totalAmount: serializeMoneyDecimal(po.totalAmount),
     approvedByName,
     code:        `OC-${String(po.number).padStart(3, "0")}`,
     supplierName,
@@ -301,7 +307,7 @@ export async function listProcurementWbsOptions(
           id: l.id,
           description: l.description,
           unit: l.unit,
-          unitCost: l.unitCost.toString(),
+          unitCost: serializeUnitPriceDecimal(l.unitCost),
           productId: l.productId,
           // Prefill remaining to buy (0 when fully covered).
           quantity: c?.shortfallQty ?? null,

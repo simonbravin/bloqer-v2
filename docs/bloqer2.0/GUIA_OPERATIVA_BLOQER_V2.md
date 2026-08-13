@@ -5,7 +5,7 @@
 > **Base de evidencia:** rutas implementadas en `apps/web`, servicios en `packages/services`, enums en `packages/database/prisma/schema.prisma` y la spec funcional de `docs/bloqer2.0/`.
 > **Regla de prevalencia:** cuando el texto de una pantalla o de la documentación difiere del comportamiento del código, esta guía describe **lo que hace el sistema hoy**.
 > **Relación con otros documentos:** visión ejecutiva [`PANORAMA_GENERAL_BLOQER_V2.md`](./PANORAMA_GENERAL_BLOQER_V2.md); estado técnico A–G [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md); smoke por rol [`08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md).
-> **Archivo canónico:** `GUIA_OPERATIVA_BLOQER_V2.md` (único; se sobrescribe al evolucionar el producto — no crear variantes `_REVISADA` / `_vN`).
+> **Archivo canónico:** `GUIA_OPERATIVA_BLOQER_V2.md` (único).
 > **Entregable DOCX:** `guides/Guía_Operativa_Bloqer_v2.docx`, regenerado con `cd docs/bloqer2.0/guides && node build_guide.js` desde **esta** MD.
 > **Mantenimiento obligatorio:** todo cambio de UX, rutas, etiquetas, flujos financieros/contables, presupuesto/EDT, notificaciones o reglas visibles al usuario **debe actualizar esta guía en el mismo PR** (y regenerar el DOCX si se entrega a cliente). Ver [D-050](./00-product/DECISION_LOG.md)–[D-064](./00-product/DECISION_LOG.md) y `AGENT_GUARDRAILS.md`.
 > **Capturas:** los bloques `📷 Captura sugerida` indican dónde insertar pantallazos reales. No inventar UI: fotografiar el producto actual.
@@ -15,19 +15,13 @@
 
 ## 0. Cómo leer esta guía
 
-Bloqer v2 trabaja en **dos niveles** más una consola de plataforma:
+Bloqer v2 trabaja en **dos niveles**:
 
 - **Nivel empresa (corporativo):** datos maestros y funciones transversales a todas las obras (directorio, usuarios, tesorería, finanzas corporativas, contabilidad, inventario, configuración).
 - **Nivel proyecto (obra):** el corazón operativo; casi toda la actividad económica cuelga de un proyecto.
-- **Plataforma (superadmin SaaS):** alta de empresas, habilitación de módulos y vencimientos. **No es accesible para los usuarios de la empresa**; la gestionan los administradores del servicio.
 
 ```mermaid
 flowchart TB
-  subgraph PLAT["Plataforma (superadmin — no accesible al cliente)"]
-    P1["Alta de empresas"]
-    P2["Módulos habilitados por empresa"]
-    P3["Vencimientos"]
-  end
   subgraph EMP["Nivel Empresa"]
     E1["Directorio"]
     E2["Usuarios / Roles / Permisos"]
@@ -48,7 +42,7 @@ flowchart TB
     R8["Facturas · Cobranzas · Pagos"]
     R9["EDT y costos"]
   end
-  PLAT --> EMP --> PROJ
+  EMP --> PROJ
   PROJ --> E3
   PROJ --> E5
 ```
@@ -136,11 +130,15 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 - El **menú lateral de empresa** agrupa: **General · Finanzas · Tesorería · Contabilidad · Configuración**.
 - Al entrar a una obra, el menú lateral se reemplaza por el **menú del proyecto**.
 
-> **📷 Captura sugerida — Login (email + Google)**  
-> Ruta: `/login` · Mostrar formulario email/contraseña + botón Google y marca Bloqer · Tip: desktop, sin datos sensibles.
+<!-- capture:01 login-email-google -->
+![Bloqer — Login (email + Google)](./guides/assets/screenshots/01-login-email-google.png)
 
-> **📷 Captura sugerida — Dashboard / menú empresa**  
-> Ruta: `/dashboard` · Mostrar sidebar (General · Finanzas · Tesorería · Contabilidad · Configuración) + campana de notificaciones en el header · Tip: recortar solo shell + KPI principales.
+*Login (email + Google).*
+
+<!-- capture:01 dashboard-menu-empresa -->
+![Bloqer — Dashboard / menú empresa](./guides/assets/screenshots/01-dashboard-menu-empresa.png)
+
+*Dashboard / menú empresa.*
 
 ### 1.2 Menú de empresa (rutas reales)
 
@@ -154,7 +152,7 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 
 > **Visibilidad (D-056):** las secciones **Finanzas**, **Tesorería** y **Contabilidad** del menú de empresa solo aparecen para roles de **company finance**: `OWNER`, `ADMIN`, `FINANCE`, `TREASURER` y `VIEWER` (lectura). Roles operativos (`PROJECT_MANAGER`, `PROCUREMENT`, `SALES`, `PROJECT_FINANCE`, etc.) trabajan finanzas desde el **proyecto**, no desde el hub corporativo.
 
-> Las **notificaciones** se abren desde la **campana del encabezado** (no tienen ítem propio en el menú lateral). Ver §1.5.
+> Las **notificaciones** se abren desde la **campana del encabezado** (no tienen ítem propio en el menú lateral). Ver §1.4.
 
 ### 1.3 Datos de la empresa
 
@@ -166,8 +164,10 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 - Razón social / CUIT son de solo lectura acá (datos fiscales de la empresa principal).
 - **Política de compras:** `/configuracion/compras` (subnavegación Configuración → **Compras**, o card desde `/configuracion`): umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos.
 
-> **📷 Captura sugerida — Configuración + zona horaria**  
-> Ruta: `/configuracion` · Mostrar desplegable de zona con etiqueta GMT · Tip: incluir subnav de configuración si está visible.
+<!-- capture:02 configuracion-zona-horaria -->
+![Bloqer — Configuración + zona horaria](./guides/assets/screenshots/02-configuracion-zona-horaria.png)
+
+*Configuración + zona horaria.*
 
 ### 1.3a Registro de actividad
 
@@ -176,15 +176,7 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 - **Fechas y horas** en la zona de la empresa (§1.3), no en UTC del servidor ni en la zona del navegador. El detalle al hacer click debe coincidir con la columna Fecha.
 - Exports CSV/PDF usan la misma zona (el encabezado CSV indica la zona, ej. `Fecha (Buenos Aires (GMT-3))`).
 
-### 1.4 Módulos habilitados
-
-- Cada empresa puede tener módulos **activos o inactivos**. La habilitación se administra desde la **consola de plataforma** (`/platform/tenants/[id]/modules`), no desde la empresa.
-- **Comportamiento por defecto:** si nunca se creó una configuración de módulo para la empresa, **el módulo se considera habilitado** (default-on). Tenerlo en cuenta al asumir que algo está "apagado".
-
-> **📷 Captura sugerida — Plataforma · módulos del tenant**  
-> Ruta: `/platform/tenants/[id]/modules` · Mostrar columnas Explícita/Default-on y cobertura · Tip: solo para material interno del proveedor SaaS (no entregar al cliente final).
-
-### 1.5 Notificaciones (campana, inbox, alertas y emails) — D-054
+### 1.4 Notificaciones (campana, inbox, alertas y emails) — D-054
 
 Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **campana del encabezado**.
 
@@ -204,8 +196,10 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 
 > **Montos en notificaciones:** saldos y montos se muestran a **2 decimales** (D-053), igual que en el resto de la UI.
 
-> **📷 Captura sugerida — Campana abierta**  
-> Ruta: cualquier pantalla autenticada · Abrir campana con badge + 1–2 ítems + “Ver todas” · Tip: sin datos sensibles de clientes reales.
+<!-- capture:04 campana-abierta -->
+![Bloqer — Campana abierta](./guides/assets/screenshots/04-campana-abierta.png)
+
+*Campana abierta.*
 
 ---
 
@@ -220,11 +214,15 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 - Gestión de cada miembro: `/configuracion/equipo/[membershipId]`.
 - **Tenant suspendido:** no se puede aceptar una invitación a una empresa inactiva; el mensaje lo indica en pantalla.
 
-> **📷 Captura sugerida — Invitar usuario**  
-> Ruta: `/configuracion/equipo/invitar` · Mostrar formulario email + roles · Tip: datos demo; no usar emails reales de clientes.
+<!-- capture:05 invitar-usuario -->
+![Bloqer — Invitar usuario](./guides/assets/screenshots/05-invitar-usuario.png)
 
-> **📷 Captura sugerida — Aceptar invitación**  
-> Ruta: `/invitaciones/aceptar` · Mostrar pantalla de aceptación (sin `?token=` en la barra de direcciones) · Tip: desktop; recortar URL bar para demostrar ausencia del token.
+*Invitar usuario.*
+
+<!-- capture:06 aceptar-invitacion -->
+![Bloqer — Aceptar invitación](./guides/assets/screenshots/06-aceptar-invitacion.png)
+
+*Aceptar invitación.*
 
 ### 2.2 Roles disponibles (enum `UserRole`)
 
@@ -243,8 +241,10 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 - En la matriz, algunos módulos aparecen como **no disponibles en esta versión** (p. ej. contratos formales, órdenes de cambio, RFIs, impuestos dedicados): no hay pantallas operativas. **Conciliación bancaria** y **cierre de períodos** **sí** están operativos (ver §4.2 y §15.3).
 - La autorización se aplica **también en el backend** (servicios), no solo en la interfaz.
 
-> **📷 Captura sugerida — Matriz de permisos (solo lectura)**  
-> Ruta: `/configuracion/permisos` · Mostrar banner “solo lectura” + filas BANK_RECONCILIATION / PERIOD_CLOSE si están visibles · Tip: no recortar el banner.
+<!-- capture:07 matriz-de-permisos-solo-lectura -->
+![Bloqer — Matriz de permisos (solo lectura)](./guides/assets/screenshots/07-matriz-de-permisos-solo-lectura.png)
+
+*Matriz de permisos (solo lectura).*
 
 ### 2.4 Reglas especiales
 
@@ -275,8 +275,10 @@ Bloqer separa herramientas de **empresa** y de **proyecto** (estilo Procore):
 - **Error a evitar:** dar de alta el mismo contacto dos veces cuando cumple varios roles. Usar siempre un contacto con múltiples roles.
 - Se debe crear el **cliente** antes de crear el proyecto que lo referencia.
 
-> **📷 Captura sugerida — Directorio / contacto con roles**  
-> Ruta: `/directorio` o detalle de contacto · Mostrar roles CLIENT / SUPPLIER / SUBCONTRACTOR en un mismo contacto · Tip: datos demo, sin CUIT reales de clientes.
+<!-- capture:08 directorio-contacto-con-roles -->
+![Bloqer — Directorio / contacto con roles](./guides/assets/screenshots/08-directorio-contacto-con-roles.png)
+
+*Directorio / contacto con roles.*
 
 ---
 
@@ -299,11 +301,15 @@ Configurar tesorería **antes** de operar cobranzas y pagos.
 - En cobranzas y pagos podés indicar **método de liquidación** (Efectivo, Transferencia, Cheque, Tarjeta, Otro) y referencia opcional ([D-074]).
 - **Fondos insuficientes:** un **pago** no puede dejar la cuenta en saldo negativo (igual que transferencias). El sistema muestra el disponible y bloquea.
 
-> **📷 Captura sugerida — Tesorería con subnav (incl. Conciliación)**  
-> Ruta: `/tesoreria` · Mostrar `ModuleSubnav` completo: Resumen · Cuentas · Movimientos · Flujo de caja · Transferencias · **Conciliación** · Tip: incluir al menos una cuenta con saldo.
+<!-- capture:09 tesoreria-con-subnav-incl-conciliacion -->
+![Bloqer — Tesorería con subnav (incl. Conciliación)](./guides/assets/screenshots/09-tesoreria-con-subnav-incl-conciliacion.png)
 
-> **📷 Captura sugerida — Ledger de movimientos con Estado**  
-> Ruta: `/tesoreria/movimientos` · Mostrar columnas Tipo + **Estado** (Confirmado / Conciliado) · Tip: mezclar un movimiento confirmado y uno conciliado si es posible.
+*Tesorería con subnav (incl. Conciliación).*
+
+<!-- capture:10 ledger-de-movimientos-con-estado -->
+![Bloqer — Ledger de movimientos con Estado](./guides/assets/screenshots/10-ledger-de-movimientos-con-estado.png)
+
+*Ledger de movimientos con Estado.*
 
 > **Terminología correcta:** tipos de movimiento = `INFLOW` (ingreso), `OUTFLOW` (egreso), `TRANSFER_IN`, `TRANSFER_OUT`, `ADJUSTMENT` (ajuste). Estados de movimiento relevantes: **Confirmado** (`CONFIRMED`) y **Conciliado** (`RECONCILED`). Un movimiento conciliado **no** se anula ni se edita hasta desemparejarlo.
 
@@ -361,20 +367,30 @@ Cuadrá el extracto del banco (o archivo CSV/OFX) con los movimientos que Bloqer
 > - Dos sesiones abiertas a la vez sobre la misma cuenta → el sistema lo impide (una sesión abierta por cuenta).
 > - Cerrar el mes contable (§15.3) **antes** de terminar la conciliación del mes → no podrás crear/anular movimientos de esas fechas hasta reabrir el período.
 
-> **📷 Captura sugerida — Listado de conciliaciones**  
-> Ruta: `/tesoreria/conciliacion` · Mostrar tabla con estados (En progreso / Cerrada) + CTA **Nueva conciliación** · Tip: filtros por cuenta/estado visibles.
+<!-- capture:11 listado-de-conciliaciones -->
+![Bloqer — Listado de conciliaciones](./guides/assets/screenshots/11-listado-de-conciliaciones.png)
 
-> **📷 Captura sugerida — Nueva conciliación (alta)**  
-> Ruta: `/tesoreria/conciliacion/nueva` · Formulario cuenta + período + saldos de extracto · Tip: completar con datos demo.
+*Listado de conciliaciones.*
 
-> **📷 Captura sugerida — Workspace de empareje (dos columnas)**  
-> Ruta: `/tesoreria/conciliacion/[id]` · Mostrar líneas de extracto a la izquierda y candidatos del sistema a la derecha + botón **Emparejar seleccionados** · Tip: esta es la captura más importante del módulo; desktop ancho.
+<!-- capture:12 nueva-conciliacion-alta -->
+![Bloqer — Nueva conciliación (alta)](./guides/assets/screenshots/12-nueva-conciliacion-alta.png)
 
-> **📷 Captura sugerida — Importar CSV / OFX**  
-> Ruta: detalle de sesión · Bloques **Importar CSV de extracto** e **Importar OFX / QFX** · Tip: no hace falta subir un archivo real en la foto; alcanza con el UI del upload.
+*Nueva conciliación (alta).*
 
-> **📷 Captura sugerida — Cerrar conciliación**  
-> Ruta: detalle · Diálogo de confirmación **Cerrar conciliación** con resumen de diferencia en cero o casi cero · Tip: preferible sesión ya cuadrada.
+<!-- capture:13 workspace-de-empareje-dos-columnas -->
+![Bloqer — Workspace de empareje (dos columnas)](./guides/assets/screenshots/13-workspace-de-empareje-dos-columnas.png)
+
+*Workspace de empareje (dos columnas).*
+
+<!-- capture:14 importar-csv-ofx -->
+![Bloqer — Importar CSV / OFX](./guides/assets/screenshots/14-importar-csv-ofx.png)
+
+*Importar CSV / OFX.*
+
+<!-- capture:15 cerrar-conciliacion -->
+![Bloqer — Cerrar conciliación](./guides/assets/screenshots/15-cerrar-conciliacion.png)
+
+*Cerrar conciliación.*
 
 ---
 
@@ -389,11 +405,15 @@ Para diferencias de caja/banco que no vienen de un cobro/pago (cargos bancarios,
 
 > El ajuste queda sujeto a **período abierto** (§15.3) y puede emparejarse luego en conciliación si aparece en el extracto.
 
-> **📷 Captura sugerida — Ajuste manual de cuenta**  
-> Ruta: `/tesoreria/cuentas/[accountId]/ajuste` · Formulario con cuenta, moneda, monto y motivo · Tip: desde detalle de cuenta con CTA visible en la captura previa del detalle.
+<!-- capture:16 ajuste-manual-de-cuenta -->
+![Bloqer — Ajuste manual de cuenta](./guides/assets/screenshots/16-ajuste-manual-de-cuenta.png)
 
-> **📷 Captura sugerida — Detalle de cuenta con CTA Ajuste manual**  
-> Ruta: `/tesoreria/cuentas/[accountId]` · Mostrar botón **Ajuste manual** · Tip: cuenta ACTIVE.
+*Ajuste manual de cuenta.*
+
+<!-- capture:17 detalle-de-cuenta-con-cta-ajuste-manual -->
+![Bloqer — Detalle de cuenta con CTA Ajuste manual](./guides/assets/screenshots/17-detalle-de-cuenta-con-cta-ajuste-manual.png)
+
+*Detalle de cuenta con CTA Ajuste manual.*
 
 ---
 
@@ -430,8 +450,10 @@ Para diferencias de caja/banco que no vienen de un cobro/pago (cargos bancarios,
 | Completar | `COMPLETED` |
 | Cancelar | `CANCELLED` (no destructiva: conserva datos) |
 
-> **📷 Captura sugerida — Alta de proyecto**  
-> Ruta: `/proyectos/nuevo` · Campos Código, Nombre, Cliente, Tipo Privado/Público · Tip: no enviar sin cliente.
+<!-- capture:18 alta-de-proyecto -->
+![Bloqer — Alta de proyecto](./guides/assets/screenshots/18-alta-de-proyecto.png)
+
+*Alta de proyecto.*
 
 ### 5.2 Menú del proyecto (rutas reales)
 
@@ -449,8 +471,10 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
 > En UI, **EDT** = Estructura de Desglose de Trabajo (WBS técnico = `WbsNode`).  
 > **Recepciones** viven bajo **Compras**, no bajo Operación. **Consumos** viven bajo **Operación**.
 
-> **📷 Captura sugerida — Menú del proyecto (Compras + Operación)**  
-> Ruta: cualquier `/proyectos/[id]/…` · Expandir Compras y Operación · Tip: Recepciones ≠ Consumos.
+<!-- capture:19 menu-del-proyecto-compras-operacion -->
+![Bloqer — Menú del proyecto (Compras + Operación)](./guides/assets/screenshots/19-menu-del-proyecto-compras-operacion.png)
+
+*Menú del proyecto (Compras + Operación).*
 
 ---
 
@@ -516,8 +540,10 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
   - Toggle **Incidencia** `%` (peso de la fila sobre TOTAL GENERAL)
 - **Exports** CSV/XLSX/PDF: solo filas EDT (sin filas APU); respetan el modo activo.
 
-> **📷 Captura sugerida — EDT con insumos expandibles**  
-> Ruta: `/proyectos/[id]/presupuestos/[budgetId]` · Partida expandida con APU·MAT + toolbar Costo/Venta · Tip: chevron APU ≠ hijos EDT.
+<!-- capture:20 edt-con-insumos-expandibles -->
+![Bloqer — EDT con insumos expandibles](./guides/assets/screenshots/20-edt-con-insumos-expandibles.png)
+
+*EDT con insumos expandibles.*
 
 ### 6.2 Procedimiento — Aprobar el presupuesto
 
@@ -549,8 +575,10 @@ stateDiagram-v2
 > **Hito:** con `APPROVED` o `CLOSED` se habilitan certificaciones al cliente, tablero Materiales (líneas MAT) y baseline de control de costos.  
 > **Solo un** presupuesto `APPROVED` por proyecto a la vez.
 
-> **📷 Captura sugerida — Presupuesto aprobado / EDT**  
-> Ruta: `/proyectos/[id]/presupuestos/[budgetId]` · Estado Aprobado + partida hoja · Tip: sin copy de “versión” formal.
+<!-- capture:21 presupuesto-aprobado-edt -->
+![Bloqer — Presupuesto aprobado / EDT](./guides/assets/screenshots/21-presupuesto-aprobado-edt.png)
+
+*Presupuesto aprobado / EDT.*
 
 ### 6.3 Adendas — limitación actual
 
@@ -582,8 +610,10 @@ stateDiagram-v2
 
 **Montos** en sidebar/tabla/detalle (comprometido, presupuesto, certificado): moneda del presupuesto base del cronograma.
 
-> **📷 Captura sugerida — Cronograma Gantt**  
-> Ruta: `/proyectos/[id]/cronograma` (default Gantt) o `?view=gantt` · Tareas + hitos · Tip: 5–8 ítems alcanzan.
+<!-- capture:22 cronograma-gantt -->
+![Bloqer — Cronograma Gantt](./guides/assets/screenshots/22-cronograma-gantt.png)
+
+*Cronograma Gantt.*
 
 ### 7.1 Cuatro dimensiones de avance (no confundir)
 
@@ -636,11 +666,15 @@ flowchart LR
 3. **Registrar consumo**.
 4. Atajos: desde Inventario del proyecto o desde Materiales → enlace **Consumos**.
 
-> **📷 Captura sugerida — Parte de obra (detalle)**  
-> Ruta: `/proyectos/[id]/libro-obra/[logId]` · Avance por partida EDT + adjuntos · Tip: SUBMITTED o APPROVED.
+<!-- capture:23 parte-de-obra-detalle -->
+![Bloqer — Parte de obra (detalle)](./guides/assets/screenshots/23-parte-de-obra-detalle.png)
 
-> **📷 Captura sugerida — Listado de consumos**  
-> Ruta: `/proyectos/[id]/consumos` · Empty state con **Registrar consumo** o filas · Tip: no confundir con Inventario corporativo.
+*Parte de obra (detalle).*
+
+<!-- capture:24 listado-de-consumos -->
+![Bloqer — Listado de consumos](./guides/assets/screenshots/24-listado-de-consumos.png)
+
+*Listado de consumos.*
 
 ---
 
@@ -663,8 +697,10 @@ flowchart LR
 5. Vista **Varianza ($)** (`?tab=varianza`): desvío monetario (export CSV/PDF).
 6. Atajos en pantalla: **EDT y costos** · Tablero de compras · Solicitudes · Consumos.
 
-> **📷 Captura sugerida — Materiales Operativo + Pedir**  
-> Ruta: `/proyectos/[id]/materiales` · Fila con faltante + CTA Pedir · Tip: ventana “Próximos 14 días”.
+<!-- capture:25 materiales-operativo-pedir -->
+![Bloqer — Materiales Operativo + Pedir](./guides/assets/screenshots/25-materiales-operativo-pedir.png)
+
+*Materiales Operativo + Pedir.*
 
 ```mermaid
 flowchart LR
@@ -713,8 +749,10 @@ flowchart LR
 | Recepción | Stock + cantidades recibidas (**no** crea CxP sola) |
 | Factura proveedor **emitida** | **Devengado** + CxP (+ auto-DRAFT contable) |
 
-> **📷 Captura sugerida — OC confirmada con links**  
-> Ruta: `/proyectos/[id]/ordenes-compra/[poId]` · Estado Confirmada + recepción/factura · Tip: botones Enviar/Aprobar/Devolver según estado.
+<!-- capture:26 oc-confirmada-con-links -->
+![Bloqer — OC confirmada con links](./guides/assets/screenshots/26-oc-confirmada-con-links.png)
+
+*OC confirmada con links.*
 
 ### 9.3 Procedimiento — Recepciones
 
@@ -722,8 +760,10 @@ flowchart LR
 2. Indicar cantidades recibidas por línea; confirmar.
 3. Si hay producto/depósito → **entrada de stock** (el movimiento IN puede copiar `wbsNodeId`).
 
-> **📷 Captura sugerida — Listado Recepciones**  
-> Ruta: `/proyectos/[id]/recepciones` · Bajo menú Compras · Tip: no confundir con Consumos.
+<!-- capture:27 listado-recepciones -->
+![Bloqer — Listado Recepciones](./guides/assets/screenshots/27-listado-recepciones.png)
+
+*Listado Recepciones.*
 
 ---
 
@@ -739,8 +779,10 @@ flowchart LR
 4. Al **aprobar**, el sistema genera / ofrece CTA hacia una **factura de proveedor en borrador**; hay que **emitirla** para crear la CxP y poder pagar.
 5. En el detalle: badge de estado de factura + **Revisar y emitir** o **Ver factura**.
 
-> **📷 Captura sugerida — Cert. subcontrato con factura**  
-> Ruta: `/proyectos/[id]/subcontratos/[subId]/certificaciones/[certId]` · Badge factura + CTA · Tip: estado intermedio = ISSUED, no SUBMITTED.
+<!-- capture:28 cert-subcontrato-con-factura -->
+![Bloqer — Cert. subcontrato con factura](./guides/assets/screenshots/28-cert-subcontrato-con-factura.png)
+
+*Cert. subcontrato con factura.*
 
 > **Limitación:** retenciones y anticipos de subcontrato **no** están modelados como entidad separada.
 
@@ -785,8 +827,10 @@ stateDiagram-v2
 - **Emitir factura** abre la **cuenta por cobrar**; la **cobranza** elige la cuenta de tesorería y genera el ingreso (`INFLOW`).
 - Al emitir factura de obra con saldo pendiente, `OWNER`/`ADMIN`/`FINANCE`/`TREASURER` reciben aviso **Listo para cobrar**; un PM con permiso de cobro puede registrar la cobranza igual.
 
-> **📷 Captura sugerida — Certificación cliente APPROVED**  
-> Ruta: `/proyectos/[id]/certificaciones/[certId]` · CTA Emitir factura o factura vinculada · Tip: Lote 3 B-02.
+<!-- capture:29 certificacion-cliente-approved -->
+![Bloqer — Certificación cliente APPROVED](./guides/assets/screenshots/29-certificacion-cliente-approved.png)
+
+*Certificación cliente APPROVED.*
 
 ---
 
@@ -818,11 +862,15 @@ Casos como capacitaciones, venta de materiales o servicios de estructura **sin p
 3. Si solo necesitás mover caja **sin** CxC (aportes, préstamos, reintegros): modo **Solo caja** (`TREASURY_INFLOW`).
 4. Gestionar saldos en **Cuentas por cobrar** (`/finanzas/cuentas-por-cobrar` → **Cobrar**). Filas sin obra se etiquetan **Empresa**.
 
-> **📷 Captura sugerida — Factura emitida → CxC / cobranza**  
-> Ruta: `/proyectos/[id]/facturas/[invoiceId]` · Mostrar panel CxC + CTA Registrar cobranza + adjuntos · Tip: Lote 3 D-03 / D-052.
+<!-- capture:31 factura-emitida-cxc-cobranza -->
+![Bloqer — Factura emitida → CxC / cobranza](./guides/assets/screenshots/31-factura-emitida-cxc-cobranza.png)
 
-> **📷 Captura sugerida — Ingreso corporativo con CxC**  
-> Ruta: `/finanzas/transacciones` · Registrar transacción → Ingreso / cobro → Factura / cuenta por cobrar · Tip: D-051.
+*Factura emitida → CxC / cobranza.*
+
+<!-- capture:32 ingreso-corporativo-con-cxc -->
+![Bloqer — Ingreso corporativo con CxC](./guides/assets/screenshots/32-ingreso-corporativo-con-cxc.png)
+
+*Ingreso corporativo con CxC.*
 
 ### 12.2 Facturas de proveedor y pagos (AP) — D-052
 
@@ -868,14 +916,20 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 > - Export **CSV/PDF** desde CxP y Facturas y gastos corporativos.
 > - Desde OC confirmada: **Registrar factura desde OC** cuando hay cantidades recibidas.
 
-> **📷 Captura sugerida — Emitir y pagar ahora (obra)**  
-> Ruta: `/proyectos/[id]/facturas-proveedor/nueva` · Checkbox Emitir y pagar ahora + cuenta + fecha · Tip: D-052; usuario con EDIT tesorería.
+<!-- capture:33 emitir-y-pagar-ahora-obra -->
+![Bloqer — Emitir y pagar ahora (obra)](./guides/assets/screenshots/33-emitir-y-pagar-ahora-obra.png)
 
-> **📷 Captura sugerida — CxP corporativo con export**  
-> Ruta: `/finanzas/cuentas-por-pagar` · Listado + Exportar · Tip: Lote 5.
+*Emitir y pagar ahora (obra).*
 
-> **📷 Captura sugerida — Transacciones / pagos proveedor**  
-> Ruta: `/finanzas/transacciones?sourceType=PAYMENT&type=OUTFLOW` · Filtros y movimientos de pago.
+<!-- capture:34 cxp-corporativo-con-export -->
+![Bloqer — CxP corporativo con export](./guides/assets/screenshots/34-cxp-corporativo-con-export.png)
+
+*CxP corporativo con export.*
+
+<!-- capture:35 transacciones-pagos-proveedor -->
+![Bloqer — Transacciones / pagos proveedor](./guides/assets/screenshots/35-transacciones-pagos-proveedor.png)
+
+*Transacciones / pagos proveedor.*
 
 ---
 
@@ -901,8 +955,10 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 4. Registrar **pago** de la CxP.
 5. Volver al drill-down de la partida: deben aparecer links a OC, factura y pago; la exposición = devengado + comprometido abierto.
 
-> **📷 Captura sugerida — EDT y costos**  
-> Ruta: `/proyectos/[id]/control-costos` · Mostrar título EDT + columnas comprometido/devengado/pagado/exposición · Tip: primera columna sticky si aplica. Hover en encabezados muestra definición de cada capa.
+<!-- capture:36 edt-y-costos -->
+![Bloqer — EDT y costos](./guides/assets/screenshots/36-edt-y-costos.png)
+
+*EDT y costos.*
 
 ### 13.2 Rentabilidad y reportes
 
@@ -920,8 +976,10 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 - **Gastos generales / overhead** (`/finanzas/gastos-generales`): se **imputan a las obras** de forma **manual** o por **prorrateo automático** según el peso del costo directo, con **cierre de período**. *(Es un módulo complejo; conviene validar los cálculos en producción.)*
 - **Inventario corporativo** (`/inventario`): productos (`/inventario/productos`), depósitos (`/inventario/depositos`), movimientos (`/inventario/movimientos`, ledger append‑only; el saldo se calcula sumando movimientos) y transferencias (`/inventario/transferencias`).
 
-> **📷 Captura sugerida — Inventario con subnav**  
-> Ruta: `/inventario` · Mostrar ModuleSubnav Productos / Depósitos / Movimientos / Transferencias · Tip: Lote 4 D-05.
+<!-- capture:37 inventario-con-subnav -->
+![Bloqer — Inventario con subnav](./guides/assets/screenshots/37-inventario-con-subnav.png)
+
+*Inventario con subnav.*
 
 > **Limitación:** no hay **valuación de inventario FIFO/promedio** configurable; el costo se toma de la compra.
 
@@ -992,11 +1050,15 @@ flowchart LR
 
 > **Limitaciones:** sin cierre de **ejercicio** GL ni numeración correlativa de asientos; sí hay **cierre mensual operativo** (§15.3). Reportes gerenciales on-the-fly ≠ AFIP; multi-moneda por bloques sin consolidación FX; IVA/retenciones solo si hay cuentas en el plan.
 
-> **📷 Captura sugerida — Contabilidad hub + plantilla**  
-> Ruta: `/contabilidad` · Subnav (incluir pestaña **Cierres**) + Borradores pendientes · Tip: D-061/D-062.
+<!-- capture:38 contabilidad-hub-plantilla -->
+![Bloqer — Contabilidad hub + plantilla](./guides/assets/screenshots/38-contabilidad-hub-plantilla.png)
 
-> **📷 Captura sugerida — Aplicar plantilla AR**  
-> Ruta: `/contabilidad/cuentas` · CTA Aplicar plantilla AR · Tip: empresa nueva.
+*Contabilidad hub + plantilla.*
+
+<!-- capture:39 aplicar-plantilla-ar -->
+![Bloqer — Aplicar plantilla AR](./guides/assets/screenshots/39-aplicar-plantilla-ar.png)
+
+*Aplicar plantilla AR.*
 
 ### 15.3 Procedimiento — Cierre de períodos (bloqueo mensual) — [D-014] · [D-078]
 
@@ -1024,14 +1086,20 @@ Congela **movimientos de tesorería** y **asientos contables** cuya fecha cae en
 > - **Cierre de período** (`/contabilidad/cierres`) = bloquea caja + GL del mes.
 > - **Cierre de GG / overhead** (`/finanzas/gastos-generales`) = congela el prorrateo automático de gastos generales; **no** bloquea tesorería ni asientos.
 
-> **📷 Captura sugerida — Cierres de período (listado)**  
-> Ruta: `/contabilidad/cierres` · Tabla Períodos mensuales con columnas Período / Desde / Hasta / Estado / Acciones · Tip: mezclar un mes Abierto y uno Cerrado.
+<!-- capture:40 cierres-de-periodo-listado -->
+![Bloqer — Cierres de período (listado)](./guides/assets/screenshots/40-cierres-de-periodo-listado.png)
 
-> **📷 Captura sugerida — Diálogo Cerrar período**  
-> Ruta: `/contabilidad/cierres` · Modal de confirmación **Cerrar período** · Tip: texto del diálogo legible.
+*Cierres de período (listado).*
 
-> **📷 Captura sugerida — Diálogo Reabrir con motivo**  
-> Ruta: `/contabilidad/cierres` · Modal **Reabrir** con campo de motivo · Tip: no enviar el formulario en la captura; solo mostrar el UI.
+<!-- capture:41 dialogo-cerrar-periodo -->
+![Bloqer — Diálogo Cerrar período](./guides/assets/screenshots/41-dialogo-cerrar-periodo.png)
+
+*Diálogo Cerrar período.*
+
+<!-- capture:42 dialogo-reabrir-con-motivo -->
+![Bloqer — Diálogo Reabrir con motivo](./guides/assets/screenshots/42-dialogo-reabrir-con-motivo.png)
+
+*Diálogo Reabrir con motivo.*
 
 ---
 
@@ -1115,11 +1183,15 @@ flowchart LR
 - [ ] Cierre de mes: cobros/pagos OK → borradores contabilizados → conciliaciones cerradas → **Cerrar período** (`/contabilidad/cierres`)
 - [ ] Si hay que corregir un mes cerrado: **Reabrir** con motivo auditado
 
-> **📷 Captura sugerida — Alertas · Última actividad**  
-> Ruta: `/notificaciones/alertas` · Mostrar card Última actividad · Tip: Lote 5 G-03; solo OWNER/ADMIN.
+<!-- capture:43 alertas-ultima-actividad -->
+![Bloqer — Alertas · Última actividad](./guides/assets/screenshots/43-alertas-ultima-actividad.png)
 
-> **📷 Captura sugerida — Reportes programados (Omitido ≠ Fallido)**  
-> Ruta: `/configuracion/reportes` · Mostrar badge de última corrida con hint visible · Tip: Lote 5 G-02.
+*Alertas · Última actividad.*
+
+<!-- capture:44 reportes-programados-omitido-fallido -->
+![Bloqer — Reportes programados (Omitido ≠ Fallido)](./guides/assets/screenshots/44-reportes-programados-omitido-fallido.png)
+
+*Reportes programados (Omitido ≠ Fallido).*
 
 ### Project Manager / Jefe de obra
 
@@ -1227,8 +1299,8 @@ flowchart LR
 
 ## 21. Mantenimiento de esta guía (obligatorio para el equipo)
 
-1. **Fuente viva (única):** este archivo (`GUIA_OPERATIVA_BLOQER_V2.md`). Se **sobrescribe** en el mismo path ante cada cambio de producto — no crear variantes “_REVISADA”, “_v3”, etc.
-2. **Entregable cliente:** únicamente `docs/bloqer2.0/guides/Guía_Operativa_Bloqer_v2.docx` (no hay variante “PROFESIONAL”).
+1. **Fuente viva (única):** este archivo (`GUIA_OPERATIVA_BLOQER_V2.md`). Se **sobrescribe** en el mismo path ante cada cambio de producto.
+2. **Entregable cliente:** únicamente `docs/bloqer2.0/guides/Guía_Operativa_Bloqer_v2.docx`.
 3. **Cuándo actualizar:** todo PR que cambie rutas, menús, etiquetas, flujos de OC/CxP/CxC/tesorería/conciliación/cierres/contabilidad, presupuesto/EDT, notificaciones, permisos visibles o reglas de montos.
 4. **Cómo regenerar el DOCX:** `cd docs/bloqer2.0/guides && node build_guide.js`.
 5. **Capturas:** los bloques `📷 Captura sugerida` del DOCX aparecen como cajas grises con título y tip; **reemplazalos** con pantallazos reales del producto (no inventar UI). Priorizar las marcadas en §§4.2, 4.3 y 15.3 si el entregable incluye los módulos nuevos.

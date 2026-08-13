@@ -25,6 +25,16 @@ describe("roundToDecimals half-up", () => {
     assert.equal(serializeMoney("100.5"), "100.50");
   });
 
+  it("coerces Decimal-like objects via toString (duplicate decimal.js copies)", () => {
+    const foreign = { toString: () => "100.5" };
+    assert.equal(serializeMoney(foreign as unknown as string), "100.50");
+  });
+
+  it("rejects plain objects and arrays instead of crashing on trim", () => {
+    assert.throws(() => serializeMoney({} as unknown as string), /INVALID_AMOUNT/);
+    assert.throws(() => serializeMoney([1.5] as unknown as string), /INVALID_AMOUNT/);
+  });
+
   it("handles negatives", () => {
     assert.equal(roundMoney("-1.005"), "-1.01");
   });

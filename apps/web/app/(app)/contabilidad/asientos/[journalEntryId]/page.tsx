@@ -17,6 +17,7 @@ import {
   JournalEntryStatusBadge,
 } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
+import { formatMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import {
   getJournalEntryById,
@@ -121,10 +122,10 @@ export default async function AsientoDetallePage({
                     {l.description ?? "—"}
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm">
-                    {l.debit !== "0" ? l.debit : "—"}
+                    {!isZeroMoneyAmount(l.debit) ? formatMoneyAmount(l.debit) : "—"}
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm">
-                    {l.credit !== "0" ? l.credit : "—"}
+                    {!isZeroMoneyAmount(l.credit) ? formatMoneyAmount(l.credit) : "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">{l.currency}</TableCell>
                 </TableRow>

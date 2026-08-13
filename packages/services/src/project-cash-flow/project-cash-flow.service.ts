@@ -6,6 +6,7 @@ import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenan
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 
 import { canViewProjectCashFlowReport } from "../project/project-nav-guards";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export { canViewProjectCashFlowReport };
 
@@ -280,10 +281,10 @@ export async function getProjectCashFlowReport(
         return {
           periodKey:             key,
           periodLabel:           periodLabel(key, period),
-          inflows:               inflows.toString(),
-          outflows:              outflows.toString(),
-          netCashFlow:           net.toString(),
-          cumulativeNetCashFlow: cumulative.toString(),
+          inflows:               serializeMoneyDecimal(inflows),
+          outflows:              serializeMoneyDecimal(outflows),
+          netCashFlow:           serializeMoneyDecimal(net),
+          cumulativeNetCashFlow: serializeMoneyDecimal(cumulative),
         };
       });
 
@@ -292,9 +293,9 @@ export async function getProjectCashFlowReport(
 
     currencyRows.push({
       currency:      cur,
-      totalInflows:  totalInflows.toString(),
-      totalOutflows: totalOutflows.toString(),
-      netCashFlow:   totalInflows.minus(totalOutflows).toString(),
+      totalInflows:  serializeMoneyDecimal(totalInflows),
+      totalOutflows: serializeMoneyDecimal(totalOutflows),
+      netCashFlow:   serializeMoneyDecimal(totalInflows.minus(totalOutflows)),
       periods,
       collections: curCollections.map((c) => ({
         collectionId:  c.id,
@@ -302,7 +303,7 @@ export async function getProjectCashFlowReport(
         clientName:    contactName(c.clientContact),
         invoiceNumber: c.salesInvoice.number,
         receivableId:  c.receivableId,
-        amount:        c.amount.toString(),
+        amount:        serializeMoneyDecimal(c.amount),
         currency:      c.currency,
         accountName:   c.account.name,
         notes:         c.notes,
@@ -313,7 +314,7 @@ export async function getProjectCashFlowReport(
         supplierName:          contactName(p.payable.supplierInvoice.supplierContact),
         supplierInvoiceNumber: p.payable.supplierInvoice.number,
         payableId:             p.payableId,
-        amount:                p.amount.toString(),
+        amount:                serializeMoneyDecimal(p.amount),
         currency:              p.currency,
         accountName:           p.account.name,
         notes:                 p.notes,

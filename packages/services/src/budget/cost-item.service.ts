@@ -8,6 +8,7 @@ import { assertProjectAllowsBudgetPlanning } from "../project/project-operationa
 import { assertBudgetEditable, lockBudgetForEconomicEdit } from "./budget.service";
 import { _recalcCostItemTotals, _recalcBudgetSummary } from "./budget-calc.service";
 import { _recomputePartidaLinesForQuantity } from "./cost-analysis.service";
+import { serializeQtyDecimal } from "../finance/money-decimal";
 
 export async function updateCostItem(
   id: string,
@@ -60,7 +61,7 @@ export async function updateCostItem(
     action: "cost_item.updated",
     entityType: "CostItem",
     entityId: id,
-    before: { unit: costItem.unit, quantity: costItem.quantity.toString() },
+    before: { unit: costItem.unit, quantity: serializeQtyDecimal(costItem.quantity) },
     after: input,
     ipAddress: ctx.ipAddress,
   });

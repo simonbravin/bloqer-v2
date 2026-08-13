@@ -9,6 +9,7 @@ import {
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { ServiceContext } from "../types";
+import { serializeMoneyDecimal } from "./money-decimal";
 
 export type CompanyOpenPayableBalanceRow = {
   currency: string;
@@ -117,7 +118,7 @@ export async function getCompanyFinanceOperationsSummary(
     const recentCorporatePayments: CompanyRecentPaymentRow[] = recentPayRows.map((r) => ({
       id: r.id,
       paymentDate: r.paymentDate.toISOString().slice(0, 10),
-      amount: r.amount.toString(),
+      amount: serializeMoneyDecimal(r.amount),
       currency: r.currency,
       supplierLabel: supplierLabel(r.supplierContact.legalName, r.supplierContact.fantasyName),
     }));

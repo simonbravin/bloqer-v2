@@ -1,4 +1,5 @@
 import { Prisma, type AccountType } from "@bloqer/database";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 /** Debit-normal accounts: ASSET, EXPENSE. Credit-normal: LIABILITY, EQUITY, INCOME. [D-062] */
 export function isDebitNormalAccountType(type: AccountType | string): boolean {
@@ -18,7 +19,7 @@ export function naturalBalanceSignedString(
   debit: Prisma.Decimal,
   credit: Prisma.Decimal,
 ): string {
-  return naturalBalance(type, debit, credit).toString();
+  return serializeMoneyDecimal(naturalBalance(type, debit, credit));
 }
 
 /** Running balance step: apply line to prior natural balance. */

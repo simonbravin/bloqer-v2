@@ -1,4 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+import { hash } from "bcryptjs";
+import { seedDocsGuideDataset } from "./seed-docs-guide";
 
 /**
  * Demo seed: one user + tenant + company + membership.
@@ -55,7 +57,26 @@ async function main() {
     },
   });
 
+  const seedPassword = process.env["SEED_USER_PASSWORD"]?.trim();
+  if (seedPassword) {
+    const passwordHash = await hash(seedPassword, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordUpdatedAt: new Date(),
+        emailVerified: new Date(),
+        status: "ACTIVE",
+      },
+    });
+    console.log("Seeded credentials password for seed user (from SEED_USER_PASSWORD)");
+  }
+
   console.log(`Seeded: user=${email}, tenant=demo, membership=OWNER`);
+
+  if (process.env["DOCS_DEMO_SEED"] === "1") {
+    await seedDocsGuideDataset(prisma);
+  }
 }
 
 main()

@@ -1,4 +1,5 @@
 import { formatDate } from "@/lib/format";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import Link from "next/link";
@@ -201,7 +202,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                       ) : null}
                     </TableCell>
                   )}
-                  <TableCell className="text-right tabular-nums">{line.lineTotal}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatMoneyAmount(line.lineTotal)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -211,16 +212,16 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
         <div className="flex justify-end gap-8 text-sm">
           <div className="text-right">
             <p className="text-muted-foreground">Subtotal</p>
-            <p className="tabular-nums">{order.subtotal}</p>
+            <p className="tabular-nums">{formatMoneyAmount(order.subtotal)}</p>
           </div>
           <div className="text-right">
             <p className="text-muted-foreground">IVA</p>
-            <p className="tabular-nums">{order.taxAmount}</p>
+            <p className="tabular-nums">{formatMoneyAmount(order.taxAmount)}</p>
           </div>
           <div className="text-right">
             <p className="font-semibold">Total</p>
             <p className="font-semibold tabular-nums">
-              {order.totalAmount} {order.currency}
+              {formatMoneyAmount(order.totalAmount, order.currency)}
             </p>
           </div>
         </div>

@@ -10,6 +10,7 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
+import { formatMoneyAmount } from "@/lib/format-money";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -91,7 +92,7 @@ export default async function NuevaCobranzaPage({ params, searchParams }: PagePr
                     asChild
                   >
                     <Link href={`/proyectos/${id}/cobranzas/nueva?receivableId=${r.id}`}>
-                      {r.currency} {r.balanceDue} — {r.clientName}
+                      {formatMoneyAmount(r.balanceDue, r.currency)} — {r.clientName}
                     </Link>
                   </Button>
                 ))}

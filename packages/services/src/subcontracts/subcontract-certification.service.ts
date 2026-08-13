@@ -8,6 +8,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { assertSubcontractCertSuccessionAllowed } from "./subcontract-cert-succession";
 import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ function serializeCert(c: CertWithRelations): SubcontractCertificationView {
     code:              `CERT-SC-${String(c.number).padStart(3, "0")}`,
     subcontractCode:   `SC-${String(c.subcontract.number).padStart(3, "0")}`,
     subcontractorName: c.subcontractorContact.fantasyName ?? c.subcontractorContact.legalName,
-    totalAmount:       totalAmount.toString(),
+    totalAmount:       serializeMoneyDecimal(totalAmount),
     supplierInvoiceId: c.supplierInvoice?.id ?? null,
     supplierInvoiceCode: c.supplierInvoice ? `FP-${String(c.supplierInvoice.number).padStart(5, "0")}` : null,
     supplierInvoiceStatus: c.supplierInvoice?.status ?? null,
@@ -68,18 +69,18 @@ function serializeCert(c: CertWithRelations): SubcontractCertificationView {
       id:                         l.id,
       subcontractCertificationId: l.subcontractCertificationId,
       subcontractLineId:          l.subcontractLineId,
-      previousQty:                l.previousQty.toString(),
-      currentQty:                 l.currentQty.toString(),
-      cumulativeQty:              l.cumulativeQty.toString(),
-      remainingQty:               l.remainingQty.toString(),
-      unitPriceSnapshot:          l.unitPriceSnapshot.toString(),
-      lineTotal:                  l.lineTotal.toString(),
+      previousQty:                serializeQtyDecimal(l.previousQty),
+      currentQty:                 serializeQtyDecimal(l.currentQty),
+      cumulativeQty:              serializeQtyDecimal(l.cumulativeQty),
+      remainingQty:               serializeQtyDecimal(l.remainingQty),
+      unitPriceSnapshot:          serializeUnitPriceDecimal(l.unitPriceSnapshot),
+      lineTotal:                  serializeMoneyDecimal(l.lineTotal),
       notes:                      l.notes,
       sortOrder:                  l.sortOrder,
       subcontractLine: {
         description: l.subcontractLine.description,
         unit:        l.subcontractLine.unit,
-        quantity:    l.subcontractLine.quantity.toString(),
+        quantity:    serializeQtyDecimal(l.subcontractLine.quantity),
       },
     })),
   };

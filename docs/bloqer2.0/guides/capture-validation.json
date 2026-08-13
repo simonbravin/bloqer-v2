@@ -1,0 +1,447 @@
+{
+  "generatedAt": "2026-08-12T23:29:28.586Z",
+  "pilotOnly": false,
+  "okCaptureIds": [
+    "01",
+    "01",
+    "02",
+    "04",
+    "05",
+    "06",
+    "07",
+    "08",
+    "09",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44"
+  ],
+  "rows": [
+    {
+      "id": "01",
+      "title": "Login (email + Google)",
+      "route": "/login",
+      "status": "OK",
+      "result": "OK",
+      "file": "01-login-email-google.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "01",
+      "title": "Dashboard / menú empresa",
+      "route": "/dashboard",
+      "status": "OK",
+      "result": "OK",
+      "file": "01-dashboard-menu-empresa.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "02",
+      "title": "Configuración + zona horaria",
+      "route": "/configuracion",
+      "status": "OK",
+      "result": "OK",
+      "file": "02-configuracion-zona-horaria.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "03",
+      "title": "Plataforma · módulos del tenant",
+      "route": "/platform/tenants/[id]/modules",
+      "status": "PENDIENTE",
+      "result": "MISSING",
+      "file": "03-plataforma-modulos-del-tenant.png",
+      "notes": "Archivo no generado"
+    },
+    {
+      "id": "04",
+      "title": "Campana abierta",
+      "route": "cualquier pantalla autenticada",
+      "status": "OK",
+      "result": "OK",
+      "file": "04-campana-abierta.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "05",
+      "title": "Invitar usuario",
+      "route": "/configuracion/equipo/invitar",
+      "status": "OK",
+      "result": "OK",
+      "file": "05-invitar-usuario.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "06",
+      "title": "Aceptar invitación",
+      "route": "/invitaciones/aceptar",
+      "status": "OK",
+      "result": "OK",
+      "file": "06-aceptar-invitacion.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "07",
+      "title": "Matriz de permisos (solo lectura)",
+      "route": "/configuracion/permisos",
+      "status": "OK",
+      "result": "OK",
+      "file": "07-matriz-de-permisos-solo-lectura.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "08",
+      "title": "Directorio / contacto con roles",
+      "route": "/directorio`",
+      "status": "OK",
+      "result": "OK",
+      "file": "08-directorio-contacto-con-roles.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "09",
+      "title": "Tesorería con subnav (incl. Conciliación)",
+      "route": "/tesoreria",
+      "status": "OK",
+      "result": "OK",
+      "file": "09-tesoreria-con-subnav-incl-conciliacion.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "10",
+      "title": "Ledger de movimientos con Estado",
+      "route": "/tesoreria/movimientos",
+      "status": "OK",
+      "result": "OK",
+      "file": "10-ledger-de-movimientos-con-estado.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "11",
+      "title": "Listado de conciliaciones",
+      "route": "/tesoreria/conciliacion",
+      "status": "OK",
+      "result": "OK",
+      "file": "11-listado-de-conciliaciones.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "12",
+      "title": "Nueva conciliación (alta)",
+      "route": "/tesoreria/conciliacion/nueva",
+      "status": "OK",
+      "result": "OK",
+      "file": "12-nueva-conciliacion-alta.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "13",
+      "title": "Workspace de empareje (dos columnas)",
+      "route": "/tesoreria/conciliacion/[id]",
+      "status": "OK",
+      "result": "OK",
+      "file": "13-workspace-de-empareje-dos-columnas.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "14",
+      "title": "Importar CSV / OFX",
+      "route": "detalle de sesión",
+      "status": "OK",
+      "result": "OK",
+      "file": "14-importar-csv-ofx.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "15",
+      "title": "Cerrar conciliación",
+      "route": "detalle",
+      "status": "OK",
+      "result": "OK",
+      "file": "15-cerrar-conciliacion.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "16",
+      "title": "Ajuste manual de cuenta",
+      "route": "/tesoreria/cuentas/[accountId]/ajuste",
+      "status": "OK",
+      "result": "OK",
+      "file": "16-ajuste-manual-de-cuenta.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "17",
+      "title": "Detalle de cuenta con CTA Ajuste manual",
+      "route": "/tesoreria/cuentas/[accountId]",
+      "status": "OK",
+      "result": "OK",
+      "file": "17-detalle-de-cuenta-con-cta-ajuste-manual.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "18",
+      "title": "Alta de proyecto",
+      "route": "/proyectos/nuevo",
+      "status": "OK",
+      "result": "OK",
+      "file": "18-alta-de-proyecto.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "19",
+      "title": "Menú del proyecto (Compras + Operación)",
+      "route": "cualquier `/proyectos/[id]/…",
+      "status": "OK",
+      "result": "OK",
+      "file": "19-menu-del-proyecto-compras-operacion.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "20",
+      "title": "EDT con insumos expandibles",
+      "route": "/proyectos/[id]/presupuestos/[budgetId]",
+      "status": "OK",
+      "result": "OK",
+      "file": "20-edt-con-insumos-expandibles.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "21",
+      "title": "Presupuesto aprobado / EDT",
+      "route": "/proyectos/[id]/presupuestos/[budgetId]",
+      "status": "OK",
+      "result": "OK",
+      "file": "21-presupuesto-aprobado-edt.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "22",
+      "title": "Cronograma Gantt",
+      "route": "/proyectos/[id]/cronograma` (default Gantt)",
+      "status": "OK",
+      "result": "OK",
+      "file": "22-cronograma-gantt.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "23",
+      "title": "Parte de obra (detalle)",
+      "route": "/proyectos/[id]/libro-obra/[logId]",
+      "status": "OK",
+      "result": "OK",
+      "file": "23-parte-de-obra-detalle.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "24",
+      "title": "Listado de consumos",
+      "route": "/proyectos/[id]/consumos",
+      "status": "OK",
+      "result": "OK",
+      "file": "24-listado-de-consumos.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "25",
+      "title": "Materiales Operativo + Pedir",
+      "route": "/proyectos/[id]/materiales",
+      "status": "OK",
+      "result": "OK",
+      "file": "25-materiales-operativo-pedir.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "26",
+      "title": "OC confirmada con links",
+      "route": "/proyectos/[id]/ordenes-compra/[poId]",
+      "status": "OK",
+      "result": "OK",
+      "file": "26-oc-confirmada-con-links.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "27",
+      "title": "Listado Recepciones",
+      "route": "/proyectos/[id]/recepciones",
+      "status": "OK",
+      "result": "OK",
+      "file": "27-listado-recepciones.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "28",
+      "title": "Cert. subcontrato con factura",
+      "route": "/proyectos/[id]/subcontratos/[subId]/certificaciones/[certId]",
+      "status": "OK",
+      "result": "OK",
+      "file": "28-cert-subcontrato-con-factura.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "29",
+      "title": "Certificación cliente APPROVED",
+      "route": "/proyectos/[id]/certificaciones/[certId]",
+      "status": "OK",
+      "result": "OK",
+      "file": "29-certificacion-cliente-approved.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "31",
+      "title": "Factura emitida → CxC / cobranza",
+      "route": "/proyectos/[id]/facturas/[invoiceId]",
+      "status": "OK",
+      "result": "OK",
+      "file": "31-factura-emitida-cxc-cobranza.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "32",
+      "title": "Ingreso corporativo con CxC",
+      "route": "/finanzas/transacciones",
+      "status": "OK",
+      "result": "OK",
+      "file": "32-ingreso-corporativo-con-cxc.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "33",
+      "title": "Emitir y pagar ahora (obra)",
+      "route": "/proyectos/[id]/facturas-proveedor/nueva",
+      "status": "OK",
+      "result": "OK",
+      "file": "33-emitir-y-pagar-ahora-obra.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "34",
+      "title": "CxP corporativo con export",
+      "route": "/finanzas/cuentas-por-pagar",
+      "status": "OK",
+      "result": "OK",
+      "file": "34-cxp-corporativo-con-export.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "35",
+      "title": "Transacciones / pagos proveedor",
+      "route": "/finanzas/transacciones?sourceType=PAYMENT&type=OUTFLOW",
+      "status": "OK",
+      "result": "OK",
+      "file": "35-transacciones-pagos-proveedor.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "36",
+      "title": "EDT y costos",
+      "route": "/proyectos/[id]/control-costos",
+      "status": "OK",
+      "result": "OK",
+      "file": "36-edt-y-costos.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "37",
+      "title": "Inventario con subnav",
+      "route": "/inventario",
+      "status": "OK",
+      "result": "OK",
+      "file": "37-inventario-con-subnav.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "38",
+      "title": "Contabilidad hub + plantilla",
+      "route": "/contabilidad",
+      "status": "OK",
+      "result": "OK",
+      "file": "38-contabilidad-hub-plantilla.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "39",
+      "title": "Aplicar plantilla AR",
+      "route": "/contabilidad/cuentas",
+      "status": "OK",
+      "result": "OK",
+      "file": "39-aplicar-plantilla-ar.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "40",
+      "title": "Cierres de período (listado)",
+      "route": "/contabilidad/cierres",
+      "status": "OK",
+      "result": "OK",
+      "file": "40-cierres-de-periodo-listado.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "41",
+      "title": "Diálogo Cerrar período",
+      "route": "/contabilidad/cierres",
+      "status": "OK",
+      "result": "OK",
+      "file": "41-dialogo-cerrar-periodo.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "42",
+      "title": "Diálogo Reabrir con motivo",
+      "route": "/contabilidad/cierres",
+      "status": "OK",
+      "result": "OK",
+      "file": "42-dialogo-reabrir-con-motivo.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "43",
+      "title": "Alertas · Última actividad",
+      "route": "/notificaciones/alertas",
+      "status": "OK",
+      "result": "OK",
+      "file": "43-alertas-ultima-actividad.png",
+      "notes": "1440×1000px"
+    },
+    {
+      "id": "44",
+      "title": "Reportes programados (Omitido ≠ Fallido)",
+      "route": "/configuracion/reportes",
+      "status": "OK",
+      "result": "OK",
+      "file": "44-reportes-programados-omitido-fallido.png",
+      "notes": "1440×1000px"
+    }
+  ]
+}

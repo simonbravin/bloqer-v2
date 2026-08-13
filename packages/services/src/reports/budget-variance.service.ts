@@ -10,6 +10,7 @@ import {
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { ServiceContext, ServiceError } from "../types";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 
 /** Capa de costo para comparar contra presupuesto ([D-021]). */
 export type CostVarianceLayer = "exposure" | "committed" | "accrued" | "paid";
@@ -340,9 +341,9 @@ export async function getWbsSubcontractBudgetHints(
       code: node.code,
       name: node.name,
       unit: ci.unit,
-      quantity: qty.toString(),
-      budgetSubcontractTotal: total.toFixed(2),
-      unitSubcontractCost: unitSub.toFixed(2),
+      quantity: serializeQtyDecimal(qty),
+      budgetSubcontractTotal: serializeMoneyDecimal(total),
+      unitSubcontractCost: serializeUnitPriceDecimal(unitSub),
     });
   }
 

@@ -4,6 +4,7 @@ import { canViewArProjectArea, canViewCompanyAr } from "../ar/ar-access";
 import { assertApTenantModule, assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { deriveObligationDisplayStatus, hasOpenObligationBalance, obligationDaysOverdue, parseObligationAsOfDate, startOfDayUtc } from "../finance/obligation-date";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -103,18 +104,18 @@ function serializeAcc(acc: BucketAcc): AgingTotals {
   const totalOverdue = acc.b1_30.add(acc.b31_60).add(acc.b61_90).add(acc.b90Plus);
   const totalBalance = acc.current.add(totalOverdue);
   return {
-    current:     acc.current.toString(),
-    bucket1_30:  acc.b1_30.toString(),
-    bucket31_60: acc.b31_60.toString(),
-    bucket61_90: acc.b61_90.toString(),
-    bucket90Plus: acc.b90Plus.toString(),
-    totalOverdue: totalOverdue.toString(),
-    totalBalance: totalBalance.toString(),
+    current:     serializeMoneyDecimal(acc.current),
+    bucket1_30:  serializeMoneyDecimal(acc.b1_30),
+    bucket31_60: serializeMoneyDecimal(acc.b31_60),
+    bucket61_90: serializeMoneyDecimal(acc.b61_90),
+    bucket90Plus: serializeMoneyDecimal(acc.b90Plus),
+    totalOverdue: serializeMoneyDecimal(totalOverdue),
+    totalBalance: serializeMoneyDecimal(totalBalance),
   };
 }
 
 function rowBalance(acc: BucketAcc): string {
-  return acc.current.add(acc.b1_30).add(acc.b31_60).add(acc.b61_90).add(acc.b90Plus).toString();
+  return serializeMoneyDecimal(acc.current.add(acc.b1_30).add(acc.b31_60).add(acc.b61_90).add(acc.b90Plus));
 }
 
 function getBucket(daysOverdue: number): AgingBucket {
@@ -208,9 +209,9 @@ export async function getReceivableAgingReport(
       issueDate:      toDateStr(new Date(r.salesInvoice.issueDate)),
       dueDate:        toDateStr(dueDate),
       daysOverdue,
-      originalAmount: r.originalAmount.toString(),
-      paidAmount:     r.paidAmount.toString(),
-      balanceDue:     balanceDue.toString(),
+      originalAmount: serializeMoneyDecimal(r.originalAmount),
+      paidAmount:     serializeMoneyDecimal(r.paidAmount),
+      balanceDue:     serializeMoneyDecimal(balanceDue),
       status,
       bucket,
       currency:       r.currency,
@@ -306,9 +307,9 @@ export async function getPayableAgingReport(
       issueDate:      toDateStr(new Date(p.supplierInvoice.issueDate)),
       dueDate:        toDateStr(dueDate),
       daysOverdue,
-      originalAmount: p.originalAmount.toString(),
-      paidAmount:     p.paidAmount.toString(),
-      balanceDue:     balanceDue.toString(),
+      originalAmount: serializeMoneyDecimal(p.originalAmount),
+      paidAmount:     serializeMoneyDecimal(p.paidAmount),
+      balanceDue:     serializeMoneyDecimal(balanceDue),
       status,
       bucket,
       currency:       p.currency,
@@ -347,11 +348,11 @@ function buildReport(
     contactName: g.contactName,
     currency:    g.currency,
     totalBalance: rowBalance(g.acc),
-    current:      g.acc.current.toString(),
-    bucket1_30:   g.acc.b1_30.toString(),
-    bucket31_60:  g.acc.b31_60.toString(),
-    bucket61_90:  g.acc.b61_90.toString(),
-    bucket90Plus: g.acc.b90Plus.toString(),
+    current:      serializeMoneyDecimal(g.acc.current),
+    bucket1_30:   serializeMoneyDecimal(g.acc.b1_30),
+    bucket31_60:  serializeMoneyDecimal(g.acc.b31_60),
+    bucket61_90:  serializeMoneyDecimal(g.acc.b61_90),
+    bucket90Plus: serializeMoneyDecimal(g.acc.b90Plus),
     items:        g.items,
   }));
 

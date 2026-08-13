@@ -1,7 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { JournalEntrySourceType, AccountingMappingEventType } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import { roundMoney } from "@bloqer/utils";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 import type { CreateJournalEntryInput, GenerateJournalSuggestionInput } from "@bloqer/validators";
 import { ServiceContext, ServiceError } from "../types";
 import { isCrossCompany } from "../company-scope";
@@ -68,7 +68,7 @@ function assertCompanyScope(ctx: ServiceContext, entityCompanyId: string) {
 }
 
 function decimalToAmountString(d: Prisma.Decimal): string {
-  return roundMoney(d.toString());
+  return serializeMoneyDecimal(d);
 }
 
 function noRuleError(label: string): ServiceError {

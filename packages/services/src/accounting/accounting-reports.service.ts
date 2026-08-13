@@ -12,6 +12,7 @@ import {
 } from "./accounting-date";
 import { naturalBalance, naturalBalanceSignedString } from "./accounting-natural-balance";
 import { getAccountLedger } from "./journal-entry.service";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export type AccountingReportDateRange = {
   companyId?: string | null;
@@ -183,8 +184,8 @@ export async function getTrialBalanceReport(
       accountName: r.accountName,
       accountType: r.accountType,
       currency: r.currency,
-      debit: r.debit.toString(),
-      credit: r.credit.toString(),
+      debit: serializeMoneyDecimal(r.debit),
+      credit: serializeMoneyDecimal(r.credit),
       balance: naturalBalanceSignedString(r.accountType, r.debit, r.credit),
     })),
   };
@@ -244,8 +245,8 @@ export async function listPostedJournalBook(
         accountCode: l.account.code,
         accountName: l.account.name,
         description: l.description,
-        debit: l.debit.toString(),
-        credit: l.credit.toString(),
+        debit: serializeMoneyDecimal(l.debit),
+        credit: serializeMoneyDecimal(l.credit),
         currency: l.currency,
       })),
     })),
@@ -357,7 +358,7 @@ export async function getStatementOfFinancialPosition(
         accountCode: r.accountCode,
         accountName: r.accountName,
         currency,
-        balance: bal.toString(),
+        balance: serializeMoneyDecimal(bal),
       };
       if (r.accountType === "ASSET") {
         assets.push(row);
@@ -383,7 +384,7 @@ export async function getStatementOfFinancialPosition(
         accountCode: "—",
         accountName: "Resultado del ejercicio (no cerrado)",
         currency,
-        balance: netPl.toString(),
+        balance: serializeMoneyDecimal(netPl),
         synthetic: true,
       });
       totalEquity = totalEquity.plus(netPl);
@@ -394,9 +395,9 @@ export async function getStatementOfFinancialPosition(
       assets,
       liabilities,
       equity,
-      totalAssets: totalAssets.toString(),
-      totalLiabilities: totalLiabilities.toString(),
-      totalEquity: totalEquity.toString(),
+      totalAssets: serializeMoneyDecimal(totalAssets),
+      totalLiabilities: serializeMoneyDecimal(totalLiabilities),
+      totalEquity: serializeMoneyDecimal(totalEquity),
       balanced: totalAssets.equals(rhs),
     };
   }
@@ -441,7 +442,7 @@ export async function getIncomeStatement(
         accountCode: r.accountCode,
         accountName: r.accountName,
         currency,
-        balance: bal.toString(),
+        balance: serializeMoneyDecimal(bal),
       };
       if (r.accountType === "INCOME") {
         income.push(row);
@@ -455,9 +456,9 @@ export async function getIncomeStatement(
     byCurrency[currency] = {
       income,
       expenses,
-      totalIncome: totalIncome.toString(),
-      totalExpenses: totalExpenses.toString(),
-      netResult: totalIncome.minus(totalExpenses).toString(),
+      totalIncome: serializeMoneyDecimal(totalIncome),
+      totalExpenses: serializeMoneyDecimal(totalExpenses),
+      netResult: serializeMoneyDecimal(totalIncome.minus(totalExpenses)),
     };
   }
 

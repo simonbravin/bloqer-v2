@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
+import { serializeQtyDecimal } from "../finance/money-decimal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ export async function getStockBalanceByWarehouse(filters: {
     .filter(([, qty]) => qty.greaterThan(0))
     .map(([key, qty]) => ({
       ...keyMeta.get(key)!,
-      totalQuantity: qty.toString(),
+      totalQuantity: serializeQtyDecimal(qty),
     }));
 }
 
@@ -151,6 +152,6 @@ export async function listNegativeStockBalancesForTenant(params: { tenantId: str
     .filter(([, qty]) => qty.lessThan(0))
     .map(([key, qty]) => ({
       ...keyMeta.get(key)!,
-      totalQuantity: qty.toString(),
+      totalQuantity: serializeQtyDecimal(qty),
     }));
 }

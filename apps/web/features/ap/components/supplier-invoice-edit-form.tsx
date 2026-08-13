@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   defaultTaxRateForInvoiceLetter,
   invoiceLetterHint,
+  isZeroIvaRate,
   requiresArInvoiceLetter,
   suggestInvoiceLetter,
   type InvoiceLetterCode,
@@ -197,7 +198,7 @@ export function SupplierInvoiceEditForm({
                       taxRate:
                         v === "C" || v === "E"
                           ? "0"
-                          : l.taxRate === "0"
+                          : isZeroIvaRate(l.taxRate)
                             ? nextRate
                             : l.taxRate,
                     })),

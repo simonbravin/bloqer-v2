@@ -8,6 +8,7 @@ import {
   canEditPurchaseOrders,
 } from "./procurement-access";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { serializeMoneyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import {
@@ -112,8 +113,8 @@ async function applyVarianceSnapshots(
     const result = evaluateLineVariance(
       {
         unit: line.unit,
-        unitPrice: line.unitPrice.toString(),
-        budgetUnitCost: budgetUnitCost?.toString() ?? null,
+        unitPrice: serializeUnitPriceDecimal(line.unitPrice),
+        budgetUnitCost: budgetUnitCost != null ? serializeUnitPriceDecimal(budgetUnitCost) : null,
         budgetUnit: baseline.unit,
         varianceJustification: line.varianceJustification,
       },
@@ -136,7 +137,7 @@ async function applyVarianceSnapshots(
   for (const [wbsNodeId, pendingTotal] of pendingByWbs) {
     const ref = await getWbsBudgetReference(wbsNodeId, tenantId, {
       excludePurchaseOrderId: purchaseOrderId,
-      pendingLineTotal: pendingTotal.toString(),
+      pendingLineTotal: serializeMoneyDecimal(pendingTotal),
       db: tx,
     });
     if (ref.wouldExceedBudget) {
@@ -555,7 +556,7 @@ export async function confirmPurchaseOrder(
       "PurchaseOrder",
       id,
       { projectId: po.projectId, companyId: po.companyId },
-      { after: { totalAmountArs: fx.amountArs.toString() }, tx },
+      { after: { totalAmountArs: serializeMoneyDecimal(fx.amountArs) }, tx },
     );
   });
 

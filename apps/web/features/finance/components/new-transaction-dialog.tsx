@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   defaultTaxRateForInvoiceLetter,
   invoiceLetterHint,
+  isZeroIvaRate,
   requiresArInvoiceLetter,
   suggestInvoiceLetter,
   type InvoiceLetterCode,
@@ -187,7 +188,7 @@ export function NewTransactionDialog({
         taxRate:
           suggested === "C" || suggested === "E"
             ? "0"
-            : l.taxRate === "0"
+            : isZeroIvaRate(l.taxRate)
               ? nextRate
               : l.taxRate,
       })),
@@ -592,7 +593,7 @@ export function NewTransactionDialog({
                             taxRate:
                               v === "C" || v === "E"
                                 ? "0"
-                                : l.taxRate === "0"
+                                : isZeroIvaRate(l.taxRate)
                                   ? nextRate
                                   : l.taxRate,
                           })),
@@ -750,7 +751,7 @@ export function NewTransactionDialog({
                                 taxRate:
                                   v === "C" || v === "E"
                                     ? "0"
-                                    : l.taxRate === "0"
+                                    : isZeroIvaRate(l.taxRate)
                                       ? nextRate
                                       : l.taxRate,
                               })),

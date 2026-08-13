@@ -13,8 +13,10 @@ import { getCashFlowReport, type CashFlowReport } from "../treasury-reports/trea
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { formatDashboardMoney } from "./dashboard-format";
 
-export { formatDashboardMoney } from "./dashboard-format";
+export { formatDashboardMoney };
 
 const ZERO = new Prisma.Decimal(0);
 const RECENT_TREASURY_MOVEMENTS = 6;
@@ -135,20 +137,7 @@ export type TenantDashboardView = {
 };
 
 function fmtDecimalEs(value: string, currencyCode?: string): string {
-  const n = Number(value);
-  if (Number.isNaN(n)) return value;
-  if (currencyCode) {
-    try {
-      return new Intl.NumberFormat("es-AR", {
-        style:    "currency",
-        currency: currencyCode,
-        maximumFractionDigits: 2,
-      }).format(n);
-    } catch {
-      return `${value} ${currencyCode}`;
-    }
-  }
-  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(n);
+  return formatDashboardMoney(value, currencyCode);
 }
 
 function isoDate(d: Date | null | undefined): string | null {
@@ -287,7 +276,7 @@ function pushMoneyKpi(
     kpis.push({
       key,
       label,
-      value: fmtDecimalEs(amount.toString(), currency),
+      value: fmtDecimalEs(serializeMoneyDecimal(amount), currency),
       href,
     });
     return;
@@ -431,9 +420,9 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
         clientName:       p.client ? (p.client.fantasyName ?? p.client.legalName) : null,
         startDate:        isoDate(p.startDate),
         expectedEndDate:  isoDate(p.expectedEndDate),
-        budgetAmount:     b ? b.totalSalePrice.toString() : null,
+        budgetAmount:     b ? serializeMoneyDecimal(b.totalSalePrice) : null,
         budgetCurrency:   b ? b.currency : null,
-        actualCost:       b ? b.totalCost.toString() : null,
+        actualCost:       b ? serializeMoneyDecimal(b.totalCost) : null,
         progressPct:      null,
         href:             `/proyectos/${p.id}`,
       };
@@ -607,7 +596,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       }
       const cashByCurrency: Record<string, string> = {};
       for (const [cur, dec] of byCur) {
-        cashByCurrency[cur] = dec.toString();
+        cashByCurrency[cur] = serializeMoneyDecimal(dec);
       }
       financeSummary!.cashByCurrency = cashByCurrency;
       financeSummary!.cashMulticurrency = byCur.size > 1;
@@ -617,7 +606,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
         kpis.push({
           key:    "treasury_balance",
           label:  "Saldo tesorería (cuentas activas)",
-          value:  fmtDecimalEs(balance.toString(), only![0].length === 3 ? only![0] : undefined),
+          value:  fmtDecimalEs(serializeMoneyDecimal(balance), only![0].length === 3 ? only![0] : undefined),
           href:   "/tesoreria",
           tone:   balance.greaterThan(ZERO) ? "success" : balance.lessThan(ZERO) ? "danger" : "muted",
         });
@@ -658,7 +647,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       id: m.id,
       movementDate: isoDate(m.movementDate) ?? m.movementDate.toISOString().slice(0, 10),
       description: m.description,
-      amount: m.amount.toString(),
+      amount: serializeMoneyDecimal(m.amount),
       currency: m.currency,
       type: m.type,
       accountName: m.account.name,

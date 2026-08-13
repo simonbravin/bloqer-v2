@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   defaultTaxRateForInvoiceLetter,
   evaluateInvoiceLetterTaxConsistency,
+  isZeroIvaRate,
   normalizeIvaRatePreset,
 } from "./iva-rates";
 
@@ -20,6 +21,16 @@ describe("normalizeIvaRatePreset", () => {
     assert.equal(normalizeIvaRatePreset("21.0000"), "21");
     assert.equal(normalizeIvaRatePreset("10.50"), "10.5");
     assert.equal(normalizeIvaRatePreset("13"), null);
+  });
+});
+
+describe("isZeroIvaRate", () => {
+  it("treats padded D-053 zeros as zero", () => {
+    assert.equal(isZeroIvaRate("0"), true);
+    assert.equal(isZeroIvaRate("0.00"), true);
+    assert.equal(isZeroIvaRate("0.0000"), true);
+    assert.equal(isZeroIvaRate("21"), false);
+    assert.equal(isZeroIvaRate("21.0000"), false);
   });
 });
 

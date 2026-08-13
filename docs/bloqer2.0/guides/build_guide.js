@@ -250,6 +250,86 @@ function calloutBox(qlines) {
   });
 }
 
+const docsDir = path.resolve(__dirname, "..");
+
+function resolveGuideAsset(relPath) {
+  const rel = relPath.replace(/\\/g, "/");
+  if (rel.startsWith("./")) return path.resolve(docsDir, rel.slice(2));
+  if (rel.startsWith("guides/")) return path.resolve(docsDir, rel);
+  return path.resolve(docsDir, rel);
+}
+
+function readImageDimensions(buf) {
+  if (buf.length >= 24 && buf[0] === 0x89) {
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  }
+  return null;
+}
+
+const DOC_IMAGE_MAX_WIDTH = 620;
+
+function capturePendingBox(label, relPath) {
+  const inner = [
+    new Paragraph({
+      spacing: { after: 40 },
+      children: [new TextRun({ text: "📷 CAPTURA PENDIENTE", bold: true, color: BLUE_DARK, size: 20, font: "Arial" })],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 40, after: 40 },
+      children: [new TextRun({ text: stripMd(label || "Captura pendiente"), italic: true, color: GRAY_DASH, size: 22, font: "Arial" })],
+    }),
+  ];
+  if (relPath) {
+    inner.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: relPath, size: 16, color: TEXT_MID, font: "Consolas" })],
+    }));
+  }
+  return new Table({
+    width: { size: 9360, type: WidthType.DXA },
+    columnWidths: [9360],
+    rows: [new TableRow({ children: [new TableCell({
+      borders: dashedBorders(GRAY_DASH),
+      width: { size: 9360, type: WidthType.DXA },
+      shading: { fill: CAPTURE_BG, type: ShadingType.CLEAR },
+      margins: { top: 180, bottom: 180, left: 240, right: 240 },
+      children: inner,
+    })] })],
+  });
+}
+
+function imageFigure(relPath, alt, caption) {
+  const abs = resolveGuideAsset(relPath);
+  if (!fs.existsSync(abs)) return capturePendingBox(alt || "Captura pendiente", relPath);
+
+  const data = fs.readFileSync(abs);
+  const dims = readImageDimensions(data);
+  let w = DOC_IMAGE_MAX_WIDTH;
+  let h = Math.round(w * 0.62);
+  if (dims && dims.width > 0) {
+    w = Math.min(DOC_IMAGE_MAX_WIDTH, dims.width);
+    h = Math.round(dims.height * (w / dims.width));
+  }
+
+  const blocks = [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 120, after: 80 },
+      children: [new ImageRun({ data, transformation: { width: w, height: h } })],
+    }),
+  ];
+  const cap = caption || alt;
+  if (cap) {
+    blocks.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 160 },
+      children: parseInline(cap, { italic: true, size: 18, color: TEXT_MID }),
+    }));
+  }
+  return blocks;
+}
+
 // ─── CAPTURA SUGERIDA → caja placeholder ────────────────────────────────────
 function captureBox(qlines) {
   const rawTitle = (qlines[0] || "").trim();
@@ -339,7 +419,7 @@ function renderTable(tlines) {
 // ─── MERMAID → tipBox de referencia ─────────────────────────────────────────
 function mermaidBox() {
   return tipBox(
-    "Diagrama disponible en la versión Markdown editable de esta guía. Representa las relaciones y transiciones descriptas en esta sección (niveles empresa / proyecto / plataforma, ciclos de estado y flujos económicos).",
+    "Diagrama disponible en la versión Markdown editable de esta guía. Representa las relaciones y transiciones descriptas en esta sección (niveles empresa / proyecto, ciclos de estado y flujos económicos).",
     "tip", "DIAGRAMA"
   );
 }
@@ -361,7 +441,8 @@ function codeBlock(codeLines) {
 function isBlockStart(line) {
   const t = line.trim();
   return /^#{1,6}\s/.test(line) || /^>/.test(line) || /^\|/.test(t) ||
-    /^```/.test(t) || /^\s*[-*]\s+/.test(line) || /^\s*\d+\.\s+/.test(line) || /^---+$/.test(t);
+    /^```/.test(t) || /^\s*[-*]\s+/.test(line) || /^\s*\d+\.\s+/.test(line) || /^---+$/.test(t) ||
+    /^!\[/.test(t) || /^<!-- capture:/.test(t);
 }
 
 function parseMarkdown(md) {
@@ -376,6 +457,24 @@ function parseMarkdown(md) {
 
     if (t === "") { i++; continue; }
     if (/^---+$/.test(t)) { i++; continue; }
+    if (/^<!-- capture:/.test(t)) { i++; continue; }
+
+    if (/^!\[/.test(t)) {
+      const imgMatch = t.match(/^!\[([^\]]*)\]\(([^)]+)\)/);
+      if (imgMatch) {
+        const alt = imgMatch[1];
+        const rel = imgMatch[2];
+        let caption = null;
+        if (i + 1 < lines.length && /^\*[^*]+\.*\*?$/.test(lines[i + 1].trim())) {
+          caption = lines[i + 1].trim().replace(/^\*|\*$/g, "");
+          i++;
+        }
+        out.push(...imageFigure(rel, alt, caption));
+        out.push(...space(1));
+        i++;
+        continue;
+      }
+    }
 
     if (/^#\s+/.test(line)) { i++; continue; }                 // # título del doc → lo maneja la portada
     if (/^##\s+/.test(line)) { out.push(sectionTitle(line.replace(/^##\s+/, ""))); i++; continue; }
@@ -394,7 +493,14 @@ function parseMarkdown(md) {
     if (/^>/.test(line)) {                                       // blockquote group
       const q = [];
       while (i < lines.length && /^>/.test(lines[i])) { q.push(lines[i].replace(/^>\s?/, "").replace(/\s+$/, "")); i++; }
-      if (/^\*{0,2}\s*📷\s*Captura sugerida/i.test((q[0] || "").trim())) { out.push(captureBox(q)); captureCount++; }
+      if (/^\*{0,2}\s*📷\s*Captura sugerida/i.test((q[0] || "").trim())) {
+        const blob = q.join(" ").toLowerCase();
+        if (/\/platform\/|no entregar al cliente|proveedor saas|superadmin/.test(blob)) {
+          continue;
+        }
+        out.push(captureBox(q));
+        captureCount++;
+      }
       else out.push(calloutBox(q));
       out.push(...space(1));
       continue;
@@ -502,7 +608,7 @@ const doc = new Document({
               new TableCell({ borders: borders(GRAY_BORDER), width: { size: 2600, type: WidthType.DXA }, shading: { fill: BLUE_LIGHT, type: ShadingType.CLEAR }, margins: cellPadSm,
                 children: [new Paragraph({ children: [new TextRun({ text: "Versión", bold: true, color: BLUE_DARK, size: 18, font: "Arial" })] })] }),
               new TableCell({ borders: borders(GRAY_BORDER), width: { size: 5000, type: WidthType.DXA }, shading: { fill: WHITE, type: ShadingType.CLEAR }, margins: cellPadSm,
-                children: [new Paragraph({ children: [new TextRun({ text: "2.2 — Julio 2026", size: 18, font: "Arial" })] })] }),
+                children: [new Paragraph({ children: [new TextRun({ text: "2.3 — Agosto 2026", size: 18, font: "Arial" })] })] }),
             ] }),
             new TableRow({ children: [
               new TableCell({ borders: borders(GRAY_BORDER), width: { size: 2600, type: WidthType.DXA }, shading: { fill: BLUE_LIGHT, type: ShadingType.CLEAR }, margins: cellPadSm,

@@ -1,6 +1,6 @@
 import { Prisma } from "@bloqer/database";
 import type { JournalEntrySourceType } from "@bloqer/database";
-import { roundMoney } from "@bloqer/utils";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 import type { CreateJournalEntryInput } from "@bloqer/validators";
 
 /** CoA template codes ([D-085]) — Argentine construction seed. */
@@ -8,7 +8,7 @@ export const COA_IVA_CREDIT_FISCAL = "1.1.20";
 export const COA_IVA_DEBIT_FISCAL = "2.1.10";
 
 function moneyAmountString(d: Prisma.Decimal): string {
-  return roundMoney(d.toString());
+  return serializeMoneyDecimal(d);
 }
 
 export function buildTwoLineJournalInput(params: {

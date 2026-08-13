@@ -11,6 +11,7 @@ import {
   canViewProcurementProjectArea,
 } from "./procurement-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { serializeQtyDecimal } from "../finance/money-decimal";
 import {
   resolveUserDisplayNames,
   userDisplayNameFromMap,
@@ -70,7 +71,7 @@ function serializeReceipt(
       purchaseReceiptId:   l.purchaseReceiptId,
       purchaseOrderLineId: l.purchaseOrderLineId,
       lineDescription:     l.purchaseOrderLine.description,
-      quantityReceived:    l.quantityReceived.toString(),
+      quantityReceived:    serializeQtyDecimal(l.quantityReceived),
       notes:               l.notes,
     })),
   };

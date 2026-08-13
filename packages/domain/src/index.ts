@@ -108,6 +108,7 @@ export {
   IVA_RATE_CONSTRUCTION_HINT_ES,
   defaultTaxRateForInvoiceLetter,
   evaluateInvoiceLetterTaxConsistency,
+  isZeroIvaRate,
   normalizeIvaRatePreset,
   type IvaRatePreset,
   type InvoiceLetterTaxIssue,

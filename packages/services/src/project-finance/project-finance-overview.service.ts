@@ -14,6 +14,7 @@ import { getProjectShellInfo } from "../project/project.service";
 import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import { getTenantModuleGate, type TenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { ServiceContext } from "../types";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export { canShowProjectFinanzasNavLink } from "../project/project-nav-guards";
 
@@ -104,7 +105,7 @@ export type ProjectFinanceOverview = {
 function moneyRowsFromMap(m: Map<string, Prisma.Decimal>): ProjectFinanceMoneyByCurrency[] {
   return [...m.entries()]
     .filter(([, v]) => v.greaterThan(ZERO))
-    .map(([currency, amount]) => ({ currency, amount: amount.toString() }))
+    .map(([currency, amount]) => ({ currency, amount: serializeMoneyDecimal(amount) }))
     .sort((a, b) => a.currency.localeCompare(b.currency));
 }
 

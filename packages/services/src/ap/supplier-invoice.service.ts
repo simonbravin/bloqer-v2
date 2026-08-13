@@ -16,7 +16,7 @@ import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.s
 import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
-import { serializeMoneyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
 import { assertWbsLineForProject } from "../procurement/procurement-wbs";
@@ -1159,9 +1159,9 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
       wbsNodeId:   l.wbsNodeId,
       purchaseOrderLineId: l.purchaseOrderLineId,
       description: l.description,
-      quantity:    l.quantity.toString(),
+      quantity:    serializeQtyDecimal(l.quantity),
       unitPrice:   serializeUnitPriceDecimal(l.unitPrice),
-      taxRate:     l.taxRate.toString(),
+      taxRate:     serializeRatePctDecimal(l.taxRate),
       lineSubtotal: serializeMoneyDecimal(l.lineSubtotal),
       lineTax:     serializeMoneyDecimal(l.lineTax),
       lineTotal:   serializeMoneyDecimal(l.lineTotal),

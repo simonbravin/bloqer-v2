@@ -1,6 +1,6 @@
 import { Prisma } from "@bloqer/database";
 import { calcLineAmountsFromGrossInclusive } from "@bloqer/utils";
-import { toMoneyDecimal } from "./money-decimal";
+import { serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal, toMoneyDecimal } from "./money-decimal";
 
 /** Exclusive tax (neto + IVA) — same rule as AR/AP calcLine [D-053]. */
 function calcLineExclusive(
@@ -44,9 +44,9 @@ export function resolveInvoiceLineMoney(params: {
   }
 
   const r = calcLineAmountsFromGrossInclusive({
-    quantity: params.quantity.toString(),
-    unitPriceGross: params.unitPrice.toString(),
-    taxRatePercent: params.taxRate.toString(),
+    quantity: serializeQtyDecimal(params.quantity),
+    unitPriceGross: serializeUnitPriceDecimal(params.unitPrice),
+    taxRatePercent: serializeRatePctDecimal(params.taxRate),
   });
   return {
     unitPriceNet: new Prisma.Decimal(r.unitPriceNet),
