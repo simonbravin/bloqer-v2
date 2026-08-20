@@ -17,6 +17,7 @@ import {
 
 const PROJECT_HREF_SUFFIXES = [
   { suffix: "", labelMatch: "Resumen", exact: true },
+  { suffix: "/pendientes", labelMatch: "Pendientes" },
   { suffix: "/libro-obra", labelMatch: "Libro de obra" },
   { suffix: "/materiales", labelMatch: "Materiales" },
   { suffix: "/compras", labelMatch: "Tablero de compras" },
@@ -24,7 +25,7 @@ const PROJECT_HREF_SUFFIXES = [
   { suffix: "/cronograma", labelMatch: "Cronograma" },
 ];
 
-const GENERAL_HREFS = new Set(["/proyectos", "/directorio", "/notificaciones"]);
+const GENERAL_HREFS = new Set(["/proyectos", "/directorio"]);
 
 type Props = {
   open: boolean;
@@ -53,9 +54,15 @@ export function FieldMoreSheet({ open, onOpenChange, roles, moduleGateSnapshot, 
       }).filter((x): x is { href: string; label: string } => x != null)
     : [];
 
-  const generalLinks = globalSections
+  const fromGlobal = globalSections
     .flatMap((s) => s.items)
-    .filter((item) => GENERAL_HREFS.has(item.href) || item.href === "/pendientes");
+    .filter((item) => GENERAL_HREFS.has(item.href) || item.href === "/pendientes")
+    .map((item) =>
+      item.href === "/pendientes" && projectId
+        ? { ...item, label: "Pendientes · todas las obras" }
+        : item,
+    );
+  const generalLinks = [...fromGlobal, { href: "/notificaciones", label: "Notificaciones" }];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

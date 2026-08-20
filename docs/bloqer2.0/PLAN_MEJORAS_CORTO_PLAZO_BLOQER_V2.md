@@ -475,13 +475,13 @@ flowchart LR
 | **Problema actual** | Solo campana/header. |
 | **Evidencia** | RELEVAMIENTO D-2 |
 | **Impacto** | Bajo si la campana es descubrible. |
-| **Solución** | Evaluar ítem “Notificaciones” en General; o mejorar discoverability de la campana. |
+| **Solución** | **Cerrado [D-087]:** sin ítem en sidebar de empresa ni de obra. Campana + “Ver todas”; mobile Más. |
 | **Áreas** | `global-workspace-nav.ts`, header |
 | **Riesgo** | Bajo |
 | **Complejidad** | Baja |
-| **Prioridad** | P3 |
-| **Dependencias** | **Decisión humana:** ¿sidebar o solo campana? |
-| **Criterios de aceptación** | Decisión documentada; si sidebar, visible con permiso. |
+| **Prioridad** | P3 — hecha |
+| **Dependencias** | [D-087] |
+| **Criterios de aceptación** | Decisión documentada; campana es el acceso principal. |
 | **Tests** | — |
 | **Migración Prisma** | No |
 | **Cambia UI** | Sí si se elige |

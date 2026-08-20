@@ -212,7 +212,7 @@ Esta sección **no** cambia reglas de código; documenta huecos entre matriz doc
 
 ### 9.2 Inbox y `NOTIFICATIONS`
 
-- La matriz otorga `VIEW NOTIFICATIONS` a roles típicos; la ruta **`/notificaciones`** permanece accesible a **cualquier** usuario con membresía activa en el tenant (**sin** exigir `VIEW NOTIFICATIONS`) para bandeja personal. Alertas operativas (`/notificaciones/alertas`) y log de emails siguen restringidas a **OWNER**/**ADMIN**. Si en el futuro se exige el permiso para la bandeja, es cambio de producto explícito.
+- La matriz otorga `VIEW NOTIFICATIONS` a roles típicos; la ruta **`/notificaciones`** permanece accesible a **cualquier** usuario con membresía activa en el tenant (**sin** exigir `VIEW NOTIFICATIONS`) para bandeja personal. Acceso por **campana** ([D-054]/[D-087]), no por sidebar de empresa ni de obra. Alertas operativas (`/notificaciones/alertas`) y log de emails siguen restringidas a **OWNER**/**ADMIN**. Si en el futuro se exige el permiso para la bandeja, es cambio de producto explícito.
 
 ### 9.3 Aging global y `PROJECT_MANAGER` — cerrado [D-056]
 

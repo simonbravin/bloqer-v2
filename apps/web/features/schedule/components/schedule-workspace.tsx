@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { ScheduleWorkspaceDto } from "@bloqer/services";
+import type { ScheduleFieldItemDto, ScheduleWorkspaceDto, ScheduleWorkspaceItemDto } from "@bloqer/services";
 import {
   parseScheduleFieldFilter,
   type ScheduleFieldFilterId,
@@ -23,7 +23,6 @@ import { ScheduleCreateDialog } from "./schedule-create-dialog";
 import { ScheduleProgressLegend } from "./schedule-progress-dimensions";
 import { ScheduleFieldItemSheet } from "./schedule-field-item-sheet";
 import { ScheduleFieldView, ScheduleFieldViewSkeleton } from "./schedule-field-view";
-import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
 import { filterScheduleItemsForDisplay } from "../adapters/schedule-view-types";
 import { useHasMounted, useIsLgUp } from "@/lib/media-query";
 
@@ -48,6 +47,30 @@ function parseDialogTab(raw: string | null): ScheduleItemDialogTab {
     return raw as ScheduleItemDialogTab;
   }
   return "detail";
+}
+
+function toFieldItem(
+  item: ScheduleWorkspaceItemDto,
+  all: ScheduleWorkspaceItemDto[],
+): ScheduleFieldItemDto {
+  return {
+    id: item.id,
+    parentId: item.parentId,
+    name: item.name,
+    type: item.type,
+    status: item.status,
+    blockReason: item.blockReason,
+    startDate: item.startDate,
+    endDate: item.endDate,
+    progressPct: item.progressPct,
+    timePlanPct: item.timePlanPct,
+    daysLate: item.daysLate,
+    wbsLinks: item.wbsLinks,
+    predecessorIds: item.predecessorIds,
+    predecessorNames: item.predecessorIds
+      .map((id) => all.find((row) => row.id === id)?.name)
+      .filter((name): name is string => Boolean(name)),
+  };
 }
 
 export function ScheduleWorkspace({
@@ -184,12 +207,19 @@ export function ScheduleWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMounted, isLgUp, fieldParam]);
 
-  const selectedItem = selectedId
-    ? workspace.items.find((i) => i.id === selectedId) ?? null
+  const fieldWorkspace = useMemo(
+    () => ({
+      projectId: workspace.projectId,
+      items: workspace.items.map((item) => toFieldItem(item, workspace.items)),
+    }),
+    [workspace.items, workspace.projectId],
+  );
+  const selectedFieldItem = selectedId
+    ? fieldWorkspace.items.find((i) => i.id === selectedId) ?? null
     : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-schedule-source="desktop">
       {!hasMounted ? (
         <>
           <div className="lg:hidden">
@@ -201,11 +231,14 @@ export function ScheduleWorkspace({
 
       {showField ? (
         <ScheduleFieldView
-          workspace={workspace}
+          workspace={fieldWorkspace}
           fieldParam={fieldFilter}
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
-          onSelect={(item) => selectItem(item)}
+          onSelect={(item) => {
+            const desktop = workspace.items.find((row) => row.id === item.id);
+            if (desktop) selectItem(desktop);
+          }}
           onFilterChange={setFieldFilter}
           queryMs={queryMs}
         />
@@ -328,8 +361,8 @@ export function ScheduleWorkspace({
       {showField ? (
         <ScheduleFieldItemSheet
           projectId={projectId}
-          workspace={workspace}
-          item={selectedItem}
+          canEdit={workspace.canEdit}
+          item={selectedFieldItem}
           open={dialogOpen}
           onOpenChange={closeDialog}
         />

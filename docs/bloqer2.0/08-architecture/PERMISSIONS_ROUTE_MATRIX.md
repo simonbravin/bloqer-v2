@@ -17,6 +17,7 @@ Project-scoped access (same tenant, correct `projectId`) is enforced in services
 | Label        | Route          | Visible when (`VIEW` unless noted)        |
 |-------------|----------------|-------------------------------------------|
 | Inicio      | `/dashboard`   | Always (authenticated app shell)          |
+| Pendientes  | `/pendientes`    | Always (authenticated app shell); personal action inbox, optional `?proyecto=` ([D-087]) |
 | Proyectos   | `/proyectos`     | `PROJECTS` **and** tenant module `PROJECTS` enabled |
 | Directorio  | `/directorio`    | `DIRECTORY` **and** tenant module `DIRECTORY` enabled |
 | Inventario  | `/inventario`    | `INVENTORY` **and** tenant module `INVENTORY` enabled |
@@ -97,7 +98,7 @@ Las rutas bajo **`/finanzas/**`** comparten layout: subnav filtrada por módulo 
 
 | Route | Access | Notes |
 |-------|--------|-------|
-| `/notificaciones` | Authenticated user with active tenant membership | Personal inbox only; **not** gated on `VIEW NOTIFICATIONS` |
+| `/notificaciones` | Authenticated user with active tenant membership | Personal inbox only; **not** gated on `VIEW NOTIFICATIONS`. Access via header bell ([D-054]/[D-087]), not company/project sidebar |
 | `/notificaciones/alertas` | **OWNER** or **ADMIN** on active tenant membership (`canRunOperationalAlerts`) | Manual operational alert runner; others get `notFound()` |
 | `GET /api/notifications/bell` | Authenticated user with active tenant membership | Bell snapshot (`unreadCount` + last 5 non-archived); used by header polling ([D-054]) |
 | `/api/cron/operational-alerts` | **No session.** Valid `CRON_SECRET` via `Authorization: Bearer` or `x-cron-secret` | Server-to-server / Vercel Cron; optional `?tenantId=` (UUID, ACTIVE only); respuesta agregada sin PII ([`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md)) |
@@ -132,6 +133,7 @@ See [`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md).
 | Procurement quote — create / select | `canManageProcurementQuotes` | Same as `canEditPurchaseOrders` |
 | Purchase order / receipt — reads | `VIEW PROCUREMENT` **or** `VIEW PROJECTS` | Aligned with entity document list; `listLinkablePurchaseOrders` / `listProcurementWbsOptions` now gated |
 | `/proyectos/[id]/solicitudes-compra` | `canViewPurchaseRequests` + module `PROCUREMENT` | Filtro `?status=SUBMITTED` en UI; alerta en overview si pendientes y `canEditPurchaseOrders` |
+| `/proyectos/[id]/pendientes` | Same as project layout (`getProjectShellInfo`) | Personal action inbox scoped to the project ([D-087]); sources still filtered by `fieldPendingSourcesForActor`. Company-wide twin: `/pendientes` |
 | Supplier invoice / payable / payment — project workspace | `VIEW AP` **or** `VIEW PROJECTS` | Aligned with `SUPPLIER_INVOICE` documents; `projectScopeId` en getters/mutaciones donde aplica (16B.1) |
 | Supplier invoice / payable / payment — **Finanzas empresa** (`/finanzas/...`, filas con `projectId` null) | **`VIEW AP` only** | Phase **16C**: sin atajo `VIEW PROJECTS`; servicios `listCompany*`, `getCompany*` + `canViewCompanyAp` |
 | Sales invoice / receivable / collection — project-scoped reads | `VIEW AR` **or** `VIEW PROJECTS` | Same pattern as AP project reads (`ar-access.ts`) |

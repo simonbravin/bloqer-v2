@@ -42,6 +42,7 @@ const PATH_SEGMENT_LABELS: Record<string, string> = {
   invitaciones: "Invitaciones",
   invitar: "Invitar",
   notificaciones: "Notificaciones",
+  pendientes: "Pendientes",
   presupuestos: "Presupuesto",
   cronograma: "Cronograma",
   "control-costos": "EDT y costos",

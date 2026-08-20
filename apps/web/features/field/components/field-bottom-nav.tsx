@@ -7,6 +7,7 @@ import { ClipboardList, HardHat, Home, Menu, Plus } from "lucide-react";
 import type { PermissionModule, UserRole } from "@bloqer/domain";
 import { cn } from "@/lib/utils";
 import { isFieldImmersivePath } from "@/lib/field-immersive-routes";
+import { isPendingInboxPath } from "@/lib/field-pending-path";
 import { useFieldProjectContext } from "@/lib/field-project-context";
 import { FieldPlusSheet } from "./field-plus-sheet";
 import { FieldMoreSheet } from "./field-more-sheet";
@@ -32,8 +33,8 @@ export function FieldBottomNav({ pendingCount, roles, moduleGateSnapshot }: Prop
 
   const obraHref = convenienceProjectId ? `/proyectos/${convenienceProjectId}` : "/proyectos";
   const homeActive = pathname === "/dashboard";
-  const obraActive = pathname.startsWith("/proyectos/");
-  const pendingActive = pathname.startsWith("/pendientes");
+  const pendingActive = isPendingInboxPath(pathname);
+  const obraActive = pathname.startsWith("/proyectos/") && !pendingActive;
   const badge = badgeLabel(pendingCount);
 
   return (

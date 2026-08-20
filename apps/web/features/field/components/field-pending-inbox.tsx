@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { FieldPendingGroup, FieldPendingList } from "@bloqer/services";
 import { FieldPendingCard } from "./field-pending-card";
 import { Button } from "@/components/ui/button";
+import { fieldPendingEmptyObraCta } from "@/lib/field-pending-empty-cta";
 
 const FILTERS: { id: "todos" | FieldPendingGroup; label: string }[] = [
   { id: "todos", label: "Todos" },
@@ -15,17 +16,31 @@ type Props = {
   group: FieldPendingGroup | undefined;
   projectId: string | undefined;
   projects: Array<{ id: string; code: string }>;
-  obraHref: string;
+  lastProjectId?: string | null;
+  /** When true, stay on `/proyectos/[id]/pendientes` (no cross-project chips). */
+  lockProject?: boolean;
 };
 
-export function FieldPendingInbox({ list, group, projectId, projects, obraHref }: Props) {
+export function FieldPendingInbox({
+  list,
+  group,
+  projectId,
+  projects,
+  lastProjectId = null,
+  lockProject = false,
+}: Props) {
   const filterHref = (id: (typeof FILTERS)[number]["id"]) => {
     const params = new URLSearchParams();
     if (id !== "todos") params.set("grupo", id);
-    if (projectId) params.set("proyecto", projectId);
+    if (!lockProject && projectId) params.set("proyecto", projectId);
     const q = params.toString();
+    if (lockProject && projectId) {
+      return q ? `/proyectos/${projectId}/pendientes?${q}` : `/proyectos/${projectId}/pendientes`;
+    }
     return q ? `/pendientes?${q}` : "/pendientes";
   };
+
+  const obraCta = fieldPendingEmptyObraCta({ projectId, projects, lastProjectId });
 
   return (
     <div className="space-y-4" data-testid="field-pending-inbox" data-query-ms={list.queryMs}>
@@ -46,7 +61,7 @@ export function FieldPendingInbox({ list, group, projectId, projects, obraHref }
         })}
       </div>
 
-      {projects.length > 1 ? (
+      {!lockProject && projects.length > 1 ? (
         <div className="flex flex-wrap gap-2">
           <Button variant={!projectId ? "default" : "outline"} size="sm" className="min-h-11" asChild>
             <Link href={group ? `/pendientes?grupo=${group}` : "/pendientes"}>Todas las obras</Link>
@@ -76,7 +91,7 @@ export function FieldPendingInbox({ list, group, projectId, projects, obraHref }
           <p className="font-medium">No tenés acciones pendientes.</p>
           <div className="mt-4 flex flex-col gap-2">
             <Button asChild className="min-h-11">
-              <Link href={obraHref}>Volver a mi obra</Link>
+              <Link href={obraCta.href}>{obraCta.label}</Link>
             </Button>
             <Button asChild variant="outline" className="min-h-11">
               <Link href="/notificaciones">Ver notificaciones</Link>

@@ -1288,6 +1288,22 @@
 
 ---
 
+### D-087 — Pendientes empresa + obra; notificaciones solo campana
+
+- **Fecha:** 2026-08-19
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** `/pendientes` era solo de empresa; el empty state “Volver a mi obra” usaba la cookie de última obra (ambiguo con N proyectos). Poner la bandeja solo en el proyecto obligaría a un aprobador (p. ej. OWNER con OC en varias obras) a entrar a cada una. Las notificaciones son personales (`recipientUserId`) y [D-054] ya definió la campana como acceso principal.
+- **Decisión:**
+  1. **Bandeja personal de empresa** `/pendientes` se mantiene (General + bottom nav Field). Misma proyección `getMyFieldPendingItems`; fuentes filtradas por rol/módulo. El admin no tiene que entrar a una obra para ver lo suyo.
+  2. **Bandeja de obra** `/proyectos/[id]/pendientes` en el sidebar del proyecto (sección Resumen, junto a Resumen). Mismo service con `projectId` fijo; sin chips “Todas las obras”.
+  3. **Empty state:** una sola obra o filtro/lock de proyecto → “Volver a {código}”; N obras + cookie → “Ir a {código}”; N obras sin cookie → “Ver proyectos”. Nunca “mi obra” si hay más de una.
+  4. **Notificaciones:** sin ítem en el sidebar de empresa ni de obra. Acceso: campana del header → “Ver todas” → `/notificaciones` (bandeja **del usuario**, no de la empresa). En mobile, enlace en **Más** (General).
+- **Implicancias:** patrón Procore (My Open Items company + project). `VIEW NOTIFICATIONS` sigue sin gatear la bandeja personal.
+- **Documentos afectados:** [`NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md), [`NOTIFICATIONS_ARCHITECTURE.md`](../08-architecture/NOTIFICATIONS_ARCHITECTURE.md), [`PERMISSIONS_ROUTE_MATRIX.md`](../08-architecture/PERMISSIONS_ROUTE_MATRIX.md), [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md), [`AUDITORIA_MOBILE_BLOQER_V2.md`](../AUDITORIA_MOBILE_BLOQER_V2.md), [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](../08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md), [`PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md`](../PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1296,7 +1312,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-087`…).
+1. Tomar el siguiente ID disponible (`D-088`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

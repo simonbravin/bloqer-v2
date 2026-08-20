@@ -4,7 +4,9 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   readViewportHintFromDocument,
+  VIEWPORT_LG_QUERY,
   VIEWPORT_MD_QUERY,
+  viewportHintFromMatchMedia,
   writeViewportHintCookie,
   type ViewportHint,
 } from "@/lib/viewport-hint-cookie";
@@ -15,20 +17,30 @@ export function ViewportHintSync() {
   const pathname = usePathname();
 
   useEffect(() => {
-    const mq = window.matchMedia(VIEWPORT_MD_QUERY);
+    const mdMq = window.matchMedia(VIEWPORT_MD_QUERY);
+    const lgMq = window.matchMedia(VIEWPORT_LG_QUERY);
     const sync = () => {
-      const next: ViewportHint = mq.matches ? "md" : "sm";
+      const next: ViewportHint = viewportHintFromMatchMedia(mdMq.matches, lgMq.matches);
       const prev = readViewportHintFromDocument();
       writeViewportHintCookie(next);
       if (readViewportHintFromDocument() !== next) return;
       if (prev === next) return;
-      if (pathname === "/dashboard" || prev !== null) {
+
+      const isDashboard = pathname === "/dashboard";
+      const isCronograma = pathname.includes("/cronograma");
+      const cronogramaSourceChanged = (prev === "lg") !== (next === "lg");
+
+      if (isDashboard || (isCronograma && cronogramaSourceChanged) || prev !== null) {
         router.refresh();
       }
     };
     sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
+    mdMq.addEventListener("change", sync);
+    lgMq.addEventListener("change", sync);
+    return () => {
+      mdMq.removeEventListener("change", sync);
+      lgMq.removeEventListener("change", sync);
+    };
   }, [pathname, router]);
 
   return null;

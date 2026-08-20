@@ -9,6 +9,7 @@ import {
   FileText,
   FolderKanban,
   HardHat,
+  Inbox,
   LayoutDashboard,
   ListOrdered,
   Package,
@@ -25,6 +26,7 @@ import {
 
 const PROJECT_NAV_ICON_BY_LABEL: Record<string, LucideIcon> = {
   Resumen: LayoutDashboard,
+  Pendientes: Inbox,
   Presupuesto: FileSpreadsheet,
   Cronograma: CalendarRange,
   "EDT y costos": FolderKanban,

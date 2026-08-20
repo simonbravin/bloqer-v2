@@ -6,6 +6,7 @@ import {
   calendarRangeOverlapsIsoRange,
   compareScheduleFieldItems,
   filterAndSortScheduleFieldItems,
+  limitScheduleFieldItems,
   parseScheduleFieldFilter,
   scheduleFieldStatusActions,
   scheduleFieldWindow,
@@ -248,6 +249,30 @@ describe("search and containers", () => {
     assert.equal(search.length, 1);
     const miss = filterAndSortScheduleFieldItems(items, "all", WINDOW, "no-match");
     assert.equal(miss.length, 0);
+  });
+});
+
+describe("200-item display cap", () => {
+  it("filters before the cap so a delayed leaf past position 200 still appears in Atrasadas", () => {
+    const items = Array.from({ length: 250 }, (_, i) =>
+      item({
+        id: `t${i}`,
+        name: `T${String(i).padStart(3, "0")}`,
+        startDate: "2026-08-19",
+        endDate: "2026-08-19",
+        daysLate: i === 249 ? 4 : null,
+      }),
+    );
+    const allCapped = limitScheduleFieldItems(
+      filterAndSortScheduleFieldItems(items, "all", WINDOW),
+    );
+    const delayedCapped = limitScheduleFieldItems(
+      filterAndSortScheduleFieldItems(items, "delayed", WINDOW),
+    );
+    assert.equal(allCapped.visible.some((row) => row.id === "t249"), false);
+    assert.equal(delayedCapped.visible.some((row) => row.id === "t249"), true);
+    assert.equal(delayedCapped.matchedCount, 1);
+    assert.equal(summarizeScheduleFieldKpis(items).delayed, 1);
   });
 });
 

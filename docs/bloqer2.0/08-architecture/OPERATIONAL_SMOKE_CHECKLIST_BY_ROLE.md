@@ -51,7 +51,7 @@ Roles de proyecto `PROJECT_VIEWER`: fuera de alcance Fase 1 (portal externo).
 | A4 | `/configuracion/compras` | Abrir política de compras | Card / form de umbrales y auto-aprobación visibles desde Configuración |
 | A5 | `/configuracion/reportes` | Crear o abrir un envío | Copy de **cron diario**; estados de última corrida con hint Omitido ≠ Fallido |
 | A6 | `/configuracion/reportes/[id]` | Ver historial + link a emails | Enlace a `/notificaciones/emails?…` funciona |
-| A7 | `/notificaciones` (campana) | Abrir inbox | **Sin** ítem “Notificaciones” en sidebar; campana del header con conteo |
+| A7 | `/notificaciones` (campana) | Abrir inbox | **Sin** ítem “Notificaciones” en sidebar ([D-087]); campana del header con conteo |
 | A8 | `/notificaciones/alertas` | Ver card “Última actividad” | Fecha/conteo o vacío explicativo; link a emails de alerta |
 | A9 | `/notificaciones/emails` | Filtrar por estado | Leyenda Enviado / Omitido / Fallido comprensible |
 

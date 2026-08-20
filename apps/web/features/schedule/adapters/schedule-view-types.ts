@@ -174,7 +174,9 @@ export function mapScheduleItemsToCalendarFeatures(
     .filter((f): f is CalendarFeature => f != null);
 }
 
-export function primaryWbsLink(item: ScheduleWorkspaceItemDto) {
+export function primaryWbsLink(item: {
+  wbsLinks: Array<{ isPrimary: boolean; wbsCode: string; wbsName: string }>;
+}) {
   return item.wbsLinks.find((l) => l.isPrimary) ?? null;
 }
 

@@ -1,5 +1,4 @@
 import { prisma } from "@bloqer/database";
-import { isUuid } from "@bloqer/utils";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { resolveUserDisplayNames } from "../user/resolve-user-display-names";
@@ -7,6 +6,7 @@ import type { ServiceContext } from "../types";
 import {
   FIELD_PENDING_GROUP_BY_SOURCE,
   fieldPendingSourcesForActor,
+  resolveFieldPendingProjectFilter,
   type FieldPendingGroup,
   type FieldPendingSource,
 } from "./field-pending-access";
@@ -81,8 +81,7 @@ export async function getMyFieldPendingItems(
   const started = Date.now();
   const gate = await getTenantModuleGate(ctx);
   const sources = fieldPendingSourcesForActor(ctx.roles, gate);
-  const projectFilter =
-    filters?.projectId && isUuid(filters.projectId) ? filters.projectId : undefined;
+  const projectFilter = resolveFieldPendingProjectFilter(filters?.projectId);
   const groupFilter = filters?.group;
   const countsOnly = filters?.countsOnly === true;
 

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isFieldImmersivePath } from "./field-immersive-routes";
+import { isPendingInboxPath } from "./field-pending-path";
 import { listFieldQuickActions } from "./field-quick-actions";
 
 test("immersive paths hide bottom nav", () => {
@@ -27,4 +28,13 @@ test("PROJECT_MANAGER can create parte and SC but not consumption", () => {
 test("OWNER can register consumption", () => {
   const ids = listFieldQuickActions(["OWNER"], () => true).map((a) => a.id);
   assert.equal(ids.includes("consumption"), true);
+});
+
+test("pending inbox paths include company and project routes", () => {
+  assert.equal(isPendingInboxPath("/pendientes"), true);
+  assert.equal(isPendingInboxPath("/proyectos/abc/pendientes"), true);
+  assert.equal(isPendingInboxPath("/proyectos/abc"), false);
+  assert.equal(isPendingInboxPath("/proyectos/abc/pendientes/extra"), false);
+  assert.equal(isPendingInboxPath("/foo/pendientes"), false);
+  assert.equal(isPendingInboxPath("/notificaciones"), false);
 });

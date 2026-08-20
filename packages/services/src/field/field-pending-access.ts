@@ -1,8 +1,10 @@
 import { can, type UserRole } from "@bloqer/domain";
+import { isUuid } from "@bloqer/utils";
 import { canApprovePurchaseOrders } from "../procurement/procurement-access";
 import { canEditSubcontractsArea } from "../subcontracts/subcontract-access";
 import { canSuperviseJobsiteLog } from "../jobsite-log/jobsite-log-access";
 import type { TenantModuleGate } from "../tenant-modules/tenant-module-gate";
+import { ServiceError } from "../types";
 
 export type FieldPendingSource =
   | "PURCHASE_ORDER"
@@ -11,6 +13,25 @@ export type FieldPendingSource =
   | "SUBCONTRACT_CERTIFICATION";
 
 export type FieldPendingGroup = "compras" | "obra" | "certificaciones";
+
+export const FIELD_PENDING_GROUPS: readonly FieldPendingGroup[] = [
+  "compras",
+  "obra",
+  "certificaciones",
+];
+
+export function parseFieldPendingGroup(raw: string | null | undefined): FieldPendingGroup | undefined {
+  return FIELD_PENDING_GROUPS.find((group) => group === raw);
+}
+
+/** Rejects non-UUID filters so a scoped inbox cannot silently widen to the whole tenant. */
+export function resolveFieldPendingProjectFilter(projectId: string | undefined): string | undefined {
+  if (!projectId) return undefined;
+  if (!isUuid(projectId)) {
+    throw new ServiceError("VALIDATION", "Proyecto inválido");
+  }
+  return projectId;
+}
 
 export const FIELD_PENDING_GROUP_BY_SOURCE: Record<FieldPendingSource, FieldPendingGroup> = {
   PURCHASE_ORDER: "compras",

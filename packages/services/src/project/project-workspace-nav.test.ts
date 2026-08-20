@@ -62,3 +62,14 @@ test("project nav hides Consumos when INVENTORY module is off", () => {
   const operacion = sections.find((s) => s.title === "Operación");
   assert.equal(operacion?.items.some((i) => i.label === "Consumos") ?? false, false);
 });
+
+test("project nav places Pendientes next to Resumen", () => {
+  const sections = buildProjectWorkspaceNavSections("proj-1", allOnGate, ["PROJECT_MANAGER"]);
+  const resumen = sections.find((s) => s.title === "Resumen");
+  assert.ok(resumen);
+  assert.deepEqual(
+    resumen!.items.map((i) => i.label),
+    ["Resumen", "Pendientes"],
+  );
+  assert.equal(resumen!.items[1]!.href, "/proyectos/proj-1/pendientes");
+});

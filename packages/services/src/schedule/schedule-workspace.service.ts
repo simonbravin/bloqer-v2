@@ -219,20 +219,47 @@ function mergeCategoryTotals(
   }
 }
 
+export type ScheduleWorkspaceQueryTimings = {
+  moduleGateMs: number;
+  costControlMs: number;
+  ensureScheduleMs: number;
+  baselineWriteMs: number;
+  secondCostControlMs: number;
+  budgetCurrencyMs: number;
+  itemCountMs: number;
+  itemsMs: number;
+  rollupSourceMs: number;
+  costByCategoryMs: number;
+  mapMs: number;
+  totalMs: number;
+};
+
+let lastScheduleWorkspaceTimings: ScheduleWorkspaceQueryTimings | null = null;
+
+export function getLastScheduleWorkspaceTimings(): ScheduleWorkspaceQueryTimings | null {
+  return lastScheduleWorkspaceTimings;
+}
+
 export async function getProjectScheduleWorkspace(
   projectId: string,
   filters: ScheduleWorkspaceFilters,
   ctx: ServiceContext,
 ): Promise<ScheduleWorkspaceResult> {
+  const t0 = Date.now();
+  const mark = (from: number) => Date.now() - from;
   if (!canViewScheduleArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cronograma");
   }
 
+  let t = Date.now();
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");
   assertTenantModuleEnabledWithGate(gate, "SCHEDULE");
+  const moduleGateMs = mark(t);
 
+  t = Date.now();
   const cc = await getProjectCostControl(projectId, { budgetId: filters.budgetId }, ctx);
+  const costControlMs = mark(t);
   if (cc.type === "BUDGET_SELECTION_REQUIRED") {
     return { type: "BUDGET_SELECTION_REQUIRED", availableBudgets: cc.availableBudgets };
   }
@@ -240,10 +267,13 @@ export async function getProjectScheduleWorkspace(
     return { type: "NO_APPROVED_BUDGETS" };
   }
 
+  t = Date.now();
   const schedule = await ensureScheduleForProject(projectId, ctx);
+  const ensureScheduleMs = mark(t);
 
   // Only seed baseline when empty — never silently rewrite (orphans WBS links).
   let baselineBudgetId = schedule.baselineBudgetId;
+  t = Date.now();
   if (!baselineBudgetId) {
     await prisma.schedule.update({
       where: { id: schedule.id },
@@ -251,10 +281,12 @@ export async function getProjectScheduleWorkspace(
     });
     baselineBudgetId = cc.budgetId;
   }
+  const baselineWriteMs = mark(t);
   const baselineBudgetMismatch = baselineBudgetId !== cc.budgetId;
 
   /** WBS links live on the baseline budget — join cost rows there so committed/cert don't show fake zeros. */
   let metricsCc = cc;
+  t = Date.now();
   if (baselineBudgetMismatch && baselineBudgetId) {
     const baselineCc = await getProjectCostControl(
       projectId,
@@ -265,21 +297,27 @@ export async function getProjectScheduleWorkspace(
       metricsCc = baselineCc;
     }
   }
+  const secondCostControlMs = mark(t);
   const costRowByWbs = new Map(metricsCc.rows.map((r) => [r.wbsNodeId, r]));
 
+  t = Date.now();
   const metricsBudget = await prisma.budget.findUnique({
     where: { id: metricsCc.budgetId },
     select: { currency: true },
   });
+  const budgetCurrencyMs = mark(t);
   const budgetCurrency = metricsBudget?.currency ?? "ARS";
 
+  t = Date.now();
   const unfilteredActiveCount = await prisma.scheduleItem.count({
     where: {
       scheduleId: schedule.id,
       status: { not: "CANCELLED" },
     },
   });
+  const itemCountMs = mark(t);
 
+  t = Date.now();
   const items = await prisma.scheduleItem.findMany({
     where: {
       scheduleId: schedule.id,
@@ -292,8 +330,10 @@ export async function getProjectScheduleWorkspace(
       successors: { select: { successorId: true } },
     },
   });
+  const itemsMs = mark(t);
 
   /** Rollup / leaf detection must use the full schedule tree — filters must not shrink it. */
+  t = Date.now();
   const rollupSourceItems = await prisma.scheduleItem.findMany({
     where: { scheduleId: schedule.id },
     select: {
@@ -306,11 +346,15 @@ export async function getProjectScheduleWorkspace(
       durationDays: true,
     },
   });
+  const rollupSourceMs = mark(t);
 
   const allWbsIds = [
     ...new Set(items.flatMap((i) => i.wbsLinks.map((l) => l.wbsNodeId))),
   ];
+  t = Date.now();
   const categoryByWbs = await loadCostByCategoryForWbs(allWbsIds);
+  const costByCategoryMs = mark(t);
+  const mapStarted = Date.now();
 
   const dtoItems: ScheduleWorkspaceItemDto[] = [];
 
@@ -430,6 +474,24 @@ export async function getProjectScheduleWorkspace(
   const scheduleProgressPct = new Prisma.Decimal(weightSum).greaterThan(0)
       ? serializeProgressPct(divideDecimal(weighted, weightSum, 2))
       : null;
+
+  lastScheduleWorkspaceTimings = {
+    moduleGateMs,
+    costControlMs,
+    ensureScheduleMs,
+    baselineWriteMs,
+    secondCostControlMs,
+    budgetCurrencyMs,
+    itemCountMs,
+    itemsMs,
+    rollupSourceMs,
+    costByCategoryMs,
+    mapMs: Date.now() - mapStarted,
+    totalMs: Date.now() - t0,
+  };
+  if (process.env.BLOQER_SCHEDULE_PROFILE === "1") {
+    console.info("[schedule-workspace] timings", lastScheduleWorkspaceTimings);
+  }
 
   return {
     type: "WORKSPACE",

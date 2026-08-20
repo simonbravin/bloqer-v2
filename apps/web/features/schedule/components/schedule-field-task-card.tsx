@@ -1,6 +1,6 @@
 "use client";
 
-import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
+import type { ScheduleFieldItemDto } from "@bloqer/services";
 import { Badge } from "@/components/ui/badge";
 import { formatDateRangeShortAr, formatDateShortAr } from "@/lib/gantt-date-format";
 import { cn } from "@/lib/utils";
@@ -18,8 +18,8 @@ export function ScheduleFieldTaskCard({
   item,
   onSelect,
 }: {
-  item: ScheduleWorkspaceItemDto;
-  onSelect: (item: ScheduleWorkspaceItemDto) => void;
+  item: ScheduleFieldItemDto;
+  onSelect: (item: ScheduleFieldItemDto) => void;
 }) {
   const primary = primaryWbsLink(item);
   const real = formatProgressPctLabel(item.progressPct);

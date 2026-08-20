@@ -26,7 +26,26 @@ async function settle(page: Page): Promise<void> {
   await page.waitForTimeout(400);
 }
 
+async function viewportHintForWidth(width: number): Promise<"sm" | "md" | "lg"> {
+  if (width >= 1024) return "lg";
+  if (width >= 768) return "md";
+  return "sm";
+}
+
+async function setViewportHintCookie(page: Page): Promise<void> {
+  const width = page.viewportSize()?.width ?? 390;
+  const origin = new URL(page.url() === "about:blank" ? "http://localhost:3000" : page.url()).origin;
+  await page.context().addCookies([
+    {
+      name: "bloqer-viewport",
+      value: await viewportHintForWidth(width),
+      url: origin,
+    },
+  ]);
+}
+
 async function gotoCronograma(page: Page, projectId: string, query = "field=today"): Promise<void> {
+  await setViewportHintCookie(page);
   const res = await page.goto(`/proyectos/${projectId}/cronograma?${query}`, {
     waitUntil: "domcontentloaded",
     timeout: 180_000,
@@ -65,7 +84,8 @@ test.describe("Cronograma Field", () => {
     await capture(page, "05-task-card-390.png");
 
     const queryMs = await page.getByTestId("schedule-field-view").getAttribute("data-query-ms");
-    console.log(`cronograma field queryMs=${queryMs}`);
+    const source = await page.getByTestId("schedule-field-view").getAttribute("data-schedule-source");
+    console.log(`cronograma field queryMs=${queryMs} source=${source}`);
 
     await page.getByTestId("schedule-field-chip-week").click();
     await expect(page.getByTestId("schedule-field-chip-week")).toHaveAttribute("aria-pressed", "true");

@@ -30,8 +30,8 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 - Silenciar tipo de notificación (Fase 2).
 
 ## 9. Pantallas y vistas necesarias
-- Campana en header: dropdown con las **últimas 5** no archivadas, badge solo si hay no leídas, enlace “Ver todas” (acceso principal a la bandeja; **sin** ítem en Configuración).
-- Centro `/notificaciones` con filtros (todas = no archivadas / no leídas / leídas / archivadas) y **paginación 20** por página. Sin búsqueda en esta fase.
+- Campana en header: dropdown con las **últimas 5** no archivadas, badge solo si hay no leídas, enlace “Ver todas” (acceso principal a la bandeja; **sin** ítem en el sidebar de empresa ni de obra — [D-087]; **sin** ítem en Configuración).
+- Centro `/notificaciones` con filtros (todas = no archivadas / no leídas / leídas / archivadas) y **paginación 20** por página. Sin búsqueda en esta fase. Mobile: enlace en **Más**.
 - `/notificaciones/alertas` y `/notificaciones/emails` (OWNER/ADMIN). Alertas: cron diario **12:00 UTC** en prod; panel = corrida manual. Vencimientos = día calendario **UTC**.
 
 ## 10. Reglas de negocio

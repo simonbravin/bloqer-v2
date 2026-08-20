@@ -2,10 +2,10 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import type { ScheduleWorkspaceDto, ScheduleWorkspaceItemDto } from "@bloqer/services";
+import type { ScheduleFieldItemDto, ScheduleFieldWorkspaceDto } from "@bloqer/services";
 import {
-  SCHEDULE_FIELD_LIST_LIMIT,
   filterAndSortScheduleFieldItems,
+  limitScheduleFieldItems,
   parseScheduleFieldFilter,
   scheduleFieldWindow,
   summarizeScheduleFieldKpis,
@@ -46,27 +46,30 @@ export function ScheduleFieldView({
   onFilterChange,
   queryMs,
 }: {
-  workspace: ScheduleWorkspaceDto;
+  workspace: Pick<ScheduleFieldWorkspaceDto, "projectId" | "items">;
   fieldParam: string | null;
   searchQuery: string;
   onSearchQueryChange: (value: string) => void;
-  onSelect: (item: ScheduleWorkspaceItemDto) => void;
+  onSelect: (item: ScheduleFieldItemDto) => void;
   onFilterChange: (filter: ScheduleFieldFilterId) => void;
   queryMs?: number;
 }) {
   const filter = parseScheduleFieldFilter(fieldParam) ?? "today";
   const window = useMemo(() => scheduleFieldWindow(), []);
   const kpis = useMemo(() => summarizeScheduleFieldKpis(workspace.items), [workspace.items]);
-  const delayedKpi = workspace.summary.delayedItems;
-  const items = useMemo(
+  const matched = useMemo(
     () => filterAndSortScheduleFieldItems(workspace.items, filter, window, searchQuery),
     [workspace.items, filter, window, searchQuery],
   );
-  const visible = items.slice(0, SCHEDULE_FIELD_LIST_LIMIT);
-  const truncated = items.length > visible.length;
+  const { visible, truncated, matchedCount } = limitScheduleFieldItems(matched);
 
   return (
-    <div className="space-y-4" data-testid="schedule-field-view" data-query-ms={queryMs}>
+    <div
+      className="space-y-4"
+      data-testid="schedule-field-view"
+      data-query-ms={queryMs}
+      data-schedule-source="field"
+    >
       <div className="grid grid-cols-4 gap-2" data-testid="schedule-field-kpis">
         <FieldKpi
           label="En curso"
@@ -76,8 +79,8 @@ export function ScheduleFieldView({
         />
         <FieldKpi
           label="Atrasadas"
-          value={delayedKpi}
-          tone={delayedKpi > 0 ? "danger" : undefined}
+          value={kpis.delayed}
+          tone={kpis.delayed > 0 ? "danger" : undefined}
           active={filter === "delayed"}
           onClick={() => onFilterChange("delayed")}
         />
@@ -158,7 +161,7 @@ export function ScheduleFieldView({
 
       {truncated ? (
         <p className="text-xs text-muted-foreground">
-          Mostrando {visible.length} de {items.length} tareas. Acotá con filtros o búsqueda.
+          Mostrando {visible.length} de {matchedCount} tareas. Acotá con filtros o búsqueda.
         </p>
       ) : null}
     </div>
@@ -176,7 +179,7 @@ export function ScheduleFieldViewSkeleton() {
       <Skeleton className="h-11 w-full rounded-lg" />
       <Skeleton className="h-11 w-full rounded-lg" />
       {Array.from({ length: 4 }).map((_, i) => (
-        <Skeleton key={i} className="h-28 w-full rounded-lg" />
+        <Skeleton key={i} className="h-28 rounded-lg" />
       ))}
     </div>
   );

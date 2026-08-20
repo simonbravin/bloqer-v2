@@ -229,6 +229,22 @@ export function filterAndSortScheduleFieldItems<T extends ScheduleFieldDateItem>
     .sort((a, b) => compareScheduleFieldItems(a, b, filter));
 }
 
+/**
+ * Display cap for Field cards. Always call **after** `filterAndSortScheduleFieldItems`
+ * so Hoy / Semana / Atrasadas never drop a matching leaf that sits past position 200
+ * of the unfiltered list.
+ */
+export function limitScheduleFieldItems<T>(
+  filteredSorted: T[],
+  limit = SCHEDULE_FIELD_LIST_LIMIT,
+): { visible: T[]; truncated: boolean; matchedCount: number } {
+  return {
+    visible: filteredSorted.slice(0, limit),
+    truncated: filteredSorted.length > limit,
+    matchedCount: filteredSorted.length,
+  };
+}
+
 export type ScheduleFieldStatusAction = "IN_PROGRESS" | "COMPLETED" | "BLOCKED";
 
 export function scheduleFieldStatusActions(

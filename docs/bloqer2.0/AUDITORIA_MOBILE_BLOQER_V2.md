@@ -410,7 +410,7 @@ Storage: si R2 no está configurado, el form muestra warning PLACEHOLDER (metada
 
 No portar el Gantt.
 
-**Fuente de datos (ya existe):** `ScheduleWorkspaceDto` / `getProjectScheduleWorkspace`.
+**Fuente de datos:** `< lg` → `getProjectScheduleFieldWorkspace` / `ScheduleFieldWorkspaceDto`. `≥ lg` → `getProjectScheduleWorkspace` / `ScheduleWorkspaceDto` (Gantt). Ver Resultado — Cronograma Field.
 
 Filtros posibles mapeados a query actuales:
 
@@ -971,11 +971,11 @@ Navega a flujos ya existentes: Nuevo parte, Registrar consumo, Subir documento/f
 
 ## 5. Más
 
-Sheet agrupado. **Proyecto** (si hay contexto): Resumen, Libro de obra, Materiales, Tablero de compras, Documentos, Cronograma — filtrados desde `buildProjectWorkspaceNavSections` (mismas gates que el sidebar). **General:** Pendientes, Proyectos, Directorio, Notificaciones (`buildGlobalNavSections`). **Cuenta:** Perfil, Cerrar sesión. Sin APU/conciliación/contabilidad. El drawer/sidebar Foundation sigue siendo el menú completo. Screenshot `08-mas-sheet-390.png`.
+Sheet agrupado. **Proyecto** (si hay contexto): Resumen, Pendientes (esta obra), Libro de obra, Materiales, Tablero de compras, Documentos, Cronograma — filtrados desde `buildProjectWorkspaceNavSections`. **General:** Pendientes (todas las obras), Proyectos, Directorio, Notificaciones (campana es el acceso principal; Más conserva el enlace — [D-087]). **Cuenta:** Perfil, Cerrar sesión. Sin APU/conciliación/contabilidad. El drawer/sidebar Foundation sigue siendo el menú completo. Screenshot `08-mas-sheet-390.png`.
 
-## 6. Bandeja `/pendientes`
+## 6. Bandeja `/pendientes` y `/proyectos/[id]/pendientes`
 
-Nueva ruta de presentación. No reemplaza `/notificaciones`.
+Nueva ruta de presentación. No reemplaza `/notificaciones`. [D-087]: inbox **personal de empresa** (`/pendientes`) + atajo **de obra** (`/proyectos/[id]/pendientes`, sidebar Resumen).
 
 Service read-only `getMyFieldPendingItems` / `getMyFieldPendingCounts`. Fuentes v1 (antes de Prisma, filtradas por `fieldPendingSourcesForActor`):
 
@@ -986,7 +986,7 @@ Service read-only `getMyFieldPendingItems` / `getMyFieldPendingCounts`. Fuentes 
 | Cert. cliente | `ISSUED` | `APPROVE CERTIFICATIONS` + CERTIFICATIONS | detalle |
 | Cert. subcontrato | `ISSUED` | `canEditSubcontractsArea` + SUBCONTRACTS | detalle |
 
-No hay tabla Pending. No se aprueba desde la card (`Revisar` → ficha). Chips: Todos / Compras / Obra / Certificaciones + `Todas las obras` si hay >1 proyecto. Empty: “No tenés acciones pendientes.” + Volver a mi obra / Ver notificaciones.
+No hay tabla Pending. No se aprueba desde la card (`Revisar` → ficha). Chips: Todos / Compras / Obra / Certificaciones; en la bandeja de empresa, `Todas las obras` si hay >1 proyecto. Empty: “No tenés acciones pendientes.” + CTA de obra según [D-087] (Volver a {código} / Ir a {código} / Ver proyectos) / Ver notificaciones.
 
 OWNER ve OC+parte+certs. PROJECT_MANAGER no recibe OC ni cert. cliente **en el service** (no solo UI). VIEWER: cero fuentes. Screenshots `06-pendientes-390.png`, `07-pendientes-compras-390.png`.
 
@@ -1045,11 +1045,28 @@ Materiales mobile completo; PWA/offline/push/GPS; gasto rápido; remito Prisma; 
 
 Screenshots: `docs/bloqer2.0/mobile-audit/after-schedule-field/`.
 
-Misma app Next.js, misma ruta `/proyectos/[id]/cronograma`, mismos `Schedule` / `ScheduleItem`, mismos services y actions. Sin `FieldTask`, sin tabla Prisma, sin API mobile, sin Gantt miniatura, sin drag, sin scroll horizontal.
+Misma app Next.js, misma ruta `/proyectos/[id]/cronograma`, mismos `Schedule` / `ScheduleItem`, mismos services y actions. Sin `FieldTask`, sin tabla Prisma, sin API mobile, sin Gantt miniatura, sin drag, sin scroll horizontal. Sin migraciones.
 
 ## Arquitectura
 
-**A — mismo `ScheduleWorkspaceDto` filtrado.** No se creó `getProjectScheduleFieldView`. La página sigue llamando `getProjectScheduleWorkspace`. Filtros Hoy/Semana/estado se aplican en helpers puros (`schedule-field.ts`) sobre el DTO existente (`daysLate`, `progressPct`, `timePlanPct`, WBS, predecesoras). El payload de control de costos sigue viajando (igual que desktop); el dataset demo es chico. Si un tenant llega a miles de ítems, el tope de lista Field es 200 cards y conviene entonces un read-model liviano **sin duplicar** `computeDaysLate` ni transiciones.
+**Antes (lote Field inicial):** la ruta siempre llamaba `getProjectScheduleWorkspace` (Gantt + control de costos + APU por categoría). Field filtraba el DTO desktop en cliente. Warm `data-query-ms` ≈ 4.5–5.3 s.
+
+**Después:** dos read-models, un solo árbol por request.
+
+| Viewport (`bloqer-viewport`) | Data source | UI |
+|---|---|---|
+| `sm` (&lt;768) o `md` (768–1023) o cookie ausente | `getProjectScheduleFieldWorkspace` | Cronograma Field |
+| `lg` (≥1024) | `getProjectScheduleWorkspace` (sin cambios) | Gantt / Kanban / tabla / calendario |
+
+La cookie reutiliza `ViewportHintSync` (matchMedia, no User-Agent). Se agregó el valor `lg` para distinguir 768 (Field) de 1440 (Gantt). El dashboard sigue tratando `md` **y** `lg` como desktop (`md` = ≥768 como antes).
+
+No se montan los dos árboles de datos en la misma request.
+
+DTO Field (`ScheduleFieldWorkspaceDto`): hojas activas con `id`, `name`, `type`, `status`, `blockReason`, fechas, `progressPct`, `timePlanPct`, `daysLate`, WBS, `predecessorIds` / `predecessorNames`, `canEdit`. KPIs hoja: en curso / atrasadas / bloqueadas / completadas.
+
+No carga: `getProjectCostControl`, APU / `costAnalysisLine`, métricas financieras por ítem, successors, rollup de contenedores para Gantt, `availableBudgets`.
+
+Permisos, gates `PROJECTS`+`SCHEDULE`, `computeDaysLate`, `computeTimePlanProgressPct` y `moveScheduleItemStatusAction` son los mismos. Filtros Hoy/Semana/estado siguen en helpers puros (`schedule-field.ts`).
 
 ## Filtros y deep links
 
@@ -1069,7 +1086,7 @@ Lunes–domingo de la semana calendario en TZ de producto (`productWeekMondaySun
 
 ## Semántica Atrasada
 
-La misma de desktop: `computeDaysLate` (hojas, no COMPLETED/CANCELLED, días calendario de producto posteriores a `endDate`). El KPI «Atrasadas» usa `workspace.summary.delayedItems`; la lista filtra `daysLate != null`.
+La misma de desktop: `computeDaysLate` (hojas, no COMPLETED/CANCELLED, días calendario de producto posteriores a `endDate`). El KPI «Atrasadas» usa `summarizeScheduleFieldKpis` sobre **todas** las hojas del read-model Field (no sobre el tope de 200).
 
 ## Timezone
 
@@ -1099,9 +1116,11 @@ Status y progreso siguen separados. No se asigna 50%/100% al cambiar estado. El 
 
 `canViewScheduleArea` / `canEditScheduleArea`. Módulo `SCHEDULE` (+ `PROJECTS`) igual que desktop. Sin permisos Field nuevos. Bottom nav sin sexto ítem: se llega desde Inicio, Más y Obra.
 
-## Escalabilidad
+## Escalabilidad / tope 200
 
-Workspace carga el árbol completo (igual que Gantt). Field lista solo hojas, tope 200, búsqueda cliente (nombre + EDT) sobre ese set.
+El read-model Field trae **todas** las hojas activas (sin paginación). Los chips filtran y ordenan en cliente (`history.replaceState`, sin refetch). El tope 200 es **solo display**: `filterAndSortScheduleFieldItems` y recién después `limitScheduleFieldItems` (slice 200).
+
+Si hay 300 hojas y una atrasada está en la posición 250 de «Todas», **sigue apareciendo en Atrasadas** (el filtro corre antes del cap). El KPI cuenta las 300. Si un filtro puntual supera 200 coincidencias, se muestran 200 y un texto «Mostrando 200 de N…». No hay paginación extra.
 
 ## Offline / PWA / push
 
@@ -1120,9 +1139,18 @@ No implementados.
 
 ## Playwright
 
-`docs/bloqer2.0/mobile-audit/cronograma-field.spec.ts` — skip `bloqer.app` / `vercel.app`. Viewports 390, 430, 768 (lista Field), 1440 (Gantt). 3 passed (OWNER 390 + VIEWER + 430/768/1440).
+`docs/bloqer2.0/mobile-audit/cronograma-field.spec.ts` — skip `bloqer.app` / `vercel.app`. Viewports 390, 430, 768 (lista Field), 1440 (Gantt). Cookie `bloqer-viewport` `sm`/`md`/`lg` alineada al viewport para no cargar el DTO desktop en mobile.
 
 ## Performance
 
-Medición local (dev, caliente, Neon `dev`): `data-query-ms` del workspace ~4.5–5.3 s (incluye `getProjectCostControl`, igual que desktop). Los chips Field **no** vuelven a consultar el servidor (`history.replaceState`). Visible time después del primer paint: inmediato al cambiar Hoy/Semana. El costo grande sigue siendo la carga inicial del DTO de Gantt/costos; no se duplicó dominio para un read-model B porque el demo es chico.
+Medición local (dev, caliente, Neon `dev`, DEMO-001):
+
+| | BEFORE (`getProjectScheduleWorkspace`) | AFTER (`getProjectScheduleFieldWorkspace`) |
+|---|---|---|
+| Causa | `getProjectCostControl` (certificaciones, OC, subcontratos, AP, inventario, partes, APU por categoría) + ítems/WBS/deps/métricas | Ítems + WBS + predecesoras |
+| `data-query-ms` warm | ≈ 4.5–5.3 s | (ver corrida de este lote) |
+| Queries Field | decenas (reporte de costos) | `ensureScheduleForProject` + `scheduleItem.findMany` |
+| Payload | DTO Gantt + métricas por ítem | hojas Field |
+
+Los chips Field **no** vuelven a consultar el servidor. Desktop ≥ `lg` sigue en el workspace completo; no se reemplazó su DTO.
 

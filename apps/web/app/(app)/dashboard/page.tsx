@@ -82,7 +82,7 @@ export default async function DashboardPage() {
 
   const jar = await cookies();
   const hint = parseViewportHint(jar.get(VIEWPORT_COOKIE)?.value);
-  const showFieldHome = hint !== "md";
+  const showFieldHome = hint !== "md" && hint !== "lg";
   const showDesktop = hint !== "sm";
 
   return (

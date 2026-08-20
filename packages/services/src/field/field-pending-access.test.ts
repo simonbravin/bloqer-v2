@@ -1,8 +1,9 @@
 import { can } from "@bloqer/domain";
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { ServiceError } from "../types";
 import { createTenantModuleGate } from "../tenant-modules/tenant-module-gate";
-import { fieldPendingSourceAllowed, fieldPendingSourcesForActor } from "./field-pending-access";
+import { fieldPendingSourceAllowed, fieldPendingSourcesForActor, parseFieldPendingGroup, resolveFieldPendingProjectFilter } from "./field-pending-access";
 
 const allOn = createTenantModuleGate(new Map());
 
@@ -34,4 +35,25 @@ test("disabled PROCUREMENT module omits purchase orders even for OWNER", () => {
   const gate = createTenantModuleGate(new Map([["PROCUREMENT", false]]));
   assert.equal(fieldPendingSourceAllowed(["OWNER"], gate, "PURCHASE_ORDER"), false);
   assert.equal(can(["OWNER"], "APPROVE", "PURCHASE_ORDERS"), true);
+});
+
+test("parseFieldPendingGroup accepts canonical ids only", () => {
+  assert.equal(parseFieldPendingGroup("compras"), "compras");
+  assert.equal(parseFieldPendingGroup("obra"), "obra");
+  assert.equal(parseFieldPendingGroup("certificaciones"), "certificaciones");
+  assert.equal(parseFieldPendingGroup("all"), undefined);
+  assert.equal(parseFieldPendingGroup(undefined), undefined);
+});
+
+test("resolveFieldPendingProjectFilter does not silently drop a bad id", () => {
+  assert.equal(resolveFieldPendingProjectFilter(undefined), undefined);
+  assert.equal(resolveFieldPendingProjectFilter(""), undefined);
+  assert.equal(
+    resolveFieldPendingProjectFilter("00000000-0000-4000-8000-000000000010"),
+    "00000000-0000-4000-8000-000000000010",
+  );
+  assert.throws(
+    () => resolveFieldPendingProjectFilter("not-a-uuid"),
+    (err: unknown) => err instanceof ServiceError && err.code === "VALIDATION",
+  );
 });

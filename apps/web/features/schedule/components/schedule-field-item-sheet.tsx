@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import type { ScheduleWorkspaceDto, ScheduleWorkspaceItemDto } from "@bloqer/services";
+import type { ScheduleFieldItemDto } from "@bloqer/services";
 import { scheduleFieldStatusActions } from "@bloqer/services/schedule-field";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -28,14 +28,14 @@ const ACTION_LABELS: Record<string, string> = {
 
 export function ScheduleFieldItemSheet({
   projectId,
-  workspace,
+  canEdit,
   item,
   open,
   onOpenChange,
 }: {
   projectId: string;
-  workspace: ScheduleWorkspaceDto;
-  item: ScheduleWorkspaceItemDto | null;
+  canEdit: boolean;
+  item: ScheduleFieldItemDto | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -51,15 +51,9 @@ export function ScheduleFieldItemSheet({
 
   const primary = item ? primaryWbsLink(item) : null;
   const isMilestone = item?.type === "MILESTONE";
-  const predecessors = useMemo(() => {
-    if (!item) return [];
-    return item.predecessorIds
-      .map((id) => workspace.items.find((row) => row.id === id)?.name)
-      .filter((name): name is string => Boolean(name));
-  }, [item, workspace.items]);
+  const predecessors = useMemo(() => item?.predecessorNames ?? [], [item]);
 
   const actions = item ? scheduleFieldStatusActions(item.status) : [];
-  const canEdit = workspace.canEdit;
   const primaryActions = actions.filter((action) => action !== "BLOCKED");
   const canBlock = actions.includes("BLOCKED");
 

@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import type { ScheduleItemStatus } from "@bloqer/database";
 import {
+  getProjectScheduleFieldWorkspace,
   getProjectScheduleWorkspace,
   getProjectShellInfo,
   parseScheduleFieldFilter,
@@ -11,8 +13,10 @@ import {
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { ScheduleWorkspace } from "@/features/schedule";
+import { ScheduleFieldExperience } from "@/features/schedule/components/schedule-field-experience";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { isScheduleFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -43,6 +47,27 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
+  }
+
+  const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
+  const loadField = isScheduleFieldViewport(hint);
+
+  if (loadField) {
+    const started = Date.now();
+    let field;
+    try {
+      field = await getProjectScheduleFieldWorkspace(projectId, ctx);
+    } catch (err) {
+      if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+      throw err;
+    }
+    const queryMs = Date.now() - started;
+    return (
+      <PageShell variant="default" className="space-y-6">
+        <ProjectPageHeader title="Cronograma" subtitle="Tareas de la obra" />
+        <ScheduleFieldExperience projectId={projectId} workspace={field} queryMs={queryMs} />
+      </PageShell>
+    );
   }
 
   let result;
