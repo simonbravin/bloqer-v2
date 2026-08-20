@@ -40,6 +40,8 @@ export default async function NuevaCertificacionPage({ params, searchParams }: P
     throw err;
   }
 
+  if (subcontract.projectId !== projectId) notFound();
+
   if (subcontract.status !== "ACTIVE") {
     redirect(`/proyectos/${projectId}/subcontratos/${subcontractId}`);
   }

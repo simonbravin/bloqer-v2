@@ -1,5 +1,6 @@
 import { prisma } from "@bloqer/database";
 import { ServiceError } from "../types";
+import { assertCompanyProjectScopeMatch } from "./assert-company-project-scope";
 
 export async function assertWbsLineForProject(
   wbsNodeId: string,
@@ -25,14 +26,21 @@ export async function assertCompanyMatchesProject(
   projectId: string,
   tenantId: string,
 ): Promise<void> {
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, tenantId },
-    select: { companyId: true },
+  const [project, company] = await Promise.all([
+    prisma.project.findFirst({
+      where: { id: projectId, tenantId },
+      select: { companyId: true },
+    }),
+    prisma.company.findFirst({
+      where: { id: companyId, tenantId },
+      select: { id: true },
+    }),
+  ]);
+  assertCompanyProjectScopeMatch({
+    project,
+    companyInTenant: Boolean(company),
+    companyId,
   });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.companyId && project.companyId !== companyId) {
-    throw new ServiceError("CONFLICT", "La empresa de la orden no coincide con la empresa del proyecto");
-  }
 }
 
 /** [D-068] Optional APU hint must belong to the same WBS ITEM cost item. */

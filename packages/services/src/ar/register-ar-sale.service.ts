@@ -35,6 +35,7 @@ import {
   assertPeriodOpenUnderCompanyLock,
   lockTreasuryAccountRow,
 } from "../treasury/treasury-write-locks";
+import { assertContactRoleMatchesTenant } from "../contact/assert-contact-role";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
@@ -268,19 +269,17 @@ export async function registerArSale(
     where: { id: input.clientContactId },
     select: { id: true, tenantId: true, status: true, country: true },
   });
-  if (!contact || contact.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Cliente no encontrado");
-  }
-  if (contact.status !== "ACTIVE") {
-    throw new ServiceError("CONFLICT", "El cliente seleccionado no está activo");
-  }
-
   const clientRole = await prisma.contactRole.findUnique({
     where: { contactId_role: { contactId: input.clientContactId, role: "CLIENT" } },
+    select: { tenantId: true, status: true },
   });
-  if (!clientRole || clientRole.tenantId !== ctx.tenantId || clientRole.status !== "ACTIVE") {
-    throw new ServiceError("CONFLICT", "El contacto seleccionado no tiene rol de cliente activo");
-  }
+  assertContactRoleMatchesTenant({
+    contact,
+    role: clientRole,
+    ctxTenantId: ctx.tenantId,
+    roleType: "CLIENT",
+    contactNotFoundMessage: "Cliente no encontrado",
+  });
 
   if (input.certificationId) {
     throw new ServiceError(
@@ -307,7 +306,7 @@ export async function registerArSale(
   assertInvoiceLetterOnIssue({
     invoiceLetter: input.invoiceLetter,
     companyCountry: company?.country,
-    counterpartyCountry: contact.country,
+    counterpartyCountry: contact!.country,
     documentLabel: "factura de venta",
   });
   const forceZeroTax = input.invoiceLetter === "C" || input.invoiceLetter === "E";

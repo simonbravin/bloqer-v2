@@ -16,6 +16,7 @@ import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
 import { assertArTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
+import { assertContactRoleMatchesTenant } from "../contact/assert-contact-role";
 import {
   isIdempotencyUniqueConflict,
   pickCompositeCollection,
@@ -239,19 +240,17 @@ export async function registerArIncome(
     where: { id: input.clientContactId },
     select: { id: true, tenantId: true, status: true, country: true },
   });
-  if (!contact || contact.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Cliente no encontrado");
-  }
-  if (contact.status !== "ACTIVE") {
-    throw new ServiceError("CONFLICT", "El cliente seleccionado no está activo");
-  }
-
   const clientRole = await prisma.contactRole.findUnique({
     where: { contactId_role: { contactId: input.clientContactId, role: "CLIENT" } },
+    select: { tenantId: true, status: true },
   });
-  if (!clientRole || clientRole.tenantId !== ctx.tenantId || clientRole.status !== "ACTIVE") {
-    throw new ServiceError("CONFLICT", "El contacto seleccionado no tiene rol de cliente activo");
-  }
+  assertContactRoleMatchesTenant({
+    contact,
+    role: clientRole,
+    ctxTenantId: ctx.tenantId,
+    roleType: "CLIENT",
+    contactNotFoundMessage: "Cliente no encontrado",
+  });
 
   const companyId = await resolveCompanyIdForAr(null, ctx);
   const company = await prisma.company.findUnique({
@@ -261,7 +260,7 @@ export async function registerArIncome(
   assertInvoiceLetterOnIssue({
     invoiceLetter: input.invoiceLetter,
     companyCountry: company?.country,
-    counterpartyCountry: contact.country,
+    counterpartyCountry: contact!.country,
     documentLabel: "factura de venta",
   });
   const forceZeroTax = input.invoiceLetter === "C" || input.invoiceLetter === "E";

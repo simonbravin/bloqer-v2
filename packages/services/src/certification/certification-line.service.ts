@@ -107,12 +107,18 @@ export async function addCertificationLine(
   }
   const cert = await _guardLine(input.certificationId, ctx);
 
-  // Validate wbsNode: must be ITEM type, must belong to cert's budget
+  // Validate wbsNode: must be ITEM type, must belong to cert's budget + tenant
   const wbsNode = await prisma.wbsNode.findUnique({
     where: { id: input.wbsNodeId },
-    include: { costItem: true },
+    include: {
+      costItem: true,
+      budget: { select: { tenantId: true } },
+    },
   });
   if (!wbsNode) throw new ServiceError("NOT_FOUND", "Nodo EDT no encontrado");
+  if (wbsNode.budget.tenantId !== ctx.tenantId) {
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  }
   if (wbsNode.budgetId !== cert.budgetId) {
     throw new ServiceError("CONFLICT", "El nodo EDT no pertenece al presupuesto de esta certificación");
   }

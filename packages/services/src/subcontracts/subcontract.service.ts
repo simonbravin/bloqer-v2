@@ -85,20 +85,6 @@ const subcontractInclude = {
   },
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-async function resolveCompanyId(projectId: string, ctx: ServiceContext): Promise<string> {
-  if (ctx.companyId) return ctx.companyId;
-  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { companyId: true } });
-  if (project?.companyId) return project.companyId;
-  const company = await prisma.company.findFirst({
-    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
-    orderBy: { createdAt: "asc" },
-  });
-  if (!company) throw new ServiceError("CONFLICT", "No hay empresa activa");
-  return company.id;
-}
-
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 export async function getSubcontractById(id: string, ctx: ServiceContext): Promise<SubcontractView> {

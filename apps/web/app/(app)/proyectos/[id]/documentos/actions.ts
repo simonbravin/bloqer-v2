@@ -8,6 +8,7 @@ import {
   getDocumentById,
   restoreDocument,
   softDeleteDocument,
+  ServiceError,
 } from "@bloqer/services";
 
 function getCtx(current: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
@@ -26,7 +27,7 @@ async function assertDocumentInProject(
 ): Promise<void> {
   const doc = await getDocumentById(documentId, ctx);
   if (doc.projectId !== projectId) {
-    throw new Error("El documento no pertenece a este proyecto");
+    throw new ServiceError("FORBIDDEN", "El documento no pertenece a este proyecto");
   }
 }
 

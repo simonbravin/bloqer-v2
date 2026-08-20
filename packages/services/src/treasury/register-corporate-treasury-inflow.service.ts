@@ -8,6 +8,7 @@ import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/r
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
+import { assertContactRoleMatchesTenant } from "../contact/assert-contact-role";
 import { ensureDraftJournalFromTreasuryMovement } from "../accounting/accounting-auto-draft.service";
 import {
   requireIdempotencyKey,
@@ -92,22 +93,17 @@ export async function registerCorporateTreasuryInflow(
             where: { id: counterpartyContactId },
             select: { id: true, tenantId: true, status: true },
           });
-          if (!contact || contact.tenantId !== ctx.tenantId) {
-            throw new ServiceError("NOT_FOUND", "Contacto de contraparte no encontrado");
-          }
-          if (contact.status !== "ACTIVE") {
-            throw new ServiceError("CONFLICT", "El contacto de contraparte no está activo");
-          }
-
           const clientRole = await tx.contactRole.findUnique({
             where: { contactId_role: { contactId: counterpartyContactId, role: "CLIENT" } },
+            select: { tenantId: true, status: true },
           });
-          if (!clientRole || clientRole.tenantId !== ctx.tenantId || clientRole.status !== "ACTIVE") {
-            throw new ServiceError(
-              "CONFLICT",
-              "El contacto seleccionado no tiene rol de cliente activo",
-            );
-          }
+          assertContactRoleMatchesTenant({
+            contact,
+            role: clientRole,
+            ctxTenantId: ctx.tenantId,
+            roleType: "CLIENT",
+            contactNotFoundMessage: "Contacto de contraparte no encontrado",
+          });
         }
 
         await tx.accountMovement.create({
