@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idempotencyKeySchema } from "./idempotency";
 
 export const createProductSchema = z.object({
   companyId:   z.string().uuid().optional().nullable(),
@@ -35,13 +36,14 @@ export const updateWarehouseSchema = z.object({
 });
 
 export const createStockConsumptionSchema = z.object({
-  projectId:    z.string().uuid(),
-  warehouseId:  z.string().uuid(),
-  productId:    z.string().uuid(),
-  wbsNodeId:    z.string().uuid().optional().nullable(),
-  quantity:     z.string().regex(/^\d+(\.\d+)?$/, "Cantidad inválida"),
-  movementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  notes:        z.string().optional().nullable(),
+  projectId:         z.string().uuid(),
+  warehouseId:       z.string().uuid(),
+  productId:         z.string().uuid(),
+  wbsNodeId:         z.string().uuid().optional().nullable(),
+  quantity:          z.string().regex(/^\d+(\.\d+)?$/, "Cantidad inválida"),
+  movementDate:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  notes:             z.string().optional().nullable(),
+  idempotencyKey:    idempotencyKeySchema,
 });
 
 export const createWarehouseTransferSchema = z.object({
@@ -53,6 +55,7 @@ export const createWarehouseTransferSchema = z.object({
   quantity:               z.string().regex(/^\d+(\.\d+)?$/, "Cantidad inválida"),
   unitCost:               z.string().regex(/^\d+(\.\d+)?$/).optional().nullable(),
   notes:                  z.string().optional().nullable(),
+  idempotencyKey:         idempotencyKeySchema,
 });
 
 export type CreateProductInput             = z.infer<typeof createProductSchema>;

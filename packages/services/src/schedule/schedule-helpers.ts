@@ -1,6 +1,6 @@
 import { Prisma } from "@bloqer/database";
 import type { ScheduleItemStatus } from "@bloqer/database";
-import { divideDecimal, multiplyDecimal } from "@bloqer/utils";
+import { divideDecimal, multiplyDecimal, productCalendarDateUtc } from "@bloqer/utils";
 import { ServiceError } from "../types";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
 
@@ -259,12 +259,15 @@ export function assertScheduleStatusTransition(
   }
 }
 
-export function computeDaysLate(endDate: Date | null, status: ScheduleItemStatus): number | null {
+export function computeDaysLate(
+  endDate: Date | null,
+  status: ScheduleItemStatus,
+  now: Date = new Date(),
+): number | null {
   if (!endDate || status === "COMPLETED" || status === "CANCELLED") return null;
-  const today = new Date();
+  const today = productCalendarDateUtc(now).getTime();
   const end = Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate());
-  const now = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-  const diff = Math.floor((now - end) / MS_PER_DAY);
+  const diff = Math.floor((today - end) / MS_PER_DAY);
   return diff > 0 ? diff : null;
 }
 
@@ -272,20 +275,20 @@ export function computeDaysLate(endDate: Date | null, status: ScheduleItemStatus
 export function computeTimePlanProgressPct(
   startDate: string | null,
   endDate: string | null,
+  now: Date = new Date(),
 ): string | null {
   if (!startDate || !endDate) return null;
   const start = parseDateOnly(startDate);
   const end = parseDateOnly(endDate);
-  const today = new Date();
   const t0 = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
   const t1 = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
-  const now = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const nowMs = productCalendarDateUtc(now).getTime();
   const total = t1 - t0;
-  if (total <= 0) return now >= t1 ? "100.00" : "0.00";
-  if (now <= t0) return "0.00";
-  if (now >= t1) return "100.00";
+  if (total <= 0) return nowMs >= t1 ? "100.00" : "0.00";
+  if (nowMs <= t0) return "0.00";
+  if (nowMs >= t1) return "100.00";
   return serializeProgressPct(
-    divideDecimal(multiplyDecimal(String(now - t0), "100"), String(total), 2),
+    divideDecimal(multiplyDecimal(String(nowMs - t0), "100"), String(total), 2),
   );
 }
 

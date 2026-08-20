@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,13 +12,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  JobsiteLogForm,
-  type ContactOption,
-  type ProductOption,
-  type SubcontractOption,
-  type WarehouseOption,
-  type WbsItemOption,
+import { useHasMounted, useIsMdUp } from "@/lib/media-query";
+import { JobsiteLogCreateComposer } from "./jobsite-log-create-composer";
+import type {
+  ContactOption,
+  ProductOption,
+  SubcontractOption,
+  WarehouseOption,
+  WbsItemOption,
 } from "./jobsite-log-form";
 import type { WbsIncrementalProgressSnapshot } from "@bloqer/services";
 
@@ -58,10 +60,18 @@ export function NewJobsiteLogDialog({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(defaultOpen);
+  const hasMounted = useHasMounted();
+  const isMdUp = useIsMdUp();
+  const nuevoHref = `/proyectos/${projectId}/libro-obra/nuevo`;
 
   useEffect(() => {
     if (defaultOpen) setOpen(true);
   }, [defaultOpen]);
+
+  useEffect(() => {
+    if (!hasMounted || isMdUp || !defaultOpen) return;
+    router.replace(nuevoHref);
+  }, [hasMounted, isMdUp, defaultOpen, router, nuevoHref]);
 
   function clearCreateQueryParam() {
     if (searchParams.get("create") !== "1") return;
@@ -80,6 +90,14 @@ export function NewJobsiteLogDialog({
     setOpen(false);
   }
 
+  if (hasMounted && !isMdUp) {
+    return (
+      <Button asChild className="min-h-11">
+        <Link href={nuevoHref}>{triggerLabel}</Link>
+      </Button>
+    );
+  }
+
   return (
     <Dialog
       open={open}
@@ -89,7 +107,7 @@ export function NewJobsiteLogDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button>{triggerLabel}</Button>
+        <Button className="min-h-11 md:min-h-9">{triggerLabel}</Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
@@ -99,7 +117,7 @@ export function NewJobsiteLogDialog({
           </DialogDescription>
         </DialogHeader>
         {open ? (
-          <JobsiteLogForm
+          <JobsiteLogCreateComposer
             projectId={projectId}
             companyId={companyId}
             wbsOptions={wbsOptions}

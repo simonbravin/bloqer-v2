@@ -74,6 +74,18 @@ function utcNoonForParts(parts: CalendarDateParts): Date {
   return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0, 0));
 }
 
+/**
+ * UTC midnight of the calendar Y-M-D in `timeZone` (product TZ by default).
+ * Use this to compare Prisma `@db.Date` values (stored as UTC midnight), not UTC noon.
+ */
+export function productCalendarDateUtc(
+  now: Date = new Date(),
+  timeZone: string = PRODUCT_TIMEZONE,
+): Date {
+  const parts = calendarPartsInTimeZone(now, timeZone);
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 0, 0, 0, 0));
+}
+
 /** Subtract calendar days from a Y-M-D (timezone-safe via UTC noon pivot). */
 export function addCalendarDays(parts: CalendarDateParts, deltaDays: number): CalendarDateParts {
   const pivot = utcNoonForParts(parts);

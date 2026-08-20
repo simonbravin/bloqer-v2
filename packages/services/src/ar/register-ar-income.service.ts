@@ -16,7 +16,14 @@ import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
 import { assertArTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
-import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
+import {
+  isIdempotencyUniqueConflict,
+  pickCompositeCollection,
+  registerArSaleReplayMatches,
+  requireIdempotencyKey,
+  withIdempotentCreate,
+} from "../idempotency/idempotency";
+import { recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { resolveCompanyIdForAr } from "./sales-invoice.service";
 import {
@@ -48,6 +55,118 @@ type ArIncomeOutcome = {
   movementId?: string;
   collectAccountId?: string;
 };
+
+type ArIncomeReplay = {
+  outcome: ArIncomeOutcome;
+  status: string;
+  clientContactId: string;
+  projectId: string | null;
+  issueDate: Date;
+  dueDate: Date;
+  currency: string;
+  invoiceLetter: string | null;
+  externalInvoiceRef: string | null;
+  createdAt: Date;
+  receivableId: string | null;
+  lines: Array<{
+    description: string;
+    quantity: Prisma.Decimal;
+    unitPrice: Prisma.Decimal;
+    taxRate: Prisma.Decimal;
+    sortOrder: number;
+    certificationLineId: string | null;
+  }>;
+  collections: Array<{
+    id: string;
+    receivableId: string;
+    accountId: string;
+    collectionDate: Date;
+    amount: Prisma.Decimal;
+    status: string;
+    createdAt: Date;
+  }>;
+};
+
+async function loadArIncomeReplay(
+  tenantId: string,
+  idempotencyKey: string,
+  collectNow?: {
+    accountId: string;
+    collectionDate: string;
+    collectFullBalance?: boolean;
+    amount?: string | null;
+  },
+): Promise<ArIncomeReplay | null> {
+  const invoice = await prisma.salesInvoice.findFirst({
+    where: { tenantId, idempotencyKey },
+    include: {
+      lines: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      receivable: { select: { id: true } },
+      collections: {
+        where: { status: "CONFIRMED" },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          receivableId: true,
+          accountId: true,
+          collectionDate: true,
+          amount: true,
+          status: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+  if (!invoice) return null;
+
+  let collectionId: string | undefined;
+  let movementId: string | undefined;
+  let collectAccountId: string | undefined;
+  const collection = pickCompositeCollection(
+    invoice.createdAt,
+    invoice.receivable?.id ?? null,
+    invoice.collections,
+    collectNow,
+  );
+  if (collection) {
+    collectionId = collection.id;
+    collectAccountId = collection.accountId;
+    const movement = await prisma.accountMovement.findFirst({
+      where: {
+        tenantId,
+        sourceType: "COLLECTION",
+        sourceId: collection.id,
+        status: { in: ["CONFIRMED", "RECONCILED"] },
+      },
+      select: { id: true },
+    });
+    movementId = movement?.id;
+  }
+
+  return {
+    outcome: {
+      invoiceId: invoice.id,
+      receivableId: invoice.receivable?.id ?? "",
+      number: invoice.number,
+      companyId: invoice.companyId,
+      collectionId,
+      movementId,
+      collectAccountId,
+    },
+    status: invoice.status,
+    clientContactId: invoice.clientContactId,
+    projectId: invoice.projectId,
+    issueDate: invoice.issueDate,
+    dueDate: invoice.dueDate,
+    currency: invoice.currency,
+    invoiceLetter: invoice.invoiceLetter,
+    externalInvoiceRef: invoice.externalInvoiceRef,
+    createdAt: invoice.createdAt,
+    receivableId: invoice.receivable?.id ?? null,
+    lines: invoice.lines,
+    collections: invoice.collections,
+  };
+}
 
 function buildArIncomeTraceChain(outcome: ArIncomeOutcome): FinancialTraceLink[] {
   const chain: FinancialTraceLink[] = [
@@ -168,10 +287,20 @@ export async function registerArIncome(
     })(),
   });
 
-  let outcome!: ArIncomeOutcome;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      outcome = await prisma.$transaction(async (tx) => {
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+
+  const replay = await withIdempotentCreate({
+    findExisting: () => loadArIncomeReplay(ctx.tenantId, idempotencyKey, input.collectNow),
+    payloadsMatch: (existing) =>
+      registerArSaleReplayMatches(existing, {
+        ...input,
+        projectId: null,
+      }),
+    create: async () => {
+      let createdOutcome!: ArIncomeOutcome;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          createdOutcome = await prisma.$transaction(async (tx) => {
         const maxNum = await tx.salesInvoice.aggregate({
           where: { tenantId: ctx.tenantId, companyId },
           _max: { number: true },
@@ -193,6 +322,7 @@ export async function registerArIncome(
             notes: input.notes ?? null,
             internalNotes: input.internalNotes ?? null,
             externalInvoiceRef: input.externalInvoiceRef ?? null,
+            idempotencyKey,
             createdBy: ctx.actorUserId,
             updatedBy: ctx.actorUserId,
           },
@@ -333,6 +463,7 @@ export async function registerArIncome(
               paymentMethod: input.collectNow.paymentMethod ?? null,
               reference: input.collectNow.reference ?? null,
               notes: input.collectNow.notes ?? null,
+              idempotencyKey: requireIdempotencyKey(input.collectNow.idempotencyKey),
               status: "CONFIRMED",
               createdBy: ctx.actorUserId,
               updatedBy: ctx.actorUserId,
@@ -421,15 +552,31 @@ export async function registerArIncome(
           collectAccountId,
         };
       });
-      break;
-    } catch (err) {
-      if (attempt === 0 && isUniqueConstraintError(err)) continue;
-      throw err;
-    }
-  }
-  if (!outcome) {
-    throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
-  }
+          break;
+        } catch (err) {
+          if (isIdempotencyUniqueConflict(err)) throw err;
+          if (attempt === 0 && isUniqueConstraintError(err)) continue;
+          throw err;
+        }
+      }
+      if (!createdOutcome) {
+        throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
+      }
+
+      const row = await loadArIncomeReplay(ctx.tenantId, idempotencyKey, input.collectNow);
+      if (!row) {
+        throw new ServiceError("CONFLICT", "No se pudo recargar la factura registrada");
+      }
+      if (createdOutcome.collectionId && !row.outcome.collectionId) {
+        row.outcome.collectionId = createdOutcome.collectionId;
+        row.outcome.movementId = createdOutcome.movementId;
+        row.outcome.collectAccountId = createdOutcome.collectAccountId;
+      }
+      return row;
+    },
+  });
+
+  const outcome = replay.outcome;
 
   await ensureDraftJournalFromSalesInvoice(outcome.invoiceId, ctx);
   if (outcome.collectionId) {

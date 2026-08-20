@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button }   from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { WbsIncrementalProgressSnapshot } from "@bloqer/services";
+import { toIsoDateInTimeZone } from "@bloqer/utils";
 import {
   JOBSITE_SHIFT_OPTIONS,
   JOBSITE_WEATHER_OPTIONS,
@@ -148,9 +149,15 @@ type Props = {
   };
   submitLabel?: string;
   mode?: "create" | "edit";
+  extraSections?: ReactNode;
   onCancel?: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (id: string) => void;
+  onCreated?: (id: string) => Promise<{ navigate?: boolean; message?: string } | void>;
 };
+
+function todayLocalInputDate(): string {
+  return toIsoDateInTimeZone();
+}
 
 const SELECT_NONE = "__none__";
 const SHIFT_CUSTOM = "__custom_shift__";
@@ -163,8 +170,10 @@ export function JobsiteLogForm({
   legacyPhysicalPctWarning = false,
   stockPreviewAction,
   action, defaultValues, submitLabel = "Crear parte", mode = "create",
+  extraSections,
   onCancel,
   onSuccess,
+  onCreated,
 }: Props) {
   const router = useRouter();
 
@@ -360,12 +369,28 @@ export function JobsiteLogForm({
       if ("error" in result) {
         setError(result.error);
       } else {
-        toast.success(mode === "edit" ? "Parte actualizado." : "Parte guardado.");
-        onSuccess?.();
+        let created: { navigate?: boolean; message?: string } | void = undefined;
+        try {
+          created = await onCreated?.(result.id);
+        } catch {
+          created = {
+            navigate: false,
+            message: "Parte creado correctamente. Alguna foto no pudo subirse.",
+          };
+        }
+        if (created?.message) {
+          toast.warning(created.message);
+        } else {
+          toast.success(mode === "edit" ? "Parte actualizado." : "Parte guardado.");
+        }
+        if (created?.navigate === false) {
+          setPending(false);
+          return;
+        }
+        onSuccess?.(result.id);
         if (mode === "edit") {
           router.push("..");
         } else {
-          // replace avoids Back landing on ?create=1 and reopening the dialog
           router.replace(`/proyectos/${projectId}/libro-obra/${result.id}`);
         }
         router.refresh();
@@ -406,7 +431,14 @@ export function JobsiteLogForm({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="space-y-1">
             <Label htmlFor="logDate">Fecha *</Label>
-            <Input id="logDate" name="logDate" type="date" required defaultValue={defaultValues?.logDate} />
+            <Input
+              id="logDate"
+              name="logDate"
+              type="date"
+              required
+              className="min-h-11 md:min-h-10"
+              defaultValue={defaultValues?.logDate ?? (mode === "create" ? todayLocalInputDate() : undefined)}
+            />
           </div>
           <div className="space-y-1">
             <Label>Turno</Label>
@@ -418,7 +450,7 @@ export function JobsiteLogForm({
                 setShift(v === SELECT_NONE ? "" : v);
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="min-h-11 md:min-h-10">
                 <SelectValue placeholder="Seleccionar…" />
               </SelectTrigger>
               <SelectContent>
@@ -442,7 +474,7 @@ export function JobsiteLogForm({
                 setWeather(v === SELECT_NONE ? "" : v);
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="min-h-11 md:min-h-10">
                 <SelectValue placeholder="Seleccionar…" />
               </SelectTrigger>
               <SelectContent>
@@ -467,7 +499,7 @@ export function JobsiteLogForm({
       <section className="form-section space-y-3 p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Avance de obra</h2>
-          <Button type="button" variant="outline" size="sm" onClick={() => setProgress((p) => [...p, { ...DEFAULT_PROGRESS }])}>
+          <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={() => setProgress((p) => [...p, { ...DEFAULT_PROGRESS }])}>
             + Agregar fila
           </Button>
         </div>
@@ -491,7 +523,7 @@ export function JobsiteLogForm({
                   <Label className="text-xs">Partida EDT</Label>
                   <SearchableCombobox
                     popoverWidth="wide"
-                    className="h-8 text-xs w-full"
+                    className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"
                     options={progressWbsOptions}
                     value={row.wbsNodeId}
                     onValueChange={(v) => updateProgress(i, "wbsNodeId", v)}
@@ -501,19 +533,19 @@ export function JobsiteLogForm({
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Descripción</Label>
-                  <Input className="h-8 text-xs" value={row.description} onChange={(e) => updateProgress(i, "description", e.target.value)} />
+                  <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.description} onChange={(e) => updateProgress(i, "description", e.target.value)} />
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">
                       Cantidad{wbs?.unit ? ` (${wbs.unit})` : ""}
                     </Label>
-                    <Input className="h-8 text-xs" value={row.quantityCompleted} onChange={(e) => updateProgress(i, "quantityCompleted", e.target.value)} placeholder="0.00" />
+                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.quantityCompleted} onChange={(e) => updateProgress(i, "quantityCompleted", e.target.value)} placeholder="0.00" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">% del día</Label>
                     <Input
-                      className="h-8 text-xs"
+                      className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"
                       value={row.physicalPct}
                       onChange={(e) => updateProgress(i, "physicalPct", e.target.value)}
                       placeholder="0"
@@ -522,13 +554,13 @@ export function JobsiteLogForm({
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Avance acumulado</Label>
-                    <div className="h-8 flex items-center rounded-md border bg-muted/40 px-2 text-xs font-mono tabular-nums">
+                    <div className="flex h-11 min-h-11 items-center rounded-md border bg-muted/40 px-2 text-xs font-mono tabular-nums md:h-8 md:min-h-8">
                       {cumulativePctLabel(row.wbsNodeId, progress, wbsProgressSnapshot)}
                     </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Notas</Label>
-                    <Input className="h-8 text-xs" value={row.notes} onChange={(e) => updateProgress(i, "notes", e.target.value)} />
+                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateProgress(i, "notes", e.target.value)} />
                   </div>
                 </div>
                 {row.wbsNodeId !== "__none__" ? (
@@ -556,7 +588,7 @@ export function JobsiteLogForm({
       <section className="form-section space-y-3 p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Mano de obra</h2>
-          <Button type="button" variant="outline" size="sm" onClick={() => setLabor((p) => [...p, { ...DEFAULT_LABOR }])}>
+          <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={() => setLabor((p) => [...p, { ...DEFAULT_LABOR }])}>
             + Agregar fila
           </Button>
         </div>
@@ -571,7 +603,7 @@ export function JobsiteLogForm({
                     <Label className="text-xs">Contacto</Label>
                     <SearchableCombobox
                       popoverWidth="wide"
-                      className="h-8 text-xs w-full"
+                      className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"
                       options={contactComboboxOptions}
                       value={row.contactId}
                       onValueChange={(v) => updateLabor(i, "contactId", v)}
@@ -583,7 +615,7 @@ export function JobsiteLogForm({
                     <Label className="text-xs">Subcontrato</Label>
                     <SearchableCombobox
                       popoverWidth="wide"
-                      className="h-8 text-xs w-full"
+                      className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"
                       options={subcontractComboboxOptions}
                       value={row.subcontractId}
                       onValueChange={(v) => updateLabor(i, "subcontractId", v)}
@@ -595,20 +627,20 @@ export function JobsiteLogForm({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="space-y-1 sm:col-span-2">
                     <Label className="text-xs">Descripción cuadrilla</Label>
-                    <Input className="h-8 text-xs" value={row.crewDescription} onChange={(e) => updateLabor(i, "crewDescription", e.target.value)} />
+                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.crewDescription} onChange={(e) => updateLabor(i, "crewDescription", e.target.value)} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Trabajadores</Label>
-                    <Input className="h-8 text-xs" type="number" min="1" value={row.workersCount} onChange={(e) => updateLabor(i, "workersCount", e.target.value)} />
+                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" type="number" min="1" value={row.workersCount} onChange={(e) => updateLabor(i, "workersCount", e.target.value)} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Horas</Label>
-                    <Input className="h-8 text-xs" value={row.hoursWorked} onChange={(e) => updateLabor(i, "hoursWorked", e.target.value)} placeholder="0.00" />
+                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.hoursWorked} onChange={(e) => updateLabor(i, "hoursWorked", e.target.value)} placeholder="0.00" />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Notas</Label>
-                  <Input className="h-8 text-xs" value={row.notes} onChange={(e) => updateLabor(i, "notes", e.target.value)} />
+                  <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateLabor(i, "notes", e.target.value)} />
                 </div>
                 <div className="flex justify-end">
                   <Button type="button" variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => setLabor((p) => p.filter((_, idx) => idx !== i))}>Eliminar fila</Button>
@@ -636,7 +668,7 @@ export function JobsiteLogForm({
               <p className="text-xs text-muted-foreground mt-0.5">Sin control de stock (módulo inventario no disponible).</p>
             )}
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => setMaterials((p) => [...p, { ...DEFAULT_MATERIAL }])}>
+          <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={() => setMaterials((p) => [...p, { ...DEFAULT_MATERIAL }])}>
             + Agregar fila
           </Button>
         </div>
@@ -659,7 +691,7 @@ export function JobsiteLogForm({
                       <Label className="text-xs">Producto</Label>
                       <SearchableCombobox
                         popoverWidth="wide"
-                        className="h-8 text-xs w-full"
+                        className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"
                         options={productComboboxOptions}
                         value={row.productId}
                         onValueChange={(v) => updateMaterial(i, "productId", v)}
@@ -670,7 +702,7 @@ export function JobsiteLogForm({
                     <div className="space-y-1">
                       <Label className="text-xs">Depósito</Label>
                       <Select value={row.warehouseId} onValueChange={(v) => updateMaterial(i, "warehouseId", v)}>
-                        <SelectTrigger className="h-8 text-xs w-full"><SelectValue placeholder="— ninguno —" /></SelectTrigger>
+                        <SelectTrigger className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"><SelectValue placeholder="— ninguno —" /></SelectTrigger>
                         <SelectContent className="min-w-[var(--radix-select-trigger-width)] w-max max-w-[min(28rem,90vw)]">
                           <SelectItem value="__none__">— ninguno —</SelectItem>
                           {warehouseOptions.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
@@ -687,16 +719,16 @@ export function JobsiteLogForm({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1 sm:col-span-2">
                       <Label className="text-xs">Descripción *</Label>
-                      <Input className="h-8 text-xs" value={row.description} onChange={(e) => updateMaterial(i, "description", e.target.value)} />
+                      <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.description} onChange={(e) => updateMaterial(i, "description", e.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Cantidad</Label>
-                      <Input className="h-8 text-xs" value={row.quantity} onChange={(e) => updateMaterial(i, "quantity", e.target.value)} placeholder="0.00" />
+                      <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.quantity} onChange={(e) => updateMaterial(i, "quantity", e.target.value)} placeholder="0.00" />
                     </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Notas</Label>
-                    <Input className="h-8 text-xs" value={row.notes} onChange={(e) => updateMaterial(i, "notes", e.target.value)} />
+                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateMaterial(i, "notes", e.target.value)} />
                   </div>
                   <div className="flex justify-end">
                     <Button type="button" variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => setMaterials((p) => p.filter((_, idx) => idx !== i))}>Eliminar fila</Button>
@@ -708,11 +740,13 @@ export function JobsiteLogForm({
         )}
       </section>
 
+      {extraSections}
+
       {/* ── Issues ── */}
       <section className="form-section space-y-3 p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Problemas / Incidencias</h2>
-          <Button type="button" variant="outline" size="sm" onClick={() => setIssues((p) => [...p, { ...DEFAULT_ISSUE }])}>
+          <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={() => setIssues((p) => [...p, { ...DEFAULT_ISSUE }])}>
             + Agregar fila
           </Button>
         </div>
@@ -726,7 +760,7 @@ export function JobsiteLogForm({
                   <div className="space-y-1">
                     <Label className="text-xs">Tipo</Label>
                     <Select value={row.type} onValueChange={(v) => updateIssue(i, "type", v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="INCIDENT">Incidente</SelectItem>
                         <SelectItem value="BLOCKER">Bloqueo</SelectItem>
@@ -738,7 +772,7 @@ export function JobsiteLogForm({
                   <div className="space-y-1">
                     <Label className="text-xs">Severidad</Label>
                     <Select value={row.severity} onValueChange={(v) => updateIssue(i, "severity", v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="LOW">Baja</SelectItem>
                         <SelectItem value="MEDIUM">Media</SelectItem>
@@ -750,7 +784,7 @@ export function JobsiteLogForm({
                   <div className="space-y-1">
                     <Label className="text-xs">Estado</Label>
                     <Select value={row.status} onValueChange={(v) => updateIssue(i, "status", v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="OPEN">Abierto</SelectItem>
                         <SelectItem value="RESOLVED">Resuelto</SelectItem>
@@ -762,12 +796,12 @@ export function JobsiteLogForm({
                 <div className="space-y-1">
                   <Label className="text-xs">Descripción *</Label>
                   {/* No HTML required: empty draft rows are dropped on submit (same as materials filter). */}
-                  <Input className="h-8 text-xs" value={row.description} onChange={(e) => updateIssue(i, "description", e.target.value)} />
+                  <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.description} onChange={(e) => updateIssue(i, "description", e.target.value)} />
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div className="min-w-0 flex-1 space-y-1">
                     <Label className="text-xs">Notas</Label>
-                    <Input className="h-8 text-xs" value={row.notes} onChange={(e) => updateIssue(i, "notes", e.target.value)} />
+                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateIssue(i, "notes", e.target.value)} />
                   </div>
                   <Button
                     type="button"
@@ -787,11 +821,18 @@ export function JobsiteLogForm({
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <div className="flex gap-3">
-        <Button type="submit" disabled={pending || stockExceeded}>{pending ? "Guardando…" : submitLabel}</Button>
+      <div className="sticky bottom-0 z-20 -mx-1 flex flex-col gap-2 border-t bg-background/95 p-3 backdrop-blur sm:flex-row md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        <Button
+          type="submit"
+          className="min-h-11 md:min-h-9"
+          disabled={pending || stockExceeded}
+        >
+          {pending ? "Guardando…" : submitLabel}
+        </Button>
         <Button
           type="button"
           variant="outline"
+          className="min-h-11 md:min-h-9"
           disabled={pending}
           onClick={() => (onCancel ? onCancel() : router.back())}
         >

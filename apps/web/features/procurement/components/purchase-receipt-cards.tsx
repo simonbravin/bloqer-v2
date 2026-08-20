@@ -30,6 +30,12 @@ export function PurchaseReceiptCards({
             <PurchaseReceiptStatusBadge status={r.status} />
           </div>
           <p className="mt-2 font-semibold">{r.supplierName}</p>
+          {r.lineCount != null ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {r.lineCount === 1 ? "1 línea" : `${r.lineCount} líneas`}
+              {r.quantitySummary ? ` · ${r.quantitySummary}` : ""}
+            </p>
+          ) : null}
           <p className="mt-3 text-sm text-muted-foreground">
             {formatDate(r.receiptDate)}
           </p>

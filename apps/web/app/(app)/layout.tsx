@@ -9,6 +9,7 @@ import {
   isPlatformSuperadmin,
   getTenantLogoDisplayMeta,
 } from "@bloqer/services";
+import { getCachedFieldPendingCounts } from "@/lib/rsc-cached-tenant";
 
 export default async function AppGroupLayout({ children }: { children: React.ReactNode }) {
   const current = await getCurrentUser();
@@ -19,20 +20,6 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
     if (!platform) redirect("/onboarding");
   }
 
-  let notificationUnreadCount = 0;
-  if (current.tenantCtx) {
-    try {
-      notificationUnreadCount = await getUnreadNotificationCount({
-        actorUserId: current.session.user.id!,
-        tenantId:    current.tenantCtx.tenantId,
-        companyId:   current.tenantCtx.companyId,
-        roles:       current.tenantCtx.roles,
-      });
-    } catch {
-      /* badge is best-effort; never break the app shell */
-    }
-  }
-
   let showPlatformLink = false;
   try {
     showPlatformLink = await isPlatformSuperadmin(current.session.user.id!);
@@ -40,27 +27,33 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
     showPlatformLink = false;
   }
 
+  let notificationUnreadCount = 0;
+  let pendingCount = 0;
   let moduleGateSnapshot: Partial<Record<PermissionModule, boolean>> | undefined;
   let hasTenantLogo = false;
   let tenantLogoVersion: string | null = null;
+
   if (current.tenantCtx) {
     const ctx = await buildTenantServiceContext();
     if (ctx) {
-      try {
-        const gate = await getTenantModuleGate(ctx);
+      const [unread, pending, gateResult, logoResult] = await Promise.allSettled([
+        getUnreadNotificationCount(ctx),
+        getCachedFieldPendingCounts(ctx),
+        getTenantModuleGate(ctx),
+        getTenantLogoDisplayMeta(ctx),
+      ]);
+      if (unread.status === "fulfilled") notificationUnreadCount = unread.value;
+      if (pending.status === "fulfilled") pendingCount = pending.value.total;
+      if (gateResult.status === "fulfilled") {
         moduleGateSnapshot = Object.fromEntries(
-          OVERVIEW_MODULES.map((m) => [m, gate.isEnabled(m)]),
+          OVERVIEW_MODULES.map((m) => [m, gateResult.value.isEnabled(m)]),
         ) as Record<PermissionModule, boolean>;
-      } catch {
+      } else {
         moduleGateSnapshot = {};
       }
-      try {
-        const logoMeta = await getTenantLogoDisplayMeta(ctx);
-        hasTenantLogo = logoMeta.hasLogo;
-        tenantLogoVersion = logoMeta.version;
-      } catch {
-        hasTenantLogo = false;
-        tenantLogoVersion = null;
+      if (logoResult.status === "fulfilled") {
+        hasTenantLogo = logoResult.value.hasLogo;
+        tenantLogoVersion = logoResult.value.version;
       }
     } else {
       moduleGateSnapshot = {};
@@ -72,6 +65,7 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
       user={current.session.user}
       tenantCtx={current.tenantCtx}
       notificationUnreadCount={notificationUnreadCount}
+      pendingCount={pendingCount}
       showPlatformLink={showPlatformLink}
       moduleGateSnapshot={moduleGateSnapshot}
       hasTenantLogo={hasTenantLogo}

@@ -8,6 +8,7 @@ import {
 } from "./money";
 import { treasurySettlementFieldsSchema } from "./treasury-settlement";
 import { invoiceLetterSchema } from "./contact";
+import { idempotencyKeySchema } from "./idempotency";
 
 const invoiceLineSchema = z.object({
   description: z.string().min(1),
@@ -76,10 +77,13 @@ export const collectNowSchema = z
     /** When true or amount omitted, server collects stored total ([D-053]). */
     collectFullBalance:   z.boolean().optional(),
     notes:                z.string().optional().nullable(),
+    idempotencyKey:       idempotencyKeySchema,
   })
   .merge(treasurySettlementFieldsSchema);
 
+/** Project AR composite flow. ISSUED + Receivable — not DRAFT create. */
 export const registerArSaleSchema = createSalesInvoiceSchema.extend({
+  idempotencyKey: idempotencyKeySchema,
   collectNow: collectNowSchema.optional(),
 });
 
@@ -87,6 +91,7 @@ export const registerArSaleSchema = createSalesInvoiceSchema.extend({
 export const registerArIncomeSchema = createSalesInvoiceSchema
   .omit({ projectId: true, certificationId: true })
   .extend({
+    idempotencyKey: idempotencyKeySchema,
     collectNow: collectNowSchema.optional(),
   });
 

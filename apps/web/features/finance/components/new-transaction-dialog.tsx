@@ -34,6 +34,7 @@ import { SettlementFields } from "@/features/treasury/components/settlement-fiel
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
 import { registerTransactionAction } from "@/app/(app)/finanzas/transacciones/actions";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 
 export type SupplierOption = {
   id: string;
@@ -133,6 +134,12 @@ export function NewTransactionDialog({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [attachment, setAttachment] = useState<File | null>(null);
+  const { idempotencyKey: expenseKey, rotateIdempotencyKey: rotateExpenseKey } = useIdempotencyKey();
+  const { idempotencyKey: incomeKey, rotateIdempotencyKey: rotateIncomeKey } = useIdempotencyKey();
+  const { idempotencyKey: payNowKey, rotateIdempotencyKey: rotatePayNowKey } = useIdempotencyKey();
+  const { idempotencyKey: collectNowKey, rotateIdempotencyKey: rotateCollectNowKey } = useIdempotencyKey();
+  const { idempotencyKey: attachmentKey, rotateIdempotencyKey: rotateAttachmentKey } = useIdempotencyKey();
+  const { idempotencyKey: inflowKey, rotateIdempotencyKey: rotateInflowKey } = useIdempotencyKey();
 
   const [supplierContactId, setSupplierContactId] = useState("");
   const [clientContactId, setClientContactId] = useState("");
@@ -150,6 +157,10 @@ export function NewTransactionDialog({
 
   const [inflowAccountId, setInflowAccountId] = useState("");
   const [counterpartyContactId, setCounterpartyContactId] = useState<string | null>(null);
+
+  useEffect(() => {
+    rotateAttachmentKey();
+  }, [attachment, rotateAttachmentKey]);
 
   const selectedSupplier = useMemo(
     () => suppliers.find((s) => s.id === supplierContactId),
@@ -242,6 +253,10 @@ export function NewTransactionDialog({
   function resetForm() {
     setError(null);
     setAttachment(null);
+    rotateExpenseKey();
+    rotateIncomeKey();
+    rotatePayNowKey();
+    rotateCollectNowKey();
     setSupplierContactId("");
     setClientContactId("");
     setInvoiceLetter(null);
@@ -304,6 +319,7 @@ export function NewTransactionDialog({
     fd.set("linkedEntityId", opts.invoiceId);
     fd.set("category", "INVOICE");
     fd.set("revalidatePaths", JSON.stringify([opts.detailPath]));
+    fd.set("idempotencyKey", attachmentKey);
     const uploadRes = await uploadDocumentAction(fd);
     if ("error" in uploadRes) {
       toast.warning(
@@ -353,6 +369,7 @@ export function NewTransactionDialog({
         const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
         const res = await registerTransactionAction({
           kind: "AP_EXPENSE",
+          idempotencyKey: expenseKey,
           supplierContactId,
           issueDate,
           dueDate,
@@ -374,6 +391,7 @@ export function NewTransactionDialog({
                 notes: null,
                 paymentMethod: payMethod || null,
                 reference: String(fd.get("reference") ?? "").trim() || null,
+                idempotencyKey: payNowKey,
               }
             : undefined,
         });
@@ -432,6 +450,7 @@ export function NewTransactionDialog({
         const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
         const res = await registerTransactionAction({
           kind: "AR_INCOME",
+          idempotencyKey: incomeKey,
           clientContactId,
           issueDate,
           dueDate,
@@ -454,6 +473,7 @@ export function NewTransactionDialog({
                 notes: null,
                 paymentMethod: collectMethod || null,
                 reference: String(fd.get("reference") ?? "").trim() || null,
+                idempotencyKey: collectNowKey,
               }
             : undefined,
         });
@@ -497,11 +517,13 @@ export function NewTransactionDialog({
         description: fd.get("description") as string,
         counterpartyContactId,
         externalInvoiceRef: ((fd.get("externalInvoiceRef") as string) || "").trim() || null,
+        idempotencyKey: inflowKey,
       });
       if ("error" in res) {
         setError(res.error);
         return;
       }
+      rotateInflowKey();
       finishAndNavigate(res.href);
     });
   }

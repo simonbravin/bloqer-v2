@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { hash } from "bcryptjs";
-import { seedDocsGuideDataset } from "./seed-docs-guide";
+import { assertNonProductionDatabase } from "./assert-non-production-db";
+import { DOCS_GUIDE_IDS, seedDocsGuideDataset } from "./seed-docs-guide";
 
 /**
  * Demo seed: one user + tenant + company + membership.
@@ -14,6 +15,7 @@ import { seedDocsGuideDataset } from "./seed-docs-guide";
 const prisma = new PrismaClient();
 
 async function main() {
+  assertNonProductionDatabase();
   const email = process.env["SEED_USER_EMAIL"];
   if (!email) throw new Error("SEED_USER_EMAIL env var is required");
 
@@ -35,10 +37,10 @@ async function main() {
   });
 
   const company = await prisma.company.upsert({
-    where: { id: "seed-company-id" },
+    where: { id: DOCS_GUIDE_IDS.companyId },
     update: {},
     create: {
-      id: "seed-company-id",
+      id: DOCS_GUIDE_IDS.companyId,
       tenantId: tenant.id,
       name: "Demo Company",
       status: "ACTIVE",

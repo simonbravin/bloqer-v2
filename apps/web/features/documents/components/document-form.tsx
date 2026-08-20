@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import { uploadDocumentAction } from "../upload-document-action";
 import { DocumentUploadZone } from "./document-upload-zone";
 
@@ -80,6 +81,12 @@ export function DocumentForm({
   const [category, setCategory] = useState(defaultCategory);
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
+
+  function handleFileSelect(file: File | null) {
+    setSelectedFile(file);
+    if (file) rotateIdempotencyKey();
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -114,6 +121,7 @@ export function DocumentForm({
       if (paths.length > 0) {
         formData.append("revalidatePaths", JSON.stringify(paths));
       }
+      formData.append("idempotencyKey", idempotencyKey);
 
       const result = await uploadDocumentAction(formData);
 
@@ -126,6 +134,7 @@ export function DocumentForm({
 
       const { documentId } = result;
       toast.success("Documento guardado.");
+      rotateIdempotencyKey();
       setSelectedFile(null);
       setDescription("");
       setCategory(defaultCategory);
@@ -168,7 +177,7 @@ export function DocumentForm({
 
       <DocumentUploadZone
         selectedFile={selectedFile}
-        onFileSelect={setSelectedFile}
+        onFileSelect={handleFileSelect}
         onValidationError={setError}
         disabled={pending}
       />

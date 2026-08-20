@@ -46,8 +46,10 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
     title: "General",
     items: [
       { label: "Inicio", href: "/dashboard" },
+      { label: "Pendientes", href: "/pendientes" },
       { label: "Proyectos", href: "/proyectos", require: { action: "VIEW", module: "PROJECTS" } },
       { label: "Directorio", href: "/directorio", require: { action: "VIEW", module: "DIRECTORY" } },
+      { label: "Notificaciones", href: "/notificaciones" },
       { label: "Inventario", href: "/inventario", require: { action: "VIEW", module: "INVENTORY" } },
     ],
   },

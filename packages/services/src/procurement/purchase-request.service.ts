@@ -21,6 +21,8 @@ import {
 export type PurchaseRequestLineView = {
   id: string;
   wbsNodeId: string | null;
+  wbsNodeCode: string | null;
+  wbsNodeName: string | null;
   productId: string | null;
   costAnalysisLineId: string | null;
   lineType: string;
@@ -33,6 +35,7 @@ export type PurchaseRequestLineView = {
 export type PurchaseRequestView = Omit<PurchaseRequest, never> & {
   code: string;
   requestedByName: string | null;
+  selectedSupplierName: string | null;
   lines: PurchaseRequestLineView[];
 };
 
@@ -65,13 +68,63 @@ async function nextDocumentNumber(
 function serialize(
   pr: PurchaseRequest & { lines: PurchaseRequestLineView[] },
   requestedByName: string | null = null,
+  selectedSupplierName: string | null = null,
 ): PurchaseRequestView {
   return {
     ...pr,
     code: `SC-${String(pr.number).padStart(3, "0")}`,
     requestedByName,
+    selectedSupplierName,
     lines: pr.lines,
   };
+}
+
+const prLineInclude = {
+  orderBy: { sortOrder: "asc" as const },
+  include: { wbsNode: { select: { code: true, name: true } } },
+};
+
+const selectedQuoteInclude = {
+  where: { status: "SELECTED" as const },
+  include: { supplierContact: { select: { legalName: true, fantasyName: true } } },
+  take: 1,
+};
+
+function mapPrLines(
+  lines: Array<{
+    id: string;
+    wbsNodeId: string | null;
+    productId: string | null;
+    costAnalysisLineId: string | null;
+    lineType: string;
+    description: string;
+    unit: string;
+    quantity: Prisma.Decimal;
+    budgetUnitCostSnapshot: Prisma.Decimal | null;
+    wbsNode: { code: string; name: string } | null;
+  }>,
+): PurchaseRequestLineView[] {
+  return lines.map((l) => ({
+    id: l.id,
+    wbsNodeId: l.wbsNodeId,
+    wbsNodeCode: l.wbsNode?.code ?? null,
+    wbsNodeName: l.wbsNode?.name ?? null,
+    productId: l.productId,
+    costAnalysisLineId: l.costAnalysisLineId,
+    lineType: l.lineType,
+    description: l.description,
+    unit: l.unit,
+    quantity: serializeQtyDecimal(l.quantity),
+    budgetUnitCostSnapshot: l.budgetUnitCostSnapshot != null ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot) : null,
+  }));
+}
+
+function selectedSupplierFromQuotes(
+  quotes: Array<{ supplierContact: { legalName: string; fantasyName: string | null } }>,
+): string | null {
+  const q = quotes[0];
+  if (!q) return null;
+  return q.supplierContact.fantasyName ?? q.supplierContact.legalName;
 }
 
 function assertDraftPr(status: string): void {
@@ -90,7 +143,10 @@ export async function listPurchaseRequestsByProject(
   }
   const rows = await prisma.purchaseRequest.findMany({
     where: { projectId, tenantId: ctx.tenantId },
-    include: { lines: { orderBy: { sortOrder: "asc" } } },
+    include: {
+      lines: prLineInclude,
+      quotes: selectedQuoteInclude,
+    },
     orderBy: { number: "desc" },
   });
   const nameById = await resolveUserDisplayNames(rows.map((r) => r.requestedByUserId));
@@ -98,19 +154,10 @@ export async function listPurchaseRequestsByProject(
     serialize(
       {
         ...r,
-        lines: r.lines.map((l) => ({
-          id: l.id,
-          wbsNodeId: l.wbsNodeId,
-          productId: l.productId,
-          costAnalysisLineId: l.costAnalysisLineId,
-          lineType: l.lineType,
-          description: l.description,
-          unit: l.unit,
-          quantity: serializeQtyDecimal(l.quantity),
-          budgetUnitCostSnapshot: l.budgetUnitCostSnapshot != null ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot) : null,
-        })),
+        lines: mapPrLines(r.lines),
       },
       userDisplayNameFromMap(nameById, r.requestedByUserId),
+      selectedSupplierFromQuotes(r.quotes),
     ),
   );
 }
@@ -122,26 +169,20 @@ export async function getPurchaseRequestById(id: string, ctx: ServiceContext): P
   }
   const pr = await prisma.purchaseRequest.findUnique({
     where: { id },
-    include: { lines: { orderBy: { sortOrder: "asc" } } },
+    include: {
+      lines: prLineInclude,
+      quotes: selectedQuoteInclude,
+    },
   });
   if (!pr || pr.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
   const nameById = await resolveUserDisplayNames([pr.requestedByUserId]);
   return serialize(
     {
       ...pr,
-      lines: pr.lines.map((l) => ({
-        id: l.id,
-        wbsNodeId: l.wbsNodeId,
-        productId: l.productId,
-        costAnalysisLineId: l.costAnalysisLineId,
-        lineType: l.lineType,
-        description: l.description,
-        unit: l.unit,
-        quantity: serializeQtyDecimal(l.quantity),
-        budgetUnitCostSnapshot: l.budgetUnitCostSnapshot != null ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot) : null,
-      })),
+      lines: mapPrLines(pr.lines),
     },
     userDisplayNameFromMap(nameById, pr.requestedByUserId),
+    selectedSupplierFromQuotes(pr.quotes),
   );
 }
 

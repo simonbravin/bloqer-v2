@@ -4,14 +4,21 @@ import type { PrismaClient } from "@prisma/client";
 import fs from "fs";
 import path from "path";
 
+/** Previous demo company PK (not a UUID). Remapped once by seedDocsGuideDataset. */
+const LEGACY_DEMO_COMPANY_ID = "seed-company-id";
+const DOCS_PM_EMAIL = "docs-pm@bloqer.demo";
+const DOCS_VIEWER_EMAIL = "docs-viewer@bloqer.demo";
+
 /** Stable IDs for guide captures — safe to reference from Playwright and env overrides. */
 export const DOCS_GUIDE_IDS = {
+  companyId: "00000000-0000-4000-8000-000000000001",
   clientContactId: "a0000001-0000-4000-8000-000000000001",
   supplierContactId: "a0000002-0000-4000-8000-000000000002",
   subcontractorContactId: "a0000003-0000-4000-8000-000000000003",
   projectId: "a0000010-0000-4000-8000-000000000010",
   scheduleId: "a0000011-0000-4000-8000-000000000011",
   confirmedPoId: "a0000020-0000-4000-8000-000000000020",
+  confirmedPoLineId: "a0000021-0000-4000-8000-000000000021",
   budgetId: "a0000030-0000-4000-8000-000000000030",
   budgetSettingsId: "a0000031-0000-4000-8000-000000000031",
   wbsGroup01Id: "a0000032-0000-4000-8000-000000000032",
@@ -61,6 +68,20 @@ export const DOCS_GUIDE_IDS = {
   jobsiteLogId: "a00000a0-0000-4000-8000-0000000000a0",
   jobsiteLogProgressId: "a00000a1-0000-4000-8000-0000000000a1",
   tenantInvitationId: "a00000b0-0000-4000-8000-0000000000b0",
+  productCementId: "a00000e0-0000-4000-8000-0000000000e0",
+  warehouseCentralId: "a00000e1-0000-4000-8000-0000000000e1",
+  openingStockId: "a00000e2-0000-4000-8000-0000000000e2",
+  purchaseRequestId: "a00000e3-0000-4000-8000-0000000000e3",
+  purchaseRequestLineId: "a00000e4-0000-4000-8000-0000000000e4",
+  submittedPoId: "a00000e5-0000-4000-8000-0000000000e5",
+  submittedPoLineId: "a00000e6-0000-4000-8000-0000000000e6",
+  returnPoId: "a00000e7-0000-4000-8000-0000000000e7",
+  returnPoLineId: "a00000e8-0000-4000-8000-0000000000e8",
+  project2Id: "a00000f0-0000-4000-8000-0000000000f0",
+  issuedCertificationId: "a00000f1-0000-4000-8000-0000000000f1",
+  issuedCertificationLineId: "a00000f2-0000-4000-8000-0000000000f2",
+  issuedSubcontractCertId: "a00000f3-0000-4000-8000-0000000000f3",
+  issuedSubcontractCertLineId: "a00000f4-0000-4000-8000-0000000000f4",
 } as const;
 
 const DOCS_TENANT_NAME = "Bloqer Demo Construcciones";
@@ -1022,6 +1043,564 @@ async function seedTenantInvitation(prisma: PrismaClient, ctx: SeedCtx): Promise
   return rawToken;
 }
 
+async function remapLegacyDemoCompanyId(
+  prisma: PrismaClient,
+  tenantId: string,
+  nextCompanyId: string,
+): Promise<void> {
+  if (nextCompanyId === LEGACY_DEMO_COMPANY_ID) return;
+  const legacy = await prisma.company.findUnique({ where: { id: LEGACY_DEMO_COMPANY_ID } });
+  if (!legacy || legacy.tenantId !== tenantId) return;
+
+  const whereLegacy = { companyId: LEGACY_DEMO_COMPANY_ID };
+  const toNext = { companyId: nextCompanyId };
+
+  const delegates: Array<{ updateMany: (args: { where: { companyId: string }; data: { companyId: string } }) => Promise<unknown> }> = [
+    prisma.userMembership,
+    prisma.project,
+    prisma.budget,
+    prisma.certification,
+    prisma.salesInvoice,
+    prisma.receivable,
+    prisma.treasuryAccount,
+    prisma.collection,
+    prisma.internalTransfer,
+    prisma.supplierInvoice,
+    prisma.payable,
+    prisma.payment,
+    prisma.purchaseOrder,
+    prisma.purchaseReceipt,
+    prisma.purchaseRequest,
+    prisma.product,
+    prisma.warehouse,
+    prisma.stockMovement,
+    prisma.subcontract,
+    prisma.subcontractCertification,
+    prisma.jobsiteLog,
+    prisma.warehouseTransfer,
+    prisma.tenantInvitation,
+    prisma.accountingAccount,
+    prisma.journalEntry,
+    prisma.accountingMappingRule,
+    prisma.auditLog,
+    prisma.scheduledReport,
+    prisma.bankReconciliation,
+    prisma.period,
+    prisma.projectOverheadAllocation,
+    prisma.overheadPeriodClose,
+    prisma.overheadAutoPeriodSnapshot,
+  ];
+
+  for (const model of delegates) {
+    await model.updateMany({ where: whereLegacy, data: toNext });
+  }
+
+  const legacySettings = await prisma.companyProcurementSettings.findUnique({
+    where: { companyId: LEGACY_DEMO_COMPANY_ID },
+  });
+  const nextSettings = await prisma.companyProcurementSettings.findUnique({
+    where: { companyId: nextCompanyId },
+  });
+  if (legacySettings && nextSettings) {
+    await prisma.companyProcurementSettings.delete({ where: { companyId: LEGACY_DEMO_COMPANY_ID } });
+  } else if (legacySettings) {
+    await prisma.companyProcurementSettings.update({
+      where: { companyId: LEGACY_DEMO_COMPANY_ID },
+      data: { companyId: nextCompanyId },
+    });
+  }
+
+  await prisma.company.delete({ where: { id: LEGACY_DEMO_COMPANY_ID } });
+}
+
+async function seedFieldPmUser(
+  prisma: PrismaClient,
+  ctx: SeedCtx,
+  password: string,
+): Promise<void> {
+  const pmUser = await prisma.user.upsert({
+    where: { email: DOCS_PM_EMAIL },
+    update: {
+      name: "Jefe de obra Demo",
+      status: "ACTIVE",
+      emailVerified: new Date(),
+    },
+    create: {
+      email: DOCS_PM_EMAIL,
+      name: "Jefe de obra Demo",
+      status: "ACTIVE",
+      emailVerified: new Date(),
+    },
+  });
+
+  if (password) {
+    const passwordHash = await hash(password, 12);
+    await prisma.user.update({
+      where: { id: pmUser.id },
+      data: {
+        passwordHash,
+        passwordUpdatedAt: new Date(),
+        emailVerified: new Date(),
+        status: "ACTIVE",
+      },
+    });
+  }
+
+  await prisma.userMembership.upsert({
+    where: { userId_tenantId: { userId: pmUser.id, tenantId: ctx.tenantId } },
+    update: {
+      companyId: ctx.companyId,
+      roles: ["PROJECT_MANAGER"],
+      status: "ACTIVE",
+    },
+    create: {
+      userId: pmUser.id,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      roles: ["PROJECT_MANAGER"],
+      status: "ACTIVE",
+    },
+  });
+}
+
+async function seedFieldViewerUser(
+  prisma: PrismaClient,
+  ctx: SeedCtx,
+  password: string,
+): Promise<void> {
+  const viewer = await prisma.user.upsert({
+    where: { email: DOCS_VIEWER_EMAIL },
+    update: {
+      name: "Consulta Demo",
+      status: "ACTIVE",
+      emailVerified: new Date(),
+    },
+    create: {
+      email: DOCS_VIEWER_EMAIL,
+      name: "Consulta Demo",
+      status: "ACTIVE",
+      emailVerified: new Date(),
+    },
+  });
+
+  if (password) {
+    const passwordHash = await hash(password, 12);
+    await prisma.user.update({
+      where: { id: viewer.id },
+      data: {
+        passwordHash,
+        passwordUpdatedAt: new Date(),
+        emailVerified: new Date(),
+        status: "ACTIVE",
+      },
+    });
+  }
+
+  await prisma.userMembership.upsert({
+    where: { userId_tenantId: { userId: viewer.id, tenantId: ctx.tenantId } },
+    update: {
+      companyId: ctx.companyId,
+      roles: ["VIEWER"],
+      status: "ACTIVE",
+    },
+    create: {
+      userId: viewer.id,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      roles: ["VIEWER"],
+      status: "ACTIVE",
+    },
+  });
+}
+
+async function seedSecondDemoProject(prisma: PrismaClient, ctx: SeedCtx): Promise<void> {
+  await prisma.project.upsert({
+    where: { id: DOCS_GUIDE_IDS.project2Id },
+    update: {
+      code: "DEMO-002",
+      name: "Ampliación Demo Sur",
+      status: "ACTIVE",
+      companyId: ctx.companyId,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.project2Id,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      clientContactId: ctx.clientId,
+      code: "DEMO-002",
+      name: "Ampliación Demo Sur",
+      description: "Segunda obra ficticia para selector de contexto Field.",
+      type: "PRIVATE",
+      status: "ACTIVE",
+      startDate: new Date("2026-06-01T12:00:00.000Z"),
+      createdBy: ctx.docsUserId,
+    },
+  });
+}
+
+async function seedFieldPendingEntities(prisma: PrismaClient, ctx: SeedCtx): Promise<void> {
+  const certQty = "8.0000";
+  const unitSale = "4200.0000";
+  const periodAmount = money(8 * 4200);
+
+  await prisma.certification.upsert({
+    where: { id: DOCS_GUIDE_IDS.issuedCertificationId },
+    update: {
+      status: "ISSUED",
+      totalAmount: periodAmount,
+      issueDate: new Date("2026-08-01T12:00:00.000Z"),
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.issuedCertificationId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      budgetId: DOCS_GUIDE_IDS.budgetId,
+      number: 2,
+      periodStart: new Date("2026-07-01T12:00:00.000Z"),
+      periodEnd: new Date("2026-07-31T12:00:00.000Z"),
+      issueDate: new Date("2026-08-01T12:00:00.000Z"),
+      status: "ISSUED",
+      totalAmount: periodAmount,
+      notes: "Certificación cliente demo emitida, pendiente de aprobación.",
+      createdBy: ctx.docsUserId,
+    },
+  });
+
+  await prisma.certificationLine.upsert({
+    where: { id: DOCS_GUIDE_IDS.issuedCertificationLineId },
+    update: {
+      currentQty: certQty,
+      cumulativeQty: "48.0000",
+      previousQty: "40.0000",
+      periodAmount,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.issuedCertificationLineId,
+      certificationId: DOCS_GUIDE_IDS.issuedCertificationId,
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0101Id,
+      unitSalePriceSnapshot: unitSale,
+      budgetQty: "120.0000",
+      physicalPct: "6.6667",
+      previousQty: "40.0000",
+      currentQty: certQty,
+      cumulativeQty: "48.0000",
+      periodAmount,
+      sortOrder: 0,
+    },
+  });
+
+  const subQty = "5.0000";
+  const linePrice = "1800.0000";
+  const lineTotal = money(5 * 1800);
+
+  await prisma.subcontractCertification.upsert({
+    where: { id: DOCS_GUIDE_IDS.issuedSubcontractCertId },
+    update: {
+      status: "ISSUED",
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.issuedSubcontractCertId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      subcontractId: DOCS_GUIDE_IDS.subcontractId,
+      subcontractorContactId: ctx.subcontractorId,
+      number: 2,
+      periodStart: new Date("2026-07-01T12:00:00.000Z"),
+      periodEnd: new Date("2026-07-31T12:00:00.000Z"),
+      certificationDate: new Date("2026-08-02T12:00:00.000Z"),
+      status: "ISSUED",
+      notes: "Certificación de subcontrato demo emitida, pendiente de aprobación.",
+      createdBy: ctx.docsUserId,
+    },
+  });
+
+  await prisma.subcontractCertificationLine.upsert({
+    where: { id: DOCS_GUIDE_IDS.issuedSubcontractCertLineId },
+    update: {
+      currentQty: subQty,
+      cumulativeQty: "40.0000",
+      previousQty: "35.0000",
+      remainingQty: "60.0000",
+      lineTotal,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.issuedSubcontractCertLineId,
+      subcontractCertificationId: DOCS_GUIDE_IDS.issuedSubcontractCertId,
+      subcontractLineId: DOCS_GUIDE_IDS.subcontractLineId,
+      previousQty: "35.0000",
+      currentQty: subQty,
+      cumulativeQty: "40.0000",
+      remainingQty: "60.0000",
+      unitPriceSnapshot: linePrice,
+      lineTotal,
+      sortOrder: 0,
+    },
+  });
+}
+
+async function seedFieldProcurementCatalog(prisma: PrismaClient, ctx: SeedCtx): Promise<void> {
+  await prisma.product.upsert({
+    where: { id: DOCS_GUIDE_IDS.productCementId },
+    update: {
+      sku: "CEM-DEMO-50",
+      name: "Cemento Portland demo",
+      unit: "bolsa",
+      status: "ACTIVE",
+      companyId: ctx.companyId,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.productCementId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      sku: "CEM-DEMO-50",
+      name: "Cemento Portland demo",
+      description: "Producto ficticio para E2E de campo.",
+      unit: "bolsa",
+      category: "MATERIALES",
+      status: "ACTIVE",
+      createdBy: ctx.docsUserId,
+    },
+  });
+
+  await prisma.purchaseOrderLine.update({
+    where: { id: DOCS_GUIDE_IDS.confirmedPoLineId },
+    data: {
+      productId: DOCS_GUIDE_IDS.productCementId,
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0101Id,
+    },
+  });
+
+  await prisma.warehouse.upsert({
+    where: { id: DOCS_GUIDE_IDS.warehouseCentralId },
+    update: {
+      name: "Depósito central demo",
+      status: "ACTIVE",
+      companyId: ctx.companyId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.warehouseCentralId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      name: "Depósito central demo",
+      type: "PROJECT",
+      status: "ACTIVE",
+      createdBy: ctx.docsUserId,
+    },
+  });
+
+  await prisma.stockMovement.upsert({
+    where: { id: DOCS_GUIDE_IDS.openingStockId },
+    update: {
+      quantity: "100.0000",
+      status: "CONFIRMED",
+      companyId: ctx.companyId,
+      warehouseId: DOCS_GUIDE_IDS.warehouseCentralId,
+      productId: DOCS_GUIDE_IDS.productCementId,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.openingStockId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      warehouseId: DOCS_GUIDE_IDS.warehouseCentralId,
+      productId: DOCS_GUIDE_IDS.productCementId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      type: "IN",
+      sourceType: "OPENING_BALANCE",
+      sourceId: DOCS_GUIDE_IDS.openingStockId,
+      movementDate: new Date("2026-03-01T12:00:00.000Z"),
+      quantity: "100.0000",
+      status: "CONFIRMED",
+      notes: "Saldo inicial ficticio para E2E de consumos.",
+      createdBy: ctx.docsUserId,
+    },
+  });
+
+  await prisma.purchaseRequest.upsert({
+    where: { id: DOCS_GUIDE_IDS.purchaseRequestId },
+    update: {
+      status: "SUBMITTED",
+      companyId: ctx.companyId,
+      notes: "Solicitud demo enviada para listado mobile.",
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.purchaseRequestId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      number: 1,
+      requestedByUserId: ctx.docsUserId,
+      neededByDate: new Date("2026-04-15T12:00:00.000Z"),
+      status: "SUBMITTED",
+      notes: "Solicitud demo enviada para listado mobile.",
+      submittedAt: new Date("2026-03-10T12:00:00.000Z"),
+      createdBy: ctx.docsUserId,
+    },
+  });
+
+  await prisma.purchaseRequestLine.upsert({
+    where: { id: DOCS_GUIDE_IDS.purchaseRequestLineId },
+    update: {
+      description: "Malla sima demo",
+      quantity: "20.0000",
+      unit: "m2",
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0101Id,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.purchaseRequestLineId,
+      purchaseRequestId: DOCS_GUIDE_IDS.purchaseRequestId,
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0101Id,
+      lineType: "MATERIAL",
+      description: "Malla sima demo",
+      unit: "m2",
+      quantity: "20.0000",
+      sortOrder: 0,
+    },
+  });
+
+  const submittedQty = "8.0000";
+  const submittedPrice = "2200.0000";
+  const submittedSubtotal = "17600.0000";
+  const submittedTax = "3696.0000";
+  const submittedTotal = "21296.0000";
+
+  await prisma.purchaseOrder.upsert({
+    where: { id: DOCS_GUIDE_IDS.submittedPoId },
+    update: {
+      status: "SUBMITTED",
+      companyId: ctx.companyId,
+      supplierContactId: ctx.supplierId,
+      subtotal: submittedSubtotal,
+      taxAmount: submittedTax,
+      totalAmount: submittedTotal,
+      totalAmountArs: submittedTotal,
+      returnReason: null,
+      returnedAt: null,
+      returnedByUserId: null,
+      approvedByUserId: null,
+      approvedAt: null,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.submittedPoId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      supplierContactId: ctx.supplierId,
+      number: 2,
+      issueDate: new Date("2026-03-12T12:00:00.000Z"),
+      expectedDeliveryDate: new Date("2026-03-28T12:00:00.000Z"),
+      currency: "ARS",
+      fxRate: "1.000000",
+      subtotal: submittedSubtotal,
+      taxAmount: submittedTax,
+      totalAmount: submittedTotal,
+      totalAmountArs: submittedTotal,
+      status: "SUBMITTED",
+      notes: "OC demo pendiente de aprobación.",
+      createdBy: ctx.docsUserId,
+      originRequestedByUserId: ctx.docsUserId,
+    },
+  });
+
+  await prisma.purchaseOrderLine.upsert({
+    where: { id: DOCS_GUIDE_IDS.submittedPoLineId },
+    update: {
+      description: "Hierro ADN 420 demo",
+      quantity: submittedQty,
+      unitPrice: submittedPrice,
+      lineSubtotal: submittedSubtotal,
+      lineTax: submittedTax,
+      lineTotal: submittedTotal,
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0101Id,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.submittedPoLineId,
+      purchaseOrderId: DOCS_GUIDE_IDS.submittedPoId,
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0101Id,
+      description: "Hierro ADN 420 demo",
+      unit: "kg",
+      quantity: submittedQty,
+      unitPrice: submittedPrice,
+      lineSubtotal: submittedSubtotal,
+      lineTax: submittedTax,
+      lineTotal: submittedTotal,
+      sortOrder: 0,
+    },
+  });
+
+  const returnQty = "4.0000";
+  const returnPrice = "1800.0000";
+  const returnSubtotal = "7200.0000";
+  const returnTax = "1512.0000";
+  const returnTotal = "8712.0000";
+
+  await prisma.purchaseOrder.upsert({
+    where: { id: DOCS_GUIDE_IDS.returnPoId },
+    update: {
+      status: "SUBMITTED",
+      companyId: ctx.companyId,
+      supplierContactId: ctx.supplierId,
+      subtotal: returnSubtotal,
+      taxAmount: returnTax,
+      totalAmount: returnTotal,
+      totalAmountArs: returnTotal,
+      returnReason: null,
+      returnedAt: null,
+      returnedByUserId: null,
+      approvedByUserId: null,
+      approvedAt: null,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.returnPoId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      supplierContactId: ctx.supplierId,
+      number: 3,
+      issueDate: new Date("2026-03-13T12:00:00.000Z"),
+      currency: "ARS",
+      fxRate: "1.000000",
+      subtotal: returnSubtotal,
+      taxAmount: returnTax,
+      totalAmount: returnTotal,
+      totalAmountArs: returnTotal,
+      status: "SUBMITTED",
+      notes: "OC demo para devolver con motivo.",
+      createdBy: ctx.docsUserId,
+      originRequestedByUserId: ctx.docsUserId,
+    },
+  });
+
+  await prisma.purchaseOrderLine.upsert({
+    where: { id: DOCS_GUIDE_IDS.returnPoLineId },
+    update: {
+      description: "Cal hidráulica demo",
+      quantity: returnQty,
+      unitPrice: returnPrice,
+      lineSubtotal: returnSubtotal,
+      lineTax: returnTax,
+      lineTotal: returnTotal,
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0102Id,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.returnPoLineId,
+      purchaseOrderId: DOCS_GUIDE_IDS.returnPoId,
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0102Id,
+      description: "Cal hidráulica demo",
+      unit: "bolsa",
+      quantity: returnQty,
+      unitPrice: returnPrice,
+      lineSubtotal: returnSubtotal,
+      lineTax: returnTax,
+      lineTotal: returnTotal,
+      sortOrder: 0,
+    },
+  });
+}
+
 export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> {
   const docsEmail = (process.env.DOCS_USER_EMAIL || "docs-guide@bloqer.demo").trim().toLowerCase();
   const password = (process.env.DOCS_USER_PASSWORD || process.env.SEED_USER_PASSWORD || "").trim();
@@ -1038,15 +1617,16 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
   });
 
   const company = await prisma.company.upsert({
-    where: { id: "seed-company-id" },
+    where: { id: DOCS_GUIDE_IDS.companyId },
     update: { name: DOCS_TENANT_NAME, tenantId: tenant.id, status: "ACTIVE" },
     create: {
-      id: "seed-company-id",
+      id: DOCS_GUIDE_IDS.companyId,
       tenantId: tenant.id,
       name: DOCS_TENANT_NAME,
       status: "ACTIVE",
     },
   });
+  await remapLegacyDemoCompanyId(prisma, tenant.id, company.id);
 
   const docsUser = await prisma.user.upsert({
     where: { email: docsEmail },
@@ -1217,6 +1797,9 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
     subcontractorId: subcontractor.id,
   };
 
+  await seedFieldPmUser(prisma, seedCtx, password);
+  await seedFieldViewerUser(prisma, seedCtx, password);
+
   const projectStart = new Date("2026-01-15T12:00:00.000Z");
   await prisma.project.upsert({
     where: { id: DOCS_GUIDE_IDS.projectId },
@@ -1357,7 +1940,7 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
     },
   });
 
-  const poLineId = "a0000021-0000-4000-8000-000000000021";
+  const poLineId = DOCS_GUIDE_IDS.confirmedPoLineId;
   await prisma.purchaseOrderLine.upsert({
     where: { id: poLineId },
     update: {
@@ -1387,10 +1970,13 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
     where: { projectId: DOCS_GUIDE_IDS.projectId },
     data: { baselineBudgetId: DOCS_GUIDE_IDS.budgetId },
   });
+  await seedFieldProcurementCatalog(prisma, seedCtx);
   await seedTreasury(prisma, seedCtx);
   await seedSubcontractChain(prisma, seedCtx);
   await seedCertificationAndSales(prisma, seedCtx);
   await seedJobsiteLog(prisma, seedCtx);
+  await seedSecondDemoProject(prisma, seedCtx);
+  await seedFieldPendingEntities(prisma, seedCtx);
   await seedTenantInvitation(prisma, seedCtx);
 
   const idsPath = path.resolve(__dirname, "../../../docs/bloqer2.0/guides/docs-demo-ids.json");
@@ -1401,11 +1987,13 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
       {
         generatedAt: new Date().toISOString(),
         docsUserEmail: docsEmail,
+        fieldPmEmail: DOCS_PM_EMAIL,
+        fieldViewerEmail: DOCS_VIEWER_EMAIL,
         invitationEmail: DOCS_INVITATION_EMAIL,
         tenantId: tenant.id,
         tenantSlug: tenant.slug,
-        companyId: company.id,
         ...DOCS_GUIDE_IDS,
+        companyId: company.id,
         accountId: DOCS_GUIDE_IDS.treasuryAccountId,
         reconciliationId: DOCS_GUIDE_IDS.reconciliationInProgressId,
       },

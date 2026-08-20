@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idempotencyKeySchema } from "./idempotency";
 
 const DOCUMENT_CATEGORIES = [
   "CONTRACT", "PLAN", "PERMIT", "TECHNICAL", "PHOTO",
@@ -93,6 +94,7 @@ export const initiateUploadSchema = z
       ])
       .optional(),
     linkedEntityId:   z.string().uuid().optional(),
+    idempotencyKey:   idempotencyKeySchema,
   })
   .superRefine((data, ctx) => {
     if (data.linkedEntityType && !data.linkedEntityId) {

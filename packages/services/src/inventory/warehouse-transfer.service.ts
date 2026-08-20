@@ -7,6 +7,11 @@ import { getStockBalance, lockStockBalanceKey } from "./stock-balance.service";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import {
+  requireIdempotencyKey,
+  warehouseTransferReplayMatches,
+  withIdempotentCreate,
+} from "../idempotency/idempotency";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -201,6 +206,21 @@ export async function createWarehouseTransfer(
   if (srcWarehouse.companyId !== dstWarehouse.companyId) {
     throw new ServiceError("CONFLICT", "Los depósitos deben pertenecer a la misma empresa");
   }
+  if (
+    srcWarehouse.projectId &&
+    dstWarehouse.projectId &&
+    srcWarehouse.projectId !== dstWarehouse.projectId
+  ) {
+    throw new ServiceError("CONFLICT", "Los depósitos pertenecen a obras distintas");
+  }
+  if (input.projectId) {
+    if (srcWarehouse.projectId && srcWarehouse.projectId !== input.projectId) {
+      throw new ServiceError("CONFLICT", "El depósito origen está asignado a otra obra");
+    }
+    if (dstWarehouse.projectId && dstWarehouse.projectId !== input.projectId) {
+      throw new ServiceError("CONFLICT", "El depósito destino está asignado a otra obra");
+    }
+  }
   if (srcWarehouse.status !== "ACTIVE") {
     throw new ServiceError("CONFLICT", "El depósito origen no está activo");
   }
@@ -221,106 +241,126 @@ export async function createWarehouseTransfer(
 
   const companyId = srcWarehouse.companyId;
   const transferDate = new Date(input.transferDate);
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
 
-  const transfer = await prisma.$transaction(async (tx) => {
-    // BR-INV-002: serialize + check source balance before deducting
-    await lockStockBalanceKey(tx, input.sourceWarehouseId, input.productId);
-    const srcBalance = await getStockBalance(
-      {
-        tenantId:    ctx.tenantId,
-        warehouseId: input.sourceWarehouseId,
-        productId:   input.productId,
-      },
-      tx,
-    );
-    if (qty.greaterThan(srcBalance)) {
-      throw new ServiceError(
-        "CONFLICT",
-        `Stock insuficiente en depósito origen. Disponible: ${serializeQtyDecimal(srcBalance)}, solicitado: ${serializeQtyDecimal(qty)}`,
-      );
-    }
-
-    // Generate sequential number per tenant+company
-    const agg = await tx.warehouseTransfer.aggregate({
-      where: { tenantId: ctx.tenantId, companyId },
-      _max:  { number: true },
-    });
-    const nextNumber = (agg._max.number ?? 0) + 1;
-
-    const wt = await tx.warehouseTransfer.create({
-      data: {
-        tenantId:              ctx.tenantId,
-        companyId,
-        projectId:             input.projectId ?? null,
-        number:                nextNumber,
-        sourceWarehouseId:     input.sourceWarehouseId,
+  const transfer = await withIdempotentCreate({
+    findExisting: () =>
+      prisma.warehouseTransfer.findFirst({
+        where: { tenantId: ctx.tenantId, idempotencyKey },
+      }),
+    payloadsMatch: (existing) =>
+      warehouseTransferReplayMatches(existing, {
+        sourceWarehouseId: input.sourceWarehouseId,
         destinationWarehouseId: input.destinationWarehouseId,
-        productId:             input.productId,
-        transferDate,
-        quantity:              qty,
-        unitCost,
-        totalCost,
-        notes:                 input.notes ?? null,
-        status:                "CONFIRMED",
-        createdBy:             ctx.actorUserId,
-      },
-    });
+        productId: input.productId,
+        projectId: input.projectId,
+        transferDate: input.transferDate,
+        quantity: input.quantity,
+      }),
+    create: async () => {
+      const created = await prisma.$transaction(async (tx) => {
+        // BR-INV-002: serialize + check source balance before deducting
+        await lockStockBalanceKey(tx, input.sourceWarehouseId, input.productId);
+        const srcBalance = await getStockBalance(
+          {
+            tenantId:    ctx.tenantId,
+            warehouseId: input.sourceWarehouseId,
+            productId:   input.productId,
+          },
+          tx,
+        );
+        if (qty.greaterThan(srcBalance)) {
+          throw new ServiceError(
+            "CONFLICT",
+            `Stock insuficiente en depósito origen. Disponible: ${serializeQtyDecimal(srcBalance)}, solicitado: ${serializeQtyDecimal(qty)}`,
+          );
+        }
 
-    // R-INT-013: exactly 2 StockMovements, paired by warehouseTransferId
-    await tx.stockMovement.createMany({
-      data: [
-        {
-          tenantId:           ctx.tenantId,
-          companyId,
-          warehouseId:        input.sourceWarehouseId,
-          productId:          input.productId,
-          projectId:          input.projectId ?? null,
-          type:               "TRANSFER_OUT",
-          sourceType:         "TRANSFER",
-          sourceId:           wt.id,
-          warehouseTransferId: wt.id,
-          movementDate:       transferDate,
-          quantity:           qty,
-          unitCost,
-          totalCost,
-          status:             "CONFIRMED",
-          createdBy:          ctx.actorUserId,
+        // Generate sequential number per tenant+company
+        const agg = await tx.warehouseTransfer.aggregate({
+          where: { tenantId: ctx.tenantId, companyId },
+          _max:  { number: true },
+        });
+        const nextNumber = (agg._max.number ?? 0) + 1;
+
+        const wt = await tx.warehouseTransfer.create({
+          data: {
+            tenantId:              ctx.tenantId,
+            companyId,
+            projectId:             input.projectId ?? null,
+            number:                nextNumber,
+            sourceWarehouseId:     input.sourceWarehouseId,
+            destinationWarehouseId: input.destinationWarehouseId,
+            productId:             input.productId,
+            transferDate,
+            quantity:              qty,
+            unitCost,
+            totalCost,
+            notes:                 input.notes ?? null,
+            status:                "CONFIRMED",
+            idempotencyKey,
+            createdBy:             ctx.actorUserId,
+          },
+        });
+
+        // R-INT-013: exactly 2 StockMovements, paired by warehouseTransferId
+        await tx.stockMovement.createMany({
+          data: [
+            {
+              tenantId:           ctx.tenantId,
+              companyId,
+              warehouseId:        input.sourceWarehouseId,
+              productId:          input.productId,
+              projectId:          input.projectId ?? null,
+              type:               "TRANSFER_OUT",
+              sourceType:         "TRANSFER",
+              sourceId:           wt.id,
+              warehouseTransferId: wt.id,
+              movementDate:       transferDate,
+              quantity:           qty,
+              unitCost,
+              totalCost,
+              status:             "CONFIRMED",
+              createdBy:          ctx.actorUserId,
+            },
+            {
+              tenantId:           ctx.tenantId,
+              companyId,
+              warehouseId:        input.destinationWarehouseId,
+              productId:          input.productId,
+              projectId:          input.projectId ?? null,
+              type:               "TRANSFER_IN",
+              sourceType:         "TRANSFER",
+              sourceId:           wt.id,
+              warehouseTransferId: wt.id,
+              movementDate:       transferDate,
+              quantity:           qty,
+              unitCost,
+              totalCost,
+              status:             "CONFIRMED",
+              createdBy:          ctx.actorUserId,
+            },
+          ],
+        });
+
+        return wt;
+      });
+
+      await log({
+        tenantId:    ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        action:      "warehouse_transfer.created",
+        entityType:  "WarehouseTransfer",
+        entityId:    created.id,
+        after: {
+          number: created.number,
+          sourceWarehouseId:      input.sourceWarehouseId,
+          destinationWarehouseId: input.destinationWarehouseId,
+          productId: input.productId,
+          quantity:  input.quantity,
         },
-        {
-          tenantId:           ctx.tenantId,
-          companyId,
-          warehouseId:        input.destinationWarehouseId,
-          productId:          input.productId,
-          projectId:          input.projectId ?? null,
-          type:               "TRANSFER_IN",
-          sourceType:         "TRANSFER",
-          sourceId:           wt.id,
-          warehouseTransferId: wt.id,
-          movementDate:       transferDate,
-          quantity:           qty,
-          unitCost,
-          totalCost,
-          status:             "CONFIRMED",
-          createdBy:          ctx.actorUserId,
-        },
-      ],
-    });
-
-    return wt;
-  });
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "warehouse_transfer.created",
-    entityType:  "WarehouseTransfer",
-    entityId:    transfer.id,
-    after: {
-      number: transfer.number,
-      sourceWarehouseId:      input.sourceWarehouseId,
-      destinationWarehouseId: input.destinationWarehouseId,
-      productId: input.productId,
-      quantity:  input.quantity,
+      });
+      return created;
     },
   });
 

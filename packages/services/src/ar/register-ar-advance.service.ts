@@ -76,6 +76,7 @@ export async function registerArAdvance(
       notes: input.notes ?? "Anticipo de cliente — imputado a obra",
       internalNotes: "Registrado vía flujo de anticipo",
       externalInvoiceRef: null,
+      idempotencyKey: input.idempotencyKey,
       lines: [
         {
           description: ADVANCE_LINE_DESCRIPTION,
@@ -92,6 +93,7 @@ export async function registerArAdvance(
         notes: input.collectNow.notes ?? "Cobro de anticipo",
         paymentMethod: input.collectNow.paymentMethod ?? null,
         reference: input.collectNow.reference ?? null,
+        idempotencyKey: input.collectNow.idempotencyKey,
       },
     },
     ctx,

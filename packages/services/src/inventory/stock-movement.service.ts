@@ -13,6 +13,8 @@ import { getStockBalance, lockStockBalanceKey } from "./stock-balance.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import { consumptionReplayMatches, requireIdempotencyKey, withIdempotentCreate } from "../idempotency/idempotency";
+import { consumptionWarehouseScopeConflict } from "./consumption-warehouse-scope";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -148,6 +150,45 @@ export async function createStockConsumption(
     throw new ServiceError("FORBIDDEN", "Sin permisos para registrar consumos de stock");
   }
 
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+
+  const movement = await withIdempotentCreate({
+    findExisting: () =>
+      prisma.stockMovement.findFirst({
+        where: { tenantId: ctx.tenantId, idempotencyKey },
+        include: movementInclude,
+      }),
+    payloadsMatch: (existing) =>
+      consumptionReplayMatches(existing, {
+        warehouseId: input.warehouseId,
+        productId: input.productId,
+        projectId: input.projectId,
+        wbsNodeId: input.wbsNodeId,
+        movementDate: input.movementDate,
+        quantity: input.quantity,
+      }),
+    create: async () => {
+      const created = await createStockConsumptionOnce(input, ctx, idempotencyKey);
+      await log({
+        tenantId: ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        action: "STOCK_CONSUMPTION_CREATED",
+        entityType: "StockMovement",
+        entityId: created.id,
+        after: { productId: input.productId, warehouseId: input.warehouseId, quantity: input.quantity },
+      });
+      return created;
+    },
+  });
+
+  return serializeMovement(movement);
+}
+
+async function createStockConsumptionOnce(
+  input: CreateStockConsumptionInput,
+  ctx: ServiceContext,
+  idempotencyKey: string,
+) {
   const [warehouse, product] = await Promise.all([
     prisma.warehouse.findUnique({ where: { id: input.warehouseId } }),
     prisma.product.findUnique({ where: { id: input.productId } }),
@@ -164,9 +205,20 @@ export async function createStockConsumption(
     throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (product.status !== "ACTIVE") throw new ServiceError("CONFLICT", "El producto no está activo");
 
+  let projectCompanyId: string | null = null;
   if (input.projectId) {
-    await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+    const project = await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+    projectCompanyId = project.companyId;
   }
+
+  const scopeConflict = consumptionWarehouseScopeConflict({
+    warehouseCompanyId: warehouse.companyId,
+    warehouseProjectId: warehouse.projectId,
+    productCompanyId: product.companyId,
+    consumptionProjectId: input.projectId ?? null,
+    projectCompanyId,
+  });
+  if (scopeConflict) throw new ServiceError("CONFLICT", scopeConflict);
 
   if (input.wbsNodeId) {
     const wbs = await prisma.wbsNode.findUnique({
@@ -230,22 +282,13 @@ export async function createStockConsumption(
         quantity: qty,
         status: "CONFIRMED",
         notes: input.notes ?? null,
+        idempotencyKey,
         createdBy: ctx.actorUserId,
       },
       include: movementInclude,
     });
   });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "STOCK_CONSUMPTION_CREATED",
-    entityType: "StockMovement",
-    entityId: movement.id,
-    after: { productId: input.productId, warehouseId: input.warehouseId, quantity: input.quantity },
-  });
-
-  return serializeMovement(movement);
+  return movement;
 }
 
 // ─── Internal: create IN movement from receipt line ───────────────────────────
@@ -436,6 +479,14 @@ export async function createJobsiteLogMaterialStockMovements(
     if (!warehouse || warehouse.status !== "ACTIVE") {
       throw new ServiceError("CONFLICT", "El depósito del material no está activo");
     }
+    const scopeConflict = consumptionWarehouseScopeConflict({
+      warehouseCompanyId: warehouse.companyId,
+      warehouseProjectId: warehouse.projectId,
+      productCompanyId: null,
+      consumptionProjectId: params.projectId,
+      projectCompanyId: params.companyId,
+    });
+    if (scopeConflict) throw new ServiceError("CONFLICT", scopeConflict);
 
     const wbsNodeId = resolveJobsiteLogMaterialWbs(m.wbsNodeId, params.progressWbsNodeIds);
     if (!m.wbsNodeId) {

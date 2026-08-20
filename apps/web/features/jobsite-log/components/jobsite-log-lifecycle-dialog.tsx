@@ -27,6 +27,7 @@ interface JobsiteLogLifecycleDialogProps {
   canContribute: boolean;
   canSupervise: boolean;
   triggerLabel?: string;
+  triggerVariant?: "default" | "outline";
   onSubmit: (data?: LifecyclePayload) => Promise<{ ok: true } | { error: string }>;
   onReturn: (data: { comment: string }) => Promise<{ ok: true } | { error: string }>;
   onApprove: (data?: LifecyclePayload) => Promise<{ ok: true } | { error: string }>;
@@ -120,6 +121,7 @@ export function JobsiteLogLifecycleDialog({
   canContribute,
   canSupervise,
   triggerLabel = "Ciclo de vida",
+  triggerVariant = "outline",
   onSubmit,
   onReturn,
   onApprove,
@@ -200,7 +202,7 @@ export function JobsiteLogLifecycleDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant={triggerVariant} size="sm" className="min-h-11 md:min-h-8">
           {triggerLabel}
         </Button>
       </DialogTrigger>
@@ -261,7 +263,7 @@ export function JobsiteLogLifecycleDialog({
                 {status === "DRAFT" && canContribute && (
                   <>
                     <Button
-                      size="sm"
+                      className="min-h-11 md:min-h-8"
                       disabled={isPending}
                       onClick={() => setPending({ kind: "submit" })}
                     >
@@ -282,7 +284,7 @@ export function JobsiteLogLifecycleDialog({
                 {status === "SUBMITTED" && canSupervise && (
                   <>
                     <Button
-                      size="sm"
+                      className="min-h-11 md:min-h-8"
                       disabled={isPending}
                       onClick={() => setPending({ kind: "approve" })}
                     >
@@ -291,6 +293,7 @@ export function JobsiteLogLifecycleDialog({
                     <Button
                       size="sm"
                       variant="outline"
+                      className="min-h-11 md:min-h-8"
                       disabled={isPending}
                       onClick={() => setPending({ kind: "return" })}
                     >

@@ -12,9 +12,16 @@ import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modu
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
+import {
+  isIdempotencyUniqueConflict,
+  pickCompositePayment,
+  registerApExpenseReplayMatches,
+  requireIdempotencyKey,
+  withIdempotentCreate,
+} from "../idempotency/idempotency";
 import { canMutateApForScope, canRegisterApPayment } from "./ap-access";
 import { notifyPayableReadyToPay, notifyPaymentConfirmed } from "./ap-notifications.service";
-import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
+import { recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import {
   assertPurchaseOrderLinkableForAp,
@@ -88,6 +95,176 @@ function buildApExpenseTraceChain(outcome: ApExpenseOutcome): FinancialTraceLink
     );
   }
   return chain;
+}
+
+type ApExpenseReplay = {
+  outcome: ApExpenseOutcome;
+  status: string;
+  supplierContactId: string;
+  projectId: string | null;
+  issueDate: Date;
+  dueDate: Date;
+  currency: string;
+  invoiceLetter: string | null;
+  purchaseOrderId: string | null;
+  createdAt: Date;
+  payableId: string | null;
+  lines: Array<{
+    description: string;
+    quantity: Prisma.Decimal;
+    unitPrice: Prisma.Decimal;
+    taxRate: Prisma.Decimal;
+    sortOrder: number;
+    wbsNodeId: string | null;
+    purchaseOrderLineId: string | null;
+  }>;
+  payments: Array<{
+    id: string;
+    payableId: string;
+    accountId: string;
+    paymentDate: Date;
+    amount: Prisma.Decimal;
+    status: string;
+    createdAt: Date;
+  }>;
+};
+
+async function loadApExpenseReplay(
+  tenantId: string,
+  idempotencyKey: string,
+  payNow?: {
+    accountId: string;
+    paymentDate: string;
+    payFullBalance?: boolean;
+    amount?: string | null;
+  },
+): Promise<ApExpenseReplay | null> {
+  const invoice = await prisma.supplierInvoice.findFirst({
+    where: { tenantId, idempotencyKey },
+    include: {
+      lines: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      payable: { select: { id: true } },
+      apPayments: {
+        where: { status: "CONFIRMED" },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          payableId: true,
+          accountId: true,
+          paymentDate: true,
+          amount: true,
+          status: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+  if (!invoice) return null;
+
+  let paymentId: string | undefined;
+  let movementId: string | undefined;
+  let payAccountId: string | undefined;
+  const payment = pickCompositePayment(
+    invoice.createdAt,
+    invoice.payable?.id ?? null,
+    invoice.apPayments,
+    payNow,
+  );
+  if (payment) {
+    paymentId = payment.id;
+    payAccountId = payment.accountId;
+    const movement = await prisma.accountMovement.findFirst({
+      where: {
+        tenantId,
+        sourceType: "PAYMENT",
+        sourceId: payment.id,
+        status: { in: ["CONFIRMED", "RECONCILED"] },
+      },
+      select: { id: true },
+    });
+    movementId = movement?.id;
+  }
+
+  return {
+    outcome: {
+      invoiceId: invoice.id,
+      payableId: invoice.payable?.id ?? "",
+      number: invoice.number,
+      companyId: invoice.companyId,
+      projectId: invoice.projectId,
+      paymentId,
+      movementId,
+      payAccountId,
+    },
+    status: invoice.status,
+    supplierContactId: invoice.supplierContactId,
+    projectId: invoice.projectId,
+    issueDate: invoice.issueDate,
+    dueDate: invoice.dueDate,
+    currency: invoice.currency,
+    invoiceLetter: invoice.invoiceLetter,
+    purchaseOrderId: invoice.purchaseOrderId,
+    createdAt: invoice.createdAt,
+    payableId: invoice.payable?.id ?? null,
+    lines: invoice.lines,
+    payments: invoice.apPayments,
+  };
+}
+
+async function notifyApExpenseCreated(outcome: ApExpenseOutcome, ctx: ServiceContext): Promise<void> {
+  if (outcome.projectId && !outcome.paymentId) {
+    const inv = await prisma.supplierInvoice.findUnique({
+      where: { id: outcome.invoiceId },
+      select: {
+        number: true,
+        totalAmount: true,
+        currency: true,
+        purchaseOrderId: true,
+      },
+    });
+    if (inv) {
+      let purchaseOrderCode: string | null = null;
+      if (inv.purchaseOrderId) {
+        const po = await prisma.purchaseOrder.findUnique({
+          where: { id: inv.purchaseOrderId },
+          select: { number: true },
+        });
+        if (po) purchaseOrderCode = `OC-${String(po.number).padStart(3, "0")}`;
+      }
+      await notifyPayableReadyToPay({
+        ctx,
+        supplierInvoiceId: outcome.invoiceId,
+        payableId: outcome.payableId,
+        projectId: outcome.projectId,
+        companyId: outcome.companyId,
+        invoiceNumber: inv.number,
+        purchaseOrderId: inv.purchaseOrderId,
+        purchaseOrderCode,
+        amountLabel: `${serializeMoneyDecimal(inv.totalAmount)} ${inv.currency}`,
+      }).catch(() => undefined);
+    }
+  }
+
+  if (outcome.paymentId) {
+    const payment = await prisma.payment.findUnique({
+      where: { id: outcome.paymentId },
+      include: {
+        account: { select: { name: true } },
+        supplierInvoice: { select: { number: true } },
+      },
+    });
+    if (payment) {
+      await notifyPaymentConfirmed({
+        ctx,
+        supplierInvoiceId: payment.supplierInvoiceId,
+        projectId: payment.projectId,
+        companyId: payment.companyId,
+        invoiceNumber: payment.supplierInvoice.number,
+        amountLabel: `${serializeMoneyDecimal(payment.amount)} ${payment.currency}`,
+        accountName: payment.account.name,
+      }).catch(() => undefined);
+    }
+  }
 }
 
 /**
@@ -226,225 +403,197 @@ export async function registerApExpense(
     })(),
   });
 
-  let outcome!: ApExpenseOutcome;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      outcome = await prisma.$transaction(async (tx) => {
-        const maxNum = await tx.supplierInvoice.aggregate({
-          where: { tenantId: ctx.tenantId, companyId },
-          _max: { number: true },
-        });
-        const number = (maxNum._max.number ?? 0) + 1;
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
 
-        const created = await tx.supplierInvoice.create({
-          data: {
-            tenantId: ctx.tenantId,
-            companyId,
-            projectId,
-            supplierContactId: input.supplierContactId,
-            number,
-            issueDate: new Date(input.issueDate),
-            dueDate: new Date(input.dueDate),
-            currency: input.currency ?? "ARS",
-            fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : new Prisma.Decimal(1),
-            invoiceLetter: input.invoiceLetter ?? null,
-            notes: input.notes ?? null,
-            internalNotes: input.internalNotes ?? null,
-            purchaseOrderId: input.purchaseOrderId ?? null,
-            createdBy: ctx.actorUserId,
-            updatedBy: ctx.actorUserId,
-          },
-        });
+  const replay = await withIdempotentCreate({
+    findExisting: () => loadApExpenseReplay(ctx.tenantId, idempotencyKey, input.payNow),
+    payloadsMatch: (existing) => registerApExpenseReplayMatches(existing, input),
+    create: async () => {
+      let createdOutcome!: ApExpenseOutcome;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          createdOutcome = await prisma.$transaction(async (tx) => {
+            const maxNum = await tx.supplierInvoice.aggregate({
+              where: { tenantId: ctx.tenantId, companyId },
+              _max: { number: true },
+            });
+            const number = (maxNum._max.number ?? 0) + 1;
 
-        for (const line of input.lines) {
-          const qty = new Prisma.Decimal(line.quantity);
-          const price = new Prisma.Decimal(line.unitPrice);
-          const rate = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
-          const { unitPriceNet, lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
-            quantity: qty,
-            unitPrice: price,
-            taxRate: rate,
-            pricesIncludeTax,
+            const created = await tx.supplierInvoice.create({
+              data: {
+                tenantId: ctx.tenantId,
+                companyId,
+                projectId,
+                supplierContactId: input.supplierContactId,
+                number,
+                issueDate: new Date(input.issueDate),
+                dueDate: new Date(input.dueDate),
+                currency: input.currency ?? "ARS",
+                fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : new Prisma.Decimal(1),
+                invoiceLetter: input.invoiceLetter ?? null,
+                notes: input.notes ?? null,
+                internalNotes: input.internalNotes ?? null,
+                purchaseOrderId: input.purchaseOrderId ?? null,
+                idempotencyKey,
+                createdBy: ctx.actorUserId,
+                updatedBy: ctx.actorUserId,
+              },
+            });
+
+            for (const line of input.lines) {
+              const qty = new Prisma.Decimal(line.quantity);
+              const price = new Prisma.Decimal(line.unitPrice);
+              const rate = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
+              const { unitPriceNet, lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+                quantity: qty,
+                unitPrice: price,
+                taxRate: rate,
+                pricesIncludeTax,
+              });
+              await tx.supplierInvoiceLine.create({
+                data: {
+                  invoiceId: created.id,
+                  wbsNodeId: line.wbsNodeId ?? null,
+                  purchaseOrderLineId: line.purchaseOrderLineId ?? null,
+                  description: line.description,
+                  quantity: qty,
+                  unitPrice: unitPriceNet,
+                  taxRate: rate,
+                  lineSubtotal,
+                  lineTax,
+                  lineTotal,
+                  sortOrder: line.sortOrder ?? 0,
+                },
+              });
+            }
+
+            await recalcSupplierInvoiceTotals(tx, created.id);
+            const refreshed = await tx.supplierInvoice.findUniqueOrThrow({ where: { id: created.id } });
+            if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
+              throw new ServiceError("CONFLICT", "El total de la factura debe ser mayor a 0");
+            }
+
+            const fx = computeDocumentFxAmounts(refreshed.currency, refreshed.totalAmount, refreshed.fxRate);
+            await tx.supplierInvoice.update({
+              where: { id: created.id },
+              data: {
+                status: "ISSUED",
+                fxRate: fx.fxRate,
+                amountArs: fx.amountArs,
+                updatedBy: ctx.actorUserId,
+              },
+            });
+
+            const payable = await tx.payable.create({
+              data: {
+                tenantId: refreshed.tenantId,
+                companyId: refreshed.companyId,
+                projectId,
+                supplierContactId: refreshed.supplierContactId,
+                supplierInvoiceId: refreshed.id,
+                issueDate: refreshed.issueDate,
+                dueDate: refreshed.dueDate,
+                currency: refreshed.currency,
+                originalAmount: refreshed.totalAmount,
+                paidAmount: new Prisma.Decimal(0),
+                status: "OPEN",
+                createdBy: ctx.actorUserId,
+                updatedBy: ctx.actorUserId,
+              },
+            });
+
+            let paymentId: string | undefined;
+            let movementId: string | undefined;
+            let payAccountId: string | undefined;
+
+            if (input.payNow) {
+              // D-053: payFullBalance / omitted amount → stored invoice total.
+              const payAmount =
+                input.payNow.payFullBalance || input.payNow.amount == null
+                  ? refreshed.totalAmount
+                  : toMoneyDecimal(input.payNow.amount);
+
+              const applied = await applyPaymentToPayable(
+                tx,
+                {
+                  payable,
+                  accountId: input.payNow.accountId,
+                  amount: payAmount,
+                  paymentDate: input.payNow.paymentDate,
+                  notes: input.payNow.notes ?? null,
+                  paymentMethod: input.payNow.paymentMethod ?? null,
+                  reference: input.payNow.reference ?? null,
+                  idempotencyKey: input.payNow.idempotencyKey,
+                },
+                ctx,
+              );
+              paymentId = applied.paymentId;
+              movementId = applied.movementId;
+              payAccountId = applied.accountId;
+            }
+
+            await auditAp(
+              ctx,
+              "supplier_invoice.registered_expense",
+              "SupplierInvoice",
+              refreshed.id,
+              { companyId, projectId },
+              { after: { number, issued: true, paid: Boolean(input.payNow) }, tx },
+            );
+
+            if (paymentId) {
+              await auditAp(
+                ctx,
+                "payment.confirmed",
+                "Payment",
+                paymentId,
+                { companyId, projectId },
+                { after: { number, payableId: payable.id }, tx },
+              );
+            }
+
+            return {
+              invoiceId: refreshed.id,
+              payableId: payable.id,
+              number,
+              companyId,
+              projectId,
+              paymentId,
+              movementId,
+              payAccountId,
+            };
           });
-          await tx.supplierInvoiceLine.create({
-            data: {
-              invoiceId: created.id,
-              wbsNodeId: line.wbsNodeId ?? null,
-              purchaseOrderLineId: line.purchaseOrderLineId ?? null,
-              description: line.description,
-              quantity: qty,
-              unitPrice: unitPriceNet,
-              taxRate: rate,
-              lineSubtotal,
-              lineTax,
-              lineTotal,
-              sortOrder: line.sortOrder ?? 0,
-            },
-          });
+          break;
+        } catch (err) {
+          if (isIdempotencyUniqueConflict(err)) throw err;
+          if (attempt === 0 && isUniqueConstraintError(err)) continue;
+          throw err;
         }
+      }
+      if (!createdOutcome) {
+        throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
+      }
 
-        await recalcSupplierInvoiceTotals(tx, created.id);
-        const refreshed = await tx.supplierInvoice.findUniqueOrThrow({ where: { id: created.id } });
-        if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
-          throw new ServiceError("CONFLICT", "El total de la factura debe ser mayor a 0");
-        }
+      await notifyApExpenseCreated(createdOutcome, ctx);
 
-        const fx = computeDocumentFxAmounts(refreshed.currency, refreshed.totalAmount, refreshed.fxRate);
-        await tx.supplierInvoice.update({
-          where: { id: created.id },
-          data: {
-            status: "ISSUED",
-            fxRate: fx.fxRate,
-            amountArs: fx.amountArs,
-            updatedBy: ctx.actorUserId,
-          },
-        });
+      const row = await loadApExpenseReplay(ctx.tenantId, idempotencyKey, input.payNow);
+      if (!row) {
+        throw new ServiceError("CONFLICT", "No se pudo recargar la factura registrada");
+      }
+      if (createdOutcome.paymentId && !row.outcome.paymentId) {
+        row.outcome.paymentId = createdOutcome.paymentId;
+        row.outcome.movementId = createdOutcome.movementId;
+        row.outcome.payAccountId = createdOutcome.payAccountId;
+      }
+      return row;
+    },
+  });
 
-        const payable = await tx.payable.create({
-          data: {
-            tenantId: refreshed.tenantId,
-            companyId: refreshed.companyId,
-            projectId,
-            supplierContactId: refreshed.supplierContactId,
-            supplierInvoiceId: refreshed.id,
-            issueDate: refreshed.issueDate,
-            dueDate: refreshed.dueDate,
-            currency: refreshed.currency,
-            originalAmount: refreshed.totalAmount,
-            paidAmount: new Prisma.Decimal(0),
-            status: "OPEN",
-            createdBy: ctx.actorUserId,
-            updatedBy: ctx.actorUserId,
-          },
-        });
-
-        let paymentId: string | undefined;
-        let movementId: string | undefined;
-        let payAccountId: string | undefined;
-
-        if (input.payNow) {
-          // D-053: payFullBalance / omitted amount → stored invoice total.
-          const payAmount =
-            input.payNow.payFullBalance || input.payNow.amount == null
-              ? refreshed.totalAmount
-              : toMoneyDecimal(input.payNow.amount);
-
-          const applied = await applyPaymentToPayable(
-            tx,
-            {
-              payable,
-              accountId: input.payNow.accountId,
-              amount: payAmount,
-              paymentDate: input.payNow.paymentDate,
-              notes: input.payNow.notes ?? null,
-              paymentMethod: input.payNow.paymentMethod ?? null,
-              reference: input.payNow.reference ?? null,
-            },
-            ctx,
-          );
-          paymentId = applied.paymentId;
-          movementId = applied.movementId;
-          payAccountId = applied.accountId;
-        }
-
-        await auditAp(
-          ctx,
-          "supplier_invoice.registered_expense",
-          "SupplierInvoice",
-          refreshed.id,
-          { companyId, projectId },
-          { after: { number, issued: true, paid: Boolean(input.payNow) }, tx },
-        );
-
-        if (paymentId) {
-          await auditAp(
-            ctx,
-            "payment.confirmed",
-            "Payment",
-            paymentId,
-            { companyId, projectId },
-            { after: { number, payableId: payable.id }, tx },
-          );
-        }
-
-        return {
-          invoiceId: refreshed.id,
-          payableId: payable.id,
-          number,
-          companyId,
-          projectId,
-          paymentId,
-          movementId,
-          payAccountId,
-        };
-      });
-      break;
-    } catch (err) {
-      if (attempt === 0 && isUniqueConstraintError(err)) continue;
-      throw err;
-    }
-  }
-  if (!outcome) {
-    throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
-  }
+  const outcome = replay.outcome;
 
   await ensureDraftJournalFromSupplierInvoice(outcome.invoiceId, ctx);
   if (outcome.paymentId) {
     await ensureDraftJournalFromPayment(outcome.paymentId, ctx);
-  }
-
-  if (outcome.projectId && !outcome.paymentId) {
-    const inv = await prisma.supplierInvoice.findUnique({
-      where: { id: outcome.invoiceId },
-      select: {
-        number: true,
-        totalAmount: true,
-        currency: true,
-        purchaseOrderId: true,
-      },
-    });
-    if (inv) {
-      let purchaseOrderCode: string | null = null;
-      if (inv.purchaseOrderId) {
-        const po = await prisma.purchaseOrder.findUnique({
-          where: { id: inv.purchaseOrderId },
-          select: { number: true },
-        });
-        if (po) purchaseOrderCode = `OC-${String(po.number).padStart(3, "0")}`;
-      }
-      await notifyPayableReadyToPay({
-        ctx,
-        supplierInvoiceId: outcome.invoiceId,
-        payableId: outcome.payableId,
-        projectId: outcome.projectId,
-        companyId: outcome.companyId,
-        invoiceNumber: inv.number,
-        purchaseOrderId: inv.purchaseOrderId,
-        purchaseOrderCode,
-        amountLabel: `${serializeMoneyDecimal(inv.totalAmount)} ${inv.currency}`,
-      }).catch(() => undefined);
-    }
-  }
-
-  if (outcome.paymentId) {
-    const payment = await prisma.payment.findUnique({
-      where: { id: outcome.paymentId },
-      include: {
-        account: { select: { name: true } },
-        supplierInvoice: { select: { number: true } },
-      },
-    });
-    if (payment) {
-      await notifyPaymentConfirmed({
-        ctx,
-        supplierInvoiceId: payment.supplierInvoiceId,
-        projectId: payment.projectId,
-        companyId: payment.companyId,
-        invoiceNumber: payment.supplierInvoice.number,
-        amountLabel: `${serializeMoneyDecimal(payment.amount)} ${payment.currency}`,
-        accountName: payment.account.name,
-      }).catch(() => undefined);
-    }
   }
 
   const traceChain = buildApExpenseTraceChain(outcome);

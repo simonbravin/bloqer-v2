@@ -6,6 +6,7 @@ import {
   defaultCalendarDateRangeDays,
   formatCalendarDate,
   PRODUCT_TIMEZONE,
+  productCalendarDateUtc,
   toIsoDateInTimeZone,
 } from "./calendar-date";
 
@@ -28,6 +29,12 @@ describe("calendar-date (America/Argentina/Buenos_Aires)", () => {
     assert.equal(toIsoDateInTimeZone(nearUtcMidnight, PRODUCT_TIMEZONE), "2026-07-22");
     // UTC slice would wrongly yield 2026-07-23
     assert.equal(nearUtcMidnight.toISOString().slice(0, 10), "2026-07-23");
+  });
+
+  it("productCalendarDateUtc is UTC midnight of the product calendar day", () => {
+    const nearUtcMidnight = new Date("2026-07-23T02:30:00.000Z");
+    assert.equal(productCalendarDateUtc(nearUtcMidnight).toISOString(), "2026-07-22T00:00:00.000Z");
+    assert.equal(productCalendarDateUtc(new Date("2026-07-22T18:00:00.000Z")).toISOString(), "2026-07-22T00:00:00.000Z");
   });
 
   it("computeDateRangePreset month/ytd/week/d90", () => {

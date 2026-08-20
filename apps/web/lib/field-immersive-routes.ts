@@ -1,0 +1,11 @@
+/** Full-screen field flows: hide bottom nav to keep the keyboard and CTA usable. */
+const IMMERSIVE_PATTERNS: RegExp[] = [
+  /^\/proyectos\/[^/]+\/libro-obra\/nuevo\/?$/,
+  /^\/proyectos\/[^/]+\/libro-obra\/[^/]+\/editar\/?$/,
+  /^\/proyectos\/[^/]+\/solicitudes-compra\/nueva\/?$/,
+  /^\/proyectos\/[^/]+\/ordenes-compra\/[^/]+\/recepciones\/nueva\/?$/,
+];
+
+export function isFieldImmersivePath(pathname: string): boolean {
+  return IMMERSIVE_PATTERNS.some((re) => re.test(pathname));
+}

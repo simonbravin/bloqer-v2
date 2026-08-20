@@ -167,10 +167,10 @@ export async function getPurchaseOrderBillingSummary(
   const pendingToInvoice = computePendingToInvoiceAmount(receivedAmount, invoicedAmount);
 
   return {
-    receivedAmount: receivedAmount.toFixed(2),
-    invoicedAmount: invoicedAmount.toFixed(2),
-    paidAmount: paidAmount.toFixed(2),
-    pendingToInvoice: pendingToInvoice.toFixed(2),
+    receivedAmount: serializeMoneyDecimal(receivedAmount),
+    invoicedAmount: serializeMoneyDecimal(invoicedAmount),
+    paidAmount: serializeMoneyDecimal(paidAmount),
+    pendingToInvoice: serializeMoneyDecimal(pendingToInvoice),
     hasReceivedQuantity,
     draftInvoiceCount,
     lineMatches,

@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { requiresArInvoiceLetter, suggestInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
+import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,7 +56,7 @@ export function CertificationInvoiceForm({
   // Certification PU already includes budget taxes — default 0; user may discriminate IVA.
   const [taxRate, setTaxRate] = useState("0");
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toIsoDateInTimeZone();
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

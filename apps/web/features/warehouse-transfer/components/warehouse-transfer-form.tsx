@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,7 @@ import {
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { toSearchableOptions } from "@/lib/searchable-options";
 import { formatQtyFromString } from "@/lib/format-money";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 
 interface Warehouse { id: string; name: string }
 interface Product   { id: string; name: string; unit: string }
@@ -37,9 +39,13 @@ export function WarehouseTransferForm({
   selectedProductId,
   action,
 }: Props) {
-  const router     = useRouter();
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const [productId, setProductId] = useState(selectedProductId ?? "");
+  const [sourceWarehouseId, setSourceWarehouseId] = useState(selectedSourceId ?? "");
+  const [destinationWarehouseId, setDestinationWarehouseId] = useState("");
+  const { idempotencyKey } = useIdempotencyKey();
 
   const productOptions = useMemo(
     () =>
@@ -52,33 +58,42 @@ export function WarehouseTransferForm({
     [products],
   );
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toIsoDateInTimeZone();
 
   function onWarehouseOrProductChange(key: "src" | "prod", value: string) {
     const params = new URLSearchParams(window.location.search);
-    if (key === "src")  params.set("sourceWarehouseId", value);
+    if (key === "src") params.set("sourceWarehouseId", value);
     if (key === "prod") params.set("productId", value);
     router.replace(`?${params.toString()}`);
   }
 
   async function handleSubmit(fd: FormData) {
+    setError(null);
     startTransition(async () => {
       const result = await action(fd);
       if (result?.error) {
-        alert(result.error);
+        setError(result.error);
       }
     });
   }
 
   return (
     <form action={handleSubmit} className="space-y-5 max-w-xl">
+      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+      <input type="hidden" name="sourceWarehouseId" value={sourceWarehouseId} />
+      <input type="hidden" name="destinationWarehouseId" value={destinationWarehouseId} />
+      {error ? (
+        <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+      ) : null}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="sourceWarehouseId">Depósito origen</Label>
           <Select
-            name="sourceWarehouseId"
-            defaultValue={selectedSourceId ?? ""}
-            onValueChange={(v) => onWarehouseOrProductChange("src", v)}
+            value={sourceWarehouseId || undefined}
+            onValueChange={(v) => {
+              setSourceWarehouseId(v);
+              onWarehouseOrProductChange("src", v);
+            }}
             required
           >
             <SelectTrigger id="sourceWarehouseId">
@@ -94,7 +109,11 @@ export function WarehouseTransferForm({
 
         <div className="space-y-1.5">
           <Label htmlFor="destinationWarehouseId">Depósito destino</Label>
-          <Select name="destinationWarehouseId" defaultValue="" required>
+          <Select
+            value={destinationWarehouseId || undefined}
+            onValueChange={setDestinationWarehouseId}
+            required
+          >
             <SelectTrigger id="destinationWarehouseId">
               <SelectValue placeholder="Seleccioná un depósito" />
             </SelectTrigger>
@@ -175,7 +194,7 @@ export function WarehouseTransferForm({
       </div>
 
       <div className="flex gap-2 pt-2">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending || !sourceWarehouseId || !destinationWarehouseId || !productId}>
           {pending ? "Guardando…" : "Crear transferencia"}
         </Button>
         <Button type="button" variant="ghost" onClick={() => router.back()}>

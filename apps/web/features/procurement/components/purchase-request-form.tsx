@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,11 +51,12 @@ interface PurchaseRequestFormProps {
     costAnalysisLineId?: string;
     unit?: string;
   };
-  /** When true, show banner that fields came from materiales board. */
   prefilledFromMaterials?: boolean;
   variant?: "card" | "plain";
+  extraSections?: React.ReactNode;
   onCancel?: () => void;
   onSuccess?: () => void;
+  onCreated?: (id: string) => Promise<{ navigate?: boolean; message?: string } | void>;
 }
 
 export function PurchaseRequestForm({
@@ -63,8 +65,10 @@ export function PurchaseRequestForm({
   initialLine,
   prefilledFromMaterials = false,
   variant = "card",
+  extraSections,
   onCancel,
   onSuccess,
+  onCreated,
 }: PurchaseRequestFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -128,7 +132,6 @@ export function PurchaseRequestForm({
     if (wbs?.budgetUnit && !unit) setUnit(wbs.budgetUnit);
   }
 
-  // Sync APU hint / unit when opened from Materiales with costAnalysisLineId.
   useEffect(() => {
     if (!initialLine?.costAnalysisLineId || !wbsNodeId) return;
     const wbs = wbsOptions.find((w) => w.id === wbsNodeId);
@@ -140,7 +143,7 @@ export function PurchaseRequestForm({
   }, [initialLine?.costAnalysisLineId, wbsNodeId, wbsOptions]);
 
   return (
-    <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
+    <div className={variant === "card" ? "rounded-lg border bg-card p-4 sm:p-6" : undefined}>
       <form
         className="space-y-5"
         action={(fd) => {
@@ -171,6 +174,23 @@ export function PurchaseRequestForm({
               setError(result.error);
               return;
             }
+            let created: { navigate?: boolean; message?: string } | void = undefined;
+            try {
+              created = await onCreated?.(result.id);
+            } catch {
+              created = {
+                navigate: false,
+                message: "Solicitud creada correctamente. Algún archivo no pudo subirse.",
+              };
+            }
+            if (created?.message) {
+              toast.warning(created.message);
+            } else {
+              toast.success("Solicitud creada.");
+            }
+            if (created?.navigate === false) {
+              return;
+            }
             onSuccess?.();
             router.push(`/proyectos/${projectId}/solicitudes-compra/${result.id}`);
             router.refresh();
@@ -189,107 +209,127 @@ export function PurchaseRequestForm({
           </p>
         ) : null}
 
-        <div className="space-y-2">
-          <Label htmlFor="pr-wbs">Ítem EDT (obligatorio)</Label>
-          {wbsOptions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No hay ítems EDT en presupuestos aprobados/cerrados.
-            </p>
-          ) : (
-            <SearchableCombobox
-              id="pr-wbs"
-              popoverWidth="wide"
-              options={wbsComboboxOptions}
-              value={wbsNodeId}
-              onValueChange={onWbsChange}
-              placeholder="Elegir partida…"
-              searchPlaceholder="Buscar partida…"
-            />
-          )}
-          {selectedWbs?.budgetUnitCost != null ? (
-            <p className="text-xs text-muted-foreground">
-              Costo ref. materiales: {formatDecimalAr(Number(selectedWbs.budgetUnitCost))}
-              {selectedWbs?.availableSaldo != null
-                ? ` · Saldo disponible: ${formatDecimalAr(Number(selectedWbs.availableSaldo))}`
-                : ""}
-            </p>
-          ) : null}
-          {selectedWbs?.wouldExceedBudget ? (
-            <p className="text-xs text-destructive">
-              Este ítem ya está cerca o por encima del saldo disponible.
-            </p>
-          ) : null}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="pr-apu">Insumo APU (opcional)</Label>
-          <SearchableCombobox
-            id="pr-apu"
-            popoverWidth="wide"
-            options={apuOptions}
-            value={costAnalysisLineId ?? SEARCHABLE_NONE}
-            onValueChange={(v) => applyApu(v === SEARCHABLE_NONE ? null : v)}
-            placeholder="Elegir material del APU…"
-            searchPlaceholder="Buscar insumo…"
-            disabled={!wbsNodeId || (selectedWbs?.apuLines?.length ?? 0) === 0}
-          />
-          <p className="text-xs text-muted-foreground">
-            Al elegir un insumo se precarga el faltante (necesidad − ya pedido). Editable.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="description">Descripción</Label>
-          <Input
-            id="description"
-            name="description"
-            required
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold">Qué necesito</h2>
           <div className="space-y-2">
-            <Label htmlFor="quantity">Cantidad</Label>
+            <Label htmlFor="description">Descripción / material</Label>
             <Input
-              id="quantity"
-              name="quantity"
-              inputMode="decimal"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
+              id="description"
+              name="description"
               required
+              className="min-h-11 md:min-h-9"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
             />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Cantidad</Label>
+              <Input
+                id="quantity"
+                name="quantity"
+                inputMode="decimal"
+                className="min-h-11 md:min-h-9"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="unit">Unidad</Label>
+              <UnitSelect
+                value={unit || selectedWbs?.budgetUnit || "un"}
+                onChange={setUnit}
+              />
+            </div>
+          </div>
+          {apuHint ? <p className="text-xs text-muted-foreground">{apuHint}</p> : null}
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold">Dónde se usa</h2>
+          <div className="space-y-2">
+            <Label htmlFor="pr-wbs">Ítem EDT (obligatorio)</Label>
+            {wbsOptions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No hay ítems EDT en presupuestos aprobados/cerrados.
+              </p>
+            ) : (
+              <SearchableCombobox
+                id="pr-wbs"
+                popoverWidth="wide"
+                options={wbsComboboxOptions}
+                value={wbsNodeId}
+                onValueChange={onWbsChange}
+                placeholder="Elegir partida…"
+                searchPlaceholder="Buscar partida…"
+              />
+            )}
+            {selectedWbs?.budgetUnitCost != null ? (
+              <p className="text-xs text-muted-foreground">
+                Costo ref. materiales: {formatDecimalAr(Number(selectedWbs.budgetUnitCost))}
+                {selectedWbs?.availableSaldo != null
+                  ? ` · Saldo disponible: ${formatDecimalAr(Number(selectedWbs.availableSaldo))}`
+                  : ""}
+              </p>
+            ) : null}
+            {selectedWbs?.wouldExceedBudget ? (
+              <p className="text-xs text-destructive">
+                Este ítem ya está cerca o por encima del saldo disponible.
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="unit">Unidad</Label>
-            <UnitSelect
-              value={unit || selectedWbs?.budgetUnit || "un"}
-              onChange={setUnit}
+            <Label htmlFor="pr-apu">Insumo APU (opcional)</Label>
+            <SearchableCombobox
+              id="pr-apu"
+              popoverWidth="wide"
+              options={apuOptions}
+              value={costAnalysisLineId ?? SEARCHABLE_NONE}
+              onValueChange={(v) => applyApu(v === SEARCHABLE_NONE ? null : v)}
+              placeholder="Elegir material del APU…"
+              searchPlaceholder="Buscar insumo…"
+              disabled={!wbsNodeId || (selectedWbs?.apuLines?.length ?? 0) === 0}
             />
+            <p className="text-xs text-muted-foreground">
+              Al elegir un insumo se precarga el faltante (necesidad − ya pedido). Editable.
+            </p>
           </div>
-        </div>
-        {apuHint ? <p className="text-xs text-muted-foreground">{apuHint}</p> : null}
+        </section>
 
-        <div className="space-y-2">
-          <Label htmlFor="neededByDate">Fecha necesaria</Label>
-          <Input id="neededByDate" name="neededByDate" type="date" />
-        </div>
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold">Cuándo</h2>
+          <div className="space-y-2">
+            <Label htmlFor="neededByDate">Fecha requerida</Label>
+            <Input id="neededByDate" name="neededByDate" type="date" className="min-h-11 md:min-h-9" />
+          </div>
+        </section>
 
-        <div className="space-y-2">
-          <Label htmlFor="notes">Notas</Label>
-          <Textarea id="notes" name="notes" rows={3} />
-        </div>
+        {extraSections}
 
-        <div className="flex flex-wrap justify-end gap-2">
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold">Observaciones</h2>
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notas</Label>
+            <Textarea id="notes" name="notes" rows={3} className="min-h-24" />
+          </div>
+        </section>
+
+        <div className="sticky bottom-0 z-20 -mx-1 flex flex-col-reverse gap-2 border-t bg-background/95 p-3 backdrop-blur sm:flex-row sm:justify-end md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
           <Button
             type="button"
             variant="outline"
+            className="min-h-11 md:min-h-9"
             onClick={onCancel ?? (() => router.back())}
           >
             Cancelar
           </Button>
-          <Button type="submit" disabled={pending || wbsOptions.length === 0}>
+          <Button
+            type="submit"
+            className="min-h-11 md:min-h-9"
+            data-testid="purchase-request-create-submit"
+            disabled={pending || wbsOptions.length === 0}
+          >
             {pending ? "Guardando…" : "Crear solicitud"}
           </Button>
         </div>

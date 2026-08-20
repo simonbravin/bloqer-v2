@@ -23,6 +23,7 @@ import {
   JobsiteLogIssueSeverityBadge,
   JobsiteLogIssueTypeBadge,
   JobsiteLogLifecycleDialog,
+  JobsiteLogDetailMobileSections,
 } from "@/features/jobsite-log";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { ReportExportActions } from "@/features/reports";
@@ -163,13 +164,21 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
               entries={activityLog.entries}
               canContribute={canContribute}
               canSupervise={canSupervise}
+              triggerLabel={
+                log.status === "DRAFT" && canContribute
+                  ? "Enviar a revisión"
+                  : log.status === "SUBMITTED"
+                    ? "Pendiente de aprobación"
+                    : "Ciclo de vida"
+              }
+              triggerVariant={log.status === "DRAFT" && canContribute ? "default" : "outline"}
               onSubmit={submitJobsiteLogAction.bind(null, logId, projectId)}
               onReturn={returnJobsiteLogAction.bind(null, logId, projectId)}
               onApprove={approveJobsiteLogAction.bind(null, logId, projectId)}
               onCancel={cancelJobsiteLogAction.bind(null, logId, projectId)}
             />
             {showEditLink && (
-              <Button variant="outline" size="sm" asChild>
+              <Button variant="outline" size="sm" className="min-h-11 md:min-h-8" asChild>
                 <Link href={`/proyectos/${projectId}/libro-obra/${logId}/editar`}>Editar</Link>
               </Button>
             )}
@@ -181,6 +190,15 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
           </div>
         </div>
       </div>
+
+      {log.status === "SUBMITTED" && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+          <p className="font-medium">Pendiente de aprobación</p>
+          <p className="mt-0.5 text-muted-foreground">
+            El parte está en revisión y no se puede editar hasta que se apruebe o se devuelva.
+          </p>
+        </div>
+      )}
 
       {log.status === "DRAFT" && log.returnNotes && (
         <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 dark:bg-yellow-950/20">
@@ -218,8 +236,23 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
           </div>
         ))}
 
+      <div className="md:hidden space-y-4">
+      <EntityDocumentsPanel
+        scope={{ kind: "project", projectId }}
+        linkedEntity={{ type: "JOBSITE_LOG", id: logId }}
+        storageConfigured={storageConfigured}
+        docs={logAttachments}
+        canEdit={canEditAttachments}
+      />
+        <JobsiteLogDetailMobileSections
+          log={log}
+          progressRows={progressRows}
+          stockMovementByMaterialId={stockMovementByMaterialId}
+        />
+      </div>
+
       {log.progress.length > 0 && (
-        <DataTableSection title="Avance de obra">
+        <DataTableSection title="Avance de obra" className="hidden md:block">
           <TableScroll>
             <Table>
               <TableHeader>
@@ -261,7 +294,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
       )}
 
       {log.labor.length > 0 && (
-        <DataTableSection title="Mano de obra">
+        <DataTableSection title="Mano de obra" className="hidden md:block">
           <TableScroll>
             <Table>
               <TableHeader>
@@ -296,7 +329,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
       )}
 
       {log.materials.length > 0 && (
-        <DataTableSection title="Materiales utilizados">
+        <DataTableSection title="Materiales utilizados" className="hidden md:block">
           <TableScroll>
             <Table>
               <TableHeader>
@@ -354,7 +387,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
       )}
 
       {log.issues.length > 0 && (
-        <DataTableSection title="Problemas / Incidencias">
+        <DataTableSection title="Problemas / Incidencias" className="hidden md:block">
           <TableScroll>
             <Table>
               <TableHeader>
@@ -394,13 +427,15 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
         </DataTableSection>
       )}
 
-      <EntityDocumentsPanel
-        scope={{ kind: "project", projectId }}
-        linkedEntity={{ type: "JOBSITE_LOG", id: logId }}
-        storageConfigured={storageConfigured}
-        docs={logAttachments}
-        canEdit={canEditAttachments}
-      />
+      <div className="hidden md:block">
+        <EntityDocumentsPanel
+          scope={{ kind: "project", projectId }}
+          linkedEntity={{ type: "JOBSITE_LOG", id: logId }}
+          storageConfigured={storageConfigured}
+          docs={logAttachments}
+          canEdit={canEditAttachments}
+        />
+      </div>
     </PageShell>
   );
 }

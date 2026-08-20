@@ -10,6 +10,11 @@ import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { ensureDraftJournalFromTreasuryMovement } from "../accounting/accounting-auto-draft.service";
 import {
+  requireIdempotencyKey,
+  treasuryMovementReplayMatches,
+  withIdempotentCreate,
+} from "../idempotency/idempotency";
+import {
   assertPeriodOpenUnderCompanyLock,
   lockTreasuryAccountRow,
 } from "./treasury-write-locks";
@@ -40,103 +45,126 @@ export async function registerCorporateTreasuryInflow(
   if (!description) {
     throw new ServiceError("VALIDATION", "La descripción es requerida");
   }
-  const movementId = randomUUID();
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
 
-  await prisma.$transaction(async (tx) => {
-    await lockTreasuryAccountRow(tx, input.accountId, ctx.tenantId);
-    const account = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
-    if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
-    if (account.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    if (account.status !== "ACTIVE") {
-      throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
-    }
-    // Tesorería es tenant-wide: las cuentas corporativas (companyId null) son válidas para
-    // ingresos corporativos; sólo rechazamos cuentas que pertenezcan a OTRA empresa.
-    if (isCrossCompany(account.companyId, ctx)) {
-      throw new ServiceError(
-        "FORBIDDEN",
-        "La cuenta de tesorería no pertenece a la empresa activa.",
-      );
-    }
-
-    await assertPeriodOpenUnderCompanyLock(tx, {
-      tenantId: ctx.tenantId,
-      companyId: ctx.companyId!,
-      date: input.movementDate,
-    });
-
-    if (counterpartyContactId) {
-      const contact = await tx.contact.findUnique({
-        where: { id: counterpartyContactId },
-        select: { id: true, tenantId: true, status: true },
-      });
-      if (!contact || contact.tenantId !== ctx.tenantId) {
-        throw new ServiceError("NOT_FOUND", "Contacto de contraparte no encontrado");
-      }
-      if (contact.status !== "ACTIVE") {
-        throw new ServiceError("CONFLICT", "El contacto de contraparte no está activo");
-      }
-
-      const clientRole = await tx.contactRole.findUnique({
-        where: { contactId_role: { contactId: counterpartyContactId, role: "CLIENT" } },
-      });
-      if (!clientRole || clientRole.tenantId !== ctx.tenantId || clientRole.status !== "ACTIVE") {
-        throw new ServiceError(
-          "CONFLICT",
-          "El contacto seleccionado no tiene rol de cliente activo",
-        );
-      }
-    }
-
-    await tx.accountMovement.create({
-      data: {
-        id: movementId,
-        tenantId: ctx.tenantId,
-        companyId: ctx.companyId,
+  const movement = await withIdempotentCreate({
+    findExisting: () =>
+      prisma.accountMovement.findFirst({
+        where: { tenantId: ctx.tenantId, idempotencyKey },
+      }),
+    payloadsMatch: (existing) =>
+      treasuryMovementReplayMatches(existing, {
         accountId: input.accountId,
-        movementDate: new Date(input.movementDate),
+        movementDate: input.movementDate,
         type: "INFLOW",
-        sourceType: "MANUAL_ADJUSTMENT",
-        sourceId: movementId,
-        currency: account.currency,
-        amount,
+        amount: input.amount,
         description,
         counterpartyContactId,
         externalInvoiceRef,
-        status: "CONFIRMED",
-        createdBy: ctx.actorUserId,
-      },
-    });
+      }),
+    create: async () => {
+      const movementId = randomUUID();
+      await prisma.$transaction(async (tx) => {
+        await lockTreasuryAccountRow(tx, input.accountId, ctx.tenantId);
+        const account = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
+        if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
+        if (account.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+        if (account.status !== "ACTIVE") {
+          throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
+        }
+        // Tesorería es tenant-wide: las cuentas corporativas (companyId null) son válidas para
+        // ingresos corporativos; sólo rechazamos cuentas que pertenezcan a OTRA empresa.
+        if (isCrossCompany(account.companyId, ctx)) {
+          throw new ServiceError(
+            "FORBIDDEN",
+            "La cuenta de tesorería no pertenece a la empresa activa.",
+          );
+        }
 
-    await auditTreasury(
-      ctx,
-      "account_movement.confirmed",
-      "AccountMovement",
-      movementId,
-      { companyId: ctx.companyId },
-      {
-        after: {
-          type: "INFLOW",
-          sourceType: "MANUAL_ADJUSTMENT",
-          amount: input.amount,
-          counterpartyContactId,
-          externalInvoiceRef,
-        },
-        tx,
-      },
-    );
+        await assertPeriodOpenUnderCompanyLock(tx, {
+          tenantId: ctx.tenantId,
+          companyId: ctx.companyId!,
+          date: input.movementDate,
+        });
+
+        if (counterpartyContactId) {
+          const contact = await tx.contact.findUnique({
+            where: { id: counterpartyContactId },
+            select: { id: true, tenantId: true, status: true },
+          });
+          if (!contact || contact.tenantId !== ctx.tenantId) {
+            throw new ServiceError("NOT_FOUND", "Contacto de contraparte no encontrado");
+          }
+          if (contact.status !== "ACTIVE") {
+            throw new ServiceError("CONFLICT", "El contacto de contraparte no está activo");
+          }
+
+          const clientRole = await tx.contactRole.findUnique({
+            where: { contactId_role: { contactId: counterpartyContactId, role: "CLIENT" } },
+          });
+          if (!clientRole || clientRole.tenantId !== ctx.tenantId || clientRole.status !== "ACTIVE") {
+            throw new ServiceError(
+              "CONFLICT",
+              "El contacto seleccionado no tiene rol de cliente activo",
+            );
+          }
+        }
+
+        await tx.accountMovement.create({
+          data: {
+            id: movementId,
+            tenantId: ctx.tenantId,
+            companyId: ctx.companyId,
+            accountId: input.accountId,
+            movementDate: new Date(input.movementDate),
+            type: "INFLOW",
+            sourceType: "MANUAL_ADJUSTMENT",
+            sourceId: movementId,
+            currency: account.currency,
+            amount,
+            description,
+            counterpartyContactId,
+            externalInvoiceRef,
+            status: "CONFIRMED",
+            idempotencyKey,
+            createdBy: ctx.actorUserId,
+          },
+        });
+
+        await auditTreasury(
+          ctx,
+          "account_movement.confirmed",
+          "AccountMovement",
+          movementId,
+          { companyId: ctx.companyId },
+          {
+            after: {
+              type: "INFLOW",
+              sourceType: "MANUAL_ADJUSTMENT",
+              amount: input.amount,
+              counterpartyContactId,
+              externalInvoiceRef,
+            },
+            tx,
+          },
+        );
+      });
+
+      const created = await prisma.accountMovement.findUniqueOrThrow({ where: { id: movementId } });
+      return created;
+    },
   });
 
-  await ensureDraftJournalFromTreasuryMovement(movementId, ctx);
+  await ensureDraftJournalFromTreasuryMovement(movement.id, ctx);
 
-  const href = buildFinancialHref("AccountMovement", movementId, { accountId: input.accountId });
+  const href = buildFinancialHref("AccountMovement", movement.id, { accountId: movement.accountId });
   const traceChain: FinancialTraceLink[] = [
-    { entityType: "AccountMovement", entityId: movementId, href },
+    { entityType: "AccountMovement", entityId: movement.id, href },
   ];
 
   return {
     kind: "TREASURY_INFLOW",
-    primaryEntityId: movementId,
+    primaryEntityId: movement.id,
     primaryEntityType: "AccountMovement",
     href,
     traceChain,

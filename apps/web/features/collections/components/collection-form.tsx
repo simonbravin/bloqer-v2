@@ -16,6 +16,7 @@ import { SettlementFields } from "@/features/treasury/components/settlement-fiel
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { createCollectionAction } from "@/app/(app)/proyectos/[id]/cobranzas/actions";
 import { createCompanyCollectionAction } from "@/app/(app)/finanzas/cuentas-por-cobrar/actions";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 
 interface AccountOption {
   id: string;
@@ -46,6 +47,7 @@ export function CollectionForm({
   const [error, setError] = useState<string | null>(null);
   const [accountId, setAccountId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<SettlementMethodValue | "">("");
+  const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
 
   const matchingAccounts = accounts.filter((a) => a.currency === receivableCurrency);
   const balanceSerialized = serializeMoney(receivableBalance);
@@ -95,6 +97,7 @@ export function CollectionForm({
       paymentMethod: paymentMethod || null,
       reference: rawRef || null,
       notes: (fd.get("notes") as string) || null,
+      idempotencyKey,
     };
     startTransition(async () => {
       const res = companyFinanzas
@@ -103,8 +106,10 @@ export function CollectionForm({
       if ("error" in res) {
         setError(res.error);
       } else if (companyFinanzas) {
+        rotateIdempotencyKey();
         router.push(`/finanzas/cuentas-por-cobrar/${receivableId}`);
       } else {
+        rotateIdempotencyKey();
         router.push(`/proyectos/${projectId}/cuentas-por-cobrar/${receivableId}`);
       }
     });

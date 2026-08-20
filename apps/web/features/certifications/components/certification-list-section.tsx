@@ -1,7 +1,7 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import type { CertificationListItem } from "./certification-list";
+import { useListViewMode } from "@/components/ui/list-view-toggle";
 import { CertificationCards } from "./certification-cards";
 import { CertificationTable } from "./certification-table";
 
@@ -12,7 +12,7 @@ export function CertificationListSection({
   certifications: CertificationListItem[];
   projectId: string;
 }) {
-  const view = useSearchParams().get("view") === "cards" ? "cards" : "table";
+  const view = useListViewMode();
   if (view === "cards") {
     return <CertificationCards certifications={certifications} projectId={projectId} />;
   }

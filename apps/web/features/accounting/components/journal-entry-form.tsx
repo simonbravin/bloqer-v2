@@ -13,6 +13,7 @@ import {
   updateJournalEntryAction,
 } from "@/app/(app)/contabilidad/actions";
 import type { JournalEntryView } from "@bloqer/services";
+import { toIsoDateInTimeZone } from "@bloqer/utils";
 import type { CompanyOption } from "./accounting-account-form";
 import { JournalEntryLinesEditor } from "./journal-entry-lines-editor";
 import {
@@ -122,7 +123,7 @@ export function JournalEntryForm({
 
   const defaultDate = initial?.entryDate
     ? initial.entryDate.toISOString().slice(0, 10)
-    : new Date().toISOString().slice(0, 10);
+    : toIsoDateInTimeZone();
 
   return (
     <div className="rounded-lg border bg-card p-6">

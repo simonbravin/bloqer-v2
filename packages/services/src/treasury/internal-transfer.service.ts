@@ -19,6 +19,11 @@ import {
   lockTreasuryAccountRow,
 } from "./treasury-write-locks";
 import { isCrossCompany } from "../company-scope";
+import {
+  requireIdempotencyKey,
+  transferReplayMatches,
+  withIdempotentCreate,
+} from "../idempotency/idempotency";
 
 export type InternalTransferView = Omit<InternalTransfer, "amount"> & {
   amount: string;
@@ -161,7 +166,27 @@ export async function createInternalTransfer(
     throw new ServiceError("CONFLICT", "La cuenta origen y destino deben ser diferentes");
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+  const transferInclude = {
+    sourceAccount:      { select: { name: true } },
+    destinationAccount: { select: { name: true } },
+  } as const;
+
+  const result = await withIdempotentCreate({
+    findExisting: () =>
+      prisma.internalTransfer.findFirst({
+        where: { tenantId: ctx.tenantId, idempotencyKey },
+        include: transferInclude,
+      }),
+    payloadsMatch: (existing) =>
+      transferReplayMatches(existing, {
+        sourceAccountId: input.sourceAccountId,
+        destinationAccountId: input.destinationAccountId,
+        transferDate: input.transferDate,
+        amount: input.amount,
+      }),
+    create: async () => {
+      return prisma.$transaction(async (tx) => {
     // Stable lock order avoids deadlocks when two transfers cross the same accounts.
     const accountIds = [input.sourceAccountId, input.destinationAccountId].sort();
     for (const accountId of accountIds) {
@@ -228,6 +253,7 @@ export async function createInternalTransfer(
         currency:             source.currency,
         amount,
         description:          input.description ?? null,
+        idempotencyKey,
         status:               "CONFIRMED",
         createdBy:            ctx.actorUserId,
         updatedBy:            ctx.actorUserId,
@@ -280,10 +306,7 @@ export async function createInternalTransfer(
 
     const result = await tx.internalTransfer.findUniqueOrThrow({
       where: { id: transfer.id },
-      include: {
-        sourceAccount:      { select: { name: true } },
-        destinationAccount: { select: { name: true } },
-      },
+      include: transferInclude,
     });
 
     await auditTreasury(
@@ -303,6 +326,8 @@ export async function createInternalTransfer(
     );
 
     return result;
+      });
+    },
   });
 
   await ensureDraftJournalFromInternalTransfer(result.id, ctx);

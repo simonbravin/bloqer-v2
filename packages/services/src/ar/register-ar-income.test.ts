@@ -7,6 +7,7 @@ import { COMPANY_AR_PROJECT_LABEL } from "./receivable.service";
 
 const CLIENT_ID = "11111111-1111-4111-8111-111111111111";
 const ACCOUNT_ID = "22222222-2222-4222-8222-222222222222";
+const REGISTER_KEY = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 describe("registerArIncomeSchema (D-051)", () => {
   it("accepts corporate invoice without projectId", () => {
@@ -15,6 +16,7 @@ describe("registerArIncomeSchema (D-051)", () => {
       issueDate: "2026-07-21",
       dueDate: "2026-08-21",
       currency: "ARS",
+      idempotencyKey: REGISTER_KEY,
       externalInvoiceRef: "FC A 0001-00001234",
       lines: [
         {
@@ -37,6 +39,7 @@ describe("registerArIncomeSchema (D-051)", () => {
       clientContactId: CLIENT_ID,
       issueDate: "2026-07-21",
       dueDate: "2026-07-21",
+      idempotencyKey: REGISTER_KEY,
       lines: [{ description: "Servicio", quantity: "1", unitPrice: "100", taxRate: "0" }],
     });
     assert.equal(parsed.success, true);
@@ -57,10 +60,12 @@ describe("registerArIncomeSchema (D-051)", () => {
       clientContactId: CLIENT_ID,
       issueDate: "2026-07-21",
       dueDate: "2026-08-21",
+      idempotencyKey: REGISTER_KEY,
       lines: [{ description: "Materiales", quantity: "2", unitPrice: "1000", taxRate: "21" }],
       collectNow: {
         accountId: ACCOUNT_ID,
         collectionDate: "2026-07-21",
+        idempotencyKey: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       },
     });
     assert.equal(parsed.success, true);
@@ -69,6 +74,7 @@ describe("registerArIncomeSchema (D-051)", () => {
   it("registers under registerTransactionSchema as AR_INCOME", () => {
     const parsed = registerTransactionSchema.safeParse({
       kind: "AR_INCOME",
+      idempotencyKey: REGISTER_KEY,
       clientContactId: CLIENT_ID,
       issueDate: "2026-07-21",
       dueDate: "2026-08-21",

@@ -10,7 +10,9 @@ import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { toSearchableOptions } from "@/lib/searchable-options";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
+import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { registerArAdvanceAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import type { ClientOption } from "./manual-invoice-form";
 
 type TreasuryAccountOption = {
@@ -38,6 +40,9 @@ export function AdvanceInvoiceForm({
   const [clientContactId, setClientContactId] = useState(defaultClientId ?? "");
   const [accountId, setAccountId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<SettlementMethodValue | "">("");
+  const { idempotencyKey: saleKey, rotateIdempotencyKey: rotateSaleKey } = useIdempotencyKey();
+  const { idempotencyKey: collectNowKey, rotateIdempotencyKey: rotateCollectNowKey } =
+    useIdempotencyKey();
 
   const selectedAccount = useMemo(
     () => accounts.find((a) => a.id === accountId),
@@ -73,6 +78,7 @@ export function AdvanceInvoiceForm({
         currency: selectedAccount.currency,
         amount,
         notes: (fd.get("notes") as string) || null,
+        idempotencyKey: saleKey,
         collectNow: {
           accountId,
           collectionDate,
@@ -80,17 +86,20 @@ export function AdvanceInvoiceForm({
           notes: "Cobro de anticipo",
           paymentMethod: paymentMethod || null,
           reference: String(fd.get("reference") ?? "").trim() || null,
+          idempotencyKey: collectNowKey,
         },
       });
       if ("error" in res) {
         setError(res.error);
       } else {
+        rotateSaleKey();
+        rotateCollectNowKey();
         router.push(`/proyectos/${projectId}/facturas/${res.invoiceId}`);
       }
     });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toIsoDateInTimeZone();
 
   return (
     <div className="rounded-lg border bg-card p-6 space-y-4">

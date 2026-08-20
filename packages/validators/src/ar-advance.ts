@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { moneyAmountString } from "./money";
 import { collectNowSchema } from "./sales-invoice";
+import { idempotencyKeySchema } from "./idempotency";
 
 export const registerArAdvanceSchema = z.object({
   projectId: z.string().uuid(),
@@ -10,6 +11,8 @@ export const registerArAdvanceSchema = z.object({
   currency: z.string().length(3).default("ARS"),
   amount: moneyAmountString,
   notes: z.string().optional().nullable(),
+  /** Register-level key for the ISSUED invoice + Receivable composite. Nested collectNow has its own key. */
+  idempotencyKey: idempotencyKeySchema,
   collectNow: collectNowSchema,
 });
 

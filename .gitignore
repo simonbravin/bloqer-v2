@@ -35,5 +35,11 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 
+# Test artifacts
+test-results/
+**/test-results/
+playwright-report/
+blob-report/
+
 # Vercel
 .vercel

@@ -1,7 +1,7 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import type { PurchaseReceiptListItem } from "./purchase-receipt-list";
+import { useListViewMode } from "@/components/ui/list-view-toggle";
 import { PurchaseReceiptCards } from "./purchase-receipt-cards";
 import { PurchaseReceiptTable } from "./purchase-receipt-table";
 
@@ -12,7 +12,7 @@ export function PurchaseReceiptListSection({
   receipts: PurchaseReceiptListItem[];
   projectId: string;
 }) {
-  const view = useSearchParams().get("view") === "cards" ? "cards" : "table";
+  const view = useListViewMode();
   if (view === "cards") {
     return <PurchaseReceiptCards receipts={receipts} projectId={projectId} />;
   }

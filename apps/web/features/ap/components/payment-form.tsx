@@ -16,6 +16,7 @@ import { SettlementFields } from "@/features/treasury/components/settlement-fiel
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { createPaymentAction } from "@/app/(app)/proyectos/[id]/cuentas-por-pagar/actions";
 import { createCompanyPaymentAction } from "@/app/(app)/finanzas/cuentas-por-pagar/actions";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 
 interface AccountOption {
   id: string;
@@ -52,6 +53,7 @@ export function PaymentForm({
   const [error, setError] = useState<string | null>(null);
   const [accountId, setAccountId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<SettlementMethodValue | "">("");
+  const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
 
   const matchingAccounts = accounts.filter((a) => a.currency === payableCurrency);
   const balanceSerialized = serializeMoney(payableBalance);
@@ -95,6 +97,7 @@ export function PaymentForm({
       paymentMethod: paymentMethod || null,
       reference: rawRef || null,
       notes: (fd.get("notes") as string) || null,
+      idempotencyKey,
     };
     startTransition(async () => {
       if (companyFinanzas) {
@@ -102,6 +105,7 @@ export function PaymentForm({
         if ("error" in res) {
           setError(res.error);
         } else {
+          rotateIdempotencyKey();
           onSuccess?.();
           router.push(`/finanzas/pagos-proveedor/${res.id}`);
         }
@@ -115,6 +119,7 @@ export function PaymentForm({
       if ("error" in res) {
         setError(res.error);
       } else {
+        rotateIdempotencyKey();
         onSuccess?.();
         router.push(`/proyectos/${projectId}/pagos/${res.id}`);
       }

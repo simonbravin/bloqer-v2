@@ -33,6 +33,7 @@ import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { EntityDocumentsPanel } from "@/features/documents";
+import { PurchaseRequestDetailMobileSections } from "@/features/procurement/components/purchase-request-detail-mobile-sections";
 import { isStorageConfigured } from "@bloqer/config";
 import { listEntityDocuments } from "@bloqer/services";
 import {
@@ -115,9 +116,41 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={pr.code}>
-      <div className="flex items-center gap-4 flex-wrap">
-        <h1 className="text-2xl font-bold tracking-tight">{pr.code}</h1>
-        <PurchaseRequestStatusBadge status={pr.status} />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4 flex-wrap">
+          <h1 className="text-2xl font-bold tracking-tight">{pr.code}</h1>
+          <PurchaseRequestStatusBadge status={pr.status} />
+        </div>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
+          {isDraft && canEditPr && (
+            <form
+              action={async () => {
+                "use server";
+                const res = await submitPurchaseRequestAction(prId, id);
+                if ("error" in res) redirectWithActionError(prPath, res.error);
+                redirect(prPath);
+              }}
+            >
+              <Button type="submit" className="min-h-11 w-full md:min-h-9 sm:w-auto" data-testid="purchase-request-submit">
+                Enviar solicitud
+              </Button>
+            </form>
+          )}
+          {pr.status !== "CANCELLED" && pr.status !== "COMPLETED" && canEditPr && (
+            <form
+              action={async () => {
+                "use server";
+                const res = await cancelPurchaseRequestAction(prId, id);
+                if ("error" in res) redirectWithActionError(prPath, res.error);
+                redirect(prPath);
+              }}
+            >
+              <Button type="submit" variant="destructive" className="min-h-11 w-full md:min-h-9 sm:w-auto">
+                Anular
+              </Button>
+            </form>
+          )}
+        </div>
       </div>
 
       <ActionErrorBanner message={sp.actionError} />
@@ -135,7 +168,34 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
         </div>
       )}
 
-      <div className="rounded-lg border bg-card p-6 space-y-4 text-sm">
+      {pr.status === "SUBMITTED" ? (
+        <p className="rounded-lg border bg-muted/30 px-4 py-3 text-sm md:hidden">
+          Solicitud enviada. Pendiente de cotización.
+        </p>
+      ) : null}
+
+      <PurchaseRequestDetailMobileSections
+        pr={pr}
+        quotes={quotes.map((q) => ({
+          id: q.id,
+          supplierName: q.supplierName,
+          status: q.status,
+          totalAmount: q.totalAmount,
+          currency: q.currency,
+          leadTimeDays: q.leadTimeDays,
+        }))}
+        documents={
+          <EntityDocumentsPanel
+            scope={{ kind: "project", projectId: id }}
+            linkedEntity={{ type: "PURCHASE_REQUEST", id: prId }}
+            storageConfigured={storageConfigured}
+            docs={prAttachments}
+            canEdit={canEditAttachments}
+          />
+        }
+      />
+
+      <div className="hidden md:block rounded-lg border bg-card p-6 space-y-4 text-sm">
         {pr.neededByDate && (
           <p>
             <span className="text-muted-foreground">Necesaria para: </span>
@@ -175,37 +235,8 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
         </TableScroll>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        {isDraft && canEditPr && (
-          <form
-            action={async () => {
-              "use server";
-              const res = await submitPurchaseRequestAction(prId, id);
-              if ("error" in res) redirectWithActionError(prPath, res.error);
-              redirect(prPath);
-            }}
-          >
-            <Button type="submit">Enviar solicitud</Button>
-          </form>
-        )}
-        {pr.status !== "CANCELLED" && pr.status !== "COMPLETED" && canEditPr && (
-          <form
-            action={async () => {
-              "use server";
-              const res = await cancelPurchaseRequestAction(prId, id);
-              if ("error" in res) redirectWithActionError(prPath, res.error);
-              redirect(prPath);
-            }}
-          >
-            <Button type="submit" variant="destructive">
-              Anular
-            </Button>
-          </form>
-        )}
-      </div>
-
       {showQuotes && (
-        <>
+        <div className="hidden md:block space-y-4">
           <h2 className="text-lg font-semibold">Cotizaciones</h2>
           <TableScroll>
             <Table>
@@ -289,9 +320,10 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
 
+      <div className="hidden md:block">
       <EntityDocumentsPanel
         scope={{ kind: "project", projectId: id }}
         linkedEntity={{ type: "PURCHASE_REQUEST", id: prId }}
@@ -299,6 +331,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
         docs={prAttachments}
         canEdit={canEditAttachments}
       />
+      </div>
     </PageShell>
   );
 }

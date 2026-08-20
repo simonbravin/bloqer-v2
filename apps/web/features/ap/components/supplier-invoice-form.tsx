@@ -25,6 +25,7 @@ import {
   registerProjectApExpenseAction,
 } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
 import { createCompanySupplierInvoiceAction } from "@/app/(app)/finanzas/facturas-proveedor/actions";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 
 export type SupplierOption = {
   id: string;
@@ -95,8 +96,15 @@ export function SupplierInvoiceForm({
   const [payAccountId, setPayAccountId] = useState("");
   const [payMethod, setPayMethod] = useState<SettlementMethodValue | "">("");
   const [attachment, setAttachment] = useState<File | null>(null);
+  const { idempotencyKey: expenseKey, rotateIdempotencyKey: rotateExpenseKey } = useIdempotencyKey();
+  const { idempotencyKey: payNowKey, rotateIdempotencyKey: rotatePayNowKey } = useIdempotencyKey();
+  const { idempotencyKey: attachmentKey, rotateIdempotencyKey: rotateAttachmentKey } = useIdempotencyKey();
   const [poPreview, setPoPreview] = useState<PurchaseOrderInvoiceDraftPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    rotateAttachmentKey();
+  }, [attachment, rotateAttachmentKey]);
 
   const selectedSupplier = useMemo(
     () => suppliers.find((s) => s.id === supplierContactId),
@@ -229,6 +237,7 @@ export function SupplierInvoiceForm({
       ? `/proyectos/${scopeProjectId}/facturas-proveedor/${invoiceId}`
       : `/finanzas/facturas-proveedor/${invoiceId}`;
     fd.set("revalidatePaths", JSON.stringify([detailPath]));
+    fd.set("idempotencyKey", attachmentKey);
     return uploadDocumentAction(fd);
   }
 
@@ -300,6 +309,7 @@ export function SupplierInvoiceForm({
           return;
         }
         const res = await registerProjectApExpenseAction(projectId, {
+          idempotencyKey: expenseKey,
           supplierContactId,
           issueDate,
           dueDate: fd.get("dueDate") as string,
@@ -316,6 +326,7 @@ export function SupplierInvoiceForm({
             notes: null,
             paymentMethod: payMethod || null,
             reference: String(fd.get("reference") ?? "").trim() || null,
+            idempotencyKey: payNowKey,
           },
         });
         if ("error" in res) {
@@ -326,6 +337,8 @@ export function SupplierInvoiceForm({
         if (uploadRes && "error" in uploadRes) {
           notifyAttachFailure(uploadRes.error, true);
         }
+        rotateExpenseKey();
+        rotatePayNowKey();
         onSuccess?.();
         router.push(`/proyectos/${projectId}/facturas-proveedor/${res.id}`);
         return;

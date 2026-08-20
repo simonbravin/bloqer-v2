@@ -31,9 +31,10 @@ SEED_USER_EMAIL=your@email.com
 
 ## Neon Branch Strategy
 
-- `main` branch → production database
+- Neon project **bloqer-v2**: branch `production` (primary/default) → production database
+- Local `.env` → Neon branch `dev` of the same project (pooled `DATABASE_URL` + `DIRECT_URL`)
 - Vercel Preview deployments → Vercel + Neon integration creates a preview branch per PR automatically
-- Local dev → use the Neon `dev` branch (create once, reuse)
+- Never point local `DATABASE_URL` / `DIRECT_URL` at `production`. Tooling (`db:seed`, `db:seed:docs`, `migrate dev`, `db push`) refuses the production compute unless `BLOQER_ALLOW_PRODUCTION_DB=I_UNDERSTAND_THIS_IS_PRODUCTION`.
 
 ## Schema Changes
 

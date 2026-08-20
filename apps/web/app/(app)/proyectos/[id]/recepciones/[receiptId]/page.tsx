@@ -103,6 +103,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
               <Link
                 href={`/proyectos/${id}/ordenes-compra/${receipt.purchaseOrderId}`}
                 className="hover:underline"
+                data-testid="receipt-po-link"
               >
                 {receipt.purchaseOrderCode}
               </Link>
@@ -114,8 +115,21 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
           </div>
         </div>
 
-        <hr />
+        <hr className="hidden md:block" />
 
+        <div className="space-y-3 md:hidden">
+          {receipt.lines.map((line) => (
+            <div key={line.id} className="rounded-lg border p-4">
+              <p className="font-medium">{line.lineDescription}</p>
+              <p className="mt-1 text-sm tabular-nums text-muted-foreground">
+                Recibido {line.quantityReceived}
+              </p>
+              {line.notes ? <p className="mt-1 text-sm">{line.notes}</p> : null}
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden md:block">
         <TableScroll>
           <Table>
             <TableHeader>
@@ -138,6 +152,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
             </TableBody>
           </Table>
         </TableScroll>
+        </div>
 
         {receipt.notes && (
           <div>
@@ -205,8 +220,13 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
             </Button>
           </form>
         )}
-        <Button asChild variant="outline">
-          <Link href={`/proyectos/${id}/ordenes-compra/${receipt.purchaseOrderId}`}>Ver OC →</Link>
+        <Button asChild variant="outline" className="min-h-11 md:min-h-9">
+          <Link
+            href={`/proyectos/${id}/ordenes-compra/${receipt.purchaseOrderId}`}
+            data-testid="receipt-view-po"
+          >
+            Ver OC
+          </Link>
         </Button>
       </div>
 

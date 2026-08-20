@@ -16,7 +16,14 @@ import { assertArTenantModule, assertTreasuryTenantModule } from "../tenant-modu
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea } from "./ar-access";
-import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
+import {
+  isIdempotencyUniqueConflict,
+  pickCompositeCollection,
+  registerArSaleReplayMatches,
+  requireIdempotencyKey,
+  withIdempotentCreate,
+} from "../idempotency/idempotency";
+import { recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import {
@@ -83,6 +90,148 @@ function buildArSaleTraceChain(outcome: ArSaleOutcome): FinancialTraceLink[] {
     );
   }
   return chain;
+}
+
+type ArSaleReplay = {
+  outcome: ArSaleOutcome;
+  status: string;
+  clientContactId: string;
+  projectId: string | null;
+  issueDate: Date;
+  dueDate: Date;
+  currency: string;
+  invoiceLetter: string | null;
+  externalInvoiceRef: string | null;
+  createdAt: Date;
+  receivableId: string | null;
+  lines: Array<{
+    description: string;
+    quantity: Prisma.Decimal;
+    unitPrice: Prisma.Decimal;
+    taxRate: Prisma.Decimal;
+    sortOrder: number;
+    certificationLineId: string | null;
+  }>;
+  collections: Array<{
+    id: string;
+    receivableId: string;
+    accountId: string;
+    collectionDate: Date;
+    amount: Prisma.Decimal;
+    status: string;
+    createdAt: Date;
+  }>;
+};
+
+async function loadArSaleReplay(
+  tenantId: string,
+  idempotencyKey: string,
+  collectNow?: {
+    accountId: string;
+    collectionDate: string;
+    collectFullBalance?: boolean;
+    amount?: string | null;
+  },
+): Promise<ArSaleReplay | null> {
+  const invoice = await prisma.salesInvoice.findFirst({
+    where: { tenantId, idempotencyKey },
+    include: {
+      lines: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      receivable: { select: { id: true } },
+      collections: {
+        where: { status: "CONFIRMED" },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          receivableId: true,
+          accountId: true,
+          collectionDate: true,
+          amount: true,
+          status: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+  if (!invoice) return null;
+
+  let collectionId: string | undefined;
+  let movementId: string | undefined;
+  let collectAccountId: string | undefined;
+  const collection = pickCompositeCollection(
+    invoice.createdAt,
+    invoice.receivable?.id ?? null,
+    invoice.collections,
+    collectNow,
+  );
+  if (collection) {
+    collectionId = collection.id;
+    collectAccountId = collection.accountId;
+    const movement = await prisma.accountMovement.findFirst({
+      where: {
+        tenantId,
+        sourceType: "COLLECTION",
+        sourceId: collection.id,
+        status: { in: ["CONFIRMED", "RECONCILED"] },
+      },
+      select: { id: true },
+    });
+    movementId = movement?.id;
+  }
+
+  return {
+    outcome: {
+      invoiceId: invoice.id,
+      receivableId: invoice.receivable?.id ?? "",
+      number: invoice.number,
+      projectId: invoice.projectId ?? "",
+      companyId: invoice.companyId,
+      collectionId,
+      movementId,
+      collectAccountId,
+    },
+    status: invoice.status,
+    clientContactId: invoice.clientContactId,
+    projectId: invoice.projectId,
+    issueDate: invoice.issueDate,
+    dueDate: invoice.dueDate,
+    currency: invoice.currency,
+    invoiceLetter: invoice.invoiceLetter,
+    externalInvoiceRef: invoice.externalInvoiceRef,
+    createdAt: invoice.createdAt,
+    receivableId: invoice.receivable?.id ?? null,
+    lines: invoice.lines,
+    collections: invoice.collections,
+  };
+}
+
+async function notifyArSaleCreated(outcome: ArSaleOutcome, ctx: ServiceContext): Promise<void> {
+  const receivable = await prisma.receivable.findFirst({
+    where: { id: outcome.receivableId, tenantId: ctx.tenantId },
+    select: {
+      id: true,
+      status: true,
+      originalAmount: true,
+      paidAmount: true,
+      currency: true,
+    },
+  });
+  if (
+    receivable &&
+    receivable.status !== "CANCELLED" &&
+    receivable.status !== "PAID" &&
+    receivable.paidAmount.lt(receivable.originalAmount)
+  ) {
+    await notifyReceivableReadyToCollect({
+      ctx,
+      salesInvoiceId: outcome.invoiceId,
+      receivableId: receivable.id,
+      projectId: outcome.projectId,
+      companyId: outcome.companyId,
+      invoiceNumber: outcome.number,
+      amountLabel: `${serializeMoneyDecimal(receivable.originalAmount.minus(receivable.paidAmount))} ${receivable.currency}`,
+    }).catch(() => undefined);
+  }
 }
 
 async function resolveCompanyId(projectId: string, ctx: ServiceContext): Promise<string> {
@@ -184,10 +333,16 @@ export async function registerArSale(
     })(),
   });
 
-  let outcome!: ArSaleOutcome;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      outcome = await prisma.$transaction(async (tx) => {
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+
+  const replay = await withIdempotentCreate({
+    findExisting: () => loadArSaleReplay(ctx.tenantId, idempotencyKey, input.collectNow),
+    payloadsMatch: (existing) => registerArSaleReplayMatches(existing, input),
+    create: async () => {
+      let createdOutcome!: ArSaleOutcome;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          createdOutcome = await prisma.$transaction(async (tx) => {
         const maxNum = await tx.salesInvoice.aggregate({
           where: { tenantId: ctx.tenantId, companyId },
           _max: { number: true },
@@ -209,6 +364,7 @@ export async function registerArSale(
             notes: input.notes ?? null,
             internalNotes: input.internalNotes ?? null,
             externalInvoiceRef: input.externalInvoiceRef ?? null,
+            idempotencyKey,
             createdBy: ctx.actorUserId,
             updatedBy: ctx.actorUserId,
           },
@@ -347,6 +503,7 @@ export async function registerArSale(
               paymentMethod: input.collectNow.paymentMethod ?? null,
               reference: input.collectNow.reference ?? null,
               notes: input.collectNow.notes ?? null,
+              idempotencyKey: requireIdempotencyKey(input.collectNow.idempotencyKey),
               status: "CONFIRMED",
               createdBy: ctx.actorUserId,
               updatedBy: ctx.actorUserId,
@@ -436,47 +593,37 @@ export async function registerArSale(
           collectAccountId,
         };
       });
-      break;
-    } catch (err) {
-      if (attempt === 0 && isUniqueConstraintError(err)) continue;
-      throw err;
-    }
-  }
-  if (!outcome) {
-    throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
-  }
+          break;
+        } catch (err) {
+          if (isIdempotencyUniqueConflict(err)) throw err;
+          if (attempt === 0 && isUniqueConstraintError(err)) continue;
+          throw err;
+        }
+      }
+      if (!createdOutcome) {
+        throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
+      }
+
+      await notifyArSaleCreated(createdOutcome, ctx);
+
+      const row = await loadArSaleReplay(ctx.tenantId, idempotencyKey, input.collectNow);
+      if (!row) {
+        throw new ServiceError("CONFLICT", "No se pudo recargar la factura registrada");
+      }
+      if (createdOutcome.collectionId && !row.outcome.collectionId) {
+        row.outcome.collectionId = createdOutcome.collectionId;
+        row.outcome.movementId = createdOutcome.movementId;
+        row.outcome.collectAccountId = createdOutcome.collectAccountId;
+      }
+      return row;
+    },
+  });
+
+  const outcome = replay.outcome;
 
   await ensureDraftJournalFromSalesInvoice(outcome.invoiceId, ctx);
   if (outcome.collectionId) {
     await ensureDraftJournalFromCollection(outcome.collectionId, ctx);
-  }
-
-  // D-072: nudge company finance when CxC still has balance (skip if cobrado al emitir).
-  const receivable = await prisma.receivable.findFirst({
-    where: { id: outcome.receivableId, tenantId: ctx.tenantId },
-    select: {
-      id: true,
-      status: true,
-      originalAmount: true,
-      paidAmount: true,
-      currency: true,
-    },
-  });
-  if (
-    receivable &&
-    receivable.status !== "CANCELLED" &&
-    receivable.status !== "PAID" &&
-    receivable.paidAmount.lt(receivable.originalAmount)
-  ) {
-    await notifyReceivableReadyToCollect({
-      ctx,
-      salesInvoiceId: outcome.invoiceId,
-      receivableId: receivable.id,
-      projectId: outcome.projectId,
-      companyId: outcome.companyId,
-      invoiceNumber: outcome.number,
-      amountLabel: `${serializeMoneyDecimal(receivable.originalAmount.minus(receivable.paidAmount))} ${receivable.currency}`,
-    });
   }
 
   const traceChain = buildArSaleTraceChain(outcome);

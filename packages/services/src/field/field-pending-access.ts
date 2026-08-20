@@ -1,0 +1,49 @@
+import { can, type UserRole } from "@bloqer/domain";
+import { canApprovePurchaseOrders } from "../procurement/procurement-access";
+import { canEditSubcontractsArea } from "../subcontracts/subcontract-access";
+import { canSuperviseJobsiteLog } from "../jobsite-log/jobsite-log-access";
+import type { TenantModuleGate } from "../tenant-modules/tenant-module-gate";
+
+export type FieldPendingSource =
+  | "PURCHASE_ORDER"
+  | "JOBSITE_LOG"
+  | "CERTIFICATION"
+  | "SUBCONTRACT_CERTIFICATION";
+
+export type FieldPendingGroup = "compras" | "obra" | "certificaciones";
+
+export const FIELD_PENDING_GROUP_BY_SOURCE: Record<FieldPendingSource, FieldPendingGroup> = {
+  PURCHASE_ORDER: "compras",
+  JOBSITE_LOG: "obra",
+  CERTIFICATION: "certificaciones",
+  SUBCONTRACT_CERTIFICATION: "certificaciones",
+};
+
+/** Which pending sources this actor may query. Module-off sources are omitted. */
+export function fieldPendingSourcesForActor(
+  roles: UserRole[],
+  gate: Pick<TenantModuleGate, "isEnabled">,
+): FieldPendingSource[] {
+  const sources: FieldPendingSource[] = [];
+  if (gate.isEnabled("PROCUREMENT") && canApprovePurchaseOrders(roles)) {
+    sources.push("PURCHASE_ORDER");
+  }
+  if (gate.isEnabled("JOBSITE_LOG") && canSuperviseJobsiteLog(roles)) {
+    sources.push("JOBSITE_LOG");
+  }
+  if (gate.isEnabled("CERTIFICATIONS") && can(roles, "APPROVE", "CERTIFICATIONS")) {
+    sources.push("CERTIFICATION");
+  }
+  if (gate.isEnabled("SUBCONTRACTS") && canEditSubcontractsArea(roles)) {
+    sources.push("SUBCONTRACT_CERTIFICATION");
+  }
+  return sources;
+}
+
+export function fieldPendingSourceAllowed(
+  roles: UserRole[],
+  gate: Pick<TenantModuleGate, "isEnabled">,
+  source: FieldPendingSource,
+): boolean {
+  return fieldPendingSourcesForActor(roles, gate).includes(source);
+}

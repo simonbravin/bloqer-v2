@@ -12,6 +12,11 @@ export interface DocsEnv {
   configured: boolean;
   projectId?: string;
   poId?: string;
+  submittedPoId?: string;
+  returnPoId?: string;
+  fieldPmEmail?: string;
+  fieldViewerEmail?: string;
+  project2Id?: string;
   budgetId?: string;
   accountId?: string;
   reconciliationId?: string;
@@ -22,6 +27,7 @@ export interface DocsEnv {
   subcontractId?: string;
   subcontractCertificationId?: string;
   wbsExpandItemNodeId?: string;
+  wbsItem0101Id?: string;
 }
 
 export function loadDocsIds(): Record<string, string> | null {
@@ -66,6 +72,11 @@ export function getEnv(): DocsEnv {
     configured: Boolean(baseUrl && email && password),
     projectId: pick(ids, "projectId", "DOCS_PROJECT_ID"),
     poId: pick(ids, "confirmedPoId", "DOCS_PO_ID"),
+    submittedPoId: pick(ids, "submittedPoId", "DOCS_SUBMITTED_PO_ID"),
+    returnPoId: pick(ids, "returnPoId", "DOCS_RETURN_PO_ID"),
+    fieldPmEmail: pick(ids, "fieldPmEmail", "DOCS_PM_EMAIL") || ids?.fieldPmEmail,
+    fieldViewerEmail: pick(ids, "fieldViewerEmail", "DOCS_VIEWER_EMAIL") || ids?.fieldViewerEmail,
+    project2Id: pick(ids, "project2Id", "DOCS_PROJECT_2_ID"),
     budgetId: pick(ids, "budgetId", "DOCS_BUDGET_ID"),
     accountId: pick(ids, "treasuryAccountId", "DOCS_ACCOUNT_ID") || pick(ids, "accountId", "DOCS_ACCOUNT_ID"),
     reconciliationId:
@@ -78,6 +89,7 @@ export function getEnv(): DocsEnv {
     subcontractId: pick(ids, "subcontractId", "DOCS_SUBCONTRACT_ID"),
     subcontractCertificationId: pick(ids, "subcontractCertificationId", "DOCS_SUBCONTRACT_CERT_ID"),
     wbsExpandItemNodeId: pick(ids, "wbsExpandItemNodeId", "DOCS_WBS_EXPAND_NODE_ID"),
+    wbsItem0101Id: pick(ids, "wbsItem0101Id", "DOCS_WBS_ITEM_0101_ID"),
   };
 }
 

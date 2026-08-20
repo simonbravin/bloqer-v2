@@ -11,6 +11,7 @@ import {
 } from "./money";
 import { treasurySettlementFieldsSchema } from "./treasury-settlement";
 import { invoiceLetterSchema } from "./contact";
+import { idempotencyKeySchema } from "./idempotency";
 
 const supplierInvoiceLineSchema = z.object({
   description: z.string().min(1, "Descripción requerida"),
@@ -64,6 +65,7 @@ export const createPaymentFieldsSchema = z
     /** Server applies stored balanceDue — [D-053]. */
     payFullBalance: z.boolean().optional(),
     notes:          z.string().optional().nullable(),
+    idempotencyKey: idempotencyKeySchema,
   })
   .merge(treasurySettlementFieldsSchema);
 
@@ -85,6 +87,7 @@ export const payNowSchema = z
     /** When true or amount omitted, server pays stored invoice total ([D-053]). */
     payFullBalance: z.boolean().optional(),
     notes:          z.string().optional().nullable(),
+    idempotencyKey: idempotencyKeySchema,
   })
   .merge(treasurySettlementFieldsSchema)
   .superRefine((val, ctx) => {
@@ -97,8 +100,9 @@ export const payNowSchema = z
     }
   });
 
-/** Corporate or project AP composite flow ([D-052]). */
+/** Corporate or project AP composite flow ([D-052]). ISSUED + Payable — not DRAFT create. */
 export const registerApExpenseSchema = createSupplierInvoiceSchema.extend({
+  idempotencyKey: idempotencyKeySchema,
   payNow: payNowSchema.optional(),
 });
 

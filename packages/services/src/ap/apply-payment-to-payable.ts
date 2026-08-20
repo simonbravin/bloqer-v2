@@ -13,6 +13,7 @@ import {
 } from "../treasury/treasury-write-locks";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
+import { requireIdempotencyKey } from "../idempotency/idempotency";
 
 type TxClient = Omit<
   typeof prisma,
@@ -40,6 +41,7 @@ export type ApplyPaymentToPayableInput = {
   notes?: string | null;
   paymentMethod?: "CASH" | "BANK_TRANSFER" | "CHECK" | "CARD" | "OTHER" | null;
   reference?: string | null;
+  idempotencyKey: string;
 };
 
 export type ApplyPaymentToPayableResult = {
@@ -60,6 +62,7 @@ export async function applyPaymentToPayable(
   ctx: ServiceContext,
 ): Promise<ApplyPaymentToPayableResult> {
   const { payable, accountId, paymentDate, notes, paymentMethod, reference } = input;
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
 
   const balanceDue = payable.originalAmount.minus(payable.paidAmount);
   // D-053: if caller passes the exact stored balance (payFullBalance), keep it;
@@ -150,6 +153,7 @@ export async function applyPaymentToPayable(
       paymentMethod: paymentMethod ?? null,
       reference: reference ?? null,
       notes: notes ?? null,
+      idempotencyKey,
       status: "CONFIRMED",
       createdBy: ctx.actorUserId,
       updatedBy: ctx.actorUserId,

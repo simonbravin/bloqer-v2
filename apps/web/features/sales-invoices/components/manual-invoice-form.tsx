@@ -19,6 +19,7 @@ import {
   createSalesInvoiceAction,
   registerProjectArSaleAction,
 } from "@/app/(app)/proyectos/[id]/facturas/actions";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 
 export type ClientOption = {
   id: string;
@@ -75,6 +76,13 @@ export function ManualInvoiceForm({
   const [collectNow, setCollectNow] = useState(false);
   const [collectAccountId, setCollectAccountId] = useState("");
   const [collectMethod, setCollectMethod] = useState<SettlementMethodValue | "">("");
+  const { idempotencyKey: saleKey, rotateIdempotencyKey: rotateSaleKey } = useIdempotencyKey();
+  const { idempotencyKey: collectNowKey, rotateIdempotencyKey: rotateCollectNowKey } = useIdempotencyKey();
+  const { idempotencyKey: attachmentKey, rotateIdempotencyKey: rotateAttachmentKey } = useIdempotencyKey();
+
+  useEffect(() => {
+    rotateAttachmentKey();
+  }, [attachment, rotateAttachmentKey]);
 
   const selectedClient = useMemo(
     () => clients.find((c) => c.id === clientContactId),
@@ -119,6 +127,7 @@ export function ManualInvoiceForm({
     fd.set("category", "INVOICE");
     fd.set("projectId", projectId);
     fd.set("revalidatePaths", JSON.stringify([detailPath]));
+    fd.set("idempotencyKey", attachmentKey);
     return uploadDocumentAction(fd);
   }
 
@@ -153,6 +162,7 @@ export function ManualInvoiceForm({
         const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
         const res = await registerProjectArSaleAction(projectId, {
           projectId,
+          idempotencyKey: saleKey,
           clientContactId,
           issueDate,
           dueDate: fd.get("dueDate") as string,
@@ -175,12 +185,15 @@ export function ManualInvoiceForm({
             notes: null,
             paymentMethod: collectMethod || null,
             reference: String(fd.get("reference") ?? "").trim() || null,
+            idempotencyKey: collectNowKey,
           },
         });
         if ("error" in res) {
           setError(res.error);
           return;
         }
+        rotateSaleKey();
+        rotateCollectNowKey();
         const uploadRes = await uploadAttachmentIfAny(res.id);
         if (uploadRes && "error" in uploadRes) {
           notifyAttachFailure(uploadRes.error, true);

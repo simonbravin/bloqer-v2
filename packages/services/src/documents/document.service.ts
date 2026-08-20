@@ -1,6 +1,6 @@
 import { prisma } from "@bloqer/database";
 import type { LinkedEntityType } from "@bloqer/database";
-import { buildStorageKey, putObject, getPresignedGetUrl } from "@bloqer/storage";
+import { buildStorageKey, putObject, getPresignedGetUrl, deleteObject, assertTenantScopedStorageKey } from "@bloqer/storage";
 import { isStorageConfigured } from "@bloqer/config";
 import { can, type PermissionModule } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
@@ -24,6 +24,14 @@ import {
   canViewPurchaseRequests,
 } from "../procurement/procurement-access";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { canMutateJobsiteLogAsContributor } from "../jobsite-log/jobsite-log-access";
+import {
+  documentReplayMatches,
+  requireIdempotencyKey,
+  sha256Hex,
+  withIdempotentCreate,
+} from "../idempotency/idempotency";
+import { assertUploadContentMatchesDeclaredMime } from "./sniff-upload-content";
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024;
 
@@ -152,6 +160,7 @@ type DocumentUploadPlan = {
 async function resolveDocumentUploadPlan(
   input: InitiateUploadInput,
   ctx:   ServiceContext,
+  storageObjectId: string,
 ): Promise<DocumentUploadPlan> {
   const linkedJobsiteLog =
     input.linkedEntityType === "JOBSITE_LOG" && input.linkedEntityId
@@ -199,7 +208,7 @@ async function resolveDocumentUploadPlan(
       : null;
 
   if (linkedJobsiteLog) {
-    if (!can(ctx.roles, "EDIT", "JOBSITE_LOG")) {
+    if (!canMutateJobsiteLogAsContributor(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos al libro de obra");
     }
   } else if (linkedCertification) {
@@ -388,7 +397,7 @@ async function resolveDocumentUploadPlan(
 
   const id         = crypto.randomUUID();
   const fileName   = sanitize(input.originalFileName);
-  const storageKey = buildStorageKey(ctx.tenantId, anchorProjectId, id, input.originalFileName);
+  const storageKey = buildStorageKey(ctx.tenantId, anchorProjectId, storageObjectId, input.originalFileName);
 
   return {
     id,
@@ -477,21 +486,50 @@ export async function uploadDocument(
   ctx:     ServiceContext,
 ): Promise<{ documentId: string; storageConfigured: boolean }> {
   const configured = isStorageConfigured();
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
 
   if (input.sizeBytes === 0) {
     throw new ServiceError("VALIDATION", "El archivo está vacío");
   }
-  if (configured) {
-    if (content.length === 0) {
-      throw new ServiceError("VALIDATION", "El archivo está vacío");
-    }
-    if (content.length !== input.sizeBytes) {
-      throw new ServiceError("VALIDATION", "El tamaño del archivo no coincide");
-    }
+  if (content.length === 0) {
+    throw new ServiceError("VALIDATION", "El archivo está vacío");
+  }
+  if (content.length !== input.sizeBytes) {
+    throw new ServiceError("VALIDATION", "El tamaño del archivo no coincide");
   }
 
-  const plan     = await resolveDocumentUploadPlan(input, ctx);
+  await assertUploadContentMatchesDeclaredMime(content, input.mimeType);
+
+  const contentSha256 = sha256Hex(content);
+  const plan = await resolveDocumentUploadPlan(input, ctx, idempotencyKey);
   const provider = configured ? "R2" : "PLACEHOLDER";
+
+  const findExisting = () =>
+    prisma.documentAttachment.findFirst({
+      where: { tenantId: ctx.tenantId, idempotencyKey },
+    });
+  const payloadsMatch = (existing: {
+    contentSha256: string | null;
+    linkedEntityType: string | null;
+    linkedEntityId: string | null;
+    status: string;
+  }) =>
+    documentReplayMatches(existing, {
+      contentSha256,
+      linkedEntityType: plan.linkedEntityType,
+      linkedEntityId: plan.linkedEntityId,
+    });
+
+  const existing = await findExisting();
+  if (existing) {
+    if (!payloadsMatch(existing)) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Esta operación ya se registró con datos distintos. Recargá e intentá de nuevo.",
+      );
+    }
+    return { documentId: existing.id, storageConfigured: configured };
+  }
 
   if (configured) {
     try {
@@ -501,39 +539,61 @@ export async function uploadDocument(
     }
   }
 
-  const doc = await prisma.documentAttachment.create({
-    data: {
-      id:               plan.id,
-      tenantId:         ctx.tenantId,
-      companyId:        ctx.companyId ?? null,
-      projectId:        plan.anchorProjectId,
-      originalFileName: input.originalFileName,
-      fileName:         plan.fileName,
-      mimeType:         input.mimeType,
-      sizeBytes:        input.sizeBytes,
-      storageProvider:  provider,
-      storageKey:       plan.storageKey,
-      category:         input.category ?? "OTHER",
-      description:      input.description ?? null,
-      status:           "ACTIVE",
-      linkedEntityType: plan.linkedEntityType,
-      linkedEntityId:   plan.linkedEntityId,
-      uploadedBy:       ctx.actorUserId,
-    },
-  });
+  let createdNow = false;
+  let doc;
+  try {
+    doc = await withIdempotentCreate({
+      findExisting,
+      payloadsMatch,
+      create: async () => {
+        const row = await prisma.documentAttachment.create({
+          data: {
+            id:               plan.id,
+            tenantId:         ctx.tenantId,
+            companyId:        ctx.companyId ?? null,
+            projectId:        plan.anchorProjectId,
+            originalFileName: input.originalFileName,
+            fileName:         plan.fileName,
+            mimeType:         input.mimeType,
+            sizeBytes:        input.sizeBytes,
+            storageProvider:  provider,
+            storageKey:       plan.storageKey,
+            category:         input.category ?? "OTHER",
+            description:      input.description ?? null,
+            status:           "ACTIVE",
+            linkedEntityType: plan.linkedEntityType,
+            linkedEntityId:   plan.linkedEntityId,
+            contentSha256,
+            idempotencyKey,
+            uploadedBy:       ctx.actorUserId,
+          },
+        });
+        createdNow = true;
+        return row;
+      },
+    });
+  } catch (err) {
+    const conflict =
+      err instanceof ServiceError && err.code === "CONFLICT";
+    if (configured && !conflict) {
+      await deleteObject(plan.storageKey).catch(() => undefined);
+    }
+    throw err;
+  }
 
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "document.uploaded",
-    entityType:  "DocumentAttachment",
-    entityId:    doc.id,
-    after:       { originalFileName: doc.originalFileName, storageProvider: provider, status: "ACTIVE" },
-  });
+  if (createdNow) {
+    await log({
+      tenantId:    ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action:      "document.uploaded",
+      entityType:  "DocumentAttachment",
+      entityId:    doc.id,
+      after:       { originalFileName: doc.originalFileName, storageProvider: provider, status: "ACTIVE" },
+    });
+    await notifyDocumentUploadConfirmed(doc, ctx);
+  }
 
-  await notifyDocumentUploadConfirmed(doc, ctx);
-
-  return { documentId: plan.id, storageConfigured: configured };
+  return { documentId: doc.id, storageConfigured: configured };
 }
 
 export async function getDocumentDownloadUrl(
@@ -554,6 +614,11 @@ export async function getDocumentDownloadUrl(
     );
   }
 
+  try {
+    assertTenantScopedStorageKey(ctx.tenantId, doc.storageKey);
+  } catch {
+    throw new ServiceError("NOT_FOUND", "Documento no encontrado");
+  }
   return getPresignedGetUrl(doc.storageKey, 300);
 }
 

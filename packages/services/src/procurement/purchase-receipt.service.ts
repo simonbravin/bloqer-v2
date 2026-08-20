@@ -221,13 +221,16 @@ export async function createPurchaseReceipt(
         tenantId: ctx.tenantId,
         status: "ACTIVE",
       },
-      select: { id: true, companyId: true },
+      select: { id: true, companyId: true, projectId: true },
     });
     if (!warehouse) {
       throw new ServiceError("NOT_FOUND", "Depósito no encontrado o inactivo");
     }
     if (warehouse.companyId !== po.companyId) {
       throw new ServiceError("CONFLICT", "El depósito no pertenece a la misma empresa que la orden");
+    }
+    if (warehouse.projectId && warehouse.projectId !== po.projectId) {
+      throw new ServiceError("CONFLICT", "El depósito está asignado a otra obra");
     }
   }
 

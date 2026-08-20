@@ -14,6 +14,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { PurchaseRequestStatusBadge } from "@/features/procurement/components/purchase-request-status-badge";
 import { NewPurchaseRequestDialog } from "@/features/procurement";
+import { PurchaseRequestMobileCards } from "@/features/procurement/components/purchase-request-mobile-cards";
 import type { WbsOption } from "@/features/procurement";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { getCurrentUser } from "@/lib/auth";
@@ -156,6 +157,25 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
         </div>
       )}
 
+      {filtered.length === 0 ? (
+        <div className="md:hidden">
+          <PurchaseRequestMobileCards
+            requests={[]}
+            projectId={id}
+            emptyAction={
+              !statusFilter && canCreate ? (
+                <Button asChild size="sm">
+                  <Link href={`/proyectos/${id}/solicitudes-compra/nueva`}>Nueva solicitud</Link>
+                </Button>
+              ) : undefined
+            }
+          />
+        </div>
+      ) : (
+        <PurchaseRequestMobileCards requests={filtered} projectId={id} />
+      )}
+
+      <div className="hidden md:block">
       <TableScroll>
         <Table>
           <TableHeader>
@@ -232,6 +252,7 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
           </TableBody>
         </Table>
       </TableScroll>
+      </div>
     </PageShell>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import type { PayableListItem } from "./payable-list";
+import { useListViewMode } from "@/components/ui/list-view-toggle";
 import { PayableCards } from "./payable-cards";
 import { PayableTable } from "./payable-table";
 
@@ -14,7 +14,7 @@ export function PayableListSection({
   hrefPrefix: string;
   supplierInvoiceHrefPrefix?: string;
 }) {
-  const view = useSearchParams().get("view") === "cards" ? "cards" : "table";
+  const view = useListViewMode();
   if (view === "cards") {
     return (
       <PayableCards

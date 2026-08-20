@@ -46,10 +46,13 @@ export default async function RecepcionesPage({ params }: PageProps) {
   const items: PurchaseReceiptListItem[] = receipts.map((r) => ({
     id: r.id,
     purchaseOrderCode: r.purchaseOrderCode,
+    purchaseOrderId: r.purchaseOrderId,
     supplierName: r.supplierName,
     receiptDate: r.receiptDate,
     status: r.status,
     receivedByName: r.receivedByName,
+    lineCount: r.lines.length,
+    quantitySummary: r.lines.map((l) => `${l.quantityReceived}`).join(" · "),
   }));
 
   return (

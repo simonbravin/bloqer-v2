@@ -24,25 +24,22 @@ import {
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { sortTreeOrder } from "@bloqer/utils";
 import { serializeQtyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
+import {
+  canMutateJobsiteLogAsContributor,
+  canSuperviseJobsiteLog,
+  canViewJobsiteLogArea,
+} from "./jobsite-log-access";
 
 export type WbsIncrementalProgressSnapshot = JobsiteLogProgressSnapshot;
 export { hasLegacyPhysicalPctOverflow, remainingPhysicalPct, buildProgressSnapshotEntry };
+export {
+  canMutateJobsiteLogAsContributor,
+  canSuperviseJobsiteLog,
+  canViewJobsiteLogArea,
+} from "./jobsite-log-access";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HUNDRED = new Prisma.Decimal(100);
-
-function canViewJobsiteLogArea(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "VIEW", "JOBSITE_LOG") || can(roles, "VIEW", "PROJECTS");
-}
-
-/** Create / update / submit / cancel — not approve/return (supervisor). */
-function canMutateJobsiteLogAsContributor(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "EDIT", "JOBSITE_LOG") || can(roles, "EDIT", "PROJECTS");
-}
-
-function canSuperviseJobsiteLog(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "APPROVE", "JOBSITE_LOG") || can(roles, "EDIT", "PROJECTS");
-}
 
 // ─── View types ───────────────────────────────────────────────────────────────
 

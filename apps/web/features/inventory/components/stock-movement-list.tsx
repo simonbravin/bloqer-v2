@@ -21,6 +21,7 @@ import {
   isPositiveQty,
 } from "@/lib/format-money";
 import { StockMovementTypeBadge } from "./stock-movement-type-badge";
+import { StockConsumptionMobileCards } from "./stock-consumption-mobile-cards";
 
 function consumptionCostOk(m: StockMovementView): boolean {
   if (m.totalCost && isPositiveMoneyAmount(m.totalCost)) return true;
@@ -53,6 +54,9 @@ export function StockMovementList({
   }
 
   return (
+    <>
+      <StockConsumptionMobileCards movements={movements} />
+      <div className="hidden md:block">
     <TableScroll stickyFirstColumn>
       <Table>
         <TableHeader>
@@ -108,5 +112,7 @@ export function StockMovementList({
         </TableBody>
       </Table>
     </TableScroll>
+      </div>
+    </>
   );
 }

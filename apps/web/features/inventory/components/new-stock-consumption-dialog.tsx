@@ -12,6 +12,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { useHasMounted, useIsMdUp } from "@/lib/media-query";
+import {
   ConsumptionForm,
   type ProductOption,
   type WarehouseOption,
@@ -37,6 +46,9 @@ export function NewStockConsumptionDialog({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(defaultOpen);
+  const hasMounted = useHasMounted();
+  const isMdUp = useIsMdUp();
+  const useSheet = hasMounted && !isMdUp;
 
   useEffect(() => {
     if (defaultOpen) setOpen(true);
@@ -55,13 +67,51 @@ export function NewStockConsumptionDialog({
     clearCreateQueryParam();
   }
 
-  /**
-   * Destination is the same list page. Clearing `create` here is safe and prevents
-   * `defaultOpen` + refresh from reopening the dialog after a successful submit.
-   */
   function handleSuccess() {
     setOpen(false);
     clearCreateQueryParam();
+  }
+
+  const form = open ? (
+    <ConsumptionForm
+      projectId={projectId}
+      products={products}
+      warehouses={warehouses}
+      wbsOptions={wbsOptions}
+      variant="plain"
+      onCancel={closeDialog}
+      onSuccess={handleSuccess}
+    />
+  ) : null;
+
+  const trigger = (
+    <Button className="min-h-11 md:min-h-9">Registrar consumo</Button>
+  );
+
+  if (useSheet) {
+    return (
+      <Sheet
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) clearCreateQueryParam();
+        }}
+      >
+        <SheetTrigger asChild>{trigger}</SheetTrigger>
+        <SheetContent
+          side="bottom"
+          className="max-h-[92vh] overflow-y-auto rounded-t-xl"
+        >
+          <SheetHeader className="text-left">
+            <SheetTitle>Registrar consumo</SheetTitle>
+            <SheetDescription className="sr-only">
+              Completá los datos para registrar un consumo de inventario del proyecto.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-4">{form}</div>
+        </SheetContent>
+      </Sheet>
+    );
   }
 
   return (
@@ -72,9 +122,7 @@ export function NewStockConsumptionDialog({
         if (!next) clearCreateQueryParam();
       }}
     >
-      <DialogTrigger asChild>
-        <Button>Registrar consumo</Button>
-      </DialogTrigger>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Registrar consumo</DialogTitle>
@@ -82,17 +130,7 @@ export function NewStockConsumptionDialog({
             Completá los datos para registrar un consumo de inventario del proyecto.
           </DialogDescription>
         </DialogHeader>
-        {open ? (
-          <ConsumptionForm
-            projectId={projectId}
-            products={products}
-            warehouses={warehouses}
-            wbsOptions={wbsOptions}
-            variant="plain"
-            onCancel={closeDialog}
-            onSuccess={handleSuccess}
-          />
-        ) : null}
+        {form}
       </DialogContent>
     </Dialog>
   );

@@ -31,6 +31,8 @@ import {
   JobsiteLogStatusBadge,
   JobsiteLogWorkspaceView,
   NewJobsiteLogDialog,
+  JobsiteLogMobileCards,
+  JobsiteLogMobileFab,
   type JobsiteLogListRow,
 } from "@/features/jobsite-log";
 import { PageShell } from "@/components/layout/page-shell";
@@ -124,8 +126,23 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
   const subtitleParts = [`${logs.length} ${logs.length === 1 ? "parte" : "partes"}`];
   if (hasFilters) subtitleParts.push("filtrado");
 
+  const listRows: JobsiteLogListRow[] = logs.map((l) => ({
+    id: l.id,
+    logDate: l.logDate,
+    status: l.status,
+    title: l.title,
+    workFront: l.workFront,
+    shift: l.shift,
+    weather: l.weather,
+    progressCount: l.progress.length,
+    progressSummary: l.progress[0]
+      ? l.progress[0].description?.trim() ||
+        `${l.progress[0].wbsNode.code} — ${l.progress[0].wbsNode.name}`
+      : null,
+  }));
+
   return (
-    <PageShell variant="default" className="space-y-6">
+    <PageShell variant="default" className="space-y-6 pb-20 md:pb-0">
       <ProjectPageHeader
         title="Libro de obra"
         subtitle={subtitleParts.join(" · ")}
@@ -178,26 +195,29 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
       <Suspense fallback={<ListSectionSkeleton />}>
         {logs.length === 0 ? (
           <ListEmptyState
-            message={
+            title={
               filterError
                 ? "Corregí los filtros para ver partes."
                 : hasFilters
                   ? "No hay partes que coincidan con los filtros."
                   : "No hay partes de obra registrados en este proyecto."
             }
+            action={
+              !filterError && !hasFilters ? (
+                <Link
+                  href={`/proyectos/${projectId}/libro-obra/nuevo`}
+                  className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+                >
+                  + Nuevo parte
+                </Link>
+              ) : undefined
+            }
           />
         ) : (
           <JobsiteLogWorkspaceView
             projectId={projectId}
-            logs={logs.map(
-              (l): JobsiteLogListRow => ({
-                id: l.id,
-                logDate: l.logDate,
-                status: l.status,
-                title: l.title,
-                workFront: l.workFront,
-              }),
-            )}
+            logs={listRows}
+            cards={<JobsiteLogMobileCards projectId={projectId} logs={listRows} />}
             table={
               <TableScroll>
                 <Table>
@@ -273,6 +293,7 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
           />
         )}
       </Suspense>
+      <JobsiteLogMobileFab projectId={projectId} />
     </PageShell>
   );
 }

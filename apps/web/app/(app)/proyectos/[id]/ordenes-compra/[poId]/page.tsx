@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
@@ -17,10 +18,12 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import {
   CancelPurchaseOrderButton,
   PurchaseOrderStatusBadge,
-  PurchaseReceiptTable,
+  PurchaseReceiptListSection,
   PoBillingNextStepPanel,
   canRegisterApInvoice,
 } from "@/features/procurement";
+import { PurchaseOrderMobileFiche } from "@/features/procurement/components/purchase-order-mobile-fiche";
+import { PurchaseOrderApprovalActions } from "@/features/procurement/components/purchase-order-approval-actions";
 import { SupplierInvoiceTable } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
 import type { PurchaseReceiptListItem } from "@/features/procurement";
@@ -33,6 +36,7 @@ import {
   canEditPurchaseReceipts,
   getPurchaseOrderBillingSummary,
   getPurchaseOrderById,
+  getProjectShellInfo,
   listEntityDocuments,
   listReceiptsByPurchaseOrder,
   listSupplierInvoicesByPurchaseOrder,
@@ -42,8 +46,6 @@ import { Badge } from "@/components/ui/badge";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   submitPurchaseOrderAction,
-  approvePurchaseOrderAction,
-  returnPurchaseOrderAction,
   confirmPurchaseOrderAction,
 } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 import { Button } from "@/components/ui/button";
@@ -66,13 +68,14 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     roles: current.tenantCtx.roles,
   };
 
-  let order, receipts, billing, linkedInvoices;
+  let order, receipts, billing, linkedInvoices, project;
   try {
-    [order, receipts, billing, linkedInvoices] = await Promise.all([
+    [order, receipts, billing, linkedInvoices, project] = await Promise.all([
       getPurchaseOrderById(poId, ctx),
       listReceiptsByPurchaseOrder(poId, ctx),
       getPurchaseOrderBillingSummary(poId, ctx),
       listSupplierInvoicesByPurchaseOrder(poId, ctx),
+      getProjectShellInfo(id, ctx),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
@@ -103,10 +106,13 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   const receiptItems: PurchaseReceiptListItem[] = receipts.map((r) => ({
     id: r.id,
     purchaseOrderCode: r.purchaseOrderCode,
+    purchaseOrderId: r.purchaseOrderId,
     supplierName: r.supplierName,
     receiptDate: r.receiptDate,
     status: r.status,
     receivedByName: r.receivedByName,
+    lineCount: r.lines.length,
+    quantitySummary: r.lines.map((l) => `${l.quantityReceived}`).join(" · "),
   }));
 
   const invoiceItems: SupplierInvoiceListItem[] = linkedInvoices.map((inv) => ({
@@ -123,14 +129,29 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={order.code}>
-      <div className="flex items-center gap-4">
+      <div className="hidden items-center gap-4 md:flex">
         <h1 className="text-2xl font-bold tracking-tight">{order.code}</h1>
         <PurchaseOrderStatusBadge status={order.status} />
       </div>
 
       <ActionErrorBanner message={sp.actionError} />
 
-      <div className="rounded-lg border bg-card p-6 space-y-4">
+      <PurchaseOrderMobileFiche
+        order={order}
+        projectCode={project.code}
+        projectName={project.name}
+        documents={
+          <EntityDocumentsPanel
+            scope={{ kind: "project", projectId: id }}
+            linkedEntity={{ type: "PURCHASE_ORDER", id: poId }}
+            storageConfigured={storageConfigured}
+            docs={poAttachments}
+            canEdit={canEditAttachments}
+          />
+        }
+      />
+
+      <div className="hidden md:block rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-muted-foreground">Proveedor</p>
@@ -269,45 +290,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           </>
         )}
         {isSubmitted && canApprovePo && (
-          <>
-            <form
-              action={async () => {
-                "use server";
-                const res = await approvePurchaseOrderAction(poId, id);
-                if ("error" in res) redirectWithActionError(poPath, res.error);
-                redirect(poPath);
-              }}
-            >
-              <Button type="submit">Aprobar</Button>
-            </form>
-            <form
-              action={async (fd) => {
-                "use server";
-                const reason = String(fd.get("returnReason") ?? "");
-                const res = await returnPurchaseOrderAction(poId, id, reason);
-                if ("error" in res) redirectWithActionError(poPath, res.error);
-                redirect(poPath);
-              }}
-              className="flex flex-wrap items-end gap-2"
-            >
-              <div className="space-y-1">
-                <label htmlFor="returnReason" className="text-xs text-muted-foreground">
-                  Motivo de devolución
-                </label>
-                <input
-                  id="returnReason"
-                  name="returnReason"
-                  required
-                  minLength={3}
-                  className="flex h-9 w-64 rounded-md border border-input bg-transparent px-3 text-sm"
-                  placeholder="Indicar motivo…"
-                />
-              </div>
-              <Button type="submit" variant="outline">
-                Devolver a borrador
-              </Button>
-            </form>
-          </>
+          <PurchaseOrderApprovalActions poId={poId} projectId={id} />
         )}
         {isApproved && canEditPo && (
           <form
@@ -322,7 +305,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           </form>
         )}
         {isReceivable && canReceive && (
-          <Button asChild>
+          <Button asChild className="min-h-11 w-full md:min-h-9 md:w-auto" data-testid="po-register-receipt">
             <Link href={`/proyectos/${id}/ordenes-compra/${poId}/recepciones/nueva`}>
               Registrar recepción
             </Link>
@@ -341,7 +324,9 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           </Button>
         }
       >
-        <PurchaseReceiptTable receipts={receiptItems} projectId={id} />
+        <Suspense fallback={null}>
+          <PurchaseReceiptListSection receipts={receiptItems} projectId={id} />
+        </Suspense>
       </DataTableSection>
 
       <DataTableSection title="Facturas vinculadas">
@@ -351,13 +336,15 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
         />
       </DataTableSection>
 
-      <EntityDocumentsPanel
-        scope={{ kind: "project", projectId: id }}
-        linkedEntity={{ type: "PURCHASE_ORDER", id: poId }}
-        storageConfigured={storageConfigured}
-        docs={poAttachments}
-        canEdit={canEditAttachments}
-      />
+      <div className="hidden md:block">
+        <EntityDocumentsPanel
+          scope={{ kind: "project", projectId: id }}
+          linkedEntity={{ type: "PURCHASE_ORDER", id: poId }}
+          storageConfigured={storageConfigured}
+          docs={poAttachments}
+          canEdit={canEditAttachments}
+        />
+      </div>
     </PageShell>
   );
 }

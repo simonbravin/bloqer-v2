@@ -164,8 +164,8 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      <div className="flex gap-4 items-start">
-        <div className="flex-1 min-w-0">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="min-w-0 flex-1">
           <CertificationLineEditor
             certificationId={certId}
             lines={cert.lines}
@@ -179,7 +179,7 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
           />
         </div>
 
-        <div className="w-56 shrink-0">
+        <div className="w-full shrink-0 lg:w-56">
           <CertificationTotalsPanel
             status={cert.status}
             currency={cert.currency}

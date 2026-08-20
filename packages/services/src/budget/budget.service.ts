@@ -371,6 +371,17 @@ export async function returnBudgetForChanges(
   );
 }
 
+/** Unique `budgets_one_approved_per_project_key` must surface as CONFLICT, never 500. */
+export function rethrowIfBudgetApproveUniqueConflict(err: unknown): void {
+  if (err instanceof ServiceError) throw err;
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+    throw new ServiceError(
+      "CONFLICT",
+      "Ya existe un presupuesto aprobado para este proyecto. Ciérrelo antes de aprobar otro.",
+    );
+  }
+}
+
 export async function approveBudget(
   id: string,
   ctx: ServiceContext,
@@ -434,13 +445,7 @@ export async function approveBudget(
     }
     updated = await prisma.budget.findUniqueOrThrow({ where: { id } });
   } catch (e) {
-    if (e instanceof ServiceError) throw e;
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      throw new ServiceError(
-        "CONFLICT",
-        "Ya existe un presupuesto aprobado para este proyecto. Ciérrelo antes de aprobar otro.",
-      );
-    }
+    rethrowIfBudgetApproveUniqueConflict(e);
     throw e;
   }
 

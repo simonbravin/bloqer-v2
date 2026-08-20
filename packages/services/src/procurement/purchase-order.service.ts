@@ -78,6 +78,8 @@ export type PurchaseOrderView = Omit<PurchaseOrder, "subtotal" | "taxAmount" | "
   code: string;
   supplierName: string;
   approvedByName: string | null;
+  createdByName: string | null;
+  originRequestedByName: string | null;
   lines: PurchaseOrderLineView[];
 };
 
@@ -130,7 +132,11 @@ function serializePO(
     supplierContact: { legalName: string; fantasyName: string | null };
     lines: Array<Parameters<typeof serializeLine>[0]>;
   },
-  approvedByName: string | null = null,
+  names: {
+    approvedByName: string | null;
+    createdByName: string | null;
+    originRequestedByName: string | null;
+  } = { approvedByName: null, createdByName: null, originRequestedByName: null },
 ): PurchaseOrderView {
   const supplierName = po.supplierContact.fantasyName ?? po.supplierContact.legalName;
   return {
@@ -138,7 +144,9 @@ function serializePO(
     subtotal:    serializeMoneyDecimal(po.subtotal),
     taxAmount:   serializeMoneyDecimal(po.taxAmount),
     totalAmount: serializeMoneyDecimal(po.totalAmount),
-    approvedByName,
+    approvedByName: names.approvedByName,
+    createdByName: names.createdByName,
+    originRequestedByName: names.originRequestedByName,
     code:        `OC-${String(po.number).padStart(3, "0")}`,
     supplierName,
     lines:       po.lines.map(serializeLine),
@@ -337,8 +345,16 @@ async function toPurchaseOrderView(
     lines: Array<Parameters<typeof serializeLine>[0]>;
   },
 ): Promise<PurchaseOrderView> {
-  const nameById = await resolveUserDisplayNames([po.approvedByUserId]);
-  return serializePO(po, userDisplayNameFromMap(nameById, po.approvedByUserId));
+  const nameById = await resolveUserDisplayNames([
+    po.approvedByUserId,
+    po.createdBy,
+    po.originRequestedByUserId,
+  ]);
+  return serializePO(po, {
+    approvedByName: userDisplayNameFromMap(nameById, po.approvedByUserId),
+    createdByName: userDisplayNameFromMap(nameById, po.createdBy),
+    originRequestedByName: userDisplayNameFromMap(nameById, po.originRequestedByUserId),
+  });
 }
 
 export async function getPurchaseOrderById(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
@@ -369,8 +385,16 @@ export async function listPurchaseOrdersByProject(
     include: poInclude,
     orderBy: { number: "asc" },
   });
-  const nameById = await resolveUserDisplayNames(orders.map((o) => o.approvedByUserId));
-  return orders.map((o) => serializePO(o, userDisplayNameFromMap(nameById, o.approvedByUserId)));
+  const nameById = await resolveUserDisplayNames(
+    orders.flatMap((o) => [o.approvedByUserId, o.createdBy, o.originRequestedByUserId]),
+  );
+  return orders.map((o) =>
+    serializePO(o, {
+      approvedByName: userDisplayNameFromMap(nameById, o.approvedByUserId),
+      createdByName: userDisplayNameFromMap(nameById, o.createdBy),
+      originRequestedByName: userDisplayNameFromMap(nameById, o.originRequestedByUserId),
+    }),
+  );
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────

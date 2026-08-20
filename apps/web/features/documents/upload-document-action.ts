@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { uploadDocument, ServiceError } from "@bloqer/services";
-import { isStorageConfigured } from "@bloqer/config";
 import {
   initiateUploadSchema,
   resolveAllowedMimeType,
@@ -26,7 +25,19 @@ function parseRevalidatePaths(raw: FormDataEntryValue | null): string[] {
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return [...new Set(parsed.filter((p): p is string => typeof p === "string" && p.startsWith("/")))];
+    return [
+      ...new Set(
+        parsed.filter(
+          (p): p is string =>
+            typeof p === "string" &&
+            p.startsWith("/") &&
+            !p.startsWith("//") &&
+            !p.includes("?") &&
+            !p.includes("#") &&
+            !p.includes("\\"),
+        ),
+      ),
+    ];
   } catch {
     return [];
   }
@@ -67,6 +78,7 @@ export async function uploadDocumentAction(formData: FormData): Promise<UploadDo
     description: readOptionalString(formData.get("description")) ?? null,
     linkedEntityType: readOptionalString(formData.get("linkedEntityType")),
     linkedEntityId: readOptionalString(formData.get("linkedEntityId")),
+    idempotencyKey: readOptionalString(formData.get("idempotencyKey")),
   });
 
   if (!parsed.success) {
@@ -81,10 +93,9 @@ export async function uploadDocumentAction(formData: FormData): Promise<UploadDo
   };
 
   const revalidatePaths = parseRevalidatePaths(formData.get("revalidatePaths"));
-  const storageReady    = isStorageConfigured();
 
   try {
-    const content = storageReady ? Buffer.from(await file.arrayBuffer()) : Buffer.alloc(0);
+    const content = Buffer.from(await file.arrayBuffer());
     const result  = await uploadDocument(parsed.data, content, ctx);
 
     for (const path of revalidatePaths) {

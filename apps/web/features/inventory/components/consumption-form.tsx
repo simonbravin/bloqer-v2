@@ -11,19 +11,17 @@ import {
 } from "@/components/ui/select";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, productsToSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
+import { toIsoDateInTimeZone } from "@bloqer/utils";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import { createStockConsumptionAction } from "@/app/(app)/proyectos/[id]/consumos/actions";
 
 export type ProductOption   = { id: string; name: string; sku: string; unit: string };
 export type WarehouseOption = { id: string; name: string };
 export type WbsOption       = { id: string; code: string; name: string };
 
-/** Local calendar date as `YYYY-MM-DD` (avoids UTC off-by-one from toISOString). */
+/** Product calendar date as `YYYY-MM-DD` (avoids UTC off-by-one from toISOString). */
 function todayLocalInputDate(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return toIsoDateInTimeZone();
 }
 
 interface Props {
@@ -51,6 +49,7 @@ export function ConsumptionForm({
   const [productId, setProductId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [wbsNodeId, setWbsNodeId] = useState<string>(SEARCHABLE_NONE);
+  const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
 
   const productOptions = useMemo(() => productsToSearchableOptions(products), [products]);
   const wbsComboboxOptions = useMemo(
@@ -74,11 +73,13 @@ export function ConsumptionForm({
         quantity:     fd.get("quantity") as string,
         movementDate: fd.get("movementDate") as string,
         notes:        (fd.get("notes") as string) || null,
+        idempotencyKey,
       });
       if ("error" in res) {
         setError(res.error ?? null);
         return;
       }
+      rotateIdempotencyKey();
       // Close first, then land on clean list URL so `?create=1` cannot reopen the dialog after refresh.
       onSuccess?.();
       router.replace(`/proyectos/${projectId}/consumos`);
@@ -112,6 +113,7 @@ export function ConsumptionForm({
           ) : (
             <SearchableCombobox
               popoverWidth="wide"
+              className="min-h-11 h-11 md:h-10 md:min-h-10"
               options={productOptions}
               value={productId}
               onValueChange={setProductId}
@@ -127,7 +129,7 @@ export function ConsumptionForm({
             <p className="text-sm text-muted-foreground">Sin depósitos activos.</p>
           ) : (
             <Select value={warehouseId} onValueChange={setWarehouseId}>
-              <SelectTrigger>
+              <SelectTrigger className="min-h-11 md:min-h-10">
                 <SelectValue placeholder="Seleccionar depósito…" />
               </SelectTrigger>
               <SelectContent>
@@ -144,7 +146,7 @@ export function ConsumptionForm({
             <Label htmlFor="quantity">
               Cantidad{selectedProduct?.unit ? ` (${selectedProduct.unit})` : ""}
             </Label>
-            <Input id="quantity" name="quantity" required placeholder="0" inputMode="decimal" />
+            <Input id="quantity" name="quantity" required placeholder="0" inputMode="decimal" className="min-h-11 md:min-h-10" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="movementDate">Fecha</Label>
@@ -153,6 +155,7 @@ export function ConsumptionForm({
               name="movementDate"
               type="date"
               required
+              className="min-h-11 md:min-h-10"
               defaultValue={todayLocalInputDate()}
             />
           </div>
@@ -163,6 +166,7 @@ export function ConsumptionForm({
             <Label>Partida EDT (opcional)</Label>
             <SearchableCombobox
               popoverWidth="wide"
+              className="min-h-11 h-11 md:h-10 md:min-h-10"
               options={wbsComboboxOptions}
               value={wbsNodeId}
               onValueChange={setWbsNodeId}
@@ -177,16 +181,17 @@ export function ConsumptionForm({
           <Textarea id="notes" name="notes" rows={2} />
         </div>
 
-        <div className="flex flex-wrap justify-end gap-2 pt-2">
+        <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap justify-end gap-2 border-t bg-background/95 p-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
           <Button
             type="button"
             variant="outline"
+            className="min-h-11 md:min-h-9"
             onClick={onCancel ?? (() => router.back())}
             disabled={isPending}
           >
             Cancelar
           </Button>
-          <Button type="submit" disabled={isPending || !catalogsReady}>
+          <Button type="submit" className="min-h-11 md:min-h-9" disabled={isPending || !catalogsReady}>
             {isPending ? "Guardando…" : "Registrar consumo"}
           </Button>
         </div>

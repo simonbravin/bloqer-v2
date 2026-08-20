@@ -20,6 +20,11 @@ import {
 import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
 import { assertPeriodOpenUnderCompanyLock } from "../treasury/treasury-write-locks";
 import { assertResourceTenant } from "../security/tenant-isolation";
+import {
+  paymentReplayMatches,
+  requireIdempotencyKey,
+  withIdempotentCreate,
+} from "../idempotency/idempotency";
 
 export type PaymentView = Omit<Payment, "amount"> & {
   amount: string;
@@ -215,96 +220,121 @@ export async function createPayment(
     await assertProjectAllowsOperationalMutation(payablePreview.projectId, ctx.tenantId);
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    // Load payable inside txn for consistency
-    const payable = await tx.payable.findUnique({ where: { id: input.payableId } });
-    if (!payable) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
-    assertResourceTenant(payable.tenantId, ctx.tenantId);
-    if (projectScopeId !== undefined && payable.projectId !== projectScopeId) {
-      throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
-    }
-    if (payable.status === "CANCELLED") {
-      throw new ServiceError("CONFLICT", "No se puede pagar una cuenta por pagar cancelada");
-    }
-    if (payable.status === "PAID") {
-      throw new ServiceError("CONFLICT", "La cuenta por pagar ya está totalmente pagada");
-    }
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+  const paymentInclude = { account: { select: { name: true } } } as const;
 
-    const balanceDue = payable.originalAmount.minus(payable.paidAmount);
-    // D-053: payFullBalance applies stored balance; never round-then-reapply from UI.
-    // Also treat amount that rounds to the same 2dp as balance as full (API clients).
-    let amount: Prisma.Decimal;
-    if (input.payFullBalance) {
-      amount = balanceDue;
-    } else {
-      const partial = toMoneyDecimal(input.amount ?? "0");
-      amount = partial.eq(toMoneyDecimal(balanceDue)) ? balanceDue : partial;
-    }
-    if (amount.lessThanOrEqualTo(0)) {
-      throw new ServiceError("VALIDATION", "El monto debe ser mayor a 0");
-    }
-
-    const supplierInvoice = await tx.supplierInvoice.findUnique({
-      where: { id: payable.supplierInvoiceId },
-      select: { status: true, number: true },
-    });
-    if (!supplierInvoice) {
-      throw new ServiceError("CONFLICT", "La factura de proveedor asociada no existe");
-    }
-    if (supplierInvoice.status === "CANCELLED") {
-      throw new ServiceError("CONFLICT", "No se puede pagar una factura de proveedor cancelada");
-    }
-
-    const applied = await applyPaymentToPayable(
-      tx,
-      {
-        payable,
+  const payment = await withIdempotentCreate({
+    findExisting: () =>
+      prisma.payment.findFirst({
+        where: { tenantId: ctx.tenantId, idempotencyKey },
+        include: paymentInclude,
+      }),
+    payloadsMatch: (existing) =>
+      paymentReplayMatches(existing, {
+        payableId: input.payableId,
         accountId: input.accountId,
-        amount,
         paymentDate: input.paymentDate,
-        notes: input.notes ?? null,
-        paymentMethod: input.paymentMethod ?? null,
-        reference: input.reference ?? null,
-      },
-      ctx,
-    );
+        payFullBalance: Boolean(input.payFullBalance),
+        amount: input.amount,
+      }),
+    create: async () => {
+      const created = await prisma.$transaction(async (tx) => {
+        // Load payable inside txn for consistency
+        const payable = await tx.payable.findUnique({ where: { id: input.payableId } });
+        if (!payable) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
+        assertResourceTenant(payable.tenantId, ctx.tenantId);
+        if (projectScopeId !== undefined && payable.projectId !== projectScopeId) {
+          throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
+        }
+        if (payable.status === "CANCELLED") {
+          throw new ServiceError("CONFLICT", "No se puede pagar una cuenta por pagar cancelada");
+        }
+        if (payable.status === "PAID") {
+          throw new ServiceError("CONFLICT", "La cuenta por pagar ya está totalmente pagada");
+        }
 
-    const result = await tx.payment.findUniqueOrThrow({
-      where: { id: applied.paymentId },
-      include: { account: { select: { name: true } } },
-    });
+        const balanceDue = payable.originalAmount.minus(payable.paidAmount);
+        // D-053: payFullBalance applies stored balance; never round-then-reapply from UI.
+        // Also treat amount that rounds to the same 2dp as balance as full (API clients).
+        let amount: Prisma.Decimal;
+        if (input.payFullBalance) {
+          amount = balanceDue;
+        } else {
+          const partial = toMoneyDecimal(input.amount ?? "0");
+          amount = partial.eq(toMoneyDecimal(balanceDue)) ? balanceDue : partial;
+        }
+        if (amount.lessThanOrEqualTo(0)) {
+          throw new ServiceError("VALIDATION", "El monto debe ser mayor a 0");
+        }
 
-    await auditAp(
-      ctx,
-      "payment.confirmed",
-      "Payment",
-      result.id,
-      { projectId: result.projectId, companyId: result.companyId },
-      {
-        after: {
-          payableId: input.payableId,
-          amount: serializeMoneyDecimal(amount),
-          payFullBalance: Boolean(input.payFullBalance),
-          number: supplierInvoice.number,
-        },
-        tx,
-      },
-    );
+        const supplierInvoice = await tx.supplierInvoice.findUnique({
+          where: { id: payable.supplierInvoiceId },
+          select: { status: true, number: true },
+        });
+        if (!supplierInvoice) {
+          throw new ServiceError("CONFLICT", "La factura de proveedor asociada no existe");
+        }
+        if (supplierInvoice.status === "CANCELLED") {
+          throw new ServiceError("CONFLICT", "No se puede pagar una factura de proveedor cancelada");
+        }
 
-    return { result, supplierInvoice };
+        const applied = await applyPaymentToPayable(
+          tx,
+          {
+            payable,
+            accountId: input.accountId,
+            amount,
+            paymentDate: input.paymentDate,
+            notes: input.notes ?? null,
+            paymentMethod: input.paymentMethod ?? null,
+            reference: input.reference ?? null,
+            idempotencyKey,
+          },
+          ctx,
+        );
+
+        const result = await tx.payment.findUniqueOrThrow({
+          where: { id: applied.paymentId },
+          include: paymentInclude,
+        });
+
+        await auditAp(
+          ctx,
+          "payment.confirmed",
+          "Payment",
+          result.id,
+          { projectId: result.projectId, companyId: result.companyId },
+          {
+            after: {
+              payableId: input.payableId,
+              amount: serializeMoneyDecimal(amount),
+              payFullBalance: Boolean(input.payFullBalance),
+              number: supplierInvoice.number,
+            },
+            tx,
+          },
+        );
+
+        return { result, supplierInvoice };
+      });
+
+      // Replay must not emit a second in-app/email notification (inside create()).
+      await notifyPaymentConfirmed({
+        ctx,
+        supplierInvoiceId: created.result.supplierInvoiceId,
+        projectId: created.result.projectId,
+        companyId: created.result.companyId,
+        invoiceNumber: created.supplierInvoice.number,
+        amountLabel: `${serializeMoneyDecimal(created.result.amount)} ${created.result.currency}`,
+        accountName: created.result.account.name,
+      }).catch(() => undefined);
+
+      return created.result;
+    },
   });
 
-  await ensureDraftJournalFromPayment(result.result.id, ctx);
-  await notifyPaymentConfirmed({
-    ctx,
-    supplierInvoiceId: result.result.supplierInvoiceId,
-    projectId: result.result.projectId,
-    companyId: result.result.companyId,
-    invoiceNumber: result.supplierInvoice.number,
-    amountLabel: `${serializeMoneyDecimal(result.result.amount)} ${result.result.currency}`,
-    accountName: result.result.account.name,
-  }).catch(() => undefined);
-  return serialize(result.result);
+  await ensureDraftJournalFromPayment(payment.id, ctx);
+  return serialize(payment);
 }
 
 export async function cancelPayment(

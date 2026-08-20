@@ -13,6 +13,7 @@ export {
   computeDateRangePreset,
   defaultCalendarDateRangeDays,
   formatCalendarDate,
+  productCalendarDateUtc,
   toIsoDateInTimeZone,
   type CalendarDateParts,
   type DateRangePresetId,

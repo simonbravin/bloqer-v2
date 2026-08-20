@@ -1,7 +1,7 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import type { ReceivableListItem } from "./receivable-list";
+import { useListViewMode } from "@/components/ui/list-view-toggle";
 import { ReceivableCards } from "./receivable-cards";
 import { ReceivableTable } from "./receivable-table";
 
@@ -22,7 +22,7 @@ export function ReceivableListSection({
   invoicesHref?: string;
   invoicesActionLabel?: string;
 }) {
-  const view = useSearchParams().get("view") === "cards" ? "cards" : "table";
+  const view = useListViewMode();
   if (view === "cards") {
     return (
       <ReceivableCards

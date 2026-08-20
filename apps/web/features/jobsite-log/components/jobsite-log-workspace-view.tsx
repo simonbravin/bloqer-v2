@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import type { ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MonthCalendarGrid } from "@/components/ui/month-calendar-grid";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,10 @@ export type JobsiteLogListRow = {
   status: string;
   title: string | null;
   workFront: string | null;
+  shift: string | null;
+  weather: string | null;
+  progressCount: number;
+  progressSummary: string | null;
 };
 
 type ViewId = "table" | "calendar";
@@ -24,10 +29,12 @@ export function JobsiteLogWorkspaceView({
   projectId,
   logs,
   table,
+  cards,
 }: {
   projectId: string;
   logs: JobsiteLogListRow[];
-  table: React.ReactNode;
+  table: ReactNode;
+  cards?: ReactNode;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -61,7 +68,7 @@ export function JobsiteLogWorkspaceView({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="hidden justify-end md:flex">
         <div className="flex gap-1 rounded-lg border p-1">
           <Button
             size="sm"
@@ -82,6 +89,9 @@ export function JobsiteLogWorkspaceView({
         </div>
       </div>
 
+      {cards}
+
+      <div className="hidden md:block">
       {view === "table" ? (
         table
       ) : (
@@ -92,6 +102,7 @@ export function JobsiteLogWorkspaceView({
           }
         />
       )}
+      </div>
     </div>
   );
 }

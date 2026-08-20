@@ -514,18 +514,18 @@ enum WarehouseTransferStatus {
 // ─── Auth.js v5 adapter tables ────────────────────────────────────────────────
 
 model User {
-  id                 String     @id @default(uuid())
-  name               String?
-  email              String     @unique
-  emailVerified      DateTime?
-  image              String?
+  id                String     @id @default(uuid())
+  name              String?
+  email             String     @unique
+  emailVerified     DateTime?
+  image             String?
   /// bcrypt hash for Credentials login; null for Google-only users until they set a password.
-  passwordHash       String?
+  passwordHash      String?
   /// Bumped on password set/reset; JWT claim `pwdAt` compared in Node `getCurrentUser`.
-  passwordUpdatedAt  DateTime?
-  status             UserStatus @default(INVITED)
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  passwordUpdatedAt DateTime?
+  status            UserStatus @default(INVITED)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
   accounts                  Account[]
   sessions                  Session[]
@@ -954,48 +954,48 @@ model AuditLog {
 // BR-DIR-001: tax_id unique per tenant when non-null (Postgres allows multiple NULLs in unique index).
 
 model Contact {
-  id          String        @id @default(uuid())
-  tenantId    String
-  legalName   String
-  fantasyName String?
-  taxId       String?
-  taxIdType   TaxIdType?
+  id           String        @id @default(uuid())
+  tenantId     String
+  legalName    String
+  fantasyName  String?
+  taxId        String?
+  taxIdType    TaxIdType?
   /// Condición frente al IVA ([D-084]).
   ivaCondition IvaCondition?
-  address     String?
-  city        String?
-  province    String?
-  country     String        @default("AR")
-  phone       String?
-  email       String?
-  notes       String?
-  status      ContactStatus @default(ACTIVE)
-  createdBy   String?
-  updatedBy   String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  address      String?
+  city         String?
+  province     String?
+  country      String        @default("AR")
+  phone        String?
+  email        String?
+  notes        String?
+  status       ContactStatus @default(ACTIVE)
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  tenant                    Tenant                     @relation(fields: [tenantId], references: [id])
-  roles                     ContactRole[]
-  clientProfile             ClientProfile?
-  supplierProfile           SupplierProfile?
-  subcontractorProfile      SubcontractorProfile?
-  projects                  Project[]
-  salesInvoices             SalesInvoice[]
-  receivables               Receivable[]
-  collections               Collection[]
-  supplierInvoices          SupplierInvoice[]
-  payables                  Payable[]
-  purchaseOrders            PurchaseOrder[]
-  purchaseReceipts          PurchaseReceipt[]
-  procurementQuotes         ProcurementQuote[]
-  subcontracts              Subcontract[]              @relation("SubcontractSubcontractor")
-  subcontractCertifications SubcontractCertification[] @relation("SubcontractCertificationSubcontractor")
-  jobsiteLogLabors          JobsiteLogLabor[]
+  tenant                         Tenant                     @relation(fields: [tenantId], references: [id])
+  roles                          ContactRole[]
+  clientProfile                  ClientProfile?
+  supplierProfile                SupplierProfile?
+  subcontractorProfile           SubcontractorProfile?
+  projects                       Project[]
+  salesInvoices                  SalesInvoice[]
+  receivables                    Receivable[]
+  collections                    Collection[]
+  supplierInvoices               SupplierInvoice[]
+  payables                       Payable[]
+  purchaseOrders                 PurchaseOrder[]
+  purchaseReceipts               PurchaseReceipt[]
+  procurementQuotes              ProcurementQuote[]
+  subcontracts                   Subcontract[]              @relation("SubcontractSubcontractor")
+  subcontractCertifications      SubcontractCertification[] @relation("SubcontractCertificationSubcontractor")
+  jobsiteLogLabors               JobsiteLogLabor[]
   /// Accounts-payable payments (`payments` table); distinct from `payables` / treasury naming.
-  apPayments                Payment[]
+  apPayments                     Payment[]
   /// Optional counterparty on manual treasury movements (corporate inflows / future outflows).
-  accountMovementsAsCounterparty AccountMovement[] @relation("AccountMovementCounterparty")
+  accountMovementsAsCounterparty AccountMovement[]          @relation("AccountMovementCounterparty")
 
   @@unique([tenantId, taxId])
   @@index([tenantId, status])
@@ -1298,19 +1298,19 @@ model WbsNode {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  budget               Budget                @relation(fields: [budgetId], references: [id])
-  parent               WbsNode?              @relation("WbsChildren", fields: [parentId], references: [id])
-  children             WbsNode[]             @relation("WbsChildren")
+  budget               Budget                    @relation(fields: [budgetId], references: [id])
+  parent               WbsNode?                  @relation("WbsChildren", fields: [parentId], references: [id])
+  children             WbsNode[]                 @relation("WbsChildren")
   costItem             CostItem?
   certificationLines   CertificationLine[]
-  purchaseOrderLines     PurchaseOrderLine[]
-  purchaseRequestLines   PurchaseRequestLine[]
-  stockMovements         StockMovement[]
-  subcontractLines       SubcontractLine[]
-  jobsiteLogProgress     JobsiteLogProgress[]
-  jobsiteLogMaterials    JobsiteLogMaterialUsage[]
-  scheduleItemWbsLinks   ScheduleItemWbsLink[]
-  supplierInvoiceLines   SupplierInvoiceLine[]
+  purchaseOrderLines   PurchaseOrderLine[]
+  purchaseRequestLines PurchaseRequestLine[]
+  stockMovements       StockMovement[]
+  subcontractLines     SubcontractLine[]
+  jobsiteLogProgress   JobsiteLogProgress[]
+  jobsiteLogMaterials  JobsiteLogMaterialUsage[]
+  scheduleItemWbsLinks ScheduleItemWbsLink[]
+  supplierInvoiceLines SupplierInvoiceLine[]
 
   @@unique([budgetId, code])
   @@index([budgetId, parentId])
@@ -1361,9 +1361,9 @@ model CostAnalysisLine {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
-  product  Product? @relation(fields: [productId], references: [id])
-  costItem CostItem @relation(fields: [costItemId], references: [id])
-  budget   Budget   @relation(fields: [budgetId], references: [id])
+  product              Product?              @relation(fields: [productId], references: [id])
+  costItem             CostItem              @relation(fields: [costItemId], references: [id])
+  budget               Budget                @relation(fields: [budgetId], references: [id])
   purchaseOrderLines   PurchaseOrderLine[]
   purchaseRequestLines PurchaseRequestLine[]
 
@@ -1475,6 +1475,8 @@ model SalesInvoice {
   externalInvoiceRef String?
   notes              String?
   internalNotes      String?
+  /// Client UUID for registerArSale (ISSUED + Receivable). Partial unique (tenantId, idempotencyKey) WHERE NOT NULL — SQL migration.
+  idempotencyKey     String?            @db.VarChar(36)
   createdBy          String?
   updatedBy          String?
   createdAt          DateTime           @default(now())
@@ -1496,6 +1498,8 @@ model SalesInvoice {
   @@index([tenantId, invoiceLetter])
   @@map("sales_invoices")
 }
+
+// Uniqueness of SalesInvoice.idempotencyKey is a partial unique index in SQL (see migration 20260819200000).
 
 model SalesInvoiceLine {
   id                  String   @id @default(uuid())
@@ -1605,14 +1609,14 @@ model JournalEntry {
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
 
-  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company        Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  project        Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  lines          JournalEntryLine[]
-  createdBy      User               @relation("JournalEntryCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  updatedBy      User               @relation("JournalEntryUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
-  reversesEntry  JournalEntry?      @relation("JournalEntryReversal", fields: [reversesEntryId], references: [id], onDelete: Restrict)
-  reversedByEntry JournalEntry?     @relation("JournalEntryReversal")
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company         Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  project         Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  lines           JournalEntryLine[]
+  createdBy       User               @relation("JournalEntryCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedBy       User               @relation("JournalEntryUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  reversesEntry   JournalEntry?      @relation("JournalEntryReversal", fields: [reversesEntryId], references: [id], onDelete: Restrict)
+  reversedByEntry JournalEntry?      @relation("JournalEntryReversal")
 
   @@index([tenantId, companyId, entryDate])
   @@index([tenantId, sourceType, sourceId])
@@ -1693,13 +1697,13 @@ model TreasuryAccount {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
-  tenant       Tenant             @relation(fields: [tenantId], references: [id])
-  company      Company?           @relation(fields: [companyId], references: [id])
-  movements         AccountMovement[]
-  collections       Collection[]
-  transfersOut      InternalTransfer[] @relation("TransferSource")
-  transfersIn       InternalTransfer[] @relation("TransferDest")
-  payments          Payment[]
+  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  company             Company?             @relation(fields: [companyId], references: [id])
+  movements           AccountMovement[]
+  collections         Collection[]
+  transfersOut        InternalTransfer[]   @relation("TransferSource")
+  transfersIn         InternalTransfer[]   @relation("TransferDest")
+  payments            Payment[]
   bankReconciliations BankReconciliation[]
 
   /// Tenant-wide unique **display name** (see docs/bloqer2.0/03-finance/TREASURY_MODEL.md §TreasuryAccount uniqueness).
@@ -1714,32 +1718,35 @@ model TreasuryAccount {
 // Phase 16B: optional project dimension for reporting / manual classification.
 // Movements from Collection/Payment keep projectId null unless explicitly set later; avoid duplicating source truth.
 model AccountMovement {
-  id                     String                    @id @default(uuid())
-  tenantId               String
-  companyId              String?
-  accountId              String
-  projectId              String?
+  id                    String                    @id @default(uuid())
+  tenantId              String
+  companyId             String?
+  accountId             String
+  projectId             String?
   /// Optional directory contact for manual corporate inflows (D-049); not used for COLLECTION/PAYMENT.
-  counterpartyContactId  String?
+  counterpartyContactId String?
   /// External official invoice / voucher reference (e.g. ARCA FC A 0001-00001234) when issued outside Bloqer.
-  externalInvoiceRef     String?
-  movementDate           DateTime                  @db.Date
-  type                   AccountMovementType
-  sourceType             AccountMovementSourceType
-  sourceId               String?
-  currency               String
-  amount                 Decimal                   @db.Decimal(18, 4)
-  description            String
-  status                 AccountMovementStatus     @default(CONFIRMED)
-  transferId             String?
-  createdBy              String?
-  createdAt              DateTime                  @default(now())
-  updatedAt              DateTime                  @updatedAt
+  externalInvoiceRef    String?
+  movementDate          DateTime                  @db.Date
+  type                  AccountMovementType
+  sourceType            AccountMovementSourceType
+  sourceId              String?
+  currency              String
+  amount                Decimal                   @db.Decimal(18, 4)
+  description           String
+  status                AccountMovementStatus     @default(CONFIRMED)
+  transferId            String?
+  /// Client UUID for manual inflow/adjustment. Payment/collection/transfer legs leave this NULL.
+  /// Partial unique (tenantId, idempotencyKey) WHERE NOT NULL — SQL migration.
+  idempotencyKey        String?                   @db.VarChar(36)
+  createdBy             String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
 
-  tenant       Tenant          @relation(fields: [tenantId], references: [id])
-  account      TreasuryAccount @relation(fields: [accountId], references: [id])
-  project      Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  counterparty Contact?        @relation("AccountMovementCounterparty", fields: [counterpartyContactId], references: [id], onDelete: SetNull)
+  tenant                Tenant                    @relation(fields: [tenantId], references: [id])
+  account               TreasuryAccount           @relation(fields: [accountId], references: [id])
+  project               Project?                  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  counterparty          Contact?                  @relation("AccountMovementCounterparty", fields: [counterpartyContactId], references: [id], onDelete: SetNull)
   reconciliationMatches BankReconciliationMatch[]
 
   @@index([tenantId, accountId, movementDate])
@@ -1750,6 +1757,8 @@ model AccountMovement {
   @@index([tenantId, status])
   @@map("account_movements")
 }
+
+// Uniqueness of AccountMovement.idempotencyKey is a partial unique index in SQL (see migration 20260819190000).
 
 /// Bank reconciliation session ([D-032]/[D-075]/[D-076]/[D-079]). Manual lines + CSV/OFX import.
 /// Partial unique (migration 20260808180000): one DRAFT|IN_PROGRESS per (tenantId, accountId).
@@ -1772,11 +1781,11 @@ model BankReconciliation {
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
 
-  tenant   Tenant          @relation(fields: [tenantId], references: [id])
-  company  Company?        @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  account  TreasuryAccount @relation(fields: [accountId], references: [id])
-  lines    BankStatementLine[]
-  matches  BankReconciliationMatch[]
+  tenant  Tenant                    @relation(fields: [tenantId], references: [id])
+  company Company?                  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  account TreasuryAccount           @relation(fields: [accountId], references: [id])
+  lines   BankStatementLine[]
+  matches BankReconciliationMatch[]
 
   @@index([tenantId, accountId, status])
   @@index([tenantId, periodStart, periodEnd])
@@ -1806,18 +1815,18 @@ model BankStatementLine {
 }
 
 model BankReconciliationMatch {
-  id               String   @id @default(uuid())
-  tenantId         String
-  reconciliationId String
-  statementLineId  String   @unique
-  accountMovementId String  @unique
-  matchedBy        String?
-  matchedAt        DateTime @default(now())
+  id                String   @id @default(uuid())
+  tenantId          String
+  reconciliationId  String
+  statementLineId   String   @unique
+  accountMovementId String   @unique
+  matchedBy         String?
+  matchedAt         DateTime @default(now())
 
-  tenant          Tenant            @relation(fields: [tenantId], references: [id])
+  tenant          Tenant             @relation(fields: [tenantId], references: [id])
   reconciliation  BankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
-  statementLine   BankStatementLine @relation(fields: [statementLineId], references: [id], onDelete: Cascade)
-  accountMovement AccountMovement   @relation(fields: [accountMovementId], references: [id], onDelete: Restrict)
+  statementLine   BankStatementLine  @relation(fields: [statementLineId], references: [id], onDelete: Cascade)
+  accountMovement AccountMovement    @relation(fields: [accountMovementId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, reconciliationId])
   @@map("bank_reconciliation_matches")
@@ -1829,7 +1838,7 @@ model BankReconciliationMatch {
 // Currency must match Receivable.currency and TreasuryAccount.currency (no FX in Phase 3C).
 // BR-AR-003 / D-051: projectId nullable — corporate collections without obra (mirrors Payment).
 model Collection {
-  id              String           @id @default(uuid())
+  id              String                    @id @default(uuid())
   tenantId        String
   companyId       String
   projectId       String?
@@ -1837,21 +1846,23 @@ model Collection {
   receivableId    String
   salesInvoiceId  String
   accountId       String
-  collectionDate  DateTime         @db.Date
+  collectionDate  DateTime                  @db.Date
   currency        String
-  fxRate          Decimal          @default(1) @db.Decimal(18, 6)
-  amountArs       Decimal          @default(0) @db.Decimal(18, 4)
-  amount          Decimal          @db.Decimal(18, 4)
+  fxRate          Decimal                   @default(1) @db.Decimal(18, 6)
+  amountArs       Decimal                   @default(0) @db.Decimal(18, 4)
+  amount          Decimal                   @db.Decimal(18, 4)
   /// Settlement channel ([D-074]). Null on legacy rows.
   paymentMethod   TreasurySettlementMethod?
   /// Transfer/cheque/voucher reference ([D-074]).
   reference       String?
   notes           String?
-  status          CollectionStatus @default(CONFIRMED)
+  status          CollectionStatus          @default(CONFIRMED)
+  /// Client UUID for this collection intent. Partial unique (tenantId, idempotencyKey) WHERE NOT NULL — SQL migration.
+  idempotencyKey  String?                   @db.VarChar(36)
   createdBy       String?
   updatedBy       String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
 
   tenant        Tenant          @relation(fields: [tenantId], references: [id])
   company       Company         @relation(fields: [companyId], references: [id])
@@ -1867,6 +1878,8 @@ model Collection {
   @@map("collections")
 }
 
+// Uniqueness of Collection.idempotencyKey is a partial unique index in SQL (see migration 20260819180000).
+
 // BR-TRZ-004: exactly 2 AccountMovements per transfer (TRANSFER_OUT + TRANSFER_IN), linked by transferId.
 // Same currency only for Phase 3C. Source != destination. No negative balance allowed.
 model InternalTransfer {
@@ -1880,6 +1893,8 @@ model InternalTransfer {
   amount               Decimal                @db.Decimal(18, 4)
   description          String?
   status               InternalTransferStatus @default(CONFIRMED)
+  /// Client UUID for this transfer intent. Partial unique (tenantId, idempotencyKey) WHERE NOT NULL — SQL migration.
+  idempotencyKey       String?                @db.VarChar(36)
   createdBy            String?
   updatedBy            String?
   createdAt            DateTime               @default(now())
@@ -1923,6 +1938,8 @@ model SupplierInvoice {
   status            SupplierInvoiceStatus @default(DRAFT)
   notes             String?
   internalNotes     String?
+  /// Client UUID for registerApExpense (ISSUED + Payable). Partial unique (tenantId, idempotencyKey) WHERE NOT NULL — SQL migration.
+  idempotencyKey    String?               @db.VarChar(36)
   createdBy         String?
   updatedBy         String?
   createdAt         DateTime              @default(now())
@@ -1952,23 +1969,25 @@ model SupplierInvoice {
   @@map("supplier_invoices")
 }
 
+// Uniqueness of SupplierInvoice.idempotencyKey is a partial unique index in SQL (see migration 20260819200000).
+
 model SupplierInvoiceLine {
-  id           String   @id @default(uuid())
-  invoiceId    String
+  id                  String   @id @default(uuid())
+  invoiceId           String
   /// Required in service when invoice.projectId is set ([D-055] / Q-053).
-  wbsNodeId    String?
+  wbsNodeId           String?
   /// Optional link to PO line for 3-way / exposure anti-double-count ([D-066]).
   purchaseOrderLineId String?
-  description  String
-  quantity     Decimal  @db.Decimal(18, 4)
-  unitPrice    Decimal  @db.Decimal(18, 4)
-  taxRate      Decimal  @default(0) @db.Decimal(8, 4)
-  lineSubtotal Decimal  @db.Decimal(18, 4)
-  lineTax      Decimal  @default(0) @db.Decimal(18, 4)
-  lineTotal    Decimal  @db.Decimal(18, 4)
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  description         String
+  quantity            Decimal  @db.Decimal(18, 4)
+  unitPrice           Decimal  @db.Decimal(18, 4)
+  taxRate             Decimal  @default(0) @db.Decimal(8, 4)
+  lineSubtotal        Decimal  @db.Decimal(18, 4)
+  lineTax             Decimal  @default(0) @db.Decimal(18, 4)
+  lineTotal           Decimal  @db.Decimal(18, 4)
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   invoice           SupplierInvoice    @relation(fields: [invoiceId], references: [id])
   wbsNode           WbsNode?           @relation(fields: [wbsNodeId], references: [id])
@@ -2020,7 +2039,7 @@ model Payable {
 // On cancel: reverses all effects atomically.
 // Currency must match Payable.currency and TreasuryAccount.currency (no FX in Phase 4A).
 model Payment {
-  id                String        @id @default(uuid())
+  id                String                    @id @default(uuid())
   tenantId          String
   companyId         String
   projectId         String?
@@ -2028,21 +2047,23 @@ model Payment {
   payableId         String
   supplierInvoiceId String
   accountId         String
-  paymentDate       DateTime      @db.Date
+  paymentDate       DateTime                  @db.Date
   currency          String
-  fxRate            Decimal       @default(1) @db.Decimal(18, 6)
-  amountArs         Decimal       @default(0) @db.Decimal(18, 4)
-  amount            Decimal       @db.Decimal(18, 4)
+  fxRate            Decimal                   @default(1) @db.Decimal(18, 6)
+  amountArs         Decimal                   @default(0) @db.Decimal(18, 4)
+  amount            Decimal                   @db.Decimal(18, 4)
   /// Settlement channel ([D-074]). Null on legacy rows.
   paymentMethod     TreasurySettlementMethod?
   /// Transfer/cheque/voucher reference ([D-074]).
   reference         String?
   notes             String?
-  status            PaymentStatus @default(CONFIRMED)
+  status            PaymentStatus             @default(CONFIRMED)
+  /// Client UUID for this payment intent. Partial unique (tenantId, idempotencyKey) WHERE NOT NULL — SQL migration.
+  idempotencyKey    String?                   @db.VarChar(36)
   createdBy         String?
   updatedBy         String?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
 
   tenant          Tenant          @relation(fields: [tenantId], references: [id])
   company         Company         @relation(fields: [companyId], references: [id])
@@ -2073,29 +2094,29 @@ enum ApPaymentNotificationChannel {
 }
 
 model CompanyProcurementSettings {
-  id                              String   @id @default(uuid())
-  companyId                       String   @unique
-  poApprovalThresholdArs          Decimal? @db.Decimal(18, 4)
-  purchaseRequestRequiredAboveArs Decimal? @db.Decimal(18, 4)
-  minQuotesRequired               Int      @default(2)
-  maxQuotesAllowed                Int      @default(3)
+  id                              String                       @id @default(uuid())
+  companyId                       String                       @unique
+  poApprovalThresholdArs          Decimal?                     @db.Decimal(18, 4)
+  purchaseRequestRequiredAboveArs Decimal?                     @db.Decimal(18, 4)
+  minQuotesRequired               Int                          @default(2)
+  maxQuotesAllowed                Int                          @default(3)
   quoteRequiredCategories         Json?
-  allowDirectPo                   Boolean  @default(true)
-  allowSelfApproval               Boolean  @default(true)
-  allowEmergencyDirectPo          Boolean  @default(false)
-  varianceSoftAlertPct            Decimal  @default(10) @db.Decimal(8, 4)
-  varianceNoteRequiredPct         Decimal  @default(25) @db.Decimal(8, 4)
-  varianceExtraApprovalPct        Decimal  @default(25) @db.Decimal(8, 4)
+  allowDirectPo                   Boolean                      @default(true)
+  allowSelfApproval               Boolean                      @default(true)
+  allowEmergencyDirectPo          Boolean                      @default(false)
+  varianceSoftAlertPct            Decimal                      @default(10) @db.Decimal(8, 4)
+  varianceNoteRequiredPct         Decimal                      @default(25) @db.Decimal(8, 4)
+  varianceExtraApprovalPct        Decimal                      @default(25) @db.Decimal(8, 4)
   /// Over-receipt vs OC qty allowed % ([BR-PUR-006] / [D-067]). Default 0 = hard block; max 5.
-  overReceiptTolerancePct         Decimal  @default(0) @db.Decimal(8, 4)
+  overReceiptTolerancePct         Decimal                      @default(0) @db.Decimal(8, 4)
   /// Invoice vs received qty/amount soft-match tolerance % ([BR-PUR-012] / [D-067]). Warn only in P2.
-  invoiceMatchTolerancePct        Decimal  @default(0) @db.Decimal(8, 4)
+  invoiceMatchTolerancePct        Decimal                      @default(0) @db.Decimal(8, 4)
   /// Hours before SLA reminder for SUBMITTED POs / SUBMITTED PRs without quotes (D-050).
-  approvalSlaHours                Int      @default(72)
+  approvalSlaHours                Int                          @default(72)
   /// Ready-to-pay / payment-confirmed alerts ([D-069]/[D-070]). Default email+in-app so finance is reached off-app.
   apPaymentNotificationChannel    ApPaymentNotificationChannel @default(IN_APP_AND_EMAIL)
-  createdAt                       DateTime @default(now())
-  updatedAt                       DateTime @updatedAt
+  createdAt                       DateTime                     @default(now())
+  updatedAt                       DateTime                     @updatedAt
 
   company Company @relation(fields: [companyId], references: [id])
 
@@ -2450,6 +2471,8 @@ model StockMovement {
   totalCost             Decimal?                @db.Decimal(18, 4)
   status                StockMovementStatus     @default(CONFIRMED)
   notes                 String?
+  /// Client UUID for this manual consumption intent. Partial unique (tenantId, idempotencyKey) WHERE NOT NULL — SQL migration.
+  idempotencyKey        String?                 @db.VarChar(36)
   createdBy             String?
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
@@ -2472,7 +2495,7 @@ model StockMovement {
   @@index([tenantId, wbsNodeId])
   @@index([purchaseReceiptId])
   @@index([warehouseTransferId])
-  /// Partial uniques (raw SQL): one CONFIRMED IN per receipt line; one CONFIRMED CONSUMPTION per sourceId; one leg per transfer type.
+  /// Partial uniques (raw SQL): one CONFIRMED IN per receipt line; one CONFIRMED CONSUMPTION per sourceId; one leg per transfer type; one idempotencyKey per tenant.
   @@map("stock_movements")
 }
 
@@ -2547,34 +2570,34 @@ model SubcontractLine {
 // APPROVED → creates SupplierInvoice DRAFT (via SupplierInvoice.subcontractCertificationId unique FK).
 // CANCELLED reverses certifiedQuantity only if previously APPROVED and linked invoice is DRAFT.
 model SubcontractCertification {
-  id                       String                         @id @default(uuid())
-  tenantId                 String
-  companyId                String
-  projectId                String
-  subcontractId            String
-  subcontractorContactId   String
-  number                   Int
-  periodStart              DateTime                       @db.Date
-  periodEnd                DateTime                       @db.Date
-  certificationDate        DateTime                       @db.Date
-  status                   SubcontractCertificationStatus @default(DRAFT)
+  id                      String                         @id @default(uuid())
+  tenantId                String
+  companyId               String
+  projectId               String
+  subcontractId           String
+  subcontractorContactId  String
+  number                  Int
+  periodStart             DateTime                       @db.Date
+  periodEnd               DateTime                       @db.Date
+  certificationDate       DateTime                       @db.Date
+  status                  SubcontractCertificationStatus @default(DRAFT)
   /// BR-SUB-005 / [D-082]: successor after REJECTED points at the rejected cert.
-  replacesCertificationId  String?
-  notes                    String?
-  createdBy                String?
-  updatedBy                String?
-  createdAt                DateTime                       @default(now())
-  updatedAt                DateTime                       @updatedAt
+  replacesCertificationId String?
+  notes                   String?
+  createdBy               String?
+  updatedBy               String?
+  createdAt               DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
 
-  tenant                 Tenant                         @relation(fields: [tenantId], references: [id])
-  company                Company                        @relation(fields: [companyId], references: [id])
-  project                Project                        @relation(fields: [projectId], references: [id])
-  subcontract            Subcontract                    @relation(fields: [subcontractId], references: [id])
-  subcontractorContact   Contact                        @relation("SubcontractCertificationSubcontractor", fields: [subcontractorContactId], references: [id])
-  replacesCertification  SubcontractCertification?       @relation("SubcontractCertSuccession", fields: [replacesCertificationId], references: [id], onDelete: SetNull)
-  replacedBy             SubcontractCertification[]     @relation("SubcontractCertSuccession")
-  lines                  SubcontractCertificationLine[]
-  supplierInvoice        SupplierInvoice?
+  tenant                Tenant                         @relation(fields: [tenantId], references: [id])
+  company               Company                        @relation(fields: [companyId], references: [id])
+  project               Project                        @relation(fields: [projectId], references: [id])
+  subcontract           Subcontract                    @relation(fields: [subcontractId], references: [id])
+  subcontractorContact  Contact                        @relation("SubcontractCertificationSubcontractor", fields: [subcontractorContactId], references: [id])
+  replacesCertification SubcontractCertification?      @relation("SubcontractCertSuccession", fields: [replacesCertificationId], references: [id], onDelete: SetNull)
+  replacedBy            SubcontractCertification[]     @relation("SubcontractCertSuccession")
+  lines                 SubcontractCertificationLine[]
+  supplierInvoice       SupplierInvoice?
 
   @@unique([subcontractId, number])
   @@index([tenantId, projectId])
@@ -2804,6 +2827,8 @@ model WarehouseTransfer {
   totalCost              Decimal?                @db.Decimal(18, 4)
   notes                  String?
   status                 WarehouseTransferStatus @default(CONFIRMED)
+  /// Client UUID for this transfer intent. Partial unique (tenantId, idempotencyKey) WHERE NOT NULL — SQL migration.
+  idempotencyKey         String?                 @db.VarChar(36)
   createdBy              String?
   updatedBy              String?
   createdAt              DateTime                @default(now())
@@ -2825,6 +2850,8 @@ model WarehouseTransfer {
   @@index([tenantId, transferDate])
   @@map("warehouse_transfers")
 }
+
+// Uniqueness of WarehouseTransfer.idempotencyKey is a partial unique index in SQL (see migration 20260819190000).
 
 // ─── Documents ────────────────────────────────────────────────────────────────
 // Download/access policy: presigned GET URLs only (`document.service`); `publicUrl` is unused/reserved — do not expose in API DTOs.
@@ -2848,6 +2875,10 @@ model DocumentAttachment {
   status           DocumentStatus    @default(ACTIVE)
   linkedEntityType LinkedEntityType?
   linkedEntityId   String?
+  /// SHA-256 hex of file bytes. Used with idempotencyKey to detect retry vs conflicting payload.
+  contentSha256    String?           @db.VarChar(64)
+  /// Client UUID for this upload intent. Partial unique (tenantId, idempotencyKey) WHERE NOT NULL — SQL migration.
+  idempotencyKey   String?           @db.VarChar(36)
   uploadedBy       String
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt

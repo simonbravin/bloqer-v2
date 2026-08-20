@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { ReceiptForm } from "@/features/procurement";
+import { ReceiptCreateComposer } from "@/features/procurement/components/receipt-create-composer";
 import { getCurrentUser } from "@/lib/auth";
 import { getPurchaseOrderById, listWarehouses, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -47,7 +47,7 @@ export default async function NuevaRecepcionPage({ params }: PageProps) {
         <h1 className="text-2xl font-bold tracking-tight">Registrar recepción</h1>
       </div>
 
-      <ReceiptForm
+      <ReceiptCreateComposer
         projectId={id}
         purchaseOrderId={poId}
         purchaseOrderCode={order.code}

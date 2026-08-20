@@ -9,6 +9,7 @@ interface AppLayoutProps {
   user: Session["user"];
   tenantCtx: TenantContext | null;
   notificationUnreadCount?: number;
+  pendingCount?: number;
   showPlatformLink?: boolean;
   /** Phase 12B / 15A: serialized tenant module flags for nav (global sidebar + project workspace). */
   moduleGateSnapshot?: Partial<Record<PermissionModule, boolean>>;
@@ -21,6 +22,7 @@ export function AppLayout({
   user,
   tenantCtx,
   notificationUnreadCount = 0,
+  pendingCount = 0,
   showPlatformLink = false,
   moduleGateSnapshot,
   hasTenantLogo = false,
@@ -48,6 +50,9 @@ export function AppLayout({
           showPlatformLink={showPlatformLink}
         />
       }
+      pendingCount={pendingCount}
+      roles={roles}
+      moduleGateSnapshot={moduleGateSnapshot}
     >
       {children}
     </ShellLayout>

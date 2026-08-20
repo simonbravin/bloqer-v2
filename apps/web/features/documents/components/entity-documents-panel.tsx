@@ -2,6 +2,7 @@
 import { formatDate } from "@/lib/format";
 
 import Link from "next/link";
+import { FileText } from "lucide-react";
 import type { DocumentAttachmentView } from "@bloqer/services";
 import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge } from "./document-status-badge";
@@ -37,6 +38,68 @@ function fmtSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function isImageDoc(doc: DocumentAttachmentView): boolean {
+  return doc.mimeType.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(doc.originalFileName);
+}
+
+function EntityDocumentMobileList({
+  docs,
+  projectId,
+  emptyMessage,
+}: {
+  docs: DocumentAttachmentView[];
+  projectId: string | null;
+  emptyMessage: string;
+}) {
+  if (docs.length === 0) {
+    return <ListEmptyState message={emptyMessage} />;
+  }
+  return (
+    <ul className="space-y-2 md:hidden">
+      {docs.map((doc) => {
+        const href = projectId ? `/proyectos/${projectId}/documentos/${doc.id}` : undefined;
+        const canPreviewImage =
+          isImageDoc(doc) &&
+          doc.storageProvider === "R2" &&
+          (doc.status === "ACTIVE" || doc.status === "ARCHIVED");
+        const inner = (
+          <>
+            {canPreviewImage ? (
+              // eslint-disable-next-line @next/next/no-img-element -- authenticated download thumbnail
+              <img
+                src={`/api/documents/${doc.id}/download`}
+                alt=""
+                className="h-14 w-14 shrink-0 rounded-md object-cover"
+              />
+            ) : (
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-muted">
+                <FileText className="h-5 w-5 text-muted-foreground" aria-hidden />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{doc.originalFileName}</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                <DocumentCategoryBadge category={doc.category} />
+              </div>
+            </div>
+          </>
+        );
+        return (
+          <li key={doc.id}>
+            {href ? (
+              <Link href={href} className="flex items-center gap-3 rounded-lg border bg-card p-3">
+                {inner}
+              </Link>
+            ) : (
+              <div className="flex items-center gap-3 rounded-lg border bg-card p-3">{inner}</div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 export type EntityDocumentsLink =
@@ -264,7 +327,13 @@ export function EntityDocumentsPanel({
       {docs.length === 0 ? (
         <ListEmptyState message={emptyMessage} />
       ) : (
-        <TableScroll>
+        <>
+          <EntityDocumentMobileList
+            docs={docs}
+            projectId={projectIdForTable}
+            emptyMessage={emptyMessage}
+          />
+        <TableScroll className="hidden md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -407,6 +476,7 @@ export function EntityDocumentsPanel({
             </TableBody>
           </Table>
         </TableScroll>
+        </>
       )}
     </div>
   );

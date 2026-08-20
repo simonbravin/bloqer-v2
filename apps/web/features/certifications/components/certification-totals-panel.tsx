@@ -72,13 +72,13 @@ export function CertificationTotalsPanel({
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Acciones</p>
           <div className="flex flex-col gap-2">
             {showIssue && (
-              <Button size="sm" disabled={isPending} onClick={() => run(onIssue, "Certificación emitida")}>
+              <Button size="sm" className="min-h-11 md:min-h-9" disabled={isPending} onClick={() => run(onIssue, "Certificación emitida")}>
                 Emitir certificación
               </Button>
             )}
             {showReview && (
               <>
-                <Button size="sm" disabled={isPending} onClick={() => run(onApprove, "Certificación aprobada")}>
+                <Button size="sm" className="min-h-11 md:min-h-9" disabled={isPending} onClick={() => run(onApprove, "Certificación aprobada")}>
                   Aprobar
                 </Button>
                 <Button size="sm" variant="outline" disabled={isPending} onClick={() => run(onReject, "Certificación rechazada")}>

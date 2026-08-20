@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { registerManualTreasuryAdjustmentAction } from "@/app/(app)/tesoreria/actions";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 
 interface Props {
   accountId: string;
@@ -29,6 +30,7 @@ export function ManualTreasuryAdjustmentForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [direction, setDirection] = useState<"INFLOW" | "OUTFLOW">("INFLOW");
+  const { idempotencyKey } = useIdempotencyKey();
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -40,6 +42,7 @@ export function ManualTreasuryAdjustmentForm({
         direction,
         amount: fd.get("amount") as string,
         description: fd.get("description") as string,
+        idempotencyKey,
       });
       if ("error" in res) {
         setError(res.error);

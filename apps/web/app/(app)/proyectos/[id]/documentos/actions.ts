@@ -24,7 +24,7 @@ export async function archiveDocumentAction(
   extraPathsToRevalidate?: string[],
 ): Promise<void> {
   const current = await getCurrentUser();
-  if (!current?.tenantCtx) return;
+  if (!current?.tenantCtx) redirect("/login");
   await archiveDocument(id, getCtx(current));
   revalidatePath(`/proyectos/${projectId}/documentos`);
   for (const p of extraPathsToRevalidate ?? []) revalidatePath(p);
@@ -36,7 +36,7 @@ export async function restoreDocumentAction(
   extraPathsToRevalidate?: string[],
 ): Promise<void> {
   const current = await getCurrentUser();
-  if (!current?.tenantCtx) return;
+  if (!current?.tenantCtx) redirect("/login");
   await restoreDocument(id, getCtx(current));
   revalidatePath(`/proyectos/${projectId}/documentos`);
   for (const p of extraPathsToRevalidate ?? []) revalidatePath(p);
@@ -48,7 +48,7 @@ export async function softDeleteDocumentAction(
   options?: { extraPathsToRevalidate?: string[]; redirectToProjectDocuments?: boolean },
 ): Promise<void> {
   const current = await getCurrentUser();
-  if (!current?.tenantCtx) return;
+  if (!current?.tenantCtx) redirect("/login");
   await softDeleteDocument(id, getCtx(current));
   revalidatePath(`/proyectos/${projectId}/documentos`);
   for (const p of options?.extraPathsToRevalidate ?? []) revalidatePath(p);

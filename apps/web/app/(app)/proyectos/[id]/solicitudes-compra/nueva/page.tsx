@@ -1,6 +1,15 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { canEditPurchaseRequests } from "@bloqer/services";
+import {
+  canEditPurchaseRequests,
+  getProjectShellInfo,
+  listProcurementWbsOptions,
+  ServiceError,
+} from "@bloqer/services";
+import { PageShell } from "@/components/layout/page-shell";
+import { ProjectPageHeader } from "@/components/layout/project-page-header";
+import { PurchaseRequestCreateComposer } from "@/features/procurement/components/purchase-request-create-composer";
+import type { WbsOption } from "@/features/procurement";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -10,11 +19,11 @@ interface PageProps {
     quantity?: string;
     productId?: string;
     costAnalysisLineId?: string;
+    unit?: string;
     from?: string;
   }>;
 }
 
-/** Legacy `/nueva` → list dialog (`?create=1`), preserving materiales prefill. */
 export default async function NuevaSolicitudCompraPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -22,14 +31,53 @@ export default async function NuevaSolicitudCompraPage({ params, searchParams }:
 
   const { id } = await params;
   const sp = await searchParams;
-  const next = new URLSearchParams();
-  next.set("create", "1");
-  if (sp.wbsNodeId) next.set("wbsNodeId", sp.wbsNodeId);
-  if (sp.description) next.set("description", sp.description);
-  if (sp.quantity) next.set("quantity", sp.quantity);
-  if (sp.productId) next.set("productId", sp.productId);
-  if (sp.costAnalysisLineId) next.set("costAnalysisLineId", sp.costAnalysisLineId);
-  if (sp.from) next.set("from", sp.from);
+  const ctx = {
+    actorUserId: current.session.user.id!,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
+  };
 
-  redirect(`/proyectos/${id}/solicitudes-compra?${next.toString()}`);
+  try {
+    await getProjectShellInfo(id, ctx);
+  } catch (err) {
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
+
+  const wbsNodes = await listProcurementWbsOptions(id, ctx);
+  const wbsOptions: WbsOption[] = wbsNodes.map((n) => ({
+    id: n.id,
+    code: n.code,
+    name: n.name,
+    budgetName: n.budgetName,
+    budgetUnitCost: n.budgetUnitCost,
+    budgetUnit: n.budgetUnit,
+    availableSaldo: n.availableSaldo,
+    wouldExceedBudget: n.wouldExceedBudget,
+    apuLines: n.apuLines,
+  }));
+
+  return (
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel="Nueva solicitud">
+      <ProjectPageHeader
+        title="Nueva solicitud de compra"
+        subtitle="Pedido simple de una línea, con evidencia fotográfica."
+      />
+      <PurchaseRequestCreateComposer
+        projectId={id}
+        wbsOptions={wbsOptions}
+        initialLine={{
+          wbsNodeId: sp.wbsNodeId,
+          description: sp.description,
+          quantity: sp.quantity,
+          productId: sp.productId,
+          costAnalysisLineId: sp.costAnalysisLineId,
+          unit: sp.unit,
+        }}
+        prefilledFromMaterials={sp.from === "materiales"}
+      />
+    </PageShell>
+  );
 }

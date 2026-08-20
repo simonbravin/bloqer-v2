@@ -47,7 +47,13 @@ export function DocumentUploadDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button type="button" variant={triggerVariant} size={triggerSize} className="gap-1.5">
+        <Button
+          type="button"
+          variant={triggerVariant}
+          size={triggerSize}
+          className="min-h-11 gap-1.5 md:min-h-9"
+          data-testid="document-upload-trigger"
+        >
           {showPlusIcon ? <Plus className="h-4 w-4" aria-hidden /> : null}
           {triggerLabel}
         </Button>

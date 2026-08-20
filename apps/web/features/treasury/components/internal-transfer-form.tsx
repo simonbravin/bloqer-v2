@@ -9,6 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { createInternalTransferAction } from "@/app/(app)/tesoreria/actions";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 
 interface AccountOption {
   id: string;
@@ -26,6 +27,7 @@ export function InternalTransferForm({ accounts }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [sourceAccountId, setSourceAccountId] = useState("");
   const [destinationAccountId, setDestinationAccountId] = useState("");
+  const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -39,10 +41,12 @@ export function InternalTransferForm({ accounts }: Props) {
         transferDate: fd.get("transferDate") as string,
         amount:       fd.get("amount") as string,
         description:  (fd.get("description") as string) || null,
+        idempotencyKey,
       });
       if ("error" in res) {
         setError(res.error);
       } else {
+        rotateIdempotencyKey();
         router.push("/tesoreria/transferencias");
       }
     });

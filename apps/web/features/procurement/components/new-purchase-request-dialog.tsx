@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +12,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { PurchaseRequestForm } from "./purchase-request-form";
+import { useHasMounted, useIsMdUp } from "@/lib/media-query";
+import { PurchaseRequestCreateComposer } from "./purchase-request-create-composer";
 import type { WbsOption } from "./purchase-order-lines-editor";
 
 interface Props {
@@ -44,22 +46,30 @@ export function NewPurchaseRequestDialog({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(defaultOpen);
+  const hasMounted = useHasMounted();
+  const isMdUp = useIsMdUp();
+
+  const nuevoHref = useMemo(() => {
+    const next = new URLSearchParams();
+    if (initialLine?.wbsNodeId) next.set("wbsNodeId", initialLine.wbsNodeId);
+    if (initialLine?.description) next.set("description", initialLine.description);
+    if (initialLine?.quantity) next.set("quantity", initialLine.quantity);
+    if (initialLine?.productId) next.set("productId", initialLine.productId);
+    if (initialLine?.costAnalysisLineId) next.set("costAnalysisLineId", initialLine.costAnalysisLineId);
+    if (initialLine?.unit) next.set("unit", initialLine.unit);
+    if (prefilledFromMaterials) next.set("from", "materiales");
+    const query = next.toString();
+    return `/proyectos/${projectId}/solicitudes-compra/nueva${query ? `?${query}` : ""}`;
+  }, [projectId, initialLine, prefilledFromMaterials]);
 
   useEffect(() => {
     if (defaultOpen) setOpen(true);
   }, [defaultOpen]);
 
-  const formKey = useMemo(
-    () =>
-      [
-        initialLine?.wbsNodeId ?? "",
-        initialLine?.description ?? "",
-        initialLine?.quantity ?? "",
-        initialLine?.productId ?? "",
-        prefilledFromMaterials ? "1" : "0",
-      ].join("|"),
-    [initialLine, prefilledFromMaterials],
-  );
+  useEffect(() => {
+    if (!hasMounted || isMdUp || !defaultOpen) return;
+    router.replace(nuevoHref);
+  }, [hasMounted, isMdUp, defaultOpen, router, nuevoHref]);
 
   function clearCreateQueryParams() {
     const hasCreate = searchParams.get("create") === "1";
@@ -90,9 +100,16 @@ export function NewPurchaseRequestDialog({
     clearCreateQueryParams();
   }
 
-  /** Avoid router.replace racing the form's router.push to the detail page. */
   function handleSuccess() {
     setOpen(false);
+  }
+
+  if (hasMounted && !isMdUp) {
+    return (
+      <Button asChild variant={triggerVariant} className="min-h-11">
+        <Link href={nuevoHref}>{triggerLabel}</Link>
+      </Button>
+    );
   }
 
   return (
@@ -114,8 +131,7 @@ export function NewPurchaseRequestDialog({
           </DialogDescription>
         </DialogHeader>
         {open ? (
-          <PurchaseRequestForm
-            key={formKey}
+          <PurchaseRequestCreateComposer
             projectId={projectId}
             wbsOptions={wbsOptions}
             initialLine={initialLine}

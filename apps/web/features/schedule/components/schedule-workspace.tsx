@@ -19,6 +19,7 @@ import { ScheduleCreateDialog } from "./schedule-create-dialog";
 import { ScheduleProgressLegend } from "./schedule-progress-dimensions";
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
 import { filterScheduleItemsForDisplay } from "../adapters/schedule-view-types";
+import { useHasMounted, useIsLgUp } from "@/lib/media-query";
 
 type ViewId = "gantt" | "calendar" | "kanban" | "table";
 
@@ -53,6 +54,8 @@ export function ScheduleWorkspace({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const hasMounted = useHasMounted();
+  const isLgUp = useIsLgUp();
   const view = useMemo(() => parseView(searchParams.get("view")), [searchParams]);
   const statusFilter = searchParams.get("status");
   const dialogTab = useMemo(
@@ -214,7 +217,7 @@ export function ScheduleWorkspace({
           unfilteredActiveCount={workspace.summary.unfilteredActiveCount}
         />
       )}
-      {view === "gantt" && (
+      {view === "gantt" && hasMounted && isLgUp && (
         <ScheduleGanttView
           projectId={projectId}
           workspace={workspace}
@@ -224,6 +227,38 @@ export function ScheduleWorkspace({
           filtersExcludeAll={filtersExcludeAll}
           unfilteredActiveCount={workspace.summary.unfilteredActiveCount}
         />
+      )}
+      {view === "gantt" && (!hasMounted || !isLgUp) && (
+        <div className="space-y-3">
+          {hasMounted ? (
+            <div className="rounded-lg border bg-card px-4 py-3 text-sm">
+              <p className="font-medium">El Gantt está disponible en pantallas grandes.</p>
+              <p className="mt-1 text-muted-foreground">
+                Usá la tabla para consultar tareas en este dispositivo.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-3 min-h-11 md:min-h-9"
+                onClick={() => setView("table")}
+              >
+                Abrir vista tabla
+              </Button>
+            </div>
+          ) : (
+            <div className="min-h-48 rounded-lg border bg-card" aria-hidden />
+          )}
+          {hasMounted && !isLgUp ? (
+            <ScheduleTableView
+              items={items}
+              onSelect={(item) => selectItem(item)}
+              budgetCurrency={workspace.budgetCurrency}
+              filtersExcludeAll={filtersExcludeAll}
+              unfilteredActiveCount={workspace.summary.unfilteredActiveCount}
+            />
+          ) : null}
+        </div>
       )}
       {view === "kanban" && (
         <ScheduleKanbanView

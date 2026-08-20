@@ -1,5 +1,6 @@
 import { createPaymentFieldsSchema, registerApExpenseSchema } from "./ap";
 import { registerArIncomeSchema } from "./sales-invoice";
+import { idempotencyKeySchema } from "./idempotency";
 import {
   moneyAmountString,
   optionalMoneyAmountString,
@@ -37,6 +38,7 @@ export const createCollectionSchema = z
     /** Server applies stored balanceDue — [D-053]. */
     collectFullBalance: z.boolean().optional(),
     notes:              z.string().optional().nullable(),
+    idempotencyKey:     idempotencyKeySchema,
   })
   .merge(treasurySettlementFieldsSchema)
   .superRefine((val, ctx) => {
@@ -55,6 +57,7 @@ export const createInternalTransferSchema = z.object({
   transferDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   amount:               positiveMoneyAmountString,
   description:          z.string().optional().nullable(),
+  idempotencyKey:       idempotencyKeySchema,
 });
 
 
@@ -74,6 +77,7 @@ export const createCorporateTreasuryInflowSchema = z.object({
     .optional()
     .nullable()
     .transform((v) => (v && v.length > 0 ? v : null)),
+  idempotencyKey:         idempotencyKeySchema,
 });
 
 /** Generic account adjustment UI ([P-TRZ-04] / Phase 3 close). */
@@ -83,6 +87,7 @@ export const createManualTreasuryAdjustmentSchema = z.object({
   direction: z.enum(["INFLOW", "OUTFLOW"]),
   amount: positiveMoneyAmountString,
   description: z.string().trim().min(1, "Descripción requerida").max(500),
+  idempotencyKey: idempotencyKeySchema,
 });
 
 export const registerTransactionSchema = z

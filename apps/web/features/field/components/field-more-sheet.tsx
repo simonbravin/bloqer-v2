@@ -1,0 +1,137 @@
+"use client";
+
+import Link from "next/link";
+import { signOut } from "next-auth/react";
+import { useMemo } from "react";
+import type { PermissionModule, UserRole } from "@bloqer/domain";
+import { buildProjectWorkspaceNavSections } from "@bloqer/services/project-workspace-nav";
+import { buildGlobalNavSections } from "@/lib/global-workspace-nav";
+import { tenantGateFromSnapshot } from "@/features/projects/tenant-gate-from-snapshot";
+import { clearActiveTenantCookieAction } from "@/lib/auth-session-actions";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+
+const PROJECT_HREF_SUFFIXES = [
+  { suffix: "", labelMatch: "Resumen", exact: true },
+  { suffix: "/libro-obra", labelMatch: "Libro de obra" },
+  { suffix: "/materiales", labelMatch: "Materiales" },
+  { suffix: "/compras", labelMatch: "Tablero de compras" },
+  { suffix: "/documentos", labelMatch: "Documentos" },
+  { suffix: "/cronograma", labelMatch: "Cronograma" },
+];
+
+const GENERAL_HREFS = new Set(["/proyectos", "/directorio", "/notificaciones"]);
+
+type Props = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  roles: UserRole[];
+  moduleGateSnapshot: Partial<Record<PermissionModule, boolean>>;
+  projectId: string | null;
+};
+
+export function FieldMoreSheet({ open, onOpenChange, roles, moduleGateSnapshot, projectId }: Props) {
+  const gate = useMemo(() => tenantGateFromSnapshot(moduleGateSnapshot), [moduleGateSnapshot]);
+  const projectSections = useMemo(
+    () => (projectId ? buildProjectWorkspaceNavSections(projectId, gate, roles) : []),
+    [projectId, gate, roles],
+  );
+  const globalSections = useMemo(
+    () => buildGlobalNavSections(roles, (m) => gate.isEnabled(m)),
+    [roles, gate],
+  );
+
+  const projectLinks = projectId
+    ? PROJECT_HREF_SUFFIXES.map((want) => {
+        const href = want.exact ? `/proyectos/${projectId}` : `/proyectos/${projectId}${want.suffix}`;
+        const found = projectSections.flatMap((s) => s.items).find((item) => item.href === href);
+        return found ? { href: found.href, label: want.labelMatch } : null;
+      }).filter((x): x is { href: string; label: string } => x != null)
+    : [];
+
+  const generalLinks = globalSections
+    .flatMap((s) => s.items)
+    .filter((item) => GENERAL_HREFS.has(item.href) || item.href === "/pendientes");
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="bottom"
+        className="max-h-[80vh] overflow-y-auto rounded-t-xl pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+        data-testid="field-more-sheet"
+      >
+        <SheetHeader>
+          <SheetTitle>Más</SheetTitle>
+        </SheetHeader>
+        <div className="mt-4 space-y-5">
+          {projectLinks.length > 0 ? (
+            <section>
+              <h3 className="mb-2 text-xs font-medium uppercase text-muted-foreground">Proyecto</h3>
+              <ul className="space-y-1">
+                {projectLinks.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="flex min-h-11 items-center rounded-md px-3 text-sm hover:bg-muted"
+                      onClick={() => onOpenChange(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          <section>
+            <h3 className="mb-2 text-xs font-medium uppercase text-muted-foreground">General</h3>
+            <ul className="space-y-1">
+              {generalLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="flex min-h-11 items-center rounded-md px-3 text-sm hover:bg-muted"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section>
+            <h3 className="mb-2 text-xs font-medium uppercase text-muted-foreground">Cuenta</h3>
+            <ul className="space-y-1">
+              <li>
+                <Link
+                  href="/configuracion/perfil"
+                  className="flex min-h-11 items-center rounded-md px-3 text-sm hover:bg-muted"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Perfil
+                </Link>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="flex min-h-11 w-full items-center rounded-md px-3 text-left text-sm text-destructive hover:bg-muted"
+                  onClick={() => {
+                    onOpenChange(false);
+                    void clearActiveTenantCookieAction().finally(() => {
+                      void signOut({ callbackUrl: "/login" });
+                    });
+                  }}
+                >
+                  Cerrar sesión
+                </button>
+              </li>
+            </ul>
+          </section>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}

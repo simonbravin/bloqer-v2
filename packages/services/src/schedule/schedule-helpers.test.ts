@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   assertScheduleStatusTransition,
   computeContainerRollup,
+  computeDaysLate,
   mergeDerivedContainerDatesIntoDtos,
   wouldCreateDependencyCycle,
   daysBetween,
@@ -211,5 +212,15 @@ describe("isScheduleLeafItem", () => {
     assert.equal(isScheduleLeafItem(items, "root"), false);
     assert.equal(isScheduleLeafItem(items, "leaf"), true);
     assert.equal(scheduleItemHasActiveChildren(items, "root"), true);
+  });
+});
+
+describe("computeDaysLate product timezone", () => {
+  it("uses ART calendar day near UTC midnight, not server UTC date", () => {
+    const end = new Date("2026-07-22T00:00:00.000Z");
+    const artEvening = new Date("2026-07-23T02:30:00.000Z");
+    assert.equal(computeDaysLate(end, "IN_PROGRESS", artEvening), null);
+    const nextArtDay = new Date("2026-07-23T03:01:00.000Z");
+    assert.equal(computeDaysLate(end, "IN_PROGRESS", nextArtDay), 1);
   });
 });

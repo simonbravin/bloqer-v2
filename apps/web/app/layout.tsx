@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { ViewportHintSync } from "@/components/layout/viewport-hint-sync";
 import { AppSessionProvider } from "@/components/providers/app-session-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <AppSessionProvider>
+            <ViewportHintSync />
             <Toaster richColors closeButton position="top-center" />
             {children}
           </AppSessionProvider>

@@ -25,6 +25,11 @@ import {
   lockTreasuryAccountRow,
 } from "./treasury-write-locks";
 import { assertResourceTenant } from "../security/tenant-isolation";
+import {
+  collectionReplayMatches,
+  requireIdempotencyKey,
+  withIdempotentCreate,
+} from "../idempotency/idempotency";
 
 export type CollectionView = Omit<Collection, "amount"> & {
   amount: string;
@@ -161,180 +166,201 @@ export async function createCollection(
     await assertProjectAllowsOperationalMutation(receivablePreview.projectId, ctx.tenantId);
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    // Load receivable inside txn for consistency
-    const receivable = await tx.receivable.findUnique({ where: { id: input.receivableId } });
-    if (!receivable) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
-    assertResourceTenant(receivable.tenantId, ctx.tenantId);
-    if (receivable.status === "CANCELLED") {
-      throw new ServiceError("CONFLICT", "No se puede cobrar una cuenta por cobrar cancelada");
-    }
-    if (receivable.status === "PAID") {
-      throw new ServiceError("CONFLICT", "La cuenta por cobrar ya está totalmente cobrada");
-    }
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+  const collectionInclude = { account: { select: { name: true } } } as const;
 
-    const salesInvoice = await tx.salesInvoice.findUnique({
-      where: { id: receivable.salesInvoiceId },
-      select: { status: true, number: true },
-    });
-    if (!salesInvoice) {
-      throw new ServiceError("CONFLICT", "La factura de venta asociada no existe");
-    }
-    if (salesInvoice.status === "CANCELLED") {
-      throw new ServiceError("CONFLICT", "No se puede cobrar una factura de venta cancelada");
-    }
+  const collection = await withIdempotentCreate({
+    findExisting: () =>
+      prisma.collection.findFirst({
+        where: { tenantId: ctx.tenantId, idempotencyKey },
+        include: collectionInclude,
+      }),
+    payloadsMatch: (existing) =>
+      collectionReplayMatches(existing, {
+        receivableId: input.receivableId,
+        accountId: input.accountId,
+        collectionDate: input.collectionDate,
+        collectFullBalance: Boolean(input.collectFullBalance),
+        amount: input.amount,
+      }),
+    create: async () => {
+      return prisma.$transaction(async (tx) => {
+        // Load receivable inside txn for consistency
+        const receivable = await tx.receivable.findUnique({ where: { id: input.receivableId } });
+        if (!receivable) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
+        assertResourceTenant(receivable.tenantId, ctx.tenantId);
+        if (receivable.status === "CANCELLED") {
+          throw new ServiceError("CONFLICT", "No se puede cobrar una cuenta por cobrar cancelada");
+        }
+        if (receivable.status === "PAID") {
+          throw new ServiceError("CONFLICT", "La cuenta por cobrar ya está totalmente cobrada");
+        }
 
-    const balanceDue = receivable.originalAmount.minus(receivable.paidAmount);
-    // D-053: collectFullBalance applies stored balance; never round-then-reapply from UI.
-    let amount: Prisma.Decimal;
-    if (input.collectFullBalance) {
-      amount = balanceDue;
-    } else {
-      const partial = toMoneyDecimal(input.amount ?? "0");
-      amount = partial.eq(toMoneyDecimal(balanceDue)) ? balanceDue : partial;
-    }
-    if (amount.lessThanOrEqualTo(0)) {
-      throw new ServiceError("VALIDATION", "El monto debe ser mayor a 0");
-    }
-    // BR-TRZ-006: block overpayment
-    if (amount.greaterThan(balanceDue)) {
-      throw new ServiceError(
-        "CONFLICT",
-        `El monto (${amount}) supera el saldo pendiente (${balanceDue}). No se permiten sobrepagos.`,
-      );
-    }
+        const salesInvoice = await tx.salesInvoice.findUnique({
+          where: { id: receivable.salesInvoiceId },
+          select: { status: true, number: true },
+        });
+        if (!salesInvoice) {
+          throw new ServiceError("CONFLICT", "La factura de venta asociada no existe");
+        }
+        if (salesInvoice.status === "CANCELLED") {
+          throw new ServiceError("CONFLICT", "No se puede cobrar una factura de venta cancelada");
+        }
 
-    // Currency + company scope guard (mirror AP payment)
-    await lockTreasuryAccountRow(tx, input.accountId, ctx.tenantId);
-    const account = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
-    if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
-    assertResourceTenant(account.tenantId, ctx.tenantId);
-    if (isCrossCompany(account.companyId, ctx)) {
-      throw new ServiceError(
-        "FORBIDDEN",
-        "La cuenta de tesorería no pertenece a la empresa activa.",
-      );
-    }
-    if (
-      account.companyId
-      && receivable.companyId
-      && account.companyId !== receivable.companyId
-    ) {
-      throw new ServiceError(
-        "FORBIDDEN",
-        "La cuenta de tesorería pertenece a otra empresa que la cuenta por cobrar.",
-      );
-    }
-    if (account.status !== "ACTIVE") {
-      throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
-    }
-    assertTreasuryAccountCurrencyMatches(account.currency, receivable.currency);
+        const balanceDue = receivable.originalAmount.minus(receivable.paidAmount);
+        // D-053: collectFullBalance applies stored balance; never round-then-reapply from UI.
+        let amount: Prisma.Decimal;
+        if (input.collectFullBalance) {
+          amount = balanceDue;
+        } else {
+          const partial = toMoneyDecimal(input.amount ?? "0");
+          amount = partial.eq(toMoneyDecimal(balanceDue)) ? balanceDue : partial;
+        }
+        if (amount.lessThanOrEqualTo(0)) {
+          throw new ServiceError("VALIDATION", "El monto debe ser mayor a 0");
+        }
+        // BR-TRZ-006: block overpayment
+        if (amount.greaterThan(balanceDue)) {
+          throw new ServiceError(
+            "CONFLICT",
+            `El monto (${amount}) supera el saldo pendiente (${balanceDue}). No se permiten sobrepagos.`,
+          );
+        }
 
-    const companyId = ctx.companyId ?? account.companyId ?? receivable.companyId;
-    if (!companyId) {
-      throw new ServiceError(
-        "VALIDATION",
-        "La cobranza requiere una empresa activa en el contexto, la cuenta o la CxC",
-      );
-    }
+        // Currency + company scope guard (mirror AP payment)
+        await lockTreasuryAccountRow(tx, input.accountId, ctx.tenantId);
+        const account = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
+        if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
+        assertResourceTenant(account.tenantId, ctx.tenantId);
+        if (isCrossCompany(account.companyId, ctx)) {
+          throw new ServiceError(
+            "FORBIDDEN",
+            "La cuenta de tesorería no pertenece a la empresa activa.",
+          );
+        }
+        if (
+          account.companyId
+          && receivable.companyId
+          && account.companyId !== receivable.companyId
+        ) {
+          throw new ServiceError(
+            "FORBIDDEN",
+            "La cuenta de tesorería pertenece a otra empresa que la cuenta por cobrar.",
+          );
+        }
+        if (account.status !== "ACTIVE") {
+          throw new ServiceError("CONFLICT", "La cuenta de tesorería no está activa");
+        }
+        assertTreasuryAccountCurrencyMatches(account.currency, receivable.currency);
 
-    await assertPeriodOpenUnderCompanyLock(tx, {
-      tenantId: ctx.tenantId,
-      companyId,
-      date: input.collectionDate,
-    });
-    const fx = computeDocumentFxAmounts(receivable.currency, amount);
+        const companyId = ctx.companyId ?? account.companyId ?? receivable.companyId;
+        if (!companyId) {
+          throw new ServiceError(
+            "VALIDATION",
+            "La cobranza requiere una empresa activa en el contexto, la cuenta o la CxC",
+          );
+        }
 
-    // Create Collection
-    const collection = await tx.collection.create({
-      data: {
-        tenantId:       ctx.tenantId,
-        companyId,
-        projectId:      receivable.projectId,
-        clientContactId: receivable.clientContactId,
-        receivableId:   receivable.id,
-        salesInvoiceId: receivable.salesInvoiceId,
-        accountId:      input.accountId,
-        collectionDate: new Date(input.collectionDate),
-        currency:       receivable.currency,
-        amount,
-        fxRate:         fx.fxRate,
-        amountArs:      fx.amountArs,
-        paymentMethod:  input.paymentMethod ?? null,
-        reference:      input.reference ?? null,
-        notes:          input.notes ?? null,
-        status:         "CONFIRMED",
-        createdBy:      ctx.actorUserId,
-        updatedBy:      ctx.actorUserId,
-      },
-    });
+        await assertPeriodOpenUnderCompanyLock(tx, {
+          tenantId: ctx.tenantId,
+          companyId,
+          date: input.collectionDate,
+        });
+        const fx = computeDocumentFxAmounts(receivable.currency, amount);
 
-    // Create AccountMovement INFLOW
-    await tx.accountMovement.create({
-      data: {
-        tenantId:    ctx.tenantId,
-        companyId:   account.companyId ?? companyId,
-        projectId:   receivable.projectId,
-        accountId:   input.accountId,
-        movementDate: new Date(input.collectionDate),
-        type:        "INFLOW",
-        sourceType:  "COLLECTION",
-        sourceId:    collection.id,
-        currency:    receivable.currency,
-        amount,
-        description: `Cobranza factura ${receivable.salesInvoiceId}`,
-        status:      "CONFIRMED",
-        createdBy:   ctx.actorUserId,
-      },
-    });
+        // Create Collection
+        const created = await tx.collection.create({
+          data: {
+            tenantId:       ctx.tenantId,
+            companyId,
+            projectId:      receivable.projectId,
+            clientContactId: receivable.clientContactId,
+            receivableId:   receivable.id,
+            salesInvoiceId: receivable.salesInvoiceId,
+            accountId:      input.accountId,
+            collectionDate: new Date(input.collectionDate),
+            currency:       receivable.currency,
+            amount,
+            fxRate:         fx.fxRate,
+            amountArs:      fx.amountArs,
+            paymentMethod:  input.paymentMethod ?? null,
+            reference:      input.reference ?? null,
+            notes:          input.notes ?? null,
+            idempotencyKey,
+            status:         "CONFIRMED",
+            createdBy:      ctx.actorUserId,
+            updatedBy:      ctx.actorUserId,
+          },
+        });
 
-    // Update Receivable
-    const newPaid = effectiveObligationPaidAfterPayment(
-      receivable.originalAmount,
-      receivable.paidAmount.plus(amount),
-    );
-    const newStatus = resolveObligationStoredStatus(newPaid, receivable.originalAmount);
+        // Create AccountMovement INFLOW
+        await tx.accountMovement.create({
+          data: {
+            tenantId:    ctx.tenantId,
+            companyId:   account.companyId ?? companyId,
+            projectId:   receivable.projectId,
+            accountId:   input.accountId,
+            movementDate: new Date(input.collectionDate),
+            type:        "INFLOW",
+            sourceType:  "COLLECTION",
+            sourceId:    created.id,
+            currency:    receivable.currency,
+            amount,
+            description: `Cobranza factura ${receivable.salesInvoiceId}`,
+            status:      "CONFIRMED",
+            createdBy:   ctx.actorUserId,
+          },
+        });
 
-    const receivableUpdate = await tx.receivable.updateMany({
-      where: {
-        id: receivable.id,
-        paidAmount: receivable.paidAmount,
-        status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
-      },
-      data: { paidAmount: newPaid, status: newStatus, updatedBy: ctx.actorUserId },
-    });
-    assertOptimisticRowUpdate(
-      receivableUpdate.count,
-      "El saldo cambió mientras registrabas la cobranza. Revisá el saldo pendiente e intentá de nuevo.",
-    );
+        // Update Receivable
+        const newPaid = effectiveObligationPaidAfterPayment(
+          receivable.originalAmount,
+          receivable.paidAmount.plus(amount),
+        );
+        const newStatus = resolveObligationStoredStatus(newPaid, receivable.originalAmount);
 
-    const result = await tx.collection.findUniqueOrThrow({
-      where: { id: collection.id },
-      include: { account: { select: { name: true } } },
-    });
+        const receivableUpdate = await tx.receivable.updateMany({
+          where: {
+            id: receivable.id,
+            paidAmount: receivable.paidAmount,
+            status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
+          },
+          data: { paidAmount: newPaid, status: newStatus, updatedBy: ctx.actorUserId },
+        });
+        assertOptimisticRowUpdate(
+          receivableUpdate.count,
+          "El saldo cambió mientras registrabas la cobranza. Revisá el saldo pendiente e intentá de nuevo.",
+        );
 
-    await auditAr(
-      ctx,
-      "collection.confirmed",
-      "Collection",
-      result.id,
-      { projectId: result.projectId, companyId: result.companyId },
-      {
-        after: {
-          receivableId: input.receivableId,
-          amount: serializeMoneyDecimal(amount),
-          collectFullBalance: Boolean(input.collectFullBalance),
-          number: salesInvoice.number,
-        },
-        tx,
-      },
-    );
+        const result = await tx.collection.findUniqueOrThrow({
+          where: { id: created.id },
+          include: collectionInclude,
+        });
 
-    return result;
+        await auditAr(
+          ctx,
+          "collection.confirmed",
+          "Collection",
+          result.id,
+          { projectId: result.projectId, companyId: result.companyId },
+          {
+            after: {
+              receivableId: input.receivableId,
+              amount: serializeMoneyDecimal(amount),
+              collectFullBalance: Boolean(input.collectFullBalance),
+              number: salesInvoice.number,
+            },
+            tx,
+          },
+        );
+
+        return result;
+      });
+    },
   });
 
-  await ensureDraftJournalFromCollection(result.id, ctx);
-  return serialize(result);
+  await ensureDraftJournalFromCollection(collection.id, ctx);
+  return serialize(collection);
 }
 
 export async function cancelCollection(
