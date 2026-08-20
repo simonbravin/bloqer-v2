@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { Prisma } from "@bloqer/database";
+import { productCalendarDateUtc } from "@bloqer/utils";
 import {
   aggregateCorporatePayableBalances,
   aggregateCorporateProjectionOutflows,
@@ -11,6 +12,7 @@ import {
   deriveObligationDisplayStatus,
   isObligationOverdue,
   obligationDaysOverdue,
+  parseObligationAsOfDate,
   startOfDayUtc,
 } from "./obligation-date";
 
@@ -149,5 +151,15 @@ describe("isCorporatePayableInProjectionHorizon", () => {
 describe("obligationDaysOverdue", () => {
   it("returns zero for due today", () => {
     assert.equal(obligationDaysOverdue(new Date("2026-05-29T00:00:00.000Z"), TODAY), 0);
+  });
+});
+
+describe("parseObligationAsOfDate", () => {
+  it("parses explicit as-of as UTC midnight", () => {
+    assert.equal(parseObligationAsOfDate("2026-07-22").toISOString(), "2026-07-22T00:00:00.000Z");
+  });
+
+  it("defaults to product calendar day (America/Argentina/Buenos_Aires)", () => {
+    assert.equal(parseObligationAsOfDate().toISOString(), productCalendarDateUtc().toISOString());
   });
 });

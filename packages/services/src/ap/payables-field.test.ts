@@ -48,13 +48,16 @@ describe("parsePayablesFieldFilter", () => {
 });
 
 describe("payablesFieldTodayIso", () => {
-  it("uses UTC calendar day", () => {
+  it("uses product TZ calendar day (ART)", () => {
+    // 02:30Z = still 19 Aug in America/Argentina/Buenos_Aires (UTC−3)
+    assert.equal(payablesFieldTodayIso(new Date("2026-08-20T02:30:00.000Z")), "2026-08-19");
+    // 03:00Z = 20 Aug 00:00 ART
     assert.equal(payablesFieldTodayIso(new Date("2026-08-20T03:00:00.000Z")), "2026-08-20");
     assert.equal(payablesFieldTodayIso(new Date("2026-08-20T23:30:00.000Z")), "2026-08-20");
   });
 });
 
-describe("urgency (UTC due date, due today is not overdue)", () => {
+describe("urgency (due date ISO vs product today, due today is not overdue)", () => {
   it("overdue when due < today and open", () => {
     assert.equal(
       payablesFieldUrgency(row({ id: "a", supplierName: "A", dueDateIso: "2026-08-19" }), TODAY),

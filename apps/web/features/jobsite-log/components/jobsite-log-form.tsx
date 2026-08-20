@@ -13,6 +13,7 @@ import { toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/l
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { WbsIncrementalProgressSnapshot } from "@bloqer/services";
 import { toIsoDateInTimeZone } from "@bloqer/utils";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import {
   JOBSITE_SHIFT_OPTIONS,
   JOBSITE_WEATHER_OPTIONS,
@@ -176,6 +177,7 @@ export function JobsiteLogForm({
   onCreated,
 }: Props) {
   const router = useRouter();
+  const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
 
   const [progress,  setProgress]  = useState<ProgressLine[]>(defaultValues?.progress  ?? []);
   const [labor,     setLabor]     = useState<LaborLine[]>(defaultValues?.labor     ?? []);
@@ -328,6 +330,9 @@ export function JobsiteLogForm({
     const fd = new FormData(e.currentTarget);
     fd.set("projectId", projectId);
     fd.set("companyId", companyId);
+    if (mode !== "edit") {
+      fd.set("idempotencyKey", idempotencyKey);
+    }
 
     const validProgress = progress.filter(isValidProgressLine);
     fd.set("progress",  JSON.stringify(validProgress.map((p, i) => ({
@@ -382,6 +387,9 @@ export function JobsiteLogForm({
           toast.warning(created.message);
         } else {
           toast.success(mode === "edit" ? "Parte actualizado." : "Parte guardado.");
+        }
+        if (mode !== "edit") {
+          rotateIdempotencyKey();
         }
         if (created?.navigate === false) {
           setPending(false);

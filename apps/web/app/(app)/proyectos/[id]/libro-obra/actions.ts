@@ -126,6 +126,7 @@ export async function createJobsiteLogAction(
       labor,
       materials,
       issues,
+      idempotencyKey: fd.get("idempotencyKey") as string,
     });
     if (!parsed.success) {
       return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };

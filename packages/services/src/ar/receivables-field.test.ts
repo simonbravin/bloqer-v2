@@ -49,7 +49,8 @@ describe("parseReceivablesFieldFilter", () => {
 });
 
 describe("receivablesFieldTodayIso", () => {
-  it("uses UTC calendar day", () => {
+  it("uses product TZ calendar day (ART)", () => {
+    assert.equal(receivablesFieldTodayIso(new Date("2026-08-20T02:30:00.000Z")), "2026-08-19");
     assert.equal(receivablesFieldTodayIso(new Date("2026-08-20T03:00:00.000Z")), "2026-08-20");
     assert.equal(receivablesFieldTodayIso(new Date("2026-08-20T23:30:00.000Z")), "2026-08-20");
   });

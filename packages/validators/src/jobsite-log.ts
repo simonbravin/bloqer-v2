@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idempotencyKeySchema } from "./idempotency";
 
 const decimalString = z.string().regex(/^\d+(\.\d+)?$/, "Debe ser un número positivo");
 const pctString     = z.string().regex(/^\d+(\.\d+)?$/).optional().nullable();
@@ -58,11 +59,14 @@ export const createJobsiteLogSchema = z.object({
   labor:        z.array(laborLineSchema).optional().default([]),
   materials:    z.array(materialLineSchema).optional().default([]),
   issues:       z.array(issueLineSchema).optional().default([]),
+  idempotencyKey: idempotencyKeySchema,
 });
 
-export const updateJobsiteLogSchema = createJobsiteLogSchema.omit({ projectId: true, companyId: true, logDate: true }).extend({
-  logDate: z.string().optional(),
-});
+export const updateJobsiteLogSchema = createJobsiteLogSchema
+  .omit({ projectId: true, companyId: true, logDate: true, idempotencyKey: true })
+  .extend({
+    logDate: z.string().optional(),
+  });
 
 export const returnJobsiteLogSchema = z.object({
   returnNotes: z.string().min(1, "Las observaciones son requeridas para devolver el parte"),

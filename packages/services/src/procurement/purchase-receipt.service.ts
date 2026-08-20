@@ -16,6 +16,11 @@ import {
   resolveUserDisplayNames,
   userDisplayNameFromMap,
 } from "../user/resolve-user-display-names";
+import {
+  purchaseReceiptReplayMatches,
+  requireIdempotencyKey,
+  withIdempotentCreate,
+} from "../idempotency/idempotency";
 
 /** Confirmer is stored on confirm as `updatedBy`; after cancel that field is the canceller. */
 function receiptActorUserId(r: {
@@ -211,6 +216,21 @@ export async function createPurchaseReceipt(
   // BR-PUR-004: receipt only allowed on CONFIRMED+
   assertPoEligibleForReceipt(po.status);
 
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+  const existingByKey = await prisma.purchaseReceipt.findFirst({
+    where: { tenantId: ctx.tenantId, idempotencyKey },
+    include: receiptInclude,
+  });
+  if (existingByKey) {
+    if (!purchaseReceiptReplayMatches(existingByKey, input)) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Esta operación ya se registró con datos distintos. Recargá e intentá de nuevo.",
+      );
+    }
+    return toPurchaseReceiptView(existingByKey);
+  }
+
   const settings = await getCompanyProcurementSettingsForProject(po.projectId, ctx);
   const tolerancePct = new Prisma.Decimal(settings.overReceiptTolerancePct);
 
@@ -269,44 +289,59 @@ export async function createPurchaseReceipt(
     });
   }
 
-  const receipt = await prisma.$transaction(async (tx) => {
-    const created = await tx.purchaseReceipt.create({
-      data: {
-        tenantId:         ctx.tenantId,
-        companyId:        po.companyId,
-        projectId:        po.projectId,
-        purchaseOrderId:  po.id,
-        supplierContactId: po.supplierContactId,
-        warehouseId:      input.warehouseId ?? null,
-        receiptDate:      new Date(input.receiptDate),
-        status:           PurchaseReceiptStatus.DRAFT,
-        notes:            input.notes ?? null,
-        createdBy:        ctx.actorUserId,
-        updatedBy:        ctx.actorUserId,
-      },
-    });
+  const receipt = await withIdempotentCreate({
+    findExisting: () =>
+      prisma.purchaseReceipt.findFirst({
+        where: { tenantId: ctx.tenantId, idempotencyKey },
+        include: receiptInclude,
+      }),
+    payloadsMatch: (existing) => purchaseReceiptReplayMatches(existing, input),
+    create: async () => {
+      const created = await prisma.$transaction(async (tx) => {
+        const row = await tx.purchaseReceipt.create({
+          data: {
+            tenantId:         ctx.tenantId,
+            companyId:        po.companyId,
+            projectId:        po.projectId,
+            purchaseOrderId:  po.id,
+            supplierContactId: po.supplierContactId,
+            warehouseId:      input.warehouseId ?? null,
+            receiptDate:      new Date(input.receiptDate),
+            status:           PurchaseReceiptStatus.DRAFT,
+            notes:            input.notes ?? null,
+            idempotencyKey,
+            createdBy:        ctx.actorUserId,
+            updatedBy:        ctx.actorUserId,
+          },
+        });
 
-    for (const inputLine of input.lines) {
-      await tx.purchaseReceiptLine.create({
-        data: {
-          purchaseReceiptId:   created.id,
-          purchaseOrderLineId: inputLine.purchaseOrderLineId,
-          quantityReceived:    new Prisma.Decimal(inputLine.quantityReceived),
-          notes:               inputLine.notes ?? null,
-        },
+        for (const inputLine of input.lines) {
+          await tx.purchaseReceiptLine.create({
+            data: {
+              purchaseReceiptId:   row.id,
+              purchaseOrderLineId: inputLine.purchaseOrderLineId,
+              quantityReceived:    new Prisma.Decimal(inputLine.quantityReceived),
+              notes:               inputLine.notes ?? null,
+            },
+          });
+        }
+
+        const full = await tx.purchaseReceipt.findUniqueOrThrow({
+          where: { id: row.id },
+          include: receiptInclude,
+        });
+        await auditProcurement(
+          ctx,
+          "purchase_receipt.created",
+          "PurchaseReceipt",
+          full.id,
+          { projectId: full.projectId, companyId: full.companyId },
+          { after: { purchaseOrderId: po.id, number: po.number }, tx },
+        );
+        return full;
       });
-    }
-
-    const receipt = await tx.purchaseReceipt.findUniqueOrThrow({ where: { id: created.id }, include: receiptInclude });
-    await auditProcurement(
-      ctx,
-      "purchase_receipt.created",
-      "PurchaseReceipt",
-      receipt.id,
-      { projectId: receipt.projectId, companyId: receipt.companyId },
-      { after: { purchaseOrderId: po.id, number: po.number }, tx },
-    );
-    return receipt;
+      return created;
+    },
   });
 
   return toPurchaseReceiptView(receipt);

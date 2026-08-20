@@ -20,6 +20,8 @@ import {
   treasuryMovementReplayMatches,
   warehouseTransferReplayMatches,
   withIdempotentCreate,
+  purchaseReceiptReplayMatches,
+  jobsiteLogReplayMatches,
 } from "./idempotency";
 
 const KEY_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -882,5 +884,101 @@ describe("assertIdempotentPayloadMatch", () => {
       (err: unknown) => err instanceof ServiceError && err.code === "CONFLICT",
     );
     assert.doesNotThrow(() => assertIdempotentPayloadMatch(true));
+  });
+});
+
+describe("purchaseReceiptReplayMatches", () => {
+  const base = {
+    purchaseOrderId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    warehouseId: null as string | null,
+    receiptDate: new Date("2026-08-20T00:00:00.000Z"),
+    notes: null as string | null,
+    lines: [{ purchaseOrderLineId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", quantityReceived: "2.5" }],
+  };
+
+  it("matches same payload", () => {
+    assert.equal(
+      purchaseReceiptReplayMatches(base, {
+        purchaseOrderId: base.purchaseOrderId,
+        warehouseId: null,
+        receiptDate: "2026-08-20",
+        notes: null,
+        lines: [{ purchaseOrderLineId: base.lines[0]!.purchaseOrderLineId, quantityReceived: "2.5" }],
+      }),
+      true,
+    );
+  });
+
+  it("rejects different qty", () => {
+    assert.equal(
+      purchaseReceiptReplayMatches(base, {
+        purchaseOrderId: base.purchaseOrderId,
+        receiptDate: "2026-08-20",
+        lines: [{ purchaseOrderLineId: base.lines[0]!.purchaseOrderLineId, quantityReceived: "3" }],
+      }),
+      false,
+    );
+  });
+});
+
+describe("jobsiteLogReplayMatches", () => {
+  const base = {
+    projectId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    companyId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    logDate: new Date("2026-08-20T00:00:00.000Z"),
+    title: "Parte",
+    workFront: null as string | null,
+    shift: null as string | null,
+    weather: null as string | null,
+    generalNotes: "ok",
+    blockers: null as string | null,
+    incidents: null as string | null,
+    safetyNotes: null as string | null,
+    progress: [] as Array<{
+      wbsNodeId: string;
+      quantityCompleted: { toString(): string };
+      physicalPct: { toString(): string } | null;
+    }>,
+    labor: [] as Array<{
+      contactId: string | null;
+      subcontractId: string | null;
+      workersCount: number;
+      hoursWorked: { toString(): string } | null;
+    }>,
+    materials: [] as Array<{
+      productId: string | null;
+      warehouseId: string | null;
+      quantity: { toString(): string };
+    }>,
+    issues: [] as Array<{ type: string; severity: string; description: string }>,
+  };
+
+  it("matches header-only create", () => {
+    assert.equal(
+      jobsiteLogReplayMatches(base, {
+        projectId: base.projectId,
+        companyId: base.companyId,
+        logDate: "2026-08-20",
+        title: "Parte",
+        generalNotes: "ok",
+        blockers: null,
+        incidents: null,
+        safetyNotes: null,
+      }),
+      true,
+    );
+  });
+
+  it("rejects different title", () => {
+    assert.equal(
+      jobsiteLogReplayMatches(base, {
+        projectId: base.projectId,
+        companyId: base.companyId,
+        logDate: "2026-08-20",
+        title: "Otro",
+        generalNotes: "ok",
+      }),
+      false,
+    );
   });
 });

@@ -22,13 +22,18 @@ import {
   type JobsiteLogProgressSnapshot,
 } from "./jobsite-log-guards";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { sortTreeOrder } from "@bloqer/utils";
+import { sortTreeOrder, toIsoDateInTimeZone } from "@bloqer/utils";
 import { serializeQtyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
 import {
   canMutateJobsiteLogAsContributor,
   canSuperviseJobsiteLog,
   canViewJobsiteLogArea,
 } from "./jobsite-log-access";
+import {
+  jobsiteLogReplayMatches,
+  requireIdempotencyKey,
+  withIdempotentCreate,
+} from "../idempotency/idempotency";
 
 export type WbsIncrementalProgressSnapshot = JobsiteLogProgressSnapshot;
 export { hasLegacyPhysicalPctOverflow, remainingPhysicalPct, buildProgressSnapshotEntry };
@@ -816,9 +821,24 @@ export async function createJobsiteLog(
 
   await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
-  const logDate = new Date(input.logDate);
-  const today   = new Date(); today.setHours(23, 59, 59, 999);
-  if (logDate > today) throw new ServiceError("CONFLICT", "La fecha del parte no puede ser futura");
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+  const existingByKey = await prisma.jobsiteLog.findFirst({
+    where: { tenantId: ctx.tenantId, idempotencyKey },
+    include: logInclude,
+  });
+  if (existingByKey) {
+    if (!jobsiteLogReplayMatches(existingByKey, input)) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Esta operación ya se registró con datos distintos. Recargá e intentá de nuevo.",
+      );
+    }
+    return serializeLog(existingByKey);
+  }
+
+  if (input.logDate > toIsoDateInTimeZone()) {
+    throw new ServiceError("CONFLICT", "La fecha del parte no puede ser futura");
+  }
 
   const hasContent =
     input.generalNotes || input.blockers || input.incidents || input.safetyNotes ||
@@ -834,38 +854,51 @@ export async function createJobsiteLog(
   const companyId = input.companyId;
   await validateJobsiteLogBusinessRules(input, input.projectId, ctx.tenantId, ctx);
 
-  const result = await prisma.$transaction(async (tx) => {
-    const created = await tx.jobsiteLog.create({
-      data: {
-        tenantId:     ctx.tenantId,
-        companyId,
-        projectId:    input.projectId,
-        logDate,
-        title:        input.title ?? null,
-        workFront:    input.workFront ?? null,
-        shift:        input.shift ?? null,
-        weather:      input.weather ?? null,
-        generalNotes: input.generalNotes ?? null,
-        blockers:     input.blockers ?? null,
-        incidents:    input.incidents ?? null,
-        safetyNotes:  input.safetyNotes ?? null,
-        createdBy:    ctx.actorUserId,
-        updatedBy:    ctx.actorUserId,
-      },
-    });
-    await writeChildren(tx, created.id, input);
-    return tx.jobsiteLog.findUniqueOrThrow({ where: { id: created.id }, include: logInclude });
-  });
+  const result = await withIdempotentCreate({
+    findExisting: () =>
+      prisma.jobsiteLog.findFirst({
+        where: { tenantId: ctx.tenantId, idempotencyKey },
+        include: logInclude,
+      }),
+    payloadsMatch: (existing) => jobsiteLogReplayMatches(existing, input),
+    create: async () => {
+      const created = await prisma.$transaction(async (tx) => {
+        const row = await tx.jobsiteLog.create({
+          data: {
+            tenantId:     ctx.tenantId,
+            companyId,
+            projectId:    input.projectId,
+            logDate:      new Date(input.logDate),
+            title:        input.title ?? null,
+            workFront:    input.workFront ?? null,
+            shift:        input.shift ?? null,
+            weather:      input.weather ?? null,
+            generalNotes: input.generalNotes ?? null,
+            blockers:     input.blockers ?? null,
+            incidents:    input.incidents ?? null,
+            safetyNotes:  input.safetyNotes ?? null,
+            idempotencyKey,
+            createdBy:    ctx.actorUserId,
+            updatedBy:    ctx.actorUserId,
+          },
+        });
+        await writeChildren(tx, row.id, input);
+        return tx.jobsiteLog.findUniqueOrThrow({ where: { id: row.id }, include: logInclude });
+      });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    companyId,
-    projectId: input.projectId,
-    action: "JOBSITE_LOG_CREATED",
-    entityType: "JobsiteLog",
-    entityId: result.id,
-    after: { projectId: input.projectId, logDate: input.logDate },
+      await log({
+        tenantId: ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        companyId,
+        projectId: input.projectId,
+        action: "JOBSITE_LOG_CREATED",
+        entityType: "JobsiteLog",
+        entityId: created.id,
+        after: { projectId: input.projectId, logDate: input.logDate },
+      });
+
+      return created;
+    },
   });
 
   return serializeLog(result);
@@ -892,9 +925,9 @@ export async function updateJobsiteLog(
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
 
   if (input.logDate) {
-    const logDate = new Date(input.logDate);
-    const today   = new Date(); today.setHours(23, 59, 59, 999);
-    if (logDate > today) throw new ServiceError("CONFLICT", "La fecha del parte no puede ser futura");
+    if (input.logDate > toIsoDateInTimeZone()) {
+      throw new ServiceError("CONFLICT", "La fecha del parte no puede ser futura");
+    }
   }
 
   await validateJobsiteLogBusinessRules(

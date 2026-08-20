@@ -68,7 +68,7 @@ Severidades según brief (no inflar). Cookies `bloqer-viewport` / `bloqer-last-p
 | BUG-056 | MEDIA | RSC / Dashboard dual tree | CONFIRMADO |
 | BUG-057 | MEDIA | RSC / Stale viewport cookie | CONFIRMADO |
 | BUG-058 | LEVE | Field / Cobrar redirect | CONFIRMADO |
-| BUG-014 | MEDIA | Budget / Money | CONFIRMADO — REQUIERE DECISIÓN (previo) |
+| BUG-014 | MEDIA | Budget / Money | CONFIRMADO — LOTE SEPARADO |
 
 ---
 
@@ -269,7 +269,7 @@ Warehouse project/tenant en recepción/consumo: gated (post BUG-003). Over-recei
 ### BUG-014 — MEDIA — Budget / Money (PREVIO, sigue abierto)
 
 - `cost-analysis.service.ts`: `Number(line.totalCost…)` en recompute APU.
-- **Estado:** CONFIRMADO — **REQUIERE DECISIÓN** (refactor APU; no tocarlo en cleanup sin decisión).
+- **Estado:** CONFIRMADO — **LOTE SEPARADO** (no mezclar con TZ/idempotency).
 
 Overpayment/overcollection: CONFLICT en services. `payFullBalance` / `collectFullBalance` server-side [D-053]. Currency vs cuenta: assert. CxP/CxC Field no duplican motor financiero.
 
@@ -386,11 +386,9 @@ CxP/CxC Field: skip aging — OK (`data-query-ms` ~843–1272 / ~883). Cronogram
 
 ### BUG-039 — MEDIA — Dates / TZ
 
-- Aging + Field CxP/CxC: “hoy” = **UTC calendar** (`obligation-date` / `obligation-field`).
-- Field Home / materiales semana: helpers **product TZ** (`America/Argentina/Buenos_Aires`).
-- **Impacto:** ventana nocturna ART (~21:00–00:00) puede divergir “Vencida” vs dashboard.
-- **Fix propuesto:** unificar “as-of” operativo a product calendar **o** documentar UTC-only para aging [REQUIERE DECISIÓN].
-- **Estado:** CONFIRMADO
+- Aging + Field CxP/CxC: “hoy” = **product TZ** (`America/Argentina/Buenos_Aires`) vía `productCalendarDateUtc` / `toIsoDateInTimeZone`.
+- Field Home / materiales semana: mismos helpers.
+- **Estado:** CORREGIDO (2026-08-20)
 
 `new Date("YYYY-MM-DD")` con `T00:00:00.000Z` en tesorería/accounting: alineado a `@db.Date` UTC — no bug local-midnight clásico.
 
@@ -443,7 +441,7 @@ Cubierto reciente: idempotency collections/payments, Field helpers, finance D-05
 
 | ID | Estado actual |
 |----|---------------|
-| BUG-014 | REQUIERE DECISIÓN — APU `Number()` |
+| BUG-014 | LOTE SEPARADO — APU `Number()` |
 | BUG-015 | Mitigado unique DB |
 | Orphan R2 | Absorbido como BUG-044 |
 | Dual SSR dashboard | Mitigado cookie |
@@ -463,14 +461,15 @@ Cubierto reciente: idempotency collections/payments, Field helpers, finance D-05
 7. BUG-040 / 049 — Zod non-negative  
 8. BUG-042 / 043 — lazy load / batch WBS (perf)
 
-### Requieren decisión
+### Requieren decisión (histórico FASE A — resuelto 2026-08-20 salvo 014)
 
 | ID | Decisión |
 |----|----------|
-| BUG-014 | ¿Refactor APU Decimal ahora o aceptar deuda? |
-| BUG-039 | ¿Aging/Field overdue en product TZ o UTC documentado? |
-| BUG-034 / 035 | ¿Idempotency key en confirm/issue o solo optimistic claim? |
-| BUG-041 | ¿Sniff Office o allowlist + tamaño? |
+| BUG-014 | Lote separado Decimal APU (pendiente) |
+| BUG-039 | CORREGIDO — product TZ |
+| BUG-034 / 035 | MITIGADO — CAS confirm/issue (sin client key) |
+| BUG-041 | ACEPTADO P2 — Office MIME |
+| BUG-053 / 054 | CORREGIDO — idempotencyKey create |
 
 ### No migración Prisma requerida para los ALTA confirmados
 
@@ -497,13 +496,13 @@ Fixes son service/page/Zod. Ningún hallazgo CRÍTICO exige migration en FASE A.
 | BUG-033 | MEDIA | **ALTA** | VIEW crea Schedule / setea baseline — mutación sin permiso de escritura |
 | BUG-032 | MEDIA | MEDIA | Actions: projectId mayormente revalidate; fix con assert en documentos |
 | BUG-042 | MEDIA | MEDIA → residual | Picklists necesarios para dialog create en list; no lazy sin refactor UI |
-| BUG-053/054 | MEDIA | **REQUIERE DECISIÓN** | Misma familia que 034/035 (keys + migration potencial) |
+| BUG-053/054 | MEDIA | **CORREGIDO** | idempotencyKey + partial unique (migration 20260820120000) |
 
 ## Tabla final triage
 
 | Bug | Severidad final | Evidencia | Fix | Test | Decisión/Migración |
 |-----|-----------------|-----------|-----|------|-------------------|
-| BUG-014 | MEDIA | cost-analysis `Number()` | — | — | **REQUIERE DECISIÓN** |
+| BUG-014 | MEDIA | cost-analysis `Number()` | — | — | **LOTE SEPARADO** (aceptado ahora) |
 | BUG-025 | ALTA | PO/AP/quotes contactRole sin tenant | `assertContactRoleInTenant` global | assert-contact-role.test | — |
 | BUG-026 | ALTA | subcontract company+contact | assert company + contact | same | — |
 | BUG-027 | ALTA | createSalesInvoice client | assert CLIENT | same | — |
@@ -513,18 +512,18 @@ Fixes son service/page/Zod. Ningún hallazgo CRÍTICO exige migration en FASE A.
 | BUG-031 | ALTA | edit pages hop | projectId checks | manual/page | — |
 | BUG-032 | MEDIA | doc actions revalidate | assertDocumentInProject | — | — |
 | BUG-033 | ALTA | ensureSchedule VIEW create | forbid_create + empty workspace | schedule-access.test | — |
-| BUG-034 | MEDIA | confirm receipt no key | — | — | **REQUIERE DECISIÓN** |
-| BUG-035 | MEDIA | issue invoice no client key | — | — | **REQUIERE DECISIÓN** |
+| BUG-034 | MEDIA | confirm receipt | CAS `updateMany` DRAFT→CONFIRMED + FOR UPDATE | — | **MITIGADO** (sin client key) |
+| BUG-035 | MEDIA | issue invoice | CAS `updateMany` DRAFT→ISSUED | — | **MITIGADO** (sin client key) |
 | BUG-036 | MEDIA | schedule transition race | updateMany status CAS | — | — |
 | BUG-037 | MEDIA | jobsite productCompanyId null | load product.companyId | consumption-warehouse-scope | — |
-| BUG-039 | MEDIA | UTC vs ART aging | — | — | **REQUIERE DECISIÓN** |
+| BUG-039 | MEDIA | UTC vs ART aging | product TZ helpers | payables/receivables/obligation-date tests | **CORREGIDO** |
 | BUG-040 | MEDIA | qty/price negativos Zod | refine non-neg | money-nonneg-validators | — |
-| BUG-041 | MEDIA | Office skip sniff | — | — | **REQUIERE DECISIÓN** |
+| BUG-041 | MEDIA | Office skip sniff | — | — | **ACEPTADO P2** |
 | BUG-042 | MEDIA | libro picklists | residual aceptado | — | deuda |
 | BUG-043 | MEDIA | WBS options N+1 serial | Promise.all refs | — | — |
 | BUG-049 | LEVE | payment amount neg | superRefine >0 | money-nonneg | — |
-| BUG-053 | MEDIA | create receipt no key | — | — | **REQUIERE DECISIÓN** (=034) |
-| BUG-054 | MEDIA | create jobsite no key | — | — | **REQUIERE DECISIÓN** (=034) |
+| BUG-053 | MEDIA | create receipt no key | idempotencyKey + UI hook | purchaseReceiptReplayMatches | **CORREGIDO** (migration DEV) |
+| BUG-054 | MEDIA | create jobsite no key | idempotencyKey + UI hook | jobsiteLogReplayMatches | **CORREGIDO** (migration DEV) |
 | BUG-055 | MEDIA | FAB/nav overlap | bottom + z-50 | — | — |
 | BUG-056 | MEDIA | dashboard dual tree | showDesktop only md/lg | — | — |
 | BUG-057 | MEDIA | stale cookie | residual + ViewportHintSync | — | deuda menor |
@@ -543,47 +542,36 @@ Fixes son service/page/Zod. Ningún hallazgo CRÍTICO exige migration en FASE A.
 
 # FASE C — CORRECCIONES
 
-## Decisiones documentadas (NO implementadas)
+## Decisiones (2026-08-20)
 
-### BUG-014 — APU Decimal → Number
+### BUG-014 — APU Decimal → Number — LOTE SEPARADO
 1. **Problema:** recompute APU usa `Number(decimal.toString())`.
-2. **Impacto:** drift de display/cálculo presupuesto; no ledger tesorería.
-3. **Alternativas:** (a) Decimal-only en APU; (b) aceptar hasta refactor budget.
-4. **Recomendación:** (b) ahora; planificar (a) en lote presupuesto.
-5. **Riesgo:** alto si se toca sin suite APU.
-6. **Esfuerzo:** L.
+2. **Decisión:** no mezclar con este lote; mini-proyecto técnico Decimal-only + tests de redondeo.
+3. **Estado:** abierto / planificado.
 
-### BUG-039 — TZ aging / Field
-1. UTC calendar vs `America/Argentina/Buenos_Aires`.
-2. Ventana nocturna ART diverge “Vencida”.
-3. Unificar product TZ **o** documentar UTC-only aging.
-4. Recomendación: product TZ para Field/aging operativo.
-5. Riesgo medio (KPIs cambian).
-6. Esfuerzo M.
+### BUG-039 — TZ aging / Field — CORREGIDO
+1. Unificado “hoy” / as-of aging y Field CxP/CxC a `America/Argentina/Buenos_Aires`.
+2. `obligation-date` → `productCalendarDateUtc`; `obligationFieldTodayIso` → `toIsoDateInTimeZone`.
+3. Parte de obra: fecha futura vs product calendar ISO (no `setHours` local server).
 
-### BUG-034/035/053/054 — idempotency keys
-1. Create receipt/parte/confirm/issue sin key cliente.
-2. Doble tap → drafts duplicados / retries.
-3. Keys + partial unique **o** aceptar claim optimista.
-4. Recomendación: keys en create receipt + jobsite (Field); issue ya tiene CAS.
-5. Riesgo: migration Prisma.
-6. Esfuerzo M + **REQUIERE APROBACIÓN PRODUCTION** si hay migration.
+### BUG-034/035/053/054 — idempotency — selectivo CORREGIDO / MITIGADO
+1. **053/054 CORREGIDO:** `idempotencyKey` en create recepción + create parte (`useIdempotencyKey` + `withIdempotentCreate` + partial unique). Migration `20260820120000` — aplicada en Neon **dev**; **REQUIERE APROBACIÓN PRODUCTION** para deploy.
+2. **034 MITIGADO:** confirm recepción ya usa `FOR UPDATE` + `updateMany` DRAFT→CONFIRMED (no doble stock/obligación).
+3. **035 MITIGADO:** issue factura usa `updateMany` DRAFT→ISSUED (no doble receivable). Creates ISSUED+obligación ya tenían key en register AP/AR.
 
-### BUG-041 — MIME Office
-1. SKIP_BYTE_SNIFF para docx/xlsx/csv.
-2. ZIP malicioso como Office.
-3. Magic sniff / allowlist size / aceptar.
-4. Recomendación: allowlist + max size ahora; sniff después.
-5. Riesgo bajo–medio.
-6. Esfuerzo S–M.
+### BUG-041 — MIME Office — ACEPTADO P2
+1. JPEG/PNG/WebP/PDF/HEIC con sniffing real; DOCX/XLSX/CSV sin parser OOXML complejo.
+2. Riesgo aceptado conscientemente; más adelante validar contenedor ZIP/OOXML de forma segura.
+3. No bloquea el producto.
 
 ## Estado CORREGIDO (código)
 
-025, 026, 027, 028, 029, 030, 031, 032, 033, 036, 037, 040, 043, 049, 055, 056, 058.
+025–033, 036, 037, 039, 040, 043, 049, 053, 054, 055, 056, 058.
+034/035 mitigados por CAS (sin client key).
 
 ## Residual / deuda aceptada
 
-042 (picklists list), 057 (stale cookie hasta sync), 044–052 leves no triviales.
+014 (lote APU), 041 (Office MIME P2), 042 (picklists list), 057 (stale cookie hasta sync), 044–052 leves no triviales.
 
 ## Segunda pasada (categorías afectadas)
 

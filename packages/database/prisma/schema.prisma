@@ -2341,6 +2341,8 @@ model PurchaseReceipt {
   receiptDate       DateTime              @db.Date
   status            PurchaseReceiptStatus @default(DRAFT)
   notes             String?
+  /// Client UUID for createPurchaseReceipt. Partial unique (tenantId, idempotencyKey) WHERE NOT NULL — SQL migration.
+  idempotencyKey    String?               @db.VarChar(36)
   createdBy         String?
   updatedBy         String?
   createdAt         DateTime              @default(now())
@@ -2361,6 +2363,9 @@ model PurchaseReceipt {
   @@index([warehouseId])
   @@map("purchase_receipts")
 }
+
+// Uniqueness of PurchaseReceipt.idempotencyKey is a partial unique index in SQL (see migration 20260820120000).
+
 
 model PurchaseReceiptLine {
   id                  String   @id @default(uuid())
@@ -2655,6 +2660,8 @@ model JobsiteLog {
   incidents    String?
   safetyNotes  String?
   returnNotes  String?
+  /// Client UUID for createJobsiteLog. Partial unique (tenantId, idempotencyKey) WHERE NOT NULL — SQL migration.
+  idempotencyKey String?        @db.VarChar(36)
   createdBy    String?
   updatedBy    String?
   createdAt    DateTime         @default(now())
@@ -2672,6 +2679,9 @@ model JobsiteLog {
   @@index([tenantId, status])
   @@map("jobsite_logs")
 }
+
+// Uniqueness of JobsiteLog.idempotencyKey is a partial unique index in SQL (see migration 20260820120000).
+
 
 // wbsNodeId must be WbsNodeType.ITEM (validated at service layer).
 // quantityCompleted is operational evidence only — does not affect Certification/CertificationLine.

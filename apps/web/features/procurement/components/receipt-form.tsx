@@ -23,6 +23,7 @@ import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { createPurchaseReceiptAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 import type { PurchaseOrderLineView } from "@bloqer/services";
 import { formatQtyFromString, isPositiveQty, compareQty } from "@/lib/format-money";
+import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 
 function todayLocalInputDate(): string {
   return toIsoDateInTimeZone();
@@ -86,6 +87,7 @@ export function ReceiptForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [warehouseId, setWarehouseId] = useState<string>("__none__");
+  const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
 
   const [lines, setLines] = useState<ReceiptLine[]>(
     poLines
@@ -127,6 +129,7 @@ export function ReceiptForm({
         warehouseId:  warehouseId === "__none__" ? null : warehouseId,
         receiptDate:  fd.get("receiptDate") as string,
         notes:        (fd.get("notes") as string) || null,
+        idempotencyKey,
         lines:        activeLines.map((l) => ({
           purchaseOrderLineId: l.purchaseOrderLineId,
           quantityReceived:    l.quantityReceived,
@@ -136,6 +139,7 @@ export function ReceiptForm({
       if ("error" in res) {
         setError(res.error);
       } else {
+        rotateIdempotencyKey();
         let created: { navigate?: boolean; message?: string } | void = undefined;
         try {
           created = await onCreated?.(res.id);

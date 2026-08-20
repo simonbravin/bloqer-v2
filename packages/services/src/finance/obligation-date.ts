@@ -1,5 +1,5 @@
 import { Prisma } from "@bloqer/database";
-import { startOfTodayUtc } from "./pagination";
+import { productCalendarDateUtc } from "@bloqer/utils";
 
 /** Minimum open balance to count in KPIs/alerts (avoids sub-cent false positives). */
 export const OBLIGATION_OPEN_BALANCE_EPSILON = new Prisma.Decimal("0.01");
@@ -11,18 +11,22 @@ export function startOfDayUtc(d: Date): Date {
   return x;
 }
 
-/** Reference date for aging / overdue checks (defaults to today UTC). */
+/**
+ * Reference date for aging / overdue checks.
+ * Defaults to “today” in the product timezone (`America/Argentina/Buenos_Aires`),
+ * stored as UTC midnight of that calendar day (matches Prisma `@db.Date`).
+ */
 export function parseObligationAsOfDate(asOfDate?: string): Date {
   if (asOfDate) return startOfDayUtc(new Date(asOfDate));
-  return startOfTodayUtc();
+  return productCalendarDateUtc();
 }
 
-/** True when due date is strictly before the as-of calendar day (UTC). Due today is NOT overdue. */
-export function isObligationOverdue(dueDate: Date, asOf: Date = startOfTodayUtc()): boolean {
+/** True when due date is strictly before the as-of calendar day. Due today is NOT overdue. */
+export function isObligationOverdue(dueDate: Date, asOf: Date = productCalendarDateUtc()): boolean {
   return startOfDayUtc(dueDate).getTime() < startOfDayUtc(asOf).getTime();
 }
 
-export function obligationDaysOverdue(dueDate: Date, asOf: Date = startOfTodayUtc()): number {
+export function obligationDaysOverdue(dueDate: Date, asOf: Date = productCalendarDateUtc()): number {
   const dueMs = startOfDayUtc(dueDate).getTime();
   const asOfMs = startOfDayUtc(asOf).getTime();
   return Math.max(0, Math.floor((asOfMs - dueMs) / 86_400_000));
@@ -48,7 +52,7 @@ export function deriveObligationDisplayStatus(
   storedStatus: string,
   balanceDue: Prisma.Decimal,
   dueDate: Date,
-  asOf: Date = startOfTodayUtc(),
+  asOf: Date = productCalendarDateUtc(),
   paidAmount?: Prisma.Decimal,
 ): ObligationDisplayStatus {
   if (storedStatus === "CANCELLED") return "CANCELLED";

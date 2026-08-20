@@ -527,6 +527,163 @@ export function documentReplayMatches(
   );
 }
 
+function linesFingerprint(
+  lines: Array<{ purchaseOrderLineId: string; quantityReceived: { toString(): string } | string }>,
+): string {
+  return lines
+    .map((l) => `${l.purchaseOrderLineId}:${qtyFingerprint(l.quantityReceived)}`)
+    .sort()
+    .join("|");
+}
+
+export function purchaseReceiptReplayMatches(
+  existing: {
+    purchaseOrderId: string;
+    warehouseId: string | null;
+    receiptDate: Date;
+    notes: string | null;
+    lines: Array<{ purchaseOrderLineId: string; quantityReceived: { toString(): string } }>;
+  },
+  input: {
+    purchaseOrderId: string;
+    warehouseId?: string | null;
+    receiptDate: string;
+    notes?: string | null;
+    lines: Array<{ purchaseOrderLineId: string; quantityReceived: string }>;
+  },
+): boolean {
+  if (existing.purchaseOrderId !== input.purchaseOrderId) return false;
+  if ((existing.warehouseId ?? null) !== (input.warehouseId ?? null)) return false;
+  if (dateOnlyFingerprint(existing.receiptDate) !== input.receiptDate) return false;
+  if ((existing.notes ?? null) !== (input.notes ?? null)) return false;
+  return linesFingerprint(existing.lines) === linesFingerprint(input.lines);
+}
+
+function nullableStr(v: string | null | undefined): string {
+  return v ?? "";
+}
+
+export function jobsiteLogReplayMatches(
+  existing: {
+    projectId: string;
+    companyId: string;
+    logDate: Date;
+    title: string | null;
+    workFront: string | null;
+    shift: string | null;
+    weather: string | null;
+    generalNotes: string | null;
+    blockers: string | null;
+    incidents: string | null;
+    safetyNotes: string | null;
+    progress: Array<{
+      wbsNodeId: string;
+      quantityCompleted: { toString(): string };
+      physicalPct: { toString(): string } | null;
+    }>;
+    labor: Array<{
+      contactId: string | null;
+      subcontractId: string | null;
+      workersCount: number;
+      hoursWorked: { toString(): string } | null;
+    }>;
+    materials: Array<{
+      productId: string | null;
+      warehouseId: string | null;
+      quantity: { toString(): string };
+    }>;
+    issues: Array<{ type: string; severity: string; description: string }>;
+  },
+  input: {
+    projectId: string;
+    companyId: string;
+    logDate: string;
+    title?: string | null;
+    workFront?: string | null;
+    shift?: string | null;
+    weather?: string | null;
+    generalNotes?: string | null;
+    blockers?: string | null;
+    incidents?: string | null;
+    safetyNotes?: string | null;
+    progress?: Array<{
+      wbsNodeId: string;
+      quantityCompleted: string;
+      physicalPct?: string | null;
+    }>;
+    labor?: Array<{
+      contactId?: string | null;
+      subcontractId?: string | null;
+      workersCount?: number;
+      hoursWorked?: string | null;
+    }>;
+    materials?: Array<{
+      productId?: string | null;
+      warehouseId?: string | null;
+      quantity: string;
+    }>;
+    issues?: Array<{ type: string; severity: string; description: string }>;
+  },
+): boolean {
+  if (existing.projectId !== input.projectId) return false;
+  if (existing.companyId !== input.companyId) return false;
+  if (dateOnlyFingerprint(existing.logDate) !== input.logDate) return false;
+  if (nullableStr(existing.title) !== nullableStr(input.title)) return false;
+  if (nullableStr(existing.workFront) !== nullableStr(input.workFront)) return false;
+  if (nullableStr(existing.shift) !== nullableStr(input.shift)) return false;
+  if (nullableStr(existing.weather) !== nullableStr(input.weather)) return false;
+  if (nullableStr(existing.generalNotes) !== nullableStr(input.generalNotes)) return false;
+  if (nullableStr(existing.blockers) !== nullableStr(input.blockers)) return false;
+  if (nullableStr(existing.incidents) !== nullableStr(input.incidents)) return false;
+  if (nullableStr(existing.safetyNotes) !== nullableStr(input.safetyNotes)) return false;
+
+  const progressFp = (rows: typeof existing.progress | NonNullable<typeof input.progress>) =>
+    [...rows]
+      .map((r) => {
+        const pct =
+          "physicalPct" in r && r.physicalPct != null && r.physicalPct !== ""
+            ? typeof r.physicalPct === "string"
+              ? r.physicalPct
+              : r.physicalPct.toString()
+            : "";
+        return `${r.wbsNodeId}:${qtyFingerprint(r.quantityCompleted)}:${pct}`;
+      })
+      .sort()
+      .join("|");
+  if (progressFp(existing.progress) !== progressFp(input.progress ?? [])) return false;
+
+  const laborFp = (
+    rows: typeof existing.labor | NonNullable<typeof input.labor>,
+  ) =>
+    [...rows]
+      .map((r) => {
+        const hours =
+          "hoursWorked" in r && r.hoursWorked != null && r.hoursWorked !== ""
+            ? typeof r.hoursWorked === "string"
+              ? r.hoursWorked
+              : r.hoursWorked.toString()
+            : "";
+        const workers = "workersCount" in r && r.workersCount != null ? r.workersCount : 0;
+        return `${r.contactId ?? ""}:${r.subcontractId ?? ""}:${workers}:${hours}`;
+      })
+      .sort()
+      .join("|");
+  if (laborFp(existing.labor) !== laborFp(input.labor ?? [])) return false;
+
+  const materialsFp = (
+    rows: typeof existing.materials | NonNullable<typeof input.materials>,
+  ) =>
+    [...rows]
+      .map((r) => `${r.productId ?? ""}:${r.warehouseId ?? ""}:${qtyFingerprint(r.quantity)}`)
+      .sort()
+      .join("|");
+  if (materialsFp(existing.materials) !== materialsFp(input.materials ?? [])) return false;
+
+  const issuesFp = (rows: typeof existing.issues | NonNullable<typeof input.issues>) =>
+    [...rows].map((r) => `${r.type}:${r.severity}:${r.description}`).sort().join("|");
+  return issuesFp(existing.issues) === issuesFp(input.issues ?? []);
+}
+
 export async function withIdempotentCreate<T>(params: {
   findExisting: () => Promise<T | null>;
   payloadsMatch: (existing: T) => boolean;

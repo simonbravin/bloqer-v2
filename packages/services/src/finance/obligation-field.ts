@@ -1,4 +1,4 @@
-import { compareDecimal } from "@bloqer/utils";
+import { compareDecimal, toIsoDateInTimeZone } from "@bloqer/utils";
 
 /**
  * Shared Field obligation filters (CxP / CxC). Deep-link: `?field=pending|overdue|upcoming|paid`.
@@ -26,14 +26,15 @@ export type ObligationFieldSortable = {
   partyName: string;
 };
 
-/** UTC calendar day as `YYYY-MM-DD` — matches AP/AR aging, not product-TZ week helpers. */
+/**
+ * Product calendar day as `YYYY-MM-DD` (`America/Argentina/Buenos_Aires`).
+ * Aligns Field overdue/due-today labels with aging (`productCalendarDateUtc`).
+ */
 export function obligationFieldTodayIso(now: Date = new Date()): string {
-  const y = now.getUTCFullYear();
-  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(now.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return toIsoDateInTimeZone(now);
 }
 
+/** Calendar day of a Prisma `@db.Date` (stored UTC midnight) as `YYYY-MM-DD`. */
 export function utcIsoDate(value: Date): string {
   const y = value.getUTCFullYear();
   const m = String(value.getUTCMonth() + 1).padStart(2, "0");

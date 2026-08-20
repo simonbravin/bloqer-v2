@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idempotencyKeySchema } from "./idempotency";
 
 const purchaseOrderLineSchema = z.object({
   wbsNodeId: z.string().uuid({ message: "Cada línea debe imputar a un ítem EDT" }),
@@ -61,6 +62,7 @@ export const createPurchaseReceiptSchema = z.object({
   receiptDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   notes: z.string().optional().nullable(),
   lines: z.array(receiptLineSchema).min(1, "Debe incluir al menos una línea"),
+  idempotencyKey: idempotencyKeySchema,
 });
 
 export type CreatePurchaseOrderInput = z.infer<typeof createPurchaseOrderSchema>;
