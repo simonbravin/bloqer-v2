@@ -52,6 +52,9 @@ export default async function FinanzasCobrarReceivablePage({ params }: PageProps
   const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
   const fieldMode = isReceivablesFieldViewport(hint);
   const detailHref = `/finanzas/cuentas-por-cobrar/${receivableId}`;
+  if (!fieldMode) {
+    redirect(`${detailHref}?cobrar=1`);
+  }
 
   return (
     <PageShell

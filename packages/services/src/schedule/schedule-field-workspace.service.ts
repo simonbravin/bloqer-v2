@@ -8,7 +8,7 @@ import {
   formatDateOnly,
   isScheduleLeafItem,
 } from "./schedule-helpers";
-import { ensureScheduleForProject } from "./schedule.service";
+import { ensureScheduleForProject, findScheduleForProject } from "./schedule.service";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
 import {
   summarizeScheduleFieldKpis,
@@ -79,7 +79,27 @@ export async function getProjectScheduleFieldWorkspace(
   }
 
   let t = Date.now();
-  const schedule = await ensureScheduleForProject(projectId, ctx);
+  const existingSchedule = await findScheduleForProject(projectId, ctx);
+  if (!existingSchedule && !canEditScheduleArea(ctx.roles)) {
+    const emptyKpis = summarizeScheduleFieldKpis([]);
+    const queryBreakdown: ScheduleFieldWorkspaceQueryTimings = {
+      ensureScheduleMs: Date.now() - t,
+      itemsMs: 0,
+      mapMs: 0,
+      totalMs: Date.now() - t0,
+    };
+    lastScheduleFieldWorkspaceTimings = queryBreakdown;
+    return {
+      type: "FIELD",
+      projectId,
+      scheduleId: "",
+      canEdit: false,
+      items: [],
+      summary: { ...emptyKpis, leafCount: 0 },
+      queryBreakdown,
+    };
+  }
+  const schedule = existingSchedule ?? (await ensureScheduleForProject(projectId, ctx));
   const ensureScheduleMs = Date.now() - t;
 
   t = Date.now();

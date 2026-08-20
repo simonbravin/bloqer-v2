@@ -8,6 +8,7 @@ import { canEditPurchaseOrders, canViewPurchaseRequests } from "./procurement-ac
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
+import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 
 export async function createProcurementQuote(
   input: CreateProcurementQuoteInput,
@@ -45,12 +46,7 @@ export async function createProcurementQuote(
     throw new ServiceError("CONFLICT", `Máximo ${settings.maxQuotesAllowed} cotizaciones por solicitud`);
   }
 
-  const supplierRole = await prisma.contactRole.findUnique({
-    where: { contactId_role: { contactId: input.supplierContactId, role: "SUPPLIER" } },
-  });
-  if (!supplierRole || supplierRole.status !== "ACTIVE") {
-    throw new ServiceError("CONFLICT", "Proveedor inválido");
-  }
+  await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
 
   const prLineIds = new Set(pr.lines.map((l) => l.id));
   for (const line of input.lines) {

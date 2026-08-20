@@ -10,7 +10,7 @@ import { ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { canEditScheduleArea, canViewScheduleArea } from "./schedule-access";
 import { computeDaysLate, formatDateOnly, computeTimePlanProgressPct, isScheduleLeafItem, mergeDerivedContainerDatesIntoDtos } from "./schedule-helpers";
-import { ensureScheduleForProject } from "./schedule.service";
+import { ensureScheduleForProject, findScheduleForProject } from "./schedule.service";
 import { addDecimal, divideDecimal, multiplyDecimal, serializeMoney, sortTreeOrder } from "@bloqer/utils";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
 
@@ -268,13 +268,52 @@ export async function getProjectScheduleWorkspace(
   }
 
   t = Date.now();
-  const schedule = await ensureScheduleForProject(projectId, ctx);
+  const existingSchedule = await findScheduleForProject(projectId, ctx);
+  if (!existingSchedule && !canEditScheduleArea(ctx.roles)) {
+      lastScheduleWorkspaceTimings = {
+        moduleGateMs,
+        costControlMs,
+        ensureScheduleMs: mark(t),
+        baselineWriteMs: 0,
+        secondCostControlMs: 0,
+        budgetCurrencyMs: 0,
+        itemCountMs: 0,
+        itemsMs: 0,
+        rollupSourceMs: 0,
+        costByCategoryMs: 0,
+        mapMs: 0,
+        totalMs: Date.now() - t0,
+      };
+      return {
+        type: "WORKSPACE",
+        projectId,
+        scheduleId: "",
+        baselineBudgetId: null,
+        baselineBudgetMismatch: false,
+        budgetId: cc.budgetId,
+        budgetName: cc.budgetName,
+        budgetStatus: cc.budgetStatus,
+        budgetCurrency: "ARS",
+        availableBudgets: cc.availableBudgets,
+        canEdit: false,
+        items: [],
+        summary: {
+          totalItems: 0,
+          unfilteredActiveCount: 0,
+          completedItems: 0,
+          delayedItems: 0,
+          scheduleProgressPct: null,
+        },
+      };
+  }
+  const schedule = existingSchedule ?? (await ensureScheduleForProject(projectId, ctx));
   const ensureScheduleMs = mark(t);
 
   // Only seed baseline when empty — never silently rewrite (orphans WBS links).
+  // Requires EDIT: VIEW must not mutate baseline on read.
   let baselineBudgetId = schedule.baselineBudgetId;
   t = Date.now();
-  if (!baselineBudgetId) {
+  if (!baselineBudgetId && canEditScheduleArea(ctx.roles)) {
     await prisma.schedule.update({
       where: { id: schedule.id },
       data: { baselineBudgetId: cc.budgetId, updatedBy: ctx.actorUserId },
@@ -282,7 +321,7 @@ export async function getProjectScheduleWorkspace(
     baselineBudgetId = cc.budgetId;
   }
   const baselineWriteMs = mark(t);
-  const baselineBudgetMismatch = baselineBudgetId !== cc.budgetId;
+  const baselineBudgetMismatch = Boolean(baselineBudgetId && baselineBudgetId !== cc.budgetId);
 
   /** WBS links live on the baseline budget — join cost rows there so committed/cert don't show fake zeros. */
   let metricsCc = cc;

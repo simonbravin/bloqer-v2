@@ -34,6 +34,8 @@ export default async function EditarSubcontratoPage({ params }: PageProps) {
     throw err;
   }
 
+  if (subcontract.projectId !== projectId) notFound();
+
   if (subcontract.status !== "DRAFT")
     redirect(`/proyectos/${projectId}/subcontratos/${subcontractId}`);
 

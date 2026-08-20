@@ -25,6 +25,7 @@ import {
   cancelDraftJournalOnOperationalCancel,
 } from "../accounting/accounting-cancel-sync.service";
 import { notifyReceivableReadyToCollect } from "./ar-notifications.service";
+import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -245,6 +246,8 @@ export async function createSalesInvoice(
     );
   }
   await assertProjectGuardIfPresent(input.projectId, ctx.tenantId);
+
+  await assertContactRoleInTenant(input.clientContactId, "CLIENT", ctx.tenantId);
 
   const companyId = await resolveCompanyId(input.projectId, ctx);
 

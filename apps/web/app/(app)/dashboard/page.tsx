@@ -82,20 +82,21 @@ export default async function DashboardPage() {
 
   const jar = await cookies();
   const hint = parseViewportHint(jar.get(VIEWPORT_COOKIE)?.value);
+  // Missing cookie → Field only (avoid dual RSC tree). md/lg → desktop only.
   const showFieldHome = hint !== "md" && hint !== "lg";
-  const showDesktop = hint !== "sm";
+  const showDesktop = hint === "md" || hint === "lg";
 
   return (
     <>
       {showFieldHome ? (
-        <div className={showDesktop ? "md:hidden" : undefined}>
+        <div>
           <Suspense fallback={<FieldHomeFallback />}>
             <FieldHomeLoader />
           </Suspense>
         </div>
       ) : null}
       {showDesktop ? (
-        <div className={showFieldHome ? "hidden md:block" : undefined}>
+        <div>
           <Suspense fallback={null}>
             <DesktopDashboard />
           </Suspense>

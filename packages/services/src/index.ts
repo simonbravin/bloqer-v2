@@ -7,6 +7,7 @@ export * from "./user/user.service";
 export * from "./user/resolve-user-display-names";
 export * from "./membership/membership.service";
 export * from "./contact/contact.service";
+export * from "./contact/assert-contact-role";
 export * from "./audit/audit.service";
 export * from "./audit/audit-read.service";
 export {

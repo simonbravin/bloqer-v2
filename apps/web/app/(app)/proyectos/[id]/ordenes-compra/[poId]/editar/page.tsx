@@ -36,6 +36,8 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
     throw err;
   }
 
+  if (order.projectId !== id) notFound();
+
   if (order.status !== "DRAFT") {
     redirect(`/proyectos/${id}/ordenes-compra/${poId}`);
   }

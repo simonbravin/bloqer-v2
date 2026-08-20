@@ -77,6 +77,13 @@ export const createPaymentSchema = createPaymentFieldsSchema.superRefine((val, c
       path: ["amount"],
     });
   }
+  if (val.amount != null && (val.amount.startsWith("-") || /^-?0+(\.0+)?$/.test(val.amount))) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "El monto debe ser mayor a 0",
+      path: ["amount"],
+    });
+  }
 });
 
 export const payNowSchema = z
@@ -95,6 +102,13 @@ export const payNowSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Monto inválido",
+        path: ["amount"],
+      });
+    }
+    if (val.amount != null && (val.amount.startsWith("-") || /^-?0+(\.0+)?$/.test(val.amount))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El monto debe ser mayor a 0",
         path: ["amount"],
       });
     }

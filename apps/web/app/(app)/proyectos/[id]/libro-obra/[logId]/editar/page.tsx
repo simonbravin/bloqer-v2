@@ -38,6 +38,8 @@ export default async function EditarParteObraPage({ params }: PageProps) {
     throw err;
   }
 
+  if (log.projectId !== projectId) notFound();
+
   if (log.status !== "DRAFT") redirect(`/proyectos/${projectId}/libro-obra/${logId}`);
 
   let wbsRaw: Awaited<ReturnType<typeof listProjectWbsItemsForLog>>;

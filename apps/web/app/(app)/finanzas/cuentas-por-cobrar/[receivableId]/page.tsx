@@ -1,10 +1,11 @@
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { ReceivableFieldDetailView, ReceivableStatusBadge } from "@/features/sales-invoices";
+import { RegisterCompanyCollectionDialog } from "@/features/collections";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { getCurrentUser } from "@/lib/auth";
@@ -16,6 +17,7 @@ import {
   getCompanyReceivableById,
   listCollectionsByReceivable,
   listEntityDocuments,
+  listTreasuryAccounts,
   ServiceError,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
@@ -25,7 +27,7 @@ import { isReceivablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "
 
 interface PageProps {
   params: Promise<{ receivableId: string }>;
-  searchParams: Promise<{ actionError?: string; collected?: string }>;
+  searchParams: Promise<{ actionError?: string; collected?: string; cobrar?: string }>;
 }
 
 const OPEN_STATUSES = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
@@ -36,6 +38,7 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
 
   const { receivableId } = await params;
   const sp = await searchParams;
+  const openCobrarDeepLink = sp.cobrar === "1";
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -110,6 +113,14 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
   const canEditAttachments = canEditAr;
   const detailPath = `/finanzas/cuentas-por-cobrar/${receivableId}`;
 
+  let activeAccounts: Array<{ id: string; name: string; currency: string }> = [];
+  if (canCollect) {
+    const accounts = await listTreasuryAccounts(ctx);
+    activeAccounts = accounts.data
+      .filter((a) => a.status === "ACTIVE")
+      .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
+  }
+
   return (
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={receivable.clientName}>
       <div className="flex items-center justify-between gap-4">
@@ -118,13 +129,17 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
           <ReceivableStatusBadge status={receivable.status} />
         </div>
         <div className="flex items-center gap-2">
-          {canCollect && (
-            <Button size="sm" asChild>
-              <Link href={`/finanzas/cuentas-por-cobrar/${receivableId}/cobrar`}>
-                Registrar cobranza
-              </Link>
-            </Button>
-          )}
+          {canCollect ? (
+            <Suspense fallback={<Button size="sm" disabled>Registrar cobranza</Button>}>
+              <RegisterCompanyCollectionDialog
+                receivableId={receivableId}
+                receivableBalance={receivable.balanceDue}
+                receivableCurrency={receivable.currency}
+                accounts={activeAccounts}
+                defaultOpen={openCobrarDeepLink}
+              />
+            </Suspense>
+          ) : null}
           {canCancel && (
             <form
               action={async () => {
@@ -191,18 +206,7 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
         </div>
       </div>
 
-      <DataTableSection
-        title="Cobranzas"
-        actions={
-          canCollect ? (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/finanzas/cuentas-por-cobrar/${receivableId}/cobrar`}>
-                Registrar cobranza
-              </Link>
-            </Button>
-          ) : undefined
-        }
-      >
+      <DataTableSection title="Cobranzas">
         {collections.length === 0 ? (
           <p className="text-sm text-muted-foreground px-1 py-2">Sin cobranzas registradas.</p>
         ) : (

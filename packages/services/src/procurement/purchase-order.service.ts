@@ -13,6 +13,7 @@ import {
 import { PO_RECEIPT_ELIGIBLE_STATUSES } from "./procurement-constants";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { assertCompanyMatchesProject, assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
+import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import { assertDirectPoAllowed } from "./procurement-policy.service";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -297,9 +298,12 @@ export async function listProcurementWbsOptions(
   const ordered = sortTreeOrder(nodes, (a, b) => a.code.localeCompare(b.code));
   const commitments = await loadMaterialApuCommitmentByLineId(projectId, ctx.tenantId);
 
+  const refs = await Promise.all(ordered.map((n) => getWbsBudgetReference(n.id, ctx.tenantId)));
+
   const result: ProcurementWbsOption[] = [];
-  for (const n of ordered) {
-    const ref = await getWbsBudgetReference(n.id, ctx.tenantId);
+  for (let i = 0; i < ordered.length; i++) {
+    const n = ordered[i]!;
+    const ref = refs[i]!;
     result.push({
       id: n.id,
       code: n.code,
@@ -410,13 +414,7 @@ export async function createPurchaseOrder(
 
   await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
-  // BR-SUP-001: validate supplier role
-  const supplierRole = await prisma.contactRole.findUnique({
-    where: { contactId_role: { contactId: input.supplierContactId, role: "SUPPLIER" } },
-  });
-  if (!supplierRole || supplierRole.status !== "ACTIVE") {
-    throw new ServiceError("CONFLICT", "El contacto seleccionado no tiene rol de proveedor activo");
-  }
+  await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
 
   assertWbsRequiredOnLines(input.lines);
   for (const line of input.lines) {
@@ -543,12 +541,7 @@ export async function updatePurchaseOrder(
   assertDraft(existing);
 
   if (input.supplierContactId) {
-    const supplierRole = await prisma.contactRole.findUnique({
-      where: { contactId_role: { contactId: input.supplierContactId, role: "SUPPLIER" } },
-    });
-    if (!supplierRole || supplierRole.status !== "ACTIVE") {
-      throw new ServiceError("CONFLICT", "El contacto seleccionado no tiene rol de proveedor activo");
-    }
+    await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
   }
 
   if (input.lines) {

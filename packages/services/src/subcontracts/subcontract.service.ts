@@ -8,6 +8,8 @@ import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import { assertCompanyMatchesProject, assertWbsLineForProject } from "../procurement/procurement-wbs";
+import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -184,22 +186,16 @@ export async function createSubcontract(
 
   await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
-  const subcontractorRole = await prisma.contactRole.findUnique({
-    where: { contactId_role: { contactId: input.subcontractorContactId, role: "SUBCONTRACTOR" } },
-  });
-  if (!subcontractorRole || subcontractorRole.status !== "ACTIVE") {
-    throw new ServiceError("CONFLICT", "El contacto no tiene rol de subcontratista activo");
-  }
+  await assertContactRoleInTenant(input.subcontractorContactId, "SUBCONTRACTOR", ctx.tenantId);
 
   for (const line of input.lines) {
     if (line.wbsNodeId) {
-      const wbs = await prisma.wbsNode.findUnique({ where: { id: line.wbsNodeId } });
-      if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo EDT no encontrado: ${line.wbsNodeId}`);
-      if (wbs.type !== "ITEM") throw new ServiceError("CONFLICT", "El nodo EDT debe ser de tipo ITEM");
+      await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId);
     }
   }
 
-  const companyId = input.companyId ?? await resolveCompanyId(input.projectId, ctx);
+  const companyId = input.companyId;
+  await assertCompanyMatchesProject(companyId, input.projectId, ctx.tenantId);
 
   const maxAttempts = 3;
   let result: SubcontractWithRelations | null = null;
@@ -298,9 +294,7 @@ export async function updateSubcontract(
   if (input.lines) {
     for (const line of input.lines) {
       if (line.wbsNodeId) {
-        const wbs = await prisma.wbsNode.findUnique({ where: { id: line.wbsNodeId } });
-        if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo EDT no encontrado: ${line.wbsNodeId}`);
-        if (wbs.type !== "ITEM") throw new ServiceError("CONFLICT", "El nodo EDT debe ser de tipo ITEM");
+        await assertWbsLineForProject(line.wbsNodeId, existing.projectId, ctx.tenantId);
       }
     }
   }

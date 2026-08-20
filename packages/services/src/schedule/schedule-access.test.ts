@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { canEditScheduleArea, canViewScheduleArea } from "./schedule-access";
+import { canEditScheduleArea, canViewScheduleArea, resolveEnsureScheduleCreatePolicy } from "./schedule-access";
 
 describe("schedule-access", () => {
   it("VIEWER can consult and cannot mutate", () => {
@@ -26,5 +26,14 @@ describe("schedule-access", () => {
   it("empty roles cannot view or edit", () => {
     assert.equal(canViewScheduleArea([]), false);
     assert.equal(canEditScheduleArea([]), false);
+  });
+
+  it("VIEWER cannot create schedule when missing; can reuse existing", () => {
+    assert.equal(resolveEnsureScheduleCreatePolicy(false, ["VIEWER"]), "forbid_create");
+    assert.equal(resolveEnsureScheduleCreatePolicy(true, ["VIEWER"]), "reuse");
+  });
+
+  it("PROJECT_MANAGER can create schedule when missing", () => {
+    assert.equal(resolveEnsureScheduleCreatePolicy(false, ["PROJECT_MANAGER"]), "create");
   });
 });

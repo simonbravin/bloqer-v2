@@ -8,11 +8,15 @@ test("assertPoEligibleForReceipt allows CONFIRMED", () => {
   assert.doesNotThrow(() => assertPoEligibleForReceipt("CONFIRMED"));
 });
 
-test("assertPoEligibleForReceipt rejects DRAFT", () => {
+test("assertPoEligibleForReceipt rejects RECEIVED", () => {
   assert.throws(
-    () => assertPoEligibleForReceipt("DRAFT"),
+    () => assertPoEligibleForReceipt("RECEIVED"),
     (err) => err instanceof ServiceError && err.code === "CONFLICT",
   );
+});
+
+test("assertPoEligibleForReceipt allows PARTIALLY_RECEIVED", () => {
+  assert.doesNotThrow(() => assertPoEligibleForReceipt("PARTIALLY_RECEIVED"));
 });
 
 test("assertReceiptQtyWithinRemaining allows within remaining", () => {

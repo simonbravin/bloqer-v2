@@ -38,6 +38,9 @@ interface Props {
   fieldMode?: boolean;
   clientName?: string;
   successHref?: string;
+  variant?: "card" | "plain";
+  onCancel?: () => void;
+  onSuccess?: () => void;
 }
 
 export function CollectionForm({
@@ -50,6 +53,9 @@ export function CollectionForm({
   fieldMode = false,
   clientName,
   successHref,
+  variant = "card",
+  onCancel,
+  onSuccess,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -147,6 +153,7 @@ export function CollectionForm({
         setStep("form");
       } else {
         rotateIdempotencyKey();
+        onSuccess?.();
         const nextHref = successHref
           ?? (companyFinanzas
             ? `/finanzas/cuentas-por-cobrar/${receivableId}`
@@ -159,10 +166,17 @@ export function CollectionForm({
 
   if (matchingAccounts.length === 0) {
     return (
-      <div className="rounded-lg border bg-card p-6">
+      <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
         <p className="text-sm text-muted-foreground">
           No hay cuentas de tesorería activas en {receivableCurrency}. Creá una cuenta con esa moneda primero.
         </p>
+        {onCancel ? (
+          <div className="mt-4 flex justify-end">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancelar
+            </Button>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -177,7 +191,7 @@ export function CollectionForm({
 
   return (
     <div
-      className="rounded-lg border bg-card p-6"
+      className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}
       data-testid={fieldMode ? "receivables-field-collection-form" : undefined}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -314,7 +328,7 @@ export function CollectionForm({
           </div>
         ) : (
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => router.back()}>
+            <Button type="button" variant="outline" onClick={onCancel ?? (() => router.back())}>
               Cancelar
             </Button>
             {fieldMode ? (

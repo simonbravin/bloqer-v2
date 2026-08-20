@@ -41,6 +41,8 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
     throw err;
   }
 
+  if (doc.projectId !== id) notFound();
+
   const canDownload =
     doc.storageProvider === "R2" && (doc.status === "ACTIVE" || doc.status === "ARCHIVED");
 

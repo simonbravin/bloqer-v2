@@ -23,6 +23,7 @@ import { canMutateApForScope, canRegisterApPayment } from "./ap-access";
 import { notifyPayableReadyToPay, notifyPaymentConfirmed } from "./ap-notifications.service";
 import { recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
+import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import {
   assertPurchaseOrderLinkableForAp,
   assertSupplierInvoiceLinesPoLink,
@@ -323,12 +324,7 @@ export async function registerApExpense(
     }
   }
 
-  const supplierRole = await prisma.contactRole.findUnique({
-    where: { contactId_role: { contactId: input.supplierContactId, role: "SUPPLIER" } },
-  });
-  if (!supplierRole || supplierRole.status !== "ACTIVE") {
-    throw new ServiceError("CONFLICT", "El contacto seleccionado no tiene rol de proveedor activo");
-  }
+  await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
 
   const supplier = await prisma.contact.findUnique({
     where: { id: input.supplierContactId },

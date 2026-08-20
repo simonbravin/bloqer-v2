@@ -5,7 +5,7 @@ import { sortTreeOrder } from "@bloqer/utils";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
-import { canEditScheduleArea, canViewScheduleArea } from "./schedule-access";
+import { canEditScheduleArea, canViewScheduleArea, resolveEnsureScheduleCreatePolicy } from "./schedule-access";
 import {
   assertScheduleStatusTransition,
   checkFinishStartViolations,
@@ -46,7 +46,6 @@ async function assertProjectAccess(projectId: string, ctx: ServiceContext) {
 async function getScheduleForProject(projectId: string, ctx: ServiceContext) {
   const schedule = await prisma.schedule.findUnique({
     where: { projectId },
-    include: { items: { select: { id: true } } },
   });
   if (!schedule) return null;
   if (schedule.tenantId !== ctx.tenantId) {
@@ -192,7 +191,11 @@ export async function ensureScheduleForProject(projectId: string, ctx: ServiceCo
   assertTenantModuleEnabledWithGate(gate, "SCHEDULE");
 
   const existing = await getScheduleForProject(projectId, ctx);
-  if (existing) return existing;
+  const policy = resolveEnsureScheduleCreatePolicy(Boolean(existing), ctx.roles);
+  if (policy === "reuse" && existing) return existing;
+  if (policy === "forbid_create") {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para crear cronograma");
+  }
 
   await assertProjectScheduleMutation(projectId, ctx);
 
@@ -214,6 +217,18 @@ export async function ensureScheduleForProject(projectId: string, ctx: ServiceCo
     { projectId, type: created.type },
   );
   return created;
+}
+
+/** Read-only: returns existing schedule or null — never creates. */
+export async function findScheduleForProject(projectId: string, ctx: ServiceContext) {
+  if (!canViewScheduleArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cronograma");
+  }
+  await assertProjectAccess(projectId, ctx);
+  const gate = await getTenantModuleGate(ctx);
+  assertTenantModuleEnabledWithGate(gate, "PROJECTS");
+  assertTenantModuleEnabledWithGate(gate, "SCHEDULE");
+  return getScheduleForProject(projectId, ctx);
 }
 
 export type ImportScheduleFromBudgetInput = {
@@ -676,14 +691,18 @@ async function transitionScheduleItem(
 
   const before = scheduleItemSnapshot(item);
   const updated = await prisma.$transaction(async (tx) => {
-    const row = await tx.scheduleItem.update({
-      where: { id: item.id },
+    const claimed = await tx.scheduleItem.updateMany({
+      where: { id: item.id, tenantId: ctx.tenantId, status: item.status },
       data: {
         status: to,
         blockReason: to === "BLOCKED" ? extra!.blockReason!.trim() : to === "IN_PROGRESS" ? null : item.blockReason,
         updatedBy: ctx.actorUserId,
       },
     });
+    if (claimed.count !== 1) {
+      throw new ServiceError("CONFLICT", "El ítem de cronograma cambió de estado. Recargá e intentá de nuevo.");
+    }
+    const row = await tx.scheduleItem.findUniqueOrThrow({ where: { id: item.id } });
     if (to === "CANCELLED") {
       await rollupScheduleContainerDatesInTx(item.scheduleId, ctx, tx);
     }

@@ -25,6 +25,7 @@ import {
   assertJournalAllowsOperationalCancel,
   cancelDraftJournalOnOperationalCancel,
 } from "../accounting/accounting-cancel-sync.service";
+import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 
 const PO_AP_LINKABLE_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
 
@@ -454,13 +455,8 @@ export async function createSupplierInvoice(
     }
   }
 
-  // BR-AP-001: validate supplier role
-  const supplierRole = await prisma.contactRole.findUnique({
-    where: { contactId_role: { contactId: input.supplierContactId, role: "SUPPLIER" } },
-  });
-  if (!supplierRole || supplierRole.status !== "ACTIVE") {
-    throw new ServiceError("CONFLICT", "El contacto seleccionado no tiene rol de proveedor activo");
-  }
+  // BR-AP-001: validate supplier role + tenant
+  await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
 
   // Optional PO link: only when invoice is project-scoped (OC always belongs to a project)
   if (input.purchaseOrderId) {
@@ -629,12 +625,7 @@ export async function updateSupplierInvoice(
   assertSupplierInvoiceEditable(existing);
 
   if (input.supplierContactId && input.supplierContactId !== existing.supplierContactId) {
-    const supplierRole = await prisma.contactRole.findUnique({
-      where: { contactId_role: { contactId: input.supplierContactId, role: "SUPPLIER" } },
-    });
-    if (!supplierRole || supplierRole.status !== "ACTIVE") {
-      throw new ServiceError("CONFLICT", "El contacto seleccionado no tiene rol de proveedor activo");
-    }
+    await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
   }
 
   // Optional PO link validation on update

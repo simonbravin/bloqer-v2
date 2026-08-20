@@ -479,10 +479,20 @@ export async function createJobsiteLogMaterialStockMovements(
     if (!warehouse || warehouse.status !== "ACTIVE") {
       throw new ServiceError("CONFLICT", "El depósito del material no está activo");
     }
+    const product = await tx.product.findUnique({
+      where: { id: m.productId },
+      select: { companyId: true, tenantId: true, status: true },
+    });
+    if (!product || product.tenantId !== params.tenantId) {
+      throw new ServiceError("NOT_FOUND", "Producto no encontrado");
+    }
+    if (product.status !== "ACTIVE") {
+      throw new ServiceError("CONFLICT", "El producto no está activo");
+    }
     const scopeConflict = consumptionWarehouseScopeConflict({
       warehouseCompanyId: warehouse.companyId,
       warehouseProjectId: warehouse.projectId,
-      productCompanyId: null,
+      productCompanyId: product.companyId,
       consumptionProjectId: params.projectId,
       projectCompanyId: params.companyId,
     });

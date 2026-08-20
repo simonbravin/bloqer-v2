@@ -49,6 +49,13 @@ export const createCollectionSchema = z
         path: ["amount"],
       });
     }
+    if (val.amount != null && (val.amount.startsWith("-") || /^-?0+(\.0+)?$/.test(val.amount))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El monto debe ser mayor a 0",
+        path: ["amount"],
+      });
+    }
   });
 
 export const createInternalTransferSchema = z.object({

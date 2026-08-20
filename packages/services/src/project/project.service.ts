@@ -18,6 +18,7 @@ import {
   canCancelDraftProject,
   canReactivateProject,
 } from "./project-lifecycle-access";
+import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
 
@@ -443,16 +444,9 @@ export async function reactivateProject(
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 async function _guardClientRole(contactId: string, tenantId: string) {
-  const contact = await prisma.contact.findUnique({ where: { id: contactId } });
-  if (!contact) throw new ServiceError("NOT_FOUND", "Contacto cliente no encontrado");
-  if (contact.tenantId !== tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-
-  const clientRole = await prisma.contactRole.findUnique({
-    where: { contactId_role: { contactId, role: "CLIENT" } },
+  await assertContactRoleInTenant(contactId, "CLIENT", tenantId, {
+    contactNotFoundMessage: "Contacto cliente no encontrado",
   });
-  if (!clientRole || clientRole.status !== "ACTIVE") {
-    throw new ServiceError("CONFLICT", "El contacto no tiene el rol Cliente activo");
-  }
 }
 
 async function _transition(

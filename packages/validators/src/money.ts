@@ -48,12 +48,13 @@ export const optionalFxRateString = z.preprocess((v) => {
   return v;
 }, fxRateString.optional());
 
-/** Quantity: round to 4 dp. */
+/** Quantity: round to 4 dp. Non-negative (invoice/procurement lines). */
 export const qtyString = z
   .string()
   .trim()
   .regex(LOOSE_DECIMAL, "Cantidad inválida")
-  .transform((v) => roundQty(v));
+  .transform((v) => roundQty(v))
+  .refine((v) => !v.startsWith("-"), "La cantidad no puede ser negativa");
 
 /**
  * Line unit price: 4 dp (schema Decimal 18,4).
@@ -63,7 +64,8 @@ export const unitPriceString = z
   .string()
   .trim()
   .regex(LOOSE_DECIMAL, "Precio inválido")
-  .transform((v) => roundQty(v));
+  .transform((v) => roundQty(v))
+  .refine((v) => !v.startsWith("-"), "El precio no puede ser negativo");
 
 /** Tax / rate percentage: round to 4 dp. */
 export const ratePctString = z

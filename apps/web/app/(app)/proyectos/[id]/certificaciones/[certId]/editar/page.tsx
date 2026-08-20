@@ -34,6 +34,8 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
     throw err;
   }
 
+  if (cert.projectId !== projectId) notFound();
+
   if (cert.status !== "DRAFT") redirect(`/proyectos/${projectId}/certificaciones/${certId}`);
 
   const toDateInput = (d: Date | string) => new Date(d).toISOString().split("T")[0];
