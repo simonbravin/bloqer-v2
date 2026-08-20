@@ -473,7 +473,7 @@ Backup Neon: branch `backup-pre-20260819200000` (`br-still-forest-ap8gidpm`), fo
 
 **Fecha:** 20 agosto 2026 (America/Argentina, deploy UTC 20 ago).  
 **Rama:** `main`.  
-**Commit:** se registra en el push de este release (`feat: stabilize Bloqer Field and harden operational integrity`).  
+**Commit:** `12ab8f82b2f3c964b9caa8b9fa7390d7a18c5ae6` (`feat: stabilize Bloqer Field and harden operational integrity`) on `main`. Parent: `d5db691` (email transactional context, ya en origin).  
 **Objetivo:** alinear el código productivo con el schema ya migrado. Sin Cronograma Field, sin PWA, sin migraciones nuevas.
 
 ## Migrations (ya aplicadas; no se re-ejecutó seed/reset/db push)
@@ -519,7 +519,21 @@ Contra `dev` (servidor nuevo):
 
 ## Deploy
 
-Push a `origin/main` → Vercel Production. No se cambiaron env vars de production. No seed / reset / db push. Detalle READY/logs: completar tras el deployment (follow-up en este mismo documento si hace falta).
+Push a `origin/main` (fast-forward `d5db691..12ab8f8`, sin force). Vercel project `bloqer-v2-web`, deployment `dpl_9ydyN2SRnVApYUUf59aRv5TWxPxr`, **READY**, target production, alias `portal.bloqer.app`. SHA desplegado: `12ab8f8`. Build: Prisma generate OK, Next compile ~2.6 min, Build Completed ~5 min. Warning único: `memory` en `vercel.json` ignorado en Active CPU billing. Sin seed / reset / db push. Env vars de production no se tocaron.
+
+## Production smoke (read-only)
+
+* `GET /login` sirve el formulario de auth.
+* `/dashboard` y `/pendientes` redirigen a login si no hay sesión (auth viva).
+* Logs post-deploy en `dpl_9ydyN2SRnVApYUUf59aRv5TWxPxr`: HTTP **200** y **307** (redirect auth). 0 clusters de runtime error. Tráfico autenticado previo al cutover (deploy anterior) en dashboard, finanzas, tesorería, proyectos. `prisma:error connection Closed` apareció en el deploy **anterior** (`79b5b07`) con HTTP 200 (ruido de pooler Neon, no mismatch de columnas).
+* No se ejecutó E2E mutante contra production. No se usó el usuario demo de captura para login productivo.
+
+## Confirmación
+
+* production operativa (READY + tráfico 200).
+* local `.env` sigue en Neon `dev` (`ep-curly-math-aptjniho`).
+* backup `backup-pre-20260819200000` disponible.
+* ninguna feature nueva de Cronograma Field / Materiales Mobile / PWA / offline en este release.
 
 ## Residuales aceptados (no reabrir auditoría)
 
@@ -532,11 +546,4 @@ Push a `origin/main` → Vercel Production. No se cambiaron env vars de producti
 * Docs subcontract cert SUBMITTED vs Prisma ISSUED.
 * Test Playwright `procurement-mobile` 05 acoplado a pending qty de una sola OC demo.
 * `upload-jobsite-log-evidence.test.ts` bajo tsx sin alias `@/`.
-
-## Confirmación
-
-* production operativa se verifica en smoke read-only post-deploy.
-* local sigue en Neon `dev`.
-* backup `backup-pre-20260819200000` disponible.
-* ninguna feature nueva de Cronograma Field / Materiales Mobile / PWA / offline en este release.
 
