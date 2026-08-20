@@ -44,6 +44,7 @@ export async function createCollectionAction(
     const collection = await createCollection(parsed.data, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/cobranzas`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+    revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar/${parsed.data.receivableId}`);
     revalidateProjectCostAndFinancePaths(projectId);
     revalidateTreasuryPaths();
     return { id: collection.id };

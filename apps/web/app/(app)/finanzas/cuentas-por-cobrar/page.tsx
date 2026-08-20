@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -6,7 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { TransaccionesDateFilters } from "@/features/finance/components/transacciones-date-filters";
-import { ReceivableListSection, type ReceivableListItem } from "@/features/sales-invoices";
+import {
+  ReceivableListSection,
+  ReceivablesFieldExperience,
+  type ReceivableListItem,
+} from "@/features/sales-invoices";
 import { AgingSummaryCards, AgingFilters, AgingTable } from "@/features/aging";
 import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
@@ -14,12 +19,14 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   getReceivableAgingReport,
   listCompanyReceivables,
+  listReceivablesFieldBoard,
   parseAgingFilters,
   ServiceError,
 } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
+import { isReceivablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 const PAGE_SIZE = 20;
 const STATUSES = ["OPEN", "PARTIAL", "PAID", "OVERDUE", "CANCELLED"] as const;
@@ -61,6 +68,30 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
     companyId: current.tenantCtx.companyId,
     roles: current.tenantCtx.roles,
   };
+
+  const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
+  const loadField = isReceivablesFieldViewport(hint);
+
+  if (loadField) {
+    const started = Date.now();
+    let board;
+    try {
+      board = await listReceivablesFieldBoard(ctx, { company: true });
+    } catch (err) {
+      if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+      throw err;
+    }
+    const queryMs = Date.now() - started;
+    return (
+      <PageShell variant="default" className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Cuentas por cobrar</h1>
+          <p className="text-sm text-muted-foreground">Empresa</p>
+        </div>
+        <ReceivablesFieldExperience rows={board.rows} queryMs={queryMs} />
+      </PageShell>
+    );
+  }
 
   let agingReport;
   let listResult;
@@ -125,6 +156,7 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
 
   return (
     <PageShell variant="default" className="space-y-6">
+      <div className="space-y-6" data-testid="receivables-desktop-view">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cuentas por cobrar</h1>
@@ -205,6 +237,7 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
           </Suspense>
         </CardContent>
       </Card>
+      </div>
     </PageShell>
   );
 }

@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { CollectionForm } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import { can } from "@bloqer/domain";
 import { getReceivableById, listSelectableTreasuryAccounts, ServiceError } from "@bloqer/services";
+import { isReceivablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 interface PageProps {
   params: Promise<{ id: string; receivableId: string }>;
@@ -45,6 +47,9 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
     .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
 
   const isBlocked = receivable.status === "PAID" || receivable.status === "CANCELLED";
+  const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
+  const fieldMode = isReceivablesFieldViewport(hint);
+  const detailHref = `/proyectos/${id}/cuentas-por-cobrar/${receivableId}`;
 
   return (
     <PageShell
@@ -77,6 +82,9 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
           receivableBalance={receivable.balanceDue}
           receivableCurrency={receivable.currency}
           accounts={activeAccounts}
+          fieldMode={fieldMode}
+          clientName={receivable.clientName}
+          successHref={fieldMode ? `${detailHref}?collected=1` : undefined}
         />
       )}
     </PageShell>

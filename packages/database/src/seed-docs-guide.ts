@@ -110,6 +110,22 @@ export const DOCS_GUIDE_IDS = {
   fieldPayablePaidId: "a000011d-0000-4000-8000-00000000011d",
   fieldPayablePaidPaymentId: "a000011e-0000-4000-8000-00000000011e",
   fieldPayablePaidMovementId: "a000011f-0000-4000-8000-00000000011f",
+  fieldReceivableOverdueInvoiceId: "a0000120-0000-4000-8000-000000000120",
+  fieldReceivableOverdueLineId: "a0000121-0000-4000-8000-000000000121",
+  fieldReceivableOverdueId: "a0000122-0000-4000-8000-000000000122",
+  fieldReceivableUpcomingInvoiceId: "a0000123-0000-4000-8000-000000000123",
+  fieldReceivableUpcomingLineId: "a0000124-0000-4000-8000-000000000124",
+  fieldReceivableUpcomingId: "a0000125-0000-4000-8000-000000000125",
+  fieldReceivablePartialInvoiceId: "a0000126-0000-4000-8000-000000000126",
+  fieldReceivablePartialLineId: "a0000127-0000-4000-8000-000000000127",
+  fieldReceivablePartialId: "a0000128-0000-4000-8000-000000000128",
+  fieldReceivablePartialCollectionId: "a0000129-0000-4000-8000-000000000129",
+  fieldReceivablePartialMovementId: "a000012a-0000-4000-8000-00000000012a",
+  fieldReceivablePaidInvoiceId: "a000012b-0000-4000-8000-00000000012b",
+  fieldReceivablePaidLineId: "a000012c-0000-4000-8000-00000000012c",
+  fieldReceivablePaidId: "a000012d-0000-4000-8000-00000000012d",
+  fieldReceivablePaidCollectionId: "a000012e-0000-4000-8000-00000000012e",
+  fieldReceivablePaidMovementId: "a000012f-0000-4000-8000-00000000012f",
 } as const;
 
 const DOCS_TENANT_NAME = "Bloqer Demo Construcciones";
@@ -2206,6 +2222,287 @@ async function seedFieldPayables(prisma: PrismaClient, ctx: SeedCtx): Promise<vo
   });
 }
 
+async function seedFieldReceivables(prisma: PrismaClient, ctx: SeedCtx): Promise<void> {
+  const today = new Date();
+  today.setUTCHours(12, 0, 0, 0);
+
+  const scenarios = [
+    {
+      invoiceId: DOCS_GUIDE_IDS.fieldReceivableOverdueInvoiceId,
+      lineId: DOCS_GUIDE_IDS.fieldReceivableOverdueLineId,
+      receivableId: DOCS_GUIDE_IDS.fieldReceivableOverdueId,
+      number: 9201,
+      description: "Certificación Field CxC vencida",
+      total: money(120_000),
+      paid: money(0),
+      status: "OPEN" as const,
+      dueOffset: -10,
+    },
+    {
+      invoiceId: DOCS_GUIDE_IDS.fieldReceivableUpcomingInvoiceId,
+      lineId: DOCS_GUIDE_IDS.fieldReceivableUpcomingLineId,
+      receivableId: DOCS_GUIDE_IDS.fieldReceivableUpcomingId,
+      number: 9202,
+      description: "Anticipo Field CxC próxima",
+      total: money(80_000),
+      paid: money(0),
+      status: "OPEN" as const,
+      dueOffset: 8,
+    },
+    {
+      invoiceId: DOCS_GUIDE_IDS.fieldReceivablePartialInvoiceId,
+      lineId: DOCS_GUIDE_IDS.fieldReceivablePartialLineId,
+      receivableId: DOCS_GUIDE_IDS.fieldReceivablePartialId,
+      number: 9203,
+      description: "Adicional Field CxC parcial",
+      total: money(50_000),
+      paid: money(20_000),
+      status: "PARTIAL" as const,
+      dueOffset: 4,
+    },
+    {
+      invoiceId: DOCS_GUIDE_IDS.fieldReceivablePaidInvoiceId,
+      lineId: DOCS_GUIDE_IDS.fieldReceivablePaidLineId,
+      receivableId: DOCS_GUIDE_IDS.fieldReceivablePaidId,
+      number: 9204,
+      description: "Saldo Field CxC cobrada",
+      total: money(30_000),
+      paid: money(30_000),
+      status: "PAID" as const,
+      dueOffset: -40,
+    },
+  ];
+
+  for (const row of scenarios) {
+    const dueDate = addUtcDays(today, row.dueOffset);
+    const issueDate = addUtcDays(dueDate, -30);
+    await prisma.salesInvoice.upsert({
+      where: { id: row.invoiceId },
+      update: {
+        status: "ISSUED",
+        number: row.number,
+        issueDate,
+        dueDate,
+        subtotal: row.total,
+        taxAmount: money(0),
+        totalAmount: row.total,
+        amountArs: row.total,
+        clientContactId: ctx.clientId,
+        projectId: DOCS_GUIDE_IDS.projectId,
+        invoiceLetter: "B",
+      },
+      create: {
+        id: row.invoiceId,
+        tenantId: ctx.tenantId,
+        companyId: ctx.companyId,
+        projectId: DOCS_GUIDE_IDS.projectId,
+        clientContactId: ctx.clientId,
+        number: row.number,
+        invoiceLetter: "B",
+        issueDate,
+        dueDate,
+        currency: "ARS",
+        fxRate: "1.000000",
+        subtotal: row.total,
+        taxAmount: money(0),
+        totalAmount: row.total,
+        amountArs: row.total,
+        status: "ISSUED",
+        createdBy: ctx.docsUserId,
+      },
+    });
+    await prisma.salesInvoiceLine.upsert({
+      where: { id: row.lineId },
+      update: {
+        description: row.description,
+        quantity: "1.0000",
+        unitPrice: row.total,
+        lineSubtotal: row.total,
+        lineTax: money(0),
+        lineTotal: row.total,
+      },
+      create: {
+        id: row.lineId,
+        invoiceId: row.invoiceId,
+        description: row.description,
+        quantity: "1.0000",
+        unitPrice: row.total,
+        taxRate: "0.0000",
+        lineSubtotal: row.total,
+        lineTax: money(0),
+        lineTotal: row.total,
+        sortOrder: 0,
+      },
+    });
+  }
+
+  const keepCollectionIds = [
+    DOCS_GUIDE_IDS.fieldReceivablePartialCollectionId,
+    DOCS_GUIDE_IDS.fieldReceivablePaidCollectionId,
+  ];
+  const receivableIds = scenarios.map((s) => s.receivableId);
+  const extras = await prisma.collection.findMany({
+    where: { receivableId: { in: receivableIds }, id: { notIn: keepCollectionIds } },
+    select: { id: true },
+  });
+  if (extras.length > 0) {
+    const extraIds = extras.map((e) => e.id);
+    await prisma.accountMovement.deleteMany({
+      where: { sourceType: "COLLECTION", sourceId: { in: extraIds } },
+    });
+    await prisma.collection.deleteMany({ where: { id: { in: extraIds } } });
+  }
+
+  for (const row of scenarios) {
+    const dueDate = addUtcDays(today, row.dueOffset);
+    const issueDate = addUtcDays(dueDate, -30);
+    await prisma.receivable.upsert({
+      where: { id: row.receivableId },
+      update: {
+        status: row.status,
+        originalAmount: row.total,
+        paidAmount: row.paid,
+        issueDate,
+        dueDate,
+        clientContactId: ctx.clientId,
+        salesInvoiceId: row.invoiceId,
+        projectId: DOCS_GUIDE_IDS.projectId,
+        currency: "ARS",
+      },
+      create: {
+        id: row.receivableId,
+        tenantId: ctx.tenantId,
+        companyId: ctx.companyId,
+        projectId: DOCS_GUIDE_IDS.projectId,
+        clientContactId: ctx.clientId,
+        salesInvoiceId: row.invoiceId,
+        issueDate,
+        dueDate,
+        currency: "ARS",
+        originalAmount: row.total,
+        paidAmount: row.paid,
+        status: row.status,
+        createdBy: ctx.docsUserId,
+      },
+    });
+  }
+
+  const partialDate = addUtcDays(today, -2);
+  await prisma.collection.upsert({
+    where: { id: DOCS_GUIDE_IDS.fieldReceivablePartialCollectionId },
+    update: {
+      amount: money(20_000),
+      amountArs: money(20_000),
+      collectionDate: partialDate,
+      status: "CONFIRMED",
+      reference: "TRANSF-FIELD-CXC-PARCIAL",
+      accountId: DOCS_GUIDE_IDS.treasuryAccountId,
+      receivableId: DOCS_GUIDE_IDS.fieldReceivablePartialId,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldReceivablePartialCollectionId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      clientContactId: ctx.clientId,
+      receivableId: DOCS_GUIDE_IDS.fieldReceivablePartialId,
+      salesInvoiceId: DOCS_GUIDE_IDS.fieldReceivablePartialInvoiceId,
+      accountId: DOCS_GUIDE_IDS.treasuryAccountId,
+      collectionDate: partialDate,
+      currency: "ARS",
+      fxRate: "1.000000",
+      amountArs: money(20_000),
+      amount: money(20_000),
+      paymentMethod: "BANK_TRANSFER",
+      reference: "TRANSF-FIELD-CXC-PARCIAL",
+      status: "CONFIRMED",
+      createdBy: ctx.docsUserId,
+    },
+  });
+  await prisma.accountMovement.upsert({
+    where: { id: DOCS_GUIDE_IDS.fieldReceivablePartialMovementId },
+    update: {
+      amount: money(20_000),
+      movementDate: partialDate,
+      sourceId: DOCS_GUIDE_IDS.fieldReceivablePartialCollectionId,
+      status: "CONFIRMED",
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldReceivablePartialMovementId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      accountId: DOCS_GUIDE_IDS.treasuryAccountId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      movementDate: partialDate,
+      type: "INFLOW",
+      sourceType: "COLLECTION",
+      sourceId: DOCS_GUIDE_IDS.fieldReceivablePartialCollectionId,
+      currency: "ARS",
+      amount: money(20_000),
+      description: "Cobro parcial Field demo FAC-09203",
+      status: "CONFIRMED",
+      createdBy: ctx.docsUserId,
+    },
+  });
+
+  const paidDate = addUtcDays(today, -20);
+  await prisma.collection.upsert({
+    where: { id: DOCS_GUIDE_IDS.fieldReceivablePaidCollectionId },
+    update: {
+      amount: money(30_000),
+      amountArs: money(30_000),
+      collectionDate: paidDate,
+      status: "CONFIRMED",
+      accountId: DOCS_GUIDE_IDS.treasuryAccountId,
+      receivableId: DOCS_GUIDE_IDS.fieldReceivablePaidId,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldReceivablePaidCollectionId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      clientContactId: ctx.clientId,
+      receivableId: DOCS_GUIDE_IDS.fieldReceivablePaidId,
+      salesInvoiceId: DOCS_GUIDE_IDS.fieldReceivablePaidInvoiceId,
+      accountId: DOCS_GUIDE_IDS.treasuryAccountId,
+      collectionDate: paidDate,
+      currency: "ARS",
+      fxRate: "1.000000",
+      amountArs: money(30_000),
+      amount: money(30_000),
+      paymentMethod: "BANK_TRANSFER",
+      reference: "TRANSF-FIELD-CXC-COBRADA",
+      status: "CONFIRMED",
+      createdBy: ctx.docsUserId,
+    },
+  });
+  await prisma.accountMovement.upsert({
+    where: { id: DOCS_GUIDE_IDS.fieldReceivablePaidMovementId },
+    update: {
+      amount: money(30_000),
+      movementDate: paidDate,
+      sourceId: DOCS_GUIDE_IDS.fieldReceivablePaidCollectionId,
+      status: "CONFIRMED",
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldReceivablePaidMovementId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      accountId: DOCS_GUIDE_IDS.treasuryAccountId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      movementDate: paidDate,
+      type: "INFLOW",
+      sourceType: "COLLECTION",
+      sourceId: DOCS_GUIDE_IDS.fieldReceivablePaidCollectionId,
+      currency: "ARS",
+      amount: money(30_000),
+      description: "Cobro total Field demo FAC-09204",
+      status: "CONFIRMED",
+      createdBy: ctx.docsUserId,
+    },
+  });
+}
+
 export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> {
   const docsEmail = (process.env.DOCS_USER_EMAIL || "docs-guide@bloqer.demo").trim().toLowerCase();
   const password = (process.env.DOCS_USER_PASSWORD || process.env.SEED_USER_PASSWORD || "").trim();
@@ -2587,6 +2884,7 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
   await seedFieldPayables(prisma, seedCtx);
   await seedSubcontractChain(prisma, seedCtx);
   await seedCertificationAndSales(prisma, seedCtx);
+  await seedFieldReceivables(prisma, seedCtx);
   await seedJobsiteLog(prisma, seedCtx);
   await seedSecondDemoProject(prisma, seedCtx);
   await seedFieldPendingEntities(prisma, seedCtx);

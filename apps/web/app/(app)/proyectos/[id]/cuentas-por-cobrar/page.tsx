@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Pagination } from "@/components/ui/pagination";
@@ -7,6 +8,7 @@ import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { AgingFilters, AgingSummaryCards, AgingTable } from "@/features/aging";
 import {
   ReceivableListSection,
+  ReceivablesFieldExperience,
   SalesInvoiceListSection,
   type ReceivableListItem,
   type SalesInvoiceListItem,
@@ -20,12 +22,14 @@ import {
   listCollectionsByProject,
   listInvoicesByProject,
   listReceivablesByProject,
+  listReceivablesFieldBoard,
   parseAgingFilters,
   ServiceError,
 } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { PageShell } from "@/components/layout/page-shell";
 import { parsePage } from "@/lib/parse-page";
+import { isReceivablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 const PAGE_SIZE = 20;
 const RELATED_PAGE_SIZE = 5;
@@ -63,6 +67,31 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
+  }
+
+  const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
+  const loadField = isReceivablesFieldViewport(hint);
+
+  if (loadField) {
+    const started = Date.now();
+    let board;
+    try {
+      board = await listReceivablesFieldBoard(ctx, { projectId: id });
+    } catch (err) {
+      if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+      if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
+      throw err;
+    }
+    const queryMs = Date.now() - started;
+    return (
+      <PageShell variant="default" className="space-y-6">
+        <ProjectPageHeader
+          title="Cuentas por cobrar"
+          subtitle={`${board.total} ${board.total === 1 ? "cuenta" : "cuentas"}`}
+        />
+        <ReceivablesFieldExperience rows={board.rows} queryMs={queryMs} />
+      </PageShell>
+    );
   }
 
   let receivablesResult;
@@ -129,6 +158,7 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
 
   return (
     <PageShell variant="default" className="space-y-6">
+      <div className="space-y-6" data-testid="receivables-desktop-view">
       <ProjectPageHeader
         title="Cuentas por cobrar"
         subtitle={`${receivablesTotal} ${receivablesTotal === 1 ? "cuenta" : "cuentas"}`}
@@ -178,6 +208,7 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
       <Suspense fallback={null}>
         <Pagination page={page} pageSize={PAGE_SIZE} total={receivablesTotal} />
       </Suspense>
+      </div>
     </PageShell>
   );
 }

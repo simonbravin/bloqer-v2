@@ -13,7 +13,8 @@
     "./project-workspace-nav": "./src/project/project-workspace-nav.ts",
     "./schedule-field": "./src/schedule/schedule-field.ts",
     "./materials-field": "./src/materials/materials-field.ts",
-    "./payables-field": "./src/ap/payables-field.ts"
+    "./payables-field": "./src/ap/payables-field.ts",
+    "./receivables-field": "./src/ar/receivables-field.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

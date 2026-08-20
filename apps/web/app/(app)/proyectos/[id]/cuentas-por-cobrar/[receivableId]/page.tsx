@@ -1,23 +1,32 @@
+import { cookies } from "next/headers";
 import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DataTableSection } from "@/components/ui/data-table-section";
-import { ReceivableStatusBadge } from "@/features/sales-invoices";
+import { ReceivableFieldDetailView, ReceivableStatusBadge } from "@/features/sales-invoices";
 import { CollectionTable } from "@/features/collections";
 import type { CollectionListItem } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
-import { getReceivableById, listCollectionsByReceivable, ServiceError } from "@bloqer/services";
+import {
+  canMutateArForScope,
+  getProjectShellInfo,
+  getReceivableById,
+  getSalesInvoiceById,
+  listCollectionsByReceivable,
+  ServiceError,
+} from "@bloqer/services";
 import { cancelReceivableAction } from "../../facturas/actions";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { isReceivablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 interface PageProps {
   params: Promise<{ id: string; receivableId: string }>;
-  searchParams: Promise<{ actionError?: string }>;
+  searchParams: Promise<{ actionError?: string; collected?: string }>;
 }
 
 function fmtDate(d: Date) {
@@ -43,13 +52,23 @@ export default async function ReceivableDetailPage({ params, searchParams }: Pag
     roles: current.tenantCtx.roles,
   };
 
+  const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
+  const loadField = isReceivablesFieldViewport(hint);
+
   let receivable;
   let collections;
+  let invoiceCode: string | null = null;
+  let projectName: string | null = null;
   try {
     [receivable, collections] = await Promise.all([
       getReceivableById(receivableId, ctx, id),
       listCollectionsByReceivable(receivableId, ctx, id),
     ]);
+    if (loadField) {
+      projectName = (await getProjectShellInfo(id, ctx)).name;
+      const invoice = await getSalesInvoiceById(receivable.salesInvoiceId, ctx, id);
+      invoiceCode = invoice.code;
+    }
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
@@ -59,9 +78,47 @@ export default async function ReceivableDetailPage({ params, searchParams }: Pag
   const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
 
   const returnPath = `/proyectos/${id}/cuentas-por-cobrar/${receivableId}`;
-  const canCollect = canEditAr && OPEN_STATUSES.has(receivable.status);
+  const canCollectDesktop = canEditAr && OPEN_STATUSES.has(receivable.status);
+  const canCollectField =
+    canMutateArForScope(ctx.roles, receivable.projectId) && OPEN_STATUSES.has(receivable.status);
   const canCancel =
     canEditAr && receivable.status !== "CANCELLED" && receivable.status !== "PAID";
+
+  if (loadField) {
+    return (
+      <PageShell variant="detail" className="space-y-6" breadcrumbLabel={receivable.clientName}>
+        <ReceivableFieldDetailView
+          clientName={receivable.clientName}
+          invoiceCode={invoiceCode}
+          invoiceHref={`/proyectos/${id}/facturas/${receivable.salesInvoiceId}`}
+          projectName={projectName}
+          issueDate={receivable.issueDate}
+          dueDate={receivable.dueDate}
+          currency={receivable.currency}
+          originalAmount={receivable.originalAmount}
+          paidAmount={receivable.paidAmount}
+          balanceDue={receivable.balanceDue}
+          status={receivable.status}
+          collections={collections.map((c) => ({
+            id: c.id,
+            collectionDate: c.collectionDate,
+            amount: c.amount,
+            currency: c.currency,
+            accountName: c.accountName,
+            reference: c.reference ?? null,
+            href: `/proyectos/${id}/cobranzas/${c.id}`,
+          }))}
+          canCollect={canCollectField}
+          collectHref={
+            canCollectField
+              ? `/proyectos/${id}/cuentas-por-cobrar/${receivableId}/cobrar`
+              : null
+          }
+          collectedBanner={sp.collected === "1"}
+        />
+      </PageShell>
+    );
+  }
 
   const collectionItems: CollectionListItem[] = collections.map((c) => ({
     id: c.id,
@@ -85,7 +142,7 @@ export default async function ReceivableDetailPage({ params, searchParams }: Pag
         </div>
 
         <div className="flex items-center gap-2">
-          {canCollect && (
+          {canCollectDesktop && (
             <Button size="sm" asChild>
               <Link href={`/proyectos/${id}/cuentas-por-cobrar/${receivableId}/cobrar`}>
                 Registrar cobranza
@@ -173,7 +230,7 @@ export default async function ReceivableDetailPage({ params, searchParams }: Pag
       <DataTableSection
         title="Cobranzas"
         actions={
-          canCollect ? (
+          canCollectDesktop ? (
             <Button variant="outline" size="sm" asChild>
               <Link href={`/proyectos/${id}/cuentas-por-cobrar/${receivableId}/cobrar`}>
                 Registrar cobranza

@@ -5,6 +5,7 @@ import {
   isScheduleFieldViewport,
   isMaterialsFieldViewport,
   isPayablesFieldViewport,
+  isReceivablesFieldViewport,
   parseViewportHint,
   viewportHintFromMatchMedia,
 } from "./viewport-hint-cookie";
@@ -34,6 +35,8 @@ test("cronograma and materiales Field are everything except lg, including missin
   assert.equal(isMaterialsFieldViewport("lg"), false);
   assert.equal(isPayablesFieldViewport("md"), true);
   assert.equal(isPayablesFieldViewport("lg"), false);
+  assert.equal(isReceivablesFieldViewport("md"), true);
+  assert.equal(isReceivablesFieldViewport("lg"), false);
 });
 
 test("matchMedia maps 390/768/1440 onto sm/md/lg", () => {

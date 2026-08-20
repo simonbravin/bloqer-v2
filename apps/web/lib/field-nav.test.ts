@@ -9,7 +9,10 @@ test("immersive paths hide bottom nav", () => {
   assert.equal(isFieldImmersivePath("/proyectos/abc/solicitudes-compra/nueva"), true);
   assert.equal(isFieldImmersivePath("/proyectos/abc/cuentas-por-pagar/pay1/pagar"), true);
   assert.equal(isFieldImmersivePath("/finanzas/cuentas-por-pagar/pay1/pagar"), true);
+  assert.equal(isFieldImmersivePath("/proyectos/abc/cuentas-por-cobrar/rec1/cobrar"), true);
+  assert.equal(isFieldImmersivePath("/finanzas/cuentas-por-cobrar/rec1/cobrar"), true);
   assert.equal(isFieldImmersivePath("/proyectos/abc/cuentas-por-pagar"), false);
+  assert.equal(isFieldImmersivePath("/proyectos/abc/cuentas-por-cobrar"), false);
   assert.equal(isFieldImmersivePath("/proyectos/abc/ordenes-compra/po1/recepciones/nueva"), true);
   assert.equal(isFieldImmersivePath("/proyectos/abc/libro-obra"), false);
   assert.equal(isFieldImmersivePath("/dashboard"), false);
@@ -28,12 +31,16 @@ test("PROJECT_MANAGER can create parte and SC but not consumption", () => {
   assert.equal(ids.includes("consumption"), false);
 });
 
-test("OWNER can register consumption and field + does not include Pagar", () => {
+test("OWNER can register consumption and field + does not include Pagar or Cobrar", () => {
   const ids = listFieldQuickActions(["OWNER"], () => true).map((a) => a.id);
   assert.equal(ids.includes("consumption"), true);
   assert.equal(ids.includes("jobsiteLog"), true);
   assert.equal(
     ids.some((id) => id.toLowerCase().includes("pay") || id.toLowerCase().includes("pago")),
+    false,
+  );
+  assert.equal(
+    ids.some((id) => id.toLowerCase().includes("cobr") || id.toLowerCase().includes("collect")),
     false,
   );
 });

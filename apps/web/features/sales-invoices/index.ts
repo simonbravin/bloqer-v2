@@ -6,6 +6,8 @@ export { SalesInvoiceListSection } from "./components/sales-invoice-list-section
 export { ReceivableTable } from "./components/receivable-table";
 export { ReceivableCards } from "./components/receivable-cards";
 export { ReceivableListSection } from "./components/receivable-list-section";
+export { ReceivablesFieldExperience } from "./components/receivables-field-experience";
+export { ReceivableFieldDetailView } from "./components/receivable-field-detail-view";
 export { CertificationInvoiceForm } from "./components/certification-invoice-form";
 export { InvoiceEditForm } from "./components/invoice-edit-form";
 export { ManualInvoiceForm } from "./components/manual-invoice-form";

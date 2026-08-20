@@ -30,13 +30,14 @@ export function ViewportHintSync() {
       const isCronograma = pathname.includes("/cronograma");
       const isMateriales = pathname.includes("/materiales");
       const isCuentasPorPagar = pathname.includes("/cuentas-por-pagar");
+      const isCuentasPorCobrar = pathname.includes("/cuentas-por-cobrar");
       const fieldSourceChanged = (prev === "lg") !== (next === "lg");
 
       if (isDashboard) {
         router.refresh();
         return;
       }
-      if (isCronograma || isMateriales || isCuentasPorPagar) {
+      if (isCronograma || isMateriales || isCuentasPorPagar || isCuentasPorCobrar) {
         if (fieldSourceChanged) router.refresh();
         return;
       }

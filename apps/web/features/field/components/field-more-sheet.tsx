@@ -24,9 +24,15 @@ const PROJECT_HREF_SUFFIXES = [
   { suffix: "/documentos", labelMatch: "Documentos" },
   { suffix: "/cronograma", labelMatch: "Cronograma" },
   { suffix: "/cuentas-por-pagar", labelMatch: "Cuentas por pagar" },
+  { suffix: "/cuentas-por-cobrar", labelMatch: "Cuentas por cobrar" },
 ];
 
-const GENERAL_HREFS = new Set(["/proyectos", "/directorio", "/finanzas/cuentas-por-pagar"]);
+const GENERAL_HREFS = new Set([
+  "/proyectos",
+  "/directorio",
+  "/finanzas/cuentas-por-pagar",
+  "/finanzas/cuentas-por-cobrar",
+]);
 
 type Props = {
   open: boolean;

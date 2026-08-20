@@ -1,9 +1,10 @@
+import { cookies } from "next/headers";
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DataTableSection } from "@/components/ui/data-table-section";
-import { ReceivableStatusBadge } from "@/features/sales-invoices";
+import { ReceivableFieldDetailView, ReceivableStatusBadge } from "@/features/sales-invoices";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { getCurrentUser } from "@/lib/auth";
@@ -11,6 +12,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { isStorageConfigured } from "@bloqer/config";
 import { can } from "@bloqer/domain";
 import {
+  canMutateArForScope,
   getCompanyReceivableById,
   listCollectionsByReceivable,
   listEntityDocuments,
@@ -19,10 +21,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { cancelCompanyReceivableAction } from "../actions";
+import { isReceivablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 interface PageProps {
   params: Promise<{ receivableId: string }>;
-  searchParams: Promise<{ actionError?: string }>;
+  searchParams: Promise<{ actionError?: string; collected?: string }>;
 }
 
 const OPEN_STATUSES = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
@@ -54,6 +57,49 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
     throw err;
   }
 
+  const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
+  const loadField = isReceivablesFieldViewport(hint);
+  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
+  const canCollect = canEditAr && OPEN_STATUSES.has(receivable.status);
+  const canCancel =
+    canEditAr && receivable.status !== "CANCELLED" && receivable.status !== "PAID";
+
+  if (loadField) {
+    const canCollectField =
+      canMutateArForScope(ctx.roles, receivable.projectId) && OPEN_STATUSES.has(receivable.status);
+    return (
+      <PageShell variant="detail" className="space-y-6" breadcrumbLabel={receivable.clientName}>
+        <ReceivableFieldDetailView
+          clientName={receivable.clientName}
+          invoiceCode={receivable.salesInvoiceCode}
+          invoiceHref={null}
+          projectName={null}
+          issueDate={receivable.issueDate}
+          dueDate={receivable.dueDate}
+          currency={receivable.currency}
+          originalAmount={receivable.originalAmount}
+          paidAmount={receivable.paidAmount}
+          balanceDue={receivable.balanceDue}
+          status={receivable.status}
+          collections={collections.map((c) => ({
+            id: c.id,
+            collectionDate: c.collectionDate,
+            amount: c.amount,
+            currency: c.currency,
+            accountName: c.accountName,
+            reference: c.reference ?? null,
+            href: null,
+          }))}
+          canCollect={canCollectField}
+          collectHref={
+            canCollectField ? `/finanzas/cuentas-por-cobrar/${receivableId}/cobrar` : null
+          }
+          collectedBanner={sp.collected === "1"}
+        />
+      </PageShell>
+    );
+  }
+
   const invoiceAttachments = await listEntityDocuments(
     "SALES_INVOICE",
     receivable.salesInvoiceId,
@@ -61,13 +107,8 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
     {},
   );
   const storageConfigured = isStorageConfigured();
-  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
   const canEditAttachments = canEditAr;
   const detailPath = `/finanzas/cuentas-por-cobrar/${receivableId}`;
-
-  const canCollect = canEditAr && OPEN_STATUSES.has(receivable.status);
-  const canCancel =
-    canEditAr && receivable.status !== "CANCELLED" && receivable.status !== "PAID";
 
   return (
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={receivable.clientName}>

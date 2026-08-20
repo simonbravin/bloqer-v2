@@ -6,6 +6,8 @@ const IMMERSIVE_PATTERNS: RegExp[] = [
   /^\/proyectos\/[^/]+\/ordenes-compra\/[^/]+\/recepciones\/nueva\/?$/,
   /^\/proyectos\/[^/]+\/cuentas-por-pagar\/[^/]+\/pagar\/?$/,
   /^\/finanzas\/cuentas-por-pagar\/[^/]+\/pagar\/?$/,
+  /^\/proyectos\/[^/]+\/cuentas-por-cobrar\/[^/]+\/cobrar\/?$/,
+  /^\/finanzas\/cuentas-por-cobrar\/[^/]+\/cobrar\/?$/,
 ];
 
 export function isFieldImmersivePath(pathname: string): boolean {

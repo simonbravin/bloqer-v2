@@ -1,10 +1,30 @@
-import { compareDecimal } from "@bloqer/utils";
+import {
+  compareObligationFieldRows,
+  isObligationFieldOpen,
+  limitObligationFieldRows,
+  matchesObligationFieldFilter,
+  matchesObligationFieldSearch,
+  obligationFieldHasOpenBalance,
+  obligationFieldTodayIso,
+  obligationFieldUrgency,
+  obligationFieldUrgencyRank,
+  OBLIGATION_FIELD_FETCH_LIMIT,
+  OBLIGATION_FIELD_LIST_LIMIT,
+  OBLIGATION_FIELD_OPEN_BALANCE_EPSILON,
+  parseObligationFieldFilter,
+  summarizeObligationFieldKpis,
+  utcIsoDate,
+  type ObligationFieldFilterId,
+  type ObligationFieldKpis,
+  type ObligationFieldSortable,
+  type ObligationFieldUrgency,
+} from "../finance/obligation-field";
 
 /**
  * Field CxP filters. Deep-link: `?field=pending|overdue|upcoming|paid`.
  * Default mobile: `pending` (open balance).
  */
-export type PayablesFieldFilterId = "pending" | "overdue" | "upcoming" | "paid";
+export type PayablesFieldFilterId = ObligationFieldFilterId;
 
 export const PAYABLES_FIELD_FILTER_IDS: PayablesFieldFilterId[] = [
   "pending",
@@ -14,19 +34,19 @@ export const PAYABLES_FIELD_FILTER_IDS: PayablesFieldFilterId[] = [
 ];
 
 /** Fetch cap for the Field list query (not `resolvePagination` / aging). */
-export const PAYABLES_FIELD_FETCH_LIMIT = 500;
+export const PAYABLES_FIELD_FETCH_LIMIT = OBLIGATION_FIELD_FETCH_LIMIT;
 
 /** Display cap after filter + sort (same pattern as Materiales Field). */
-export const PAYABLES_FIELD_LIST_LIMIT = 200;
+export const PAYABLES_FIELD_LIST_LIMIT = OBLIGATION_FIELD_LIST_LIMIT;
 
 /** Same cent threshold as `hasOpenObligationBalance` (D-053). Prisma-free for client. */
-export const PAYABLES_FIELD_OPEN_BALANCE_EPSILON = "0.01";
+export const PAYABLES_FIELD_OPEN_BALANCE_EPSILON = OBLIGATION_FIELD_OPEN_BALANCE_EPSILON;
 
 /**
  * Derived urgency labels — not persisted.
  * Calendar comparison is UTC date (`YYYY-MM-DD`), same as AP aging / `isObligationOverdue`.
  */
-export type PayablesFieldUrgency = "overdue" | "due_today" | "upcoming" | "paid" | "cancelled";
+export type PayablesFieldUrgency = ObligationFieldUrgency;
 
 export const PAYABLES_FIELD_URGENCY_LABELS: Record<PayablesFieldUrgency, string> = {
   overdue: "Vencida",
@@ -52,61 +72,40 @@ export type PayablesFieldRow = {
   status: string;
 };
 
+function asSortable(row: PayablesFieldRow): ObligationFieldSortable {
+  return {
+    status: row.status,
+    balanceDue: row.balanceDue,
+    dueDateIso: row.dueDateIso,
+    partyName: row.supplierName,
+  };
+}
+
 export function formatSupplierInvoiceCode(number: number | null | undefined): string | null {
   if (number == null) return null;
   return `FP-${String(number).padStart(5, "0")}`;
 }
 
 /** UTC calendar day as `YYYY-MM-DD` — matches AP aging, not product-TZ week helpers. */
-export function payablesFieldTodayIso(now: Date = new Date()): string {
-  const y = now.getUTCFullYear();
-  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(now.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+export const payablesFieldTodayIso = obligationFieldTodayIso;
 
-export function utcIsoDate(value: Date): string {
-  const y = value.getUTCFullYear();
-  const m = String(value.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(value.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+export { utcIsoDate };
 
-export function parsePayablesFieldFilter(
-  raw: string | null | undefined,
-): PayablesFieldFilterId | null {
-  if (!raw) return null;
-  const value = raw.trim().toLowerCase();
-  if (PAYABLES_FIELD_FILTER_IDS.includes(value as PayablesFieldFilterId)) {
-    return value as PayablesFieldFilterId;
-  }
-  return null;
-}
+export const parsePayablesFieldFilter = parseObligationFieldFilter;
 
-export function payablesFieldHasOpenBalance(balanceDue: string): boolean {
-  try {
-    return compareDecimal(balanceDue, PAYABLES_FIELD_OPEN_BALANCE_EPSILON) >= 0;
-  } catch {
-    return false;
-  }
-}
+export const payablesFieldHasOpenBalance = obligationFieldHasOpenBalance;
 
 export function isPayablesFieldOpen(
   row: Pick<PayablesFieldRow, "status" | "balanceDue">,
 ): boolean {
-  if (row.status === "CANCELLED" || row.status === "PAID") return false;
-  return payablesFieldHasOpenBalance(row.balanceDue);
+  return isObligationFieldOpen(row);
 }
 
 export function payablesFieldUrgency(
   row: Pick<PayablesFieldRow, "status" | "balanceDue" | "dueDateIso">,
   todayIso: string,
 ): PayablesFieldUrgency {
-  if (row.status === "CANCELLED") return "cancelled";
-  if (!isPayablesFieldOpen(row)) return "paid";
-  if (row.dueDateIso < todayIso) return "overdue";
-  if (row.dueDateIso === todayIso) return "due_today";
-  return "upcoming";
+  return obligationFieldUrgency(row, todayIso);
 }
 
 export function matchesPayablesFieldFilter(
@@ -114,29 +113,14 @@ export function matchesPayablesFieldFilter(
   filter: PayablesFieldFilterId,
   todayIso: string,
 ): boolean {
-  const urgency = payablesFieldUrgency(row, todayIso);
-  switch (filter) {
-    case "pending":
-      return isPayablesFieldOpen(row);
-    case "overdue":
-      return urgency === "overdue";
-    case "upcoming":
-      return urgency === "due_today" || urgency === "upcoming";
-    case "paid":
-      return urgency === "paid";
-    default:
-      return false;
-  }
+  return matchesObligationFieldFilter(asSortable(row), filter, todayIso);
 }
 
 export function matchesPayablesFieldSearch(
   row: Pick<PayablesFieldRow, "supplierName" | "supplierInvoiceCode">,
   query: string,
 ): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  const hay = `${row.supplierName} ${row.supplierInvoiceCode ?? ""}`.toLowerCase();
-  return hay.includes(q);
+  return matchesObligationFieldSearch(row.supplierName, row.supplierInvoiceCode, query);
 }
 
 /** Overdue → due today → due date → larger balance → supplier. Not alpha-first. */
@@ -144,20 +128,7 @@ export function payablesFieldUrgencyRank(
   row: PayablesFieldRow,
   todayIso: string,
 ): number {
-  const urgency = payablesFieldUrgency(row, todayIso);
-  if (urgency === "overdue") return 0;
-  if (urgency === "due_today") return 1;
-  if (urgency === "upcoming") return 2;
-  if (urgency === "paid") return 3;
-  return 4;
-}
-
-function compareBalanceDesc(a: string, b: string): number {
-  try {
-    return compareDecimal(b, a);
-  } catch {
-    return 0;
-  }
+  return obligationFieldUrgencyRank(asSortable(row), todayIso);
 }
 
 export function comparePayablesFieldRows(
@@ -165,13 +136,7 @@ export function comparePayablesFieldRows(
   b: PayablesFieldRow,
   todayIso: string,
 ): number {
-  const rank = payablesFieldUrgencyRank(a, todayIso) - payablesFieldUrgencyRank(b, todayIso);
-  if (rank !== 0) return rank;
-  return (
-    a.dueDateIso.localeCompare(b.dueDateIso) ||
-    compareBalanceDesc(a.balanceDue, b.balanceDue) ||
-    a.supplierName.localeCompare(b.supplierName, "es")
-  );
+  return compareObligationFieldRows(asSortable(a), asSortable(b), todayIso);
 }
 
 export function filterAndSortPayablesFieldRows(
@@ -191,39 +156,15 @@ export function limitPayablesFieldRows(rows: PayablesFieldRow[]): {
   truncated: boolean;
   matchedCount: number;
 } {
-  const matchedCount = rows.length;
-  if (matchedCount <= PAYABLES_FIELD_LIST_LIMIT) {
-    return { visible: rows, truncated: false, matchedCount };
-  }
-  return {
-    visible: rows.slice(0, PAYABLES_FIELD_LIST_LIMIT),
-    truncated: true,
-    matchedCount,
-  };
+  return limitObligationFieldRows(rows);
 }
 
-export type PayablesFieldKpis = {
-  pending: number;
-  overdue: number;
-  upcoming: number;
-  paid: number;
-};
+export type PayablesFieldKpis = ObligationFieldKpis;
 
 /** KPIs over the loaded set (before the 200 display cap). */
 export function summarizePayablesFieldKpis(
   rows: PayablesFieldRow[],
   todayIso: string,
 ): PayablesFieldKpis {
-  let pending = 0;
-  let overdue = 0;
-  let upcoming = 0;
-  let paid = 0;
-  for (const row of rows) {
-    const urgency = payablesFieldUrgency(row, todayIso);
-    if (isPayablesFieldOpen(row)) pending += 1;
-    if (urgency === "overdue") overdue += 1;
-    if (urgency === "due_today" || urgency === "upcoming") upcoming += 1;
-    if (urgency === "paid") paid += 1;
-  }
-  return { pending, overdue, upcoming, paid };
+  return summarizeObligationFieldKpis(rows.map(asSortable), todayIso);
 }

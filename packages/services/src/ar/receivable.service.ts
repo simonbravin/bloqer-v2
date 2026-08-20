@@ -24,6 +24,12 @@ import {
   computeObligationBalanceDue,
   normalizeObligationBalanceDue,
 } from "../finance/obligation-balance";
+import {
+  formatSalesInvoiceCode,
+  RECEIVABLES_FIELD_FETCH_LIMIT,
+  utcIsoDate,
+  type ReceivablesFieldRow,
+} from "./receivables-field";
 
 const MAX_COLLECTIBLE_RECEIVABLES = 500;
 
@@ -304,6 +310,83 @@ export async function getCompanyReceivableById(
     projectCode: "—",
     projectName: COMPANY_AR_PROJECT_LABEL,
     salesInvoiceCode: num != null ? `FAC-${String(num).padStart(5, "0")}` : null,
+  };
+}
+
+export type ReceivablesFieldBoardResult = {
+  rows: ReceivablesFieldRow[];
+  total: number;
+  truncatedFetch: boolean;
+};
+
+/**
+ * Lightweight Field list: receivables only (invoice number + optional project name).
+ * Skips aging and related invoices/collections. Not a second collection engine.
+ * Company scope matches `listCompanyReceivables` (project + corporate).
+ */
+export async function listReceivablesFieldBoard(
+  ctx: ServiceContext,
+  scope: { projectId: string } | { company: true },
+): Promise<ReceivablesFieldBoardResult> {
+  await assertArTenantModule(ctx);
+
+  const where: Prisma.ReceivableWhereInput = { tenantId: ctx.tenantId };
+
+  if ("projectId" in scope) {
+    if (!canViewArProjectArea(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
+    }
+    const project = await prisma.project.findUnique({ where: { id: scope.projectId } });
+    if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+    if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    where.projectId = scope.projectId;
+  } else {
+    if (!canViewCompanyAr(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar a nivel empresa");
+    }
+    if (ctx.companyId) where.companyId = ctx.companyId;
+  }
+
+  const [rows, total] = await Promise.all([
+    prisma.receivable.findMany({
+      where,
+      include: {
+        clientContact: { select: { legalName: true, fantasyName: true } },
+        salesInvoice: { select: { number: true } },
+        project: { select: { name: true } },
+      },
+      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+      take: RECEIVABLES_FIELD_FETCH_LIMIT,
+    }),
+    prisma.receivable.count({ where }),
+  ]);
+
+  const reconciled = await Promise.all(rows.map((r) => reconcileReceivableStatusIfSettled(r, ctx)));
+  const mapped: ReceivablesFieldRow[] = reconciled.map((p, i) => {
+    const row = rows[i]!;
+    const { salesInvoice, project, ...receivableWithContact } = row;
+    const base = serializeReceivable({ ...receivableWithContact, ...p });
+    return {
+      id: base.id,
+      clientName: base.clientName,
+      salesInvoiceId: base.salesInvoiceId,
+      salesInvoiceCode: formatSalesInvoiceCode(salesInvoice?.number),
+      projectId: base.projectId,
+      projectName: project?.name ?? null,
+      issueDateIso: utcIsoDate(base.issueDate),
+      dueDateIso: utcIsoDate(base.dueDate),
+      currency: base.currency,
+      originalAmount: base.originalAmount,
+      paidAmount: base.paidAmount,
+      balanceDue: base.balanceDue,
+      status: base.status,
+    };
+  });
+
+  return {
+    rows: mapped,
+    total,
+    truncatedFetch: total > RECEIVABLES_FIELD_FETCH_LIMIT,
   };
 }
 

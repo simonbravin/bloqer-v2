@@ -188,12 +188,12 @@ Clasificación: **M0** ready · **M1** ajustes menores · **M2** layout mobile �
 | Fin. obra | Facturas AP | `/facturas-proveedor` | Tabla | Tabla | OK | **M2** | | Cards existen | Default cards consulta |
 | Fin. obra | Facturas venta | `/facturas` | Tabla | Tabla | OK | **M2** | | Idem | Idem |
 | Fin. obra | CxP | `/cuentas-por-pagar` | Cards Field &lt; `lg`; aging/tabla ≥ `lg` | OK | OK | **M1** | **P** | `PayablesFieldView` + `listPayablesFieldBoard`; CTA Ver cuenta | Ver Resultado — CxP Field |
-| Fin. obra | CxC | `/cuentas-por-cobrar` | **3 tablas overflow** | — | OK | **M2** | | Aging + list | Cards vencidas |
-| Fin. obra | Cobrar | `/cuentas-por-cobrar/[id]/cobrar` | Form usable; fecha+monto lado a lado (`48-cobrar-390.png`) | OK | OK | **M1** | | `grid` 2 cols en fecha/monto | `grid-cols-1 sm:grid-cols-2` |
+| Fin. obra | CxC | `/cuentas-por-cobrar` | Cards Field &lt; `lg`; aging/tabla ≥ `lg` | OK | OK | **M1** | **P** | `ReceivablesFieldView` + `listReceivablesFieldBoard`; CTA Ver cuenta | Ver Resultado — CxC Field |
+| Fin. obra | Cobrar | `/cuentas-por-cobrar/[id]/cobrar` | Field: confirmación + `collectFullBalance`; desktop igual | OK | OK | **M1** | **P** | Misma `CollectionForm` / `createCollection` | Ver Resultado — CxC Field |
 | Fin. obra | Pagar | `/cuentas-por-pagar/[id]/pagar` | Field: confirmación + `payFullBalance`; desktop igual | OK | OK | **M1** | **P** | Misma `PaymentForm` / `createPayment` | Ver Resultado — CxP Field |
 | Fin. corp | Tablero | `/finanzas` | KPIs | KPIs | OK | **M2** | | | Consulta |
 | Fin. corp | Transacciones | `/finanzas/transacciones` | Ledger | Ledger | OK | **M2** | **P** | `NewTransactionDialog` `sm:max-w-4xl` + IVA/líneas | Flujo corto gasto+foto; dialog actual = desktop |
-| Fin. corp | CxP / CxC corp | `/finanzas/cuentas-por-pagar` etc. | Tablas | Tablas | OK | **M2** | | | Consulta + pagar/cobrar |
+| Fin. corp | CxP / CxC corp | `/finanzas/cuentas-por-pagar` etc. | CxP/CxC Field &lt; `lg`; aging/tabla ≥ `lg` | OK | OK | **M1** | **P** | Misma UI Field; proyecto solo si aplica | Ver Resultado — CxP Field / CxC Field |
 | Tesorería | Resumen / cuentas | `/tesoreria`, `/cuentas` | Hubs + cards toggle | — | OK | **M2** | | | Consulta saldos |
 | Tesorería | Movimientos | `/movimientos` | Ledger ancho | — | Scroll | **M4** | | | Desktop |
 | Tesorería | Transferencias | `/transferencias` | Form | — | OK | **M2** | | | Baja prioridad campo |
@@ -1317,6 +1317,58 @@ CxP ISSUED: vencida FP-09101, próxima FP-09102, parcial FP-09103, pagada FP-091
 ## Fuera de scope
 
 Prisma/migraciones; PWA/offline; contabilidad; conciliación; cashflow; CxC; nuevas reglas financieras; Field Home KPI de vencidas; BUG-014; Materiales; Cronograma; Libro de obra.
+
+# Resultado — CxC Field
+
+Screenshots: `docs/bloqer2.0/mobile-audit/after-receivables-field/`.
+
+Misma app Next.js, mismas rutas `/proyectos/[id]/cuentas-por-cobrar` y `/finanzas/cuentas-por-cobrar`, mismos `Collection` / `Receivable` / `createCollection` / `idempotencyKey`. Sin Collection Field paralelo, sin Prisma/migraciones, sin PWA/offline. Sin Libro de obra, Materiales, Cronograma, CxP (salvo helpers compartidos de obligación), conciliación ni cashflow. Sin KPI de CxC en Field Home. Sin ítem extra en bottom nav ni Cobrar en `+`.
+
+## Arquitectura
+
+**Antes:** el listado de proyecto siempre llamaba `getReceivableAgingReport` + `listReceivablesByProject` (page 20) + facturas/cobranzas relacionadas. Aging es el dashboard de antigüedad, no hace falta para “qué hay que cobrar” en el teléfono.
+
+**Después:** un árbol por request, mismo umbral `lg` (1024) que Cronograma/Materiales/CxP. 768 usa cards.
+
+| Viewport (`bloqer-viewport`) | Data source | UI |
+|---|---|---|
+| `sm` / `md` / cookie ausente | `listReceivablesFieldBoard` — **sin** aging ni relacionados | CxC Field |
+| `lg` (≥1024) | aging + listado paginado (sin cambios) | Tabla / aging / toggle cards desktop |
+
+Helpers cliente: `@bloqer/services/receivables-field` (no importar el barrel desde el cliente). Filtro/urgencia/cap compartidos con CxP en `obligation-field.ts` (Prisma-free). No hay un framework financiero mobile.
+
+Vencida / Vence hoy / Próxima / Cobrada son labels derivados (UTC calendar day, igual que `isObligationOverdue`). Due today **no** es vencida. Filtros cliente: Pendientes (default) / Vencidas / Próximas (hoy+futuro) / Cobradas. Búsqueda cliente/factura. Cap 200 después de filtrar. Fetch 500 sin `resolvePagination` (máx. 100).
+
+Listado empresa: mismo alcance que `listCompanyReceivables` (proyecto + corporativo). Cards de proyecto van a `/proyectos/.../cuentas-por-cobrar/[id]` (el detalle corporativo rechaza `projectId !== null`).
+
+## Cobro
+
+`CollectionForm` gana `fieldMode`: saldo pendiente, `Cobrar saldo total` (rellena el monto; el server aplica `collectFullBalance` si coincide con `balanceDue`), confirmación Cliente/Monto/Cuenta/Fecha, CTA `Confirmar cobro` **dentro** del panel de confirmación. Misma `idempotencyKey` entre revisar y confirmar. Éxito → detalle de la CxC con `Cobro registrado` (`?collected=1`). Desktop sigue yendo a la obligación sin confirmación extra.
+
+## Permisos
+
+Consulta proyecto: `canViewArProjectArea`. Corporativo: `canViewCompanyAr`. Cobrar: `canMutateArForScope`. VIEWER consulta, sin CTA. Validaciones (saldo, cuenta, moneda, estado, tenant/project) siguen en `createCollection`.
+
+## Navegación
+
+Más → Cuentas por cobrar (proyecto) y CxC empresa si el nav global la habilita. Bottom nav sin sexto ítem. `+` no incluye Cobrar. Field Home **no** agrega KPI de CxC vencidas.
+
+## Performance
+
+Playwright 390 `data-query-ms` **883** `data-receivables-source=field` (warm). Un `findMany` de receivables + número de factura + nombre de proyecto; se omite `getReceivableAgingReport` y los listados relacionados. Los chips no refetch. Desktop ≥ `lg` sigue igual.
+
+## Tests
+
+Unit: filtros, urgencia UTC, cap-después-de-filtro, búsqueda, href proyecto vs empresa. Reuso: `idempotency.test.ts`, `finance-access.d056.test.ts` (VIEWER no muta AR). Playwright `docs/bloqer2.0/mobile-audit/receivables-field.spec.ts` — skip `bloqer.app` / `vercel.app`. 3 passed (OWNER 390 cobro parcial+total + VIEWER + 768/1440). Neon `dev`.
+
+## Seed demo (Neon `dev` only)
+
+CxC ISSUED: vencida FAC-09201, próxima FAC-09202, parcial FAC-09203, cobrada FAC-09204. Idempotente (borra cobranzas extra de Playwright). ARS. No production.
+
+## Fuera de scope
+
+Prisma/migraciones; PWA/offline; contabilidad; conciliación; cashflow; tesorería avanzada; Field Home KPI de vencidas; BUG-014; Materiales; Cronograma; Libro de obra; Inventario mobile.
+
 
 
 
