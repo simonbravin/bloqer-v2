@@ -51,6 +51,10 @@ export function MobileFieldHome({ home }: Props) {
   }, [featured, featured?.id, home.projects]);
   const actions = QUICK.filter((action) => home.actions[action.id]).slice(0, 4);
   const obraHref = featured ? `/proyectos/${featured.id}` : "/proyectos";
+  const cronogramaHref =
+    featured && home.canViewSchedule
+      ? `/proyectos/${featured.id}/cronograma?field=today`
+      : "/proyectos";
   const pendingBits: string[] = [];
   if (home.pendingCounts.purchaseOrders > 0) {
     pendingBits.push(
@@ -123,11 +127,11 @@ export function MobileFieldHome({ home }: Props) {
       <section className="rounded-lg border bg-card p-4" data-testid="field-home-hoy">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold">Hoy</h2>
-          {featured ? (
-            <Link href={`/proyectos/${featured.id}/cronograma`} className="text-sm font-medium underline">
+          {featured && home.canViewSchedule ? (
+            <Link href={cronogramaHref} className="text-sm font-medium underline">
               Ver cronograma
             </Link>
-          ) : (
+          ) : featured ? null : (
             <Link href="/proyectos" className="text-sm font-medium underline">
               Ver cronograma
             </Link>
@@ -137,21 +141,32 @@ export function MobileFieldHome({ home }: Props) {
           <p className="mt-3 text-sm text-muted-foreground">No hay tareas activas para mostrar.</p>
         ) : (
           <ul className="mt-3 space-y-3">
-            {home.todayItems.map((item) => (
-              <li key={item.id} className="rounded-md border p-3">
-                <p className="font-medium">{item.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {SCHEDULE_STATUS[item.status] ?? item.status}
-                  {item.endDate ? ` · ${formatDate(item.endDate)}` : ""}
-                  {item.daysLate ? ` · ${item.daysLate} d atrasada` : ""}
-                </p>
-                {!featured ? (
-                  <p className="text-xs text-muted-foreground">
-                    {item.projectCode} · {item.projectName}
-                  </p>
-                ) : null}
-              </li>
-            ))}
+            {home.todayItems.map((item) => {
+              const href = home.canViewSchedule
+                ? `/proyectos/${item.projectId}/cronograma?field=today&itemId=${item.id}`
+                : `/proyectos/${item.projectId}`;
+              return (
+                <li key={item.id}>
+                  <Link
+                    href={href}
+                    className="block rounded-md border p-3"
+                    data-testid="field-home-today-item"
+                  >
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {SCHEDULE_STATUS[item.status] ?? item.status}
+                      {item.endDate ? ` · ${formatDate(item.endDate)}` : ""}
+                      {item.daysLate ? ` · ${item.daysLate} d atrasada` : ""}
+                    </p>
+                    {!featured ? (
+                      <p className="text-xs text-muted-foreground">
+                        {item.projectCode} · {item.projectName}
+                      </p>
+                    ) : null}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

@@ -47,6 +47,7 @@ export type FieldHomeView = {
   todayItems: FieldHomeTodayItem[];
   pendingCounts: FieldPendingCounts;
   actions: FieldHomeActions;
+  canViewSchedule: boolean;
   queryMs: number;
 };
 
@@ -102,8 +103,9 @@ export async function getFieldHome(
   };
 
   const todayScopeIds = featuredProject ? [featuredProject.id] : projects.map((p) => p.id);
-  const canSchedule =
-    gate.isEnabled("SCHEDULE") && canViewScheduleArea(ctx.roles) && todayScopeIds.length > 0;
+  const canViewSchedule =
+    gate.isEnabled("SCHEDULE") && canViewScheduleArea(ctx.roles);
+  const canSchedule = canViewSchedule && todayScopeIds.length > 0;
 
   const today = productCalendarDateUtc();
   const [pending, todayRows] = await Promise.all([
@@ -118,19 +120,24 @@ export async function getFieldHome(
             tenantId: ctx.tenantId,
             status: { notIn: ["COMPLETED", "CANCELLED"] },
             schedule: { projectId: { in: todayScopeIds } },
+            // Same overlap as `calendarRangeOverlapsIsoDay`: span today, or a
+            // milestone with a single bound equal to today (AUDITORIA_MOBILE §Hoy).
             OR: [
-              { status: "IN_PROGRESS" },
-              { endDate: { lt: today } },
               {
                 AND: [
                   { startDate: { lte: today } },
                   { endDate: { gte: today } },
                 ],
               },
+              { AND: [{ startDate: today }, { endDate: null }] },
+              { AND: [{ endDate: today }, { startDate: null }] },
             ],
+            children: {
+              none: { tenantId: ctx.tenantId, status: { not: "CANCELLED" } },
+            },
           },
           orderBy: { endDate: "asc" },
-          take: 40,
+          take: TODAY_LIMIT,
           select: {
             id: true,
             name: true,
@@ -148,28 +155,18 @@ export async function getFieldHome(
         })
       : Promise.resolve([]),
   ]);
-  const todayItems: FieldHomeTodayItem[] = [];
-  for (const row of todayRows) {
-    const daysLate = computeDaysLate(row.endDate, row.status);
-    const starts = row.startDate ? row.startDate.getTime() <= today.getTime() : false;
-    const ends = row.endDate ? row.endDate.getTime() >= today.getTime() : false;
-    const overlapsToday = starts && ends;
-    const inProgress = row.status === "IN_PROGRESS";
-    if (!inProgress && !overlapsToday && daysLate == null) continue;
-    todayItems.push({
-      id: row.id,
-      name: row.name,
-      status: row.status,
-      startDate: row.startDate,
-      endDate: row.endDate,
-      progressPct: row.progressPct.toFixed(2),
-      daysLate,
-      projectId: row.schedule.projectId,
-      projectCode: row.schedule.project.code,
-      projectName: row.schedule.project.name,
-    });
-    if (todayItems.length >= TODAY_LIMIT) break;
-  }
+  const todayItems: FieldHomeTodayItem[] = todayRows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    status: row.status,
+    startDate: row.startDate,
+    endDate: row.endDate,
+    progressPct: row.progressPct.toFixed(2),
+    daysLate: computeDaysLate(row.endDate, row.status),
+    projectId: row.schedule.projectId,
+    projectCode: row.schedule.project.code,
+    projectName: row.schedule.project.name,
+  }));
 
   return {
     projects,
@@ -178,6 +175,7 @@ export async function getFieldHome(
     todayItems,
     pendingCounts: pending.counts,
     actions,
+    canViewSchedule,
     queryMs: Date.now() - started,
   };
 }

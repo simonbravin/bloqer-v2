@@ -7,6 +7,7 @@ import {
   formatCalendarDate,
   PRODUCT_TIMEZONE,
   productCalendarDateUtc,
+  productWeekMondaySundayBounds,
   toIsoDateInTimeZone,
 } from "./calendar-date";
 
@@ -58,5 +59,26 @@ describe("calendar-date (America/Argentina/Buenos_Aires)", () => {
       dateTo: "2026-07-22",
     });
     assert.deepEqual(defaultCalendarDateRangeDays(90, now), computeDateRangePreset("d90", now));
+  });
+
+  it("productWeekMondaySundayBounds is Monday–Sunday, not week-to-date", () => {
+    const now = new Date("2026-07-22T18:00:00.000Z");
+    assert.deepEqual(productWeekMondaySundayBounds(now), {
+      weekStart: "2026-07-20",
+      weekEnd: "2026-07-26",
+    });
+    assert.deepEqual(computeDateRangePreset("week", now), {
+      dateFrom: "2026-07-20",
+      dateTo: "2026-07-22",
+    });
+  });
+
+  it("productWeekMondaySundayBounds uses ART day near UTC midnight", () => {
+    // 2026-07-20 02:30 UTC = Sunday 19 Jul in Buenos Aires
+    const nearUtcMidnight = new Date("2026-07-20T02:30:00.000Z");
+    assert.deepEqual(productWeekMondaySundayBounds(nearUtcMidnight), {
+      weekStart: "2026-07-13",
+      weekEnd: "2026-07-19",
+    });
   });
 });

@@ -2,11 +2,13 @@ import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
   BarChart3,
+  Bell,
   BookOpen,
   Briefcase,
   Building2,
   Calculator,
   CalendarClock,
+  ClipboardList,
   FileSpreadsheet,
   FolderKanban,
   GitBranch,
@@ -26,6 +28,8 @@ import { isInternalTransferMovimientosHref, navHrefPathname } from "@/lib/nav-li
 
 const GLOBAL_NAV_ICON_BY_HREF: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
+  "/pendientes": ClipboardList,
+  "/notificaciones": Bell,
   "/proyectos": FolderKanban,
   "/directorio": Building2,
   "/inventario": Package,

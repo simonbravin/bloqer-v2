@@ -5,6 +5,7 @@ import type { ScheduleItemStatus } from "@bloqer/database";
 import {
   getProjectScheduleWorkspace,
   getProjectShellInfo,
+  parseScheduleFieldFilter,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -15,7 +16,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ budgetId?: string; delayedOnly?: string; status?: string }>;
+  searchParams: Promise<{
+    budgetId?: string;
+    delayedOnly?: string;
+    status?: string;
+    field?: string;
+  }>;
 }
 
 export default async function ProyectoCronogramaPage({ params, searchParams }: PageProps) {
@@ -36,11 +42,11 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
     await getProjectShellInfo(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
-    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
   let result;
+  const started = Date.now();
   try {
     const statusValues = [
       "PLANNED",
@@ -52,13 +58,14 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
     const status = statusValues.includes(sp.status as ScheduleItemStatus)
       ? (sp.status as ScheduleItemStatus)
       : undefined;
+    const fieldFilter = parseScheduleFieldFilter(sp.field);
 
     result = await getProjectScheduleWorkspace(
       projectId,
       {
         budgetId: sp.budgetId,
-        delayedOnly: sp.delayedOnly === "1",
-        status,
+        delayedOnly: fieldFilter ? false : sp.delayedOnly === "1",
+        status: fieldFilter ? undefined : status,
       },
       ctx,
     );
@@ -66,6 +73,7 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
+  const queryMs = Date.now() - started;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -109,7 +117,7 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
       )}
 
       {result.type === "WORKSPACE" && (
-        <ScheduleWorkspace projectId={projectId} workspace={result} />
+        <ScheduleWorkspace projectId={projectId} workspace={result} queryMs={queryMs} />
       )}
     </PageShell>
   );

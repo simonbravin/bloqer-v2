@@ -10,7 +10,8 @@
     "./wbs-metrics": "./src/budget/wbs-metrics.ts",
     "./dashboard-format": "./src/dashboard/dashboard-format.ts",
     "./tenant-module-gate": "./src/tenant-modules/tenant-module-gate.ts",
-    "./project-workspace-nav": "./src/project/project-workspace-nav.ts"
+    "./project-workspace-nav": "./src/project/project-workspace-nav.ts",
+    "./schedule-field": "./src/schedule/schedule-field.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

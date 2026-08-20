@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-19T18:32:27.062Z",
+  "generatedAt": "2026-08-20T02:23:16.639Z",
   "docsUserEmail": "docs-guide@bloqer.demo",
   "fieldPmEmail": "docs-pm@bloqer.demo",
   "fieldViewerEmail": "docs-viewer@bloqer.demo",
@@ -77,6 +77,13 @@
   "issuedCertificationLineId": "a00000f2-0000-4000-8000-0000000000f2",
   "issuedSubcontractCertId": "a00000f3-0000-4000-8000-0000000000f3",
   "issuedSubcontractCertLineId": "a00000f4-0000-4000-8000-0000000000f4",
+  "fieldTaskTodayId": "a0000100-0000-4000-8000-000000000100",
+  "fieldTaskBlockedId": "a0000101-0000-4000-8000-000000000101",
+  "fieldTaskDelayedId": "a0000102-0000-4000-8000-000000000102",
+  "fieldTaskWeekId": "a0000103-0000-4000-8000-000000000103",
+  "fieldTaskCompletedId": "a0000104-0000-4000-8000-000000000104",
+  "fieldMilestoneTodayId": "a0000105-0000-4000-8000-000000000105",
+  "fieldTaskTodayWbsLinkId": "a0000106-0000-4000-8000-000000000106",
   "accountId": "a0000060-0000-4000-8000-000000000060",
   "reconciliationId": "a0000064-0000-4000-8000-000000000064"
 }

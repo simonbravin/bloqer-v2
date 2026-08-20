@@ -14,6 +14,7 @@ export {
   defaultCalendarDateRangeDays,
   formatCalendarDate,
   productCalendarDateUtc,
+  productWeekMondaySundayBounds,
   toIsoDateInTimeZone,
   type CalendarDateParts,
   type DateRangePresetId,

@@ -152,7 +152,8 @@ Clasificación: **M0** ready · **M1** ajustes menores · **M2** layout mobile �
 | Plan | Presupuestos | `/proyectos/[id]/presupuestos` | Tabla | Tabla | OK- | **M2** | | `BudgetListSection` | Cards compactas para consultar versión |
 | Plan | Detalle presupuesto / EDT | `/proyectos/[id]/presupuestos/[budgetId]` | KPIs OK; EDT árbol denso (`11-presupuesto-detalle-390.png`) | Denso | Aire | **M4** | | `wbs-tree.tsx` overflow-x, APU expandible | Consulta read-only opcional; edición **desktop** |
 | Plan | APU dialog | (dialog en EDT) | `max-w-5xl` | — | — | **M4** | | `cost-item-apu-dialog.tsx` | Desktop-only |
-| Plan | Cronograma Gantt | `?view=gantt` | KPIs sí; timeline no (`12-cronograma-gantt-390.png`) | No | Regular | **M3** | P | `schedule-gantt-view.tsx` + kibo Gantt; hover `group-hover`; drag fechas | Vista **Hoy/Semana/Atrasadas** nueva; Gantt ≥ `lg` |
+| Plan | Cronograma Gantt | `?view=gantt` | Desktop ≥ `lg` | — | — | **M4** | | `schedule-gantt-view.tsx` + kibo; hover/drag | Intencional desktop. No miniatura mobile |
+| Campo | Cronograma Field | `/cronograma` &lt; `lg` | Lista Hoy/Semana/Atrasadas | OK | OK | **M1** | P | misma ruta/`ScheduleItem`; cards + sheet | Ejecución de campo; ver Resultado — Cronograma Field |
 | Plan | Kanban | `?view=kanban` | Columnas + dnd-kit; warning keys | Igual | Regular | **M3** | | `schedule-kanban-view.tsx` `@dnd-kit`; keys duplicados (overlay “1 Issue” en capturas) | No priorizar drag mobile; lista por estado |
 | Plan | Tabla cronograma | `?view=table` | `overflow-x-auto`, fechas nowrap | Scroll | OK | **M2** | P | `schedule-table-view.tsx` | Cards de tarea &lt; `md` |
 | Plan | Calendario | `?view=calendar` | Mes kibo, celdas chicas | Regular | OK | **M2** | | `schedule-calendar-view.tsx` | Lista del día &gt; grid mes |
@@ -271,7 +272,7 @@ Form compacto (producto, depósito, qty, EDT, notas). Sin foto. Dialog `sm:max-w
 
 Datos ya en `getProjectScheduleWorkspace`: nombre, fechas, `status` (PLANNED / IN_PROGRESS / BLOCKED / COMPLETED), WBS, métricas, atrasados (`delayedOnly=1`). Los KPIs “Atrasados: 6” ya se ven en 390.
 
-Vista mobile propuesta (sin Gantt): filtros Hoy / Esta semana / Atrasadas / En curso / Bloqueadas / Completadas; card por tarea. El Gantt de kibo usa hover y drag: **M4**.
+Vista mobile (sin Gantt): **Cronograma Field** — chips Hoy / Esta semana / Atrasadas / En curso / Bloqueadas / Completadas; card por tarea. El Gantt de kibo usa hover y drag: **M4** intencional ≥ `lg`.
 
 ## Transacciones — MOBILE PRIORITY (gasto rápido)
 
@@ -591,7 +592,7 @@ No conviene un rewrite nativo ahora. Tampoco conviene “hacer responsive todo�
 | F06 | SC crear 1 línea + foto | Pedido urgente | M2 | Alto | Baja-media | **P1 Mobile** |
 | F07 | Materiales faltantes → Pedir | Logística | M2 | Alto | Media | **P1 Mobile** |
 | F08 | Consumo + foto | Cuadrilla | M1 | Alto | Baja | **P1 Mobile** |
-| F09 | Cronograma Hoy/semana/atrasadas | Plan diario | M3 Gantt | Alto | Media | **P1 Mobile** |
+| F09 | Cronograma Hoy/semana/atrasadas | Plan diario | **M1** Field / M4 Gantt | Alto | Media | **Hecho (este lote)** |
 | F10 | Aprobar parte | Supervisión | M2 | Alto | Baja | **P1 Mobile** |
 | F11 | Documentos / cámara genérica | Evidencia | M1 | Alto | Baja | **P1 Mobile** |
 | F12 | Inbox pendientes / notificaciones | Dirección | M1 | Medio-alto | Media | **P1 Mobile** |
@@ -1030,10 +1031,98 @@ Correr con `--grep "Field Navigation flows"` / `"Field Navigation after screensh
 
 ## Fuera de scope (no implementado)
 
-Materiales mobile completo; cronograma Field Hoy/Semana; PWA/offline/push/GPS; gasto rápido; remito Prisma; fotos de consumo; contabilidad; aprobar desde la bandeja.
+Materiales mobile completo; PWA/offline/push/GPS; gasto rápido; remito Prisma; fotos de consumo; contabilidad; aprobar desde la bandeja.
 
 ## REQUIERE VALIDACIÓN DISPOSITIVO REAL
 
 * [ ] Safe area iPhone (Home indicator vs bottom nav).
 * [ ] Teclado en altas immersive (nav oculto).
 * [ ] Sheet `+` / Más / picker con Escape y focus.
+
+---
+
+# Resultado — Cronograma Field
+
+Screenshots: `docs/bloqer2.0/mobile-audit/after-schedule-field/`.
+
+Misma app Next.js, misma ruta `/proyectos/[id]/cronograma`, mismos `Schedule` / `ScheduleItem`, mismos services y actions. Sin `FieldTask`, sin tabla Prisma, sin API mobile, sin Gantt miniatura, sin drag, sin scroll horizontal.
+
+## Arquitectura
+
+**A — mismo `ScheduleWorkspaceDto` filtrado.** No se creó `getProjectScheduleFieldView`. La página sigue llamando `getProjectScheduleWorkspace`. Filtros Hoy/Semana/estado se aplican en helpers puros (`schedule-field.ts`) sobre el DTO existente (`daysLate`, `progressPct`, `timePlanPct`, WBS, predecesoras). El payload de control de costos sigue viajando (igual que desktop); el dataset demo es chico. Si un tenant llega a miles de ítems, el tope de lista Field es 200 cards y conviene entonces un read-model liviano **sin duplicar** `computeDaysLate` ni transiciones.
+
+## Filtros y deep links
+
+Chips: Hoy (default mobile) · Esta semana · Atrasadas · En curso · Bloqueadas · Completadas · Todas.
+
+URL: `?field=today|week|delayed|in_progress|blocked|completed|all` (`field=day` es alias de today). Refresh conserva el filtro. `itemId=` abre el detalle.
+
+## Semántica Hoy
+
+Producto TZ `America/Argentina/Buenos_Aires`. Una tarea (o hito) entra en Hoy si su rango `startDate`–`endDate` (ISO `YYYY-MM-DD`, sin `new Date("YYYY-MM-DD")`) **incluye el día de hoy**. Cubre: empieza hoy, termina hoy, o atraviesa hoy. No entra si terminó ayer o empieza mañana. Hitos: un solo bound.
+
+Field Home «Hoy» usa la misma superposición (ítems no COMPLETED/CANCELLED).
+
+## Semántica Semana
+
+Lunes–domingo de la semana calendario en TZ de producto (`productWeekMondaySundayBounds`). **No** es el preset de listados `computeDateRangePreset("week")` (lunes→hoy). Entra si el rango se solapa con la semana (empieza dentro, termina dentro, o cruza). Las tareas largas que empezaron antes siguen visibles.
+
+## Semántica Atrasada
+
+La misma de desktop: `computeDaysLate` (hojas, no COMPLETED/CANCELLED, días calendario de producto posteriores a `endDate`). El KPI «Atrasadas» usa `workspace.summary.delayedItems`; la lista filtra `daysLate != null`.
+
+## Timezone
+
+`toIsoDateInTimeZone` / `productCalendarDateUtc`. Casos cerca de medianoche UTC cubiertos en unit tests.
+
+## Cards
+
+Nombre; badge de estado (Planificada / En curso / Bloqueada / Completada) o «Hito»; fechas compactas `19 ago → 23 ago`; `Real % · Plan %` desde `progressPct` / `timePlanPct` (no hay fórmula mobile); `N días de atraso` si aplica; EDT primario si existe. **No hay responsable** en `ScheduleItem`. Borde `destructive` si atrasada o bloqueada.
+
+## Detalle mobile
+
+Sheet inferior (no se duplica el dialog desktop). Nombre, estado, EDT, fechas, plan/real, motivo de bloqueo, `Depende de: …` si hay predecesoras en el DTO.
+
+## Acciones
+
+Solo transiciones existentes vía `moveScheduleItemStatusAction`: **Iniciar** (PLANNED→IN_PROGRESS), **Completar** (IN_PROGRESS→COMPLETED), **Bloquear** (con causa obligatoria), **Reanudar** (BLOCKED→IN_PROGRESS). El server revalida `canEditScheduleArea`. VIEWER no ve botones.
+
+## Progreso / Libro de obra
+
+Status y progreso siguen separados. No se asigna 50%/100% al cambiar estado. El **Real** del cronograma es `ScheduleItem.progressPct`, sincronizado al **aprobar** un parte (`schedule-progress-sync`). Field V1 **no** expone «Actualizar avance» manual para no competir con el libro. Tampoco «Ver último parte» (exigiría `getScheduleItemContext` extra).
+
+## Field Home
+
+`Ver cronograma` → `?field=today` si el módulo SCHEDULE está habilitado. Tocar una tarea de Hoy → `?field=today&itemId=`. Si el módulo está off, no se deep-linkea al cronograma.
+
+## Permisos y gates
+
+`canViewScheduleArea` / `canEditScheduleArea`. Módulo `SCHEDULE` (+ `PROJECTS`) igual que desktop. Sin permisos Field nuevos. Bottom nav sin sexto ítem: se llega desde Inicio, Más y Obra.
+
+## Escalabilidad
+
+Workspace carga el árbol completo (igual que Gantt). Field lista solo hojas, tope 200, búsqueda cliente (nombre + EDT) sobre ese set.
+
+## Offline / PWA / push
+
+No implementados.
+
+## Seed demo (Neon `dev` only)
+
+Ítems determinísticos `Campo: …` en `seed-docs-guide.ts` (hoy, semana, atrasada, bloqueada, en curso, completada, hito). No se tocó production ni seeds productivos.
+
+## Clasificaciones M
+
+| Superficie | Antes | Después |
+|---|---|---|
+| Cronograma Gantt mobile | M3 | **M4** intencional (no se monta &lt; `lg`) |
+| Cronograma ejecución Field | no existía | **M1** |
+
+## Playwright
+
+`docs/bloqer2.0/mobile-audit/cronograma-field.spec.ts` — skip `bloqer.app` / `vercel.app`. Viewports 390, 430, 768 (lista Field), 1440 (Gantt). 3 passed (OWNER 390 + VIEWER + 430/768/1440).
+
+## Performance
+
+Medición local (dev, caliente, Neon `dev`): `data-query-ms` del workspace ~4.5–5.3 s (incluye `getProjectCostControl`, igual que desktop). Los chips Field **no** vuelven a consultar el servidor (`history.replaceState`). Visible time después del primer paint: inmediato al cambiar Hoy/Semana. El costo grande sigue siendo la carga inicial del DTO de Gantt/costos; no se duplicó dominio para un read-model B porque el demo es chico.
+

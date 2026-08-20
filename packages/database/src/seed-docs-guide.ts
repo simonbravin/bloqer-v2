@@ -82,6 +82,13 @@ export const DOCS_GUIDE_IDS = {
   issuedCertificationLineId: "a00000f2-0000-4000-8000-0000000000f2",
   issuedSubcontractCertId: "a00000f3-0000-4000-8000-0000000000f3",
   issuedSubcontractCertLineId: "a00000f4-0000-4000-8000-0000000000f4",
+  fieldTaskTodayId: "a0000100-0000-4000-8000-000000000100",
+  fieldTaskBlockedId: "a0000101-0000-4000-8000-000000000101",
+  fieldTaskDelayedId: "a0000102-0000-4000-8000-000000000102",
+  fieldTaskWeekId: "a0000103-0000-4000-8000-000000000103",
+  fieldTaskCompletedId: "a0000104-0000-4000-8000-000000000104",
+  fieldMilestoneTodayId: "a0000105-0000-4000-8000-000000000105",
+  fieldTaskTodayWbsLinkId: "a0000106-0000-4000-8000-000000000106",
 } as const;
 
 const DOCS_TENANT_NAME = "Bloqer Demo Construcciones";
@@ -100,6 +107,30 @@ function scheduleTaskDates(base: Date, offsetDays: number, duration: number) {
   const end = new Date(start);
   end.setDate(end.getDate() + duration);
   return { start, end, duration };
+}
+
+function productTodayUtcMidnight(now = new Date()): Date {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const year = Number(parts.find((p) => p.type === "year")?.value);
+  const month = Number(parts.find((p) => p.type === "month")?.value);
+  const day = Number(parts.find((p) => p.type === "day")?.value);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function addUtcDays(date: Date, days: number): Date {
+  const out = new Date(date);
+  out.setUTCDate(out.getUTCDate() + days);
+  return out;
+}
+
+function inclusiveDurationDays(start: Date, end: Date): number {
+  const ms = end.getTime() - start.getTime();
+  return Math.max(1, Math.round(ms / 86_400_000) + 1);
 }
 
 function docsInvitationRawToken(): string {
@@ -1213,6 +1244,165 @@ async function seedFieldViewerUser(
   });
 }
 
+async function seedFieldScheduleItems(
+  prisma: PrismaClient,
+  ctx: { tenantId: string; docsUserId: string; predecessorId: string | null },
+): Promise<void> {
+  const today = productTodayUtcMidnight();
+  const mondayOffset = (today.getUTCDay() + 6) % 7;
+  const weekStart = addUtcDays(today, -mondayOffset);
+  const weekEnd = addUtcDays(weekStart, 6);
+  const isSunday = today.getUTCDay() === 0;
+  const weekOnlyStart = isSunday ? weekStart : addUtcDays(today, 1);
+  const weekOnlyEnd = isSunday ? addUtcDays(today, -1) : weekEnd;
+
+  const rows: Array<{
+    id: string;
+    name: string;
+    type: "TASK" | "MILESTONE";
+    status: "PLANNED" | "IN_PROGRESS" | "BLOCKED" | "COMPLETED";
+    start: Date;
+    end: Date;
+    progressPct: string;
+    blockReason: string | null;
+    sortOrder: number;
+  }> = [
+    {
+      id: DOCS_GUIDE_IDS.fieldTaskTodayId,
+      name: "Campo: Hormigonado losa",
+      type: "TASK",
+      status: "IN_PROGRESS",
+      start: addUtcDays(today, -1),
+      end: addUtcDays(today, 2),
+      progressPct: "45.00",
+      blockReason: null,
+      sortOrder: 100,
+    },
+    {
+      id: DOCS_GUIDE_IDS.fieldTaskBlockedId,
+      name: "Campo: Instalación eléctrica",
+      type: "TASK",
+      status: "BLOCKED",
+      start: addUtcDays(today, -1),
+      end: addUtcDays(today, 3),
+      progressPct: "20.00",
+      blockReason: "Falta tablero de obra",
+      sortOrder: 101,
+    },
+    {
+      id: DOCS_GUIDE_IDS.fieldTaskDelayedId,
+      name: "Campo: Movimiento de suelos atrasado",
+      type: "TASK",
+      status: "IN_PROGRESS",
+      start: addUtcDays(today, -10),
+      end: addUtcDays(today, -3),
+      progressPct: "30.00",
+      blockReason: null,
+      sortOrder: 102,
+    },
+    {
+      id: DOCS_GUIDE_IDS.fieldTaskWeekId,
+      name: "Campo: Impermeabilización",
+      type: "TASK",
+      status: "PLANNED",
+      start: weekOnlyStart,
+      end: weekOnlyEnd,
+      progressPct: "0.00",
+      blockReason: null,
+      sortOrder: 103,
+    },
+    {
+      id: DOCS_GUIDE_IDS.fieldTaskCompletedId,
+      name: "Campo: Replanteo completado",
+      type: "TASK",
+      status: "COMPLETED",
+      start: addUtcDays(today, -5),
+      end: addUtcDays(today, -1),
+      progressPct: "100.00",
+      blockReason: null,
+      sortOrder: 104,
+    },
+    {
+      id: DOCS_GUIDE_IDS.fieldMilestoneTodayId,
+      name: "Campo: Hito estructura",
+      type: "MILESTONE",
+      status: "PLANNED",
+      start: today,
+      end: today,
+      progressPct: "0.00",
+      blockReason: null,
+      sortOrder: 105,
+    },
+  ];
+
+  for (const row of rows) {
+    await prisma.scheduleItem.upsert({
+      where: { id: row.id },
+      update: {
+        name: row.name,
+        type: row.type,
+        status: row.status,
+        startDate: row.start,
+        endDate: row.end,
+        durationDays: inclusiveDurationDays(row.start, row.end),
+        progressPct: row.progressPct,
+        blockReason: row.blockReason,
+        sortOrder: row.sortOrder,
+      },
+      create: {
+        id: row.id,
+        tenantId: ctx.tenantId,
+        scheduleId: DOCS_GUIDE_IDS.scheduleId,
+        name: row.name,
+        type: row.type,
+        status: row.status,
+        startDate: row.start,
+        endDate: row.end,
+        durationDays: inclusiveDurationDays(row.start, row.end),
+        progressPct: row.progressPct,
+        blockReason: row.blockReason,
+        sortOrder: row.sortOrder,
+        createdBy: ctx.docsUserId,
+      },
+    });
+  }
+
+  await prisma.scheduleItemWbsLink.upsert({
+    where: {
+      scheduleItemId_wbsNodeId: {
+        scheduleItemId: DOCS_GUIDE_IDS.fieldTaskTodayId,
+        wbsNodeId: DOCS_GUIDE_IDS.wbsItem0101Id,
+      },
+    },
+    update: { isPrimary: true },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldTaskTodayWbsLinkId,
+      tenantId: ctx.tenantId,
+      scheduleItemId: DOCS_GUIDE_IDS.fieldTaskTodayId,
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0101Id,
+      isPrimary: true,
+    },
+  });
+
+  if (ctx.predecessorId) {
+    await prisma.scheduleItemDependency.upsert({
+      where: {
+        predecessorId_successorId: {
+          predecessorId: ctx.predecessorId,
+          successorId: DOCS_GUIDE_IDS.fieldTaskTodayId,
+        },
+      },
+      update: {},
+      create: {
+        tenantId: ctx.tenantId,
+        predecessorId: ctx.predecessorId,
+        successorId: DOCS_GUIDE_IDS.fieldTaskTodayId,
+        type: "FS",
+      },
+    });
+  }
+}
+
 async function seedSecondDemoProject(prisma: PrismaClient, ctx: SeedCtx): Promise<void> {
   await prisma.project.upsert({
     where: { id: DOCS_GUIDE_IDS.project2Id },
@@ -1895,6 +2085,12 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
       },
     });
   }
+
+  await seedFieldScheduleItems(prisma, {
+    tenantId: tenant.id,
+    docsUserId: docsUser.id,
+    predecessorId: itemIds[1] ?? null,
+  });
 
   const issueDate = new Date("2026-03-01T12:00:00.000Z");
   const lineQty = "10.0000";

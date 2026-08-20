@@ -266,7 +266,7 @@ export function ScheduleGanttView({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid="schedule-gantt-view">
       {(dateBreakdown.containersWithoutDates > 0 || dateBreakdown.leavesWithoutDates > 0) && (
         <div className="space-y-0.5 text-xs text-muted-foreground">
           {dateBreakdown.containersWithoutDates > 0 && (

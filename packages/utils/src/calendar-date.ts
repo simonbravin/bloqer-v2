@@ -135,6 +135,23 @@ export function computeDateRangePreset(
   }
 }
 
+/**
+ * Monday–Sunday of the calendar week that contains `now` in the product timezone.
+ * Distinct from `computeDateRangePreset("week")`, which is Monday → today (week-to-date).
+ */
+export function productWeekMondaySundayBounds(
+  now: Date = new Date(),
+  timeZone: string = PRODUCT_TIMEZONE,
+): { weekStart: string; weekEnd: string } {
+  const today = calendarPartsInTimeZone(now, timeZone);
+  const mondayOffset = (dayOfWeekInTimeZone(now, timeZone) + 6) % 7;
+  const monday = addCalendarDays(today, -mondayOffset);
+  return {
+    weekStart: formatCalendarDate(monday),
+    weekEnd: formatCalendarDate(addCalendarDays(monday, 6)),
+  };
+}
+
 /** Rolling window ending today (product TZ): last `days` calendar days inclusive of today. */
 export function defaultCalendarDateRangeDays(
   days: number,

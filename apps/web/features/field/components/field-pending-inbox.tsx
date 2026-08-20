@@ -2,9 +2,8 @@ import Link from "next/link";
 import type { FieldPendingGroup, FieldPendingList } from "@bloqer/services";
 import { FieldPendingCard } from "./field-pending-card";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
-const CHIPS: { id: "todos" | FieldPendingGroup; label: string }[] = [
+const FILTERS: { id: "todos" | FieldPendingGroup; label: string }[] = [
   { id: "todos", label: "Todos" },
   { id: "compras", label: "Compras" },
   { id: "obra", label: "Obra" },
@@ -20,7 +19,7 @@ type Props = {
 };
 
 export function FieldPendingInbox({ list, group, projectId, projects, obraHref }: Props) {
-  const chipHref = (id: (typeof CHIPS)[number]["id"]) => {
+  const filterHref = (id: (typeof FILTERS)[number]["id"]) => {
     const params = new URLSearchParams();
     if (id !== "todos") params.set("grupo", id);
     if (projectId) params.set("proyecto", projectId);
@@ -30,51 +29,43 @@ export function FieldPendingInbox({ list, group, projectId, projects, obraHref }
 
   return (
     <div className="space-y-4" data-testid="field-pending-inbox" data-query-ms={list.queryMs}>
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {CHIPS.map((chip) => {
-          const active = (group ?? "todos") === chip.id;
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map((filter) => {
+          const active = (group ?? "todos") === filter.id;
           return (
-            <Link
-              key={chip.id}
-              href={chipHref(chip.id)}
-              className={cn(
-                "inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm",
-                active ? "border-foreground bg-foreground text-background" : "bg-background",
-              )}
+            <Button
+              key={filter.id}
+              variant={active ? "default" : "outline"}
+              size="sm"
+              className="min-h-11"
+              asChild
             >
-              {chip.label}
-            </Link>
+              <Link href={filterHref(filter.id)}>{filter.label}</Link>
+            </Button>
           );
         })}
       </div>
 
       {projects.length > 1 ? (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <Link
-            href={group ? `/pendientes?grupo=${group}` : "/pendientes"}
-            className={cn(
-              "inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm",
-              !projectId ? "border-foreground bg-foreground text-background" : "bg-background",
-            )}
-          >
-            Todas las obras
-          </Link>
+        <div className="flex flex-wrap gap-2">
+          <Button variant={!projectId ? "default" : "outline"} size="sm" className="min-h-11" asChild>
+            <Link href={group ? `/pendientes?grupo=${group}` : "/pendientes"}>Todas las obras</Link>
+          </Button>
           {projects.map((project) => {
             const params = new URLSearchParams();
             if (group) params.set("grupo", group);
             params.set("proyecto", project.id);
             const active = projectId === project.id;
             return (
-              <Link
+              <Button
                 key={project.id}
-                href={`/pendientes?${params.toString()}`}
-                className={cn(
-                  "inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm",
-                  active ? "border-foreground bg-foreground text-background" : "bg-background",
-                )}
+                variant={active ? "default" : "outline"}
+                size="sm"
+                className="min-h-11"
+                asChild
               >
-                {project.code}
-              </Link>
+                <Link href={`/pendientes?${params.toString()}`}>{project.code}</Link>
+              </Button>
             );
           })}
         </div>
