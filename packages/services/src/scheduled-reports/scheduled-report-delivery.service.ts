@@ -12,6 +12,7 @@ import {
   markEmailDeliverySent,
   markEmailDeliverySkipped,
 } from "../email-delivery/email-delivery-log.service";
+import { PRODUCT_TIMEZONE, toIsoDateInTimeZone } from "@bloqer/utils";
 import { loadNotificationIdentityFacts } from "../notifications/notification-email-context";
 import { ServiceContext } from "../types";
 import type { ScheduledReportAttachment } from "./scheduled-report-attachment.service";
@@ -54,6 +55,8 @@ export type DeliverScheduledReportBundleInput = {
   recipientEmail: string;
   attachments: ScheduledReportAttachment[];
   deliveryKind?: ScheduledReportDeliveryKind;
+  projectId?: string | null;
+  timezone?: string | null;
 };
 
 export type DeliverScheduledReportBundleResult =
@@ -77,11 +80,14 @@ export async function deliverScheduledReportBundle(
     return { outcome: "duplicate" };
   }
 
-  const dateLabel = new Date().toISOString().slice(0, 10);
+  const dateLabel = toIsoDateInTimeZone(
+    new Date(),
+    input.timezone?.trim() || PRODUCT_TIMEZONE,
+  );
   const facts = await loadNotificationIdentityFacts({
     tenantId: ctx.tenantId,
     companyId: ctx.companyId,
-    projectId: null,
+    projectId: input.projectId ?? null,
   });
   const subject = formatNotificationEmailSubject(
     `${input.scheduleName} (${dateLabel})`,
@@ -125,6 +131,10 @@ export async function deliverScheduledReportBundle(
     organizationName: facts.organizationName,
     contextFields: [
       ...(facts.organizationName ? [{ label: "Organización", value: facts.organizationName }] : []),
+      ...(facts.companyName && facts.companyName !== facts.organizationName
+        ? [{ label: "Empresa", value: facts.companyName }]
+        : []),
+      ...(facts.projectLabel ? [{ label: "Proyecto", value: facts.projectLabel }] : []),
       { label: "Programa", value: input.scheduleName },
       { label: "Fecha", value: dateLabel },
       { label: "Archivos", value: String(input.attachments.length) },

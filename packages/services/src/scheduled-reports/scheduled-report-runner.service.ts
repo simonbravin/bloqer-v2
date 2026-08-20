@@ -293,6 +293,8 @@ async function runOneScheduledReport(
         recipientEmail: rec.recipient.email,
         attachments,
         deliveryKind,
+        projectId: row.projectId,
+        timezone: row.timezone,
       },
       ctx,
     );

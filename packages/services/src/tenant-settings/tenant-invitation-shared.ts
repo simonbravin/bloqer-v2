@@ -92,10 +92,11 @@ export async function sendTenantInvitationEmailMessage(
     invitedByName = inviter ? formatUserLabel(inviter.name, inviter.email) : null;
   }
 
+  const roles = rolesLabelEs(extras?.roles);
   const contextFields = [
     { label: "Organización", value: tenantName },
     ...(invitedByName ? [{ label: "Invitó", value: invitedByName }] : []),
-    ...(rolesLabelEs(extras?.roles) ? [{ label: "Roles", value: rolesLabelEs(extras?.roles)! }] : []),
+    ...(roles ? [{ label: "Roles", value: roles }] : []),
   ];
 
   const html = renderAuthEmailHtml({

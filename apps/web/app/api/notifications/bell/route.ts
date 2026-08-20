@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { getNotificationBellSnapshot, ServiceError } from "@bloqer/services";
+import { getNotificationBellSnapshot, notificationLeadBody, ServiceError } from "@bloqer/services";
 
 export async function GET(): Promise<NextResponse> {
   const current = await getCurrentUser();
@@ -20,15 +20,18 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json(
       {
         unreadCount: snapshot.unreadCount,
-        items: snapshot.items.map((n) => ({
-          id: n.id,
-          title: n.title,
-          body: n.body.length > 160 ? `${n.body.slice(0, 160)}…` : n.body,
-          severity: n.severity,
-          status: n.status,
-          createdAt: n.createdAt,
-          actionUrl: n.actionUrl,
-        })),
+        items: snapshot.items.map((n) => {
+          const lead = notificationLeadBody(n.body);
+          return {
+            id: n.id,
+            title: n.title,
+            body: lead.length > 160 ? `${lead.slice(0, 159).trimEnd()}…` : lead,
+            severity: n.severity,
+            status: n.status,
+            createdAt: n.createdAt,
+            actionUrl: n.actionUrl,
+          };
+        }),
       },
       {
         headers: {

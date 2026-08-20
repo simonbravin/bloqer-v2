@@ -176,6 +176,7 @@ export * from "./notifications/notification-email.service";
 export {
   formatNotificationIdentityBody,
   loadNotificationIdentityFacts,
+  notificationLeadBody,
 } from "./notifications/notification-email-context";
 export * from "./report-exports/report-export.types";
 export * from "./report-exports/report-export.service";

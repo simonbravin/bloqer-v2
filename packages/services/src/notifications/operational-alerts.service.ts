@@ -272,11 +272,37 @@ export async function runNegativeStockAlert(ctx: ServiceContext): Promise<Operat
   });
 
   const negatives = await listNegativeStockBalancesForTenant({ tenantId: ctx.tenantId });
+  const productIds = [...new Set(negatives.map((row) => row.productId))];
+  const warehouseIds = [...new Set(negatives.map((row) => row.warehouseId))];
+  const [products, warehouses] = await Promise.all([
+    productIds.length === 0
+      ? Promise.resolve([])
+      : prisma.product.findMany({
+          where: { id: { in: productIds }, tenantId: ctx.tenantId },
+          select: { id: true, sku: true, name: true },
+        }),
+    warehouseIds.length === 0
+      ? Promise.resolve([])
+      : prisma.warehouse.findMany({
+          where: { id: { in: warehouseIds }, tenantId: ctx.tenantId },
+          select: { id: true, name: true },
+        }),
+  ]);
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
 
   for (const row of negatives) {
     summary.checkedCount += 1;
     const linkedId = negativeStockLinkedEntityId(row);
-    const body = `Producto ${row.productId}, depósito ${row.warehouseId}. Cantidad: ${serializeQtyDecimal(row.totalQuantity)}.`;
+    const product = productById.get(row.productId);
+    const warehouse = warehouseById.get(row.warehouseId);
+    const productLabel = product
+      ? product.sku.trim()
+        ? `${product.sku.trim()} — ${product.name}`
+        : product.name
+      : row.productId;
+    const warehouseLabel = warehouse?.name.trim() || row.warehouseId;
+    const body = `Producto ${productLabel}. Depósito ${warehouseLabel}. Cantidad: ${serializeQtyDecimal(row.totalQuantity)}.`;
 
     if (recipients.length === 0) continue;
 
@@ -329,7 +355,7 @@ export async function runApprovedCertificationsWithoutInvoiceAlert(ctx: ServiceC
 
   for (const c of rows) {
     summary.checkedCount += 1;
-    const body = `Certificación n.º ${c.number} aprobada sin factura de venta emitida.`;
+    const body = `La certificación CERT-${String(c.number).padStart(3, "0")} está aprobada sin factura de venta emitida.`;
 
     if (recipients.length === 0) continue;
 

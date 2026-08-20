@@ -23,9 +23,14 @@ export type TransactionalEmailLayoutInput = {
   showFallbackLink?: boolean;
 };
 
+function usableContextFields(fields: EmailContextField[] | undefined): EmailContextField[] {
+  return (fields ?? []).filter((f) => f.value.trim() !== "");
+}
+
 function renderContextTableHtml(fields: EmailContextField[]): string {
-  if (fields.length === 0) return "";
-  const rows = fields
+  const usable = usableContextFields(fields);
+  if (usable.length === 0) return "";
+  const rows = usable
     .map(
       (f) =>
         `<tr>
@@ -79,7 +84,7 @@ export function renderTransactionalEmailHtml(input: TransactionalEmailLayoutInpu
 
 export function renderTransactionalEmailText(input: TransactionalEmailLayoutInput): string {
   const lines = [input.eyebrow, "", input.title, "", input.body, ""];
-  const fields = (input.contextFields ?? []).filter((f) => f.value.trim() !== "");
+  const fields = usableContextFields(input.contextFields);
   if (fields.length > 0) {
     for (const f of fields) {
       lines.push(`${f.label}: ${f.value}`);

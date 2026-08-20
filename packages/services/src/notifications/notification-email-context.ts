@@ -1,13 +1,53 @@
 import type { LinkedEntityType, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
-import { formatDate, serializeMoney } from "@bloqer/utils";
+import { formatDate } from "@bloqer/utils";
 import type { EmailContextField } from "@bloqer/email";
-import { serializeQtyDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
 import { resolveUserDisplayNames, userDisplayNameFromMap } from "../user/resolve-user-display-names";
 
 const MAX_ITEMS = 8;
 const MAX_NOTES = 280;
 const MAX_ITEM_DESC = 160;
+
+/** Prisma `@db.Date` is UTC midnight; format in UTC so AR servers don't shift the day. */
+function formatEmailCalendarDate(value: Date): string {
+  return formatDate(value, { timeZone: "UTC" });
+}
+
+const DOCUMENT_CATEGORY_LABEL_ES: Record<string, string> = {
+  CONTRACT: "Contrato",
+  PLAN: "Plano",
+  PERMIT: "Permiso",
+  TECHNICAL: "Técnico",
+  PHOTO: "Foto",
+  INVOICE: "Factura",
+  RECEIPT: "Remito",
+  CERTIFICATE: "Certificado",
+  REPORT: "Informe",
+  JOBSITE_EVIDENCE: "Evidencia obra",
+  OTHER: "Otro",
+};
+
+const IDENTITY_APPENDIX_LINE = /^(Organización|Empresa|Proyecto|Solicitante|Enviada por): /;
+
+/**
+ * First paragraph of an in-app body, without the identity block appended by
+ * {@link formatNotificationIdentityBody}. Emails already render that as a table.
+ */
+export function notificationLeadBody(body: string): string {
+  const trimmed = body.trim();
+  const parts = trimmed.split("\n\n");
+  if (parts.length < 2) return trimmed;
+  const restLines = parts
+    .slice(1)
+    .join("\n\n")
+    .split("\n")
+    .filter((line) => line.length > 0);
+  if (restLines.length > 0 && restLines.every((line) => IDENTITY_APPENDIX_LINE.test(line))) {
+    return parts[0]!.trim();
+  }
+  return trimmed;
+}
 
 export type NotificationEmailResolvedContext = {
   organizationName: string | null;
@@ -62,7 +102,7 @@ function contactLabel(c: { legalName: string; fantasyName: string | null } | nul
 }
 
 function moneyLabel(amount: { toString(): string }, currency: string): string {
-  return `${serializeMoney(amount.toString())} ${currency}`;
+  return `${serializeMoneyDecimal(amount)} ${currency}`;
 }
 
 function padDoc(prefix: string, number: number, width: number): string {
@@ -190,12 +230,7 @@ export async function loadNotificationIdentityFacts(params: {
   requestedByUserId?: string | null;
   actorUserId?: string | null;
 }): Promise<NotificationIdentityFacts> {
-  const userIds = [
-    ...new Set(
-      [params.requestedByUserId, params.actorUserId].filter((id): id is string => Boolean(id)),
-    ),
-  ];
-  const [tenant, company, project, users] = await Promise.all([
+  const [tenant, company, project, nameById] = await Promise.all([
     prisma.tenant.findFirst({
       where: { id: params.tenantId },
       select: { name: true },
@@ -212,14 +247,8 @@ export async function loadNotificationIdentityFacts(params: {
           select: { code: true, name: true },
         })
       : Promise.resolve(null),
-    userIds.length === 0
-      ? Promise.resolve([])
-      : prisma.user.findMany({
-          where: { id: { in: userIds } },
-          select: { id: true, name: true, email: true },
-        }),
+    loadUserLabels([params.requestedByUserId, params.actorUserId]),
   ]);
-  const nameById = new Map(users.map((u) => [u.id, formatUserLabel(u.name, u.email)]));
   return {
     organizationName: tenant?.name.trim() || null,
     companyName: company?.name.trim() || null,
@@ -273,7 +302,7 @@ async function appendPurchaseRequestFields(
     pushField(fields, "Enviada por", submittedBy);
   }
   if (pr.neededByDate) {
-    pushField(fields, "Fecha requerida", formatDate(pr.neededByDate));
+    pushField(fields, "Fecha requerida", formatEmailCalendarDate(pr.neededByDate));
   }
   if (pr.notes?.trim()) {
     pushField(fields, "Notas", truncatePlainText(pr.notes, MAX_NOTES));
@@ -335,7 +364,7 @@ async function appendPurchaseOrderFields(
   pushField(fields, "Aprobada por", po.approvedByUserId ? names.get(po.approvedByUserId) : null);
   pushField(fields, "Confirmada por", po.confirmedByUserId ? names.get(po.confirmedByUserId) : null);
   if (po.expectedDeliveryDate) {
-    pushField(fields, "Entrega estimada", formatDate(po.expectedDeliveryDate));
+    pushField(fields, "Entrega estimada", formatEmailCalendarDate(po.expectedDeliveryDate));
   }
   if (po.returnReason?.trim()) {
     pushField(fields, "Motivo de devolución", truncatePlainText(po.returnReason, MAX_NOTES));
@@ -377,10 +406,10 @@ async function appendSalesInvoiceFields(
   if (inv.receivable) {
     const balance = inv.receivable.originalAmount.minus(inv.receivable.paidAmount);
     pushField(fields, "Saldo", moneyLabel(balance, inv.currency));
-    pushField(fields, "Vencimiento", formatDate(inv.receivable.dueDate));
+    pushField(fields, "Vencimiento", formatEmailCalendarDate(inv.receivable.dueDate));
   } else {
-    pushField(fields, "Emisión", formatDate(inv.issueDate));
-    pushField(fields, "Vencimiento", formatDate(inv.dueDate));
+    pushField(fields, "Emisión", formatEmailCalendarDate(inv.issueDate));
+    pushField(fields, "Vencimiento", formatEmailCalendarDate(inv.dueDate));
   }
   const names = await loadUserLabels([inv.createdBy]);
   pushField(fields, "Emitida por", inv.createdBy ? names.get(inv.createdBy) : null);
@@ -417,10 +446,10 @@ async function appendSupplierInvoiceFields(
   if (inv.payable) {
     const balance = inv.payable.originalAmount.minus(inv.payable.paidAmount);
     pushField(fields, "Saldo", moneyLabel(balance, inv.currency));
-    pushField(fields, "Vencimiento", formatDate(inv.payable.dueDate));
+    pushField(fields, "Vencimiento", formatEmailCalendarDate(inv.payable.dueDate));
   } else {
-    pushField(fields, "Emisión", formatDate(inv.issueDate));
-    pushField(fields, "Vencimiento", formatDate(inv.dueDate));
+    pushField(fields, "Emisión", formatEmailCalendarDate(inv.issueDate));
+    pushField(fields, "Vencimiento", formatEmailCalendarDate(inv.dueDate));
   }
   const names = await loadUserLabels([inv.createdBy]);
   pushField(fields, "Cargada por", inv.createdBy ? names.get(inv.createdBy) : null);
@@ -443,8 +472,8 @@ async function appendCertificationFields(
     },
   });
   if (!cert) return;
-  pushField(fields, "Código", `n.º ${cert.number}`);
-  pushField(fields, "Período", `${formatDate(cert.periodStart)} → ${formatDate(cert.periodEnd)}`);
+  pushField(fields, "Código", padDoc("CERT", cert.number, 3));
+  pushField(fields, "Período", `${formatEmailCalendarDate(cert.periodStart)} → ${formatEmailCalendarDate(cert.periodEnd)}`);
   pushField(fields, "Total", moneyLabel(cert.totalAmount, "ARS"));
   const names = await loadUserLabels([cert.createdBy, cert.updatedBy]);
   pushField(fields, "Creada por", cert.createdBy ? names.get(cert.createdBy) : null);
@@ -465,18 +494,16 @@ async function appendJobsiteLogFields(
       title: true,
       workFront: true,
       shift: true,
-      status: true,
       returnNotes: true,
       createdBy: true,
-      updatedBy: true,
     },
   });
   if (!log) return;
-  pushField(fields, "Fecha", formatDate(log.logDate));
+  pushField(fields, "Fecha", formatEmailCalendarDate(log.logDate));
   pushField(fields, "Título", log.title);
   pushField(fields, "Frente", log.workFront);
   pushField(fields, "Turno", log.shift);
-  const names = await loadUserLabels([log.createdBy, log.updatedBy]);
+  const names = await loadUserLabels([log.createdBy]);
   pushField(fields, "Autor", log.createdBy ? names.get(log.createdBy) : null);
   if (log.returnNotes?.trim()) {
     pushField(fields, "Motivo de devolución", truncatePlainText(log.returnNotes, MAX_NOTES));
@@ -499,7 +526,7 @@ async function appendPurchaseReceiptFields(
     },
   });
   if (!rec) return;
-  pushField(fields, "Fecha", formatDate(rec.receiptDate));
+  pushField(fields, "Fecha", formatEmailCalendarDate(rec.receiptDate));
   pushField(fields, "Proveedor", contactLabel(rec.supplierContact));
   pushField(fields, "Orden", padDoc("OC", rec.purchaseOrder.number, 3));
   pushField(fields, "Depósito", rec.warehouse?.name);
@@ -518,7 +545,7 @@ async function appendDocumentFields(
   });
   if (!doc) return;
   pushField(fields, "Archivo", doc.originalFileName);
-  pushField(fields, "Categoría", doc.category);
+  pushField(fields, "Categoría", DOCUMENT_CATEGORY_LABEL_ES[doc.category] ?? doc.category);
   const names = await loadUserLabels([doc.uploadedBy]);
   pushField(fields, "Subido por", names.get(doc.uploadedBy));
 }

@@ -9,6 +9,7 @@ import {
   formatProjectLabel,
   formatQtyDisplay,
   formatUserLabel,
+  notificationLeadBody,
   truncatePlainText,
 } from "./notification-email-context";
 
@@ -119,5 +120,21 @@ describe("formatNotificationIdentityBody", () => {
     });
     assert.match(body, /Empresa: Indari Sur/);
     assert.match(body, /Enviada por: Ana López/);
+  });
+
+  it("strips the identity appendix for email/bell preview", () => {
+    const stored = formatNotificationIdentityBody("La solicitud SC-010 fue enviada y espera cotizaciones.", {
+      organizationName: "Indari",
+      companyName: "Indari",
+      projectLabel: "OBR-01 · Casa Palermo",
+      requestedByName: "Juan Pérez",
+      actorName: "Juan Pérez",
+    });
+    assert.equal(notificationLeadBody(stored), "La solicitud SC-010 fue enviada y espera cotizaciones.");
+    assert.equal(notificationLeadBody("Sin bloque de identidad"), "Sin bloque de identidad");
+    assert.equal(
+      notificationLeadBody("Cuerpo con\n\nnota interna que no es identidad"),
+      "Cuerpo con\n\nnota interna que no es identidad",
+    );
   });
 });

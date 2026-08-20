@@ -28,7 +28,7 @@ import {
 import { ServiceContext, ServiceError } from "../types";
 import { canRunOperationalAlerts } from "./operational-alerts-runner.service";
 import { OPERATIONAL_NOTIFICATION_TYPES } from "./operational-alerts.service";
-import { resolveNotificationEmailContext } from "./notification-email-context";
+import { resolveNotificationEmailContext, notificationLeadBody } from "./notification-email-context";
 
 const OPERATIONAL_NOTIFICATION_TYPE_SET: ReadonlySet<NotificationType> = new Set(
   OPERATIONAL_NOTIFICATION_TYPES,
@@ -247,7 +247,7 @@ async function dispatchNotificationEmail(
   const isOperational = OPERATIONAL_NOTIFICATION_TYPE_SET.has(n.type);
   const templateInput = {
     title: n.title,
-    body: n.body,
+    body: notificationLeadBody(n.body),
     actionUrlAbsolute,
     actionLabel: emailContext.actionLabel,
     organizationName: emailContext.organizationName,

@@ -83,6 +83,16 @@ describe("notification email template", () => {
     assert.equal(html.includes("<table"), false);
     assert.equal(html.includes("Abrir en Bloqer"), false);
   });
+
+  it("omits blank context rows", () => {
+    const html = renderNotificationEmailHtml({
+      title: "Aviso",
+      body: "Hola",
+      actionUrlAbsolute: null,
+      contextFields: [{ label: "Proyecto", value: "   " }],
+    });
+    assert.equal(html.includes("<table"), false);
+  });
 });
 
 describe("operational alert email template", () => {
