@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { TransaccionesDateFilters } from "@/features/finance/components/transacciones-date-filters";
-import { PayableListSection } from "@/features/ap";
+import { PayableListSection, PayablesFieldExperience } from "@/features/ap";
 import type { PayableListItem } from "@/features/ap";
 import { AgingSummaryCards, AgingFilters, AgingTable } from "@/features/aging";
 import { ReportExportActions } from "@/features/reports";
@@ -15,11 +16,13 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   getPayableAgingReport,
   listCompanyPayables,
+  listPayablesFieldBoard,
   parseAgingFilters,
   ServiceError,
 } from "@bloqer/services";
 import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
+import { isPayablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 const PAGE_SIZE = 20;
 const STATUSES = ["OPEN", "PARTIAL", "PAID", "OVERDUE", "CANCELLED"] as const;
@@ -61,6 +64,34 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
     companyId: current.tenantCtx.companyId,
     roles: current.tenantCtx.roles,
   };
+
+  const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
+  const loadField = isPayablesFieldViewport(hint);
+
+  if (loadField) {
+    const started = Date.now();
+    let board;
+    try {
+      board = await listPayablesFieldBoard(ctx, { companyOnly: true });
+    } catch (err) {
+      if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+      throw err;
+    }
+    const queryMs = Date.now() - started;
+    return (
+      <PageShell variant="default" className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Cuentas por pagar</h1>
+          <p className="text-sm text-muted-foreground">Empresa · sin proyecto</p>
+        </div>
+        <PayablesFieldExperience
+          rows={board.rows}
+          hrefPrefix="/finanzas/cuentas-por-pagar"
+          queryMs={queryMs}
+        />
+      </PageShell>
+    );
+  }
 
   let agingReport;
   let listResult;
@@ -131,6 +162,7 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
 
   return (
     <PageShell variant="default" className="space-y-6">
+      <div className="space-y-6" data-testid="payables-desktop-view">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cuentas por pagar</h1>
@@ -210,6 +242,7 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
           </Suspense>
         </CardContent>
       </Card>
+      </div>
     </PageShell>
   );
 }

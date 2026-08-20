@@ -12,7 +12,8 @@
     "./tenant-module-gate": "./src/tenant-modules/tenant-module-gate.ts",
     "./project-workspace-nav": "./src/project/project-workspace-nav.ts",
     "./schedule-field": "./src/schedule/schedule-field.ts",
-    "./materials-field": "./src/materials/materials-field.ts"
+    "./materials-field": "./src/materials/materials-field.ts",
+    "./payables-field": "./src/ap/payables-field.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -18,6 +18,12 @@ import {
 } from "./corporate-ap-snapshot";
 import { assertCanCancelPayableDirect } from "./payable-cancel-guards";
 import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
+import {
+  formatSupplierInvoiceCode,
+  PAYABLES_FIELD_FETCH_LIMIT,
+  utcIsoDate,
+  type PayablesFieldRow,
+} from "./payables-field";
 
 // ─── View type ────────────────────────────────────────────────────────────────
 
@@ -281,6 +287,83 @@ export async function listCompanyPayables(
   });
 
   return { data, total };
+}
+
+export type PayablesFieldBoardResult = {
+  rows: PayablesFieldRow[];
+  total: number;
+  truncatedFetch: boolean;
+};
+
+/**
+ * Lightweight Field list: payables only (invoice number + optional project name).
+ * Skips aging and related invoices/payments. Not a second payment engine.
+ */
+export async function listPayablesFieldBoard(
+  ctx: ServiceContext,
+  scope: { projectId: string } | { companyOnly: true },
+): Promise<PayablesFieldBoardResult> {
+  await assertApTenantModule(ctx);
+
+  const where: Prisma.PayableWhereInput = { tenantId: ctx.tenantId };
+
+  if ("projectId" in scope) {
+    if (!canViewApProjectArea(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar");
+    }
+    const project = await prisma.project.findUnique({ where: { id: scope.projectId } });
+    if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+    if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    where.projectId = scope.projectId;
+  } else {
+    if (!canViewCompanyAp(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar a nivel empresa");
+    }
+    where.projectId = null;
+    if (ctx.companyId) where.companyId = ctx.companyId;
+  }
+
+  const [rows, total] = await Promise.all([
+    prisma.payable.findMany({
+      where,
+      include: {
+        supplierContact: { select: { legalName: true, fantasyName: true } },
+        supplierInvoice: { select: { number: true } },
+        project: { select: { name: true } },
+      },
+      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+      take: PAYABLES_FIELD_FETCH_LIMIT,
+    }),
+    prisma.payable.count({ where }),
+  ]);
+
+  const reconciled = await Promise.all(rows.map((r) => reconcilePayableStatusIfSettled(r, ctx)));
+  const mapped: PayablesFieldRow[] = reconciled.map((p, i) => {
+    const row = rows[i]!;
+    const { supplierInvoice, project, ...payableWithContact } = row;
+    const base = serializePayable({ ...payableWithContact, ...p });
+    return {
+      id: base.id,
+      supplierName: base.supplierName,
+      supplierInvoiceId: base.supplierInvoiceId,
+      supplierInvoiceCode: formatSupplierInvoiceCode(supplierInvoice?.number),
+      projectId: base.projectId,
+      projectName: project?.name ?? null,
+      issueDateIso: utcIsoDate(base.issueDate),
+      dueDateIso: utcIsoDate(base.dueDate),
+      currency: base.currency,
+      originalAmount: base.originalAmount,
+      paidAmount: base.paidAmount,
+      balanceDue: base.balanceDue,
+      status: base.status,
+    };
+  });
+
+  return {
+    rows: mapped,
+    total,
+    truncatedFetch: total > PAYABLES_FIELD_FETCH_LIMIT,
+  };
 }
 
 /**

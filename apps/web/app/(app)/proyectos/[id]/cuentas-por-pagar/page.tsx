@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Pagination } from "@/components/ui/pagination";
@@ -7,6 +8,7 @@ import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { AgingFilters, AgingSummaryCards, AgingTable } from "@/features/aging";
 import {
   PayableListSection,
+  PayablesFieldExperience,
   SupplierInvoiceListSection,
   PaymentListSection,
   type PayableListItem,
@@ -19,6 +21,7 @@ import {
   getPayableAgingReport,
   getProjectShellInfo,
   listPayablesByProject,
+  listPayablesFieldBoard,
   listPaymentsByProject,
   listSupplierInvoicesByProject,
   parseAgingFilters,
@@ -26,6 +29,7 @@ import {
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { parsePage } from "@/lib/parse-page";
+import { isPayablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 const PAGE_SIZE = 20;
 const RELATED_PAGE_SIZE = 5;
@@ -63,6 +67,35 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
+  }
+
+  const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
+  const loadField = isPayablesFieldViewport(hint);
+
+  if (loadField) {
+    const started = Date.now();
+    let board;
+    try {
+      board = await listPayablesFieldBoard(ctx, { projectId: id });
+    } catch (err) {
+      if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+      if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
+      throw err;
+    }
+    const queryMs = Date.now() - started;
+    return (
+      <PageShell variant="default" className="space-y-6">
+        <ProjectPageHeader
+          title="Cuentas por pagar"
+          subtitle={`${board.total} ${board.total === 1 ? "cuenta" : "cuentas"}`}
+        />
+        <PayablesFieldExperience
+          rows={board.rows}
+          hrefPrefix={`/proyectos/${id}/cuentas-por-pagar`}
+          queryMs={queryMs}
+        />
+      </PageShell>
+    );
   }
 
   let payablesResult;
@@ -123,6 +156,7 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
 
   return (
     <PageShell variant="default" className="space-y-6">
+      <div className="space-y-6" data-testid="payables-desktop-view">
       <ProjectPageHeader
         title="Cuentas por pagar"
         subtitle={`${payablesTotal} ${payablesTotal === 1 ? "cuenta" : "cuentas"}`}
@@ -174,6 +208,7 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
       <Suspense fallback={null}>
         <Pagination page={page} pageSize={PAGE_SIZE} total={payablesTotal} />
       </Suspense>
+      </div>
     </PageShell>
   );
 }

@@ -42,6 +42,11 @@ export function isMaterialsFieldViewport(hint: ViewportHint | null): boolean {
   return isScheduleFieldViewport(hint);
 }
 
+/** Same `lg` threshold as Cronograma/Materiales. 768 uses CxP cards. */
+export function isPayablesFieldViewport(hint: ViewportHint | null): boolean {
+  return isScheduleFieldViewport(hint);
+}
+
 export function viewportHintFromMatchMedia(mdMatches: boolean, lgMatches: boolean): ViewportHint {
   if (lgMatches) return "lg";
   if (mdMatches) return "md";

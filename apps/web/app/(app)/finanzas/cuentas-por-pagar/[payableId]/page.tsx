@@ -1,25 +1,33 @@
+import { cookies } from "next/headers";
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { DataTableSection } from "@/components/ui/data-table-section";
-import { PayableStatusBadge, PaymentTable, RegisterCompanyPaymentDialog } from "@/features/ap";
+import {
+  PayableFieldDetailView,
+  PayableStatusBadge,
+  PaymentTable,
+  RegisterCompanyPaymentDialog,
+} from "@/features/ap";
 import type { PaymentListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   getCompanyPayableById,
+  getSupplierInvoiceById,
   listPaymentsByPayable,
   listSelectableTreasuryAccounts,
   canRegisterApPayment,
   ServiceError,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
+import { isPayablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 interface PageProps {
   params: Promise<{ payableId: string }>;
-  searchParams: Promise<{ pagar?: string }>;
+  searchParams: Promise<{ pagar?: string; paid?: string }>;
 }
 
 export default async function FinanzasPayableDetailPage({ params, searchParams }: PageProps) {
@@ -27,7 +35,7 @@ export default async function FinanzasPayableDetailPage({ params, searchParams }
   if (!current?.tenantCtx) redirect("/login");
 
   const { payableId } = await params;
-  const { pagar } = await searchParams;
+  const { pagar, paid } = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -53,6 +61,50 @@ export default async function FinanzasPayableDetailPage({ params, searchParams }
   const canPay =
     canRegisterApPayment(ctx.roles) &&
     (payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE");
+
+  const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
+  const loadField = isPayablesFieldViewport(hint);
+
+  if (loadField) {
+    let invoiceCode: string | null = null;
+    try {
+      const invoice = await getSupplierInvoiceById(payable.supplierInvoiceId, ctx);
+      invoiceCode = invoice.code;
+    } catch (err) {
+      if (!(err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))) {
+        throw err;
+      }
+    }
+    return (
+      <PageShell variant="detail" className="space-y-6" breadcrumbLabel={payable.supplierName}>
+        <PayableFieldDetailView
+          supplierName={payable.supplierName}
+          invoiceCode={invoiceCode}
+          invoiceHref={`/finanzas/facturas-proveedor/${payable.supplierInvoiceId}`}
+          projectName={null}
+          issueDate={payable.issueDate}
+          dueDate={payable.dueDate}
+          currency={payable.currency}
+          originalAmount={payable.originalAmount}
+          paidAmount={payable.paidAmount}
+          balanceDue={payable.balanceDue}
+          status={payable.status}
+          payments={payments.map((p) => ({
+            id: p.id,
+            paymentDate: p.paymentDate,
+            amount: p.amount,
+            currency: p.currency,
+            accountName: p.accountName,
+            reference: p.reference ?? null,
+            href: `/finanzas/pagos-proveedor/${p.id}`,
+          }))}
+          canPay={canPay}
+          payHref={canPay ? `/finanzas/cuentas-por-pagar/${payableId}/pagar` : null}
+          paidBanner={paid === "1"}
+        />
+      </PageShell>
+    );
+  }
 
   /** Only load treasury accounts when the dialog can actually open — avoid 404 if TREASURY is gated. */
   let activeAccounts: { id: string; name: string; currency: string }[] = [];

@@ -187,10 +187,10 @@ Clasificación: **M0** ready · **M1** ajustes menores · **M2** layout mobile �
 | Fin. obra | Flujo de caja | `/flujo-caja` | Proyección | — | Regular | **M4** | | Análisis | Desktop |
 | Fin. obra | Facturas AP | `/facturas-proveedor` | Tabla | Tabla | OK | **M2** | | Cards existen | Default cards consulta |
 | Fin. obra | Facturas venta | `/facturas` | Tabla | Tabla | OK | **M2** | | Idem | Idem |
-| Fin. obra | CxP | `/cuentas-por-pagar` | Tabla 3 overflow en métricas | — | OK | **M2** | | | Cards + pagar |
+| Fin. obra | CxP | `/cuentas-por-pagar` | Cards Field &lt; `lg`; aging/tabla ≥ `lg` | OK | OK | **M1** | **P** | `PayablesFieldView` + `listPayablesFieldBoard`; CTA Ver cuenta | Ver Resultado — CxP Field |
 | Fin. obra | CxC | `/cuentas-por-cobrar` | **3 tablas overflow** | — | OK | **M2** | | Aging + list | Cards vencidas |
 | Fin. obra | Cobrar | `/cuentas-por-cobrar/[id]/cobrar` | Form usable; fecha+monto lado a lado (`48-cobrar-390.png`) | OK | OK | **M1** | | `grid` 2 cols en fecha/monto | `grid-cols-1 sm:grid-cols-2` |
-| Fin. obra | Pagar | `/cuentas-por-pagar/[id]/pagar` | Análogo a cobrar | OK | OK | **M1** | | Misma familia | Igual |
+| Fin. obra | Pagar | `/cuentas-por-pagar/[id]/pagar` | Field: confirmación + `payFullBalance`; desktop igual | OK | OK | **M1** | **P** | Misma `PaymentForm` / `createPayment` | Ver Resultado — CxP Field |
 | Fin. corp | Tablero | `/finanzas` | KPIs | KPIs | OK | **M2** | | | Consulta |
 | Fin. corp | Transacciones | `/finanzas/transacciones` | Ledger | Ledger | OK | **M2** | **P** | `NewTransactionDialog` `sm:max-w-4xl` + IVA/líneas | Flujo corto gasto+foto; dialog actual = desktop |
 | Fin. corp | CxP / CxC corp | `/finanzas/cuentas-por-pagar` etc. | Tablas | Tablas | OK | **M2** | | | Consulta + pagar/cobrar |
@@ -1268,5 +1268,55 @@ PR Field de Caño PVC con `costAnalysisLineId` (Ver solicitud). Vínculos EDT ex
 ## Fuera de scope
 
 Prisma/migraciones; PWA/offline; stock de depósito; recepción genérica; consumo como CTA de card; Field Home KPI de faltantes; Cronograma Field; BUG-014; AI; reorder.
+
+# Resultado — CxP Field
+
+Screenshots: `docs/bloqer2.0/mobile-audit/after-payables-field/`.
+
+Misma app Next.js, mismas rutas `/proyectos/[id]/cuentas-por-pagar` y `/finanzas/cuentas-por-pagar`, mismos `Payment` / `Payable` / `createPayment` / `idempotencyKey`. Sin Payment Field paralelo, sin Prisma/migraciones, sin PWA/offline. Sin Libro de obra, Materiales, Cronograma, CxC, conciliación ni cashflow.
+
+## Arquitectura
+
+**Antes:** el listado de proyecto siempre llamaba `getPayableAgingReport` + `listPayablesByProject` (page 20) + facturas/pagos relacionados. Aging es el dashboard de antigüedad, no hace falta para “qué hay que pagar” en el teléfono.
+
+**Después:** un árbol por request, mismo umbral `lg` (1024) que Cronograma/Materiales. 768 usa cards.
+
+| Viewport (`bloqer-viewport`) | Data source | UI |
+|---|---|---|
+| `sm` / `md` / cookie ausente | `listPayablesFieldBoard` — **sin** aging ni relacionados | CxP Field |
+| `lg` (≥1024) | aging + listado paginado (sin cambios) | Tabla / aging / toggle cards desktop |
+
+Helpers cliente: `@bloqer/services/payables-field` (no importar el barrel desde el cliente).
+
+Vencida / Vence hoy / Próxima / Pagada son labels derivados (UTC calendar day, igual que `isObligationOverdue`). Due today **no** es vencida. Filtros cliente: Pendientes (default) / Vencidas / Próximas (hoy+futuro) / Pagadas. Búsqueda proveedor/factura. Cap 200 después de filtrar. Fetch 500 sin `resolvePagination` (máx. 100).
+
+## Pago
+
+`PaymentForm` gana `fieldMode`: saldo pendiente, `Pagar saldo total` (rellena el monto; el server aplica `payFullBalance` si coincide con `balanceDue`), confirmación Proveedor/Monto/Cuenta/Fecha, CTA `Confirmar pago`. Misma `idempotencyKey` entre revisar y confirmar. Éxito → detalle de la CxP con `Pago registrado` (`?paid=1`), no ficha del pago. Desktop sigue yendo al detalle del pago / dialog empresa.
+
+## Permisos
+
+Consulta proyecto: `canViewApProjectArea`. Corporativo: `canViewCompanyAp`. Pagar: `canRegisterApPayment`. VIEWER consulta, sin CTA. Validaciones (saldo, cuenta, moneda, estado, tenant/project) siguen en `createPayment` / `applyPaymentToPayable`.
+
+## Navegación
+
+Más → Cuentas por pagar (proyecto) y CxP empresa si el nav global la habilita. Bottom nav sin sexto ítem. `+` no incluye Pagar. Pendientes Field **no** agrega CxP en este lote.
+
+## Performance
+
+Playwright 390 `data-query-ms` **843–1272** `data-payables-source=field` (warm). Un `findMany` de payables + número de factura + nombre de proyecto; se omite `getPayableAgingReport` y los listados relacionados de facturas/pagos. Los chips no refetch. Desktop ≥ `lg` sigue igual.
+
+## Tests
+
+Unit: filtros, urgencia UTC, cap-después-de-filtro, búsqueda. Reuso: `idempotency.test.ts`, `finance-access.d056.test.ts` (VIEWER no registra pago). Playwright `docs/bloqer2.0/mobile-audit/payables-field.spec.ts` — skip `bloqer.app` / `vercel.app`. 3 passed (OWNER 390 pago parcial+total + VIEWER + 768/1440). Neon `dev`.
+
+## Seed demo (Neon `dev` only)
+
+CxP ISSUED: vencida FP-09101, próxima FP-09102, parcial FP-09103, pagada FP-09104. Idempotente (borra pagos extra de Playwright). ARS. No production.
+
+## Fuera de scope
+
+Prisma/migraciones; PWA/offline; contabilidad; conciliación; cashflow; CxC; nuevas reglas financieras; Field Home KPI de vencidas; BUG-014; Materiales; Cronograma; Libro de obra.
+
 
 

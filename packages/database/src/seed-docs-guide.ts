@@ -94,6 +94,22 @@ export const DOCS_GUIDE_IDS = {
   fieldTaskWeekWbsLinkId: "a0000109-0000-4000-8000-000000000109",
   fieldTaskDelayedWbsLinkId: "a000010a-0000-4000-8000-00000000010a",
   fieldTaskTodayHormigonWbsLinkId: "a000010b-0000-4000-8000-00000000010b",
+  fieldPayableOverdueInvoiceId: "a0000110-0000-4000-8000-000000000110",
+  fieldPayableOverdueLineId: "a0000111-0000-4000-8000-000000000111",
+  fieldPayableOverdueId: "a0000112-0000-4000-8000-000000000112",
+  fieldPayableUpcomingInvoiceId: "a0000113-0000-4000-8000-000000000113",
+  fieldPayableUpcomingLineId: "a0000114-0000-4000-8000-000000000114",
+  fieldPayableUpcomingId: "a0000115-0000-4000-8000-000000000115",
+  fieldPayablePartialInvoiceId: "a0000116-0000-4000-8000-000000000116",
+  fieldPayablePartialLineId: "a0000117-0000-4000-8000-000000000117",
+  fieldPayablePartialId: "a0000118-0000-4000-8000-000000000118",
+  fieldPayablePartialPaymentId: "a0000119-0000-4000-8000-000000000119",
+  fieldPayablePartialMovementId: "a000011a-0000-4000-8000-00000000011a",
+  fieldPayablePaidInvoiceId: "a000011b-0000-4000-8000-00000000011b",
+  fieldPayablePaidLineId: "a000011c-0000-4000-8000-00000000011c",
+  fieldPayablePaidId: "a000011d-0000-4000-8000-00000000011d",
+  fieldPayablePaidPaymentId: "a000011e-0000-4000-8000-00000000011e",
+  fieldPayablePaidMovementId: "a000011f-0000-4000-8000-00000000011f",
 } as const;
 
 const DOCS_TENANT_NAME = "Bloqer Demo Construcciones";
@@ -1908,6 +1924,288 @@ async function seedFieldProcurementCatalog(prisma: PrismaClient, ctx: SeedCtx): 
   });
 }
 
+async function seedFieldPayables(prisma: PrismaClient, ctx: SeedCtx): Promise<void> {
+  const today = new Date();
+  today.setUTCHours(12, 0, 0, 0);
+
+  const scenarios = [
+    {
+      invoiceId: DOCS_GUIDE_IDS.fieldPayableOverdueInvoiceId,
+      lineId: DOCS_GUIDE_IDS.fieldPayableOverdueLineId,
+      payableId: DOCS_GUIDE_IDS.fieldPayableOverdueId,
+      number: 9101,
+      description: "Cemento Field CxP vencida",
+      total: money(120_000),
+      paid: money(0),
+      status: "OPEN" as const,
+      dueOffset: -10,
+    },
+    {
+      invoiceId: DOCS_GUIDE_IDS.fieldPayableUpcomingInvoiceId,
+      lineId: DOCS_GUIDE_IDS.fieldPayableUpcomingLineId,
+      payableId: DOCS_GUIDE_IDS.fieldPayableUpcomingId,
+      number: 9102,
+      description: "Hierro Field CxP próxima",
+      total: money(80_000),
+      paid: money(0),
+      status: "OPEN" as const,
+      dueOffset: 8,
+    },
+    {
+      invoiceId: DOCS_GUIDE_IDS.fieldPayablePartialInvoiceId,
+      lineId: DOCS_GUIDE_IDS.fieldPayablePartialLineId,
+      payableId: DOCS_GUIDE_IDS.fieldPayablePartialId,
+      number: 9103,
+      description: "Arena Field CxP parcial",
+      total: money(50_000),
+      paid: money(20_000),
+      status: "PARTIAL" as const,
+      dueOffset: 4,
+    },
+    {
+      invoiceId: DOCS_GUIDE_IDS.fieldPayablePaidInvoiceId,
+      lineId: DOCS_GUIDE_IDS.fieldPayablePaidLineId,
+      payableId: DOCS_GUIDE_IDS.fieldPayablePaidId,
+      number: 9104,
+      description: "Cal Field CxP pagada",
+      total: money(30_000),
+      paid: money(30_000),
+      status: "PAID" as const,
+      dueOffset: -40,
+    },
+  ];
+
+  for (const row of scenarios) {
+    const dueDate = addUtcDays(today, row.dueOffset);
+    const issueDate = addUtcDays(dueDate, -30);
+    await prisma.supplierInvoice.upsert({
+      where: { id: row.invoiceId },
+      update: {
+        status: "ISSUED",
+        number: row.number,
+        issueDate,
+        dueDate,
+        subtotal: row.total,
+        taxAmount: money(0),
+        totalAmount: row.total,
+        amountArs: row.total,
+        supplierContactId: ctx.supplierId,
+        projectId: DOCS_GUIDE_IDS.projectId,
+      },
+      create: {
+        id: row.invoiceId,
+        tenantId: ctx.tenantId,
+        companyId: ctx.companyId,
+        projectId: DOCS_GUIDE_IDS.projectId,
+        supplierContactId: ctx.supplierId,
+        number: row.number,
+        invoiceLetter: "B",
+        issueDate,
+        dueDate,
+        currency: "ARS",
+        fxRate: "1.000000",
+        subtotal: row.total,
+        taxAmount: money(0),
+        totalAmount: row.total,
+        amountArs: row.total,
+        status: "ISSUED",
+        createdBy: ctx.docsUserId,
+      },
+    });
+    await prisma.supplierInvoiceLine.upsert({
+      where: { id: row.lineId },
+      update: {
+        description: row.description,
+        quantity: "1.0000",
+        unitPrice: row.total,
+        lineSubtotal: row.total,
+        lineTax: money(0),
+        lineTotal: row.total,
+        wbsNodeId: DOCS_GUIDE_IDS.wbsItem0101Id,
+      },
+      create: {
+        id: row.lineId,
+        invoiceId: row.invoiceId,
+        wbsNodeId: DOCS_GUIDE_IDS.wbsItem0101Id,
+        description: row.description,
+        quantity: "1.0000",
+        unitPrice: row.total,
+        taxRate: "0.0000",
+        lineSubtotal: row.total,
+        lineTax: money(0),
+        lineTotal: row.total,
+        sortOrder: 0,
+      },
+    });
+  }
+
+  const keepPaymentIds = [
+    DOCS_GUIDE_IDS.fieldPayablePartialPaymentId,
+    DOCS_GUIDE_IDS.fieldPayablePaidPaymentId,
+  ];
+  const payableIds = scenarios.map((s) => s.payableId);
+  const extras = await prisma.payment.findMany({
+    where: { payableId: { in: payableIds }, id: { notIn: keepPaymentIds } },
+    select: { id: true },
+  });
+  if (extras.length > 0) {
+    const extraIds = extras.map((e) => e.id);
+    await prisma.accountMovement.deleteMany({
+      where: { sourceType: "PAYMENT", sourceId: { in: extraIds } },
+    });
+    await prisma.payment.deleteMany({ where: { id: { in: extraIds } } });
+  }
+
+  for (const row of scenarios) {
+    const dueDate = addUtcDays(today, row.dueOffset);
+    const issueDate = addUtcDays(dueDate, -30);
+    await prisma.payable.upsert({
+      where: { id: row.payableId },
+      update: {
+        status: row.status,
+        originalAmount: row.total,
+        paidAmount: row.paid,
+        issueDate,
+        dueDate,
+        supplierContactId: ctx.supplierId,
+        supplierInvoiceId: row.invoiceId,
+        projectId: DOCS_GUIDE_IDS.projectId,
+        currency: "ARS",
+      },
+      create: {
+        id: row.payableId,
+        tenantId: ctx.tenantId,
+        companyId: ctx.companyId,
+        projectId: DOCS_GUIDE_IDS.projectId,
+        supplierContactId: ctx.supplierId,
+        supplierInvoiceId: row.invoiceId,
+        issueDate,
+        dueDate,
+        currency: "ARS",
+        originalAmount: row.total,
+        paidAmount: row.paid,
+        status: row.status,
+        createdBy: ctx.docsUserId,
+      },
+    });
+  }
+
+  const partialDate = addUtcDays(today, -2);
+  await prisma.payment.upsert({
+    where: { id: DOCS_GUIDE_IDS.fieldPayablePartialPaymentId },
+    update: {
+      amount: money(20_000),
+      amountArs: money(20_000),
+      paymentDate: partialDate,
+      status: "CONFIRMED",
+      reference: "TRANSF-FIELD-PARCIAL",
+      accountId: DOCS_GUIDE_IDS.treasuryAccountId,
+      payableId: DOCS_GUIDE_IDS.fieldPayablePartialId,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldPayablePartialPaymentId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      supplierContactId: ctx.supplierId,
+      payableId: DOCS_GUIDE_IDS.fieldPayablePartialId,
+      supplierInvoiceId: DOCS_GUIDE_IDS.fieldPayablePartialInvoiceId,
+      accountId: DOCS_GUIDE_IDS.treasuryAccountId,
+      paymentDate: partialDate,
+      currency: "ARS",
+      fxRate: "1.000000",
+      amountArs: money(20_000),
+      amount: money(20_000),
+      paymentMethod: "BANK_TRANSFER",
+      reference: "TRANSF-FIELD-PARCIAL",
+      status: "CONFIRMED",
+      createdBy: ctx.docsUserId,
+    },
+  });
+  await prisma.accountMovement.upsert({
+    where: { id: DOCS_GUIDE_IDS.fieldPayablePartialMovementId },
+    update: {
+      amount: money(20_000),
+      movementDate: partialDate,
+      sourceId: DOCS_GUIDE_IDS.fieldPayablePartialPaymentId,
+      status: "CONFIRMED",
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldPayablePartialMovementId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      accountId: DOCS_GUIDE_IDS.treasuryAccountId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      movementDate: partialDate,
+      type: "OUTFLOW",
+      sourceType: "PAYMENT",
+      sourceId: DOCS_GUIDE_IDS.fieldPayablePartialPaymentId,
+      currency: "ARS",
+      amount: money(20_000),
+      description: "Pago parcial Field demo FP-09103",
+      status: "CONFIRMED",
+      createdBy: ctx.docsUserId,
+    },
+  });
+
+  const paidDate = addUtcDays(today, -20);
+  await prisma.payment.upsert({
+    where: { id: DOCS_GUIDE_IDS.fieldPayablePaidPaymentId },
+    update: {
+      amount: money(30_000),
+      amountArs: money(30_000),
+      paymentDate: paidDate,
+      status: "CONFIRMED",
+      accountId: DOCS_GUIDE_IDS.treasuryAccountId,
+      payableId: DOCS_GUIDE_IDS.fieldPayablePaidId,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldPayablePaidPaymentId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      supplierContactId: ctx.supplierId,
+      payableId: DOCS_GUIDE_IDS.fieldPayablePaidId,
+      supplierInvoiceId: DOCS_GUIDE_IDS.fieldPayablePaidInvoiceId,
+      accountId: DOCS_GUIDE_IDS.treasuryAccountId,
+      paymentDate: paidDate,
+      currency: "ARS",
+      fxRate: "1.000000",
+      amountArs: money(30_000),
+      amount: money(30_000),
+      paymentMethod: "BANK_TRANSFER",
+      reference: "TRANSF-FIELD-PAGADA",
+      status: "CONFIRMED",
+      createdBy: ctx.docsUserId,
+    },
+  });
+  await prisma.accountMovement.upsert({
+    where: { id: DOCS_GUIDE_IDS.fieldPayablePaidMovementId },
+    update: {
+      amount: money(30_000),
+      movementDate: paidDate,
+      sourceId: DOCS_GUIDE_IDS.fieldPayablePaidPaymentId,
+      status: "CONFIRMED",
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldPayablePaidMovementId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      accountId: DOCS_GUIDE_IDS.treasuryAccountId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      movementDate: paidDate,
+      type: "OUTFLOW",
+      sourceType: "PAYMENT",
+      sourceId: DOCS_GUIDE_IDS.fieldPayablePaidPaymentId,
+      currency: "ARS",
+      amount: money(30_000),
+      description: "Pago total Field demo FP-09104",
+      status: "CONFIRMED",
+      createdBy: ctx.docsUserId,
+    },
+  });
+}
+
 export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> {
   const docsEmail = (process.env.DOCS_USER_EMAIL || "docs-guide@bloqer.demo").trim().toLowerCase();
   const password = (process.env.DOCS_USER_PASSWORD || process.env.SEED_USER_PASSWORD || "").trim();
@@ -2286,6 +2584,7 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
   await seedFieldProcurementCatalog(prisma, seedCtx);
   await seedFieldMaterialsBoard(prisma, seedCtx);
   await seedTreasury(prisma, seedCtx);
+  await seedFieldPayables(prisma, seedCtx);
   await seedSubcontractChain(prisma, seedCtx);
   await seedCertificationAndSales(prisma, seedCtx);
   await seedJobsiteLog(prisma, seedCtx);

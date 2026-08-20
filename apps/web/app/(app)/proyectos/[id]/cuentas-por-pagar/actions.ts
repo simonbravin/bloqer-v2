@@ -44,6 +44,7 @@ export async function createPaymentAction(
     const payment = await createPayment(parsed.data, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/pagos`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);
+    revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar/${parsed.data.payableId}`);
     revalidateProjectCostAndFinancePaths(projectId);
     revalidateTreasuryPaths();
     return { id: payment.id };

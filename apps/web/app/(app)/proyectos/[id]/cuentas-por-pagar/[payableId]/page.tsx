@@ -1,31 +1,36 @@
+import { cookies } from "next/headers";
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DataTableSection } from "@/components/ui/data-table-section";
-import { PayableStatusBadge, PaymentTable } from "@/features/ap";
+import { PayableFieldDetailView, PayableStatusBadge, PaymentTable } from "@/features/ap";
 import type { PaymentListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   canRegisterApPayment,
   getPayableById,
+  getProjectShellInfo,
   getPurchaseOrderCodeForApLink,
   getSupplierInvoiceById,
   listPaymentsByPayable,
   ServiceError,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
+import { isPayablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 interface PageProps {
   params: Promise<{ id: string; payableId: string }>;
+  searchParams: Promise<{ paid?: string }>;
 }
 
-export default async function PayableDetailPage({ params }: PageProps) {
+export default async function PayableDetailPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id, payableId } = await params;
+  const { paid } = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -33,17 +38,24 @@ export default async function PayableDetailPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
+  const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
+  const loadField = isPayablesFieldViewport(hint);
+
   let payable;
   let payments;
   let invoice;
   let poCode: string | null = null;
+  let projectName: string | null = null;
   try {
     [payable, payments] = await Promise.all([
       getPayableById(payableId, ctx, id),
       listPaymentsByPayable(payableId, ctx),
     ]);
+    if (loadField) {
+      projectName = (await getProjectShellInfo(id, ctx)).name;
+    }
     invoice = await getSupplierInvoiceById(payable.supplierInvoiceId, ctx, id);
-    if (invoice.purchaseOrderId) {
+    if (!loadField && invoice.purchaseOrderId) {
       poCode = await getPurchaseOrderCodeForApLink(invoice.purchaseOrderId, ctx);
     }
   } catch (err) {
@@ -64,6 +76,38 @@ export default async function PayableDetailPage({ params }: PageProps) {
   const canPayStatus =
     payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE";
   const canPay = canPayStatus && canRegisterApPayment(ctx.roles);
+
+  if (loadField) {
+    return (
+      <PageShell variant="detail" className="space-y-6" breadcrumbLabel={payable.supplierName}>
+        <PayableFieldDetailView
+          supplierName={payable.supplierName}
+          invoiceCode={invoice.code}
+          invoiceHref={`/proyectos/${id}/facturas-proveedor/${payable.supplierInvoiceId}`}
+          projectName={projectName}
+          issueDate={payable.issueDate}
+          dueDate={payable.dueDate}
+          currency={payable.currency}
+          originalAmount={payable.originalAmount}
+          paidAmount={payable.paidAmount}
+          balanceDue={payable.balanceDue}
+          status={payable.status}
+          payments={payments.map((p) => ({
+            id: p.id,
+            paymentDate: p.paymentDate,
+            amount: p.amount,
+            currency: p.currency,
+            accountName: p.accountName,
+            reference: p.reference ?? null,
+            href: `/proyectos/${id}/pagos/${p.id}`,
+          }))}
+          canPay={canPay}
+          payHref={canPay ? `/proyectos/${id}/cuentas-por-pagar/${payableId}/pagar` : null}
+          paidBanner={paid === "1"}
+        />
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={payable.supplierName}>
