@@ -30,7 +30,15 @@ export function ViewportHintSync() {
       const isCronograma = pathname.includes("/cronograma");
       const cronogramaSourceChanged = (prev === "lg") !== (next === "lg");
 
-      if (isDashboard || (isCronograma && cronogramaSourceChanged) || prev !== null) {
+      if (isDashboard) {
+        router.refresh();
+        return;
+      }
+      if (isCronograma) {
+        if (cronogramaSourceChanged) router.refresh();
+        return;
+      }
+      if (prev !== null) {
         router.refresh();
       }
     };

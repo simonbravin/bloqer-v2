@@ -1141,16 +1141,25 @@ No implementados.
 
 `docs/bloqer2.0/mobile-audit/cronograma-field.spec.ts` — skip `bloqer.app` / `vercel.app`. Viewports 390, 430, 768 (lista Field), 1440 (Gantt). Cookie `bloqer-viewport` `sm`/`md`/`lg` alineada al viewport para no cargar el DTO desktop en mobile.
 
+3 passed (OWNER 390 + VIEWER + 430/768/1440). `data-query-ms=1241` `data-schedule-source=field` en 390 (primera pintura E2E tras compile). Gantt 1440 visible; Field ausente.
+
 ## Performance
 
-Medición local (dev, caliente, Neon `dev`, DEMO-001):
+Medición local (Neon `dev`, DEMO-001, 12 `ScheduleItem`):
 
-| | BEFORE (`getProjectScheduleWorkspace`) | AFTER (`getProjectScheduleFieldWorkspace`) |
+**Desglose `getProjectScheduleWorkspace` (warm):** total **3398 ms** — `getProjectCostControl` **1306 ms**; ítems+deps **711 ms**; `ensureScheduleForProject` **574 ms**; APU/`costByCategory` **284 ms**; rollup **146 ms**; count **142 ms**; currency **147 ms**; module gate **76 ms**. Cold: **4266 ms** (cost control **1941 ms**). Payload ítems+summary ≈ 5.6 KB.
+
+**`getProjectScheduleFieldWorkspace` (warm):** total **597 ms** — `ensureScheduleForProject` **288 ms** + `scheduleItem.findMany` (WBS + predecesoras) **305 ms**. Cold **651 ms**. Payload ≈ 4.1 KB. 12 hojas.
+
+| | BEFORE | AFTER Field |
 |---|---|---|
-| Causa | `getProjectCostControl` (certificaciones, OC, subcontratos, AP, inventario, partes, APU por categoría) + ítems/WBS/deps/métricas | Ítems + WBS + predecesoras |
-| `data-query-ms` warm | ≈ 4.5–5.3 s | (ver corrida de este lote) |
-| Queries Field | decenas (reporte de costos) | `ensureScheduleForProject` + `scheduleItem.findMany` |
-| Payload | DTO Gantt + métricas por ítem | hojas Field |
+| Causa de 4.5–5.3 s | `getProjectCostControl` (certificaciones, OC, subcontratos, AP, inventario, partes) + APU por categoría + métricas Gantt | ya no corre en Field |
+| Service warm | 3.4 s (workspace) | **0.6 s** |
+| Playwright `data-query-ms` | ≈ 4.5–5.3 s | **1241 ms** (390, primera E2E) |
+| Queries Field | decenas | `ensureScheduleForProject` + 1 `findMany` |
+| HTTP GET Field (Next, caliente) | ≈ 4.9–5.4 s | ≈ 2.4 s |
+
+Costo que queda en Field (~0.6 s service / ~1.2 s queryMs E2E): round-trips Neon de schedule + ítems/WBS/predecesoras (incluye `ensureScheduleForProject`, que aún trae ids de ítems). No es control de costos.
 
 Los chips Field **no** vuelven a consultar el servidor. Desktop ≥ `lg` sigue en el workspace completo; no se reemplazó su DTO.
 
