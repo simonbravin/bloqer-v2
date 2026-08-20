@@ -1,5 +1,5 @@
 import type { JobsiteLogIssueSeverity, JobsiteLogIssueStatus, JobsiteLogIssueType, JobsiteLogStatus } from "@bloqer/database";
-import { formatDateLong, formatDateTime, toIsoDateLocal } from "@bloqer/utils";
+import { formatDateLong, formatDateTime } from "@bloqer/utils";
 import { listEntityDocuments } from "../documents/document.service";
 import { getProjectShellInfo } from "../project/project.service";
 import type { ServiceContext } from "../types";
@@ -183,7 +183,7 @@ export async function buildJobsiteLogPdfPayload(
     meta: {
       projectCode: log.projectCode,
       projectName: project.name,
-      logDateIso: toIsoDateLocal(log.logDate),
+      logDateIso: log.logDate.toISOString().slice(0, 10),
       logDateLabel: formatDateLong(log.logDate),
       title: log.title,
       workFront: log.workFront,

@@ -52,8 +52,11 @@ export async function createSalesInvoiceAction(
   const ctx = await getCtx();
   const parsed = createSalesInvoiceSchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  if (parsed.data.projectId !== projectId) {
+    return { error: "El proyecto del formulario no coincide con la obra" };
+  }
   try {
-    const inv = await createSalesInvoice(parsed.data, ctx);
+    const inv = await createSalesInvoice({ ...parsed.data, projectId }, ctx);
     revalidatePath(`/proyectos/${projectId}/facturas`);
     return { id: inv.id };
   } catch (err) { return handle(err); }
@@ -93,7 +96,7 @@ export async function createInvoiceFromCertificationAction(
   const parsed = createInvoiceFromCertificationSchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
-    const inv = await createInvoiceFromCertification(parsed.data, ctx);
+    const inv = await createInvoiceFromCertification(parsed.data, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/facturas`);
     return { id: inv.id };
   } catch (err) { return handle(err); }
@@ -133,7 +136,7 @@ export async function updateSalesInvoiceAction(
   const parsed = updateSalesInvoiceSchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
-    await updateSalesInvoice(invoiceId, parsed.data, ctx);
+    await updateSalesInvoice(invoiceId, parsed.data, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/facturas`);
     return { ok: true };
   } catch (err) { return handle(err); }
@@ -145,7 +148,7 @@ export async function issueSalesInvoiceAction(
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
-    await issueSalesInvoice(invoiceId, ctx);
+    await issueSalesInvoice(invoiceId, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/facturas`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
     revalidateProjectCostAndFinancePaths(projectId);
@@ -160,7 +163,7 @@ export async function cancelSalesInvoiceAction(
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
-    await cancelSalesInvoice(invoiceId, ctx);
+    await cancelSalesInvoice(invoiceId, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/facturas`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
     revalidateProjectCostAndFinancePaths(projectId);
@@ -175,7 +178,7 @@ export async function cancelReceivableAction(
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
-    await cancelReceivable(receivableId, ctx);
+    await cancelReceivable(receivableId, ctx, projectId);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
     revalidateProjectCostAndFinancePaths(projectId);
     revalidateTreasuryPaths();

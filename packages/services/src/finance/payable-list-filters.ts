@@ -1,6 +1,6 @@
 import type { Prisma } from "@bloqer/database";
+import { productCalendarDateUtc } from "@bloqer/utils";
 import { appendPayableAnd, openPayableBalanceWhere } from "./obligation-balance-filter";
-import { startOfTodayUtc } from "./pagination";
 
 export type CompanyPayableStatusFilter =
   | "OPEN"
@@ -72,7 +72,7 @@ export function appendPendingPayablesFilter(where: Prisma.PayableWhereInput): vo
 export function appendPayableStatusFilter(
   where: Prisma.PayableWhereInput,
   status?: CompanyPayableStatusFilter,
-  today: Date = startOfTodayUtc(),
+  today: Date = productCalendarDateUtc(),
 ): void {
   if (!status) return;
   switch (status) {

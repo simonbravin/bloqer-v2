@@ -341,6 +341,7 @@ export async function createSalesInvoice(
 export async function createInvoiceFromCertification(
   input: CreateInvoiceFromCertificationInput,
   ctx: ServiceContext,
+  projectScopeId?: string,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
   if (!canEditArArea(ctx.roles)) {
@@ -356,6 +357,9 @@ export async function createInvoiceFromCertification(
   });
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && cert.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La certificación no pertenece a este proyecto");
+  }
   await assertProjectAllowsOperationalMutation(cert.projectId, ctx.tenantId);
   // Billing gate aligned with UI / STATE_MACHINES: APPROVED only.
   if (cert.status !== "APPROVED") {
@@ -472,11 +476,15 @@ export async function updateSalesInvoice(
   id: string,
   input: UpdateSalesInvoiceInput,
   ctx: ServiceContext,
+  projectScopeId?: string,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
   const inv = await prisma.salesInvoice.findUnique({ where: { id } });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && inv.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+  }
   if (!canMutateArForScope(ctx.roles, inv.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar facturas");
   }
@@ -553,7 +561,11 @@ export async function updateSalesInvoice(
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
-export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promise<SalesInvoiceWithLines> {
+export async function issueSalesInvoice(
+  id: string,
+  ctx: ServiceContext,
+  projectScopeId?: string,
+): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
 
   const invPreview = await prisma.salesInvoice.findUnique({
@@ -562,6 +574,9 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && invPreview.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+  }
   if (isCrossCompany(invPreview.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
   }
@@ -681,7 +696,11 @@ export async function issueSalesInvoice(id: string, ctx: ServiceContext): Promis
   return serializeInvoice(result);
 }
 
-export async function cancelSalesInvoice(id: string, ctx: ServiceContext): Promise<SalesInvoice> {
+export async function cancelSalesInvoice(
+  id: string,
+  ctx: ServiceContext,
+  projectScopeId?: string,
+): Promise<SalesInvoice> {
   await assertArTenantModule(ctx);
 
   const invPreview = await prisma.salesInvoice.findUnique({
@@ -690,6 +709,9 @@ export async function cancelSalesInvoice(id: string, ctx: ServiceContext): Promi
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && invPreview.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+  }
   if (isCrossCompany(invPreview.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
   }

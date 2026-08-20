@@ -1,5 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { toIsoDateLocal } from "@bloqer/utils";
+import { toIsoDateInTimeZone } from "@bloqer/utils";
 import {
   assertTenantModuleEnabledWithGate,
   getTenantModuleGate,
@@ -21,7 +21,7 @@ function isValidIsoDate(value: string): boolean {
 
 export function resolveProjectionAsOfDate(value: string | undefined): string {
   if (value && isValidIsoDate(value)) return value;
-  return toIsoDateLocal();
+  return toIsoDateInTimeZone();
 }
 
 export type ProjectCashPositionProjectionFilters = {

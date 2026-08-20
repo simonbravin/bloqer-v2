@@ -1,6 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import { toIsoDateLocal } from "@bloqer/utils";
+import { toIsoDateInTimeZone, addCalendarDays, calendarPartsInTimeZone, formatCalendarDate } from "@bloqer/utils";
 import type { CreateSupplierInvoiceFromPurchaseOrderInput } from "@bloqer/validators";
 import { ServiceContext, ServiceError } from "../types";
 import {
@@ -58,9 +58,7 @@ export type PurchaseOrderBillingSummary = {
 };
 
 function defaultDueDate(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 30);
-  return toIsoDateLocal(d);
+  return formatCalendarDate(addCalendarDays(calendarPartsInTimeZone(), 30));
 }
 
 async function loadPoForBilling(purchaseOrderId: string, ctx: ServiceContext) {
@@ -494,7 +492,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
     {
       projectId: input.projectId,
       supplierContactId: po.supplierContactId,
-      issueDate: toIsoDateLocal(),
+      issueDate: toIsoDateInTimeZone(),
       dueDate: defaultDueDate(),
       currency: po.currency,
       invoiceLetter: suggestedLetter,

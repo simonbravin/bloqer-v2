@@ -56,7 +56,7 @@ describe("receivablesFieldTodayIso", () => {
   });
 });
 
-describe("urgency (UTC due date, due today is not overdue)", () => {
+describe("urgency (due date ISO vs product today, due today is not overdue)", () => {
   it("overdue when due < today and open", () => {
     assert.equal(
       receivablesFieldUrgency(row({ id: "a", clientName: "A", dueDateIso: "2026-08-19" }), TODAY),

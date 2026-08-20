@@ -1,7 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
+import { productCalendarDateUtc } from "@bloqer/utils";
 import { isDueOnOrBeforeHorizon } from "../reports/report-month";
 import { hasOpenObligationBalance, isObligationOverdue, OBLIGATION_OPEN_BALANCE_EPSILON } from "../finance/obligation-date";
-import { startOfTodayUtc } from "../finance/pagination";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import type { ServiceContext } from "../types";
@@ -84,7 +84,7 @@ function openBalance(row: CorporatePayableSnapshotRow): Prisma.Decimal | null {
 
 export function aggregateCorporatePayableBalances(
   rows: CorporatePayableSnapshotRow[],
-  asOf: Date = startOfTodayUtc(),
+  asOf: Date = productCalendarDateUtc(),
 ): PayablesProjectSummary {
   const total = new Map<string, Prisma.Decimal>();
   const overdue = new Map<string, Prisma.Decimal>();

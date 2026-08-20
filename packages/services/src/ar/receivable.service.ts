@@ -473,7 +473,11 @@ export async function summarizeReceivablesByProject(
   return { totalByCurrency: toRows(total), overdueByCurrency: toRows(overdue) };
 }
 
-export async function cancelReceivable(id: string, ctx: ServiceContext): Promise<Receivable> {
+export async function cancelReceivable(
+  id: string,
+  ctx: ServiceContext,
+  projectScopeId?: string,
+): Promise<Receivable> {
   await assertArTenantModule(ctx);
 
   const preview = await prisma.receivable.findUnique({
@@ -482,6 +486,9 @@ export async function cancelReceivable(id: string, ctx: ServiceContext): Promise
   });
   if (!preview) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
   if (preview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && preview.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por cobrar no pertenece a este proyecto");
+  }
   if (isCrossCompany(preview.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
   }

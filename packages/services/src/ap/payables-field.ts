@@ -86,7 +86,7 @@ export function formatSupplierInvoiceCode(number: number | null | undefined): st
   return `FP-${String(number).padStart(5, "0")}`;
 }
 
-/** UTC calendar day as `YYYY-MM-DD` — matches AP aging, not product-TZ week helpers. */
+/** Product calendar day as `YYYY-MM-DD` — matches aging / Field overdue labels. */
 export const payablesFieldTodayIso = obligationFieldTodayIso;
 
 export { utcIsoDate };

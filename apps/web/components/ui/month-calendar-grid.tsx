@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { calendarPartsInTimeZone } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -18,10 +19,6 @@ export type MonthCalendarGridProps<T> = {
   maxVisiblePerDay?: number;
 };
 
-function monthKey(d: Date) {
-  return `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
-}
-
 export function MonthCalendarGrid<T>({
   eventsByDay,
   onEventClick,
@@ -29,25 +26,21 @@ export function MonthCalendarGrid<T>({
   maxVisiblePerDay = 3,
 }: MonthCalendarGridProps<T>) {
   const [cursor, setCursor] = useState(() => {
-    const n = new Date();
-    return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), 1));
+    const today = calendarPartsInTimeZone();
+    return new Date(Date.UTC(today.year, today.month - 1, 1));
   });
 
   const year = cursor.getUTCFullYear();
   const month = cursor.getUTCMonth();
   const firstDow = new Date(Date.UTC(year, month, 1)).getUTCDay();
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const todayParts = useMemo(() => calendarPartsInTimeZone(), []);
 
   const monthLabel = cursor.toLocaleDateString("es-AR", {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
   });
-
-  const todayKey = useMemo(() => {
-    const t = new Date();
-    return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
-  }, []);
 
   return (
     <div className="space-y-4">
@@ -84,10 +77,9 @@ export function MonthCalendarGrid<T>({
           const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const feats = eventsByDay.get(key) ?? [];
           const isToday =
-            monthKey(new Date()) === monthKey(cursor) &&
-            day === new Date().getUTCDate() &&
-            month === new Date().getUTCMonth() &&
-            year === new Date().getUTCFullYear();
+            todayParts.year === year &&
+            todayParts.month === month + 1 &&
+            todayParts.day === day;
           return (
             <div
               key={key}

@@ -1,6 +1,6 @@
 import type { Prisma } from "@bloqer/database";
+import { productCalendarDateUtc } from "@bloqer/utils";
 import { appendReceivableAnd, openReceivableBalanceWhere } from "./obligation-balance-filter";
-import { startOfTodayUtc } from "./pagination";
 
 export type CompanyReceivableStatusFilter =
   | "OPEN"
@@ -70,7 +70,7 @@ export function appendPendingReceivablesFilter(where: Prisma.ReceivableWhereInpu
 export function appendReceivableStatusFilter(
   where: Prisma.ReceivableWhereInput,
   status?: CompanyReceivableStatusFilter,
-  today: Date = startOfTodayUtc(),
+  today: Date = productCalendarDateUtc(),
 ): void {
   if (!status) return;
   switch (status) {
