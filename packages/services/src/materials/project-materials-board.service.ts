@@ -5,7 +5,9 @@ import {
   calendarPartsInTimeZone,
   formatCalendarDate,
   PRODUCT_TIMEZONE,
+  toIsoDateInTimeZone,
 } from "@bloqer/utils";
+import { uniqueRelatedId } from "./materials-field";
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
@@ -35,15 +37,27 @@ export type MaterialsBoardRow = {
   productId: string | null;
   description: string;
   unit: string | null;
+  productSku: string | null;
   needQty: string;
   needCost: string;
   orderedQty: string;
   receivedQty: string;
   consumedQty: string;
   shortfallQty: string;
+  /** max(0, ordered − received). Derived; not warehouse stock. */
+  pendingReceiptQty: string;
+  /** Inclusive product-TZ dates from linked schedule items; null if unscheduled. */
+  requiredStart: string | null;
+  requiredEnd: string | null;
   missingProduct: boolean;
   unscheduled: boolean;
   overCommitted: boolean;
+  /** Set only when exactly one ordered PR line matches this APU id. Never by name. */
+  relatedPurchaseRequestId: string | null;
+  relatedPurchaseRequestNumber: number | null;
+  /** Set only when exactly one ordered PO line matches this APU id. Never by name. */
+  relatedPurchaseOrderId: string | null;
+  relatedPurchaseOrderNumber: number | null;
 };
 
 export type MaterialsBoardReport = {
@@ -322,6 +336,7 @@ export async function getProjectMaterialsBoard(
         productId: true,
         description: true,
         quantity: true,
+        purchaseRequest: { select: { id: true, number: true } },
       },
     }),
     prisma.purchaseOrderLine.findMany({
@@ -340,6 +355,7 @@ export async function getProjectMaterialsBoard(
         description: true,
         quantity: true,
         receivedQuantity: true,
+        purchaseOrder: { select: { id: true, number: true } },
       },
     }),
     gate.isEnabled("INVENTORY")
@@ -377,6 +393,11 @@ export async function getProjectMaterialsBoard(
       : Promise.resolve([]),
   ]);
 
+  const prIdsByCal = new Map<string, string[]>();
+  const prNumberById = new Map<string, number>();
+  const poIdsByCal = new Map<string, string[]>();
+  const poNumberById = new Map<string, number>();
+
   for (const line of prLines) {
     if (!line.wbsNodeId) continue;
     const row = ensureRow(
@@ -386,6 +407,12 @@ export async function getProjectMaterialsBoard(
       line.costAnalysisLineId,
     );
     row.orderedQty = row.orderedQty.add(line.quantity);
+    if (line.costAnalysisLineId) {
+      const list = prIdsByCal.get(line.costAnalysisLineId) ?? [];
+      list.push(line.purchaseRequest.id);
+      prIdsByCal.set(line.costAnalysisLineId, list);
+      prNumberById.set(line.purchaseRequest.id, line.purchaseRequest.number);
+    }
   }
   for (const line of poLines) {
     if (!line.wbsNodeId) continue;
@@ -397,6 +424,12 @@ export async function getProjectMaterialsBoard(
     );
     row.orderedQty = row.orderedQty.add(line.quantity);
     row.receivedQty = row.receivedQty.add(line.receivedQuantity);
+    if (line.costAnalysisLineId) {
+      const list = poIdsByCal.get(line.costAnalysisLineId) ?? [];
+      list.push(line.purchaseOrder.id);
+      poIdsByCal.set(line.costAnalysisLineId, list);
+      poNumberById.set(line.purchaseOrder.id, line.purchaseOrder.number);
+    }
   }
   for (const sm of consumptions) {
     if (!sm.wbsNodeId) continue;
@@ -416,11 +449,24 @@ export async function getProjectMaterialsBoard(
     row.consumedQty = row.consumedQty.add(sm.quantity);
   }
 
+  const wbsRequired = new Map<string, { start: Date; end: Date }>();
   const wbsInWindow = new Set<string>();
   const wbsScheduled = new Set<string>();
   if (winStart && winEnd) {
     for (const link of scheduleLinks) {
       wbsScheduled.add(link.wbsNodeId);
+      const start = link.scheduleItem.startDate;
+      const end = link.scheduleItem.endDate;
+      if (start || end) {
+        const s = start ?? end!;
+        const e = end ?? start!;
+        const prev = wbsRequired.get(link.wbsNodeId);
+        if (!prev) wbsRequired.set(link.wbsNodeId, { start: s, end: e });
+        else {
+          if (s < prev.start) prev.start = s;
+          if (e > prev.end) prev.end = e;
+        }
+      }
       if (
         rangesOverlap(
           link.scheduleItem.startDate,
@@ -436,6 +482,18 @@ export async function getProjectMaterialsBoard(
     for (const link of scheduleLinks) {
       wbsScheduled.add(link.wbsNodeId);
       wbsInWindow.add(link.wbsNodeId);
+      const start = link.scheduleItem.startDate;
+      const end = link.scheduleItem.endDate;
+      if (start || end) {
+        const s = start ?? end!;
+        const e = end ?? start!;
+        const prev = wbsRequired.get(link.wbsNodeId);
+        if (!prev) wbsRequired.set(link.wbsNodeId, { start: s, end: e });
+        else {
+          if (s < prev.start) prev.start = s;
+          if (e > prev.end) prev.end = e;
+        }
+      }
     }
   }
 
@@ -473,6 +531,14 @@ export async function getProjectMaterialsBoard(
     }
 
     const shortfall = Prisma.Decimal.max(ZERO, agg.needQty.sub(agg.orderedQty));
+    const pendingReceipt = Prisma.Decimal.max(ZERO, agg.orderedQty.sub(agg.receivedQty));
+    const required = wbsRequired.get(agg.wbsNodeId);
+    const relatedPrId = agg.costAnalysisLineId
+      ? uniqueRelatedId(prIdsByCal.get(agg.costAnalysisLineId) ?? [])
+      : null;
+    const relatedPoId = agg.costAnalysisLineId
+      ? uniqueRelatedId(poIdsByCal.get(agg.costAnalysisLineId) ?? [])
+      : null;
     rows.push({
       rowKey: rowKey(agg.wbsNodeId, agg.productId, agg.description),
       wbsNodeId: agg.wbsNodeId,
@@ -480,6 +546,7 @@ export async function getProjectMaterialsBoard(
       wbsName: meta.name,
       costAnalysisLineId: agg.costAnalysisLineId,
       productId: agg.productId,
+      productSku: null,
       description: agg.description,
       unit: agg.unit,
       needQty: agg.needQty.toFixed(4),
@@ -488,13 +555,32 @@ export async function getProjectMaterialsBoard(
       receivedQty: agg.receivedQty.toFixed(4),
       consumedQty: agg.consumedQty.toFixed(4),
       shortfallQty: shortfall.toFixed(4),
+      pendingReceiptQty: pendingReceipt.toFixed(4),
+      requiredStart: required ? toIsoDateInTimeZone(required.start) : null,
+      requiredEnd: required ? toIsoDateInTimeZone(required.end) : null,
       missingProduct: !agg.productId,
       unscheduled,
       overCommitted: agg.orderedQty.greaterThan(agg.needQty) && agg.needQty.greaterThan(0),
+      relatedPurchaseRequestId: relatedPrId,
+      relatedPurchaseRequestNumber: relatedPrId ? (prNumberById.get(relatedPrId) ?? null) : null,
+      relatedPurchaseOrderId: relatedPoId,
+      relatedPurchaseOrderNumber: relatedPoId ? (poNumberById.get(relatedPoId) ?? null) : null,
     });
   }
 
   rows = rows.sort((a, b) => a.wbsCode.localeCompare(b.wbsCode) || a.description.localeCompare(b.description));
+
+  const productIds = [...new Set(rows.map((r) => r.productId).filter((id): id is string => Boolean(id)))];
+  if (productIds.length > 0) {
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds }, tenantId: ctx.tenantId },
+      select: { id: true, sku: true },
+    });
+    const skuById = new Map(products.map((p) => [p.id, p.sku]));
+    for (const row of rows) {
+      if (row.productId) row.productSku = skuById.get(row.productId) ?? null;
+    }
+  }
 
   const totNeed = rows.reduce((s, r) => s.add(r.needCost), ZERO);
   const totOrd = rows.reduce((s, r) => s.add(r.orderedQty), ZERO);

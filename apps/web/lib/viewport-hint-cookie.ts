@@ -37,6 +37,11 @@ export function isScheduleFieldViewport(hint: ViewportHint | null): boolean {
   return hint !== "lg";
 }
 
+/** Same `lg` threshold as Cronograma Field. 768 uses cards; 1440 keeps the desktop table. */
+export function isMaterialsFieldViewport(hint: ViewportHint | null): boolean {
+  return isScheduleFieldViewport(hint);
+}
+
 export function viewportHintFromMatchMedia(mdMatches: boolean, lgMatches: boolean): ViewportHint {
   if (lgMatches) return "lg";
   if (mdMatches) return "md";

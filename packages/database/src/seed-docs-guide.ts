@@ -89,6 +89,11 @@ export const DOCS_GUIDE_IDS = {
   fieldTaskCompletedId: "a0000104-0000-4000-8000-000000000104",
   fieldMilestoneTodayId: "a0000105-0000-4000-8000-000000000105",
   fieldTaskTodayWbsLinkId: "a0000106-0000-4000-8000-000000000106",
+  fieldMaterialsPrId: "a0000107-0000-4000-8000-000000000107",
+  fieldMaterialsPrLineId: "a0000108-0000-4000-8000-000000000108",
+  fieldTaskWeekWbsLinkId: "a0000109-0000-4000-8000-000000000109",
+  fieldTaskDelayedWbsLinkId: "a000010a-0000-4000-8000-00000000010a",
+  fieldTaskTodayHormigonWbsLinkId: "a000010b-0000-4000-8000-00000000010b",
 } as const;
 
 const DOCS_TENANT_NAME = "Bloqer Demo Construcciones";
@@ -1530,6 +1535,118 @@ async function seedFieldPendingEntities(prisma: PrismaClient, ctx: SeedCtx): Pro
   });
 }
 
+async function seedFieldMaterialsBoard(prisma: PrismaClient, ctx: SeedCtx): Promise<void> {
+  const pvcApuId = "a00000c5-0000-4000-8000-0000000000c5";
+
+  await prisma.scheduleItemWbsLink.upsert({
+    where: {
+      scheduleItemId_wbsNodeId: {
+        scheduleItemId: DOCS_GUIDE_IDS.fieldTaskTodayId,
+        wbsNodeId: DOCS_GUIDE_IDS.wbsItem0102Id,
+      },
+    },
+    update: { isPrimary: false },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldTaskTodayHormigonWbsLinkId,
+      tenantId: ctx.tenantId,
+      scheduleItemId: DOCS_GUIDE_IDS.fieldTaskTodayId,
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0102Id,
+      isPrimary: false,
+    },
+  });
+
+  await prisma.scheduleItemWbsLink.upsert({
+    where: {
+      scheduleItemId_wbsNodeId: {
+        scheduleItemId: DOCS_GUIDE_IDS.fieldTaskWeekId,
+        wbsNodeId: DOCS_GUIDE_IDS.wbsItem0301Id,
+      },
+    },
+    update: { isPrimary: true },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldTaskWeekWbsLinkId,
+      tenantId: ctx.tenantId,
+      scheduleItemId: DOCS_GUIDE_IDS.fieldTaskWeekId,
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0301Id,
+      isPrimary: true,
+    },
+  });
+
+  await prisma.scheduleItemWbsLink.upsert({
+    where: {
+      scheduleItemId_wbsNodeId: {
+        scheduleItemId: DOCS_GUIDE_IDS.fieldTaskDelayedId,
+        wbsNodeId: DOCS_GUIDE_IDS.wbsItem0303Id,
+      },
+    },
+    update: { isPrimary: true },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldTaskDelayedWbsLinkId,
+      tenantId: ctx.tenantId,
+      scheduleItemId: DOCS_GUIDE_IDS.fieldTaskDelayedId,
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0303Id,
+      isPrimary: true,
+    },
+  });
+
+  const existingPr = await prisma.purchaseRequest.findUnique({
+    where: { id: DOCS_GUIDE_IDS.fieldMaterialsPrId },
+    select: { number: true },
+  });
+  let prNumber = existingPr?.number;
+  if (prNumber == null) {
+    const max = await prisma.purchaseRequest.aggregate({
+      where: { tenantId: ctx.tenantId, companyId: ctx.companyId },
+      _max: { number: true },
+    });
+    prNumber = (max._max.number ?? 0) + 1;
+  }
+
+  await prisma.purchaseRequest.upsert({
+    where: { id: DOCS_GUIDE_IDS.fieldMaterialsPrId },
+    update: {
+      status: "SUBMITTED",
+      companyId: ctx.companyId,
+      notes: "Solicitud Field de Caño PVC vinculada al APU (costAnalysisLineId).",
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldMaterialsPrId,
+      tenantId: ctx.tenantId,
+      companyId: ctx.companyId,
+      projectId: DOCS_GUIDE_IDS.projectId,
+      number: prNumber,
+      requestedByUserId: ctx.docsUserId,
+      neededByDate: new Date("2026-08-21T12:00:00.000Z"),
+      status: "SUBMITTED",
+      notes: "Solicitud Field de Caño PVC vinculada al APU (costAnalysisLineId).",
+      submittedAt: new Date("2026-08-18T12:00:00.000Z"),
+      createdBy: ctx.docsUserId,
+    },
+  });
+
+  await prisma.purchaseRequestLine.upsert({
+    where: { id: DOCS_GUIDE_IDS.fieldMaterialsPrLineId },
+    update: {
+      description: "Caño PVC",
+      quantity: "40.0000",
+      unit: "ml",
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0201Id,
+      costAnalysisLineId: pvcApuId,
+    },
+    create: {
+      id: DOCS_GUIDE_IDS.fieldMaterialsPrLineId,
+      purchaseRequestId: DOCS_GUIDE_IDS.fieldMaterialsPrId,
+      wbsNodeId: DOCS_GUIDE_IDS.wbsItem0201Id,
+      costAnalysisLineId: pvcApuId,
+      lineType: "MATERIAL",
+      description: "Caño PVC",
+      unit: "ml",
+      quantity: "40.0000",
+      sortOrder: 0,
+    },
+  });
+}
+
 async function seedFieldProcurementCatalog(prisma: PrismaClient, ctx: SeedCtx): Promise<void> {
   await prisma.product.upsert({
     where: { id: DOCS_GUIDE_IDS.productCementId },
@@ -2167,6 +2284,7 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
     data: { baselineBudgetId: DOCS_GUIDE_IDS.budgetId },
   });
   await seedFieldProcurementCatalog(prisma, seedCtx);
+  await seedFieldMaterialsBoard(prisma, seedCtx);
   await seedTreasury(prisma, seedCtx);
   await seedSubcontractChain(prisma, seedCtx);
   await seedCertificationAndSales(prisma, seedCtx);

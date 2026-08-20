@@ -28,14 +28,15 @@ export function ViewportHintSync() {
 
       const isDashboard = pathname === "/dashboard";
       const isCronograma = pathname.includes("/cronograma");
-      const cronogramaSourceChanged = (prev === "lg") !== (next === "lg");
+      const isMateriales = pathname.includes("/materiales");
+      const fieldSourceChanged = (prev === "lg") !== (next === "lg");
 
       if (isDashboard) {
         router.refresh();
         return;
       }
-      if (isCronograma) {
-        if (cronogramaSourceChanged) router.refresh();
+      if (isCronograma || isMateriales) {
+        if (fieldSourceChanged) router.refresh();
         return;
       }
       if (prev !== null) {

@@ -52,6 +52,7 @@ export function MaterialsBoardTable({ rows, projectId, canRequest = true }: Prop
   }
 
   return (
+    <div data-testid="materials-board-table">
     <TableScroll>
       <Table className="text-xs">
         <TableHeader className="sticky top-0 z-10 bg-muted/50">
@@ -137,5 +138,6 @@ export function MaterialsBoardTable({ rows, projectId, canRequest = true }: Prop
         </TableBody>
       </Table>
     </TableScroll>
+    </div>
   );
 }

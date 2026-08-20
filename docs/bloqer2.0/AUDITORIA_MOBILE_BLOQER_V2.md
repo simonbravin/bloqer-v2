@@ -162,7 +162,7 @@ Clasificación: **M0** ready · **M1** ajustes menores · **M2** layout mobile �
 | Campo | Libro de obra | `/libro-obra` | Filtros densos; tabla 4 cols (`18-libro-obra-390.png`) | Mejor | OK | **M2** | **P** | Default tabla; calendar alt | Lista tipo card (fecha, estado, frente) |
 | Campo | Nuevo parte | `?create=1` → `NewJobsiteLogDialog` | Dialog 90vh con form largo | 90vh | Sheet | **M2** | **P** | `new-jobsite-log-dialog.tsx` `sm:max-w-4xl`; form **ya en cards** (`jobsite-log-form.tsx`) | Full-screen sheet; no dialog centrado; foto en el flujo |
 | Campo | Detalle parte | `/libro-obra/[logId]` | Resumen OK; tabla avance overflow (`20-parte-detalle-390.png`) | Overflow | OK | **M2** | **P** | Tablas progreso/cuadrilla; adjuntos vía `EntityDocumentsPanel` (tabla) | Cards de avance; adjuntar foto visible |
-| Campo | Materiales | `/materiales` | Toolbar 4 botones + KPIs; tabla abajo (`21-materiales-390.png`) | Igual | OK- | **M2** | **P** | `MaterialsBoardTable` + `TableScroll`; CTA Pedir | Card por faltante: qty, EDT, Pedir |
+| Campo | Materiales | `/materiales` | Cards Field &lt; `lg`; tabla desktop ≥ `lg` | OK | OK | **M1** | **P** | `MaterialsFieldView` + `getProjectMaterialsBoard`; CTA Pedir | Ver Resultado — Materiales Field |
 | Campo | Inventario obra | `/inventario` | Hub | Hub | OK | **M2** | | Subnav + tablas stock | Consulta saldos en cards |
 | Campo | Consumos | `/consumos` | Empty usable (`23-consumos-390.png`) | OK | OK | **M1** | **P** | Botones wrap; CTA duplicada en empty | Default OK; form ver dialog |
 | Campo | Nuevo consumo | `NewStockConsumptionDialog` | `sm:max-w-lg` 90vh | OK | OK | **M1** | **P** | `consumption-form.tsx` combobox producto/EDT; **sin foto** | Sheet; botón cámara |
@@ -262,7 +262,7 @@ Esto **bloquea** el caso de uso de campo más claro después del parte.
 
 ## Materiales — MOBILE PRIORITY
 
-Tablero operativo (`getProjectMaterialsBoard`) con ventanas Esta semana / 14 días / mes. CTA Pedir → SC prefill. Tabla ancha. KPI “Filas con faltante” ya es el dato de campo.
+Tablero operativo (`getProjectMaterialsBoard`) con ventanas Esta semana / 14 días / mes. CTA Pedir → SC prefill. **Field &lt; `lg`:** cards de faltante (default), KPIs y chips; desktop ≥ `lg` conserva la tabla. Ver Resultado — Materiales Field.
 
 ## Consumos — MOBILE PRIORITY
 
@@ -849,7 +849,7 @@ Screenshots: `docs/bloqer2.0/mobile-audit/after-procurement-mobile/`.
 
 ## 4. Materiales → Pedir
 
-* Deep-link `?create=1&wbsNodeId=…` en mobile redirige a `/nueva` conservando prefill. Desktop sigue con dialog. No se armó el tablero mobile de Materiales.
+* Deep-link Field: `/solicitudes-compra/nueva?…&from=materiales` (desktop sigue `?create=1` → dialog; mobile redirige a `/nueva`). Tablero Field implementado: ver Resultado — Materiales Field.
 
 ## 5. Detalle SC
 
@@ -1031,7 +1031,7 @@ Correr con `--grep "Field Navigation flows"` / `"Field Navigation after screensh
 
 ## Fuera de scope (no implementado)
 
-Materiales mobile completo; PWA/offline/push/GPS; gasto rápido; remito Prisma; fotos de consumo; contabilidad; aprobar desde la bandeja.
+PWA/offline/push/GPS; gasto rápido; remito Prisma; fotos de consumo; contabilidad; aprobar desde la bandeja.
 
 ## REQUIERE VALIDACIÓN DISPOSITIVO REAL
 
@@ -1162,4 +1162,111 @@ Medición local (Neon `dev`, DEMO-001, 12 `ScheduleItem`):
 Costo que queda en Field (~0.6 s service / ~1.2 s queryMs E2E): round-trips Neon de schedule + ítems/WBS/predecesoras (incluye `ensureScheduleForProject`, que aún trae ids de ítems). No es control de costos.
 
 Los chips Field **no** vuelven a consultar el servidor. Desktop ≥ `lg` sigue en el workspace completo; no se reemplazó su DTO.
+
+---
+
+# Resultado — Materiales Field
+
+Screenshots: `docs/bloqer2.0/mobile-audit/after-materials-field/`.
+
+Misma app Next.js, misma ruta `/proyectos/[id]/materiales`, mismo `getProjectMaterialsBoard`. Sin `MaterialRequirement`, sin stock paralelo, sin Prisma/migraciones, sin PWA/offline. Sin tocar Cronograma Field ni Field Home.
+
+## Arquitectura
+
+**Antes:** `/materiales` siempre llamaba `getProjectCostControl` (solo para `availableBudgets`) y después el board operativo. Esa es la misma clase de costo que Cronograma (~5 s).
+
+**Después:** un solo árbol por request, mismo umbral `lg` (1024) que Cronograma Field. 768 usa cards (la tabla desktop es demasiado densa). No se cambiaron breakpoints globales.
+
+| Viewport (`bloqer-viewport`) | Data source | UI |
+|---|---|---|
+| `sm` / `md` / cookie ausente | `getProjectMaterialsBoard(..., { window: "all" })` — **sin** `getProjectCostControl` | Materiales Field |
+| `lg` (≥1024) | `getProjectCostControl` + board (sin cambios) | Tabla / KPIs / Varianza ($) |
+
+No se creó `getProjectMaterialsFieldBoard`: el board ya trae necesidad/pedido/recibido/faltante en pocas queries. El recorte de Field es no montar control de costos ni la pestaña Varianza.
+
+DTO extra en la misma fila (`MaterialsBoardRow`), reglas idénticas:
+
+- `pendingReceiptQty` = max(0, ordered − received)
+- `requiredStart` / `requiredEnd` desde vínculos de cronograma (min/max por EDT, TZ de producto)
+- `relatedPurchaseRequestId` / `relatedPurchaseOrderId` solo si hay **exactamente un** `costAnalysisLineId`
+- `productSku` en un `findMany` de productos (no N+1)
+
+Helpers cliente: `@bloqer/services/materials-field` (no importar el barrel `server-only` desde el cliente).
+
+Filtros/búsqueda/cap en cliente (`history.replaceState`, sin refetch).
+
+## Semántica faltante
+
+La del board, sin redefinir supply planning:
+
+`shortfallQty = max(0, needQty − orderedQty)`
+
+`needQty` = necesidad física APU ([D-047]). `orderedQty` = SC `SUBMITTED`/`QUOTE_SELECTED` **sin** OC confirmada+ **más** líneas de OC `CONFIRMED`/`PARTIALLY_RECEIVED`/`RECEIVED`.
+
+**Cubierto** = need > 0 y shortfall ≈ 0 (ordered ≥ need). No es saldo de depósito.
+
+## Stock / disponible
+
+`getProjectMaterialsBoard` **no** expone saldo de depósito. `consumedQty` es consumo confirmado, no available. Field **no** muestra “Disponible: N u.” de warehouse ni desglose multi-depósito (exigiría `getStockBalance` por producto+depósito → N+1). Se muestran Necesario / Pedido / Recibido / Faltante. Recibido ≠ stock en depósito.
+
+## Esta semana
+
+Lunes–domingo en TZ de producto (`productWeekMondaySundayBounds`), igual que Cronograma Field. Entra si el rango `requiredStart`–`requiredEnd` se solapa. Sin fecha de cronograma → no entra en «Esta semana» ni en «Próximos 14 días» (hoy → hoy+13 inclusive).
+
+## Pedidos / por recibir
+
+**Pedidos:** `orderedQty > 0`. **Por recibir:** `pendingReceiptQty > 0` (ordered − received). No se estima desde UI.
+
+Labels derivados (no persistidos): Sin pedir / Pedido / Parcial / Recibido.
+
+## Orden (Faltantes)
+
+1. vencidos (`requiredEnd` &lt; hoy); 2. se solapan con hoy; 3. esta semana; 4. resto / sin fecha. Dentro del mismo rango: fecha, mayor faltante, nombre. **No** alfabético primero.
+
+## Cap 200
+
+Filtro + sort **después** slice 200. KPIs sobre el set completo. Un faltante en la posición 250 de «Todos» sigue apareciendo en Faltantes.
+
+## Cards / Sheet
+
+Card: nombre, unidad, EDT, fechas, Necesario/Pedido/Recibido/Faltante, Por recibir si aplica, badge Faltante o Cubierto + estado de abastecimiento. CTA `Pedir` o `Solicitud creada` + `Ver solicitud`. Sin consumo como CTA principal (`+` global ya existe).
+
+Sheet: contexto + SC/OC únicas si hay id. `Ver OC` → ficha OC (recepción sigue en la OC). No hay «Registrar recepción» desde la card de material.
+
+## Pedir → SC
+
+Href Field: `/solicitudes-compra/nueva` con prefill existente (EDT, descripción, qty faltante, unidad, productId, costAnalysisLineId, `from=materiales`). Sin campos nuevos. VIEWER no ve el CTA; `canEditPurchaseRequests` + gate `PROCUREMENT`. Backend sigue siendo la defensa.
+
+## SC existente
+
+Solo si hay **un** `costAnalysisLineId` en una SC ordered. 0 o &gt;1 → se mantiene `Pedir`. Nunca se matchea por nombre/descripción.
+
+## Permisos y gates
+
+Consulta: `canViewProjectCostControlReport` o `VIEW PROJECTS` + módulos `PROJECTS`+`BUDGETS`. `Pedir`: `PROCUREMENT` + `canEditPurchaseRequests`. OWNER/PM: consulta + Pedir. VIEWER: consulta, sin Pedir. Sin gate `FIELD_MATERIALS`. Cross-tenant: `project.findFirst` con `tenantId`. Cross-project: shell/board por `projectId`+tenant. Field Home **no** carga el board.
+
+## Navegación
+
+Más → Materiales (ya estaba en `buildProjectWorkspaceNavSections`). Bottom nav sin sexto ítem.
+
+## Performance
+
+Playwright 390 `data-query-ms` **1014–1619** `data-materials-source=field` (warm). Queries Field ≈ las del board (proyecto, presupuesto, WBS, APU MATERIAL, PR/PO/consumos/cronograma en paralelo, +1 SKU). Se eliminó `getProjectCostControl` del árbol Field (certificaciones, OC, subcontratos, AP, inventario, partes).
+
+Los chips no refetch. Desktop ≥ `lg` sigue igual.
+
+## Tests
+
+Unit: shortage/covered, pending receipt, semana lun–dom, urgencia, cap-antes-de-slice, Pedir vs SC única, OWNER/PM/VIEWER `canEditPurchaseRequests`, board FORBIDDEN sin roles.
+
+Playwright `docs/bloqer2.0/mobile-audit/materials-field.spec.ts` — skip `bloqer.app` / `vercel.app`. 3 passed (OWNER 390 + VIEWER + 430/768/1440). Neon `dev`.
+
+## Seed demo (Neon `dev` only)
+
+PR Field de Caño PVC con `costAnalysisLineId` (Ver solicitud). Vínculos EDT extra para fechas (hormigón hoy, revoque semana, carpintería atrasada). Idempotente. No production.
+
+## Fuera de scope
+
+Prisma/migraciones; PWA/offline; stock de depósito; recepción genérica; consumo como CTA de card; Field Home KPI de faltantes; Cronograma Field; BUG-014; AI; reorder.
+
 

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-20T02:23:16.639Z",
+  "generatedAt": "2026-08-20T03:52:33.621Z",
   "docsUserEmail": "docs-guide@bloqer.demo",
   "fieldPmEmail": "docs-pm@bloqer.demo",
   "fieldViewerEmail": "docs-viewer@bloqer.demo",
@@ -84,6 +84,11 @@
   "fieldTaskCompletedId": "a0000104-0000-4000-8000-000000000104",
   "fieldMilestoneTodayId": "a0000105-0000-4000-8000-000000000105",
   "fieldTaskTodayWbsLinkId": "a0000106-0000-4000-8000-000000000106",
+  "fieldMaterialsPrId": "a0000107-0000-4000-8000-000000000107",
+  "fieldMaterialsPrLineId": "a0000108-0000-4000-8000-000000000108",
+  "fieldTaskWeekWbsLinkId": "a0000109-0000-4000-8000-000000000109",
+  "fieldTaskDelayedWbsLinkId": "a000010a-0000-4000-8000-00000000010a",
+  "fieldTaskTodayHormigonWbsLinkId": "a000010b-0000-4000-8000-00000000010b",
   "accountId": "a0000060-0000-4000-8000-000000000060",
   "reconciliationId": "a0000064-0000-4000-8000-000000000064"
 }

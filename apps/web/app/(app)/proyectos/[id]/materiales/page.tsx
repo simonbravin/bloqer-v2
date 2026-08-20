@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
@@ -13,10 +14,13 @@ import {
   getTenantModuleGate,
   ServiceError,
   type AvailableBudget,
+  type MaterialsBoardRow,
   type MaterialsBoardWindow,
   type ServiceContext,
 } from "@bloqer/services";
+import type { MaterialsFieldRow } from "@bloqer/services/materials-field";
 import { MaterialsBoardTable } from "@/features/materials/materials-board-table";
+import { MaterialsFieldExperience } from "@/features/materials/materials-field-experience";
 import { MaterialWbsTable, ReportDateFilters, ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
@@ -25,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { formatDecimalArFromString, formatMoneyAmount } from "@/lib/format-money";
+import { isMaterialsFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -83,6 +88,33 @@ function materialsQuery(opts: {
   return q ? `?${q}` : "";
 }
 
+function toMaterialsFieldRow(row: MaterialsBoardRow): MaterialsFieldRow {
+  return {
+    rowKey: row.rowKey,
+    wbsNodeId: row.wbsNodeId,
+    wbsCode: row.wbsCode,
+    wbsName: row.wbsName,
+    costAnalysisLineId: row.costAnalysisLineId,
+    productId: row.productId,
+    productSku: row.productSku,
+    description: row.description,
+    unit: row.unit,
+    needQty: row.needQty,
+    orderedQty: row.orderedQty,
+    receivedQty: row.receivedQty,
+    consumedQty: row.consumedQty,
+    shortfallQty: row.shortfallQty,
+    pendingReceiptQty: row.pendingReceiptQty,
+    requiredStart: row.requiredStart,
+    requiredEnd: row.requiredEnd,
+    unscheduled: row.unscheduled,
+    relatedPurchaseRequestId: row.relatedPurchaseRequestId,
+    relatedPurchaseRequestNumber: row.relatedPurchaseRequestNumber,
+    relatedPurchaseOrderId: row.relatedPurchaseOrderId,
+    relatedPurchaseOrderNumber: row.relatedPurchaseOrderNumber,
+  };
+}
+
 export default async function ProyectoMaterialesPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -109,6 +141,45 @@ export default async function ProyectoMaterialesPage({ params, searchParams }: P
     throw err;
   }
 
+  const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
+  const loadField = isMaterialsFieldViewport(hint);
+
+  const gate = await getTenantModuleGate(ctx);
+  const canRequest = gate.isEnabled("PROCUREMENT") && canEditPurchaseRequests(ctx.roles);
+
+  if (loadField) {
+    const started = Date.now();
+    let board;
+    try {
+      board = await getProjectMaterialsBoard(projectId, { window: "all", budgetId: sp.budgetId }, ctx);
+    } catch (err) {
+      if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+      throw err;
+    }
+    const queryMs = Date.now() - started;
+    const rows = board.type === "REPORT" ? board.rows.map(toMaterialsFieldRow) : [];
+    return (
+      <PageShell variant="default" className="space-y-6">
+        <ProjectPageHeader title="Materiales" subtitle="Necesidad, pedido y recepción de la obra" />
+        {board.type === "NO_APPROVED_BUDGETS" ? (
+          <div className="rounded-lg border bg-card p-8 text-center space-y-3" data-testid="materials-field-empty">
+            <p className="font-semibold">Todavía no hay necesidades de materiales para esta obra.</p>
+            <p className="text-sm text-muted-foreground">
+              Aprobá un presupuesto con APU de materiales para ver la cobertura.
+            </p>
+          </div>
+        ) : (
+          <MaterialsFieldExperience
+            projectId={projectId}
+            rows={rows}
+            canRequest={canRequest}
+            queryMs={queryMs}
+          />
+        )}
+      </PageShell>
+    );
+  }
+
   const budgetProbe = await getProjectCostControl(projectId, { budgetId: sp.budgetId }, ctx).catch(
     (err) => {
       if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
@@ -118,13 +189,10 @@ export default async function ProyectoMaterialesPage({ params, searchParams }: P
   const availableBudgets =
     budgetProbe.type === "NO_APPROVED_BUDGETS" ? [] : budgetProbe.availableBudgets;
 
-  const gate = await getTenantModuleGate(ctx);
   const showCompras =
     gate.isEnabled("PROCUREMENT") &&
     (canViewPurchaseRequests(ctx.roles) || can(ctx.roles, "VIEW", "PROJECTS"));
   const showConsumos = gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY");
-  const canRequest =
-    gate.isEnabled("PROCUREMENT") && canEditPurchaseRequests(ctx.roles);
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -301,7 +369,7 @@ async function OperativoTab({
         <KpiStatCard label="Cant. consumida" value={fmtQtyKpi(board.totals.consumedQty)} />
       </KpiStatGrid>
 
-      <Card>
+      <Card data-testid="materials-desktop-view">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Cobertura por partida</CardTitle>
         </CardHeader>
