@@ -334,7 +334,7 @@ flowchart LR
 
 | Evento | Reacción |
 |---|---|
-| `purchase_request.submitted` | notifica a Compras / aprobadores OC (in-app + email, [BR-PUR-015], [D-050]). |
+| `purchase_request.submitted` | notifica a Compras / aprobadores OC (in-app + email, [BR-PUR-015], [D-050]). El email identifica tenant, proyecto y solicitante. |
 | `purchase_order.submitted` | si requiere alto nivel (umbral o `EXTRA_APPROVAL`), notifica a OWNER/ADMIN; si auto-aprueba, emite también `purchase_order.approved`. |
 | `purchase_order.approved` | habilita confirmación al proveedor; notifica al solicitante. |
 | `purchase_order.returned_for_changes` | notifica al creador/solicitante con el motivo; documento vuelve a editable. |

@@ -3,6 +3,10 @@ import { prisma } from "@bloqer/database";
 import { createSystemNotification } from "../notifications/notification.service";
 import { sendNotificationEmailAsSystem } from "../notifications/notification-email.service";
 import { resolveNotificationAudience } from "../notifications/notification-audience.service";
+import {
+  formatNotificationIdentityBody,
+  loadNotificationIdentityFacts,
+} from "../notifications/notification-email-context";
 import type { ServiceContext } from "../types";
 
 /** Company-finance actors who should be nudged to collect (D-072). Not PROJECT_FINANCE / VIEWER. */
@@ -64,7 +68,16 @@ export async function notifyReceivableReadyToCollect(params: {
 
   const type: NotificationType = "RECEIVABLE_READY_TO_COLLECT";
   const title = "Listo para cobrar";
-  const body = `La factura ${invCode} (${params.amountLabel}) tiene CxC abierta. Elegí la cuenta de tesorería y registrá la cobranza.`;
+  const facts = await loadNotificationIdentityFacts({
+    tenantId: params.ctx.tenantId,
+    companyId: params.companyId,
+    projectId: params.projectId,
+    actorUserId: params.ctx.actorUserId,
+  });
+  const body = formatNotificationIdentityBody(
+    `La factura ${invCode} (${params.amountLabel}) tiene CxC abierta. Elegí la cuenta de tesorería y registrá la cobranza.`,
+    facts,
+  );
 
   for (const recipientUserId of unique) {
     try {

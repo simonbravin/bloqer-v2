@@ -153,7 +153,7 @@ Contexto de sistema: `buildOperationalAlertsCronServiceContext` + `runAllOperati
 ## Email bridge (Phase 8E — foundation; Phase 9D — delivery log)
 
 - **Package:** `@bloqer/email` — `sendEmail()` → Resend cuando `isEmailConfigured()`; si no hay `RESEND_*` válidos → `provider: "disabled"`, sin lanzar.
-- **Templates:** HTML + texto plano (`notification-email`, `operational-alert-email`); sin `metadata` ni `storageKey`; CTA solo si `getPublicAppBaseUrl()` devuelve URL (AUTH_URL / NEXT_PUBLIC_APP_URL / APP_URL).
+- **Templates:** HTML + texto plano (`notification-email`, `operational-alert-email`, `auth-email`); mismo layout transaccional; organización en encabezado y Subject (`[tenant] …`) en notificaciones, invitaciones y reportes; contexto por entidad (SC/OC, facturas, certificación, parte, recepción, documento, stock) resuelto al enviar; CTA solo si hay URL pública.
 - **Service:** `notification-email.service.ts` — `sendNotificationEmail`, `sendOperationalAlertEmail` (solo tipos Phase 8B); no muta la fila `Notification`, no marca leída, no crea nuevas filas.
 - **AuthZ:** destinatario de la notificación o **OWNER** / **ADMIN** (misma regla que runner manual vía `canRunOperationalAlerts`).
 - **No envío automático** desde runners 8C, ni desde cron 8D (Phase 8F + preferencias / dedupe).

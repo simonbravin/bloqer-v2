@@ -4,7 +4,13 @@ import { createHash, randomBytes } from "crypto";
 import { prisma, type Prisma, type UserRole as PrismaUserRole } from "@bloqer/database";
 import type { UserRole } from "@bloqer/domain";
 import { getPublicAppBaseUrl, isEmailConfigured } from "@bloqer/config";
-import { escapeHtml, sendEmail } from "@bloqer/email";
+import {
+  formatNotificationEmailSubject,
+  renderAuthEmailHtml,
+  renderAuthEmailText,
+  sendEmail,
+} from "@bloqer/email";
+import { formatUserLabel } from "../notifications/notification-email-context";
 
 export function hashInvitationToken(raw: string): string {
   return createHash("sha256").update(raw, "utf8").digest("hex");
@@ -24,8 +30,24 @@ export function buildTenantInvitationLink(rawToken: string): string {
   return base ? `${base}${path}` : path;
 }
 
-function sanitizeEmailSubject(s: string): string {
-  return s.replace(/[\r\n\u2028\u2029]+/g, " ").trim().slice(0, 998);
+const INVITE_ROLE_LABEL_ES: Record<string, string> = {
+  OWNER: "Propietario",
+  ADMIN: "Administrador",
+  FINANCE: "Finanzas",
+  TREASURER: "Tesorería",
+  PROJECT_FINANCE: "Finanzas de obra",
+  PROCUREMENT: "Compras",
+  WAREHOUSE: "Depósito",
+  SALES: "Ventas",
+  VIEWER: "Solo lectura",
+  PROJECT_MANAGER: "Jefe de obra",
+  SITE_FOREMAN: "Capataz",
+  PROJECT_VIEWER: "Visor de proyecto",
+};
+
+function rolesLabelEs(roles: string[] | undefined): string | null {
+  if (!roles || roles.length === 0) return null;
+  return roles.map((r) => INVITE_ROLE_LABEL_ES[r] ?? r).join(", ");
 }
 
 export type TenantInvitationEmailDispatch = {
@@ -52,6 +74,7 @@ export async function sendTenantInvitationEmailMessage(
   toEmail: string,
   invitationLink: string,
   tenantName: string,
+  extras?: { invitedByUserId?: string | null; roles?: string[] },
 ): Promise<TenantInvitationEmailDispatch> {
   if (!isEmailConfigured()) {
     return { dispatched: false, skipReason: "email_not_configured" };
@@ -59,16 +82,41 @@ export async function sendTenantInvitationEmailMessage(
   if (!getPublicAppBaseUrl()) {
     return { dispatched: false, skipReason: "app_url_missing" };
   }
-  const safeTenant = escapeHtml(tenantName);
-  const html = `
-<p>Te invitaron a unirte al equipo en <strong>${safeTenant}</strong> en Bloqer.</p>
-<p><a href="${invitationLink}">Aceptar invitación</a></p>
-<p style="font-size:12px;color:#666">Si no esperabas este correo, podés ignorarlo.</p>
-`.trim();
-  const text = `Te invitaron a unirte a "${tenantName}" en Bloqer.\n\nAceptá acá: ${invitationLink}\n`;
+
+  let invitedByName: string | null = null;
+  if (extras?.invitedByUserId) {
+    const inviter = await prisma.user.findUnique({
+      where: { id: extras.invitedByUserId },
+      select: { name: true, email: true },
+    });
+    invitedByName = inviter ? formatUserLabel(inviter.name, inviter.email) : null;
+  }
+
+  const contextFields = [
+    { label: "Organización", value: tenantName },
+    ...(invitedByName ? [{ label: "Invitó", value: invitedByName }] : []),
+    ...(rolesLabelEs(extras?.roles) ? [{ label: "Roles", value: rolesLabelEs(extras?.roles)! }] : []),
+  ];
+
+  const html = renderAuthEmailHtml({
+    title: "Invitación a Bloqer",
+    body: `Te invitaron a unirte al equipo de ${tenantName}. Abrí el enlace para aceptar y crear o vincular tu cuenta.`,
+    actionLabel: "Aceptar invitación",
+    actionUrlAbsolute: invitationLink,
+    organizationName: tenantName,
+    contextFields,
+  });
+  const text = renderAuthEmailText({
+    title: "Invitación a Bloqer",
+    body: `Te invitaron a unirte al equipo de ${tenantName}. Abrí el enlace para aceptar y crear o vincular tu cuenta.`,
+    actionLabel: "Aceptar invitación",
+    actionUrlAbsolute: invitationLink,
+    organizationName: tenantName,
+    contextFields,
+  });
   const res = await sendEmail({
     to:       toEmail,
-    subject:  sanitizeEmailSubject(`Invitación a Bloqer — ${tenantName}`),
+    subject:  formatNotificationEmailSubject("Invitación a Bloqer", tenantName),
     html,
     text,
   });

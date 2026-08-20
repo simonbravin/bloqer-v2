@@ -172,6 +172,10 @@ export * from "./notifications/operational-alerts.service";
 export * from "./notifications/operational-alerts-runner.service";
 export * from "./notifications/operational-alerts-cron.service";
 export * from "./notifications/notification-email.service";
+export {
+  formatNotificationIdentityBody,
+  loadNotificationIdentityFacts,
+} from "./notifications/notification-email-context";
 export * from "./report-exports/report-export.types";
 export * from "./report-exports/report-export.service";
 export {

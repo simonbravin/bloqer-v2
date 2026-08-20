@@ -4,11 +4,14 @@ import type {
   NotificationType,
   EmailDeliveryType,
   LinkedEntityType,
+  Prisma,
 } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import { getPublicAppBaseUrl, isEmailConfigured } from "@bloqer/config";
 import {
   sendEmail,
+  formatNotificationEmailSubject,
+  sanitizeEmailSubject,
   renderNotificationEmailHtml,
   renderNotificationEmailText,
   renderOperationalAlertEmailHtml,
@@ -25,6 +28,7 @@ import {
 import { ServiceContext, ServiceError } from "../types";
 import { canRunOperationalAlerts } from "./operational-alerts-runner.service";
 import { OPERATIONAL_NOTIFICATION_TYPES } from "./operational-alerts.service";
+import { resolveNotificationEmailContext } from "./notification-email-context";
 
 const OPERATIONAL_NOTIFICATION_TYPE_SET: ReadonlySet<NotificationType> = new Set(
   OPERATIONAL_NOTIFICATION_TYPES,
@@ -65,8 +69,10 @@ type NotificationRow = {
   body: string;
   severity: NotificationSeverity;
   actionUrl: string | null;
+  projectId: string | null;
   linkedEntityType: LinkedEntityType | null;
   linkedEntityId: string | null;
+  metadata: Prisma.JsonValue | null;
 };
 
 async function loadNotification(notificationId: string, tenantId: string): Promise<NotificationRow | null> {
@@ -83,8 +89,10 @@ async function loadNotification(notificationId: string, tenantId: string): Promi
       body: true,
       severity: true,
       actionUrl: true,
+      projectId: true,
       linkedEntityType: true,
       linkedEntityId: true,
+      metadata: true,
     },
   });
 }
@@ -95,11 +103,6 @@ async function assertRecipientActiveInTenant(recipientUserId: string, tenantId: 
     select: { id: true },
   });
   return Boolean(m);
-}
-
-/** Mitigate SMTP header injection when notification title is used as Subject. */
-function sanitizeEmailSubject(title: string): string {
-  return title.replace(/[\r\n\u2028\u2029]+/g, " ").trim().slice(0, 998);
 }
 
 async function logNotificationEmailSkipped(
@@ -203,10 +206,28 @@ async function dispatchNotificationEmail(
     return { ok: true, skipped: "no_recipient_email", provider: "disabled" };
   }
 
+  const emailContext = await resolveNotificationEmailContext({
+    tenantId: n.tenantId,
+    companyId: n.companyId,
+    projectId: n.projectId,
+    linkedEntityType: n.linkedEntityType,
+    linkedEntityId: n.linkedEntityId,
+    notificationType: n.type,
+    metadata: n.metadata,
+  }).catch(() => ({
+    organizationName: null as string | null,
+    contextFields: [] as { label: string; value: string }[],
+    items: [] as string[],
+    itemsHeading: "Ítems",
+    actionLabel: "Abrir en Bloqer",
+  }));
+
+  const subject = formatNotificationEmailSubject(n.title, emailContext.organizationName);
+
   const { id: logId } = await createEmailDeliveryLog(
     {
       recipientEmail: user.email.trim(),
-      subject: sanitizeEmailSubject(n.title),
+      subject,
       emailType,
       recipientUserId: n.recipientUserId,
       companyId: n.companyId,
@@ -224,30 +245,36 @@ async function dispatchNotificationEmail(
       : null;
 
   const isOperational = OPERATIONAL_NOTIFICATION_TYPE_SET.has(n.type);
+  const templateInput = {
+    title: n.title,
+    body: n.body,
+    actionUrlAbsolute,
+    actionLabel: emailContext.actionLabel,
+    organizationName: emailContext.organizationName,
+    contextFields: emailContext.contextFields,
+    items: emailContext.items,
+    itemsHeading: emailContext.itemsHeading,
+  };
 
   const { html, text } = isOperational
     ? {
         html: renderOperationalAlertEmailHtml({
-          title: n.title,
-          body: n.body,
+          ...templateInput,
           severityLabel: severityToLabel(n.severity),
-          actionUrlAbsolute,
         }),
         text: renderOperationalAlertEmailText({
-          title: n.title,
-          body: n.body,
+          ...templateInput,
           severityLabel: severityToLabel(n.severity),
-          actionUrlAbsolute,
         }),
       }
     : {
-        html: renderNotificationEmailHtml({ title: n.title, body: n.body, actionUrlAbsolute }),
-        text: renderNotificationEmailText({ title: n.title, body: n.body, actionUrlAbsolute }),
+        html: renderNotificationEmailHtml(templateInput),
+        text: renderNotificationEmailText(templateInput),
       };
 
   const sendResult = await sendEmail({
     to: user.email.trim(),
-    subject: sanitizeEmailSubject(n.title),
+    subject,
     html,
     text,
   });

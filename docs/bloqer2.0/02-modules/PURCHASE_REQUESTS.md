@@ -96,7 +96,7 @@ Matriz canónica: [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md)
 ## 17. Eventos / notificaciones
 - `purchase_request.created` / `submitted` / `cancelled`
 - `procurement_quote.received` / `selected`
-- Notificar Compras al enviar SC; notificar solicitante cuando hay cotización seleccionada / OC confirmada o rechazada ([BR-PUR-015], [D-050]).
+- Notificar Compras al enviar SC; notificar solicitante cuando hay cotización seleccionada / OC confirmada o rechazada ([BR-PUR-015], [D-050]). Email e in-app identifican organización, proyecto y solicitante.
 
 ## 18. Fase de implementación
 **Fase 1** (núcleo). Pendiente de implementación respecto a [D-050]: WBS hard-required, lead time en cotización, UI de costo referencial / saldo, email + SLA.

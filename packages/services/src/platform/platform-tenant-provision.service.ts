@@ -106,6 +106,7 @@ export async function provisionPlatformTenant(
     emailNorm,
     provisioned.invitationLink,
     provisioned.tenantName,
+    { invitedByUserId: ctx.actorUserId, roles: ownerRoles },
   );
 
   return {

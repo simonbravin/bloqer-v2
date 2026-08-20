@@ -306,6 +306,7 @@ export async function createTenantInvitation(
     emailNorm,
     inserted.invitationLink,
     tenant.name,
+    { invitedByUserId: ctx.actorUserId, roles: uniqueRoles },
   );
   emailDispatched = emailDispatch.dispatched;
   if (!emailDispatch.dispatched) {

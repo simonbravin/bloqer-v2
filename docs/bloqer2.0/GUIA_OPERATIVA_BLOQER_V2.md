@@ -192,7 +192,7 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 - Destinatarios primarios y/o por permiso del evento, con **CC siempre a OWNER/ADMIN** activos (salvo exclusiones del actor).
 - **Excepción anti-ruido:** `CERTIFICATION_APPROVED` llega al creador ∪ OWNER/ADMIN (no se difunde a todo quien tenga VER certificaciones).
 - Cada usuario tiene su propia fila: marcar leída **no** afecta la copia de otro.
-- Compras (SC/OC): in-app + email en cambios de estado y recordatorios SLA (ver §9).
+- Compras (SC/OC), CxP/CxC y reportes: el **asunto** lleva `[organización]` y el cuerpo identifica proyecto, contraparte y actor cuando aplica. Invitaciones al equipo muestran organización, quién invitó y roles. Útil si el mismo usuario es OWNER/ADMIN de más de un workspace.
 
 > **Montos en notificaciones:** saldos y montos se muestran a **2 decimales** (D-053), igual que en el resto de la UI.
 
@@ -208,7 +208,7 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 ### 2.1 Alta de usuarios
 
 - **Ruta:** `/configuracion/equipo` → **Invitar** (`/configuracion/equipo/invitar`).
-- El sistema envía un email con un enlace a **`/invitaciones/aceptar`**. El token de invitación **no queda visible en la URL** de la pantalla de aceptación (se guarda en cookie httpOnly al hacer clic en el enlace); no hay que copiar/pegar tokens a mano.
+- El sistema envía un email con un enlace a **`/invitaciones/aceptar`**. El asunto va como `[organización] Invitación a Bloqer` y el cuerpo indica quién invitó y los roles. El token de invitación **no queda visible en la URL** de la pantalla de aceptación (se guarda en cookie httpOnly al hacer clic en el enlace); no hay que copiar/pegar tokens a mano.
 - Si el invitado **aún no tiene cuenta**, primero se registra / inicia sesión; al volver a aceptar, la cookie sigue vigente hasta que acepte o expire.
 - Tras aceptar, queda como miembro con uno o más roles.
 - Gestión de cada miembro: `/configuracion/equipo/[membershipId]`.
@@ -723,7 +723,7 @@ flowchart LR
 3. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por partida EDT).
 4. Cargar **Cotizaciones** (precio + **plazo de entrega en días** + validez). Cumplir mínimo de cotizaciones de `/configuracion/compras`.
 5. **Seleccionar** proveedor → genera **OC en borrador**.
-6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora.
+6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora. El email de “Nueva solicitud de compra” muestra organización, proyecto, solicitante e ítems; el asunto empieza con `[nombre de la organización]`.
 
 ### 9.2 Procedimiento — Orden de compra (OC)
 

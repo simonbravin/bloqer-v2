@@ -16,7 +16,7 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 
 ## 5. Datos que produce (outputs)
 - **Notification** in-app (obligatorio).
-- **Email transaccional** para procurement (SC/OC y recordatorios SLA) según [D-050] / [BR-PUR-015]. Resto del producto: ver [Q-009](../00-product/OPEN_QUESTIONS.md) (cerrada parcial).
+- **Email transaccional** para procurement (SC/OC y recordatorios SLA) según [D-050] / [BR-PUR-015], CxP/CxC ([D-069]/[D-072]), invitaciones y reportes. Todas las plantillas usan el mismo layout: organización (tenant) en encabezado y Subject, contexto de proyecto/entidad/actor, CTA. Auth (verificar / reset) no lleva tenant. Resto del producto: ver [Q-009](../00-product/OPEN_QUESTIONS.md) (cerrada parcial).
 
 ## 6. Entidades principales
 - **Notification**, preferencias usuario (Fase 2).
@@ -39,7 +39,7 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 - Leído es por usuario: marcar leída no afecta otras copias.
 - Dedupe de alertas operativas: misma entidad + destinatario en ventana de 7 días.
 - Alertas operativas de estado (AR/AP, stock, etc.): job batch automático (cron) + runner manual opcional; AR/AP vencidos **materializan** `OVERDUE` y notifican.
-- **Compras ([D-050], [BR-PUR-015]):** in-app + email en cambios de estado de SC/OC; recordatorio por antigüedad con escalamiento a OWNER/ADMIN. Fallo de email = best-effort (no aborta la mutación).
+- **Compras ([D-050], [BR-PUR-015]):** in-app + email en cambios de estado de SC/OC; recordatorio por antigüedad con escalamiento a OWNER/ADMIN. El cuerpo in-app y el email incluyen organización, proyecto y solicitante; el Subject del mail va prefijado con el tenant (`[Indari] …`). Fallo de email = best-effort (no aborta la mutación).
 
 ## 11. Validaciones
 - Payload JSON schema-valid por tipo de evento.

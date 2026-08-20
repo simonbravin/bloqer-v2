@@ -1,6 +1,11 @@
 import { sendReportByEmailInputSchema, type SendReportByEmailInputValidated } from "@bloqer/validators";
 import { isEmailConfigured } from "@bloqer/config";
-import { sendEmail, escapeHtml } from "@bloqer/email";
+import {
+  sendEmail,
+  formatNotificationEmailSubject,
+  renderNotificationEmailHtml,
+  renderNotificationEmailText,
+} from "@bloqer/email";
 import {
   createEmailDeliveryLog,
   exportCashPositionCsv,
@@ -12,6 +17,7 @@ import {
   exportStockMovementsCsv,
   exportTreasuryCashFlowCsv,
   exportTreasuryMovementsCsv,
+  loadNotificationIdentityFacts,
   markEmailDeliveryFailed,
   markEmailDeliverySent,
   markEmailDeliverySkipped,
@@ -43,10 +49,6 @@ const REPORT_LABEL: Record<SendReportByEmailInputValidated["reportType"], string
   INVENTORY_MOVEMENTS: "Inventario — Movimientos",
   PROJECT_CASH_FLOW: "Proyecto — Flujo de caja",
 };
-
-function sanitizeEmailSubject(s: string): string {
-  return s.replace(/[\r\n\u2028\u2029]+/g, " ").trim().slice(0, 998);
-}
 
 function asFilterRecord(p: Record<string, string>): Record<string, string | undefined> {
   return p;
@@ -140,9 +142,17 @@ export async function sendReportByEmail(
     throw new ServiceError("VALIDATION", msg);
   }
   const input = parsed.data;
-
-  const defaultSubject = `Bloqer — ${REPORT_LABEL[input.reportType]} (${input.format.toUpperCase()})`;
-  const subject = sanitizeEmailSubject(input.subject?.trim() ? input.subject.trim() : defaultSubject);
+  const facts = await loadNotificationIdentityFacts({
+    tenantId: ctx.tenantId,
+    companyId: ctx.companyId,
+    projectId: input.projectId ?? null,
+    actorUserId: ctx.actorUserId,
+  });
+  const reportTitle = `${REPORT_LABEL[input.reportType]} (${input.format.toUpperCase()})`;
+  const subject = formatNotificationEmailSubject(
+    input.subject?.trim() ? input.subject.trim() : reportTitle,
+    facts.organizationName,
+  );
 
   const minuteBucket = Math.floor(Date.now() / 60_000);
   const idempotencyKey = `manual-report:${ctx.tenantId}:${input.reportType}:${input.format}:${input.recipientEmail.toLowerCase()}:${minuteBucket}`;
@@ -181,11 +191,26 @@ export async function sendReportByEmail(
     };
   }
 
-  const intro = input.message?.trim()
-    ? escapeHtml(input.message.trim())
-    : escapeHtml("Adjuntamos el reporte solicitado.");
-  const html = `<!DOCTYPE html><html><body><p>${intro}</p><p style="font-size:12px;color:#666">Generado desde Bloqer. No respondas a este correo automático.</p></body></html>`;
-  const text = `${input.message?.trim() || "Adjuntamos el reporte solicitado."}\n\n— Bloqer`;
+  const contextFields = [
+    ...(facts.organizationName ? [{ label: "Organización", value: facts.organizationName }] : []),
+    ...(facts.companyName && facts.companyName !== facts.organizationName
+      ? [{ label: "Empresa", value: facts.companyName }]
+      : []),
+    ...(facts.projectLabel ? [{ label: "Proyecto", value: facts.projectLabel }] : []),
+    { label: "Reporte", value: REPORT_LABEL[input.reportType] },
+    { label: "Formato", value: input.format.toUpperCase() },
+    { label: "Archivo", value: attachment.filename },
+    ...(facts.actorName ? [{ label: "Enviado por", value: facts.actorName }] : []),
+  ];
+  const templateInput = {
+    title: reportTitle,
+    body: input.message?.trim() || "Adjuntamos el reporte solicitado.",
+    actionUrlAbsolute: null as string | null,
+    organizationName: facts.organizationName,
+    contextFields,
+  };
+  const html = renderNotificationEmailHtml(templateInput);
+  const text = renderNotificationEmailText(templateInput);
 
   const sendResult = await sendEmail({
     to: input.recipientEmail,

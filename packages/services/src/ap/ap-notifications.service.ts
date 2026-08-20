@@ -7,6 +7,10 @@ import {
   type NotificationPermissionTarget,
 } from "../notifications/notification-audience.service";
 import { getCompanyProcurementSettings } from "../procurement/company-procurement-settings.service";
+import {
+  formatNotificationIdentityBody,
+  loadNotificationIdentityFacts,
+} from "../notifications/notification-email-context";
 import type { ServiceContext } from "../types";
 import { canRegisterApPayment } from "./ap-access";
 
@@ -111,13 +115,22 @@ export async function notifyPayableReadyToPay(params: {
       : "";
   // Deep-link to pay form ([D-069]): finance should act, not land on OC detail.
   const actionUrl = `/proyectos/${params.projectId}/cuentas-por-pagar/${params.payableId}/pagar`;
+  const facts = await loadNotificationIdentityFacts({
+    tenantId: params.ctx.tenantId,
+    companyId: params.companyId,
+    projectId: params.projectId,
+    actorUserId: params.ctx.actorUserId,
+  });
 
   await notifyApPaymentWorkflow({
     ctx: params.ctx,
     recipients,
     type: "PAYABLE_READY_TO_PAY",
     title: "Listo para pagar",
-    body: `La factura ${invCode}${ocPart} (${params.amountLabel}) tiene CxP abierta. Elegí la cuenta de tesorería y registrá el pago.`,
+    body: formatNotificationIdentityBody(
+      `La factura ${invCode}${ocPart} (${params.amountLabel}) tiene CxP abierta. Elegí la cuenta de tesorería y registrá el pago.`,
+      facts,
+    ),
     severity: "INFO",
     linkedEntityType: "SUPPLIER_INVOICE",
     linkedEntityId: params.supplierInvoiceId,
@@ -145,13 +158,22 @@ export async function notifyPaymentConfirmed(params: {
   const actionUrl = params.projectId
     ? `/proyectos/${params.projectId}/facturas-proveedor/${params.supplierInvoiceId}`
     : `/finanzas/facturas-proveedor/${params.supplierInvoiceId}`;
+  const facts = await loadNotificationIdentityFacts({
+    tenantId: params.ctx.tenantId,
+    companyId: params.companyId,
+    projectId: params.projectId,
+    actorUserId: params.ctx.actorUserId,
+  });
 
   await notifyApPaymentWorkflow({
     ctx: params.ctx,
     permissionTargets: [{ action: "EDIT", module: "PROCUREMENT" }],
     type: "PAYMENT_CONFIRMED",
     title: "Pago confirmado",
-    body: `Se confirmó el pago de ${params.amountLabel} de ${invCode} desde ${params.accountName}.`,
+    body: formatNotificationIdentityBody(
+      `Se confirmó el pago de ${params.amountLabel} de ${invCode} desde ${params.accountName}.`,
+      facts,
+    ),
     severity: "SUCCESS",
     linkedEntityType: "SUPPLIER_INVOICE",
     linkedEntityId: params.supplierInvoiceId,

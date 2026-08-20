@@ -1,18 +1,20 @@
 import { prisma } from "@bloqer/database";
 import { isEmailConfigured } from "@bloqer/config";
-import { sendEmail, escapeHtml } from "@bloqer/email";
+import {
+  sendEmail,
+  formatNotificationEmailSubject,
+  renderNotificationEmailHtml,
+  renderNotificationEmailText,
+} from "@bloqer/email";
 import {
   createEmailDeliveryLog,
   markEmailDeliveryFailed,
   markEmailDeliverySent,
   markEmailDeliverySkipped,
 } from "../email-delivery/email-delivery-log.service";
+import { loadNotificationIdentityFacts } from "../notifications/notification-email-context";
 import { ServiceContext } from "../types";
 import type { ScheduledReportAttachment } from "./scheduled-report-attachment.service";
-
-function sanitizeEmailSubject(s: string): string {
-  return s.replace(/[\r\n\u2028\u2029]+/g, " ").trim().slice(0, 998);
-}
 
 export type ScheduledReportDeliveryKind = "scheduled" | "manual" | "retry";
 
@@ -76,7 +78,15 @@ export async function deliverScheduledReportBundle(
   }
 
   const dateLabel = new Date().toISOString().slice(0, 10);
-  const subject = sanitizeEmailSubject(`Bloqer — ${input.scheduleName} (${dateLabel})`);
+  const facts = await loadNotificationIdentityFacts({
+    tenantId: ctx.tenantId,
+    companyId: ctx.companyId,
+    projectId: null,
+  });
+  const subject = formatNotificationEmailSubject(
+    `${input.scheduleName} (${dateLabel})`,
+    facts.organizationName,
+  );
 
   const { id: logId } = await createEmailDeliveryLog(
     {
@@ -108,10 +118,22 @@ export async function deliverScheduledReportBundle(
     return { outcome: "skipped", reason: "email_not_configured" };
   }
 
-  const html = `<!DOCTYPE html><html><body><p>${escapeHtml(
-    `Envío programado: ${input.scheduleName}. Adjuntamos ${input.attachments.length} reporte(s).`,
-  )}</p><p style="font-size:12px;color:#666">Generado desde Bloqer. No respondas a este correo automático.</p></body></html>`;
-  const text = `Envío programado: ${input.scheduleName}. Adjuntamos ${input.attachments.length} reporte(s).\n\n— Bloqer`;
+  const templateInput = {
+    title: input.scheduleName,
+    body: `Envío programado. Adjuntamos ${input.attachments.length} reporte(s).`,
+    actionUrlAbsolute: null as string | null,
+    organizationName: facts.organizationName,
+    contextFields: [
+      ...(facts.organizationName ? [{ label: "Organización", value: facts.organizationName }] : []),
+      { label: "Programa", value: input.scheduleName },
+      { label: "Fecha", value: dateLabel },
+      { label: "Archivos", value: String(input.attachments.length) },
+    ],
+    items: input.attachments.map((a) => a.filename),
+    itemsHeading: "Adjuntos",
+  };
+  const html = renderNotificationEmailHtml(templateInput);
+  const text = renderNotificationEmailText(templateInput);
 
   const sendResult = await sendEmail({
     to: input.recipientEmail,

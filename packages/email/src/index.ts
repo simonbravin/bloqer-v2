@@ -1,8 +1,9 @@
 export { sendEmail } from "./send-email";
 export type { EmailAttachment, EmailSendResult, SendEmailInput } from "./send-email";
 export { escapeHtml } from "./escape-html";
+export { formatNotificationEmailSubject, sanitizeEmailSubject } from "./format-subject";
 export { renderNotificationEmailHtml, renderNotificationEmailText } from "./templates/notification-email";
-export type { NotificationEmailTemplateInput } from "./templates/notification-email";
+export type { EmailContextField, NotificationEmailTemplateInput } from "./templates/notification-email";
 export {
   renderOperationalAlertEmailHtml,
   renderOperationalAlertEmailText,

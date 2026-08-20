@@ -6,6 +6,10 @@ import {
   findActiveOwnerAdminUserIds,
   resolveNotificationAudience,
 } from "../notifications/notification-audience.service";
+import {
+  formatNotificationIdentityBody,
+  loadNotificationIdentityFacts,
+} from "../notifications/notification-email-context";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 import type { ServiceContext } from "../types";
 
@@ -83,12 +87,27 @@ export async function notifyPurchaseRequestSubmitted(params: {
     alwaysCcOwnerAdmin: true,
   });
 
+  const pr = await prisma.purchaseRequest.findFirst({
+    where: { id: params.purchaseRequestId, tenantId: params.ctx.tenantId },
+    select: { requestedByUserId: true },
+  });
+  const facts = await loadNotificationIdentityFacts({
+    tenantId: params.ctx.tenantId,
+    companyId: params.companyId,
+    projectId: params.projectId,
+    requestedByUserId: pr?.requestedByUserId ?? params.ctx.actorUserId,
+    actorUserId: params.ctx.actorUserId,
+  });
+
   await notifyRecipients({
     ctx: params.ctx,
     recipients,
     type: "PURCHASE_REQUEST_SUBMITTED",
     title: "Nueva solicitud de compra",
-    body: `La solicitud ${params.code} fue enviada y espera cotizaciones.`,
+    body: formatNotificationIdentityBody(
+      `La solicitud ${params.code} fue enviada y espera cotizaciones.`,
+      facts,
+    ),
     severity: "INFO",
     linkedEntityType: "PURCHASE_REQUEST",
     linkedEntityId: params.purchaseRequestId,
@@ -124,12 +143,27 @@ export async function notifyPurchaseOrderPendingApproval(params: {
       ? "monto sobre umbral"
       : "aprobación estándar";
 
+  const po = await prisma.purchaseOrder.findFirst({
+    where: { id: params.purchaseOrderId, tenantId: params.ctx.tenantId },
+    select: { originRequestedByUserId: true, createdBy: true },
+  });
+  const facts = await loadNotificationIdentityFacts({
+    tenantId: params.ctx.tenantId,
+    companyId: params.companyId,
+    projectId: params.projectId,
+    requestedByUserId: po?.originRequestedByUserId ?? po?.createdBy ?? null,
+    actorUserId: params.ctx.actorUserId,
+  });
+
   await notifyRecipients({
     ctx: params.ctx,
     recipients,
     type: "PURCHASE_ORDER_PENDING_APPROVAL",
     title: "OC pendiente de aprobación",
-    body: `La orden ${params.code} requiere aprobación (${reason}).`,
+    body: formatNotificationIdentityBody(
+      `La orden ${params.code} requiere aprobación (${reason}).`,
+      facts,
+    ),
     severity: params.requiresVarianceExtra ? "WARNING" : "INFO",
     linkedEntityType: "PURCHASE_ORDER",
     linkedEntityId: params.purchaseOrderId,
@@ -149,12 +183,22 @@ export async function notifyPurchaseOrderApproved(params: {
   code: string;
   recipientUserIds: string[];
 }): Promise<void> {
+  const facts = await loadNotificationIdentityFacts({
+    tenantId: params.ctx.tenantId,
+    companyId: params.companyId,
+    projectId: params.projectId,
+    actorUserId: params.ctx.actorUserId,
+  });
+
   await notifyRecipients({
     ctx: params.ctx,
     recipients: params.recipientUserIds,
     type: "PURCHASE_ORDER_APPROVED",
     title: "OC aprobada",
-    body: `La orden ${params.code} fue aprobada. Pendiente confirmar al proveedor.`,
+    body: formatNotificationIdentityBody(
+      `La orden ${params.code} fue aprobada. Pendiente confirmar al proveedor.`,
+      facts,
+    ),
     severity: "SUCCESS",
     linkedEntityType: "PURCHASE_ORDER",
     linkedEntityId: params.purchaseOrderId,
@@ -174,12 +218,19 @@ export async function notifyPurchaseOrderReturned(params: {
   reason: string;
   recipientUserIds: string[];
 }): Promise<void> {
+  const facts = await loadNotificationIdentityFacts({
+    tenantId: params.ctx.tenantId,
+    companyId: params.companyId,
+    projectId: params.projectId,
+    actorUserId: params.ctx.actorUserId,
+  });
+
   await notifyRecipients({
     ctx: params.ctx,
     recipients: params.recipientUserIds,
     type: "PURCHASE_ORDER_RETURNED",
     title: "OC devuelta para cambios",
-    body: `La orden ${params.code} fue devuelta: ${params.reason}`,
+    body: formatNotificationIdentityBody(`La orden ${params.code} fue devuelta: ${params.reason}`, facts),
     severity: "WARNING",
     linkedEntityType: "PURCHASE_ORDER",
     linkedEntityId: params.purchaseOrderId,
@@ -198,12 +249,22 @@ export async function notifyPurchaseOrderConfirmed(params: {
   code: string;
   recipientUserIds: string[];
 }): Promise<void> {
+  const facts = await loadNotificationIdentityFacts({
+    tenantId: params.ctx.tenantId,
+    companyId: params.companyId,
+    projectId: params.projectId,
+    actorUserId: params.ctx.actorUserId,
+  });
+
   await notifyRecipients({
     ctx: params.ctx,
     recipients: params.recipientUserIds,
     type: "PURCHASE_ORDER_CONFIRMED",
     title: "OC confirmada al proveedor",
-    body: `La orden ${params.code} fue confirmada. Ya compromete costo y admite recepciones.`,
+    body: formatNotificationIdentityBody(
+      `La orden ${params.code} fue confirmada. Ya compromete costo y admite recepciones.`,
+      facts,
+    ),
     severity: "SUCCESS",
     linkedEntityType: "PURCHASE_ORDER",
     linkedEntityId: params.purchaseOrderId,
@@ -281,12 +342,20 @@ export async function runProcurementSlaReminders(
         needing.push(recipientUserId);
       }
       if (needing.length === 0) continue;
+      const facts = await loadNotificationIdentityFacts({
+        tenantId: ctx.tenantId,
+        companyId: po.companyId,
+        projectId: po.projectId,
+      });
       createdCount += await notifyRecipients({
         ctx,
         recipients: needing,
         type: "PROCUREMENT_SLA_REMINDER",
         title: "OC demorada en aprobación",
-        body: `La orden ${code} lleva más de ${settings.approvalSlaHours}h pendiente de aprobación.`,
+        body: formatNotificationIdentityBody(
+          `La orden ${code} lleva más de ${settings.approvalSlaHours}h pendiente de aprobación.`,
+          facts,
+        ),
         severity: "WARNING",
         linkedEntityType: "PURCHASE_ORDER",
         linkedEntityId: po.id,
@@ -336,12 +405,20 @@ export async function runProcurementSlaReminders(
         needing.push(recipientUserId);
       }
       if (needing.length === 0) continue;
+      const facts = await loadNotificationIdentityFacts({
+        tenantId: ctx.tenantId,
+        companyId: pr.companyId,
+        projectId: pr.projectId,
+      });
       createdCount += await notifyRecipients({
         ctx,
         recipients: needing,
         type: "PROCUREMENT_SLA_REMINDER",
         title: "Solicitud demorada sin cotizar",
-        body: `La solicitud ${code} lleva más de ${settings.approvalSlaHours}h sin cotizaciones.`,
+        body: formatNotificationIdentityBody(
+          `La solicitud ${code} lleva más de ${settings.approvalSlaHours}h sin cotizaciones.`,
+          facts,
+        ),
         severity: "WARNING",
         linkedEntityType: "PURCHASE_REQUEST",
         linkedEntityId: pr.id,

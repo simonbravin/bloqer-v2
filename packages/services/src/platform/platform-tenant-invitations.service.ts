@@ -204,6 +204,7 @@ export async function createPlatformTenantInvitation(
     emailNorm,
     inserted.invitationLink,
     tenant.name,
+    { invitedByUserId: ctx.actorUserId, roles: uniqueRoles },
   );
   emailDispatched = emailDispatch.dispatched;
   if (!emailDispatch.dispatched) {
