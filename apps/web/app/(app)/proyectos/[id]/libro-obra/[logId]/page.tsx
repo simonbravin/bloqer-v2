@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
-import { getJobsiteLogById, getJobsiteLogActivityLog, getWbsIncrementalProgressSnapshot, listEntityDocuments, listStockMovements, ServiceError } from "@bloqer/services";
+import { getJobsiteLogById, getJobsiteLogActivityLog, getProjectOperationalMutationBlockReason, getProjectShellInfo, getWbsIncrementalProgressSnapshot, listEntityDocuments, listStockMovements, ServiceError } from "@bloqer/services";
 import { formatQtyFromString } from "@/lib/format-money";
 import {
   JobsiteLogStatusBadge,
@@ -101,12 +101,21 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
 
   if (log.projectId !== projectId) notFound();
 
+  let projectStatus: Awaited<ReturnType<typeof getProjectShellInfo>>["status"] = "ACTIVE";
+  try {
+    const shell = await getProjectShellInfo(projectId, ctx);
+    projectStatus = shell.status;
+  } catch {
+    /* keep ACTIVE default; log load already validated access */
+  }
+
   const logAttachments = await listEntityDocuments("JOBSITE_LOG", logId, ctx, { projectId });
   const storageConfigured = isStorageConfigured();
   const canEditAttachments = canContributeJobsiteLog(roles);
   const canContribute = canContributeJobsiteLog(roles);
   const canSupervise = canSuperviseJobsiteLog(roles);
-  const showEditLink = log.status === "DRAFT" && canContribute;
+  const projectAllowsMutation = !getProjectOperationalMutationBlockReason(projectStatus);
+  const showEditLink = log.status === "DRAFT" && canContribute && projectAllowsMutation;
 
   const wasUpdated =
     log.updatedAt.getTime() - log.createdAt.getTime() > 1000 ||

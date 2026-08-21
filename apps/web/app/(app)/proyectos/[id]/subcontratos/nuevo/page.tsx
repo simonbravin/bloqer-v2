@@ -28,12 +28,17 @@ export default async function NuevoSubcontratoPage({ params, searchParams }: Pag
     roles: current.tenantCtx.roles,
   };
 
-  let wbsPick: Awaited<ReturnType<typeof getSubcontractFormWbsPickList>>;
+  let wbsPick: Awaited<ReturnType<typeof getSubcontractFormWbsPickList>> | null = null;
+  let companyResolveError: string | null = null;
   try {
     wbsPick = await getSubcontractFormWbsPickList(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
-    throw err;
+    if (err instanceof ServiceError && err.code === "VALIDATION") {
+      companyResolveError = err.message;
+    } else {
+      throw err;
+    }
   }
 
   const [subcontractorOptions, budgetHints] = await Promise.all([
@@ -41,13 +46,19 @@ export default async function NuevoSubcontratoPage({ params, searchParams }: Pag
     getWbsSubcontractBudgetHints(projectId, ctx, { excludeWithActiveContract: true }).catch(() => []),
   ]);
 
-  const companyId = wbsPick.companyId || current.tenantCtx.companyId || "";
+  const companyId = wbsPick?.companyId ?? "";
 
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Nuevo subcontrato</h1>
       </div>
+      {companyResolveError || !companyId ? (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+          {companyResolveError ??
+            "No hay una empresa activa en el tenant. Creá o activá una empresa antes de crear subcontratos."}
+        </p>
+      ) : null}
       {sp.filter === "pending" && budgetHints.length > 0 ? (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/20">
           <p className="text-sm font-medium">Partidas pendientes de contrato</p>
@@ -58,17 +69,19 @@ export default async function NuevoSubcontratoPage({ params, searchParams }: Pag
           </p>
         </div>
       ) : null}
-      <div className="rounded-lg border bg-card p-6">
-        <SubcontractForm
-          projectId={projectId}
-          companyId={companyId}
-          subcontractorOptions={subcontractorOptions}
-          wbsOptions={wbsPick.wbsOptions}
-          budgetHints={budgetHints}
-          initialWbsNodeId={sp.wbsNodeId}
-          action={createSubcontractAction}
-        />
-      </div>
+      {companyId && wbsPick ? (
+        <div className="rounded-lg border bg-card p-6">
+          <SubcontractForm
+            projectId={projectId}
+            companyId={companyId}
+            subcontractorOptions={subcontractorOptions}
+            wbsOptions={wbsPick.wbsOptions}
+            budgetHints={budgetHints}
+            initialWbsNodeId={sp.wbsNodeId}
+            action={createSubcontractAction}
+          />
+        </div>
+      ) : null}
     </PageShell>
   );
 }

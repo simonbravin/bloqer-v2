@@ -109,8 +109,12 @@ export async function createJobsiteLogAction(
     } catch (err) {
       return { error: err instanceof Error ? err.message : "Datos de líneas inválidos" };
     }
+    const rawCompanyId = fd.get("companyId");
     const parsed = createJobsiteLogSchema.safeParse({
-      companyId: fd.get("companyId") as string,
+      companyId:
+        typeof rawCompanyId === "string" && rawCompanyId.trim() !== ""
+          ? rawCompanyId
+          : undefined,
       projectId: fd.get("projectId") as string,
       logDate: fd.get("logDate") as string,
       title: (fd.get("title") as string) || null,

@@ -51,6 +51,7 @@ export type ProjectShellInfo = {
   code: string;
   status: ProjectStatus;
   tenantId: string;
+  companyId: string | null;
 };
 
 /**
@@ -79,7 +80,7 @@ export async function getProjectShellInfo(id: string, ctx: ServiceContext): Prom
   }
   const row = await prisma.project.findUnique({
     where: { id },
-    select: { id: true, name: true, code: true, status: true, tenantId: true },
+    select: { id: true, name: true, code: true, status: true, tenantId: true, companyId: true },
   });
   if (!row) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (row.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");

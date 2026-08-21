@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   getJobsiteLogById,
   getJobsiteLogFormPickList,
+  getProjectOperationalMutationBlockReason,
+  getProjectShellInfo,
   getWbsIncrementalProgressSnapshot,
   hasLegacyPhysicalPctOverflow,
   listProjectWbsItemsForLog,
@@ -41,6 +43,17 @@ export default async function EditarParteObraPage({ params }: PageProps) {
   if (log.projectId !== projectId) notFound();
 
   if (log.status !== "DRAFT") redirect(`/proyectos/${projectId}/libro-obra/${logId}`);
+
+  let shell: Awaited<ReturnType<typeof getProjectShellInfo>>;
+  try {
+    shell = await getProjectShellInfo(projectId, ctx);
+  } catch (err) {
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    throw err;
+  }
+  if (getProjectOperationalMutationBlockReason(shell.status)) {
+    redirect(`/proyectos/${projectId}/libro-obra/${logId}`);
+  }
 
   let wbsRaw: Awaited<ReturnType<typeof listProjectWbsItemsForLog>>;
   let pickList: Awaited<ReturnType<typeof getJobsiteLogFormPickList>>;

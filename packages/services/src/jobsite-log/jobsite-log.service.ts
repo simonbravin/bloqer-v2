@@ -23,6 +23,7 @@ import {
 } from "./jobsite-log-guards";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { resolveActiveCompanyId } from "../company/company.service";
+import { assertCompanyMatchesProject } from "../procurement/procurement-wbs";
 import { sortTreeOrder, toIsoDateInTimeZone } from "@bloqer/utils";
 import { serializeQtyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
 import {
@@ -823,13 +824,26 @@ export async function createJobsiteLog(
 
   const projectForCreate = await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
+  const companyId = await resolveActiveCompanyId(
+    ctx,
+    projectForCreate.companyId ?? input.companyId ?? null,
+  );
+  if (!companyId) {
+    throw new ServiceError(
+      "VALIDATION",
+      "No hay una empresa activa en el tenant para registrar el parte de obra",
+    );
+  }
+  await assertCompanyMatchesProject(companyId, input.projectId, ctx.tenantId);
+
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+  const replayInput = { ...input, companyId };
   const existingByKey = await prisma.jobsiteLog.findFirst({
     where: { tenantId: ctx.tenantId, idempotencyKey },
     include: logInclude,
   });
   if (existingByKey) {
-    if (!jobsiteLogReplayMatches(existingByKey, input)) {
+    if (!jobsiteLogReplayMatches(existingByKey, replayInput)) {
       throw new ServiceError(
         "CONFLICT",
         "Esta operación ya se registró con datos distintos. Recargá e intentá de nuevo.",
@@ -853,16 +867,6 @@ export async function createJobsiteLog(
     throw new ServiceError("CONFLICT", "El parte debe tener al menos un campo descriptivo o una entrada");
   }
 
-  const resolvedCompanyId =
-    (await resolveActiveCompanyId(ctx, projectForCreate.companyId ?? input.companyId)) ??
-    input.companyId;
-  if (!resolvedCompanyId) {
-    throw new ServiceError(
-      "VALIDATION",
-      "No hay una empresa activa en el tenant para registrar el parte de obra",
-    );
-  }
-  const companyId = resolvedCompanyId;
   await validateJobsiteLogBusinessRules(input, input.projectId, ctx.tenantId, ctx);
 
   const result = await withIdempotentCreate({
@@ -871,7 +875,7 @@ export async function createJobsiteLog(
         where: { tenantId: ctx.tenantId, idempotencyKey },
         include: logInclude,
       }),
-    payloadsMatch: (existing) => jobsiteLogReplayMatches(existing, input),
+    payloadsMatch: (existing) => jobsiteLogReplayMatches(existing, replayInput),
     create: async () => {
       const created = await prisma.$transaction(async (tx) => {
         const row = await tx.jobsiteLog.create({

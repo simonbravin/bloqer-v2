@@ -47,14 +47,29 @@ export async function getCompanyById(id: string, ctx: ServiceContext): Promise<C
 }
 
 /**
+ * Picks the preferred company id when both membership and an explicit preferred
+ * (usually project.companyId) are present. Empty strings are treated as unset.
+ */
+export function preferCompanyIdCandidate(
+  preferredCompanyId?: string | null,
+  membershipCompanyId?: string | null,
+): string | null {
+  const preferred = preferredCompanyId?.trim() || null;
+  if (preferred) return preferred;
+  const membership = membershipCompanyId?.trim() || null;
+  return membership;
+}
+
+/**
  * Resolves an ACTIVE company id for operational writes when membership/project
  * may lack `companyId` (tenant-wide users / shared projects).
+ * Explicit preferred (e.g. project company) wins over membership company.
  */
 export async function resolveActiveCompanyId(
   ctx: ServiceContext,
   preferredCompanyId?: string | null,
 ): Promise<string | null> {
-  const companyId = ctx.companyId ?? preferredCompanyId ?? null;
+  const companyId = preferCompanyIdCandidate(preferredCompanyId, ctx.companyId);
   if (companyId) {
     const scoped = await prisma.company.findFirst({
       where: { id: companyId, tenantId: ctx.tenantId, status: "ACTIVE" },

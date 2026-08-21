@@ -45,7 +45,11 @@ const issueLineSchema = z.object({
 
 export const createJobsiteLogSchema = z.object({
   projectId:    z.string().uuid(),
-  companyId:    z.string().uuid(),
+  /** Optional: service resolves from project / membership / first ACTIVE company. */
+  companyId:    z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.string().uuid().optional(),
+  ),
   logDate:      z.string().min(1, "La fecha es requerida"),
   title:        z.string().optional().nullable(),
   workFront:    z.string().optional().nullable(),

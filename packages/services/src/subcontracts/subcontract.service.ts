@@ -8,6 +8,7 @@ import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import { resolveActiveCompanyId } from "../company/company.service";
 import { assertCompanyMatchesProject, assertWbsLineForProject } from "../procurement/procurement-wbs";
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 
@@ -139,6 +140,14 @@ export async function getSubcontractFormWbsPickList(
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
+  const companyId = await resolveActiveCompanyId(ctx, project.companyId);
+  if (!companyId) {
+    throw new ServiceError(
+      "VALIDATION",
+      "No hay una empresa activa en el tenant para crear el subcontrato",
+    );
+  }
+
   const wbsNodes = await prisma.wbsNode.findMany({
     where: {
       type: "ITEM",
@@ -149,7 +158,7 @@ export async function getSubcontractFormWbsPickList(
   wbsNodes.sort((a, b) => compareWbsCodes(a.code, b.code));
 
   return {
-    companyId: project.companyId ?? ctx.companyId ?? "",
+    companyId,
     wbsOptions: wbsNodes.map((n) => ({
       id: n.id,
       code: n.code,

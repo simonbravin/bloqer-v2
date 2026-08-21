@@ -596,7 +596,7 @@ export function jobsiteLogReplayMatches(
   },
   input: {
     projectId: string;
-    companyId: string;
+    companyId?: string | null;
     logDate: string;
     title?: string | null;
     workFront?: string | null;
@@ -626,7 +626,7 @@ export function jobsiteLogReplayMatches(
   },
 ): boolean {
   if (existing.projectId !== input.projectId) return false;
-  if (existing.companyId !== input.companyId) return false;
+  if (existing.companyId !== (input.companyId ?? "")) return false;
   if (dateOnlyFingerprint(existing.logDate) !== input.logDate) return false;
   if (nullableStr(existing.title) !== nullableStr(input.title)) return false;
   if (nullableStr(existing.workFront) !== nullableStr(input.workFront)) return false;

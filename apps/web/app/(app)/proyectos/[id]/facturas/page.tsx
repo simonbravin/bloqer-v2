@@ -49,8 +49,9 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
     roles: current.tenantCtx.roles,
   };
 
+  let shell: Awaited<ReturnType<typeof getProjectShellInfo>>;
   try {
-    await getProjectShellInfo(id, ctx);
+    shell = await getProjectShellInfo(id, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect(`/proyectos/${id}`);
@@ -98,7 +99,7 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
     }));
 
     try {
-      const fiscal = await getCompanyFiscalContext(ctx);
+      const fiscal = await getCompanyFiscalContext(ctx, shell.companyId);
       if (fiscal) {
         companyCountry = fiscal.country;
         companyIvaCondition = fiscal.ivaCondition;
