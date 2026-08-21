@@ -18,7 +18,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import {
-  getCompanyById,
+  getCompanyFiscalContext,
   getProjectShellInfo,
   getTenantModuleGate,
   listContacts,
@@ -135,13 +135,13 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
         code: n.code,
         name: n.name,
       }));
-      if (ctx.companyId) {
-        try {
-          const company = await getCompanyById(ctx.companyId, ctx);
-          companyCountry = company.country;
-          companyIvaCondition = company.ivaCondition;
-        } catch { /* defaults */ }
-      }
+      try {
+        const fiscal = await getCompanyFiscalContext(ctx);
+        if (fiscal) {
+          companyCountry = fiscal.country;
+          companyIvaCondition = fiscal.ivaCondition;
+        }
+      } catch { /* defaults */ }
     } catch (err) {
       if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
       throw err;

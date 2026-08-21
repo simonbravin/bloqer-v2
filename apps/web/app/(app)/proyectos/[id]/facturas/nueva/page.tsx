@@ -7,7 +7,7 @@ import {
   canEditArArea,
   getActiveInvoiceForCertification,
   getCertificationById,
-  getCompanyById,
+  getCompanyFiscalContext,
   getContactById,
   getProjectById,
   ServiceError,
@@ -93,14 +93,12 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
     let clientCountry: string | null = null;
     let clientIvaCondition: string | null = null;
     try {
-      if (ctx.companyId) {
-        const company = await getCompanyById(ctx.companyId, ctx);
-        companyCountry = company.country;
-        companyIvaCondition = company.ivaCondition;
-      }
-    } catch { /* defaults */ }
-    try {
       const project = await getProjectById(projectId, ctx);
+      const fiscal = await getCompanyFiscalContext(ctx, project.companyId);
+      if (fiscal) {
+        companyCountry = fiscal.country;
+        companyIvaCondition = fiscal.ivaCondition;
+      }
       const client = await getContactById(project.clientContactId, ctx);
       clientCountry = client.country;
       clientIvaCondition = client.ivaCondition;

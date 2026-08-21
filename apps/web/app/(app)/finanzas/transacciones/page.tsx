@@ -15,7 +15,7 @@ import {
   DEFAULT_PAGE_SIZE,
   defaultDateRangeDays,
   getAccountMovementReport,
-  getCompanyById,
+  getCompanyFiscalContext,
   getTenantModuleGate,
   listContacts,
   listProjects,
@@ -153,14 +153,13 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
   let projectOptions: { id: string; name: string }[] = [];
   let companyCountry: string | null = null;
   let companyIvaCondition: string | null = null;
-
-  if (ctx.companyId) {
-    try {
-      const company = await getCompanyById(ctx.companyId, ctx);
-      companyCountry = company.country;
-      companyIvaCondition = company.ivaCondition;
-    } catch { /* defaults */ }
-  }
+  try {
+    const fiscal = await getCompanyFiscalContext(ctx);
+    if (fiscal) {
+      companyCountry = fiscal.country;
+      companyIvaCondition = fiscal.ivaCondition;
+    }
+  } catch { /* defaults */ }
 
   if (canEditAp) {
     try {

@@ -17,7 +17,7 @@ import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import {
   canEditArArea,
-  getCompanyById,
+  getCompanyFiscalContext,
   getProjectShellInfo,
   getTenantModuleGate,
   listContacts,
@@ -98,10 +98,10 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
     }));
 
     try {
-      if (ctx.companyId) {
-        const company = await getCompanyById(ctx.companyId, ctx);
-        companyCountry = company.country;
-        companyIvaCondition = company.ivaCondition;
+      const fiscal = await getCompanyFiscalContext(ctx);
+      if (fiscal) {
+        companyCountry = fiscal.country;
+        companyIvaCondition = fiscal.ivaCondition;
       }
     } catch {
       /* keep defaults */
