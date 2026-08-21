@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getJobsiteLogFormPickList,
+  getProjectOperationalMutationBlockReason,
   getProjectShellInfo,
   getWbsIncrementalProgressSnapshot,
   hasLegacyPhysicalPctOverflow,
@@ -29,12 +30,16 @@ export default async function NuevoParteObraPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
+  let shell: Awaited<ReturnType<typeof getProjectShellInfo>>;
   try {
-    await getProjectShellInfo(projectId, ctx);
+    shell = await getProjectShellInfo(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
+  }
+  if (getProjectOperationalMutationBlockReason(shell.status)) {
+    redirect(`/proyectos/${projectId}/libro-obra`);
   }
 
   let wbsRaw: Awaited<ReturnType<typeof listProjectWbsItemsForLog>>;

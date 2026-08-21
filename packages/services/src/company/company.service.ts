@@ -47,6 +47,30 @@ export async function getCompanyById(id: string, ctx: ServiceContext): Promise<C
 }
 
 /**
+ * Resolves an ACTIVE company id for operational writes when membership/project
+ * may lack `companyId` (tenant-wide users / shared projects).
+ */
+export async function resolveActiveCompanyId(
+  ctx: ServiceContext,
+  preferredCompanyId?: string | null,
+): Promise<string | null> {
+  const companyId = ctx.companyId ?? preferredCompanyId ?? null;
+  if (companyId) {
+    const scoped = await prisma.company.findFirst({
+      where: { id: companyId, tenantId: ctx.tenantId, status: "ACTIVE" },
+      select: { id: true },
+    });
+    if (scoped) return scoped.id;
+  }
+  const first = await prisma.company.findFirst({
+    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+    orderBy: { name: "asc" },
+    select: { id: true },
+  });
+  return first?.id ?? null;
+}
+
+/**
  * Fiscal defaults for AR invoice letter UX ([D-084]).
  * Memberships often have `companyId` null (tenant-wide users); fall back to the
  * first ACTIVE company so letter A/B/C/E still appears when the tenant operates in AR.
@@ -55,20 +79,8 @@ export async function getCompanyFiscalContext(
   ctx: ServiceContext,
   preferredCompanyId?: string | null,
 ): Promise<{ country: string; ivaCondition: Company["ivaCondition"] } | null> {
-  const companyId = ctx.companyId ?? preferredCompanyId ?? null;
-  if (companyId) {
-    try {
-      const company = await getCompanyById(companyId, ctx);
-      if (company.status !== "ACTIVE") return null;
-      return { country: company.country, ivaCondition: company.ivaCondition };
-    } catch {
-      /* fall through to tenant default */
-    }
-  }
-  const first = await prisma.company.findFirst({
-    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
-    orderBy: { name: "asc" },
-  });
-  if (!first) return null;
-  return { country: first.country, ivaCondition: first.ivaCondition };
+  const resolvedId = await resolveActiveCompanyId(ctx, preferredCompanyId);
+  if (!resolvedId) return null;
+  const company = await getCompanyById(resolvedId, ctx);
+  return { country: company.country, ivaCondition: company.ivaCondition };
 }

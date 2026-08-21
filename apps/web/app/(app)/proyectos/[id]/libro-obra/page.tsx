@@ -17,6 +17,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import {
   getJobsiteLogFormPickList,
+  getProjectOperationalMutationBlockReason,
   getProjectShellInfo,
   getPrimaryScheduleItemIdsByWbs,
   getScheduleLinkedWbsNodeIds,
@@ -62,13 +63,17 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
     roles: current.tenantCtx.roles,
   };
 
+  let shell: Awaited<ReturnType<typeof getProjectShellInfo>>;
   try {
-    await getProjectShellInfo(projectId, ctx);
+    shell = await getProjectShellInfo(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
+
+  const operationalBlockReason = getProjectOperationalMutationBlockReason(shell.status);
+  const canCreateLog = !operationalBlockReason;
 
   const filters = {
     dateFrom: sp.dateFrom,
@@ -147,30 +152,37 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
         title="Libro de obra"
         subtitle={subtitleParts.join(" · ")}
         actions={
-          <Suspense fallback={null}>
-            <NewJobsiteLogDialog
-              projectId={projectId}
-              companyId={companyId}
-              wbsOptions={formWbsOptions}
-              contactOptions={pickList.contactOptions}
-              productOptions={pickList.productOptions}
-              warehouseOptions={pickList.warehouseOptions}
-              subcontractOptions={pickList.subcontractOptions.map((s) => ({
-                id: s.id,
-                code: `SC-${String(s.number).padStart(3, "0")}`,
-                title: s.title,
-              }))}
-              wbsProgressSnapshot={wbsProgressSnapshot}
-              legacyPhysicalPctWarning={hasLegacyPhysicalPctOverflow(wbsProgressSnapshot)}
-              inventoryModuleEnabled={pickList.inventoryModuleEnabled}
-              stockPreviewAction={getStockBalancePreviewAction}
-              action={createJobsiteLogAction}
-              defaultOpen={sp.create === "1"}
-            />
-          </Suspense>
+          canCreateLog ? (
+            <Suspense fallback={null}>
+              <NewJobsiteLogDialog
+                projectId={projectId}
+                companyId={companyId}
+                wbsOptions={formWbsOptions}
+                contactOptions={pickList.contactOptions}
+                productOptions={pickList.productOptions}
+                warehouseOptions={pickList.warehouseOptions}
+                subcontractOptions={pickList.subcontractOptions.map((s) => ({
+                  id: s.id,
+                  code: `SC-${String(s.number).padStart(3, "0")}`,
+                  title: s.title,
+                }))}
+                wbsProgressSnapshot={wbsProgressSnapshot}
+                legacyPhysicalPctWarning={hasLegacyPhysicalPctOverflow(wbsProgressSnapshot)}
+                inventoryModuleEnabled={pickList.inventoryModuleEnabled}
+                stockPreviewAction={getStockBalancePreviewAction}
+                action={createJobsiteLogAction}
+                defaultOpen={sp.create === "1"}
+              />
+            </Suspense>
+          ) : null
         }
       />
 
+      {operationalBlockReason ? (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+          {operationalBlockReason}. Activá la obra desde el proyecto para cargar partes.
+        </p>
+      ) : null}
       <JobsiteLogListFilters
         wbsOptions={wbsOptions.map((n) => ({
           id: n.id,
@@ -203,7 +215,7 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
                   : "No hay partes de obra registrados en este proyecto."
             }
             action={
-              !filterError && !hasFilters ? (
+              canCreateLog && !filterError && !hasFilters ? (
                 <Link
                   href={`/proyectos/${projectId}/libro-obra/nuevo`}
                   className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
@@ -293,7 +305,7 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
           />
         )}
       </Suspense>
-      <JobsiteLogMobileFab projectId={projectId} />
+      {canCreateLog ? <JobsiteLogMobileFab projectId={projectId} /> : null}
     </PageShell>
   );
 }

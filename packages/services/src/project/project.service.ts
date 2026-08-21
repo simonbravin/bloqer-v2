@@ -37,6 +37,7 @@ export { getProjectCancellationImpact } from "./project-cancellation-impact.serv
 export {
   assertProjectAllowsOperationalMutation,
   assertProjectAllowsBudgetPlanning,
+  getProjectOperationalMutationBlockReason,
 } from "./project-operational-guard";
 
 export type ProjectWithClient = Project & {

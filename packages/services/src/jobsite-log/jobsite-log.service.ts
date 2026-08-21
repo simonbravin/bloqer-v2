@@ -22,6 +22,7 @@ import {
   type JobsiteLogProgressSnapshot,
 } from "./jobsite-log-guards";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { resolveActiveCompanyId } from "../company/company.service";
 import { sortTreeOrder, toIsoDateInTimeZone } from "@bloqer/utils";
 import { serializeQtyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
 import {
@@ -771,7 +772,7 @@ export async function getJobsiteLogFormPickList(
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
-  const [contacts, products, warehouses, subcontracts, gate] = await Promise.all([
+  const [contacts, products, warehouses, subcontracts, gate, resolvedCompanyId] = await Promise.all([
     prisma.contact.findMany({
       where: { tenantId: ctx.tenantId, status: "ACTIVE" },
       select: { id: true, legalName: true, fantasyName: true },
@@ -793,13 +794,14 @@ export async function getJobsiteLogFormPickList(
       orderBy: { number: "asc" },
     }),
     getTenantModuleGate(ctx),
+    resolveActiveCompanyId(ctx, project.companyId),
   ]);
 
   const inventoryModuleEnabled =
     gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY");
 
   return {
-    companyId: project.companyId ?? ctx.companyId ?? "",
+    companyId: resolvedCompanyId ?? "",
     inventoryModuleEnabled,
     contactOptions: contacts.map((c) => ({ id: c.id, name: c.fantasyName ?? c.legalName })),
     productOptions: products,
@@ -819,7 +821,7 @@ export async function createJobsiteLog(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear partes de obra");
   }
 
-  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+  const projectForCreate = await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
   const existingByKey = await prisma.jobsiteLog.findFirst({
@@ -851,7 +853,16 @@ export async function createJobsiteLog(
     throw new ServiceError("CONFLICT", "El parte debe tener al menos un campo descriptivo o una entrada");
   }
 
-  const companyId = input.companyId;
+  const resolvedCompanyId =
+    (await resolveActiveCompanyId(ctx, projectForCreate.companyId ?? input.companyId)) ??
+    input.companyId;
+  if (!resolvedCompanyId) {
+    throw new ServiceError(
+      "VALIDATION",
+      "No hay una empresa activa en el tenant para registrar el parte de obra",
+    );
+  }
+  const companyId = resolvedCompanyId;
   await validateJobsiteLogBusinessRules(input, input.projectId, ctx.tenantId, ctx);
 
   const result = await withIdempotentCreate({
