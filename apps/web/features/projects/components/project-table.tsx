@@ -9,9 +9,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  tableNameCellClass,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
@@ -60,32 +58,73 @@ export function ProjectTable({ projects }: ProjectTableProps) {
 
   return (
     <TableScroll>
-      <Table>
+      <Table className="table-fixed">
         <TableHeader>
           <TableRow>
-            <SortableTableHead label="Código" sortKey="code" activeKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-            <SortableTableHead label="Nombre" sortKey="name" activeKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-            <SortableTableHead label="Cliente" sortKey="client" activeKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-            <SortableTableHead label="Tipo" sortKey="type" activeKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-            <SortableTableHead label="Estado" sortKey="status" activeKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-            <TableHead className="w-20" />
+            <SortableTableHead
+              className="w-[14%]"
+              label="Código"
+              sortKey="code"
+              activeKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
+            <SortableTableHead
+              className="w-[30%]"
+              label="Nombre"
+              sortKey="name"
+              activeKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
+            <SortableTableHead
+              className="w-[30%]"
+              label="Cliente"
+              sortKey="client"
+              activeKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
+            <SortableTableHead
+              className="w-[10%]"
+              label="Tipo"
+              sortKey="type"
+              activeKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
+            <SortableTableHead
+              className="w-[10%]"
+              label="Estado"
+              sortKey="status"
+              activeKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
+            <TableHead className="w-[6%]" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {sorted.map((p) => (
             <TableRow key={p.id}>
-              <TableCell className="font-mono text-sm">{p.code}</TableCell>
-              <TableCell className={cn(tableNameCellClass, "font-medium")} title={p.name}>
+              <TableCell className="truncate font-mono text-sm" title={p.code}>
+                {p.code}
+              </TableCell>
+              <TableCell className="truncate font-medium" title={p.name}>
                 {p.name}
               </TableCell>
               <TableCell
-                className="max-w-[12rem] truncate text-sm text-muted-foreground"
+                className="truncate text-sm text-muted-foreground"
                 title={p.client.fantasyName ?? p.client.legalName}
               >
                 {p.client.fantasyName ?? p.client.legalName}
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">{TYPE_LABELS[p.type]}</TableCell>
-              <TableCell><ProjectStatusBadge status={p.status} /></TableCell>
+              <TableCell className="truncate text-sm text-muted-foreground">
+                {TYPE_LABELS[p.type]}
+              </TableCell>
+              <TableCell>
+                <ProjectStatusBadge status={p.status} />
+              </TableCell>
               <TableCell>
                 <Button variant="ghost" size="sm" asChild>
                   <Link href={`/proyectos/${p.id}`}>Ver</Link>

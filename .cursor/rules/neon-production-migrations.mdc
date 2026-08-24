@@ -1,0 +1,28 @@
+---
+description: Portal = Neon production; never migrate only the local/dev branch
+alwaysApply: true
+---
+
+# Neon DB — production first (portal.bloqer.app)
+
+Simon trabaja **contra producción**. `portal.bloqer.app` usa el branch Neon **`production`**, no `dev`.
+
+## Mapping (proyecto Neon `bloqer-v2` / `crimson-dew-50407633`)
+
+| Entorno | Neon branch | Compute (host) |
+|---|---|---|
+| **portal / Vercel production** | `production` (`br-damp-hat-aphhbquz`) | `ep-cold-mouse-appkpn84` |
+| Local `.env` (a menudo) | `dev` (`br-falling-morning-aple46i5`) | `ep-curly-math-aptjniho` |
+
+El proyecto Neon `bloqer-production` (`broad-wave-70486870`, sa-east-1) **no** es portal.
+
+## Cuando el usuario pide migrar / “actualizá la DB” / fix de columnas en portal
+
+1. **Aplicar `prisma migrate deploy` en Neon `production`** (`ep-cold-mouse…`). Obligatorio.
+2. No asumir que `pnpm db:migrate:deploy` con el `.env` local alcanza: ese archivo suele apuntar a **`dev`**.
+3. Verificar con SQL en branch `production` (`_prisma_migrations` + columnas) antes de dar por cerrado.
+4. Si también querés alinear `dev`, hacelo **después** y decilo explícitamente; nunca al revés como único paso.
+
+## Síntoma clásico
+
+Código nuevo en Vercel + migración solo en `dev` → `P2022` / “column does not exist” en `/proyectos` y pantallas Prisma que leen el modelo completo.
