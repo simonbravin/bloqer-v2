@@ -19,7 +19,7 @@ export async function updateBudgetSettings(
   const budget = await prisma.budget.findUnique({ where: { id: budgetId } });
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  assertBudgetEditable(budget);
+  await assertBudgetEditable(budget);
   await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
 
   const settings = await prisma.$transaction(async (tx) => {
@@ -38,7 +38,10 @@ export async function updateBudgetSettings(
     action: "budget_settings.updated",
     entityType: "BudgetSettings",
     entityId: settings.id,
-    after: input,
+    after: {
+      ...input,
+      ...(budget.status === "APPROVED" ? { approvedEditOverride: true } : {}),
+    },
     ipAddress: ctx.ipAddress,
   });
 

@@ -7,6 +7,7 @@ import {
   BudgetMarginConfigSection,
   BudgetExportActions,
 } from "@/features/budgets";
+import { ApprovedBudgetEditBanner } from "@/features/budgets/components/approved-budget-edit-banner";
 import { BudgetWbsViewProvider } from "@/features/budgets/lib/wbs-view-mode";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
@@ -17,9 +18,12 @@ import {
   getWbsTree,
   isBudgetScheduleBaseline,
   listBudgetsByProject,
+  resolveBudgetEconomicEditability,
+  getProjectApprovedBudgetEditFlags,
   ServiceError,
   type WbsViewNode,
 } from "@bloqer/services";
+import { can } from "@bloqer/domain";
 import { addDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { PageShell } from "@/components/layout/page-shell";
@@ -66,13 +70,17 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
   let lifecycleLog;
   let scheduleBaseline = false;
   let parentBudget: { id: string; name: string; versionNumber: number } | null = null;
+  let editability = { editable: false, approvedOverrideActive: false };
+  let policyFlags = { tenantAllow: false, projectAllow: false, canManagePolicy: false };
   try {
-    [budget, tree, lifecycleLog, scheduleBaseline] = await Promise.all([
+    [budget, tree, lifecycleLog, scheduleBaseline, policyFlags] = await Promise.all([
       getBudgetById(budgetId, ctx),
       getWbsTree(budgetId, ctx),
       getBudgetLifecycleLog(budgetId, ctx),
       isBudgetScheduleBaseline(budgetId, ctx.tenantId),
+      getProjectApprovedBudgetEditFlags(projectId, ctx),
     ]);
+    editability = await resolveBudgetEconomicEditability(budget);
     if (budget.parentBudgetId) {
       const siblings = await listBudgetsByProject(projectId, ctx);
       const parent = siblings.find((b) => b.id === budget!.parentBudgetId);
@@ -93,7 +101,8 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
 
   if (!budget || budget.projectId !== projectId) notFound();
 
-  const editable = budget.status === "DRAFT" || budget.status === "RETURNED_FOR_CHANGES";
+  const canEditBudgets = can(current.tenantCtx.roles, "EDIT", "BUDGETS");
+  const editable = editability.editable && canEditBudgets;
   const wbsStructureEditable = editable && !scheduleBaseline;
   const canCreateAddendum = budget.status === "APPROVED" || budget.status === "CLOSED";
   const hasLeafItems = (() => {
@@ -112,6 +121,14 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
     serializeMoney(addDecimal(saleStr, multiplyDecimal(costStr, "-1"))),
     budget.currency,
   );
+  const snapshotCost =
+    budget.approvedSnapshotTotalCost != null
+      ? serializeMoney(budget.approvedSnapshotTotalCost.toString())
+      : null;
+  const snapshotSale =
+    budget.approvedSnapshotTotalSalePrice != null
+      ? serializeMoney(budget.approvedSnapshotTotalSalePrice.toString())
+      : null;
 
   const s = budget.settings;
   const settingsDefaults = {
@@ -177,6 +194,15 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
           </div>
         </div>
 
+        {editability.approvedOverrideActive ? (
+          <ApprovedBudgetEditBanner
+            projectId={projectId}
+            projectAllow={policyFlags.projectAllow}
+            canManagePolicy={policyFlags.canManagePolicy}
+            readOnlyEdit={!canEditBudgets}
+          />
+        ) : null}
+
         <KpiStatGrid columns={3}>
           <KpiStatCard
             label="Costo directo total"
@@ -189,6 +215,13 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
           />
           <KpiStatCard label="Margen (venta − costo)" value={marginStr} tone="muted" />
         </KpiStatGrid>
+
+        {editability.approvedOverrideActive && snapshotCost && snapshotSale ? (
+          <p className="text-xs text-muted-foreground">
+            Totales al aprobar: costo {formatMoneyAmount(snapshotCost, budget.currency)} · venta{" "}
+            {formatMoneyAmount(snapshotSale, budget.currency)}
+          </p>
+        ) : null}
 
         <WbsTree
           nodes={tree}

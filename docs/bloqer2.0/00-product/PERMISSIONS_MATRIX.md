@@ -140,6 +140,7 @@ Más allá de la matriz, hay permisos atados a **contextos específicos**:
 | Cambiar tenant de un usuario | OWNER (origen y destino) | Casos excepcionales |
 | Forzar tipo de cambio histórico | OWNER, ADMIN | Cierre de periodo |
 | Aprobar OC sobre cierto monto | Configurable: OWNER, ADMIN, o PM con habilitación | Si Admin define umbral |
+| Encender/apagar edición excepcional de presupuesto `APPROVED` (tenant y/o obra) ([D-088]) | OWNER, ADMIN | Default OFF; ambos flags ON para editar; `CLOSED` nunca |
 
 ---
 

@@ -18,6 +18,7 @@ import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
 import { assertBudgetEditable, lockBudgetForEconomicEdit } from "./budget.service";
+import { assertCostItemQuantityNotBelowCertified } from "./cost-item-certified-qty";
 import { _recalcCostItemTotals, _recalcBudgetSummary } from "./budget-calc.service";
 
 /** Persist APU decimals at 4 dp half-up — avoid writing raw IEEE floats. */
@@ -35,7 +36,7 @@ async function _guardLine(costItemId: string, ctx: ServiceContext) {
   if (!costItem) throw new ServiceError("NOT_FOUND", "Ítem de costo no encontrado");
   const budget = await prisma.budget.findUniqueOrThrow({ where: { id: costItem.budgetId } });
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  assertBudgetEditable(budget);
+  await assertBudgetEditable(budget);
   await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
   return { costItem, budget };
 }
@@ -176,7 +177,12 @@ export async function addCostAnalysisLine(
     action: "cost_analysis_line.added",
     entityType: "CostAnalysisLine",
     entityId: line.id,
-    after: { category: input.category, description: input.description, budgetId: budget.id },
+    after: {
+      category: input.category,
+      description: input.description,
+      budgetId: budget.id,
+      ...(budget.status === "APPROVED" ? { approvedEditOverride: true } : {}),
+    },
     ipAddress: ctx.ipAddress,
   });
 
@@ -193,7 +199,7 @@ export async function updateCostAnalysisLine(
   }
   const existing = await prisma.costAnalysisLine.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Línea de análisis no encontrada");
-  await _guardLine(existing.costItemId, ctx);
+  const { budget } = await _guardLine(existing.costItemId, ctx);
 
   const updated = await prisma.$transaction(async (tx) => {
     await lockBudgetForEconomicEdit(tx, existing.budgetId, ctx.tenantId);
@@ -267,7 +273,10 @@ export async function updateCostAnalysisLine(
     action: "cost_analysis_line.updated",
     entityType: "CostAnalysisLine",
     entityId: id,
-    after: input,
+    after: {
+      ...input,
+      ...(budget.status === "APPROVED" ? { approvedEditOverride: true } : {}),
+    },
     ipAddress: ctx.ipAddress,
   });
 
@@ -280,7 +289,7 @@ export async function removeCostAnalysisLine(id: string, ctx: ServiceContext): P
   }
   const existing = await prisma.costAnalysisLine.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Línea de análisis no encontrada");
-  await _guardLine(existing.costItemId, ctx);
+  const { budget } = await _guardLine(existing.costItemId, ctx);
 
   await prisma.$transaction(async (tx) => {
     await lockBudgetForEconomicEdit(tx, existing.budgetId, ctx.tenantId);
@@ -296,7 +305,10 @@ export async function removeCostAnalysisLine(id: string, ctx: ServiceContext): P
     action: "cost_analysis_line.removed",
     entityType: "CostAnalysisLine",
     entityId: id,
-    after: { budgetId: existing.budgetId },
+    after: {
+      budgetId: existing.budgetId,
+      ...(budget.status === "APPROVED" ? { approvedEditOverride: true } : {}),
+    },
     ipAddress: ctx.ipAddress,
   });
 }
@@ -333,6 +345,14 @@ export async function saveCostItemApu(
         "VALIDATION",
         "Definí una cantidad de ítem mayor a 0 antes de guardar el APU",
       );
+    }
+
+    if (input.quantity !== undefined) {
+      await assertCostItemQuantityNotBelowCertified(tx, {
+        wbsNodeId: costItem.wbsNodeId,
+        tenantId: ctx.tenantId,
+        quantity: newQty,
+      });
     }
 
     await tx.costItem.update({
@@ -451,7 +471,12 @@ export async function saveCostItemApu(
     action: "cost_item.apu_saved",
     entityType: "CostItem",
     entityId: input.costItemId,
-    after: { budgetId: budget.id, lineCount: input.lines.length },
+    projectId: budget.projectId,
+    after: {
+      budgetId: budget.id,
+      lineCount: input.lines.length,
+      ...(budget.status === "APPROVED" ? { approvedEditOverride: true } : {}),
+    },
     ipAddress: ctx.ipAddress,
   });
 

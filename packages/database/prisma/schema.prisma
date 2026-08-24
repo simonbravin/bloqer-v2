@@ -610,6 +610,8 @@ model Tenant {
   /// Tenant brand logo in R2 ([D-071]); key must be `{tenantId}/branding/…`.
   logoStorageKey        String?            @db.VarChar(512)
   logoMimeType          String?            @db.VarChar(128)
+  /// Kill-switch: allow economic edits on APPROVED budgets when project flag is also ON ([D-088]). Default OFF.
+  allowApprovedBudgetEconomicEdits Boolean @default(false)
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
@@ -1090,6 +1092,8 @@ model Project {
   expectedEndDate          DateTime?
   actualEndDate            DateTime?
   notes                    String?
+  /// Per-project unlock for APPROVED budget economic edits ([D-088]). Requires tenant kill-switch ON. Default OFF.
+  allowApprovedBudgetEconomicEdits Boolean @default(false)
   createdBy                String?
   updatedBy                String?
   createdAt                DateTime       @default(now())
@@ -1245,6 +1249,9 @@ model Budget {
   currency       String       @default("ARS")
   totalCost      Decimal      @default(0) @db.Decimal(18, 4)
   totalSalePrice Decimal      @default(0) @db.Decimal(18, 4)
+  /// Totals frozen at approval time ([D-088]); live totals may diverge under approved-edit override.
+  approvedSnapshotTotalCost      Decimal? @db.Decimal(18, 4)
+  approvedSnapshotTotalSalePrice Decimal? @db.Decimal(18, 4)
   internalNotes  String?
   createdBy      String?
   updatedBy      String?

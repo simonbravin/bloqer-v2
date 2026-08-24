@@ -19,6 +19,7 @@ export {
 export * from "./project/project.service";
 export * from "./project/project-overview-dashboard.service";
 export * from "./budget/budget.service";
+export * from "./budget/approved-budget-edits.service";
 export * from "./budget/budget-settings.service";
 export * from "./budget/wbs.service";
 export * from "./budget/cost-item.service";

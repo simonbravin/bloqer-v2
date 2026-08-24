@@ -26,6 +26,7 @@
 | `project.completed` | ACTIVE → COMPLETED | id, completed_at |
 | `project.cancelled` | * → CANCELLED | id, reason, previous_status |
 | `project.reactivated` | CANCELLED → DRAFT \| ACTIVE \| ON_HOLD | id, reason, restored_status |
+| `project.approved_budget_edits.changed` | flag por obra de edición excepcional `APPROVED` ([D-088]) | id, allow, previous_allow |
 
 ### 2.2 Budget
 
@@ -39,6 +40,12 @@
 | `budget.superseded` | reemplazado por nueva versión |
 | `budget.cancelled` | * → `CANCELLED` |
 | `budget.addendum_added` | nueva adenda creada bajo este budget |
+
+### 2.2b Tenant (política)
+
+| Evento | Cuándo |
+|---|---|
+| `tenant.approved_budget_edits_policy.changed` | kill-switch tenant de edición excepcional `APPROVED` ([D-088]) |
 
 ### 2.3 Contract
 
@@ -327,8 +334,9 @@ flowchart LR
 |---|---|
 | `change_order.applied` | **no** muta solo el `CLOSED` ni la base vendida; si el cambio es contractual/económico sobre lo vendido → flujo **Adenda + Budget complementario** ([BR-CO-002], [BR-CO-003]). |
 | `addendum.signed` | **Solo** con adenda `SIGNED` se aplican efectos contractuales/comerciales (p. ej. `Budget` complementario) — [BR-ADD-001]. |
-| `budget.approved` | habilita emisión de certificaciones; estructura económica bloqueada salvo proceso formal ([BR-BUD-006]). |
+| `budget.approved` | habilita emisión de certificaciones; estructura económica bloqueada salvo proceso formal ([BR-BUD-006]) o override [D-088]. |
 | `budget.closed` | base contractual; bloqueo total de cómputo vendido sin adenda ([BR-BUD-002]). |
+| `tenant.approved_budget_edits_policy.changed` / `project.approved_budget_edits.changed` | kill-switch / flag por obra; mutaciones económicas en `APPROVED` solo si ambos ON ([D-088]). |
 
 ### 3.8 Aprobaciones y compras
 

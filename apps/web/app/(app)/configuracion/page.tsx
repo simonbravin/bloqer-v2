@@ -131,6 +131,23 @@ export default async function ConfiguracionHomePage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader className="flex flex-row items-start gap-3 space-y-0">
+          <div className="min-w-0 flex-1 space-y-1">
+            <CardTitle className="text-base">Presupuestos aprobados</CardTitle>
+            <CardDescription>
+              Política excepcional para editar presupuestos ya aprobados (deshabilitada por
+              defecto). Solo OWNER/ADMIN.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/configuracion/presupuestos">Abrir política de presupuestos</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
       {canEditDisplay ? (
         <>
           <Card>

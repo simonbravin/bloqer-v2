@@ -77,7 +77,7 @@
 - **Estado:** ACTIVA
 - **Contexto:** trazabilidad legal, estabilidad de cifras comprometidas con el cliente y separación entre control operativo (**Change Order**) e instrumento contractual (**Adenda**).
 - **Decisión:**
-  1. **`APPROVED`:** presupuesto aprobado **internamente**. Quedan **bloqueados** montos, WBS, cantidades, precios unitarios, fórmulas comerciales, margen, impuestos y estructura económica. **Sí** se permiten ediciones **no estructurales** (notas internas, adjuntos, responsable, tags, metadata no económica). Cualquier cambio económico o de alcance presupuestario requiere **nuevo proceso formal** (típicamente Adenda + Budget complementario o política de nueva versión).
+  1. **`APPROVED`:** presupuesto aprobado **internamente**. Quedan **bloqueados** montos, WBS, cantidades, precios unitarios, fórmulas comerciales, margen, impuestos y estructura económica. **Sí** se permiten ediciones **no estructurales** (notas internas, adjuntos, responsable, tags, metadata no económica). Cualquier cambio económico o de alcance presupuestario requiere **nuevo proceso formal** (típicamente Adenda + Budget complementario o política de nueva versión). **Excepción controlada [D-088]:** con kill-switch de tenant **y** flag de obra ON, se permite edición económica completa de `APPROVED` (auditada); `CLOSED` no aplica.
   2. **`CLOSED`:** presupuesto convertido en **base contractual/comercial**. **No** se modifica directamente el cómputo vendido. Cualquier cambio de monto, alcance vendido, condiciones vendidas o WBS contractual requiere **Adenda** (o fase/proceso formal equivalente) y **Budget** hijo que complementa.
   3. **Change Order vs Adenda:** el **Change Order** es solicitud/control operativo; **no** altera por sí solo presupuesto **`CLOSED`** ni contrato/precio vendido. La **Adenda** es el instrumento que **sí** modifica monto, alcance o WBS contractual; puede originarse desde un CO aprobado. **Regla fuerte:** si cambia precio vendido, alcance contractual o WBS contractual cerrada → **Adenda obligatoria**; el CO solo no alcanza ([BR-CO-003]).
 - **Implicancias:** `IN_REVIEW` no es aprobado. Tabla estado vs ediciones: [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Budget; reglas [BR-BUD-006], [BR-BUD-007], [BR-BUD-002], [BR-CO-002], [BR-CO-003].
@@ -1304,6 +1304,26 @@
 
 ---
 
+### D-088 — Edición excepcional de presupuesto `APPROVED` (kill-switch tenant + flag por obra)
+
+- **Fecha:** 2026-08-24
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Clientes necesitan operar (gastos, OC, certificaciones) contra un presupuesto ya `APPROVED` mientras los costos/APU de ítems se definen semanas o meses después. [D-005] / [BR-BUD-006] congelan la economía en `APPROVED`; [BR-CERT-001] exige `APPROVED`/`CLOSED` para certificar; [BR-BUD-005] exige APU para aprobar. Sin excepción controlada, el producto empuja a aprobar “de mentira” o a no operar.
+- **Decisión:**
+  1. **Default OFF.** Por defecto un `Budget` en `APPROVED` **no** admite mutación económica (igual que [D-005]).
+  2. **Dos capas (AND):** (a) `Tenant.allowApprovedBudgetEconomicEdits` (kill-switch, default `false`); (b) `Project.allowApprovedBudgetEconomicEdits` (por obra, default `false`). Solo si **ambos** están ON se permite edición económica completa de presupuestos `APPROVED` de esa obra (WBS, cantidades, PU, APU, `BudgetSettings`, márgenes).
+  3. **`CLOSED` no entra.** El cómputo contractual cerrado sigue solo vía Adenda + budget hijo ([BR-BUD-002], [D-005]). El toggle no desbloquea `CLOSED`.
+  4. **Quién enciende/apaga flags:** solo `OWNER` / `ADMIN` (política peligrosa; alineado a [PERM-007] / cierre de período). **Quién edita** con el desbloqueo activo: quien tenga `EDIT BUDGETS` (p. ej. PM). El PM **nunca** enciende el flag.
+  5. **Auditoría:** cada mutación económica bajo override queda en `AuditLog` con marca `approvedEditOverride: true`. Cambios de flags: eventos `tenant.approved_budget_edits_policy.changed` y `project.approved_budget_edits.changed`.
+  6. **Snapshots al aprobar:** al pasar a `APPROVED` se congelan `approvedSnapshotTotalCost` / `approvedSnapshotTotalSalePrice` en el `Budget` (totales al momento de aprobación); los totales vivos pueden divergir mientras el override esté activo.
+  7. **Integridad:** no borrar nodos WBS con vínculos operativos (cert/OC/PR/factura/stock/JL/subcontrato/cronograma); no bajar `CostItem.quantity` por debajo de qty certificada acumulada (`ISSUED`/`APPROVED`). Certificaciones emitidas ya snapshottean PU/qty; no se reescriben.
+  8. **Flujo operativo esperado:** aprobar con APU provisorio → operar → completar costos → apagar flag de la obra (y opcionalmente pasar a `CLOSED`). Apagar el kill-switch de tenant congela todas las obras sin borrar flags por proyecto.
+- **Implicancias:** enmienda la lectura estricta de [D-005] punto 1 / [BR-BUD-006] solo bajo ambos flags; no relaja [BR-BUD-005] ni [BR-BUD-002].
+- **Documentos afectados:** [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) ([BR-BUD-006]), [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Budget, [`BUDGETS.md`](../02-modules/BUDGETS.md), [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md), [`EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md), [D-005] (complementario).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1312,7 +1332,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-088`…).
+1. Tomar el siguiente ID disponible (`D-089`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

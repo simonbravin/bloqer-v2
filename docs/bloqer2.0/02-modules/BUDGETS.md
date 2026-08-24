@@ -32,7 +32,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Budget (diagrama + 
 | `DRAFT` | No | Editable completa | Sí |
 | `IN_REVIEW` | No | **Bloqueada** — solo comentarios/adjuntos de **revisión** y metadata no económica acotada ([BR-BUD-007]) | Notas de revisión |
 | `RETURNED_FOR_CHANGES` | No | **Editable** de nuevo; luego **`IN_REVIEW`** obligatorio antes de aprobar | Sí |
-| `APPROVED` | Sí (interno) | **Bloqueada** | **Sí** ([BR-BUD-006]) |
+| `APPROVED` | Sí (interno) | **Bloqueada** por defecto; **editable** solo si tenant + obra permiten override ([D-088], [BR-BUD-006]) | **Sí** ([BR-BUD-006]) |
 | `CLOSED` | Sí (base contractual) | **Sin edición**; cambios vendidos vía **Adenda** + budget hijo | **Solo** whitelist [BR-BUD-008]: `internal_notes`, `attachments`, `tags`, `display_order`, `non_contractual_reference_code`, `assigned_internal_responsible` |
 
 Detalle normativo: [BR-BUD-006], [BR-BUD-007], [BR-BUD-008], [BR-BUD-002], [D-005], [D-030].
@@ -62,7 +62,7 @@ Regla fuerte: precio vendido / alcance contractual / WBS contractual cerrada ⇒
 ## 10. Reglas de negocio
 - **BR-BUD-001**: una sola versión **activa** por proyecto; adendas suman ([D-002], [BR-BUD-003]).
 - **BR-BUD-002**: `CLOSED` no editable en lo vendido; vía adenda ([D-005]).
-- **BR-BUD-006**: `APPROVED` bloquea economía; permite metadata ([D-005]).
+- **BR-BUD-006**: `APPROVED` bloquea economía; permite metadata ([D-005]). Excepción [D-088]: ambos flags (tenant + obra) ON → edición económica completa auditada; `CLOSED` excluido.
 - **BR-BUD-007**: `IN_REVIEW` no es aprobado; sin cambios estructurales.
 - **BR-BUD-008**: `CLOSED` — solo metadata whitelist ([D-030]).
 - **BR-BUD-005**: no aprobar sin análisis de costo por ítem ([BR-BUD-005]).
@@ -86,10 +86,11 @@ Regla fuerte: precio vendido / alcance contractual / WBS contractual cerrada ⇒
 - **Contratos/Adendas**, **Certificaciones**, **Compras**, **Change orders**.
 
 ## 16. Permisos
-PM edita borrador y envía a revisión; solo ADMIN/OWNER aprueban/cierren (configurable). Metadata en `APPROVED` según permisos.
+PM edita borrador y envía a revisión; solo ADMIN/OWNER aprueban/cierren (configurable). Metadata en `APPROVED` según permisos. Encender/apagar override de edición en `APPROVED` ([D-088]): solo OWNER/ADMIN. Con override activo, edita quien tenga `EDIT BUDGETS`.
 
 ## 17. Eventos disparados / consumidos
 - `budget.submitted_for_review`, `budget.returned_for_changes`, `budget.approved`, `budget.closed`, `budget.addendum_added`.
+- Política override ([D-088]): `tenant.approved_budget_edits_policy.changed`, `project.approved_budget_edits.changed`.
 
 ## 18. Fase de implementación
 **Fase 1**.

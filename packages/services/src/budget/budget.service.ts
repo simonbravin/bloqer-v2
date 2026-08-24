@@ -12,16 +12,73 @@ export { canViewBudgetsArea };
 
 // ─── Guards ───────────────────────────────────────────────────────────────────
 
-export function assertBudgetEditable(budget: Budget): void {
-  if (budget.status !== "DRAFT" && budget.status !== "RETURNED_FOR_CHANGES") {
+type BudgetEditabilityClient = {
+  tenant: {
+    findUnique: (args: {
+      where: { id: string };
+      select: { allowApprovedBudgetEconomicEdits: true };
+    }) => Promise<{ allowApprovedBudgetEconomicEdits: boolean } | null>;
+  };
+  project: {
+    findUnique: (args: {
+      where: { id: string };
+      select: { allowApprovedBudgetEconomicEdits: true; tenantId: true };
+    }) => Promise<{ allowApprovedBudgetEconomicEdits: boolean; tenantId: string } | null>;
+  };
+};
+
+/**
+ * Economic edits: DRAFT / RETURNED_FOR_CHANGES always;
+ * APPROVED only when tenant kill-switch AND project flag are ON ([D-088]);
+ * CLOSED never.
+ */
+export async function assertBudgetEditable(
+  budget: Budget,
+  client: BudgetEditabilityClient = prisma,
+): Promise<void> {
+  if (budget.status === "DRAFT" || budget.status === "RETURNED_FOR_CHANGES") {
+    return;
+  }
+  if (budget.status === "CLOSED") {
+    throw new ServiceError(
+      "CONFLICT",
+      'El presupuesto cerrado no permite cambios económicos. Usá una adenda ([BR-BUD-002]).',
+    );
+  }
+  if (budget.status !== "APPROVED") {
     throw new ServiceError(
       "CONFLICT",
       `El presupuesto en estado "${budget.status}" no permite cambios económicos`,
     );
   }
+
+  const tenant = await client.tenant.findUnique({
+    where: { id: budget.tenantId },
+    select: { allowApprovedBudgetEconomicEdits: true },
+  });
+  if (!tenant?.allowApprovedBudgetEconomicEdits) {
+    throw new ServiceError(
+      "CONFLICT",
+      "La edición de presupuestos aprobados está deshabilitada en la organización ([D-088])",
+    );
+  }
+
+  const project = await client.project.findUnique({
+    where: { id: budget.projectId },
+    select: { allowApprovedBudgetEconomicEdits: true, tenantId: true },
+  });
+  if (!project || project.tenantId !== budget.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  }
+  if (!project.allowApprovedBudgetEconomicEdits) {
+    throw new ServiceError(
+      "CONFLICT",
+      "La edición de presupuestos aprobados no está habilitada para esta obra ([D-088])",
+    );
+  }
 }
 
-type BudgetLockTx = {
+type BudgetLockTx = BudgetEditabilityClient & {
   $queryRaw: typeof prisma.$queryRaw;
   budget: { findUniqueOrThrow: typeof prisma.budget.findUniqueOrThrow };
 };
@@ -40,7 +97,7 @@ export async function lockBudgetForEconomicEdit(
   if (budget.tenantId !== tenantId) {
     throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   }
-  assertBudgetEditable(budget);
+  await assertBudgetEditable(budget, tx);
   return budget;
 }
 
@@ -55,12 +112,48 @@ export async function isBudgetScheduleBaseline(
   return count > 0;
 }
 
+/**
+ * Whether economic edits are allowed for this budget under current status + D-088 flags.
+ * Used by UI (banner / editable); service mutations still go through assertBudgetEditable.
+ */
+export async function resolveBudgetEconomicEditability(
+  budget: Pick<Budget, "id" | "status" | "tenantId" | "projectId">,
+): Promise<{ editable: boolean; approvedOverrideActive: boolean }> {
+  if (budget.status === "DRAFT" || budget.status === "RETURNED_FOR_CHANGES") {
+    return { editable: true, approvedOverrideActive: false };
+  }
+  if (budget.status !== "APPROVED") {
+    return { editable: false, approvedOverrideActive: false };
+  }
+  const [tenant, project] = await Promise.all([
+    prisma.tenant.findUnique({
+      where: { id: budget.tenantId },
+      select: { allowApprovedBudgetEconomicEdits: true },
+    }),
+    prisma.project.findUnique({
+      where: { id: budget.projectId },
+      select: { allowApprovedBudgetEconomicEdits: true, tenantId: true },
+    }),
+  ]);
+  const approvedOverrideActive = Boolean(
+    tenant?.allowApprovedBudgetEconomicEdits &&
+      project?.allowApprovedBudgetEconomicEdits &&
+      project.tenantId === budget.tenantId,
+  );
+  return { editable: approvedOverrideActive, approvedOverrideActive };
+}
+
+/** OWNER / ADMIN may toggle D-088 policy flags. */
+export function canManageApprovedBudgetEditPolicy(roles: ServiceContext["roles"]): boolean {
+  return roles.some((r) => r === "OWNER" || r === "ADMIN");
+}
+
 /** WBS: estado editable y no bloqueado por cronograma. */
 export async function assertBudgetWbsStructureMutable(
   budget: Budget,
   ctx: ServiceContext,
 ): Promise<void> {
-  assertBudgetEditable(budget);
+  await assertBudgetEditable(budget);
   if (await isBudgetScheduleBaseline(budget.id, ctx.tenantId)) {
     throw new ServiceError(
       "CONFLICT",
@@ -435,7 +528,12 @@ export async function approveBudget(
   try {
     const result = await prisma.budget.updateMany({
       where: { id, tenantId: ctx.tenantId, status: "IN_REVIEW" },
-      data: { status: "APPROVED", updatedBy: ctx.actorUserId },
+      data: {
+        status: "APPROVED",
+        updatedBy: ctx.actorUserId,
+        approvedSnapshotTotalCost: budget.totalCost,
+        approvedSnapshotTotalSalePrice: budget.totalSalePrice,
+      },
     });
     if (result.count === 0) {
       throw new ServiceError(

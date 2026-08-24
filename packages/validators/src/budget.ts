@@ -195,3 +195,19 @@ export type SaveCostItemApuInput = z.infer<typeof saveCostItemApuSchema>;
 export type BudgetLifecycleCommentInput = z.infer<typeof budgetLifecycleCommentSchema>;
 export type BudgetReturnForChangesInput = z.infer<typeof budgetReturnForChangesSchema>;
 export type BudgetImportRow = z.infer<typeof budgetImportRowSchema>;
+
+export const updateTenantApprovedBudgetEditsPolicySchema = z.object({
+  allow: z.boolean(),
+});
+
+export const updateProjectApprovedBudgetEditsPolicySchema = z.object({
+  projectId: z.string().uuid(),
+  allow: z.boolean(),
+});
+
+export type UpdateTenantApprovedBudgetEditsPolicyInput = z.infer<
+  typeof updateTenantApprovedBudgetEditsPolicySchema
+>;
+export type UpdateProjectApprovedBudgetEditsPolicyInput = z.infer<
+  typeof updateProjectApprovedBudgetEditsPolicySchema
+>;

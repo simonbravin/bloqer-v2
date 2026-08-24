@@ -83,7 +83,7 @@ stateDiagram-v2
 | `DRAFT` | No | **Sí**, completa | Sí |
 | `IN_REVIEW` | **No** | **No** cambios estructurales (WBS, cantidades, PU, fórmulas, márgenes, impuestos, moneda, alcance vendido, condiciones contractuales, plazos de pago frente a cliente). Solo **comentarios de revisión**, **adjuntos de revisión** y metadata no económica si el workflow lo permite ([BR-BUD-007]) | Notas/comentarios revisión |
 | `RETURNED_FOR_CHANGES` | No | **Sí** (el responsable corrige; luego debe **`IN_REVIEW`** de nuevo) | Sí |
-| `APPROVED` | Sí (interno) | **No**: montos, WBS, cantidades, PU, fórmulas comerciales, margen, impuestos, estructura económica bloqueados ([BR-BUD-006]) | **Sí** según whitelist metadata ([BR-BUD-006]) |
+| `APPROVED` | Sí (interno) | **No** por defecto ([BR-BUD-006]). **Excepción [D-088]:** editable en lo económico solo si kill-switch de tenant **y** flag de obra están ON; `CLOSED` no aplica | **Sí** según whitelist metadata ([BR-BUD-006]) |
 | `CLOSED` | Sí (base contractual/comercial) | **No**; cambios vendidos solo **Adenda** + budget hijo ([BR-BUD-002], [D-005]) | **Solo** whitelist [BR-BUD-008]: `internal_notes`, `attachments`, `tags`, `display_order`, `non_contractual_reference_code`, `assigned_internal_responsible`. **Prohibido** todo lo usado por certificaciones, contratos, adendas, reportes o rentabilidad (WBS, cantidades, PU, costo, márgenes, impuestos, precio venta, moneda, alcance cliente, términos contractuales, plazos de pago, etc.) |
 
 `SUPERSEDED` y `CANCELLED`: solo lectura salvo procesos excepcionales auditados.
@@ -93,8 +93,8 @@ stateDiagram-v2
 - `DRAFT`: edición económica completa.
 - `IN_REVIEW`: **no** aprobado; **sin** mutación estructural; solo revisión ([BR-BUD-007]).
 - `RETURNED_FOR_CHANGES`: editable; reentrada a aprobación vía `IN_REVIEW` (`budget.returned_for_changes` / `budget.submitted_for_review`).
-- `APPROVED`: bloqueo económico estructural; metadata según [BR-BUD-006].
-- `CLOSED`: base contractual; solo metadata [BR-BUD-008] ([BR-BUD-002]).
+- `APPROVED`: bloqueo económico estructural por defecto; metadata según [BR-BUD-006]. Excepción controlada [D-088] (ambos flags ON).
+- `CLOSED`: base contractual; solo metadata [BR-BUD-008] ([BR-BUD-002]); **sin** excepción de toggle.
 - `SUPERSEDED`: histórico.
 - `CANCELLED`: nunca vigente como aprobado.
 

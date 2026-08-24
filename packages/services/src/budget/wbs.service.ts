@@ -503,7 +503,7 @@ export async function updateWbsNode(
   if (input.code != null && input.code !== node.code) {
     await assertBudgetWbsStructureMutable(budget, ctx);
   } else {
-    assertBudgetEditable(budget);
+    await assertBudgetEditable(budget);
   }
 
   if (input.code && input.code !== node.code) {
@@ -570,25 +570,39 @@ function sortNodeIdsByDepthDesc(
 }
 
 async function assertWbsNodeCanSubdivide(wbsNodeId: string): Promise<void> {
-  const [certLines, poLines, jobsiteRefs, subcontractLines, scheduleLinks] =
-    await Promise.all([
-      prisma.certificationLine.count({ where: { wbsNodeId } }),
-      prisma.purchaseOrderLine.count({ where: { wbsNodeId } }),
-      prisma.jobsiteLogProgress.count({ where: { wbsNodeId } }),
-      prisma.subcontractLine.count({ where: { wbsNodeId } }),
-      prisma.scheduleItemWbsLink.count({ where: { wbsNodeId } }),
-    ]);
+  const [
+    certLines,
+    poLines,
+    jobsiteRefs,
+    subcontractLines,
+    scheduleLinks,
+    prLines,
+    invoiceLines,
+    stockMoves,
+  ] = await Promise.all([
+    prisma.certificationLine.count({ where: { wbsNodeId } }),
+    prisma.purchaseOrderLine.count({ where: { wbsNodeId } }),
+    prisma.jobsiteLogProgress.count({ where: { wbsNodeId } }),
+    prisma.subcontractLine.count({ where: { wbsNodeId } }),
+    prisma.scheduleItemWbsLink.count({ where: { wbsNodeId } }),
+    prisma.purchaseRequestLine.count({ where: { wbsNodeId } }),
+    prisma.supplierInvoiceLine.count({ where: { wbsNodeId } }),
+    prisma.stockMovement.count({ where: { wbsNodeId } }),
+  ]);
 
   if (
     certLines > 0 ||
     poLines > 0 ||
     jobsiteRefs > 0 ||
     subcontractLines > 0 ||
-    scheduleLinks > 0
+    scheduleLinks > 0 ||
+    prLines > 0 ||
+    invoiceLines > 0 ||
+    stockMoves > 0
   ) {
     throw new ServiceError(
       "CONFLICT",
-      "No se puede subdividir este ítem: tiene certificaciones, compras, subcontratos, cronograma o libro de obra vinculados. Reasigná o eliminá esos vínculos antes de agregar hijos.",
+      "No se puede subdividir este ítem: tiene certificaciones, compras, facturas, stock, subcontratos, cronograma o libro de obra vinculados. Reasigná o eliminá esos vínculos antes de agregar hijos.",
     );
   }
 }
@@ -596,25 +610,39 @@ async function assertWbsNodeCanSubdivide(wbsNodeId: string): Promise<void> {
 async function assertWbsSubtreeDeletable(nodeIds: string[]): Promise<void> {
   if (nodeIds.length === 0) return;
 
-  const [certLines, poLines, jobsiteRefs, subcontractLines, scheduleLinks] =
-    await Promise.all([
-      prisma.certificationLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
-      prisma.purchaseOrderLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
-      prisma.jobsiteLogProgress.count({ where: { wbsNodeId: { in: nodeIds } } }),
-      prisma.subcontractLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
-      prisma.scheduleItemWbsLink.count({ where: { wbsNodeId: { in: nodeIds } } }),
-    ]);
+  const [
+    certLines,
+    poLines,
+    jobsiteRefs,
+    subcontractLines,
+    scheduleLinks,
+    prLines,
+    invoiceLines,
+    stockMoves,
+  ] = await Promise.all([
+    prisma.certificationLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+    prisma.purchaseOrderLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+    prisma.jobsiteLogProgress.count({ where: { wbsNodeId: { in: nodeIds } } }),
+    prisma.subcontractLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+    prisma.scheduleItemWbsLink.count({ where: { wbsNodeId: { in: nodeIds } } }),
+    prisma.purchaseRequestLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+    prisma.supplierInvoiceLine.count({ where: { wbsNodeId: { in: nodeIds } } }),
+    prisma.stockMovement.count({ where: { wbsNodeId: { in: nodeIds } } }),
+  ]);
 
   if (
     certLines > 0 ||
     poLines > 0 ||
     jobsiteRefs > 0 ||
     subcontractLines > 0 ||
-    scheduleLinks > 0
+    scheduleLinks > 0 ||
+    prLines > 0 ||
+    invoiceLines > 0 ||
+    stockMoves > 0
   ) {
     throw new ServiceError(
       "CONFLICT",
-      "No se puede eliminar: hay certificaciones, compras, subcontratos, cronograma o libro de obra vinculados a ítems del subárbol.",
+      "No se puede eliminar: hay certificaciones, compras, facturas, stock, subcontratos, cronograma o libro de obra vinculados a ítems del subárbol.",
     );
   }
 }

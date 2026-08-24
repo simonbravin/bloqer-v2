@@ -6,6 +6,7 @@ import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
 import { assertBudgetEditable, lockBudgetForEconomicEdit } from "./budget.service";
+import { assertCostItemQuantityNotBelowCertified } from "./cost-item-certified-qty";
 import { _recalcCostItemTotals, _recalcBudgetSummary } from "./budget-calc.service";
 import { _recomputePartidaLinesForQuantity } from "./cost-analysis.service";
 import { serializeQtyDecimal } from "../finance/money-decimal";
@@ -23,7 +24,7 @@ export async function updateCostItem(
 
   const budget = await prisma.budget.findUniqueOrThrow({ where: { id: costItem.budgetId } });
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  assertBudgetEditable(budget);
+  await assertBudgetEditable(budget);
   await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
 
   if (input.quantity !== undefined && !(input.quantity > 0)) {
@@ -35,6 +36,14 @@ export async function updateCostItem(
     const oldQty = costItem.quantity;
     const newQty =
       input.quantity !== undefined ? new Prisma.Decimal(input.quantity) : oldQty;
+
+    if (input.quantity !== undefined) {
+      await assertCostItemQuantityNotBelowCertified(tx, {
+        wbsNodeId: costItem.wbsNodeId,
+        tenantId: ctx.tenantId,
+        quantity: newQty,
+      });
+    }
 
     await tx.costItem.update({
       where: { id },
@@ -61,8 +70,12 @@ export async function updateCostItem(
     action: "cost_item.updated",
     entityType: "CostItem",
     entityId: id,
+    projectId: budget.projectId,
     before: { unit: costItem.unit, quantity: serializeQtyDecimal(costItem.quantity) },
-    after: input,
+    after: {
+      ...input,
+      ...(budget.status === "APPROVED" ? { approvedEditOverride: true } : {}),
+    },
     ipAddress: ctx.ipAddress,
   });
 
