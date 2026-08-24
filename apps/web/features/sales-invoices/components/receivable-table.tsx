@@ -8,7 +8,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableStickyNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -85,14 +87,26 @@ export function ReceivableTable({
             const canCollect = canMutate && COLLECTABLE.has(r.status);
             return (
               <TableRow key={r.id}>
-                <TableCell className="text-sm font-medium">{r.clientName}</TableCell>
+                <TableCell
+                  className={cn(tableStickyNameCellClass, "font-medium")}
+                  title={r.clientName}
+                >
+                  {r.clientName}
+                </TableCell>
                 {showProjectColumn ? (
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell
+                    className="max-w-[12rem] truncate text-sm text-muted-foreground"
+                    title={
+                      r.projectCode && r.projectCode !== "—"
+                        ? [r.projectCode, r.projectName].filter(Boolean).join(" · ")
+                        : (r.projectName ?? "Empresa")
+                    }
+                  >
                     {r.projectCode && r.projectCode !== "—" ? (
-                      <span title={r.projectName}>
+                      <>
                         {r.projectCode}
                         {r.projectName ? ` · ${r.projectName}` : ""}
-                      </span>
+                      </>
                     ) : (
                       r.projectName ?? "Empresa"
                     )}

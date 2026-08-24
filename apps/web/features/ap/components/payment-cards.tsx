@@ -22,15 +22,17 @@ export function PaymentCards({
         <Link
           key={p.id}
           href={`${hrefPrefix}/${p.id}`}
-          className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+          className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="text-xs text-muted-foreground">{formatDate(p.paymentDate)}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">{formatDate(p.paymentDate)}</span>
             <Badge variant={p.status === "CANCELLED" ? "destructive" : "default"}>
               {p.status === "CANCELLED" ? "Cancelado" : "Confirmado"}
             </Badge>
           </div>
-          <h3 className="mt-2 font-semibold leading-snug">{p.accountName}</h3>
+          <h3 className="mt-2 truncate font-semibold leading-snug" title={p.accountName}>
+            {p.accountName}
+          </h3>
           <div className="mt-3 flex justify-between gap-2 text-sm tabular-nums">
             <span className="text-muted-foreground">Monto</span>
             <span className="font-medium">

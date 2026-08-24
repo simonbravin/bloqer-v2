@@ -35,14 +35,21 @@ export function ProjectCards({ projects }: ProjectCardsProps) {
         <Link
           key={p.id}
           href={`/proyectos/${p.id}`}
-          className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+          className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="font-mono text-xs text-muted-foreground">{p.code}</span>
-            <ProjectStatusBadge status={p.status} />
+            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{p.code}</span>
+            <span className="shrink-0">
+              <ProjectStatusBadge status={p.status} />
+            </span>
           </div>
-          <h3 className="mt-2 line-clamp-2 font-semibold leading-snug">{p.name}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h3 className="mt-2 truncate font-semibold leading-snug" title={p.name}>
+            {p.name}
+          </h3>
+          <p
+            className="mt-1 truncate text-sm text-muted-foreground"
+            title={p.client.fantasyName ?? p.client.legalName}
+          >
             {p.client.fantasyName ?? p.client.legalName}
           </p>
           <p className="mt-3 text-xs text-muted-foreground">{TYPE_LABELS[p.type]}</p>

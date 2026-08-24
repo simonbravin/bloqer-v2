@@ -42,15 +42,19 @@ export function SupplierInvoiceCards({
             key={inv.id}
             className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
           >
-            <Link href={`${hrefPrefix}/${inv.id}`} className="flex flex-col min-w-0">
+            <Link href={`${hrefPrefix}/${inv.id}`} className="flex min-w-0 flex-col">
               <div className="flex items-start justify-between gap-2">
-                <span className="font-mono text-xs text-muted-foreground">
+                <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
                   {inv.code}
                   {letter ? ` · ${letter}` : ""}
                 </span>
-                <SupplierInvoiceStatusBadge status={inv.status} />
+                <span className="shrink-0">
+                  <SupplierInvoiceStatusBadge status={inv.status} />
+                </span>
               </div>
-              <p className="mt-2 font-semibold">{inv.supplierName}</p>
+              <p className="mt-2 truncate font-semibold" title={inv.supplierName}>
+                {inv.supplierName}
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Vence {formatDate(inv.dueDate)}
               </p>

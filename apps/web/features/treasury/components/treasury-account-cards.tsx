@@ -23,15 +23,21 @@ export function TreasuryAccountCards({ accounts }: { accounts: TreasuryAccountLi
         <Link
           key={acc.id}
           href={`/tesoreria/cuentas/${acc.id}`}
-          className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+          className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="text-xs text-muted-foreground">{TYPE_LABELS[acc.type]}</span>
-            <TreasuryAccountStatusBadge status={acc.status} />
+            <span className="shrink-0 text-xs text-muted-foreground">{TYPE_LABELS[acc.type]}</span>
+            <span className="shrink-0">
+              <TreasuryAccountStatusBadge status={acc.status} />
+            </span>
           </div>
-          <h3 className="mt-2 font-semibold leading-snug">{acc.name}</h3>
+          <h3 className="mt-2 truncate font-semibold leading-snug" title={acc.name}>
+            {acc.name}
+          </h3>
           {acc.bankName ? (
-            <p className="mt-1 text-sm text-muted-foreground">{acc.bankName}</p>
+            <p className="mt-1 truncate text-sm text-muted-foreground" title={acc.bankName}>
+              {acc.bankName}
+            </p>
           ) : null}
           <div className="mt-3 flex justify-between gap-2 text-sm tabular-nums">
             <span className="text-muted-foreground">Saldo</span>

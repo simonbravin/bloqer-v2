@@ -6,6 +6,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -48,12 +49,21 @@ export function SubcontractTable({
                   {s.code}
                 </Link>
               </TableCell>
-              <TableCell className="font-medium">
-                <Link href={`/proyectos/${projectId}/subcontratos/${s.id}`} className="hover:underline">
+              <TableCell className={tableNameCellClass}>
+                <Link
+                  href={`/proyectos/${projectId}/subcontratos/${s.id}`}
+                  className="block truncate font-medium hover:underline"
+                  title={s.title}
+                >
                   {s.title}
                 </Link>
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">{s.subcontractorName}</TableCell>
+              <TableCell
+                className="max-w-[12rem] truncate text-sm text-muted-foreground"
+                title={s.subcontractorName}
+              >
+                {s.subcontractorName}
+              </TableCell>
               <TableCell className="text-right tabular-nums">
                 {formatMoneyAmount(s.totalValue, s.currency)}
               </TableCell>

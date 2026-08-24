@@ -6,7 +6,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { AccountTypeBadge } from "./account-type-badge";
@@ -47,7 +49,9 @@ export function AccountingAccountTable({
                   {a.code}
                 </Link>
               </TableCell>
-              <TableCell>{a.name}</TableCell>
+              <TableCell className={cn(tableNameCellClass, "font-medium")} title={a.name}>
+                {a.name}
+              </TableCell>
               <TableCell>
                 <AccountTypeBadge type={a.type} />
               </TableCell>

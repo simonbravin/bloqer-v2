@@ -10,6 +10,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameStackCellClass,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
@@ -56,16 +57,20 @@ export function ContactTable({ contacts }: ContactTableProps) {
         <TableBody>
           {sorted.map((contact) => (
             <TableRow key={contact.id}>
-              <TableCell>
-                <div className="font-medium">{contact.legalName}</div>
+              <TableCell className={tableNameStackCellClass}>
+                <div className="truncate font-medium" title={contact.legalName}>
+                  {contact.legalName}
+                </div>
                 {contact.fantasyName && (
-                  <div className="text-xs text-muted-foreground">{contact.fantasyName}</div>
+                  <div className="truncate text-xs text-muted-foreground" title={contact.fantasyName}>
+                    {contact.fantasyName}
+                  </div>
                 )}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {contact.taxId ?? "—"}
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-normal">
                 <div className="flex flex-wrap gap-1">
                   {contact.roles.map((r) => (
                     <RoleBadge key={r.id} role={r.role} />
@@ -75,7 +80,10 @@ export function ContactTable({ contacts }: ContactTableProps) {
                   )}
                 </div>
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
+              <TableCell
+                className="max-w-[12rem] truncate text-sm text-muted-foreground"
+                title={contact.email ?? undefined}
+              >
                 {contact.email ?? "—"}
               </TableCell>
               <TableCell>

@@ -7,6 +7,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -38,13 +39,14 @@ export function JournalEntryTable({
         <TableBody>
           {entries.map((e) => (
             <TableRow key={e.id}>
-              <TableCell className="whitespace-nowrap font-mono text-sm">
+              <TableCell className="font-mono text-sm">
                 {formatDate(e.entryDate)}
               </TableCell>
-              <TableCell>
+              <TableCell className={tableNameCellClass}>
                 <Link
-                  className="text-primary underline-offset-4 hover:underline"
+                  className="block truncate text-primary underline-offset-4 hover:underline"
                   href={`/contabilidad/asientos/${e.id}${q}`}
+                  title={e.description}
                 >
                   {e.description}
                 </Link>

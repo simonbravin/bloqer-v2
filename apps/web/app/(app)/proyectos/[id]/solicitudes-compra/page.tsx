@@ -191,7 +191,7 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="p-0">
+                <TableCell colSpan={6} className="whitespace-normal p-0">
                   <ListEmptyState
                     className="rounded-none border-0"
                     title={

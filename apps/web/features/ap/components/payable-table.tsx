@@ -8,7 +8,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableStickyNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -62,7 +64,12 @@ export function PayableTable({
         <TableBody>
           {payables.map((p) => (
             <TableRow key={p.id}>
-              <TableCell className="font-medium">{p.supplierName}</TableCell>
+              <TableCell
+                className={cn(tableStickyNameCellClass, "font-medium")}
+                title={p.supplierName}
+              >
+                {p.supplierName}
+              </TableCell>
               <TableCell className="text-sm">{formatDate(p.dueDate)}</TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {p.supplierInvoiceCode && p.supplierInvoiceId && supplierInvoiceHrefPrefix ? (

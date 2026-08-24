@@ -9,7 +9,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import type { InternalTransferView } from "@bloqer/services";
@@ -39,8 +41,18 @@ export function InternalTransferTable({ transfers }: { transfers: InternalTransf
           {transfers.map((t) => (
             <TableRow key={t.id}>
               <TableCell className="text-sm">{formatDate(t.transferDate)}</TableCell>
-              <TableCell className="text-sm">{t.sourceAccountName}</TableCell>
-              <TableCell className="text-sm">{t.destinationAccountName}</TableCell>
+              <TableCell
+                className={cn(tableNameCellClass, "text-sm")}
+                title={t.sourceAccountName}
+              >
+                {t.sourceAccountName}
+              </TableCell>
+              <TableCell
+                className="max-w-[12rem] truncate text-sm"
+                title={t.destinationAccountName}
+              >
+                {t.destinationAccountName}
+              </TableCell>
               <TableCell className="text-sm">{t.currency}</TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">
                 {formatMoneyAmount(t.amount)} {t.currency}

@@ -9,7 +9,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
@@ -73,8 +75,13 @@ export function ProjectTable({ projects }: ProjectTableProps) {
           {sorted.map((p) => (
             <TableRow key={p.id}>
               <TableCell className="font-mono text-sm">{p.code}</TableCell>
-              <TableCell className="font-medium">{p.name}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">
+              <TableCell className={cn(tableNameCellClass, "font-medium")} title={p.name}>
+                {p.name}
+              </TableCell>
+              <TableCell
+                className="max-w-[12rem] truncate text-sm text-muted-foreground"
+                title={p.client.fantasyName ?? p.client.legalName}
+              >
                 {p.client.fantasyName ?? p.client.legalName}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">{TYPE_LABELS[p.type]}</TableCell>

@@ -12,7 +12,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableStickyNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { AgingBucketBadge } from "./aging-bucket-badge";
 
@@ -35,7 +37,7 @@ const STATUS_LABELS: Record<string, string> = {
 function ItemRows({ items }: { items: AgingItem[] }) {
   return (
     <TableRow>
-      <TableCell colSpan={8} className="p-0">
+      <TableCell colSpan={8} className="whitespace-normal p-0">
         <TableScroll>
           <Table className="text-xs">
             <TableHeader>
@@ -102,18 +104,21 @@ function GroupRow({
   return (
     <>
       <TableRow>
-        <TableCell className="font-medium">
+        <TableCell
+          className={cn(tableStickyNameCellClass, "font-medium")}
+          title={row.contactName}
+        >
           <button
             type="button"
             onClick={onToggle}
             disabled={!hasItems}
             aria-expanded={hasItems ? expanded : undefined}
-            className="flex w-full items-center text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+            className="flex w-full min-w-0 items-center truncate text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
           >
-            <span className="mr-2 text-muted-foreground" aria-hidden>
+            <span className="mr-2 shrink-0 text-muted-foreground" aria-hidden>
               {hasItems ? (expanded ? "▾" : "▸") : "•"}
             </span>
-            {row.contactName}
+            <span className="truncate">{row.contactName}</span>
           </button>
         </TableCell>
         <TableCell className="text-xs text-muted-foreground">

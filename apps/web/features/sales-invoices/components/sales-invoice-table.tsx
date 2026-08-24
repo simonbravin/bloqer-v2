@@ -7,7 +7,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SalesInvoiceStatusBadge } from "./sales-invoice-status-badge";
@@ -33,8 +35,8 @@ export function SalesInvoiceTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-28">N°</TableHead>
-            <TableHead className="w-16">Tipo</TableHead>
+            <TableHead>N°</TableHead>
+            <TableHead>Tipo</TableHead>
             <TableHead>Cliente</TableHead>
             <TableHead>Emisión / Vto.</TableHead>
             <TableHead>Estado</TableHead>
@@ -57,7 +59,9 @@ export function SalesInvoiceTable({
                 <TableCell className="text-sm text-muted-foreground">
                   {letter ?? "—"}
                 </TableCell>
-                <TableCell className="text-sm">{inv.clientName}</TableCell>
+                <TableCell className={cn(tableNameCellClass, "font-medium")} title={inv.clientName}>
+                  {inv.clientName}
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {formatDate(inv.issueDate)} / {formatDate(inv.dueDate)}
                 </TableCell>

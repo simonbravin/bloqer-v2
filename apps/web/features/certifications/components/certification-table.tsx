@@ -33,7 +33,7 @@ export function CertificationTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-24">N°</TableHead>
+            <TableHead>N°</TableHead>
             <TableHead>Período</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead className="text-right">Monto</TableHead>

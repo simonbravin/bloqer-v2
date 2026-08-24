@@ -92,7 +92,12 @@ export function MovementLedgerTable({
               return (
                 <TableRow key={m.id}>
                   <TableCell className="whitespace-nowrap">{formatDate(m.movementDate)}</TableCell>
-                  <TableCell className="text-muted-foreground">{m.accountName}</TableCell>
+                  <TableCell
+                    className="max-w-[10rem] truncate text-muted-foreground"
+                    title={m.accountName}
+                  >
+                    {m.accountName}
+                  </TableCell>
                   <TableCell>
                     <span className={m.isInternalTransfer ? "text-muted-foreground text-xs" : ""}>
                       {TYPE_LABELS[m.type] ?? m.type}

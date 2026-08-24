@@ -7,6 +7,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableStickyNameCellClass,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -49,15 +50,24 @@ export function WarehouseTable({ warehouses }: { warehouses: WarehouseView[] }) 
         <TableBody>
           {warehouses.map((w) => (
             <TableRow key={w.id}>
-              <TableCell className="font-medium">
-                <Link href={`/inventario/depositos/${w.id}`} className="text-primary hover:underline">
+              <TableCell className={tableStickyNameCellClass}>
+                <Link
+                  href={`/inventario/depositos/${w.id}`}
+                  className="block truncate font-medium text-primary hover:underline"
+                  title={w.name}
+                >
                   {w.name}
                 </Link>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {TYPE_LABELS[w.type] ?? w.type}
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">{w.address || "—"}</TableCell>
+              <TableCell
+                className="max-w-[14rem] truncate text-sm text-muted-foreground"
+                title={w.address || undefined}
+              >
+                {w.address || "—"}
+              </TableCell>
               <TableCell>
                 <WarehouseStatusBadge status={w.status} />
               </TableCell>

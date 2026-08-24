@@ -8,7 +8,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { UrlSortableTableHead } from "@/components/ui/url-sortable-table-head";
@@ -45,7 +47,7 @@ export function SupplierInvoiceTable({
         <TableHeader>
           <TableRow>
             <TableHead>Código</TableHead>
-            <TableHead className="w-16">Tipo</TableHead>
+            <TableHead>Tipo</TableHead>
             <TableHead>Proveedor</TableHead>
             <Suspense fallback={<TableHead>Emisión</TableHead>}>
               <UrlSortableTableHead label="Emisión" defaultDir="desc" />
@@ -78,7 +80,12 @@ export function SupplierInvoiceTable({
                 <TableCell className="text-sm text-muted-foreground">
                   {letter ?? "—"}
                 </TableCell>
-                <TableCell className="font-medium">{inv.supplierName}</TableCell>
+                <TableCell
+                  className={cn(tableNameCellClass, "font-medium")}
+                  title={inv.supplierName}
+                >
+                  {inv.supplierName}
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {formatDate(inv.issueDate)}
                 </TableCell>

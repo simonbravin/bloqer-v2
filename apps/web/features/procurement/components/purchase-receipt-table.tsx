@@ -7,7 +7,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PurchaseReceiptStatusBadge } from "./purchase-receipt-status-badge";
@@ -47,11 +49,16 @@ export function PurchaseReceiptTable({
                   {r.purchaseOrderCode}
                 </Link>
               </TableCell>
-              <TableCell className="font-medium">{r.supplierName}</TableCell>
+              <TableCell className={cn(tableNameCellClass, "font-medium")} title={r.supplierName}>
+                {r.supplierName}
+              </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {formatDate(r.receiptDate)}
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
+              <TableCell
+                className="max-w-[8rem] truncate text-sm text-muted-foreground"
+                title={r.receivedByName ?? undefined}
+              >
                 {r.receivedByName ?? "—"}
               </TableCell>
               <TableCell>

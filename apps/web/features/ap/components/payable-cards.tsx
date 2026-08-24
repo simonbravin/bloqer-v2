@@ -38,18 +38,20 @@ export function PayableCards({
         <Link
           key={p.id}
           href={`${hrefPrefix}/${p.id}`}
-          className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+          className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="text-xs text-muted-foreground">Vence {formatDate(p.dueDate)}</span>
-            <div className="flex flex-col items-end gap-1">
+            <span className="shrink-0 text-xs text-muted-foreground">Vence {formatDate(p.dueDate)}</span>
+            <div className="flex shrink-0 flex-col items-end gap-1">
               <PayableStatusBadge status={p.status} />
               <span className="text-xs text-muted-foreground">
                 Pagada: <ObligationSettledCell status={p.status} balanceDue={p.balanceDue} />
               </span>
             </div>
           </div>
-          <h3 className="mt-2 font-semibold leading-snug">{p.supplierName}</h3>
+          <h3 className="mt-2 truncate font-semibold leading-snug" title={p.supplierName}>
+            {p.supplierName}
+          </h3>
           {p.supplierInvoiceCode && p.supplierInvoiceId && supplierInvoiceHrefPrefix ? (
             <p className="mt-1 text-xs text-muted-foreground">{p.supplierInvoiceCode}</p>
           ) : null}

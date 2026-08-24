@@ -21,15 +21,19 @@ export function PurchaseReceiptCards({
         <Link
           key={r.id}
           href={`/proyectos/${projectId}/recepciones/${r.id}`}
-          className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+          className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="font-mono text-xs text-muted-foreground">
+            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
               OC {r.purchaseOrderCode}
             </span>
-            <PurchaseReceiptStatusBadge status={r.status} />
+            <span className="shrink-0">
+              <PurchaseReceiptStatusBadge status={r.status} />
+            </span>
           </div>
-          <p className="mt-2 font-semibold">{r.supplierName}</p>
+          <p className="mt-2 truncate font-semibold" title={r.supplierName}>
+            {r.supplierName}
+          </p>
           {r.lineCount != null ? (
             <p className="mt-1 text-sm text-muted-foreground">
               {r.lineCount === 1 ? "1 línea" : `${r.lineCount} líneas`}
@@ -40,7 +44,7 @@ export function PurchaseReceiptCards({
             {formatDate(r.receiptDate)}
           </p>
           {r.receivedByName ? (
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 truncate text-sm text-muted-foreground" title={r.receivedByName}>
               Recibido por {r.receivedByName}
             </p>
           ) : null}

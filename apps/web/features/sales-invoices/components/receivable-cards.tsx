@@ -42,20 +42,29 @@ export function ReceivableCards({
         <Link
           key={r.id}
           href={receivableDetailHref(r)}
-          className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+          className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="text-xs text-muted-foreground">Vence {formatDate(r.dueDate)}</span>
-            <div className="flex flex-col items-end gap-1">
+            <span className="shrink-0 text-xs text-muted-foreground">Vence {formatDate(r.dueDate)}</span>
+            <div className="flex shrink-0 flex-col items-end gap-1">
               <ReceivableStatusBadge status={r.status} />
               <span className="text-xs text-muted-foreground">
                 Cobrada: <ObligationSettledCell status={r.status} balanceDue={r.balanceDue} />
               </span>
             </div>
           </div>
-          <h3 className="mt-2 font-semibold leading-snug">{r.clientName}</h3>
+          <h3 className="mt-2 truncate font-semibold leading-snug" title={r.clientName}>
+            {r.clientName}
+          </h3>
           {showProjectColumn && r.projectName ? (
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p
+              className="mt-1 truncate text-xs text-muted-foreground"
+              title={
+                r.projectCode && r.projectCode !== "—"
+                  ? `${r.projectCode} · ${r.projectName}`
+                  : r.projectName
+              }
+            >
               {r.projectCode && r.projectCode !== "—" ? `${r.projectCode} · ` : ""}
               {r.projectName}
             </p>

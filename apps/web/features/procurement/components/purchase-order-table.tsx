@@ -8,7 +8,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
@@ -52,7 +54,9 @@ export function PurchaseOrderTable({
                   {order.code}
                 </Link>
               </TableCell>
-              <TableCell className="font-medium">{order.supplierName}</TableCell>
+              <TableCell className={cn(tableNameCellClass, "font-medium")} title={order.supplierName}>
+                {order.supplierName}
+              </TableCell>
               <TableCell className="text-sm text-muted-foreground">{formatDate(order.issueDate)}</TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : "—"}
@@ -63,7 +67,10 @@ export function PurchaseOrderTable({
               <TableCell className="text-right tabular-nums font-medium">
                 {formatMoneyAmount(order.totalAmount, order.currency)}
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
+              <TableCell
+                className="max-w-[8rem] truncate text-sm text-muted-foreground"
+                title={order.approvedByName ?? undefined}
+              >
                 {order.approvedByName ?? "—"}
               </TableCell>
               <TableCell>

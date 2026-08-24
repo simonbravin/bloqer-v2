@@ -25,13 +25,17 @@ export function ProductCards({ products }: { products: ProductView[] }) {
         <Link
           key={p.id}
           href={`/inventario/productos/${p.id}`}
-          className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+          className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="font-mono text-xs text-muted-foreground">{p.sku}</span>
-            <ProductStatusBadge status={p.status} />
+            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{p.sku}</span>
+            <span className="shrink-0">
+              <ProductStatusBadge status={p.status} />
+            </span>
           </div>
-          <h3 className="mt-2 line-clamp-2 font-semibold">{p.name}</h3>
+          <h3 className="mt-2 truncate font-semibold" title={p.name}>
+            {p.name}
+          </h3>
           <p className="mt-2 text-sm text-muted-foreground">
             {[p.category, p.unit].filter(Boolean).join(" · ") || "—"}
           </p>

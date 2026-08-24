@@ -10,7 +10,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import type { PaymentListItem } from "./payment-list";
@@ -42,7 +44,9 @@ export function PaymentTable({
           {payments.map((p) => (
             <TableRow key={p.id}>
               <TableCell className="text-sm">{formatDate(p.paymentDate)}</TableCell>
-              <TableCell className="text-sm">{p.accountName}</TableCell>
+              <TableCell className={cn(tableNameCellClass, "font-medium")} title={p.accountName}>
+                {p.accountName}
+              </TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">
                 {formatMoneyAmount(p.amount, p.currency)}
               </TableCell>

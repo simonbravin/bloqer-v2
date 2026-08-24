@@ -32,15 +32,19 @@ export function BudgetCards({
         <Link
           key={b.id}
           href={`/proyectos/${projectId}/presupuestos/${b.id}`}
-          className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+          className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="font-mono text-xs text-muted-foreground">v{b.versionNumber}</span>
-            <BudgetStatusBadge status={b.status} />
+            <span className="shrink-0 font-mono text-xs text-muted-foreground">v{b.versionNumber}</span>
+            <span className="shrink-0">
+              <BudgetStatusBadge status={b.status} />
+            </span>
           </div>
-          <h3 className="mt-2 line-clamp-2 font-semibold leading-snug">{b.name}</h3>
+          <h3 className="mt-2 truncate font-semibold leading-snug" title={b.name}>
+            {b.name}
+          </h3>
           {b.parentBudgetId && b.parentVersionNumber != null && (
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 truncate text-xs text-muted-foreground">
               Adenda de v{b.parentVersionNumber}
               {b.parentName ? ` — ${b.parentName}` : ""}
             </p>

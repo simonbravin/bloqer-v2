@@ -68,10 +68,8 @@ export function BudgetVarianceTable({ report, projectId }: Props) {
                   {row.wbsCode}
                 </Link>
               </TableCell>
-              <TableCell className="max-w-[min(22rem,40vw)]">
-                <div className="overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
-                  <span className="whitespace-nowrap pr-1">{row.wbsName}</span>
-                </div>
+              <TableCell className="max-w-[min(22rem,40vw)] truncate" title={row.wbsName}>
+                {row.wbsName}
               </TableCell>
               <TableCell className="text-right">{formatMoneyAmount(row.budgetTotalCost)}</TableCell>
               <TableCell className="text-right font-medium">{formatMoneyAmount(row.actualCost)}</TableCell>

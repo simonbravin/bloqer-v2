@@ -9,7 +9,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatCurrencyDisplay } from "@/lib/format";
@@ -66,11 +68,18 @@ export function CashPositionTable({ report }: Props) {
             <TableBody>
               {report.accounts.map((acc) => (
                 <TableRow key={acc.accountId}>
-                  <TableCell className="font-medium">{acc.name}</TableCell>
+                  <TableCell className={cn(tableNameCellClass, "font-medium")} title={acc.name}>
+                    {acc.name}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {TYPE_LABELS[acc.type] ?? acc.type}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{acc.companyName ?? "—"}</TableCell>
+                  <TableCell
+                    className="max-w-[10rem] truncate text-muted-foreground"
+                    title={acc.companyName ?? undefined}
+                  >
+                    {acc.companyName ?? "—"}
+                  </TableCell>
                   <TableCell>{formatCurrencyDisplay(acc.currency)}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {STATUS_LABELS[acc.status] ?? acc.status}

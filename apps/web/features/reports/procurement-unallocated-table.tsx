@@ -35,8 +35,8 @@ export function ProcurementUnallocatedTable({ rows }: Props) {
       <Table className="text-xs">
         <TableHeader className="sticky top-0 z-10 bg-muted/50">
           <TableRow>
-            <TableHead className="w-16">Tipo</TableHead>
-            <TableHead className="w-28">Documento</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Documento</TableHead>
             <TableHead>Proveedor</TableHead>
             <TableHead>Descripción</TableHead>
             <TableHead className="text-right">Monto</TableHead>

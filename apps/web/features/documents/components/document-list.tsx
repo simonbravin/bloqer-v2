@@ -7,6 +7,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameStackCellClass,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -52,28 +53,31 @@ export function DocumentList({ docs, projectId }: Props) {
         <TableBody>
           {docs.map((doc) => (
             <TableRow key={doc.id}>
-              <TableCell>
+              <TableCell className={tableNameStackCellClass}>
                 <Link
                   href={`/proyectos/${projectId}/documentos/${doc.id}`}
-                  className="font-medium hover:underline"
+                  className="block truncate font-medium hover:underline"
+                  title={doc.originalFileName}
                 >
                   {doc.originalFileName}
                 </Link>
                 {doc.description ? (
-                  <p className="mt-0.5 max-w-xs truncate text-xs text-muted-foreground">{doc.description}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground" title={doc.description}>
+                    {doc.description}
+                  </p>
                 ) : null}
               </TableCell>
               <TableCell>
                 <DocumentCategoryBadge category={doc.category} />
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-normal">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <DocumentStatusBadge status={doc.status} />
                   <DocumentStorageBadge storageProvider={doc.storageProvider} />
                 </div>
               </TableCell>
               <TableCell className="text-xs tabular-nums text-muted-foreground">{fmtSize(doc.sizeBytes)}</TableCell>
-              <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{fmtDate(doc.createdAt)}</TableCell>
+              <TableCell className="text-xs text-muted-foreground">{fmtDate(doc.createdAt)}</TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end">
                   <DocumentFileActions

@@ -2,6 +2,25 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Flexible name/description column: takes remaining width and truncates.
+ * Pair with `title` for the full value. Do not use on sticky first columns
+ * (use `tableStickyNameCellClass` instead).
+ */
+export const tableNameCellClass = "max-w-0 w-full truncate"
+
+/**
+ * Name column with stacked lines (e.g. legal + fantasy). Sizes like
+ * `tableNameCellClass` but allows the cell to wrap; truncate each child.
+ */
+export const tableNameStackCellClass = "max-w-0 w-full whitespace-normal"
+
+/**
+ * Sticky first-column name: bounded width so the sticky column does not
+ * collapse under `max-w-0`.
+ */
+export const tableStickyNameCellClass = "min-w-[10rem] max-w-[16rem] truncate"
+
 const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
@@ -73,7 +92,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
+      "h-11 whitespace-nowrap px-3 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
       className
     )}
     {...props}
@@ -87,7 +106,10 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn("p-4 align-middle [&:has([role=checkbox])]:pr-0", className)}
+    className={cn(
+      "whitespace-nowrap p-3 align-middle [&:has([role=checkbox])]:pr-0",
+      className
+    )}
     {...props}
   />
 ))

@@ -27,16 +27,20 @@ export function SalesInvoiceCards({
           <Link
             key={inv.id}
             href={`/proyectos/${projectId}/facturas/${inv.id}`}
-            className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+            className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
           >
             <div className="flex items-start justify-between gap-2">
-              <span className="font-mono text-xs text-muted-foreground">
+              <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
                 {inv.code}
                 {letter ? ` · ${letter}` : ""}
               </span>
-              <SalesInvoiceStatusBadge status={inv.status} />
+              <span className="shrink-0">
+                <SalesInvoiceStatusBadge status={inv.status} />
+              </span>
             </div>
-            <h3 className="mt-2 font-semibold leading-snug">{inv.clientName}</h3>
+            <h3 className="mt-2 truncate font-semibold leading-snug" title={inv.clientName}>
+              {inv.clientName}
+            </h3>
             <p className="mt-1 text-sm text-muted-foreground">
               {formatDate(inv.issueDate)} · vto. {formatDate(inv.dueDate)}
             </p>

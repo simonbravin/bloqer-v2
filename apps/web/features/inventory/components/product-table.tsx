@@ -7,7 +7,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import type { ProductView } from "@bloqer/services";
@@ -48,9 +50,16 @@ export function ProductTable({ products }: { products: ProductView[] }) {
                   {p.sku}
                 </Link>
               </TableCell>
-              <TableCell className="font-medium">{p.name}</TableCell>
+              <TableCell className={cn(tableNameCellClass, "font-medium")} title={p.name}>
+                {p.name}
+              </TableCell>
               <TableCell className="text-sm text-muted-foreground">{p.unit || "—"}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">{p.category || "—"}</TableCell>
+              <TableCell
+                className="max-w-[8rem] truncate text-sm text-muted-foreground"
+                title={p.category || undefined}
+              >
+                {p.category || "—"}
+              </TableCell>
               <TableCell>
                 <ProductStatusBadge status={p.status} />
               </TableCell>

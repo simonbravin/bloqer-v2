@@ -23,15 +23,19 @@ export function PurchaseOrderCards({
         <Link
           key={order.id}
           href={`/proyectos/${projectId}/ordenes-compra/${order.id}`}
-          className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+          className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="font-mono text-xs text-muted-foreground">{order.code}</span>
-            <PurchaseOrderStatusBadge status={order.status} />
+            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{order.code}</span>
+            <span className="shrink-0">
+              <PurchaseOrderStatusBadge status={order.status} />
+            </span>
           </div>
-          <p className="mt-2 font-semibold">{order.supplierName}</p>
+          <p className="mt-2 truncate font-semibold" title={order.supplierName}>
+            {order.supplierName}
+          </p>
           {order.approvedByName ? (
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 truncate text-sm text-muted-foreground" title={order.approvedByName}>
               Aprobado por {order.approvedByName}
             </p>
           ) : null}

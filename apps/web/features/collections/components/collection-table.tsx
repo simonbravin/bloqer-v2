@@ -7,7 +7,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -44,12 +46,17 @@ export function CollectionTable({
           {collections.map((c) => (
             <TableRow key={c.id}>
               <TableCell className="text-sm">{formatDate(c.collectionDate)}</TableCell>
-              <TableCell className="text-sm">{c.accountName}</TableCell>
+              <TableCell className="max-w-[10rem] truncate text-sm" title={c.accountName}>
+                {c.accountName}
+              </TableCell>
               <TableCell className="text-sm">{c.currency}</TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">
                 {formatMoneyAmount(c.amount)}
               </TableCell>
-              <TableCell className="max-w-[180px] truncate text-sm text-muted-foreground">
+              <TableCell
+                className={cn(tableNameCellClass, "text-sm text-muted-foreground")}
+                title={c.notes ?? undefined}
+              >
                 {c.notes ?? "—"}
               </TableCell>
               <TableCell>

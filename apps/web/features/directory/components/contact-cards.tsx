@@ -25,12 +25,18 @@ export function ContactCards({ contacts }: ContactCardsProps) {
         >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="truncate font-semibold">{contact.legalName}</h3>
+              <h3 className="truncate font-semibold" title={contact.legalName}>
+                {contact.legalName}
+              </h3>
               {contact.fantasyName ? (
-                <p className="truncate text-sm text-muted-foreground">{contact.fantasyName}</p>
+                <p className="truncate text-sm text-muted-foreground" title={contact.fantasyName}>
+                  {contact.fantasyName}
+                </p>
               ) : null}
             </div>
-            <ContactStatusBadge status={contact.status} />
+            <span className="shrink-0">
+              <ContactStatusBadge status={contact.status} />
+            </span>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{contact.taxId ?? "—"}</p>
           {contact.email ? (

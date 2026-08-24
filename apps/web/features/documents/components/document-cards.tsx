@@ -29,16 +29,19 @@ export function DocumentCards({
       {docs.map((doc) => (
         <div
           key={doc.id}
-          className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+          className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <Link
             href={`/proyectos/${projectId}/documentos/${doc.id}`}
-            className="line-clamp-2 font-semibold leading-snug hover:underline underline-offset-2"
+            className="truncate font-semibold leading-snug hover:underline underline-offset-2"
+            title={doc.originalFileName}
           >
             {doc.originalFileName}
           </Link>
           {doc.description ? (
-            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{doc.description}</p>
+            <p className="mt-1 truncate text-xs text-muted-foreground" title={doc.description}>
+              {doc.description}
+            </p>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <DocumentCategoryBadge category={doc.category} />

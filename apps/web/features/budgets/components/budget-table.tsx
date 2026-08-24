@@ -6,6 +6,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameStackCellClass,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
@@ -52,10 +53,12 @@ export function BudgetTable({
           {budgets.map((b) => (
             <TableRow key={b.id}>
               <TableCell className="font-mono text-sm text-muted-foreground">v{b.versionNumber}</TableCell>
-              <TableCell>
-                <div className="font-medium">{b.name}</div>
+              <TableCell className={tableNameStackCellClass}>
+                <div className="truncate font-medium" title={b.name}>
+                  {b.name}
+                </div>
                 {b.parentBudgetId && b.parentVersionNumber != null && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="truncate text-xs text-muted-foreground">
                     Adenda de v{b.parentVersionNumber}
                     {b.parentName ? ` — ${b.parentName}` : ""}
                   </p>

@@ -9,7 +9,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SupplierInvoiceStatusBadge } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
@@ -39,7 +41,7 @@ export function CorporateGgRecentInvoices({ invoices }: Props) {
             <TableHeader>
               <TableRow>
                 <TableHead>Código</TableHead>
-                <TableHead className="w-16">Tipo</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead>Proveedor</TableHead>
                 <TableHead>Emisión</TableHead>
                 <TableHead>Período GG</TableHead>
@@ -61,7 +63,9 @@ export function CorporateGgRecentInvoices({ invoices }: Props) {
                   <TableCell className="text-sm text-muted-foreground">
                     {formatInvoiceLetterBadge(inv.invoiceLetter) ?? "—"}
                   </TableCell>
-                  <TableCell className="font-medium">{inv.supplierName}</TableCell>
+                  <TableCell className={cn(tableNameCellClass, "font-medium")} title={inv.supplierName}>
+                    {inv.supplierName}
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDate(inv.issueDate)}
                   </TableCell>

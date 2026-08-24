@@ -6,7 +6,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -43,7 +45,9 @@ export function TreasuryAccountTable({ accounts }: { accounts: TreasuryAccountLi
         <TableBody>
           {accounts.map((acc) => (
             <TableRow key={acc.id}>
-              <TableCell className="font-medium">{acc.name}</TableCell>
+              <TableCell className={cn(tableNameCellClass, "font-medium")} title={acc.name}>
+                {acc.name}
+              </TableCell>
               <TableCell className="text-sm text-muted-foreground">{TYPE_LABELS[acc.type]}</TableCell>
               <TableCell className="text-sm">{acc.currency}</TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">

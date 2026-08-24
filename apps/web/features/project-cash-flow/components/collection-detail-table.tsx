@@ -8,7 +8,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatMoneyAmount } from "@/lib/format-money";
 
@@ -40,9 +42,16 @@ export function CollectionDetailTable({ collections, currency }: Props) {
             {collections.map((c) => (
               <TableRow key={c.collectionId}>
                 <TableCell className="whitespace-nowrap">{formatDate(c.date)}</TableCell>
-                <TableCell className="font-medium">{c.clientName}</TableCell>
+                <TableCell className={cn(tableNameCellClass, "font-medium")} title={c.clientName}>
+                  {c.clientName}
+                </TableCell>
                 <TableCell className="text-muted-foreground">#{c.invoiceNumber}</TableCell>
-                <TableCell className="text-muted-foreground text-xs">{c.accountName}</TableCell>
+                <TableCell
+                  className="max-w-[10rem] truncate text-muted-foreground text-xs"
+                  title={c.accountName}
+                >
+                  {c.accountName}
+                </TableCell>
                 <TableCell className="text-right tabular-nums font-mono text-emerald-600 dark:text-emerald-400">
                   {formatMoneyAmount(c.amount)}
                 </TableCell>
