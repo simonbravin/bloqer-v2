@@ -4,6 +4,7 @@ import type { CreateWarehouseInput, UpdateWarehouseInput } from "@bloqer/validat
 import { log } from "../audit/audit.service";
 import { assertInventoryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -66,9 +67,7 @@ export async function createWarehouse(
   }
 
   if (input.projectId) {
-    const project = await prisma.project.findUnique({ where: { id: input.projectId } });
-    if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-    if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    const project = await requireProjectInTenant(input.projectId, ctx.tenantId);
     if (project.companyId && project.companyId !== input.companyId) {
       throw new ServiceError("VALIDATION", "El proyecto no pertenece a la empresa seleccionada");
     }

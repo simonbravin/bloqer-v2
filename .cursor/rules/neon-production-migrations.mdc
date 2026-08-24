@@ -18,10 +18,11 @@ El proyecto Neon `bloqer-production` (`broad-wave-70486870`, sa-east-1) **no** e
 
 ## Cuando el usuario pide migrar / “actualizá la DB” / fix de columnas en portal
 
-1. **Aplicar `prisma migrate deploy` en Neon `production`** (`ep-cold-mouse…`). Obligatorio.
+1. **Aplicar `prisma migrate deploy` en Neon `production`** (`ep-cold-mouse…`). Obligatorio si el build aún no lo hizo.
 2. No asumir que `pnpm db:migrate:deploy` con el `.env` local alcanza: ese archivo suele apuntar a **`dev`**.
 3. Verificar con SQL en branch `production` (`_prisma_migrations` + columnas) antes de dar por cerrado.
 4. Si también querés alinear `dev`, hacelo **después** y decilo explícitamente; nunca al revés como único paso.
+5. **Vercel:** el build de `bloqer-v2-web` corre `packages/database/scripts/vercel-migrate-if-needed.mjs` (idempotente) cuando `VERCEL=1`.
 
 ## Síntoma clásico
 

@@ -20,6 +20,7 @@ import { resolvePagination } from "../finance/pagination";
 import { assertCanCancelReceivableDirect } from "./receivable-cancel-guards";
 import { deriveObligationDisplayStatus, hasOpenObligationBalance, isObligationOverdue, OBLIGATION_OPEN_BALANCE_EPSILON } from "../finance/obligation-date";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import {
   computeObligationBalanceDue,
   normalizeObligationBalanceDue,
@@ -107,9 +108,7 @@ export async function listReceivablesByProject(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const { skip, take } = resolvePagination({
     page: filters?.page,
@@ -155,9 +154,7 @@ export async function listCollectibleReceivablesByProject(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const rows = await prisma.receivable.findMany({
     where: {
@@ -336,9 +333,7 @@ export async function listReceivablesFieldBoard(
     if (!canViewArProjectArea(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
     }
-    const project = await prisma.project.findUnique({ where: { id: scope.projectId } });
-    if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-    if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    await requireProjectInTenant(scope.projectId, ctx.tenantId);
     where.projectId = scope.projectId;
   } else {
     if (!canViewCompanyAr(ctx.roles)) {
@@ -434,9 +429,7 @@ export async function summarizeReceivablesByProject(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const rows = await prisma.receivable.findMany({
     where: { projectId, tenantId: ctx.tenantId },

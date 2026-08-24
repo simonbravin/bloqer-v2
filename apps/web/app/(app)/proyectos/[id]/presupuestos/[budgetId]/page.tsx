@@ -73,14 +73,20 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
   let editability = { editable: false, approvedOverrideActive: false };
   let policyFlags = { tenantAllow: false, projectAllow: false, canManagePolicy: false };
   try {
-    [budget, tree, lifecycleLog, scheduleBaseline, policyFlags] = await Promise.all([
+    [budget, tree, lifecycleLog, scheduleBaseline] = await Promise.all([
       getBudgetById(budgetId, ctx),
       getWbsTree(budgetId, ctx),
       getBudgetLifecycleLog(budgetId, ctx),
       isBudgetScheduleBaseline(budgetId, ctx.tenantId),
-      getProjectApprovedBudgetEditFlags(projectId, ctx),
     ]);
-    editability = await resolveBudgetEconomicEditability(budget);
+    try {
+      policyFlags = await getProjectApprovedBudgetEditFlags(projectId, ctx);
+      editability = await resolveBudgetEconomicEditability(budget);
+    } catch {
+      // D-088 columns missing or policy unreadable: keep budget view read-only.
+      editability = { editable: false, approvedOverrideActive: false };
+      policyFlags = { tenantAllow: false, projectAllow: false, canManagePolicy: false };
+    }
     if (budget.parentBudgetId) {
       const siblings = await listBudgetsByProject(projectId, ctx);
       const parent = siblings.find((b) => b.id === budget!.parentBudgetId);
@@ -93,9 +99,8 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
       }
     }
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) {
-      notFound();
-    }
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 

@@ -87,16 +87,27 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
   let filterError: string | null = null;
   let wbsLoadError = false;
 
+  let pickList: Awaited<ReturnType<typeof getJobsiteLogFormPickList>>;
+  let wbsProgressSnapshot: Awaited<ReturnType<typeof getWbsIncrementalProgressSnapshot>>;
+  let scheduleWbsIds = new Set<string>();
+  let wbsOptions: Awaited<ReturnType<typeof listProjectWbsItemsForLog>> = [];
+
   // Form picklists independent of list filters — CONFLICT on filters must not wipe WBS options.
-  const [pickList, wbsProgressSnapshot, scheduleWbsIds, wbsOptions] = await Promise.all([
-    getJobsiteLogFormPickList(projectId, ctx),
-    getWbsIncrementalProgressSnapshot(projectId, ctx),
-    getScheduleLinkedWbsNodeIds(projectId, ctx).then((ids) => new Set(ids)),
-    listProjectWbsItemsForLog(projectId, ctx).catch(() => {
-      wbsLoadError = true;
-      return [] as Awaited<ReturnType<typeof listProjectWbsItemsForLog>>;
-    }),
-  ]);
+  try {
+    [pickList, wbsProgressSnapshot, scheduleWbsIds, wbsOptions] = await Promise.all([
+      getJobsiteLogFormPickList(projectId, ctx),
+      getWbsIncrementalProgressSnapshot(projectId, ctx),
+      getScheduleLinkedWbsNodeIds(projectId, ctx).then((ids) => new Set(ids)),
+      listProjectWbsItemsForLog(projectId, ctx).catch(() => {
+        wbsLoadError = true;
+        return [] as Awaited<ReturnType<typeof listProjectWbsItemsForLog>>;
+      }),
+    ]);
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
 
   try {
     logs = await listJobsiteLogsByProject(projectId, filters, ctx);
@@ -109,7 +120,8 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
       ctx,
     );
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     if (err instanceof ServiceError && err.code === "CONFLICT") {
       filterError = err.message;
       logs = [];

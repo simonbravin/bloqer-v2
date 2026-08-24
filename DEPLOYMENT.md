@@ -54,14 +54,18 @@ cd ../.. && pnpm build --filter @bloqer/web
 
 Set in Vercel project settings → Build & Development Settings → Build Command.
 
+On Vercel (`VERCEL=1`), the build runs **`prisma migrate deploy`** automatically
+(`packages/database/scripts/vercel-migrate-if-needed.mjs` via `ci:prisma` and
+`@bloqer/database` build) against the deployment’s `DATABASE_URL` / `DIRECT_URL`
+(production or preview Neon branch). Local builds skip it.
+
 ## Preview Deployment Checklist
 
 - [ ] `DATABASE_URL` and `DIRECT_URL` point to Neon preview branch (via Neon-Vercel integration)
 - [ ] `AUTH_SECRET` set in Vercel environment (preview)
 - [ ] `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` set in Vercel environment (preview)
 - [ ] `AUTH_URL` set to the preview URL if OAuth redirect fails
-- [ ] Schema is in sync: run `db:push` or ensure migration was applied
-
+- [ ] Schema is in sync: migrate deploy runs on the Vercel build (or apply manually if build skipped migrate)
 ## Seed (dev only)
 
 ```bash

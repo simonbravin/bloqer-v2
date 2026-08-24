@@ -8,6 +8,7 @@ import { createSystemNotification } from "../notifications/notification.service"
 import { resolveNotificationAudience } from "../notifications/notification-audience.service";
 import { formatCertificationCode, formatNotificationTitle } from "../notifications/notification-copy";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { ServiceContext, ServiceError } from "../types";
 import { _computePreviousQty, _recalcCertificationTotals } from "./certification-calc.service";
 import {
@@ -78,9 +79,7 @@ export async function listCertificationsByProject(
   if (!can(ctx.roles, "VIEW", "CERTIFICATIONS")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver certificaciones");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const certs = await prisma.certification.findMany({
     where: { projectId, tenantId: ctx.tenantId },

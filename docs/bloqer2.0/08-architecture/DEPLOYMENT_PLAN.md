@@ -26,7 +26,7 @@ Elegir **una** de estas dos convenciones (documentar la elegida en el proyecto V
 
 4. **Env mínimo en Vercel:** `DATABASE_URL`, `DIRECT_URL`, **`AUTH_SECRET`**, **`AUTH_URL`** (URL pública del deploy), **`AUTH_GOOGLE_ID`** / **`AUTH_GOOGLE_SECRET`**; opcionalmente **`NEXT_PUBLIC_APP_URL`** o **`APP_URL`** para links absolutos.
 5. **Build:** primer deploy de aplicación (Next.js build); sin migraciones aplicadas aún, rutas que lean DB fallarán hasta el paso 6.
-6. **Migraciones (producción):** ejecutar **`prisma migrate deploy`** contra la base del entorno — **no** usar **`prisma db push`** en bases compartidas o producción ([`MIGRATION_STRATEGY.md`](./MIGRATION_STRATEGY.md)). Comando documentado: `pnpm --filter @bloqer/database db:migrate:deploy`.
+6. **Migraciones (producción):** el build de Vercel ejecuta **`prisma migrate deploy`** automáticamente cuando `VERCEL=1` (script `packages/database/scripts/vercel-migrate-if-needed.mjs`). También se puede correr a mano: `pnpm --filter @bloqer/database db:migrate:deploy` contra Neon **`production`** (`ep-cold-mouse…`). **No** usar **`prisma db push`** en bases compartidas o producción ([`MIGRATION_STRATEGY.md`](./MIGRATION_STRATEGY.md)).
 7. **Seed / bootstrap:** si aplica, `pnpm --filter @bloqer/database db:seed` con **`SEED_USER_EMAIL`** solo en entornos no productivos, o flujo manual acordado para primer tenant + usuario.
 8. **Platform superadmin:** `PLATFORM_SUPERADMIN_EMAILS` y/o filas `PlatformAdmin` según [`PLATFORM_SUPERADMIN_ARCHITECTURE.md`](./PLATFORM_SUPERADMIN_ARCHITECTURE.md).
 9. **R2:** crear bucket + API token; setear `R2_*`; hasta entonces uploads usan comportamiento deshabilitado / placeholder sin tumbar la app.

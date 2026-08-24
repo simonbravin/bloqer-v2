@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getTenantDashboard, isPlatformSuperadmin } from "@bloqer/services";
+import { getTenantDashboard, isPlatformSuperadmin, ServiceError } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import {
   DashboardAccountingCard,
@@ -28,7 +28,13 @@ async function DesktopDashboard() {
   const ctx = await buildTenantServiceContext();
   if (!ctx) redirect("/login");
 
-  const dash = await getTenantDashboard(ctx);
+  let dash;
+  try {
+    dash = await getTenantDashboard(ctx);
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/login");
+    throw err;
+  }
   const updatedAt = formatDateTime(dash.generatedAt);
 
   return (

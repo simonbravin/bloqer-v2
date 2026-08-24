@@ -7,6 +7,7 @@ import { ServiceContext, ServiceError } from "../types";
 
 import { canViewBudgetsArea } from "../project/project-nav-guards";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 
 export { canViewBudgetsArea };
 
@@ -228,9 +229,7 @@ export async function listBudgetsByProject(
   if (!canViewBudgetsArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to view budgets");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   return prisma.budget.findMany({
     where: { projectId, tenantId: ctx.tenantId },
@@ -278,7 +277,11 @@ export async function createBudget(
   if (!can(ctx.roles, "EDIT", "BUDGETS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to create budgets");
   }
-  const project = await assertProjectAllowsBudgetPlanning(input.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(input.projectId, ctx.tenantId);
+  const projectCountry = await prisma.project.findUnique({
+    where: { id: input.projectId },
+    select: { country: true },
+  });
 
   const { name, currency, internalNotes, projectId, parentBudgetId, overheadPct, financialCostPct, financialDaysAvg, profitPct, taxPct } = input;
 
@@ -353,7 +356,7 @@ export async function createBudget(
           parentBudgetId: resolvedParentId,
           versionNumber,
           name,
-          currency: currency ?? (project.country === "AR" ? "ARS" : "USD"),
+          currency: currency ?? (projectCountry?.country === "AR" ? "ARS" : "USD"),
           internalNotes,
           createdBy: ctx.actorUserId,
           updatedBy: ctx.actorUserId,

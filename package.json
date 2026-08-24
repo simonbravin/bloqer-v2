@@ -18,7 +18,7 @@
     "db:migrate:status": "dotenv -e .env -o -- pnpm --filter @bloqer/database exec prisma migrate status",
     "db:seed": "dotenv -e .env -o -- pnpm --filter @bloqer/database db:seed",
     "db:seed:docs": "dotenv -e .env -o -- node docs/bloqer2.0/guides/capture/run-seed-docs.js",
-    "ci:prisma": "pnpm --filter @bloqer/database exec prisma generate",
+    "ci:prisma": "pnpm --filter @bloqer/database run vercel-migrate && pnpm --filter @bloqer/database exec prisma generate",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\" --ignore-path .gitignore",
     "docs:manifest": "node docs/bloqer2.0/guides/capture/parse-captures.js",
     "docs:check-demo-env": "dotenv -e .env -o -- node docs/bloqer2.0/guides/capture/check-demo-env.js",

@@ -2,6 +2,7 @@ import { Prisma, prisma } from "@bloqer/database";
 import { canViewArProjectArea } from "./ar-access";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export type ProjectBillingVsCollectionsSummary = {
@@ -18,9 +19,7 @@ export async function summarizeProjectBillingVsCollections(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const baseWhere = { projectId, tenantId: ctx.tenantId };
 

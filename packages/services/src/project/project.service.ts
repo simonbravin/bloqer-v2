@@ -39,8 +39,23 @@ export {
   assertProjectAllowsBudgetPlanning,
   getProjectOperationalMutationBlockReason,
 } from "./project-operational-guard";
+export { requireProjectInTenant, type ProjectTenantScope } from "./require-project-in-tenant";
 
-export type ProjectWithClient = Project & {
+export type ProjectWithClient = Omit<Project, "allowApprovedBudgetEconomicEdits"> & {
+  allowApprovedBudgetEconomicEdits?: boolean;
+  client: Pick<Contact, "id" | "legalName" | "fantasyName">;
+};
+
+/**
+ * List/card row: explicit Prisma select so new Project columns (e.g. D-088 flags)
+ * are not required for `/proyectos` to render if a deploy races migrations.
+ */
+export type ProjectListItem = {
+  id: string;
+  code: string;
+  name: string;
+  status: ProjectStatus;
+  type: Project["type"];
   client: Pick<Contact, "id" | "legalName" | "fantasyName">;
 };
 
@@ -112,7 +127,33 @@ export async function getProjectById(id: string, ctx: ServiceContext): Promise<P
   }
   const project = await prisma.project.findUnique({
     where: { id },
-    include: { client: { select: { id: true, legalName: true, fantasyName: true } } },
+    select: {
+      id: true,
+      tenantId: true,
+      companyId: true,
+      clientContactId: true,
+      code: true,
+      name: true,
+      description: true,
+      address: true,
+      city: true,
+      province: true,
+      country: true,
+      type: true,
+      status: true,
+      statusBeforeCancellation: true,
+      cancellationReason: true,
+      cancelledAt: true,
+      startDate: true,
+      expectedEndDate: true,
+      actualEndDate: true,
+      notes: true,
+      createdBy: true,
+      updatedBy: true,
+      createdAt: true,
+      updatedAt: true,
+      client: { select: { id: true, legalName: true, fantasyName: true } },
+    },
   });
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -122,7 +163,7 @@ export async function getProjectById(id: string, ctx: ServiceContext): Promise<P
 export async function listProjects(
   filters: ListProjectsInput,
   ctx: ServiceContext,
-): Promise<{ data: ProjectWithClient[]; total: number }> {
+): Promise<{ data: ProjectListItem[]; total: number }> {
   if (!can(ctx.roles, "VIEW", "PROJECTS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to view projects");
   }
@@ -148,7 +189,14 @@ export async function listProjects(
   const [data, total] = await Promise.all([
     prisma.project.findMany({
       where,
-      include: { client: { select: { id: true, legalName: true, fantasyName: true } } },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        status: true,
+        type: true,
+        client: { select: { id: true, legalName: true, fantasyName: true } },
+      },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,

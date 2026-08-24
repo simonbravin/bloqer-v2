@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { ProjectType } from "@bloqer/database";
-import type { ProjectWithClient } from "@bloqer/services";
+import type { ProjectListItem } from "@bloqer/services";
 import { ProjectStatusBadge } from "./project-status-badge";
 
 const TYPE_LABELS: Record<ProjectType, string> = {
@@ -11,7 +11,7 @@ const TYPE_LABELS: Record<ProjectType, string> = {
 };
 
 interface ProjectCardsProps {
-  projects: ProjectWithClient[];
+  projects: ProjectListItem[];
 }
 
 export function ProjectCards({ projects }: ProjectCardsProps) {

@@ -11,6 +11,7 @@ import {
   canViewProcurementProjectArea,
 } from "./procurement-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { serializeQtyDecimal } from "../finance/money-decimal";
 import {
   resolveUserDisplayNames,
@@ -154,9 +155,7 @@ export async function listReceiptsByProject(
   if (!canViewProcurementProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver recepciones");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const receipts = await prisma.purchaseReceipt.findMany({
     where: { projectId, tenantId: ctx.tenantId },

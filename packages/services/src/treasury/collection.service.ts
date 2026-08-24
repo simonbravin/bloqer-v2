@@ -14,6 +14,7 @@ import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal"
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { ensureDraftJournalFromCollection } from "../accounting/accounting-auto-draft.service";
 import {
   assertJournalAllowsOperationalCancel,
@@ -77,9 +78,7 @@ export async function listCollectionsByProject(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cobranzas");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const { skip, take } = resolvePagination({
     page: filters?.page,

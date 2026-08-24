@@ -33,7 +33,7 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
   try {
     dashboard = await getProjectOverviewDashboard(ctx, id);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
@@ -43,7 +43,7 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
     try {
       fullProject = await getProjectById(id, ctx);
     } catch (err) {
-      if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+      if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
       if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
       throw err;
     }

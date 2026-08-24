@@ -12,6 +12,7 @@ import {
   normalizeObligationBalanceDue,
 } from "../finance/obligation-balance";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import {
   aggregateCorporatePayableBalances,
   fetchCorporatePayableSnapshotRows,
@@ -95,9 +96,7 @@ export async function listPayablesByProject(
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const { skip, take } = resolvePagination({
     page: filters?.page,
@@ -137,9 +136,7 @@ export async function summarizePayablesByProject(
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const rows = await prisma.payable.findMany({
     where: { projectId, tenantId: ctx.tenantId },
@@ -311,9 +308,7 @@ export async function listPayablesFieldBoard(
     if (!canViewApProjectArea(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar");
     }
-    const project = await prisma.project.findUnique({ where: { id: scope.projectId } });
-    if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-    if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    await requireProjectInTenant(scope.projectId, ctx.tenantId);
     where.projectId = scope.projectId;
   } else {
     if (!canViewCompanyAp(ctx.roles)) {

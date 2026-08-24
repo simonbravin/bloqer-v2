@@ -8,6 +8,7 @@ import {
 } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { getCertificationEvolutionReport } from "./certification-evolution.service";
 import { defaultReportDateRange, monthKey, monthLabel } from "./report-month";
 import { canConsolidateToArs, parseCurrencyView, type CurrencyView } from "./report-currency-view";
@@ -71,9 +72,7 @@ export async function getProjectIncomeExpenseReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver ingresos vs gastos");
   }
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const range =
     filters.dateFrom && filters.dateTo

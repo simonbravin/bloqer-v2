@@ -9,12 +9,13 @@
   },
   "scripts": {
     "postinstall": "prisma generate",
-    "build": "prisma generate",
+    "build": "node ./scripts/vercel-migrate-if-needed.mjs && prisma generate",
     "typecheck": "tsc --noEmit",
     "db:generate": "dotenv -e ../../.env -o -- prisma generate",
     "db:push": "dotenv -e ../../.env -o -- tsx src/assert-non-production-db-cli.ts && dotenv -e ../../.env -o -- prisma db push",
     "db:migrate": "dotenv -e ../../.env -o -- tsx src/assert-non-production-db-cli.ts && dotenv -e ../../.env -o -- prisma migrate dev",
     "db:migrate:deploy": "dotenv -e ../../.env -o -- prisma migrate deploy",
+    "vercel-migrate": "node ./scripts/vercel-migrate-if-needed.mjs",
     "db:studio": "dotenv -e ../../.env -o -- prisma studio",
     "db:seed": "dotenv -e ../../.env -o -- tsx src/seed.ts"
   },

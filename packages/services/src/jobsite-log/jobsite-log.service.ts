@@ -23,6 +23,7 @@ import {
   type JobsiteLogProgressSnapshot,
 } from "./jobsite-log-guards";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { resolveActiveCompanyId } from "../company/company.service";
 import { assertCompanyMatchesProject } from "../procurement/procurement-wbs";
 import { sortTreeOrder, toIsoDateInTimeZone } from "@bloqer/utils";
@@ -690,9 +691,7 @@ export async function listJobsiteLogsByProject(
   if (!canViewJobsiteLogArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver partes de obra");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const f = filters ?? {};
   const dateOnlyRe = /^\d{4}-\d{2}-\d{2}$/;

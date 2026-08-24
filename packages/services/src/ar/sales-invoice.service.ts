@@ -19,6 +19,7 @@ import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { isCrossCompany } from "../company-scope";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { ensureDraftJournalFromSalesInvoice } from "../accounting/accounting-auto-draft.service";
 import {
   assertJournalAllowsOperationalCancel,
@@ -151,9 +152,7 @@ export async function listInvoicesByProject(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const { skip, take } = resolvePagination({
     page: filters?.page,
@@ -188,9 +187,7 @@ export async function countOpenSalesInvoicesByProject(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de venta");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   return prisma.salesInvoice.count({
     where: { projectId, tenantId: ctx.tenantId, status: "ISSUED" },

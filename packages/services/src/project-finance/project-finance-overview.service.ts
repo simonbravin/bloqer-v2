@@ -192,7 +192,12 @@ export async function getProjectFinanceOverview(
         warnings.push({ module: "AR", section: "ar", reason: "NO_DATA" });
       }
 
-      const openInvoicesCount = await countOpenSalesInvoicesByProject(projectId, ctx);
+      let openInvoicesCount = 0;
+      try {
+        openInvoicesCount = await countOpenSalesInvoicesByProject(projectId, ctx);
+      } catch {
+        warnings.push({ module: "AR", section: "open_invoices", reason: "NO_DATA" });
+      }
 
       sections.ar = {
         enabled: true,
@@ -266,7 +271,12 @@ export async function getProjectFinanceOverview(
         warnings.push({ module: "AP", section: "ap", reason: "NO_DATA" });
       }
 
-      const openSupplierInvoicesCount = await countOpenSupplierInvoicesByProject(projectId, ctx);
+      let openSupplierInvoicesCount = 0;
+      try {
+        openSupplierInvoicesCount = await countOpenSupplierInvoicesByProject(projectId, ctx);
+      } catch {
+        warnings.push({ module: "AP", section: "open_supplier_invoices", reason: "NO_DATA" });
+      }
 
       sections.ap = {
         enabled: true,

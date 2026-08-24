@@ -1,6 +1,9 @@
-import { prisma } from "@bloqer/database";
-import type { Project, ProjectStatus } from "@bloqer/database";
+import type { ProjectStatus } from "@bloqer/database";
 import { ServiceError } from "../types";
+import {
+  requireProjectInTenant,
+  type ProjectTenantScope,
+} from "./require-project-in-tenant";
 
 const STATUS_MESSAGES: Record<ProjectStatus, string> = {
   DRAFT: "La obra está en borrador: no se permiten operaciones de compra, certificación ni movimientos financieros",
@@ -18,10 +21,8 @@ export function getProjectOperationalMutationBlockReason(status: ProjectStatus):
 export async function assertProjectAllowsOperationalMutation(
   projectId: string,
   tenantId: string,
-): Promise<Project> {
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+): Promise<ProjectTenantScope> {
+  const project = await requireProjectInTenant(projectId, tenantId);
 
   if (project.status !== "ACTIVE") {
     const message =
@@ -37,10 +38,8 @@ export async function assertProjectAllowsOperationalMutation(
 export async function assertProjectAllowsBudgetPlanning(
   projectId: string,
   tenantId: string,
-): Promise<Project> {
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+): Promise<ProjectTenantScope> {
+  const project = await requireProjectInTenant(projectId, tenantId);
 
   if (project.status === "ON_HOLD") {
     throw new ServiceError("CONFLICT", "La obra está pausada: no se pueden modificar presupuestos hasta reanudarla");

@@ -12,6 +12,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { canRegisterApPayment, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { notifyPaymentConfirmed } from "./ap-notifications.service";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { ensureDraftJournalFromPayment } from "../accounting/accounting-auto-draft.service";
 import {
   assertJournalAllowsOperationalCancel,
@@ -93,9 +94,7 @@ export async function listPaymentsByProject(
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver pagos");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const { skip, take } = resolvePagination({
     page: filters?.page,

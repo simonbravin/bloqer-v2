@@ -26,6 +26,7 @@ import {
   statusChangeAuditAction,
 } from "./schedule-audit";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
 
 const MS_PER_DAY = 86_400_000;
@@ -35,12 +36,7 @@ async function assertProjectScheduleMutation(projectId: string, ctx: ServiceCont
 }
 
 async function assertProjectAccess(projectId: string, ctx: ServiceContext) {
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) {
-    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  }
-  return project;
+  return requireProjectInTenant(projectId, ctx.tenantId);
 }
 
 async function getScheduleForProject(projectId: string, ctx: ServiceContext) {
@@ -246,7 +242,7 @@ export async function importScheduleFromBudget(
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
   }
   await assertProjectScheduleMutation(projectId, ctx);
-  const project = await assertProjectAccess(projectId, ctx);
+  await assertProjectAccess(projectId, ctx);
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "SCHEDULE");
 
@@ -294,9 +290,15 @@ export async function importScheduleFromBudget(
 
   let placeholderStart: Date | null = null;
   let placeholderEnd: Date | null = null;
-  if (placeholderDates && project.startDate && project.expectedEndDate) {
-    placeholderStart = project.startDate;
-    placeholderEnd = project.expectedEndDate;
+  if (placeholderDates) {
+    const projectDates = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { startDate: true, expectedEndDate: true },
+    });
+    if (projectDates?.startDate && projectDates?.expectedEndDate) {
+      placeholderStart = projectDates.startDate;
+      placeholderEnd = projectDates.expectedEndDate;
+    }
   }
 
   const itemNodes = wbsNodes.filter((n) => n.type === "ITEM");

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getFieldHome } from "@bloqer/services";
+import { getFieldHome, ServiceError } from "@bloqer/services";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { LAST_PROJECT_COOKIE, isProjectIdValue } from "@/lib/last-project-cookie";
@@ -18,10 +18,16 @@ export async function FieldHomeLoader() {
   const raw = jar.get(LAST_PROJECT_COOKIE)?.value ?? null;
   const preferred = isProjectIdValue(raw) ? raw : null;
 
-  const home = await getFieldHome(ctx, {
-    preferredProjectId: preferred,
-    pendingCounts: await getCachedFieldPendingCounts(ctx),
-  });
+  let home;
+  try {
+    home = await getFieldHome(ctx, {
+      preferredProjectId: preferred,
+      pendingCounts: await getCachedFieldPendingCounts(ctx),
+    });
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/login");
+    throw err;
+  }
 
   if (home.projects.length === 0) {
     return (

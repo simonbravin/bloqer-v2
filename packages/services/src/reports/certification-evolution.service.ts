@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { compareDecimal } from "@bloqer/utils";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
@@ -147,9 +148,7 @@ export async function getCertificationEvolutionReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver reportes de certificaciones");
   }
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const budget = await resolveBudget(projectId, filters.budgetId, ctx);
   if (!budget) return { type: "NO_APPROVED_BUDGETS" };

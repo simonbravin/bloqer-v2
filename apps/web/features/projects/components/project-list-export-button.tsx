@@ -1,7 +1,7 @@
 "use client";
 
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
-import type { ProjectWithClient } from "@bloqer/services";
+import type { ProjectListItem } from "@bloqer/services";
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Borrador",
@@ -16,7 +16,7 @@ const TYPE_LABELS: Record<string, string> = {
   PRIVATE: "Privado",
 };
 
-export function ProjectListExportButton({ projects }: { projects: ProjectWithClient[] }) {
+export function ProjectListExportButton({ projects }: { projects: ProjectListItem[] }) {
   const rows = projects.map((p) => [
     p.code ?? "",
     p.name,

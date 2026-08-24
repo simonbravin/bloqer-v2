@@ -4,6 +4,7 @@ import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { resolveApprovedBudgetForProject } from "./report-budget-resolve";
 
 export type MaterialReportFilters = {
@@ -58,9 +59,7 @@ export async function getMaterialVarianceReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver reporte de materiales");
   }
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const budget = await resolveApprovedBudgetForProject(projectId, filters.budgetId, ctx);
   if (!budget) return { type: "NO_APPROVED_BUDGETS" };

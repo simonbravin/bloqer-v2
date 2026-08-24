@@ -6,6 +6,7 @@ import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenan
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { computeCostExposureLayers } from "./cost-exposure";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
@@ -200,9 +201,7 @@ export async function getProjectCostControl(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver control de costos");
   }
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");

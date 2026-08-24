@@ -12,6 +12,7 @@ import {
 } from "./procurement-access";
 import { PO_RECEIPT_ELIGIBLE_STATUSES } from "./procurement-constants";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { assertCompanyMatchesProject, assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
@@ -196,9 +197,7 @@ export async function listLinkablePurchaseOrders(
   if (!canViewProcurementProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para listar órdenes de compra");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const orders = await prisma.purchaseOrder.findMany({
     where: {
@@ -261,9 +260,7 @@ export async function listProcurementWbsOptions(
   if (!canViewProcurementProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para opciones de compra / EDT");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const nodes = await prisma.wbsNode.findMany({
     where: {
@@ -380,9 +377,7 @@ export async function listPurchaseOrdersByProject(
   if (!canViewProcurementProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver órdenes de compra");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const orders = await prisma.purchaseOrder.findMany({
     where: { projectId, tenantId: ctx.tenantId },

@@ -4,6 +4,7 @@ import { canViewSubcontractsArea } from "../subcontracts/subcontract-access";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { listApprovedBudgetsForProject, resolveApprovedBudgetForProject } from "./report-budget-resolve";
 import { monthKey, monthLabel } from "./report-month";
@@ -71,9 +72,7 @@ export async function getSubcontractVarianceReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver reportes de subcontratos");
   }
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const budget = await resolveApprovedBudgetForProject(projectId, filters.budgetId, ctx);
   if (!budget) return { type: "NO_APPROVED_BUDGETS" };

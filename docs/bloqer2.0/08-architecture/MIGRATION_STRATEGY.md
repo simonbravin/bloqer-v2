@@ -41,7 +41,7 @@ Usar **migraciones versionadas** alineadas a **Prisma Migrate** contra **Neon Po
 
 1. **CI:** `pnpm ci:prisma` (genera client sin `DATABASE_URL`) luego `pnpm typecheck` en cada PR (workflow en `.github/workflows/ci.yml`).
 2. **Deploy:** ejecutar `pnpm db:migrate:deploy` **antes** o en el **mismo pipeline** que publica una versión de app que dependa del nuevo schema — ver [`DEPLOYMENT_PLAN.md`](./DEPLOYMENT_PLAN.md). Evita arrancar código nuevo contra una base sin migrar.
-3. **Portal = Neon `production`:** `portal.bloqer.app` / Vercel production usan el compute `ep-cold-mouse-appkpn84` (branch `production`). El `.env` de la máquina local suele ser branch `dev` (`ep-curly-math…`). **Migrar solo local no arregla portal.** Tras un cambio de schema que va a `main`, aplicar `prisma migrate deploy` contra **production** y verificar `_prisma_migrations` ahí.
+3. **Portal = Neon `production`:** `portal.bloqer.app` / Vercel production usan el compute `ep-cold-mouse-appkpn84` (branch `production`). El `.env` de la máquina local suele ser branch `dev` (`ep-curly-math…`). **Migrar solo local no arregla portal.** En Vercel, el build corre `prisma migrate deploy` automáticamente; si migrás a mano, apuntá a **production** y verificá `_prisma_migrations`.
 
 ## Qué NO hacer
 

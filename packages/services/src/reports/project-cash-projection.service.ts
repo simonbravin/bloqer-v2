@@ -6,6 +6,7 @@ import {
 } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { monthLabel, projectionBucketKey, projectionHorizon } from "./report-month";
 
@@ -54,9 +55,7 @@ export async function getProjectCashProjectionReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver proyección de caja del proyecto");
   }
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");

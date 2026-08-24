@@ -7,6 +7,7 @@ import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { resolveActiveCompanyId } from "../company/company.service";
 import { assertCompanyMatchesProject, assertWbsLineForProject } from "../procurement/procurement-wbs";
@@ -107,9 +108,7 @@ export async function listSubcontractsByProject(
   if (!canViewSubcontractsArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver subcontratos");
   }
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectInTenant(projectId, ctx.tenantId);
 
   const subcontracts = await prisma.subcontract.findMany({
     where: { projectId, tenantId: ctx.tenantId },

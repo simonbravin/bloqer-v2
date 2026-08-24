@@ -16,8 +16,8 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { useClientTableSort } from "@/hooks/use-client-table-sort";
 import { ProjectStatusBadge } from "./project-status-badge";
+import type { ProjectListItem } from "@bloqer/services";
 import type { ProjectType } from "@bloqer/database";
-import type { ProjectWithClient } from "@bloqer/services";
 
 const TYPE_LABELS: Record<ProjectType, string> = {
   PUBLIC: "Público",
@@ -25,17 +25,17 @@ const TYPE_LABELS: Record<ProjectType, string> = {
 };
 
 interface ProjectTableProps {
-  projects: ProjectWithClient[];
+  projects: ProjectListItem[];
 }
 
 export function ProjectTable({ projects }: ProjectTableProps) {
   const accessors = useMemo(
     () => ({
-      code: (p: ProjectWithClient) => p.code ?? "",
-      name: (p: ProjectWithClient) => p.name,
-      client: (p: ProjectWithClient) => p.client.fantasyName ?? p.client.legalName,
-      type: (p: ProjectWithClient) => TYPE_LABELS[p.type],
-      status: (p: ProjectWithClient) => p.status,
+      code: (p: ProjectListItem) => p.code ?? "",
+      name: (p: ProjectListItem) => p.name,
+      client: (p: ProjectListItem) => p.client.fantasyName ?? p.client.legalName,
+      type: (p: ProjectListItem) => TYPE_LABELS[p.type],
+      status: (p: ProjectListItem) => p.status,
     }),
     [],
   );

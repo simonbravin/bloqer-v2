@@ -30,12 +30,20 @@ export default async function PresupuestosPage({ params }: PageProps) {
   try {
     await getProjectShellInfo(id, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
-  const budgets = await listBudgetsByProject(id, ctx);
+  let budgets: Awaited<ReturnType<typeof listBudgetsByProject>> = [];
+  try {
+    budgets = await listBudgetsByProject(id, ctx);
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
+
   const byId = new Map(budgets.map((b) => [b.id, b]));
 
   const serialized = budgets.map((b) => {
