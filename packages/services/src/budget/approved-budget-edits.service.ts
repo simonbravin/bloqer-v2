@@ -4,13 +4,13 @@
  */
 
 import { prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import {
   updateTenantApprovedBudgetEditsPolicySchema,
   updateProjectApprovedBudgetEditsPolicySchema,
 } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
+import { canReadTenantConfigArea } from "../tenant-settings/tenant-settings-guards";
 import { canViewBudgetsArea } from "../project/project-nav-guards";
 import { canManageApprovedBudgetEditPolicy } from "./budget.service";
 
@@ -22,13 +22,22 @@ export type ApprovedBudgetEditsPolicyView = {
     name: string;
     status: string;
     allow: boolean;
+    /** True when the project has a Budget in APPROVED (D-088 applies only to APPROVED). */
+    hasApprovedBudget: boolean;
+    /** Display line for the approved budget, or null. */
+    approvedBudgetLabel: string | null;
+    /**
+     * Human-readable budget situation for the table.
+     * Examples: "Aprobado · v1 — Obra base", "Sin presupuesto aprobado", "Sin presupuestos".
+     */
+    budgetStatusLabel: string;
   }>;
 };
 
 export async function getApprovedBudgetEditsPolicy(
   ctx: ServiceContext,
 ): Promise<ApprovedBudgetEditsPolicyView> {
-  if (!can(ctx.roles, "VIEW", "TENANT_SETTINGS") && !canManageApprovedBudgetEditPolicy(ctx.roles)) {
+  if (!canReadTenantConfigArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver la política de presupuestos");
   }
 
@@ -50,15 +59,75 @@ export async function getApprovedBudgetEditsPolicy(
     orderBy: [{ status: "asc" }, { code: "asc" }],
   });
 
+  const projectIds = projects.map((p) => p.id);
+  const budgets =
+    projectIds.length === 0
+      ? []
+      : await prisma.budget.findMany({
+          where: { tenantId: ctx.tenantId, projectId: { in: projectIds } },
+          select: {
+            projectId: true,
+            name: true,
+            versionNumber: true,
+            status: true,
+          },
+          orderBy: [{ projectId: "asc" }, { versionNumber: "desc" }],
+        });
+
+  const budgetsByProject = new Map<string, typeof budgets>();
+  for (const b of budgets) {
+    const list = budgetsByProject.get(b.projectId) ?? [];
+    list.push(b);
+    budgetsByProject.set(b.projectId, list);
+  }
+
   return {
     tenantAllow: tenant.allowApprovedBudgetEconomicEdits,
-    projects: projects.map((p) => ({
-      id: p.id,
-      code: p.code,
-      name: p.name,
-      status: p.status,
-      allow: p.allowApprovedBudgetEconomicEdits,
-    })),
+    projects: projects.map((p) => {
+      const list = budgetsByProject.get(p.id) ?? [];
+      const approved = list.find((b) => b.status === "APPROVED");
+      const hasApprovedBudget = Boolean(approved);
+      const approvedBudgetLabel = approved
+        ? `v${approved.versionNumber} — ${approved.name}`
+        : null;
+
+      let budgetStatusLabel: string;
+      if (approved) {
+        budgetStatusLabel = `Aprobado · ${approvedBudgetLabel}`;
+      } else if (list.length > 0) {
+        // Prefer the latest version (ordered desc). Do not hide a newer draft
+        // behind an older CLOSED label.
+        const latest = list[0]!;
+        if (latest.status === "CLOSED") {
+          budgetStatusLabel = `Cerrado · v${latest.versionNumber} — ${latest.name} (no editable con esta excepción)`;
+        } else {
+          const statusHint =
+            latest.status === "DRAFT"
+              ? "borrador"
+              : latest.status === "IN_REVIEW"
+                ? "en revisión"
+                : latest.status === "RETURNED_FOR_CHANGES"
+                  ? "devuelto para cambios"
+                  : latest.status === "CANCELLED"
+                    ? "cancelado"
+                    : latest.status.toLowerCase();
+          budgetStatusLabel = `Sin presupuesto aprobado (último: v${latest.versionNumber}, ${statusHint})`;
+        }
+      } else {
+        budgetStatusLabel = "Sin presupuestos";
+      }
+
+      return {
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        status: p.status,
+        allow: p.allowApprovedBudgetEconomicEdits,
+        hasApprovedBudget,
+        approvedBudgetLabel,
+        budgetStatusLabel,
+      };
+    }),
   };
 }
 
@@ -142,6 +211,19 @@ export async function updateProjectApprovedBudgetEditsPolicy(
       "CONFLICT",
       "No se puede habilitar edición de presupuestos aprobados en una obra cancelada o finalizada",
     );
+  }
+
+  if (allow) {
+    const approved = await prisma.budget.findFirst({
+      where: { projectId, tenantId: ctx.tenantId, status: "APPROVED" },
+      select: { id: true },
+    });
+    if (!approved) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Esta obra no tiene un presupuesto aprobado. Aprobá uno antes de habilitar la edición excepcional.",
+      );
+    }
   }
 
   if (project.allowApprovedBudgetEconomicEdits === allow) {

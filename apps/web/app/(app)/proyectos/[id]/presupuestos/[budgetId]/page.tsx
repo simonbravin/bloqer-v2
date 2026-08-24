@@ -216,7 +216,9 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
           <KpiStatCard label="Margen (venta − costo)" value={marginStr} tone="muted" />
         </KpiStatGrid>
 
-        {editability.approvedOverrideActive && snapshotCost && snapshotSale ? (
+        {editability.approvedOverrideActive &&
+        snapshotCost != null &&
+        snapshotSale != null ? (
           <p className="text-xs text-muted-foreground">
             Totales al aprobar: costo {formatMoneyAmount(snapshotCost, budget.currency)} · venta{" "}
             {formatMoneyAmount(snapshotSale, budget.currency)}

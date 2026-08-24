@@ -5,7 +5,7 @@ import type { UpdateCostItemInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
-import { assertBudgetEditable, lockBudgetForEconomicEdit } from "./budget.service";
+import { assertBudgetEditable, approvedEditOverrideAuditMeta, lockBudgetForEconomicEdit } from "./budget.service";
 import { assertCostItemQuantityNotBelowCertified } from "./cost-item-certified-qty";
 import { _recalcCostItemTotals, _recalcBudgetSummary } from "./budget-calc.service";
 import { _recomputePartidaLinesForQuantity } from "./cost-analysis.service";
@@ -74,7 +74,7 @@ export async function updateCostItem(
     before: { unit: costItem.unit, quantity: serializeQtyDecimal(costItem.quantity) },
     after: {
       ...input,
-      ...(budget.status === "APPROVED" ? { approvedEditOverride: true } : {}),
+      ...approvedEditOverrideAuditMeta(budget.status),
     },
     ipAddress: ctx.ipAddress,
   });

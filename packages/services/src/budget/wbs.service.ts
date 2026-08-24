@@ -5,6 +5,7 @@ import type { CreateWbsNodeInput, UpdateWbsNodeInput, ReorderWbsNodesInput } fro
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import {
+  approvedEditOverrideAuditMeta,
   assertBudgetEditable,
   assertBudgetWbsStructureMutable,
   canViewBudgetsArea,
@@ -479,7 +480,14 @@ export async function addWbsNode(
     action: "wbs_node.added",
     entityType: "WbsNode",
     entityId: node.id,
-    after: { code: node.code, name: node.name, type: node.type, budgetId },
+    projectId: budget.projectId,
+    after: {
+      code: node.code,
+      name: node.name,
+      type: node.type,
+      budgetId,
+      ...approvedEditOverrideAuditMeta(budget.status),
+    },
     ipAddress: ctx.ipAddress,
   });
 
@@ -524,7 +532,8 @@ export async function updateWbsNode(
     action: "wbs_node.updated",
     entityType: "WbsNode",
     entityId: id,
-    after: input,
+    projectId: budget.projectId,
+    after: { ...input, ...approvedEditOverrideAuditMeta(budget.status) },
     ipAddress: ctx.ipAddress,
   });
 }
@@ -745,10 +754,12 @@ export async function removeWbsNode(id: string, ctx: ServiceContext): Promise<vo
     action: "wbs_node.removed",
     entityType: "WbsNode",
     entityId: id,
+    projectId: budget.projectId,
     after: {
       code: node.code,
       budgetId: node.budgetId,
       removedNodeCount: subtreeIds.length,
+      ...approvedEditOverrideAuditMeta(budget.status),
     },
     ipAddress: ctx.ipAddress,
   });
@@ -804,7 +815,12 @@ export async function reorderWbsNodes(
     action: "wbs_nodes.reordered",
     entityType: "WbsNode",
     entityId: budgetId,
-    after: { parentId: input.parentId, orderedNodeIds: input.orderedNodeIds },
+    projectId: budget.projectId,
+    after: {
+      parentId: input.parentId,
+      orderedNodeIds: input.orderedNodeIds,
+      ...approvedEditOverrideAuditMeta(budget.status),
+    },
     ipAddress: ctx.ipAddress,
   });
 }

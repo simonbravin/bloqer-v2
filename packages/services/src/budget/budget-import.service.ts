@@ -8,6 +8,7 @@ import { toMoneyDecimal } from "../finance/money-decimal";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
 import {
+  approvedEditOverrideAuditMeta,
   assertBudgetEditable,
   assertBudgetWbsStructureMutable,
   lockBudgetForEconomicEdit,
@@ -204,7 +205,13 @@ export async function executeImport(
     action: "wbs.imported",
     entityType: "Budget",
     entityId: budgetId,
-    after: { createdNodes, createdItems, mode },
+    projectId: budget.projectId,
+    after: {
+      createdNodes,
+      createdItems,
+      mode,
+      ...approvedEditOverrideAuditMeta(budget.status),
+    },
     ipAddress: ctx.ipAddress,
   });
 

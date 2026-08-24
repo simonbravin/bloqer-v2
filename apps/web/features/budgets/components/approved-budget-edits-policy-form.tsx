@@ -57,7 +57,8 @@ export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
   }
 
   function runProjectToggle(projectId: string, code: string, next: boolean) {
-    if (!canEdit || !tenantAllow) return;
+    if (!canEdit) return;
+    if (next && !tenantAllow) return;
     const msg = next
       ? `¿Permitir editar presupuestos aprobados en la obra ${code}? Quien tenga permiso de edición de presupuestos podrá cambiar WBS, costos y venta. Cada cambio queda auditado.`
       : `¿Congelar de nuevo los presupuestos aprobados de la obra ${code}?`;
@@ -121,8 +122,8 @@ export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
         <CardHeader>
           <CardTitle className="text-base">Por obra</CardTitle>
           <CardDescription>
-            Cada obra necesita su propio permiso. Cuando la obra ya tiene los costos definidos,
-            apagá el flag de esa obra (las demás no se tocan).
+            La excepción solo aplica a presupuestos en estado Aprobado. Si la obra aún no tiene uno,
+            aparece el aviso; cuando lo aprueben, vas a poder habilitar la edición acá.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -141,39 +142,67 @@ export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
                     <th className="px-3 py-2 font-medium">Código</th>
                     <th className="px-3 py-2 font-medium">Obra</th>
                     <th className="px-3 py-2 font-medium">Estado</th>
-                    <th className="px-3 py-2 font-medium">Edición APPROVED</th>
+                    <th className="px-3 py-2 font-medium">Presupuesto</th>
+                    <th className="px-3 py-2 font-medium">Edición excepcional</th>
                     <th className="px-3 py-2 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
                   {policy.projects.map((p) => {
                     const terminal = p.status === "CANCELLED" || p.status === "COMPLETED";
+                    const canEnable =
+                      canEdit &&
+                      tenantAllow &&
+                      p.hasApprovedBudget &&
+                      !terminal &&
+                      !p.allow;
+                    // Congelar even if the org kill-switch is off (cleanup project flags).
+                    const canFreeze = canEdit && p.allow;
                     return (
-                      <tr key={p.id} className="border-t">
+                      <tr key={p.id} className="border-t align-top">
                         <td className="px-3 py-2 font-mono text-xs">{p.code}</td>
                         <td className="px-3 py-2">{p.name}</td>
-                        <td className="px-3 py-2 text-muted-foreground">
+                        <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
                           {PROJECT_STATUS_LABEL[p.status] ?? p.status}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-2 max-w-[280px]">
+                          {p.hasApprovedBudget ? (
+                            <span className="font-medium">{p.budgetStatusLabel}</span>
+                          ) : (
+                            <span className="text-muted-foreground">{p.budgetStatusLabel}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
                           {p.allow ? (
                             <span className="font-medium text-amber-700 dark:text-amber-400">
                               Habilitada
                             </span>
-                          ) : (
+                          ) : p.hasApprovedBudget ? (
                             <span className="text-muted-foreground">Bloqueada</span>
+                          ) : (
+                            <span className="text-muted-foreground">No aplica aún</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-right">
-                          {canEdit && tenantAllow && (!terminal || p.allow) ? (
+                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                          {canFreeze ? (
                             <Button
                               type="button"
                               size="sm"
-                              variant={p.allow ? "outline" : "default"}
-                              disabled={pending || (terminal && !p.allow)}
-                              onClick={() => runProjectToggle(p.id, p.code, !p.allow)}
+                              variant="outline"
+                              disabled={pending}
+                              onClick={() => runProjectToggle(p.id, p.code, false)}
                             >
-                              {p.allow ? "Congelar" : "Habilitar"}
+                              Congelar
+                            </Button>
+                          ) : canEnable ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="default"
+                              disabled={pending}
+                              onClick={() => runProjectToggle(p.id, p.code, true)}
+                            >
+                              Habilitar
                             </Button>
                           ) : null}
                         </td>

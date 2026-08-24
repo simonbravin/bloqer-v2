@@ -148,6 +148,13 @@ export function canManageApprovedBudgetEditPolicy(roles: ServiceContext["roles"]
   return roles.some((r) => r === "OWNER" || r === "ADMIN");
 }
 
+/** Audit `after` marker when an economic mutation runs on APPROVED ([D-088]). */
+export function approvedEditOverrideAuditMeta(
+  status: Budget["status"],
+): { approvedEditOverride?: true } {
+  return status === "APPROVED" ? { approvedEditOverride: true } : {};
+}
+
 /** WBS: estado editable y no bloqueado por cronograma. */
 export async function assertBudgetWbsStructureMutable(
   budget: Budget,

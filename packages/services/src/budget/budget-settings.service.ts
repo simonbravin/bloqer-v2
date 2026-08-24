@@ -5,7 +5,7 @@ import type { UpdateBudgetSettingsInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
-import { assertBudgetEditable, lockBudgetForEconomicEdit } from "./budget.service";
+import { assertBudgetEditable, approvedEditOverrideAuditMeta, lockBudgetForEconomicEdit } from "./budget.service";
 import { _recalcAllItems } from "./budget-calc.service";
 
 export async function updateBudgetSettings(
@@ -40,7 +40,7 @@ export async function updateBudgetSettings(
     entityId: settings.id,
     after: {
       ...input,
-      ...(budget.status === "APPROVED" ? { approvedEditOverride: true } : {}),
+      ...approvedEditOverrideAuditMeta(budget.status),
     },
     ipAddress: ctx.ipAddress,
   });

@@ -25,7 +25,7 @@ import {
   type BudgetImportRow,
   type BudgetLifecycleCommentInput, type BudgetReturnForChangesInput,
 } from "@bloqer/validators";
-import { getCurrentUser } from "@/lib/auth";
+import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { revalidateProjectCostAndFinancePaths } from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -34,14 +34,9 @@ type Ok = { ok: true };
 type Err = { error: string };
 
 async function getCtx() {
-  const current = await getCurrentUser();
-  if (!current?.tenantCtx) redirect("/login");
-  return {
-    actorUserId: current.session.user.id!,
-    tenantId: current.tenantCtx.tenantId,
-    companyId: current.tenantCtx.companyId,
-    roles: current.tenantCtx.roles,
-  };
+  const ctx = await buildTenantServiceContext();
+  if (!ctx) redirect("/login");
+  return ctx;
 }
 
 function handle(err: unknown): Err {

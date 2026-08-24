@@ -17,7 +17,7 @@ import type {
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
-import { assertBudgetEditable, lockBudgetForEconomicEdit } from "./budget.service";
+import { assertBudgetEditable, approvedEditOverrideAuditMeta, lockBudgetForEconomicEdit } from "./budget.service";
 import { assertCostItemQuantityNotBelowCertified } from "./cost-item-certified-qty";
 import { _recalcCostItemTotals, _recalcBudgetSummary } from "./budget-calc.service";
 
@@ -181,7 +181,7 @@ export async function addCostAnalysisLine(
       category: input.category,
       description: input.description,
       budgetId: budget.id,
-      ...(budget.status === "APPROVED" ? { approvedEditOverride: true } : {}),
+      ...approvedEditOverrideAuditMeta(budget.status),
     },
     ipAddress: ctx.ipAddress,
   });
@@ -275,7 +275,7 @@ export async function updateCostAnalysisLine(
     entityId: id,
     after: {
       ...input,
-      ...(budget.status === "APPROVED" ? { approvedEditOverride: true } : {}),
+      ...approvedEditOverrideAuditMeta(budget.status),
     },
     ipAddress: ctx.ipAddress,
   });
@@ -307,7 +307,7 @@ export async function removeCostAnalysisLine(id: string, ctx: ServiceContext): P
     entityId: id,
     after: {
       budgetId: existing.budgetId,
-      ...(budget.status === "APPROVED" ? { approvedEditOverride: true } : {}),
+      ...approvedEditOverrideAuditMeta(budget.status),
     },
     ipAddress: ctx.ipAddress,
   });
@@ -475,7 +475,7 @@ export async function saveCostItemApu(
     after: {
       budgetId: budget.id,
       lineCount: input.lines.length,
-      ...(budget.status === "APPROVED" ? { approvedEditOverride: true } : {}),
+      ...approvedEditOverrideAuditMeta(budget.status),
     },
     ipAddress: ctx.ipAddress,
   });

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Budget } from "@bloqer/database";
 import { ServiceError } from "../types";
-import { assertBudgetEditable, canManageApprovedBudgetEditPolicy } from "./budget.service";
+import { assertBudgetEditable, approvedEditOverrideAuditMeta, canManageApprovedBudgetEditPolicy } from "./budget.service";
 
 function baseBudget(overrides: Partial<Budget> = {}): Budget {
   return {
@@ -138,5 +138,15 @@ describe("canManageApprovedBudgetEditPolicy", () => {
     assert.equal(canManageApprovedBudgetEditPolicy(["ADMIN"]), true);
     assert.equal(canManageApprovedBudgetEditPolicy(["PROJECT_MANAGER"]), false);
     assert.equal(canManageApprovedBudgetEditPolicy(["FINANCE"]), false);
+  });
+});
+
+describe("approvedEditOverrideAuditMeta", () => {
+  it("marks APPROVED only", () => {
+    assert.deepEqual(approvedEditOverrideAuditMeta("APPROVED"), {
+      approvedEditOverride: true,
+    });
+    assert.deepEqual(approvedEditOverrideAuditMeta("DRAFT"), {});
+    assert.deepEqual(approvedEditOverrideAuditMeta("CLOSED"), {});
   });
 });
