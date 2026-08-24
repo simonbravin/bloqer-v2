@@ -40,6 +40,7 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 - Dedupe de alertas operativas: misma entidad + destinatario en ventana de 7 días.
 - Alertas operativas de estado (AR/AP, stock, etc.): job batch automático (cron) + runner manual opcional; AR/AP vencidos **materializan** `OVERDUE` y notifican.
 - **Compras ([D-050], [BR-PUR-015]):** in-app + email en cambios de estado de SC/OC; recordatorio por antigüedad con escalamiento a OWNER/ADMIN. El cuerpo in-app y el email incluyen organización, proyecto y solicitante; el Subject del mail va prefijado con el tenant (`[Indari] …`). Fallo de email = best-effort (no aborta la mutación).
+- **Título identificable:** el título in-app (y el Subject del mail) es `{evento} · {identificador}` — p. ej. `Documento listo · Factura FP-00005`, `Listo para pagar · FP-00005`, `Parte devuelto · 24/08/2026`, `Nueva solicitud · SC-003`. El cuerpo conserva archivo, montos y notas. Helper: `packages/services/src/notifications/notification-copy.ts`. Las filas ya persistidas no se reescriben.
 
 ## 11. Validaciones
 - Payload JSON schema-valid por tipo de evento.

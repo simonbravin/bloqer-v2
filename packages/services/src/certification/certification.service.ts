@@ -6,6 +6,7 @@ import { log } from "../audit/audit.service";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { createSystemNotification } from "../notifications/notification.service";
 import { resolveNotificationAudience } from "../notifications/notification-audience.service";
+import { formatCertificationCode, formatNotificationTitle } from "../notifications/notification-copy";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { ServiceContext, ServiceError } from "../types";
 import { _computePreviousQty, _recalcCertificationTotals } from "./certification-calc.service";
@@ -340,6 +341,8 @@ export async function approveCertification(id: string, ctx: ServiceContext): Pro
     excludeUserId: ctx.actorUserId,
   });
 
+  const certCode = formatCertificationCode(meta.number);
+
   for (const recipientUserId of recipients) {
     try {
       await createSystemNotification({
@@ -347,8 +350,8 @@ export async function approveCertification(id: string, ctx: ServiceContext): Pro
         companyId: meta.companyId,
         recipientUserId,
         type: "CERTIFICATION_APPROVED",
-        title: "Certificación aprobada",
-        body: `La certificación n.º ${meta.number} fue aprobada.`,
+        title: formatNotificationTitle("Certificación aprobada", certCode),
+        body: `La certificación ${certCode} fue aprobada.`,
         severity: "SUCCESS",
         linkedEntityType: "CERTIFICATION",
         linkedEntityId: id,

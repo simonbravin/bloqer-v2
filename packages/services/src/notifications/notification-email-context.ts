@@ -117,15 +117,20 @@ export function actionLabelForLinkedEntity(type: LinkedEntityType | null): strin
       return "Ver orden";
     case "PURCHASE_RECEIPT":
       return "Ver recepción";
+    case "PROCUREMENT_QUOTE":
+      return "Ver cotización";
     case "SALES_INVOICE":
     case "SUPPLIER_INVOICE":
       return "Ver factura";
     case "CERTIFICATION":
+    case "SUBCONTRACT_CERTIFICATION":
       return "Ver certificación";
     case "JOBSITE_LOG":
       return "Ver parte de obra";
     case "SUBCONTRACT":
       return "Ver subcontrato";
+    case "BUDGET":
+      return "Ver presupuesto";
     case "WAREHOUSE_TRANSFER":
       return "Ver transferencia";
     default:
@@ -136,6 +141,7 @@ export function actionLabelForLinkedEntity(type: LinkedEntityType | null): strin
 export function actionLabelForNotification(
   type: NotificationType | null | undefined,
   linked: LinkedEntityType | null,
+  actionUrl?: string | null,
 ): string {
   switch (type) {
     case "PAYABLE_READY_TO_PAY":
@@ -148,12 +154,27 @@ export function actionLabelForNotification(
       return "Ver inventario";
     case "STALE_DOCUMENT_UPLOAD":
     case "DOCUMENT_UPLOAD_CONFIRMED":
-      return "Ver documento";
+      return documentUploadActionLabel(linked, actionUrl);
     case "JOBSITE_LOG_RETURNED":
       return "Corregir parte";
     default:
       return actionLabelForLinkedEntity(linked);
   }
+}
+
+/** CTA must describe the destination: project uploads open `/documentos/…`, not the parent invoice. */
+function documentUploadActionLabel(
+  linked: LinkedEntityType | null,
+  actionUrl?: string | null,
+): string {
+  const url = actionUrl?.trim() ?? "";
+  if (!url || /\/documentos(\/|$)/.test(url)) {
+    return "Ver documento";
+  }
+  if (linked && linked !== "OTHER" && linked !== "PROJECT" && linked !== "SCHEDULED_REPORT") {
+    return actionLabelForLinkedEntity(linked);
+  }
+  return "Ver documento";
 }
 
 function factLine(label: string, value: string | null | undefined): string | null {
@@ -626,6 +647,7 @@ export async function resolveNotificationEmailContext(params: {
   linkedEntityId: string | null;
   notificationType?: NotificationType | null;
   metadata?: Prisma.JsonValue | null;
+  actionUrl?: string | null;
 }): Promise<NotificationEmailResolvedContext> {
   const identity = await loadNotificationIdentityFacts({
     tenantId: params.tenantId,
@@ -662,6 +684,6 @@ export async function resolveNotificationEmailContext(params: {
     contextFields: fields,
     items,
     itemsHeading: "Ítems",
-    actionLabel: actionLabelForNotification(params.notificationType, params.linkedEntityType),
+    actionLabel: actionLabelForNotification(params.notificationType, params.linkedEntityType, params.actionUrl),
   };
 }

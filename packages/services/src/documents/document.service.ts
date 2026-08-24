@@ -16,6 +16,10 @@ import { isCrossCompany } from "../company-scope";
 import { log } from "../audit/audit.service";
 import { createSystemNotification } from "../notifications/notification.service";
 import { resolveNotificationAudience } from "../notifications/notification-audience.service";
+import {
+  documentUploadConfirmedCopy,
+  resolveDocumentNotificationEntityLabel,
+} from "../notifications/notification-copy";
 import type { CreateDocumentMetadataInput, InitiateUploadInput, ListProjectDocumentsInput } from "@bloqer/validators";
 import { ALLOWED_MIME_TYPES } from "@bloqer/validators";
 import {
@@ -448,6 +452,7 @@ async function notifyDocumentUploadConfirmed(
     linkedEntityType: LinkedEntityType | null;
     linkedEntityId: string | null;
     projectId: string | null;
+    category?: string | null;
   },
   ctx: ServiceContext,
 ): Promise<void> {
@@ -462,9 +467,23 @@ async function notifyDocumentUploadConfirmed(
     return;
   }
 
+  if (recipients.length === 0) return;
+
   const actionUrl = doc.projectId
     ? `/proyectos/${doc.projectId}/documentos/${doc.id}`
     : await resolveCorporateDocumentActionUrl(doc.linkedEntityType, doc.linkedEntityId, ctx);
+
+  const entityLabel = await resolveDocumentNotificationEntityLabel({
+    tenantId: ctx.tenantId,
+    linkedEntityType: doc.linkedEntityType,
+    linkedEntityId: doc.linkedEntityId,
+    projectId: doc.projectId,
+  });
+  const { title, body } = documentUploadConfirmedCopy({
+    fileName: doc.originalFileName,
+    entityLabel,
+    category: doc.category,
+  });
 
   for (const recipientUserId of recipients) {
     try {
@@ -473,8 +492,8 @@ async function notifyDocumentUploadConfirmed(
         companyId: doc.companyId,
         recipientUserId,
         type: "DOCUMENT_UPLOAD_CONFIRMED",
-        title: "Documento listo",
-        body: `El archivo «${doc.originalFileName}» se subió correctamente.`,
+        title,
+        body,
         severity: "SUCCESS",
         linkedEntityType: doc.linkedEntityType,
         linkedEntityId: doc.linkedEntityId,

@@ -214,6 +214,7 @@ async function dispatchNotificationEmail(
     linkedEntityId: n.linkedEntityId,
     notificationType: n.type,
     metadata: n.metadata,
+    actionUrl: n.actionUrl,
   }).catch(() => ({
     organizationName: null as string | null,
     contextFields: [] as { label: string; value: string }[],

@@ -10,7 +10,7 @@ Persisted in Postgres via Prisma (`packages/database/prisma/schema.prisma`).
 | `companyId` | Optional context |
 | `recipientUserId` | Nullable in DB for future broadcast/role routing; **Phase 8A creates** always pass a non-empty id and `createSystemNotification` rejects empty recipients |
 | `type` | `NotificationType` enum (extensible — see Phase 8B below) |
-| `title` / `body` | Spanish copy from services |
+| `title` / `body` | Spanish copy from services. **Title** = event + identifier (`Documento listo · Factura FP-00005`); **body** keeps file name, amounts, notes. Existing rows are not rewritten. |
 | `severity` | `INFO` \| `SUCCESS` \| `WARNING` \| `ERROR` |
 | `status` | `UNREAD` \| `READ` \| `ARCHIVED` — no hard delete |
 | `linkedEntityType` / `linkedEntityId` | Optional; uses domain `LinkedEntityType` |
@@ -178,9 +178,9 @@ Contexto de sistema: `buildOperationalAlertsCronServiceContext` + `runAllOperati
 
 Best-effort `try/catch` so core flows never fail if notification insert fails. Recipients via `resolveNotificationAudience` (OWNER/ADMIN CC; actor excluded):
 
-1. **`confirmDocumentUpload`** — `DOCUMENT_UPLOAD_CONFIRMED` → `uploadedBy` ∪ OWNER/ADMIN; `actionUrl` when `projectId` present.
-2. **`returnJobsiteLog`** — `JOBSITE_LOG_RETURNED` → `createdBy` ∪ OWNER/ADMIN; `body` includes a truncated return-notes snippet; `metadata` stores only `{ jobsiteLogId }`.
-3. **`approveCertification`** — `CERTIFICATION_APPROVED` → `createdBy` ∪ OWNER/ADMIN (sin fan-out por `VIEW CERTIFICATIONS` hasta existir asignación a obra / `ProjectMembership`).
+1. **`confirmDocumentUpload`** — `DOCUMENT_UPLOAD_CONFIRMED` → `uploadedBy` ∪ OWNER/ADMIN; `actionUrl` when `projectId` present. Title includes the linked entity (`Documento listo · Factura FP-00005`, parte por fecha, `CERT-…`, `OC-…`) via `notification-copy.ts`.
+2. **`returnJobsiteLog`** — `JOBSITE_LOG_RETURNED` → `createdBy` ∪ OWNER/ADMIN; title `Parte devuelto · dd/mm/yyyy`; `body` includes a truncated return-notes snippet; `metadata` stores only `{ jobsiteLogId }`.
+3. **`approveCertification`** — `CERTIFICATION_APPROVED` → `createdBy` ∪ OWNER/ADMIN (sin fan-out por `VIEW CERTIFICATIONS` hasta existir asignación a obra / `ProjectMembership`); title `Certificación aprobada · CERT-007`.
 
 ## Limitations (Phase 8A–8E + D-054)
 

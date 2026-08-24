@@ -10,6 +10,7 @@ import {
   formatNotificationIdentityBody,
   loadNotificationIdentityFacts,
 } from "../notifications/notification-email-context";
+import { formatNotificationTitle } from "../notifications/notification-copy";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 import type { ServiceContext } from "../types";
 
@@ -103,7 +104,7 @@ export async function notifyPurchaseRequestSubmitted(params: {
     ctx: params.ctx,
     recipients,
     type: "PURCHASE_REQUEST_SUBMITTED",
-    title: "Nueva solicitud de compra",
+    title: formatNotificationTitle("Nueva solicitud", params.code),
     body: formatNotificationIdentityBody(
       `La solicitud ${params.code} fue enviada y espera cotizaciones.`,
       facts,
@@ -159,7 +160,7 @@ export async function notifyPurchaseOrderPendingApproval(params: {
     ctx: params.ctx,
     recipients,
     type: "PURCHASE_ORDER_PENDING_APPROVAL",
-    title: "OC pendiente de aprobación",
+    title: formatNotificationTitle("OC pendiente de aprobación", params.code),
     body: formatNotificationIdentityBody(
       `La orden ${params.code} requiere aprobación (${reason}).`,
       facts,
@@ -194,7 +195,7 @@ export async function notifyPurchaseOrderApproved(params: {
     ctx: params.ctx,
     recipients: params.recipientUserIds,
     type: "PURCHASE_ORDER_APPROVED",
-    title: "OC aprobada",
+    title: formatNotificationTitle("OC aprobada", params.code),
     body: formatNotificationIdentityBody(
       `La orden ${params.code} fue aprobada. Pendiente confirmar al proveedor.`,
       facts,
@@ -229,7 +230,7 @@ export async function notifyPurchaseOrderReturned(params: {
     ctx: params.ctx,
     recipients: params.recipientUserIds,
     type: "PURCHASE_ORDER_RETURNED",
-    title: "OC devuelta para cambios",
+    title: formatNotificationTitle("OC devuelta", params.code),
     body: formatNotificationIdentityBody(`La orden ${params.code} fue devuelta: ${params.reason}`, facts),
     severity: "WARNING",
     linkedEntityType: "PURCHASE_ORDER",
@@ -260,7 +261,7 @@ export async function notifyPurchaseOrderConfirmed(params: {
     ctx: params.ctx,
     recipients: params.recipientUserIds,
     type: "PURCHASE_ORDER_CONFIRMED",
-    title: "OC confirmada al proveedor",
+    title: formatNotificationTitle("OC confirmada", params.code),
     body: formatNotificationIdentityBody(
       `La orden ${params.code} fue confirmada. Ya compromete costo y admite recepciones.`,
       facts,
@@ -351,7 +352,7 @@ export async function runProcurementSlaReminders(
         ctx,
         recipients: needing,
         type: "PROCUREMENT_SLA_REMINDER",
-        title: "OC demorada en aprobación",
+        title: formatNotificationTitle("OC demorada", code),
         body: formatNotificationIdentityBody(
           `La orden ${code} lleva más de ${settings.approvalSlaHours}h pendiente de aprobación.`,
           facts,
@@ -414,7 +415,7 @@ export async function runProcurementSlaReminders(
         ctx,
         recipients: needing,
         type: "PROCUREMENT_SLA_REMINDER",
-        title: "Solicitud demorada sin cotizar",
+        title: formatNotificationTitle("Solicitud demorada", code),
         body: formatNotificationIdentityBody(
           `La solicitud ${code} lleva más de ${settings.approvalSlaHours}h sin cotizaciones.`,
           facts,

@@ -8,6 +8,7 @@ import {
   resolveNotificationAudience,
 } from "./notification-audience.service";
 import { createSystemNotification } from "./notification.service";
+import { resolveDocumentNotificationEntityLabel, staleDocumentUploadCopy } from "./notification-copy";
 
 /** Re-export recipient helpers for existing call sites. */
 export { findActiveOwnerAdminUserIds, findActiveUsersForPermission } from "./notification-audience.service";
@@ -401,6 +402,9 @@ export async function runStaleUploadingDocumentsAlert(ctx: ServiceContext): Prom
       companyId: true,
       originalFileName: true,
       uploadedBy: true,
+      linkedEntityType: true,
+      linkedEntityId: true,
+      category: true,
     },
   });
 
@@ -414,7 +418,17 @@ export async function runStaleUploadingDocumentsAlert(ctx: ServiceContext): Prom
     if (recipientIds.length === 0) continue;
 
     const actionUrl = d.projectId ? `/proyectos/${d.projectId}/documentos/${d.id}` : null;
-    const body = `El archivo «${d.originalFileName}» sigue en estado de carga (iniciado hace más de 1 h).`;
+    const entityLabel = await resolveDocumentNotificationEntityLabel({
+      tenantId: ctx.tenantId,
+      linkedEntityType: d.linkedEntityType,
+      linkedEntityId: d.linkedEntityId,
+      projectId: d.projectId,
+    });
+    const { title, body } = staleDocumentUploadCopy({
+      fileName: d.originalFileName,
+      entityLabel,
+      category: d.category,
+    });
 
     for (const uid of recipientIds) {
       await tryCreateAlert(
@@ -423,7 +437,7 @@ export async function runStaleUploadingDocumentsAlert(ctx: ServiceContext): Prom
           companyId: d.companyId,
           recipientUserId: uid,
           type: "STALE_DOCUMENT_UPLOAD",
-          title: "Carga de documento pendiente",
+          title,
           body,
           severity: "WARNING",
           linkedEntityType: "OTHER",

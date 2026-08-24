@@ -11,6 +11,7 @@ import {
   formatNotificationIdentityBody,
   loadNotificationIdentityFacts,
 } from "../notifications/notification-email-context";
+import { formatNotificationTitle, formatSupplierInvoiceCode } from "../notifications/notification-copy";
 import type { ServiceContext } from "../types";
 import { canRegisterApPayment } from "./ap-access";
 
@@ -107,7 +108,7 @@ export async function notifyPayableReadyToPay(params: {
   amountLabel: string;
 }): Promise<void> {
   const recipients = await findActiveApPaymentAudience(params.ctx.tenantId);
-  const invCode = `FP-${String(params.invoiceNumber).padStart(5, "0")}`;
+  const invCode = formatSupplierInvoiceCode(params.invoiceNumber);
   const ocPart = params.purchaseOrderCode
     ? ` vinculada a ${params.purchaseOrderCode}`
     : params.purchaseOrderId
@@ -126,7 +127,7 @@ export async function notifyPayableReadyToPay(params: {
     ctx: params.ctx,
     recipients,
     type: "PAYABLE_READY_TO_PAY",
-    title: "Listo para pagar",
+    title: formatNotificationTitle("Listo para pagar", invCode),
     body: formatNotificationIdentityBody(
       `La factura ${invCode}${ocPart} (${params.amountLabel}) tiene CxP abierta. Elegí la cuenta de tesorería y registrá el pago.`,
       facts,
@@ -154,7 +155,7 @@ export async function notifyPaymentConfirmed(params: {
   amountLabel: string;
   accountName: string;
 }): Promise<void> {
-  const invCode = `FP-${String(params.invoiceNumber).padStart(5, "0")}`;
+  const invCode = formatSupplierInvoiceCode(params.invoiceNumber);
   const actionUrl = params.projectId
     ? `/proyectos/${params.projectId}/facturas-proveedor/${params.supplierInvoiceId}`
     : `/finanzas/facturas-proveedor/${params.supplierInvoiceId}`;
@@ -169,7 +170,7 @@ export async function notifyPaymentConfirmed(params: {
     ctx: params.ctx,
     permissionTargets: [{ action: "EDIT", module: "PROCUREMENT" }],
     type: "PAYMENT_CONFIRMED",
-    title: "Pago confirmado",
+    title: formatNotificationTitle("Pago confirmado", invCode),
     body: formatNotificationIdentityBody(
       `Se confirmó el pago de ${params.amountLabel} de ${invCode} desde ${params.accountName}.`,
       facts,

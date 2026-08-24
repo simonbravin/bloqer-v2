@@ -70,6 +70,30 @@ describe("notification email context formatters", () => {
     assert.equal(actionLabelForNotification("PAYABLE_READY_TO_PAY", "SUPPLIER_INVOICE"), "Registrar pago");
     assert.equal(actionLabelForNotification("RECEIVABLE_READY_TO_COLLECT", "SALES_INVOICE"), "Registrar cobranza");
     assert.equal(actionLabelForNotification("ACCOUNTING_DRAFTS_PENDING", "OTHER"), "Ver asientos");
+    assert.equal(actionLabelForNotification("DOCUMENT_UPLOAD_CONFIRMED", "SUPPLIER_INVOICE"), "Ver documento");
+    assert.equal(
+      actionLabelForNotification(
+        "DOCUMENT_UPLOAD_CONFIRMED",
+        "SUPPLIER_INVOICE",
+        "/proyectos/p1/documentos/d1",
+      ),
+      "Ver documento",
+    );
+    assert.equal(
+      actionLabelForNotification(
+        "DOCUMENT_UPLOAD_CONFIRMED",
+        "SUPPLIER_INVOICE",
+        "/finanzas/facturas-proveedor/inv1",
+      ),
+      "Ver factura",
+    );
+    assert.equal(
+      actionLabelForNotification("DOCUMENT_UPLOAD_CONFIRMED", "JOBSITE_LOG", "/proyectos/p1/documentos/d1"),
+      "Ver documento",
+    );
+    assert.equal(actionLabelForNotification("DOCUMENT_UPLOAD_CONFIRMED", "PROJECT"), "Ver documento");
+    assert.equal(actionLabelForNotification("JOBSITE_LOG_RETURNED", "JOBSITE_LOG"), "Corregir parte");
+    assert.equal(actionLabelForNotification("STALE_DOCUMENT_UPLOAD", null), "Ver documento");
   });
 });
 

@@ -723,7 +723,7 @@ flowchart LR
 3. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por partida EDT).
 4. Cargar **Cotizaciones** (precio + **plazo de entrega en días** + validez). Cumplir mínimo de cotizaciones de `/configuracion/compras`.
 5. **Seleccionar** proveedor → genera **OC en borrador**.
-6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora. El email de “Nueva solicitud de compra” muestra organización, proyecto, solicitante e ítems; el asunto empieza con `[nombre de la organización]`.
+6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora. El email de nueva solicitud muestra organización, proyecto, solicitante e ítems; el asunto es `[organización] Nueva solicitud · SC-003`.
 
 ### 9.2 Procedimiento — Orden de compra (OC)
 

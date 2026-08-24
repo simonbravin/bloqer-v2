@@ -176,7 +176,7 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
                           <p className="pt-1">
                             <Button variant="link" className="h-auto p-0 text-sm" asChild>
                               <Link href={actionHref}>
-                                {notificationActionLinkLabel(n.type, n.actionUrl)}
+                                {notificationActionLinkLabel(n.type, n.actionUrl, n.linkedEntityType)}
                               </Link>
                             </Button>
                           </p>

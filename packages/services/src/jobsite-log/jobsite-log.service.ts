@@ -4,6 +4,7 @@ import type { CreateJobsiteLogInput, UpdateJobsiteLogInput, ReturnJobsiteLogInpu
 import { listEntityAuditLogs, log } from "../audit/audit.service";
 import { createSystemNotification } from "../notifications/notification.service";
 import { resolveNotificationAudience } from "../notifications/notification-audience.service";
+import { formatJobsiteLogDate, formatNotificationTitle } from "../notifications/notification-copy";
 import { getStockBalance } from "../inventory/stock-balance.service";
 import { createJobsiteLogMaterialStockMovements } from "../inventory/stock-movement.service";
 import { syncScheduleProgressFromJobsiteLog } from "../schedule/schedule-progress-sync.service";
@@ -1202,7 +1203,7 @@ export async function returnJobsiteLog(
         companyId: existing.companyId,
         recipientUserId,
         type: "JOBSITE_LOG_RETURNED",
-        title: "Parte devuelto para corrección",
+        title: formatNotificationTitle("Parte devuelto", formatJobsiteLogDate(existing.logDate)),
         body,
         severity: "WARNING",
         linkedEntityType: "JOBSITE_LOG",

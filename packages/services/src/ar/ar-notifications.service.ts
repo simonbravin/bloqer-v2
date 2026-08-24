@@ -7,6 +7,7 @@ import {
   formatNotificationIdentityBody,
   loadNotificationIdentityFacts,
 } from "../notifications/notification-email-context";
+import { formatNotificationTitle, formatSalesInvoiceCode } from "../notifications/notification-copy";
 import type { ServiceContext } from "../types";
 
 /** Company-finance actors who should be nudged to collect (D-072). Not PROJECT_FINANCE / VIEWER. */
@@ -56,7 +57,7 @@ export async function notifyReceivableReadyToCollect(params: {
   amountLabel: string;
 }): Promise<void> {
   const recipients = await findActiveArCollectionAudience(params.ctx.tenantId, params.companyId);
-  const invCode = `FAC-${String(params.invoiceNumber).padStart(5, "0")}`;
+  const invCode = formatSalesInvoiceCode(params.invoiceNumber);
   const actionUrl = `/proyectos/${params.projectId}/cuentas-por-cobrar/${params.receivableId}/cobrar`;
 
   const unique = await resolveNotificationAudience({
@@ -67,7 +68,7 @@ export async function notifyReceivableReadyToCollect(params: {
   });
 
   const type: NotificationType = "RECEIVABLE_READY_TO_COLLECT";
-  const title = "Listo para cobrar";
+  const title = formatNotificationTitle("Listo para cobrar", invCode);
   const facts = await loadNotificationIdentityFacts({
     tenantId: params.ctx.tenantId,
     companyId: params.companyId,
