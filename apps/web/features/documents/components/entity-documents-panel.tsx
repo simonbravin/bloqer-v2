@@ -8,6 +8,12 @@ import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge } from "./document-status-badge";
 import { DocumentStorageBadge } from "./document-storage-badge";
 import { DocumentUploadDialog } from "./document-upload-dialog";
+import { DocumentFileActions } from "./document-file-actions";
+import {
+  canAccessDocumentFile,
+  isImageLikeDocument,
+} from "../lib/document-file-utils";
+import { DocumentThumbnail } from "./document-thumbnail";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import {
@@ -40,10 +46,6 @@ function fmtSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function isImageDoc(doc: DocumentAttachmentView): boolean {
-  return doc.mimeType.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(doc.originalFileName);
-}
-
 function EntityDocumentMobileList({
   docs,
   projectId,
@@ -60,41 +62,43 @@ function EntityDocumentMobileList({
     <ul className="space-y-2 md:hidden">
       {docs.map((doc) => {
         const href = projectId ? `/proyectos/${projectId}/documentos/${doc.id}` : undefined;
-        const canPreviewImage =
-          isImageDoc(doc) &&
-          doc.storageProvider === "R2" &&
-          (doc.status === "ACTIVE" || doc.status === "ARCHIVED");
-        const inner = (
-          <>
-            {canPreviewImage ? (
-              // eslint-disable-next-line @next/next/no-img-element -- authenticated download thumbnail
-              <img
-                src={`/api/documents/${doc.id}/download`}
-                alt=""
-                className="h-14 w-14 shrink-0 rounded-md object-cover"
-              />
-            ) : (
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-muted">
-                <FileText className="h-5 w-5 text-muted-foreground" aria-hidden />
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{doc.originalFileName}</p>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                <DocumentCategoryBadge category={doc.category} />
+        const showThumb =
+          canAccessDocumentFile(doc) &&
+          isImageLikeDocument(doc.mimeType, doc.originalFileName);
+
+        return (
+          <li key={doc.id} className="rounded-lg border bg-card p-3 space-y-2">
+            <div className="flex items-center gap-3">
+              {showThumb ? (
+                <DocumentThumbnail documentId={doc.id} />
+              ) : (
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-muted">
+                  <FileText className="h-5 w-5 text-muted-foreground" aria-hidden />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                {href ? (
+                  <Link
+                    href={href}
+                    className="block truncate text-sm font-medium hover:underline underline-offset-2"
+                  >
+                    {doc.originalFileName}
+                  </Link>
+                ) : (
+                  <p className="truncate text-sm font-medium">{doc.originalFileName}</p>
+                )}
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  <DocumentCategoryBadge category={doc.category} />
+                </div>
               </div>
             </div>
-          </>
-        );
-        return (
-          <li key={doc.id}>
-            {href ? (
-              <Link href={href} className="flex items-center gap-3 rounded-lg border bg-card p-3">
-                {inner}
-              </Link>
-            ) : (
-              <div className="flex items-center gap-3 rounded-lg border bg-card p-3">{inner}</div>
-            )}
+            <DocumentFileActions
+              documentId={doc.id}
+              mimeType={doc.mimeType}
+              originalFileName={doc.originalFileName}
+              storageProvider={doc.storageProvider}
+              status={doc.status}
+            />
           </li>
         );
       })}
@@ -347,9 +351,6 @@ export function EntityDocumentsPanel({
             </TableHeader>
             <TableBody>
               {docs.map((doc) => {
-                const canDownload =
-                  doc.storageProvider === "R2" &&
-                  (doc.status === "ACTIVE" || doc.status === "ARCHIVED");
                 return (
                   <TableRow key={doc.id}>
                     <TableCell>
@@ -386,22 +387,13 @@ export function EntityDocumentsPanel({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex flex-wrap justify-end gap-1">
-                        {canDownload && (
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={`/api/documents/${doc.id}/download`}>Descargar</a>
-                          </Button>
-                        )}
-                        {doc.storageProvider === "PLACEHOLDER" &&
-                          (doc.status === "ACTIVE" || doc.status === "ARCHIVED") && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled
-                            title="No hay archivo binario almacenado"
-                          >
-                            Sin archivo
-                          </Button>
-                        )}
+                        <DocumentFileActions
+                          documentId={doc.id}
+                          mimeType={doc.mimeType}
+                          originalFileName={doc.originalFileName}
+                          storageProvider={doc.storageProvider}
+                          status={doc.status}
+                        />
                         {doc.canMutate && doc.status === "ACTIVE" && isCompany && (
                           <form action={archiveCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
                             <Button variant="ghost" size="sm" type="submit">

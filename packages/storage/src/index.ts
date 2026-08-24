@@ -130,16 +130,67 @@ export async function deleteObject(storageKey: string): Promise<void> {
   );
 }
 
+// ─── Content-Disposition for presigned GET ────────────────────────────────────
+
+export type ContentDispositionKind = "inline" | "attachment";
+
+/**
+ * Build a Content-Disposition value with ASCII `filename` + RFC 5987 `filename*`.
+ * Preserves the original extension; strips path separators and characters that
+ * break S3 signing or inject extra header parameters (`;`, quotes, control chars).
+ */
+export function buildContentDispositionHeader(
+  disposition: ContentDispositionKind,
+  originalFileName: string,
+): string {
+  const baseName = originalFileName.replace(/^.*[/\\]/, "").trim() || "file";
+  // Strict ASCII token for the legacy `filename=` param — no `;` / spaces / quotes.
+  const asciiName =
+    baseName
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "")
+      .slice(0, 180) || "file";
+  // RFC 5987: encodeURIComponent is close enough; escape chars some parsers reject in attr.
+  const utf8Star = encodeURIComponent(baseName).replace(
+    /['()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `${disposition}; filename="${asciiName}"; filename*=UTF-8''${utf8Star}`;
+}
+
+export type PresignedGetOptions = {
+  expiresInSeconds?: number;
+  /** Override response Content-Disposition (signed into the URL). */
+  responseContentDisposition?: string;
+  /** Override response Content-Type (signed into the URL). */
+  responseContentType?: string;
+};
+
 // ─── Presigned URLs (download) ────────────────────────────────────────────────
 
 export async function getPresignedGetUrl(
-  storageKey:      string,
-  expiresInSeconds = 300,
+  storageKey: string,
+  expiresInSecondsOrOptions: number | PresignedGetOptions = 300,
 ): Promise<string> {
+  const options: PresignedGetOptions =
+    typeof expiresInSecondsOrOptions === "number"
+      ? { expiresInSeconds: expiresInSecondsOrOptions }
+      : expiresInSecondsOrOptions;
+  const expiresIn = options.expiresInSeconds ?? 300;
+
   const { client, bucket } = createS3Client();
   const command = new GetObjectCommand({
     Bucket: bucket,
     Key:    storageKey,
+    ...(options.responseContentDisposition
+      ? { ResponseContentDisposition: options.responseContentDisposition }
+      : {}),
+    ...(options.responseContentType
+      ? { ResponseContentType: options.responseContentType }
+      : {}),
   });
-  return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
+  return getSignedUrl(client, command, { expiresIn });
 }

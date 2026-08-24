@@ -5,6 +5,7 @@ import type { DocumentAttachmentView } from "@bloqer/services";
 import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge } from "./document-status-badge";
 import { DocumentStorageBadge } from "./document-storage-badge";
+import { DocumentFileActions } from "./document-file-actions";
 
 function fmtSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -26,12 +27,16 @@ export function DocumentCards({
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {docs.map((doc) => (
-        <Link
+        <div
           key={doc.id}
-          href={`/proyectos/${projectId}/documentos/${doc.id}`}
           className="flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
-          <p className="line-clamp-2 font-semibold leading-snug">{doc.originalFileName}</p>
+          <Link
+            href={`/proyectos/${projectId}/documentos/${doc.id}`}
+            className="line-clamp-2 font-semibold leading-snug hover:underline underline-offset-2"
+          >
+            {doc.originalFileName}
+          </Link>
           {doc.description ? (
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{doc.description}</p>
           ) : null}
@@ -43,7 +48,16 @@ export function DocumentCards({
           <p className="mt-2 text-xs text-muted-foreground">
             {fmtSize(doc.sizeBytes)} · {formatDate(doc.createdAt)}
           </p>
-        </Link>
+          <div className="mt-3">
+            <DocumentFileActions
+              documentId={doc.id}
+              mimeType={doc.mimeType}
+              originalFileName={doc.originalFileName}
+              storageProvider={doc.storageProvider}
+              status={doc.status}
+            />
+          </div>
+        </div>
       ))}
     </div>
   );

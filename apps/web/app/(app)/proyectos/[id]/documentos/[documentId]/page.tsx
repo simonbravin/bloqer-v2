@@ -2,7 +2,17 @@ import { formatDate } from "@/lib/format";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getDocumentById, ServiceError } from "@bloqer/services";
-import { DocumentCategoryBadge, DocumentStatusBadge, DocumentStorageBadge } from "@/features/documents";
+import {
+  DocumentCategoryBadge,
+  DocumentStatusBadge,
+  DocumentStorageBadge,
+  DocumentFileActions,
+  DocumentInlineImagePreview,
+} from "@/features/documents";
+import {
+  canInlineImagePreview,
+  canAccessDocumentFile,
+} from "@/features/documents/lib/document-file-utils";
 import { PageShell } from "@/components/layout/page-shell";
 import { archiveDocumentAction, restoreDocumentAction, softDeleteDocumentAction } from "../actions";
 import { Button } from "@/components/ui/button";
@@ -43,8 +53,9 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
 
   if (doc.projectId !== id) notFound();
 
-  const canDownload =
-    doc.storageProvider === "R2" && (doc.status === "ACTIVE" || doc.status === "ARCHIVED");
+  const canAccess = canAccessDocumentFile(doc);
+  const showInlineImage =
+    canAccess && canInlineImagePreview(doc.mimeType, doc.originalFileName);
 
   const doArchive = async () => {
     "use server";
@@ -61,24 +72,21 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={doc.originalFileName}>
-      <div className="flex items-center justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-xl font-bold tracking-tight truncate max-w-md">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <h1 className="max-w-md truncate text-xl font-bold tracking-tight">
             {doc.originalFileName}
           </h1>
           <DocumentStorageBadge storageProvider={doc.storageProvider} />
         </div>
-        <div className="flex gap-2">
-          {canDownload && (
-            <Button variant="outline" size="sm" asChild>
-              <a href={`/api/documents/${documentId}/download`}>Descargar</a>
-            </Button>
-          )}
-          {doc.storageProvider === "PLACEHOLDER" && doc.status !== "DELETED" && (
-            <Button variant="outline" size="sm" disabled title="No hay archivo binario almacenado">
-              Descargar no disponible
-            </Button>
-          )}
+        <div className="flex flex-wrap gap-2">
+          <DocumentFileActions
+            documentId={documentId}
+            mimeType={doc.mimeType}
+            originalFileName={doc.originalFileName}
+            storageProvider={doc.storageProvider}
+            status={doc.status}
+          />
           {doc.canMutate && doc.status === "ACTIVE" && (
             <form action={doArchive}>
               <Button variant="outline" size="sm" type="submit">
@@ -131,6 +139,13 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
           </p>
         </div>
       )}
+
+      {showInlineImage ? (
+        <DocumentInlineImagePreview
+          documentId={documentId}
+          originalFileName={doc.originalFileName}
+        />
+      ) : null}
 
       <div className="rounded-lg border bg-card">
         <div className="border-b px-6 py-4">

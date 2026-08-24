@@ -6,13 +6,18 @@ interface RouteParams {
   params: Promise<{ documentId: string }>;
 }
 
-export async function GET(_req: NextRequest, { params }: RouteParams): Promise<NextResponse> {
+function parseDisposition(raw: string | null): "inline" | "attachment" {
+  return raw === "inline" ? "inline" : "attachment";
+}
+
+export async function GET(req: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
   const { documentId } = await params;
+  const disposition = parseDisposition(req.nextUrl.searchParams.get("disposition"));
 
   const ctx = {
     actorUserId: current.session.user.id!,
@@ -22,7 +27,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams): Promise<N
   };
 
   try {
-    const url = await getDocumentDownloadUrl(documentId, ctx);
+    const url = await getDocumentDownloadUrl(documentId, ctx, { disposition });
     return NextResponse.redirect(url, 302);
   } catch (err) {
     if (err instanceof ServiceError) {

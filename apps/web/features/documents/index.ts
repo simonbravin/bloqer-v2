@@ -12,3 +12,6 @@ export type {
   EntityDocumentsLink,
   EntityDocumentsPanelScope,
 } from "./components/entity-documents-panel";
+export { DocumentFileActions } from "./components/document-file-actions";
+export { DocumentThumbnail } from "./components/document-thumbnail";
+export { DocumentInlineImagePreview } from "./components/document-inline-image-preview";

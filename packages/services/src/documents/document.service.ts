@@ -1,6 +1,14 @@
 import { prisma } from "@bloqer/database";
 import type { LinkedEntityType } from "@bloqer/database";
-import { buildStorageKey, putObject, getPresignedGetUrl, deleteObject, assertTenantScopedStorageKey } from "@bloqer/storage";
+import {
+  buildStorageKey,
+  putObject,
+  getPresignedGetUrl,
+  deleteObject,
+  assertTenantScopedStorageKey,
+  buildContentDispositionHeader,
+  type ContentDispositionKind,
+} from "@bloqer/storage";
 import { isStorageConfigured } from "@bloqer/config";
 import { can, type PermissionModule } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
@@ -597,9 +605,11 @@ export async function uploadDocument(
 }
 
 export async function getDocumentDownloadUrl(
-  id:  string,
+  id: string,
   ctx: ServiceContext,
+  options: { disposition?: ContentDispositionKind } = {},
 ): Promise<string> {
+  const disposition = options.disposition ?? "attachment";
   const doc = await prisma.documentAttachment.findUnique({ where: { id } });
   if (!doc || doc.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Documento no encontrado");
   if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
@@ -619,7 +629,11 @@ export async function getDocumentDownloadUrl(
   } catch {
     throw new ServiceError("NOT_FOUND", "Documento no encontrado");
   }
-  return getPresignedGetUrl(doc.storageKey, 300);
+  return getPresignedGetUrl(doc.storageKey, {
+    expiresInSeconds: 300,
+    responseContentDisposition: buildContentDispositionHeader(disposition, doc.originalFileName),
+    responseContentType: doc.mimeType || undefined,
+  });
 }
 
 export async function archiveDocument(id: string, ctx: ServiceContext): Promise<void> {

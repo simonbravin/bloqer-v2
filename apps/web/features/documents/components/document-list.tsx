@@ -14,6 +14,7 @@ import type { DocumentAttachmentView } from "@bloqer/services";
 import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge }   from "./document-status-badge";
 import { DocumentStorageBadge }  from "./document-storage-badge";
+import { DocumentFileActions } from "./document-file-actions";
 
 function fmtDate(iso: string) {
   return formatDate(iso);
@@ -45,6 +46,7 @@ export function DocumentList({ docs, projectId }: Props) {
             <TableHead>Estado</TableHead>
             <TableHead>Tamaño</TableHead>
             <TableHead>Fecha</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -72,6 +74,17 @@ export function DocumentList({ docs, projectId }: Props) {
               </TableCell>
               <TableCell className="text-xs tabular-nums text-muted-foreground">{fmtSize(doc.sizeBytes)}</TableCell>
               <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{fmtDate(doc.createdAt)}</TableCell>
+              <TableCell className="text-right">
+                <div className="flex justify-end">
+                  <DocumentFileActions
+                    documentId={doc.id}
+                    mimeType={doc.mimeType}
+                    originalFileName={doc.originalFileName}
+                    storageProvider={doc.storageProvider}
+                    status={doc.status}
+                  />
+                </div>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
