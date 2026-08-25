@@ -374,7 +374,7 @@ export async function removeContactRole(
     where: { contactId_role: { contactId, role } },
   });
   if (!contactRole || contactRole.status === "INACTIVE") {
-    throw new ServiceError("NOT_FOUND", `El contacto no tiene el rol ${role} activo`);
+    throw new ServiceError("NOT_FOUND", `El contacto no tiene el rol ${ROLE_LABEL_ES[role]} activo`);
   }
 
   // BR-PROJ-001: project client must keep an active CLIENT role.
