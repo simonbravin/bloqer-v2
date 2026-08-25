@@ -4,7 +4,7 @@ import { can } from "@bloqer/domain";
 import {
   getCompanyById,
   getSupplierInvoiceById,
-  listContacts,
+  listAllContacts,
   listLinkablePurchaseOrders,
   listProcurementWbsOptions,
   ServiceError,
@@ -36,7 +36,7 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
   try {
     [invoice, suppliersResult, linkablePOs, wbsNodes] = await Promise.all([
       getSupplierInvoiceById(supplierInvoiceId, ctx, id),
-      listContacts(LIST_AP_DIRECT_PAYEES, ctx),
+      listAllContacts(LIST_AP_DIRECT_PAYEES, ctx),
       listLinkablePurchaseOrders(id, ctx),
       listProcurementWbsOptions(id, ctx),
     ]);
@@ -50,7 +50,7 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
   }
 
   const suppliers = withCurrentApPayee(
-    suppliersResult.data.map(toApPayeeOption),
+    suppliersResult.map(toApPayeeOption),
     { id: invoice.supplierContactId, name: invoice.supplierName },
   );
 

@@ -18,7 +18,7 @@ import {
   getAccountMovementReport,
   getCompanyFiscalContext,
   getTenantModuleGate,
-  listContacts,
+  listAllContacts,
   listProjects,
   listTreasuryAccounts,
   parseMovementReportFilters,
@@ -164,8 +164,8 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
 
   if (canEditAp) {
     try {
-      const suppliersResult = await listContacts(LIST_AP_DIRECT_PAYEES, ctx);
-      suppliersForDialog = suppliersResult.data.map(toApPayeeOption);
+      const payees = await listAllContacts(LIST_AP_DIRECT_PAYEES, ctx);
+      suppliersForDialog = payees.map(toApPayeeOption);
     } catch {
       // VIEW DIRECTORY may be missing; keep AP dialog usable without supplier list
     }
@@ -173,11 +173,8 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
 
   if (canEditTreasury || canEditAr) {
     try {
-      const clientsResult = await listContacts(
-        { role: "CLIENT", status: "ACTIVE", page: 1, pageSize: 200 },
-        ctx,
-      );
-      clientsForDialog = clientsResult.data.map((c) => ({
+      const clients = await listAllContacts({ role: "CLIENT", status: "ACTIVE" }, ctx);
+      clientsForDialog = clients.map((c) => ({
         id: c.id,
         label: c.fantasyName ?? c.legalName,
         country: c.country,

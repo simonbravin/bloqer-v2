@@ -4,8 +4,6 @@ import type { SupplierOption } from "../components/supplier-invoice-form";
 export const LIST_AP_DIRECT_PAYEES = {
   roles: ["SUPPLIER", "EMPLOYEE"] as ("SUPPLIER" | "EMPLOYEE")[],
   status: "ACTIVE" as const,
-  page: 1,
-  pageSize: 200,
 };
 
 const PAYEE_ROLE_LABEL: Record<string, string> = {

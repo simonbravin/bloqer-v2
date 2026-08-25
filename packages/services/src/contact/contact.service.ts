@@ -112,7 +112,7 @@ export async function listContacts(
     prisma.contact.findMany({
       where,
       include: {
-        roles: { where: { status: "ACTIVE" }, orderBy: { role: "asc" } },
+        roles: { where: { tenantId: ctx.tenantId, status: "ACTIVE" }, orderBy: { role: "asc" } },
         clientProfile: true,
         supplierProfile: true,
         subcontractorProfile: true,
@@ -125,6 +125,26 @@ export async function listContacts(
   ]);
 
   return { data, total };
+}
+
+/** Picker lists (AP payee, OC, clientes) must not silently drop rows past page 200. */
+export async function listAllContacts(
+  filters: Omit<ListContactsInput, "page" | "pageSize">,
+  ctx: ServiceContext,
+): Promise<ContactWithRoles[]> {
+  const pageSize = 200;
+  const acc: ContactWithRoles[] = [];
+  let page = 1;
+  let total = Infinity;
+  while (acc.length < total && page <= 50) {
+    const result = await listContacts({ ...filters, page, pageSize }, ctx);
+    total = result.total;
+    if (result.data.length === 0) break;
+    acc.push(...result.data);
+    if (acc.length >= total) break;
+    page += 1;
+  }
+  return acc;
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -309,10 +329,16 @@ export async function assignContactRole(
   const contact = await prisma.contact.findUnique({ where: { id: contactId } });
   if (!contact) throw new ServiceError("NOT_FOUND", "Contacto no encontrado");
   if (contact.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (contact.status !== "ACTIVE") {
+    throw new ServiceError("CONFLICT", "No se pueden asignar roles a un contacto archivado");
+  }
 
   const existing = await prisma.contactRole.findUnique({
     where: { contactId_role: { contactId, role: input.role } },
   });
+  if (existing && existing.tenantId !== ctx.tenantId) {
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  }
 
   let contactRole: ContactRole;
   let action: "contact_role.reactivated" | "contact_role.assigned";
@@ -422,6 +448,9 @@ async function _guardContactForProfile(contactId: string, ctx: ServiceContext) {
   const contact = await prisma.contact.findUnique({ where: { id: contactId } });
   if (!contact) throw new ServiceError("NOT_FOUND", "Contacto no encontrado");
   if (contact.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (contact.status !== "ACTIVE") {
+    throw new ServiceError("CONFLICT", "No se puede editar el perfil de un contacto archivado");
+  }
   return contact;
 }
 

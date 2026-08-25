@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   defaultTaxRateForInvoiceLetter,
@@ -62,6 +62,7 @@ export function SupplierInvoiceEditForm({
   /** Stored unit prices are net — keep off unless user re-enters gross ([D-086]). */
   const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
   const [purchaseOrderId, setPurchaseOrderId] = useState<string | null>(invoice.purchaseOrderId ?? null);
+  const payeeLocked = Boolean(invoice.subcontractCertificationId);
 
   function onPurchaseOrderChange(nextId: string | null) {
     if (nextId === purchaseOrderId) return;
@@ -99,7 +100,14 @@ export function SupplierInvoiceEditForm({
       : [{ description: "", quantity: "1", unitPrice: "", taxRate: "21", wbsNodeId: null, purchaseOrderLineId: null }],
   );
 
-  const payeeLocked = Boolean(invoice.subcontractCertificationId);
+  useEffect(() => {
+    if (payeeLocked) return;
+    if (purchaseOrderId && !filteredPOs.some((po) => po.id === purchaseOrderId)) {
+      setPurchaseOrderId(null);
+      setLines((prev) => prev.map((l) => ({ ...l, purchaseOrderLineId: null })));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplierContactId]);
 
   function handleSupplierChange(id: string) {
     if (payeeLocked) return;

@@ -4,7 +4,7 @@ import { can } from "@bloqer/domain";
 import {
   getCompanyById,
   getCompanySupplierInvoiceById,
-  listContacts,
+  listAllContacts,
   ServiceError,
 } from "@bloqer/services";
 import { SupplierInvoiceEditForm, LIST_AP_DIRECT_PAYEES, toApPayeeOption, withCurrentApPayee } from "@/features/ap";
@@ -35,7 +35,7 @@ export default async function EditarFacturaProveedorCorporativaPage({ params }: 
   try {
     [invoice, suppliersResult] = await Promise.all([
       getCompanySupplierInvoiceById(invoiceId, ctx),
-      listContacts(LIST_AP_DIRECT_PAYEES, ctx),
+      listAllContacts(LIST_AP_DIRECT_PAYEES, ctx),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
@@ -50,7 +50,7 @@ export default async function EditarFacturaProveedorCorporativaPage({ params }: 
   }
 
   const suppliers = withCurrentApPayee(
-    suppliersResult.data.map(toApPayeeOption),
+    suppliersResult.map(toApPayeeOption),
     { id: invoice.supplierContactId, name: invoice.supplierName },
   );
 

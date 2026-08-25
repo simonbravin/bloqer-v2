@@ -23,7 +23,7 @@ import {
   getCompanyFiscalContext,
   getProjectShellInfo,
   getTenantModuleGate,
-  listContacts,
+  listAllContacts,
   listLinkablePurchaseOrders,
   listProcurementWbsOptions,
   listSupplierInvoicesByProject,
@@ -117,11 +117,11 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
 
     try {
       const [suppliersResult, linkablePOs, wbsNodes] = await Promise.all([
-        listContacts(LIST_AP_DIRECT_PAYEES, ctx),
+        listAllContacts(LIST_AP_DIRECT_PAYEES, ctx),
         listLinkablePurchaseOrders(id, ctx),
         listProcurementWbsOptions(id, ctx),
       ]);
-      suppliers = suppliersResult.data.map(toApPayeeOption);
+      suppliers = suppliersResult.map(toApPayeeOption);
       poOptions = linkablePOs.map((po) => ({
         id: po.id,
         code: po.code,

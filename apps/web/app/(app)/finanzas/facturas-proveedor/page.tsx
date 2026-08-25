@@ -17,7 +17,7 @@ import { ReportExportActions } from "@/features/reports";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
-import { listCompanySupplierInvoices, listContacts, getCompanyFiscalContext, canRegisterApPayment, ServiceError } from "@bloqer/services";
+import { listCompanySupplierInvoices, listAllContacts, getCompanyFiscalContext, canRegisterApPayment, ServiceError } from "@bloqer/services";
 import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -77,7 +77,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
 
   if (canCreateInvoice) {
     try {
-      suppliersResult = await listContacts(LIST_AP_DIRECT_PAYEES, ctx);
+      suppliersResult = await listAllContacts(LIST_AP_DIRECT_PAYEES, ctx);
     } catch {
       // VIEW DIRECTORY may be missing; keep invoice list, create dialog without suppliers
     }
@@ -96,7 +96,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     payableStatus: inv.payable?.status ?? null,
     invoiceLetter: inv.invoiceLetter,
   }));
-  const suppliers: SupplierOption[] = (suppliersResult?.data ?? []).map(toApPayeeOption);
+  const suppliers: SupplierOption[] = (suppliersResult ?? []).map(toApPayeeOption);
 
   let companyCountry: string | null = null;
   let companyIvaCondition: string | null = null;

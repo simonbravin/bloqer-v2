@@ -32,6 +32,14 @@ import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
+function revalidateContactSurfaces(contactId?: string) {
+  revalidatePath("/directorio");
+  if (contactId) revalidatePath(`/directorio/${contactId}`);
+  revalidatePath("/finanzas/transacciones");
+  revalidatePath("/finanzas/facturas-proveedor");
+  revalidatePath("/proyectos", "layout");
+}
+
 async function getCtx() {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -51,8 +59,7 @@ export async function createContactAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const contact = await createContact(parsed.data, ctx);
-    revalidatePath("/directorio");
-    revalidatePath(`/directorio/${contact.id}`);
+    revalidateContactSurfaces(contact.id);
     return { id: contact.id };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -69,8 +76,7 @@ export async function updateContactAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateContact(id, parsed.data, ctx);
-    revalidatePath("/directorio");
-    revalidatePath(`/directorio/${id}`);
+    revalidateContactSurfaces(id);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -82,8 +88,7 @@ export async function archiveContactAction(id: string): Promise<{ ok: true } | {
   const ctx = await getCtx();
   try {
     await archiveContact(id, ctx);
-    revalidatePath("/directorio");
-    revalidatePath(`/directorio/${id}`);
+    revalidateContactSurfaces(id);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -95,8 +100,7 @@ export async function reactivateContactAction(id: string): Promise<{ ok: true } 
   const ctx = await getCtx();
   try {
     await reactivateContact(id, ctx);
-    revalidatePath("/directorio");
-    revalidatePath(`/directorio/${id}`);
+    revalidateContactSurfaces(id);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -113,8 +117,7 @@ export async function assignContactRoleAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await assignContactRole(contactId, parsed.data, ctx);
-    revalidatePath("/directorio");
-    revalidatePath(`/directorio/${contactId}`);
+    revalidateContactSurfaces(contactId);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -131,8 +134,7 @@ export async function removeContactRoleAction(
   if (!parsedRole.success) return { error: "Rol inválido" };
   try {
     await removeContactRole(contactId, parsedRole.data, ctx);
-    revalidatePath("/directorio");
-    revalidatePath(`/directorio/${contactId}`);
+    revalidateContactSurfaces(contactId);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
