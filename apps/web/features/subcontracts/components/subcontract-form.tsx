@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label }    from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -130,7 +131,9 @@ export function SubcontractForm({
 
   function previewLineMoney(qty: string, price: string): string {
     try {
-      return serializeMoney(multiplyDecimal(qty.trim() || "0", price.trim() || "0"));
+      return serializeMoney(
+        multiplyDecimal(serializeMoney(qty.trim() || "0"), serializeMoney(price.trim() || "0")),
+      );
     } catch {
       return "0.00";
     }
@@ -279,10 +282,10 @@ export function SubcontractForm({
                         />
                       </TableCell>
                       <TableCell className="min-w-[100px]">
-                        <Input className="h-8 text-xs text-right" type="number" step="any" min="0.0001" value={line.quantity} onChange={(e) => updateLine(i, "quantity", e.target.value)} required />
+                        <DecimalInput className="h-8 text-xs text-right" value={line.quantity} onValueChange={(v) => updateLine(i, "quantity", v)} placeholder="1,00" required />
                       </TableCell>
                       <TableCell className="min-w-[120px]">
-                        <Input className="h-8 text-xs text-right" type="number" step="any" min="0.0001" value={line.unitPrice} onChange={(e) => updateLine(i, "unitPrice", e.target.value)} required />
+                        <DecimalInput className="h-8 text-xs text-right" value={line.unitPrice} onValueChange={(v) => updateLine(i, "unitPrice", v)} placeholder="0,00" required />
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {formatMoneyAmount(sub)}

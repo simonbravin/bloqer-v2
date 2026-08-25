@@ -8,6 +8,8 @@ import {
   roundMoney,
   roundToDecimals,
   serializeMoney,
+  parseUserDecimal,
+  formatGroupedDecimal,
   sumAmountArsStrings,
 } from "./index";
 
@@ -62,6 +64,35 @@ describe("resolveFxAmounts", () => {
 describe("sumAmountArsStrings", () => {
   it("sums and rounds to 2", () => {
     assert.equal(sumAmountArsStrings([{ amountArs: "1.10" }, { amountArs: "2.01" }]), "3.11");
+  });
+});
+
+describe("parseUserDecimal and formatGroupedDecimal", () => {
+  it("parses es-AR millions", () => {
+    assert.equal(parseUserDecimal("1.234.567,89"), "1234567.89");
+    assert.equal(formatGroupedDecimal("1234567.89"), "1.234.567,89");
+  });
+
+  it("parses US thousands and a plain integer", () => {
+    assert.equal(parseUserDecimal("1,234,567.89"), "1234567.89");
+    assert.equal(parseUserDecimal("2500000"), "2500000");
+  });
+
+  it("treats a single dot with 3 fraction digits as thousands on commit", () => {
+    assert.equal(parseUserDecimal("1.234"), "1234");
+    assert.equal(parseUserDecimal("1.234", "commit"), "1234");
+  });
+
+  it("live mode does not treat in-progress tokens as thousands or cents", () => {
+    assert.throws(() => parseUserDecimal("1.234", "live"), /INVALID_AMOUNT/);
+    assert.throws(() => parseUserDecimal("2.5", "live"), /INVALID_AMOUNT/);
+    assert.throws(() => parseUserDecimal("10.", "live"), /INVALID_AMOUNT/);
+    assert.equal(parseUserDecimal("2.50", "live"), "2.50");
+    assert.equal(parseUserDecimal("1.234.567", "live"), "1234567");
+  });
+
+  it("parses US integers with multiple grouping commas", () => {
+    assert.equal(parseUserDecimal("1,234,567"), "1234567");
   });
 });
 

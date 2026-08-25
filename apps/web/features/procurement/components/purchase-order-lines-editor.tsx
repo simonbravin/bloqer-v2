@@ -2,15 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { divideDecimal, roundQty, QTY_DECIMALS } from "@bloqer/utils";
+import { addDecimal, divideDecimal, multiplyDecimal, roundMoney, serializeMoney, roundQty, QTY_DECIMALS } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, productsToSearchableOptions, toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { budgetUnitLabel } from "@/lib/budget-units";
-import { formatDecimalAr } from "@/lib/format-money";
+import { formatDecimalArFromString, formatQtyFromString, isPositiveMoneyAmount } from "@/lib/format-money";
 
 export type PurchaseOrderLine = {
   wbsNodeId: string | null;
@@ -52,11 +53,7 @@ export type ProductOption = { id: string; sku: string; name: string; unit: strin
 
 function fmtQtyHint(raw: string | null | undefined): string {
   if (raw == null || raw === "") return "—";
-  const t = raw.trim();
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return t;
-  const [i, d = ""] = t.split(".");
-  const trimmed = d.replace(/0+$/, "");
-  return trimmed ? `${i}.${trimmed}` : i;
+  return formatQtyFromString(raw);
 }
 
 /** True when qty string is a finite number > 0 (avoid prefill 0). */
@@ -68,18 +65,18 @@ function isPositiveQty(raw: string | null | undefined): boolean {
   return Number.isFinite(n) && n > 0;
 }
 
-function safeNum(v: string) {
-  const n = parseFloat(v);
-  return isNaN(n) || n < 0 ? 0 : n;
-}
-
 function linePreview(l: PurchaseOrderLine) {
-  const qty = safeNum(l.quantity);
-  const price = safeNum(l.unitPrice);
-  const rate = safeNum(l.taxRate);
-  const subtotal = qty * price;
-  const tax = subtotal * (rate / 100);
-  return { subtotal, tax, total: subtotal + tax };
+  try {
+    const qty = serializeMoney(l.quantity.trim() || "0");
+    const price = serializeMoney(l.unitPrice.trim() || "0");
+    const rate = l.taxRate.trim() || "0";
+    const subtotal = roundMoney(multiplyDecimal(qty, price));
+    const tax = roundMoney(divideDecimal(multiplyDecimal(subtotal, rate), "100"));
+    const total = roundMoney(addDecimal(subtotal, tax));
+    return { subtotal, tax, total };
+  } catch {
+    return { subtotal: "0.00", tax: "0.00", total: "0.00" };
+  }
 }
 
 interface Props {
@@ -182,7 +179,7 @@ export function PurchaseOrderLinesEditor({
 
   /** Trae el costo unitario del presupuesto (APU) al campo Precio unit. */
   function fillBudgetUnitPrice(i: number, wbs?: WbsOption) {
-    if (!wbs?.budgetUnitCost || safeNum(wbs.budgetUnitCost) <= 0) return;
+    if (!wbs?.budgetUnitCost || !isPositiveMoneyAmount(wbs.budgetUnitCost)) return;
     update(i, "unitPrice", wbs.budgetUnitCost);
     toast.success("Precio unitario completado con el referencial del presupuesto.");
   }
@@ -190,12 +187,12 @@ export function PurchaseOrderLinesEditor({
   /** Ajusta la cantidad para consumir el saldo disponible de la partida. */
   function consumePartidaSaldo(i: number, line: PurchaseOrderLine, wbs?: WbsOption) {
     if (wbs?.availableSaldo == null) return;
-    if (safeNum(wbs.availableSaldo) <= 0) {
+    if (!isPositiveMoneyAmount(wbs.availableSaldo)) {
       toast.error("La partida no tiene saldo disponible para consumir.");
       return;
     }
     const price = line.unitPrice.trim() || wbs.budgetUnitCost || "";
-    if (!price || safeNum(price) <= 0) {
+    if (!price || !isPositiveMoneyAmount(price)) {
       toast.error("Definí primero un precio unitario (o usá el referencial).");
       return;
     }
@@ -229,9 +226,13 @@ export function PurchaseOrderLinesEditor({
   const totals = lines.reduce(
     (acc, l) => {
       const p = linePreview(l);
-      return { subtotal: acc.subtotal + p.subtotal, tax: acc.tax + p.tax, total: acc.total + p.total };
+      return {
+        subtotal: roundMoney(addDecimal(acc.subtotal, p.subtotal)),
+        tax: roundMoney(addDecimal(acc.tax, p.tax)),
+        total: roundMoney(addDecimal(acc.total, p.total)),
+      };
     },
-    { subtotal: 0, tax: 0, total: 0 },
+    { subtotal: "0.00", tax: "0.00", total: "0.00" },
   );
 
   return (
@@ -295,7 +296,7 @@ export function PurchaseOrderLinesEditor({
                         wbs.wouldExceedBudget ? "text-destructive" : "text-muted-foreground"
                       }`}
                     >
-                      Saldo part.: {formatDecimalAr(Number(wbs.availableSaldo))}
+                      Saldo part.: {formatDecimalArFromString(wbs.availableSaldo)}
                       {wbs.wouldExceedBudget ? " (alerta)" : ""}
                     </button>
                   )}
@@ -336,7 +337,7 @@ export function PurchaseOrderLinesEditor({
                         ? `Necesidad ${fmtQtyHint(selectedApu.needQty)} · Pedido ${fmtQtyHint(selectedApu.orderedQty)} · Faltante ${fmtQtyHint(selectedApu.shortfallQty ?? selectedApu.quantity)} ${budgetUnitLabel(selectedApu.unit)}`
                         : `Ref. APU: ${fmtQtyHint(selectedApu.quantity)} ${budgetUnitLabel(selectedApu.unit)}`}
                       {selectedApu.unitCost
-                        ? ` · ${formatDecimalAr(Number(selectedApu.unitCost))}/u`
+                        ? ` · ${formatDecimalArFromString(selectedApu.unitCost)}/u`
                         : ""}
                     </p>
                   ) : null}
@@ -391,24 +392,22 @@ export function PurchaseOrderLinesEditor({
                 </div>
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Cantidad</Label>
-                  <Input
+                  <DecimalInput
                     required
                     value={line.quantity}
-                    onChange={(e) => update(i, "quantity", e.target.value)}
-                    placeholder="1"
-                    inputMode="decimal"
-                    className="h-9 text-sm tabular-nums"
+                    onValueChange={(v) => update(i, "quantity", v)}
+                    placeholder="1,00"
+                    className="h-9 text-sm"
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Precio unit.</Label>
-                  <Input
+                  <DecimalInput
                     required
                     value={line.unitPrice}
-                    onChange={(e) => update(i, "unitPrice", e.target.value)}
-                    placeholder="0.00"
-                    inputMode="decimal"
-                    className="h-9 text-sm tabular-nums"
+                    onValueChange={(v) => update(i, "unitPrice", v)}
+                    placeholder="0,00"
+                    className="h-9 text-sm"
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
@@ -421,7 +420,7 @@ export function PurchaseOrderLinesEditor({
                         title="Usar este costo como precio unitario"
                         className="text-left underline decoration-dotted underline-offset-2 hover:text-foreground truncate max-w-full"
                       >
-                        {formatDecimalAr(Number(wbs.budgetUnitCost))}
+                        {formatDecimalArFromString(wbs.budgetUnitCost)}
                         {wbs.budgetUnit ? ` / ${budgetUnitLabel(wbs.budgetUnit) || wbs.budgetUnit}` : ""}
                       </button>
                     ) : (
@@ -442,7 +441,7 @@ export function PurchaseOrderLinesEditor({
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Total</Label>
                   <p className="flex h-9 items-center text-sm tabular-nums font-semibold">
-                    {formatDecimalAr(p.total)}
+                    {formatDecimalArFromString(p.total)}
                   </p>
                 </div>
               </div>
@@ -467,7 +466,7 @@ export function PurchaseOrderLinesEditor({
       <div className="flex justify-end gap-8 text-sm border-t pt-3">
         <div className="text-right">
           <p className="text-xs text-muted-foreground font-semibold">Total (vista previa)</p>
-          <p className="tabular-nums font-semibold">{formatDecimalAr(totals.total)}</p>
+          <p className="tabular-nums font-semibold">{formatDecimalArFromString(totals.total)}</p>
         </div>
       </div>
     </div>

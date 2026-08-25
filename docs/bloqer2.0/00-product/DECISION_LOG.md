@@ -724,7 +724,8 @@
   5. **Pagar/cobrar todo:** el server aplica el **saldo almacenado** (`payFullBalance` / equivalente); la UI solo muestra 2 dp. No redondear en cliente y reaplicar.
   6. Datos **confirmados/emitidos** no se reescriben (inmutabilidad). Escrituras nuevas ya nacen a 2 dp. Polvo histórico: cierre vía epsilon de obligación solo cuando el residual es polvo sub-centavo de datos viejos; no write-off de centavos reales en pagos parciales.
   7. Validación Zod de money: preprocess **round-to-2** (edits históricos no rompen); inputs money `step=0.01`.
-- **Implicancias:** helpers canónicos `roundMoney` / `serializeMoney` / `formatMoneyAmount`; prohibido `parseFloat` en paths de dinero y `.toString()` crudo en DTOs money.
+  8. **Amend (2026-08-25):** display de cantidades operativas y precios unitarios en UI: **2 dp + separador de miles es-AR** (`1.234.567,89`). El storage de qty/PU puede seguir en 4 dp; FX se muestra a 6. Input canónico: `DecimalInput`.
+- **Implicancias:** helpers canónicos `roundMoney` / `serializeMoney` / `formatMoneyAmount` / `formatGroupedDecimal`; prohibido `parseFloat` en paths de dinero y `.toString()` crudo en DTOs money.
 - **Documentos afectados:** [`03-finance/MONEY_MODEL.md`](../03-finance/MONEY_MODEL.md), [`08-architecture/MONEY_AND_DECIMAL_STRATEGY.md`](../08-architecture/MONEY_AND_DECIMAL_STRATEGY.md), [`04-formulas/CURRENCY_CONVERSION_FORMULAS.md`](../04-formulas/CURRENCY_CONVERSION_FORMULAS.md), [`08-architecture/AGENT_GUARDRAILS.md`](../08-architecture/AGENT_GUARDRAILS.md), [`08-architecture/CODING_STANDARDS.md`](../08-architecture/CODING_STANDARDS.md), [`AGENTS.md`](../AGENTS.md).
 
 ---

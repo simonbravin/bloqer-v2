@@ -6,6 +6,8 @@ export const FX_DECIMALS = 6;
 export const QTY_DECIMALS = 4;
 /** Tax / overhead / profit percentages. */
 export const RATE_PCT_DECIMALS = 4;
+/** UI display for money, qty and unit prices (thousands + 2 dp, es-AR). FX stays at 6. */
+export const DISPLAY_DECIMALS = MONEY_DECIMALS;
 
 const DECIMAL_RE = /^-?\d+(\.\d+)?$/;
 
@@ -266,4 +268,77 @@ export function divideDecimal(
     return `${sign}${body}`;
   }
   return body;
+}
+
+/**
+ * Parse a user-typed decimal (es-AR `1.234.567,89` or US `1,234,567.89`) to a
+ * canonical `1234567.89` string. Does not round.
+ *
+ * `live`: reject ambiguous in-progress tokens (`2.5`, `1.234`, `10.`) so the
+ * parent value does not jump while typing thousands.
+ * `commit`: on blur — a single `.` + 3 fraction digits is thousands (`1.234` → 1234).
+ */
+export function parseUserDecimal(raw: string, mode: "live" | "commit" = "commit"): string {
+  let s = raw.trim().replace(/\s/g, "").replace(/\u00a0/g, "");
+  if (!s) throw new Error("INVALID_AMOUNT");
+  const negative = s.startsWith("-") || s.startsWith("(");
+  s = s.replace(/^[-+(]+/, "").replace(/\)+$/g, "");
+  if (!s) throw new Error("INVALID_AMOUNT");
+
+  const lastComma = s.lastIndexOf(",");
+  const lastDot = s.lastIndexOf(".");
+  if (lastComma >= 0 && lastDot >= 0) {
+    if (lastComma > lastDot) {
+      s = s.replace(/\./g, "").replace(",", ".");
+    } else {
+      s = s.replace(/,/g, "");
+    }
+  } else if (lastComma >= 0) {
+    const commaCount = (s.match(/,/g) ?? []).length;
+    // US grouping `1,234,567` (no decimal). A single comma is es-AR decimal (`1,23`).
+    s = commaCount > 1 ? s.replace(/,/g, "") : s.replace(/\./g, "").replace(",", ".");
+  } else if (lastDot >= 0) {
+    const parts = s.split(".");
+    if (parts.length > 2) {
+      s = parts.join("");
+    } else {
+      const frac = parts[1] ?? "";
+      if (mode === "live") {
+        if (frac.length === 0 || frac.length === 1 || frac.length === 3) {
+          throw new Error("INVALID_AMOUNT");
+        }
+      } else if (frac.length === 3) {
+        s = parts.join("");
+      }
+    }
+  }
+
+  if (!/^\d+(\.\d+)?$/.test(s)) throw new Error("INVALID_AMOUNT");
+  return negative ? `-${s}` : s;
+}
+
+export function tryParseUserDecimal(raw: string, mode: "live" | "commit" = "commit"): string | null {
+  const t = raw.trim();
+  if (!t) return "";
+  try {
+    return parseUserDecimal(t, mode);
+  } catch {
+    return null;
+  }
+}
+
+/** Grouped es-AR display: `1.234.567,89`. */
+export function formatGroupedDecimal(raw: string | number, decimals: number = DISPLAY_DECIMALS): string {
+  const s = roundToDecimals(raw, decimals);
+  const sign = s.startsWith("-") ? "-" : "";
+  const abs = sign ? s.slice(1) : s;
+  const [intPart = "0", decPart = ""] = abs.split(".");
+  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return decPart ? `${sign}${withThousands},${decPart}` : `${sign}${withThousands}`;
+}
+
+/** Editing buffer without thousands: `1234567,89`. */
+export function formatDecimalEditBuffer(raw: string | number, decimals: number = DISPLAY_DECIMALS): string {
+  const s = roundToDecimals(raw, decimals);
+  return s.replace(".", ",");
 }

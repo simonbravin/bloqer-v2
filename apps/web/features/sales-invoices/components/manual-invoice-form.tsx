@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
@@ -72,6 +73,8 @@ export function ManualInvoiceForm({
   const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
   const [pricesIncludeTaxTouched, setPricesIncludeTaxTouched] = useState(false);
   const [taxRate, setTaxRate] = useState("21");
+  const [quantity, setQuantity] = useState("1.00");
+  const [unitPrice, setUnitPrice] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
   const [collectNow, setCollectNow] = useState(false);
   const [collectAccountId, setCollectAccountId] = useState("");
@@ -173,8 +176,8 @@ export function ManualInvoiceForm({
           externalInvoiceRef: null,
           lines: [{
             description: fd.get("description") as string,
-            quantity: fd.get("quantity") as string,
-            unitPrice: fd.get("unitPrice") as string,
+            quantity: String(fd.get("quantity") ?? "").trim() || quantity,
+            unitPrice: String(fd.get("unitPrice") ?? "").trim() || unitPrice,
             taxRate: forceZeroTax ? "0" : (taxRate || "0"),
             sortOrder: 0,
           }],
@@ -216,8 +219,8 @@ export function ManualInvoiceForm({
         externalInvoiceRef: null,
         lines: [{
           description: fd.get("description") as string,
-          quantity:    fd.get("quantity")    as string,
-          unitPrice:   fd.get("unitPrice")   as string,
+          quantity:    String(fd.get("quantity") ?? "").trim() || quantity,
+          unitPrice:   String(fd.get("unitPrice") ?? "").trim() || unitPrice,
           taxRate:     forceZeroTax ? "0" : (taxRate || "0"),
           sortOrder:   0,
         }],
@@ -318,13 +321,13 @@ export function ManualInvoiceForm({
           </div>
           <div className="space-y-1">
             <Label htmlFor="quantity">Cantidad</Label>
-            <Input id="quantity" name="quantity" required defaultValue="1" />
+            <DecimalInput id="quantity" name="quantity" required value={quantity} onValueChange={setQuantity} placeholder="1,00" />
           </div>
           <div className="space-y-1">
             <Label htmlFor="unitPrice">
               {pricesIncludeTax ? "Precio unitario (c/IVA)" : "Precio unitario"}
             </Label>
-            <Input id="unitPrice" name="unitPrice" required placeholder="0.00" />
+            <DecimalInput id="unitPrice" name="unitPrice" required value={unitPrice} onValueChange={setUnitPrice} placeholder="0,00" />
           </div>
           <div className="space-y-1">
             <TaxRateSelect

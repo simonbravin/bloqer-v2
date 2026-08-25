@@ -6,10 +6,12 @@ import {
   divideDecimal,
   multiplyDecimal,
   roundMoney,
+  serializeMoney,
   calcLineAmountsFromGrossInclusive,
 } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { formatDecimalArFromString } from "@/lib/format-money";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
@@ -49,10 +51,16 @@ function safeDecimal(v: string): string {
   return t;
 }
 
-/** Client preview aligned with server calc ([D-053] / [D-086]). */
+/** Client preview aligned with UI 2 dp display ([D-053] / [D-086]). */
 function linePreview(l: InvoiceLine, pricesIncludeTax: boolean) {
-  const qty = safeDecimal(l.quantity);
-  const price = safeDecimal(l.unitPrice);
+  let qty: string;
+  let price: string;
+  try {
+    qty = serializeMoney(safeDecimal(l.quantity));
+    price = serializeMoney(safeDecimal(l.unitPrice));
+  } catch {
+    return { subtotal: "0.00", tax: "0.00", total: "0.00" };
+  }
   const rate = safeDecimal(l.taxRate);
   if (pricesIncludeTax) {
     const r = calcLineAmountsFromGrossInclusive({
@@ -223,28 +231,26 @@ export function InvoiceLinesEditor({
                   <Label htmlFor={quantityId} className="text-xs">
                     Cantidad
                   </Label>
-                  <Input
+                  <DecimalInput
                     id={quantityId}
                     required
                     value={line.quantity}
-                    onChange={(e) => update(i, "quantity", e.target.value)}
-                    placeholder="1"
-                    inputMode="decimal"
-                    className="h-9 text-sm tabular-nums"
+                    onValueChange={(v) => update(i, "quantity", v)}
+                    placeholder="1,00"
+                    className="h-9 text-sm"
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
                   <Label htmlFor={unitPriceId} className="text-xs">
                     {pricesIncludeTax ? "Precio unit. (c/IVA)" : "Precio unit."}
                   </Label>
-                  <Input
+                  <DecimalInput
                     id={unitPriceId}
                     required
                     value={line.unitPrice}
-                    onChange={(e) => update(i, "unitPrice", e.target.value)}
-                    placeholder="0.00"
-                    inputMode="decimal"
-                    className="h-9 text-sm tabular-nums"
+                    onValueChange={(v) => update(i, "unitPrice", v)}
+                    placeholder="0,00"
+                    className="h-9 text-sm"
                   />
                 </div>
                 <div className="space-y-1 min-w-0">

@@ -25,11 +25,11 @@ Definir cómo Bloqer representa **montos monetarios** de forma consistente, sin 
 | Concepto | Decimales de **negocio** | Capacidad típica en DB |
 |---|---|---|
 | ARS / USD / montos operativos / `amount_ars` | **2** | `NUMERIC(18,4)` (capacidad; no escala de negocio) |
-| Cantidades inventario / cómputo | 4 | `NUMERIC(18,4)` |
+| Cantidades inventario / cómputo | 4 en storage; **2 en UI** | `NUMERIC(18,4)` |
 | Tipo de cambio (`fx_rate`) | **6** | `NUMERIC(18,6)` |
 | Porcentajes impuestos / overhead | 4 | `NUMERIC(8,4)` |
 
-> Ver [D-053](../00-product/DECISION_LOG.md): la precisión de negocio la impone el kernel de aplicación; las columnas no se migran a `(18,2)`.
+> Ver [D-053](../00-product/DECISION_LOG.md): la precisión de negocio la impone el kernel de aplicación; las columnas no se migran a `(18,2)`. Display es-AR: miles con `.` y decimales con `,` (`1.234.567,89`).
 
 ## Redondeo
 - Redondeo **half-up** a la precisión del campo destino ([D-053](../00-product/DECISION_LOG.md)).

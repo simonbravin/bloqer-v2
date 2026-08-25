@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { roundMoney, serializeMoney, toIsoDateLocal } from "@bloqer/utils";
+import { compareDecimal, roundMoney, serializeMoney, toIsoDateLocal } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FillableAmount } from "@/components/ui/fillable-amount";
@@ -98,7 +99,11 @@ export function PaymentForm({
       return;
     }
     try {
-      roundMoney(amount);
+      const rounded = roundMoney(amount);
+      if (compareDecimal(rounded, balanceSerialized) > 0) {
+        setError("El monto supera el saldo pendiente");
+        return;
+      }
     } catch {
       setError("Monto inválido");
       return;
@@ -111,12 +116,16 @@ export function PaymentForm({
     e.preventDefault();
     if (!accountId) { setError("Seleccioná una cuenta de tesorería"); return; }
     const fd = new FormData(e.currentTarget);
-    const rawAmount = String(fd.get("amount") ?? "").trim();
+    const rawAmount = String(fd.get("amount") ?? "").trim() || amount.trim();
     let rounded: string;
     try {
       rounded = roundMoney(rawAmount);
     } catch {
       setError("Monto inválido");
+      return;
+    }
+    if (compareDecimal(rounded, balanceSerialized) > 0) {
+      setError("El monto supera el saldo pendiente");
       return;
     }
     // D-053: full balance uses stored balanceDue server-side (avoid round-then-reapply).
@@ -248,18 +257,13 @@ export function PaymentForm({
 
             <div className="space-y-1">
               <Label htmlFor="amount">Monto ({payableCurrency})</Label>
-              <Input
+              <DecimalInput
                 id="amount"
                 name="amount"
-                type="number"
                 required
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                step="0.01"
-                min="0.01"
-                inputMode="decimal"
-                max={balanceSerialized}
+                onValueChange={setAmount}
+                placeholder="0,00"
                 className={cn(flash && "ring-2 ring-primary transition-shadow")}
               />
               {fieldMode ? (

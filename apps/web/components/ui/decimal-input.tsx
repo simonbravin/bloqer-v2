@@ -1,0 +1,137 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  DISPLAY_DECIMALS,
+  formatDecimalEditBuffer,
+  formatGroupedDecimal,
+  roundToDecimals,
+  tryParseUserDecimal,
+} from "@bloqer/utils";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
+type DecimalInputProps = Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "type"> & {
+  value: string;
+  onValueChange: (canonical: string) => void;
+  /** Fractional digits on blur / emit. Money, qty and unit prices use 2. */
+  scale?: number;
+};
+
+function displayFromCanonical(canonical: string, scale: number): string {
+  const t = canonical.trim();
+  if (!t) return "";
+  try {
+    return formatGroupedDecimal(t, scale);
+  } catch {
+    return canonical;
+  }
+}
+
+export function DecimalInput({
+  value,
+  onValueChange,
+  scale = DISPLAY_DECIMALS,
+  name,
+  className,
+  onBlur,
+  onFocus,
+  onKeyDown,
+  ...rest
+}: DecimalInputProps) {
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState(() => displayFromCanonical(value, scale));
+  const hiddenRef = useRef<HTMLInputElement>(null);
+  const visibleRef = useRef<HTMLInputElement>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  const onValueChangeRef = useRef(onValueChange);
+  onValueChangeRef.current = onValueChange;
+
+  useEffect(() => {
+    if (!focused) setDraft(displayFromCanonical(value, scale));
+  }, [value, scale, focused]);
+
+  function emitCanonical(canonical: string) {
+    if (hiddenRef.current) hiddenRef.current.value = canonical;
+    onValueChangeRef.current(canonical);
+  }
+
+  function commit(raw: string) {
+    const parsed = tryParseUserDecimal(raw, "commit");
+    if (parsed == null) return;
+    if (parsed === "") {
+      emitCanonical("");
+      setDraft("");
+      return;
+    }
+    try {
+      const rounded = roundToDecimals(parsed, scaleRef.current);
+      emitCanonical(rounded);
+      setDraft(formatGroupedDecimal(rounded, scaleRef.current));
+    } catch {
+      /* keep draft */
+    }
+  }
+
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
+
+  useEffect(() => {
+    const form = visibleRef.current?.form;
+    if (!form) return;
+    const onSubmit = () => {
+      commitRef.current(draftRef.current);
+    };
+    form.addEventListener("submit", onSubmit, true);
+    return () => form.removeEventListener("submit", onSubmit, true);
+  }, []);
+
+  return (
+    <>
+      {name ? <input ref={hiddenRef} type="hidden" name={name} value={value} /> : null}
+      <Input
+        {...rest}
+        ref={visibleRef}
+        name={undefined}
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        className={cn("tabular-nums", className)}
+        value={focused ? draft : displayFromCanonical(value, scale)}
+        onFocus={(e) => {
+          setFocused(true);
+          const t = value.trim();
+          setDraft(t ? formatDecimalEditBuffer(t, scale) : "");
+          onFocus?.(e);
+        }}
+        onChange={(e) => {
+          const next = e.target.value;
+          setDraft(next);
+          const parsed = tryParseUserDecimal(next, "live");
+          if (parsed == null) return;
+          if (parsed === "") {
+            emitCanonical("");
+            return;
+          }
+          try {
+            emitCanonical(roundToDecimals(parsed, scale));
+          } catch {
+            /* incomplete token */
+          }
+        }}
+        onKeyDown={(e) => {
+          onKeyDown?.(e);
+          if (e.key === "Enter") commit(draft);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          commit(draft);
+          onBlur?.(e);
+        }}
+      />
+    </>
+  );
+}

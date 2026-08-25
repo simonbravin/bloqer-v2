@@ -1,54 +1,38 @@
-import { compareDecimal, roundMoney, roundQty, serializeMoney, serializeUnitPrice } from "@bloqer/utils";
-
-function formatFixedDecimalString(s: string): string {
-  const sign = s.startsWith("-") ? "-" : "";
-  const abs = sign ? s.slice(1) : s;
-  const [intPart, decPart = ""] = abs.split(".");
-  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return decPart ? `${sign}${withThousands},${decPart}` : `${sign}${withThousands}`;
-}
+import {
+  compareDecimal,
+  DISPLAY_DECIMALS,
+  formatGroupedDecimal,
+  roundQty,
+  serializeMoney,
+} from "@bloqer/utils";
 
 /** Decimal estilo AR sin depender del locale del runtime (seguro para SSR + cliente). */
 export function formatDecimalAr(n: number): string {
   return formatDecimalArFromString(serializeMoney(n));
 }
 
-/** Format a decimal string as es-AR without IEEE float (D-053). */
+/** Format a decimal string as es-AR without IEEE float (D-053 display: 2 dp + miles). */
 export function formatDecimalArFromString(raw: string): string {
-  let s: string;
   try {
-    s = serializeMoney(raw);
+    return formatGroupedDecimal(raw, DISPLAY_DECIMALS);
   } catch {
     return raw;
   }
-  return formatFixedDecimalString(s);
 }
 
-/** Cantidades inventario / cómputo (4 dp, D-053). */
+/** Cantidades en UI: 2 dp + miles. El storage puede seguir en 4 dp. */
 export function formatQtyFromString(raw: string): string {
-  try {
-    return formatFixedDecimalString(roundQty(raw));
-  } catch {
-    return raw;
-  }
+  return formatDecimalArFromString(raw);
 }
 
-/** Cantidad de presupuesto en tabla: 2 dp de display (el valor persistido sigue en 4 dp). */
+/** @deprecated Use formatQtyFromString — same 2 dp display. */
 export function formatBudgetQtyFromString(raw: string): string {
-  try {
-    return formatFixedDecimalString(roundMoney(raw, 2));
-  } catch {
-    return raw;
-  }
+  return formatQtyFromString(raw);
 }
 
-/** Precios unitarios de línea (4 dp, D-086). */
+/** Precios unitarios en UI: 2 dp + miles (el DTO puede traer 4 dp). */
 export function formatUnitPriceFromString(raw: string): string {
-  try {
-    return formatFixedDecimalString(serializeUnitPrice(raw));
-  } catch {
-    return raw;
-  }
+  return formatDecimalArFromString(raw);
 }
 
 /** Tooltip/eje de chart: Recharts entrega number; el texto sale por el kernel. */
@@ -60,7 +44,6 @@ export function formatChartMoney(value: number | string, currency?: string): str
 export function formatMoneyAmount(raw: string, currency?: string): string {
   const body = formatDecimalArFromString(raw);
   if (currency && currency.length === 3) {
-    // Prefer Intl currency style when magnitude is Number-safe; else code suffix.
     try {
       const n = Number(serializeMoney(raw));
       if (Number.isFinite(n) && Math.abs(n) < Number.MAX_SAFE_INTEGER / 100) {
