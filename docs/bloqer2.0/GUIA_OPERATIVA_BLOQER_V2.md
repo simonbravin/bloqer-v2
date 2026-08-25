@@ -55,7 +55,7 @@ Hacé esto **en orden** la primera vez; después cada módulo se usa en paralelo
 
 | # | Qué | Dónde | Para qué |
 |---|-----|-------|----------|
-| 1 | Cliente / proveedores / subcontratistas en Directorio | `/directorio` | Sin **Cliente** no se crea la obra |
+| 1 | Cliente, proveedores, subcontratistas **y empleados** en Directorio | `/directorio` | Sin **Cliente** no se crea la obra. Sin **Empleado** no se paga sueldo ni reintegro mapeado |
 | 2 | Cuentas de tesorería (caja/banco) | `/tesoreria/cuentas` | Cobranzas y pagos |
 | 3 | Contabilidad: **Aplicar plantilla AR** (si el plan está vacío) | `/contabilidad/cuentas` | Auto-borradores de asientos |
 | 4 | Crear proyecto → **Activar obra** | `/proyectos/nuevo` | Estado `ACTIVE` |
@@ -74,7 +74,7 @@ No hay un menú llamado **Afectaciones**. En obra, “afectar” = **imputar** u
 | Operación | Afecta (capa / dimensión) |
 |-----------|---------------------------|
 | Confirmar OC | **Comprometido** en EDT y costos |
-| Emitir factura proveedor | **Devengado** (+ CxP; auto-DRAFT contable) |
+| Emitir factura proveedor (con o sin OC) | **Devengado** (+ CxP; auto-DRAFT contable) |
 | Pagar CxP | **Pagado** (+ caja; auto-DRAFT) |
 | Aprobar libro de obra | **Avance real** del cronograma (+ consumo stock si aplica) |
 | Emitir/aprobar certificación cliente | **Avance certificado** (+ base para factura) |
@@ -270,11 +270,23 @@ Bloqer separa herramientas de **empresa** y de **proyecto** (estilo Procore):
 
 ## 3. Directorio (nivel empresa)
 
-- **Ruta:** `/directorio` (alta en `/directorio/nuevo`).
-- Un **contacto único** puede tener **uno o varios roles**: **CLIENT** (mandante), **SUPPLIER** (proveedor), **SUBCONTRACTOR** (subcontratista), **EMPLOYEE** (empleado).
-- **Error a evitar:** dar de alta el mismo contacto dos veces cuando cumple varios roles. Usar siempre un contacto con múltiples roles.
-- **Quién se paga ([D-089]):** sueldo/reintegro → rol Empleado (aparece en gasto sin OC). Quien factura (monotributo) → rol Proveedor. Paquete de obra → rol Subcontratista y se paga por **subcontrato**, no por OC. No hace falta marcar al empleado como proveedor solo para reintegrarle.
+- **Ruta:** `/directorio` (alta en `/directorio/nuevo`; se puede preseleccionar rol con `?role=CLIENT` / `SUPPLIER` / `EMPLOYEE` / etc.).
+- Un **contacto único** puede tener **uno o varios roles**. No dar de alta la misma persona dos veces.
 - Se debe crear el **cliente** antes de crear el proyecto que lo referencia.
+
+| Rol en pantalla | Para qué | Cómo se le paga |
+|-----------------|----------|-----------------|
+| **Cliente** | Mandante de la obra | No se le paga; se le cobra (CxC) |
+| **Proveedor** | Quien nos factura o vende (incluye monotributista) | OC y/o factura de proveedor |
+| **Subcontratista** | Paquete de ejecución en una obra | **Subcontrato** → certificar → factura → CxP. **No** es una OC |
+| **Empleado** | Personal interno | Gasto **sin OC**: sueldo como costo o reintegro ([D-089]) |
+| **Otro** | Residuo / no operativo | No entra en OC ni en el desplegable de gasto |
+
+**Convención Argentina**
+
+- Relación de dependencia / reintegro → rol **Empleado**. No hace falta marcar **Proveedor** solo para pagarle.
+- Monotributista que emite factura, aunque “parezca empleado” → rol **Proveedor** (y **Empleado** si también es de la casa).
+- Quien vende materiales **y** ejecuta un paquete → **Proveedor** + **Subcontratista**.
 
 <!-- capture:08 directorio-contacto-con-roles -->
 ![Bloqer — Directorio / contacto con roles](./guides/assets/screenshots/08-directorio-contacto-con-roles.png)
@@ -681,6 +693,14 @@ flowchart LR
 
 ## 9. Compras, materiales y abastecimiento (nivel proyecto)
 
+En obra **no todo pasa por OC**. Tres caminos de egreso:
+
+| Qué | Camino | Rol del contacto |
+|-----|--------|------------------|
+| Materiales, insumos, servicios de suministro | **OC** (esta sección) → recepción → factura → pago | **Proveedor** |
+| Paquete de ejecución (albañil, electricista, etc.) | **Subcontrato** (§10) → certificar → factura → pago | **Subcontratista** |
+| Reintegro al empleado, gasto chico sin compra formal | Factura de proveedor **sin OC** (§12.2), con partida EDT | **Empleado** o **Proveedor** |
+
 **Tablero:** Compras → **Tablero de compras** → `/proyectos/[id]/compras` (pendientes SC / cotización / OC / recepción). Altas de SC/OC en **diálogo** desde el listado (`?create=1`; rutas `/nueva` redirigen). Es el tablero de **documentos** de abastecimiento; el control de **$** por partida está en **EDT y costos**.
 
 ### 9.0 Procedimiento — Materiales del proyecto
@@ -860,7 +880,7 @@ Casos como capacitaciones, venta de materiales o servicios de estructura **sin p
 
 1. **Finanzas → Transacciones** (`/finanzas/transacciones`) → **Registrar transacción** → tab **Ingreso / cobro**.
 2. Modo **Factura / cuenta por cobrar** (`AR_INCOME`): cliente, fechas, líneas, impuestos, vencimiento; N° comprobante externo opcional; **Cobrar ahora (ingreso a caja)** opcional (cuenta + fecha; requiere permiso de tesorería).
-3. Si solo necesitás mover caja **sin** CxC (aportes, préstamos, reintegros): modo **Solo caja** (`TREASURY_INFLOW`).
+3. Si solo necesitás mover caja **sin** CxC (aportes de socios, préstamos recibidos, un tercero que **devuelve plata a la empresa**): modo **Solo caja** (`TREASURY_INFLOW`). Eso **no** es el reintegro a un empleado (ese es un **egreso**, §12.2.2).
 4. Gestionar saldos en **Cuentas por cobrar** (`/finanzas/cuentas-por-cobrar` → **Cobrar**). Filas sin obra se etiquetan **Empresa**.
 
 <!-- capture:31 factura-emitida-cxc-cobranza -->
@@ -873,15 +893,15 @@ Casos como capacitaciones, venta de materiales o servicios de estructura **sin p
 
 *Ingreso corporativo con CxC.*
 
-### 12.2 Facturas de proveedor y pagos (AP) — D-052
+### 12.2 Facturas de proveedor y pagos (AP) — D-052 · D-089
 
 ```mermaid
 flowchart LR
-  SI["Factura de proveedor (ISSUED)"] --> AP["Cuenta por pagar (Payable)"]
+  SI["Factura / gasto (ISSUED)"] --> AP["Cuenta por pagar (Payable)"]
   AP --> PAY["Pago"] --> TES["Tesorería: OUTFLOW"]
 ```
 
-Siempre existe la cadena **Factura → Payable → Payment → movimiento de caja**, aunque se pague en el mismo momento (“pagar ahora”).
+Siempre existe la cadena **Factura → Payable → Payment → movimiento de caja**, aunque se pague en el mismo momento (“pagar ahora”). El campo **A quién se le paga** es el contacto del directorio (proveedor o empleado si no hay OC).
 
 #### Proyecto
 
@@ -894,7 +914,7 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 
 **Alta en obra (`/nueva`):**
 
-1. A quién se le paga (proveedor o empleado si no hay OC), fechas, líneas (cada línea con **partida EDT obligatoria**, D-055), OC opcional (solo proveedor), **adjunto** opcional (foto/PDF del comprobante).
+1. **A quién se le paga** (proveedor o empleado si no hay OC), fechas, líneas (cada línea con **partida EDT obligatoria**, D-055), OC opcional (**solo si el payee es el proveedor de esa OC**), **adjunto** opcional (foto/PDF del comprobante).
 2. Desde OC: **Registrar factura desde OC** copia la partida EDT de cada línea de la orden.
 3. Sin más: **Crear factura** → queda en **borrador** → luego **Emitir** en el detalle (crea CxP + **asiento DRAFT** en contabilidad, ver §15).
 4. Con permiso **EDIT tesorería** y módulo Tesorería activo: checkbox **Emitir y pagar ahora (egreso de caja)** → cuenta de pago + fecha → **Emitir y pagar**. Crea factura emitida + CxP + pago + egreso en un paso. Si no hay fondos suficientes, **bloquea**.
@@ -904,11 +924,37 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 | Pantalla | Ruta / etiqueta |
 |----------|-----------------|
 | Facturas y gastos | `/finanzas/facturas-proveedor` → diálogo **Nueva factura de gasto** (borrador sin proyecto) |
-| Alta rápida con pago | `/finanzas/transacciones` → **Gasto / factura** → proveedor o empleado → opcional **Pagar ahora** |
+| Alta rápida con pago | `/finanzas/transacciones` → **Gasto / factura** → **A quién se le paga** → opcional **Pagar ahora (egreso de caja)** |
 | CxP | `/finanzas/cuentas-por-pagar` → `/[payableId]/pagar` (**Registrar pago**) |
 | Detalle de pago | `/finanzas/pagos-proveedor/[paymentId]` |
 
-**Sueldos y reintegros:** no hay nómina. Se registra un **gasto** eligiendo al **empleado** del directorio (queda mapeado al contacto). Adjunto del ticket si es reintegro. Un monotributista que emite factura se carga como **Proveedor** (y Empleado si también es de la casa).
+#### 12.2.1 Pagar un sueldo (registro de costo, no nómina)
+
+Bloqer **no** liquida haberes ni aportes. Se registra el egreso como gasto corporativo ligado al empleado.
+
+1. Directorio → el contacto existe con rol **Empleado** (activo).
+2. Finanzas → **Transacciones** (`/finanzas/transacciones`) → **Registrar transacción**.
+3. Tab **Gasto / factura**.
+4. **A quién se le paga:** elegir al empleado (en el listado figura `Nombre · Empleado`).
+5. Fecha, líneas (descripción p. ej. `Sueldo agosto 2026`, cantidad 1, importe).
+6. Marcar **Pagar ahora (egreso de caja)** → cuenta de tesorería + fecha + método.
+7. Confirmar. Queda factura emitida + CxP saldada + egreso de caja, **mapeado al contacto** (no solo en la descripción).
+
+Variante sin pagar en el acto: **Facturas y gastos** → **Nueva factura de gasto** → **Crear factura** (borrador) → **Emitir** → pagar después desde CxP.
+
+#### 12.2.2 Reintegrar un gasto a un empleado
+
+Mismo flujo que el sueldo. El empleado adelantó plata (combustible, ferretería, etc.) y la empresa se la devuelve.
+
+1. Contacto con rol **Empleado**.
+2. Transacciones → **Gasto / factura** → elegir al **empleado** (no al comercio donde compró, salvo que quieras cargar la factura fiscal de ese proveedor).
+3. Descripción del gasto; **adjunto** del ticket/factura.
+4. **Pagar ahora (egreso de caja)** o emitir y pagar después.
+
+- **Empresa** (sueldo de estructura, reintegro de oficina): Transacciones / Facturas y gastos, **sin** proyecto.
+- **Obra** (el capataz compró algo para la partida): Facturas de proveedor del **proyecto**, **sin OC**, cada línea con **partida EDT**, payee = empleado.
+
+Si el “empleado” es monotributista y te pasa factura C: cargalo como **Proveedor** (y Empleado si también es de la casa) y registrá la factura fiscal, no un reintegro genérico.
 
 **Registrar pago (obra o empresa):** cuenta de tesorería (misma moneda), fecha, monto a 2 decimales, **método de liquidación** + referencia opcional, notas. El default es el **saldo pendiente**; usarlo para saldar sin residual. Fondos insuficientes → error con disponible. Si el movimiento de caja ya está **Conciliado**, hay que desemparejar antes de cancelar el pago.
 
@@ -918,6 +964,7 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 > - Cobros y pagos: **una sola moneda** por operación.
 > - Export **CSV/PDF** desde CxP y Facturas y gastos corporativos.
 > - Desde OC confirmada: **Registrar factura desde OC** cuando hay cantidades recibidas.
+> - Una factura originada por **certificación de subcontrato** no permite cambiar a quién se le paga.
 
 <!-- capture:33 emitir-y-pagar-ahora-obra -->
 ![Bloqer — Emitir y pagar ahora (obra)](./guides/assets/screenshots/33-emitir-y-pagar-ahora-obra.png)
@@ -974,7 +1021,7 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 ## 14. Finanzas corporativas, gastos generales e inventario (nivel empresa)
 
 - **Finanzas corporativas** (`/finanzas`): tablero con KPIs, proyección y actividad consolidada.
-- **Transacciones** (`/finanzas/transacciones`): alta rápida de **gasto corporativo (AP)**, **factura/CxC corporativa (AR, D-051)** y **ingreso solo caja** (`TREASURY_INFLOW`, sin obligación).
+- **Transacciones** (`/finanzas/transacciones`): alta rápida de **gasto corporativo (AP)** a proveedor o **empleado** ([D-089], §12.2), **factura/CxC corporativa (AR, D-051)** y **ingreso solo caja** (`TREASURY_INFLOW`, sin obligación).
 - **Cuentas por cobrar empresa** (`/finanzas/cuentas-por-cobrar`): consolida obra + filas **Empresa**; detalle y cobranza corporativa en `/finanzas/cuentas-por-cobrar/[id]`.
 - **Gastos generales / overhead** (`/finanzas/gastos-generales`): se **imputan a las obras** de forma **manual** o por **prorrateo automático** según el peso del costo directo, con **cierre de período**. *(Es un módulo complejo; conviene validar los cálculos en producción.)*
 - **Inventario corporativo** (`/inventario`): productos (`/inventario/productos`), depósitos (`/inventario/depositos`), movimientos (`/inventario/movimientos`, ledger append‑only; el saldo se calcula sumando movimientos) y transferencias (`/inventario/transferencias`).
@@ -1154,6 +1201,10 @@ flowchart LR
 | Editar fechas de un contenedor del cronograma | Se pisa con el rollup | Editar solo hojas |
 | Pagar sin factura/devengado | Caja sin respaldo | Factura → cuenta por pagar → pago (o Emitir y pagar ahora) |
 | Duplicar contactos por rol | Datos partidos | Un contacto con múltiples roles |
+| Marcar al empleado como **Proveedor** solo para pagarle | Ensucia el listado de OC | Rol **Empleado**; gasto sin OC (§12.2.1) |
+| Pagar un subcontrato con OC o gasto genérico | Doble conteo / payee incorrecto | Certificar → emitir la factura del subcontrato (§10) |
+| Creer que en obra todo pasa por OC | Subcontratos y reintegros mal cargados | OC = materiales; Subcontrato = paquete; gasto sin OC = reintegro/chico (§9) |
+| Usar **Solo caja** (ingreso) para reintegrar a un empleado | El movimiento entra en vez de salir | Tab **Gasto / factura** + **Pagar ahora (egreso de caja)** |
 | Creer que “apareció el borrador” = ya está contabilizado | Libros (diario/sumas/ESP) vacíos o desfasados | Revisar borradores y **Contabilizar**; los reportes solo usan `POSTED` |
 | Dar company finance a PM/Compras “para ver más” | Ven hub/caja/GL de empresa | Usar roles de proyecto / `PROJECT_FINANCE` (D-056) |
 | Cobrar/pagar esperando conversión de moneda | Descalce | Operar en la misma moneda de la cuenta |
@@ -1236,7 +1287,8 @@ flowchart LR
 - [ ] Ingresos solo caja (sin CxC) solo cuando no hay obligación de cobro
 - [ ] CxC empresa revisadas en `/finanzas/cuentas-por-cobrar` (filas **Empresa**)
 - [ ] Facturas de proveedor de obra: borrador → emitir, o **Emitir y pagar ahora** si hay permiso de tesorería
-- [ ] Gastos corporativos desde Facturas y gastos / Transacciones
+- [ ] Gastos corporativos desde Facturas y gastos / Transacciones (**A quién se le paga** = proveedor o empleado)
+- [ ] Sueldos y reintegros mapeados al contacto con rol **Empleado** (§12.2.1 / §12.2.2); no solo texto en la descripción
 - [ ] CxP revisadas; pagos con saldo a 2 decimales; fondos suficientes en la cuenta
 - [ ] Exports CSV/PDF de CxP / facturas / transacciones corporativas cuando haga falta
 - [ ] **Conciliación bancaria** del mes: importar extracto → emparejar → **Cerrar conciliación** (§4.2)
@@ -1275,6 +1327,7 @@ flowchart LR
 | **Ajustes de caja** | **Hay UI** de ajuste manual por cuenta (§4.3). Ajustes de **stock** siguen sin pantalla dedicada de ajuste genérico. |
 | **Notificaciones** | Sin Web Push / preferencias mute; polling 30 s en pestaña visible (D-054). |
 | **Permisos** | La matriz es de solo lectura; los roles son fijos. Techos “solo su proyecto” aún sin `ProjectMembership`. |
+| **Nómina / RRHH** | Bloqer **no** liquida haberes ni aportes. El sueldo se registra como **gasto** ligado al empleado (§12.2.1). |
 | **Segundo factor (2FA)** | No disponible; acceso con Google o email/contraseña. |
 | **DOCX de guía** | Un solo entregable: `guides/Guía_Operativa_Bloqer_v2.docx`. Regenerar con `node build_guide.js` tras editar **esta** MD. |
 
@@ -1289,7 +1342,7 @@ flowchart LR
 - Plan de mejoras corto plazo: [`PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md`](./PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md)
 - Smoke por rol (J-02): [`08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md)
 - Changelog UI Lotes 1–6 (autores): [`guides/CHANGELOG_UI_LOTES_1_6.md`](./guides/CHANGELOG_UI_LOTES_1_6.md)
-- Decisiones recientes: [D-050](./00-product/DECISION_LOG.md)–[D-055](./00-product/DECISION_LOG.md) (compras/EDT/AR/AP/decimales/notif) · [D-056](./00-product/DECISION_LOG.md) (company vs project finance) · [D-057](./00-product/DECISION_LOG.md)–[D-060](./00-product/DECISION_LOG.md) (EDT/APU) · [D-061](./00-product/DECISION_LOG.md)–[D-063](./00-product/DECISION_LOG.md) (contabilidad) · [D-064](./00-product/DECISION_LOG.md) (invitación por email) · [D-072](./00-product/DECISION_LOG.md) (cobranza CxC) · [D-074](./00-product/DECISION_LOG.md) (método de liquidación) · [D-075](./00-product/DECISION_LOG.md)–[D-080](./00-product/DECISION_LOG.md) (conciliación / OFX / reapertura) · [D-078](./00-product/DECISION_LOG.md) (cierre de período)
+- Decisiones recientes: [D-050](./00-product/DECISION_LOG.md)–[D-055](./00-product/DECISION_LOG.md) (compras/EDT/AR/AP/decimales/notif) · [D-056](./00-product/DECISION_LOG.md) (company vs project finance) · [D-057](./00-product/DECISION_LOG.md)–[D-060](./00-product/DECISION_LOG.md) (EDT/APU) · [D-061](./00-product/DECISION_LOG.md)–[D-063](./00-product/DECISION_LOG.md) (contabilidad) · [D-064](./00-product/DECISION_LOG.md) (invitación por email) · [D-072](./00-product/DECISION_LOG.md) (cobranza CxC) · [D-074](./00-product/DECISION_LOG.md) (método de liquidación) · [D-075](./00-product/DECISION_LOG.md)–[D-080](./00-product/DECISION_LOG.md) (conciliación / OFX / reapertura) · [D-078](./00-product/DECISION_LOG.md) (cierre de período) · [D-089](./00-product/DECISION_LOG.md) (payee AP: proveedor o empleado; tres caminos de egreso)
 - Tesorería / conciliación: [`02-modules/TREASURY.md`](./02-modules/TREASURY.md), [`02-modules/BANK_RECONCILIATION.md`](./02-modules/BANK_RECONCILIATION.md), workflow [`05-workflows/RECONCILE_BANK.md`](./05-workflows/RECONCILE_BANK.md)
 - Cierre de período: [`03-finance/PERIOD_CLOSE_AND_LOCKS.md`](./03-finance/PERIOD_CLOSE_AND_LOCKS.md), workflow [`05-workflows/CLOSE_PERIOD.md`](./05-workflows/CLOSE_PERIOD.md)
 - Contabilidad: [`02-modules/ACCOUNTING.md`](./02-modules/ACCOUNTING.md), [`08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md`](./08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md)
@@ -1311,4 +1364,4 @@ flowchart LR
 
 ---
 
-*Documento vivo. Actualizado agosto 2026: conciliación bancaria (§4.2), ajuste manual de caja (§4.3), cierre de períodos (§15.3), métodos de liquidación, estados Confirmado/Conciliado, invitaciones sin token en URL, menús Tesorería/Contabilidad. Antes: julio 2026 (zona horaria, EDT/APU, contabilidad D-061…D-063, auth). Actualizar en el mismo PR que el cambio de producto.*
+*Documento vivo. Actualizado agosto 2026: payee AP proveedor o empleado (D-089, §3 / §12.2), conciliación bancaria (§4.2), ajuste manual de caja (§4.3), cierre de períodos (§15.3), métodos de liquidación, estados Confirmado/Conciliado, invitaciones sin token en URL, menús Tesorería/Contabilidad. Antes: julio 2026 (zona horaria, EDT/APU, contabilidad D-061…D-063, auth). Actualizar en el mismo PR que el cambio de producto.*
