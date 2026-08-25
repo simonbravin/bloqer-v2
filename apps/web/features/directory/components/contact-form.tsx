@@ -1,13 +1,18 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { createContactSchema, type CreateContactInput } from "@bloqer/validators";
+import {
+  createContactSchema,
+  updateContactSchema,
+  type CreateContactInput,
+} from "@bloqer/validators";
 import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -25,7 +30,12 @@ import {
 import { IvaConditionSelect } from "@/features/finance/components/invoice-letter-fields";
 import type { IvaConditionCode } from "@bloqer/domain";
 
+type ContactFormValues = Omit<CreateContactInput, "initialRole"> & {
+  initialRole?: CreateContactInput["initialRole"];
+};
+
 interface ContactFormProps {
+  mode?: "create" | "edit";
   onSubmit: (data: CreateContactInput) => Promise<{ id?: string; ok?: true; error?: string }>;
   defaultValues?: Partial<CreateContactInput>;
   submitLabel?: string;
@@ -46,21 +56,39 @@ const ROLE_OPTIONS = [
   { value: "SUBCONTRACTOR", label: "Subcontratista" },
   { value: "EMPLOYEE", label: "Empleado" },
   { value: "OTHER", label: "Otro" },
-];
+] as const;
 
-export function ContactForm({ onSubmit, defaultValues, submitLabel = "Crear contacto", successRedirect }: ContactFormProps) {
+const editContactFormSchema = updateContactSchema.extend({
+  legalName: createContactSchema.shape.legalName,
+});
+
+export function ContactForm({
+  mode = "create",
+  onSubmit,
+  defaultValues,
+  submitLabel = "Crear contacto",
+  successRedirect,
+}: ContactFormProps) {
   const router = useRouter();
-  const form = useForm<CreateContactInput>({
-    resolver: zodResolver(createContactSchema),
-    defaultValues: defaultValues ?? {},
+  const isCreate = mode === "create";
+  const form = useForm<ContactFormValues>({
+    resolver: zodResolver(isCreate ? createContactSchema : editContactFormSchema) as Resolver<ContactFormValues>,
+    defaultValues: {
+      country: "AR",
+      ...defaultValues,
+    },
   });
 
-  const handleSubmit = async (data: CreateContactInput) => {
-    const result = await onSubmit(data);
-    if (result.error) {
-      form.setError("root", { message: result.error });
-    } else {
-      router.push(successRedirect ?? (result.id ? `/directorio/${result.id}` : "/directorio"));
+  const handleSubmit = async (data: ContactFormValues) => {
+    try {
+      const result = await onSubmit(data as CreateContactInput);
+      if (result.error) {
+        form.setError("root", { message: result.error });
+      } else {
+        router.push(successRedirect ?? (result.id ? `/directorio/${result.id}` : "/directorio"));
+      }
+    } catch {
+      form.setError("root", { message: "Error inesperado al guardar" });
     }
   };
 
@@ -73,6 +101,37 @@ export function ContactForm({ onSubmit, defaultValues, submitLabel = "Crear cont
           </div>
         )}
 
+        {isCreate && (
+          <FormField
+            control={form.control}
+            name="initialRole"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Rol *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar rol" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {ROLE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  Definí si este contacto es cliente, proveedor, subcontratista, empleado u otro. Después podés asignarle más de un rol
+                  desde su ficha.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField
             control={form.control}
@@ -81,7 +140,7 @@ export function ContactForm({ onSubmit, defaultValues, submitLabel = "Crear cont
               <FormItem>
                 <FormLabel>Razón social *</FormLabel>
                 <FormControl>
-                  <Input placeholder="Empresa S.A." {...field} />
+                  <Input placeholder="Empresa S.A." {...field} value={field.value ?? ""} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -109,7 +168,7 @@ export function ContactForm({ onSubmit, defaultValues, submitLabel = "Crear cont
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Tipo de ID fiscal</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar tipo" />
@@ -217,7 +276,7 @@ export function ContactForm({ onSubmit, defaultValues, submitLabel = "Crear cont
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <FormField
             control={form.control}
             name="province"
@@ -246,30 +305,6 @@ export function ContactForm({ onSubmit, defaultValues, submitLabel = "Crear cont
                     onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                   />
                 </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="initialRole"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Rol inicial</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Opcional" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {ROLE_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
                 <FormMessage />
               </FormItem>
             )}

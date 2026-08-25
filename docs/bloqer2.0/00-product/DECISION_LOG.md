@@ -1324,6 +1324,25 @@
 
 ---
 
+### D-089 — Payee de gasto AP: proveedor o empleado; subcontrato ≠ OC
+
+- **Fecha:** 2026-08-25
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** el alta de gasto corporativo/obra reutiliza `SupplierInvoice` y solo listaba rol `SUPPLIER`. Un contacto `EMPLOYEE` no podía ser payee: sueldos (como costo) y reintegros no quedaban mapeados al directorio. Forzar rol Proveedor al empleado funciona (patrón QuickBooks 1099) pero ensucia el listado de OC. En paralelo, a nivel obra no todo pasa por OC: hay compras, subcontratos y gastos directos. Bloqer no liquida nómina ([PRODUCT_SCOPE](./PRODUCT_SCOPE.md) §6).
+- **Decisión:**
+  1. **`SupplierInvoice.supplierContactId` es el payee** (a quién se le paga). El campo conserva el nombre histórico; la semántica es contraparte AP, no “solo proveedor de materiales”.
+  2. **Tres caminos de egreso, no uno:**
+     - **OC / cotización / factura ligada a OC:** Contact con rol `SUPPLIER` ([BR-SUP-001]). Compra de insumos/servicios de suministro.
+     - **Subcontrato:** Contact con rol `SUBCONTRACTOR`. Flujo propio: `Subcontract` → certificación `APPROVED` → factura AP borrador → emitir → CxP → pago ([D-015], [BR-SUB-003]). **No** se paga un paquete de obra con OC ni eligiendo al subcontratista en el gasto genérico.
+     - **Gasto directo (sin OC):** Contact con rol `SUPPLIER` **o** `EMPLOYEE`. Cubre alquiler, servicios, sueldo como costo, reintegro, factura chica de obra bajo umbral ([D-006]). Empresa = `projectId` null; obra = factura de proyecto con WBS ([D-055]).
+  3. **No** exigir rol `SUPPLIER` a un empleado solo para pagarle. Un empleado en blanco / reintegro lleva `EMPLOYEE`. Un monotributista que emite factura lleva `SUPPLIER` (y `EMPLOYEE` si además es personal interno). Quien vende materiales y ejecuta paquetes: `SUPPLIER` + `SUBCONTRACTOR`.
+  4. **No** introducir entidad `Expense` ni nómina ([D-035] se mantiene). El reporte de gastos/sueldos por empleado se arma después agrupando AP cuyo payee tiene rol `EMPLOYEE`; no incluye aportes ni recibos.
+- **Implicaciones:** picker y `assertApInvoicePayee` en gasto/factura sin OC; OC y quotes sin cambio; factura auto de certificación de subcontrato sigue usando el contacto subcontratista (sin exigir `SUPPLIER`).
+- **Documentos afectados:** [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) (Q-058), [`DIRECTORY.md`](../02-modules/DIRECTORY.md), [`EXPENSES_AND_PAYMENTS.md`](../02-modules/EXPENSES_AND_PAYMENTS.md), [`SUBCONTRACTS.md`](../02-modules/SUBCONTRACTS.md), [`SUPPLIERS.md`](../02-modules/SUPPLIERS.md), [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) (BR-AP-001), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1332,7 +1351,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-089`…).
+1. Tomar el siguiente ID disponible (`D-090`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

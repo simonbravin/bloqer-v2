@@ -1,7 +1,7 @@
 # Subcontratos
 
 ## 1. Objetivo
-Gestionar contratos de **ejecución parcial de obra** con subcontratistas: alcance, montos, certificaciones de avance del subcontrato, retenciones y generación de **cuentas por pagar** ([D-015]).
+Gestionar contratos de **ejecución parcial de obra** con subcontratistas: alcance, montos, certificaciones de avance del subcontrato, retenciones y generación de **cuentas por pagar** ([D-015], [D-089]).
 
 ## 2. Usuarios y roles que lo usan
 - **PM**, **PROCUREMENT**, **FINANCE**, **ADMIN**, **OWNER**.
@@ -68,6 +68,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Subcontract y Subco
 
 ## 15. Relación con otros módulos
 - **Directorio**, **Proyectos**, **Pagos**, **Impuestos**.
+- **No es una OC.** El pago no se carga eligiendo al subcontratista en Facturas y gastos: se certifica el subcontrato, al `APPROVED` nace la factura AP en borrador, se emite y se paga la CxP ([D-015], [D-089]). Si el mismo contacto también vende materiales, se le asigna además rol `SUPPLIER` y se usa el flujo de compras.
 
 ## 16. Permisos
 PM opera; FINANCE pagos; ADMIN override.

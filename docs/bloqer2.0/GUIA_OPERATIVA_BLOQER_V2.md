@@ -271,8 +271,9 @@ Bloqer separa herramientas de **empresa** y de **proyecto** (estilo Procore):
 ## 3. Directorio (nivel empresa)
 
 - **Ruta:** `/directorio` (alta en `/directorio/nuevo`).
-- Un **contacto único** puede tener **uno o varios roles**: **CLIENT** (mandante), **SUPPLIER** (proveedor), **SUBCONTRACTOR** (subcontratista).
+- Un **contacto único** puede tener **uno o varios roles**: **CLIENT** (mandante), **SUPPLIER** (proveedor), **SUBCONTRACTOR** (subcontratista), **EMPLOYEE** (empleado).
 - **Error a evitar:** dar de alta el mismo contacto dos veces cuando cumple varios roles. Usar siempre un contacto con múltiples roles.
+- **Quién se paga ([D-089]):** sueldo/reintegro → rol Empleado (aparece en gasto sin OC). Quien factura (monotributo) → rol Proveedor. Paquete de obra → rol Subcontratista y se paga por **subcontrato**, no por OC. No hace falta marcar al empleado como proveedor solo para reintegrarle.
 - Se debe crear el **cliente** antes de crear el proyecto que lo referencia.
 
 <!-- capture:08 directorio-contacto-con-roles -->
@@ -776,7 +777,7 @@ flowchart LR
 1. **Nuevo subcontrato** (diálogo/`?create=1` si aplica): subcontratista del directorio (rol **Subcontratista**), alcance e imputación a partidas con categoría **SUB** en APU cuando corresponda.
 2. Crear **certificación de subcontrato** del período.
 3. Ciclo (enum `SubcontractCertificationStatus`): `DRAFT` → emitir (`ISSUED`) → **Aprobar** (`APPROVED`) (o `REJECTED` / `CANCELLED`).
-4. Al **aprobar**, el sistema genera / ofrece CTA hacia una **factura de proveedor en borrador**; hay que **emitirla** para crear la CxP y poder pagar.
+4. Al **aprobar**, el sistema genera / ofrece CTA hacia una **factura de proveedor en borrador** (el payee es el subcontratista); hay que **emitirla** para crear la CxP y poder pagar. **No** se paga el subcontrato creando una OC ni eligiendo al subcontratista en el gasto genérico.
 5. En el detalle: badge de estado de factura + **Revisar y emitir** o **Ver factura**.
 
 <!-- capture:28 cert-subcontrato-con-factura -->
@@ -893,7 +894,7 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 
 **Alta en obra (`/nueva`):**
 
-1. Proveedor, fechas, líneas (cada línea con **partida EDT obligatoria**, D-055), OC opcional, **adjunto** opcional (foto/PDF del comprobante).
+1. A quién se le paga (proveedor o empleado si no hay OC), fechas, líneas (cada línea con **partida EDT obligatoria**, D-055), OC opcional (solo proveedor), **adjunto** opcional (foto/PDF del comprobante).
 2. Desde OC: **Registrar factura desde OC** copia la partida EDT de cada línea de la orden.
 3. Sin más: **Crear factura** → queda en **borrador** → luego **Emitir** en el detalle (crea CxP + **asiento DRAFT** en contabilidad, ver §15).
 4. Con permiso **EDIT tesorería** y módulo Tesorería activo: checkbox **Emitir y pagar ahora (egreso de caja)** → cuenta de pago + fecha → **Emitir y pagar**. Crea factura emitida + CxP + pago + egreso en un paso. Si no hay fondos suficientes, **bloquea**.
@@ -903,9 +904,11 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 | Pantalla | Ruta / etiqueta |
 |----------|-----------------|
 | Facturas y gastos | `/finanzas/facturas-proveedor` → diálogo **Nueva factura de gasto** (borrador sin proyecto) |
-| Alta rápida con pago | `/finanzas/transacciones` → **Gasto / factura proveedor** → opcional **Pagar ahora** |
+| Alta rápida con pago | `/finanzas/transacciones` → **Gasto / factura** → proveedor o empleado → opcional **Pagar ahora** |
 | CxP | `/finanzas/cuentas-por-pagar` → `/[payableId]/pagar` (**Registrar pago**) |
 | Detalle de pago | `/finanzas/pagos-proveedor/[paymentId]` |
+
+**Sueldos y reintegros:** no hay nómina. Se registra un **gasto** eligiendo al **empleado** del directorio (queda mapeado al contacto). Adjunto del ticket si es reintegro. Un monotributista que emite factura se carga como **Proveedor** (y Empleado si también es de la casa).
 
 **Registrar pago (obra o empresa):** cuenta de tesorería (misma moneda), fecha, monto a 2 decimales, **método de liquidación** + referencia opcional, notas. El default es el **saldo pendiente**; usarlo para saldar sin residual. Fondos insuficientes → error con disponible. Si el movimiento de caja ya está **Conciliado**, hay que desemparejar antes de cancelar el pago.
 

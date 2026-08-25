@@ -8,6 +8,8 @@ import {
   NewCompanySupplierInvoiceDialog,
   SupplierInvoiceListFilters,
   SupplierInvoiceListSection,
+  LIST_AP_DIRECT_PAYEES,
+  toApPayeeOption,
   type SupplierInvoiceListItem,
   type SupplierOption,
 } from "@/features/ap";
@@ -75,10 +77,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
 
   if (canCreateInvoice) {
     try {
-      suppliersResult = await listContacts(
-        { role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 },
-        ctx,
-      );
+      suppliersResult = await listContacts(LIST_AP_DIRECT_PAYEES, ctx);
     } catch {
       // VIEW DIRECTORY may be missing; keep invoice list, create dialog without suppliers
     }
@@ -97,12 +96,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     payableStatus: inv.payable?.status ?? null,
     invoiceLetter: inv.invoiceLetter,
   }));
-  const suppliers: SupplierOption[] = (suppliersResult?.data ?? []).map((contact) => ({
-    id: contact.id,
-    label: contact.fantasyName ?? contact.legalName,
-    country: contact.country,
-    ivaCondition: contact.ivaCondition,
-  }));
+  const suppliers: SupplierOption[] = (suppliersResult?.data ?? []).map(toApPayeeOption);
 
   let companyCountry: string | null = null;
   let companyIvaCondition: string | null = null;

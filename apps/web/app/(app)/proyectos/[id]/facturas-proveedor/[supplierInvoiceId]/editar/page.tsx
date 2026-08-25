@@ -9,7 +9,7 @@ import {
   listProcurementWbsOptions,
   ServiceError,
 } from "@bloqer/services";
-import { SupplierInvoiceEditForm } from "@/features/ap";
+import { SupplierInvoiceEditForm, LIST_AP_DIRECT_PAYEES, toApPayeeOption, withCurrentApPayee } from "@/features/ap";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
@@ -36,7 +36,7 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
   try {
     [invoice, suppliersResult, linkablePOs, wbsNodes] = await Promise.all([
       getSupplierInvoiceById(supplierInvoiceId, ctx, id),
-      listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
+      listContacts(LIST_AP_DIRECT_PAYEES, ctx),
       listLinkablePurchaseOrders(id, ctx),
       listProcurementWbsOptions(id, ctx),
     ]);
@@ -49,12 +49,10 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
     redirect(`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`);
   }
 
-  const suppliers = suppliersResult.data.map((c) => ({
-    id: c.id,
-    label: c.fantasyName ?? c.legalName,
-    country: c.country,
-    ivaCondition: c.ivaCondition,
-  }));
+  const suppliers = withCurrentApPayee(
+    suppliersResult.data.map(toApPayeeOption),
+    { id: invoice.supplierContactId, name: invoice.supplierName },
+  );
 
   const poOptions = linkablePOs.map((po) => ({
     id: po.id,

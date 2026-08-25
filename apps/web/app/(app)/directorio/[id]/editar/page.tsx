@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ContactForm } from "@/features/directory/components/contact-form";
 import { getCurrentUser } from "@/lib/auth";
 import { getContactById, ServiceError } from "@bloqer/services";
 import { updateContactAction } from "../../actions";
-import type { CreateContactInput } from "@bloqer/validators";
+import type { UpdateContactInput } from "@bloqer/validators";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
@@ -30,7 +31,7 @@ export default async function EditarContactoPage({ params }: PageProps) {
     throw err;
   }
 
-  const handleUpdate = async (data: CreateContactInput) => {
+  const handleUpdate = async (data: UpdateContactInput) => {
     "use server";
     return updateContactAction(id, data);
   };
@@ -41,8 +42,17 @@ export default async function EditarContactoPage({ params }: PageProps) {
         <h1 className="text-2xl font-bold tracking-tight">Editar contacto</h1>
       </div>
 
+      <p className="text-sm text-muted-foreground">
+        Los roles (cliente, proveedor, etc.) no se cambian acá. Gestionalos en la{" "}
+        <Link href={`/directorio/${id}`} className="font-medium text-primary underline underline-offset-2">
+          ficha del contacto
+        </Link>
+        .
+      </p>
+
       <div className="rounded-lg border bg-card p-6">
         <ContactForm
+          mode="edit"
           onSubmit={handleUpdate}
           submitLabel="Guardar cambios"
           successRedirect={`/directorio/${id}`}
@@ -60,7 +70,8 @@ export default async function EditarContactoPage({ params }: PageProps) {
             email: contact.email ?? undefined,
             notes: contact.notes ?? undefined,
           }}
-        />      </div>
+        />
+      </div>
     </PageShell>
   );
 }

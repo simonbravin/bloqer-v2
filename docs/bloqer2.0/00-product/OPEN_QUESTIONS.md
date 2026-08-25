@@ -493,6 +493,14 @@
 
 ---
 
+### Q-058 — Contraparte de gasto corporativo: ¿empleados en el desplegable de AP?
+
+- **Categoría:** AP / Directorio / Tesorería
+- **Estado:** RESUELTA → [D-089](./DECISION_LOG.md#d-089--payee-de-gasto-ap-proveedor-o-empleado-subcontrato--oc)
+- **Resolución:** opción 2. Gasto/factura sin OC acepta `SUPPLIER` o `EMPLOYEE` como payee. OC sigue `SUPPLIER`. Subcontrato sigue su propio flujo (`SUBCONTRACTOR`), no el desplegable de gasto. No se exige doble rol Proveedor al empleado.
+
+---
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

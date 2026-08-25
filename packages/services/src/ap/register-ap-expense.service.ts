@@ -23,7 +23,7 @@ import { canMutateApForScope, canRegisterApPayment } from "./ap-access";
 import { notifyPayableReadyToPay, notifyPaymentConfirmed } from "./ap-notifications.service";
 import { recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
-import { assertContactRoleInTenant } from "../contact/assert-contact-role";
+import { assertApInvoicePayee } from "../contact/assert-contact-role";
 import {
   assertPurchaseOrderLinkableForAp,
   assertSupplierInvoiceLinesPoLink,
@@ -324,7 +324,9 @@ export async function registerApExpense(
     }
   }
 
-  await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
+  await assertApInvoicePayee(input.supplierContactId, ctx.tenantId, {
+    linkedToPurchaseOrder: Boolean(input.purchaseOrderId),
+  });
 
   const supplier = await prisma.contact.findUnique({
     where: { id: input.supplierContactId },

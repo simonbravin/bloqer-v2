@@ -26,7 +26,7 @@ import {
   assertJournalAllowsOperationalCancel,
   cancelDraftJournalOnOperationalCancel,
 } from "../accounting/accounting-cancel-sync.service";
-import { assertContactRoleInTenant } from "../contact/assert-contact-role";
+import { assertApInvoicePayee } from "../contact/assert-contact-role";
 
 const PO_AP_LINKABLE_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
 
@@ -452,8 +452,10 @@ export async function createSupplierInvoice(
     }
   }
 
-  // BR-AP-001: validate supplier role + tenant
-  await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
+  // BR-AP-001: payee is SUPPLIER, or EMPLOYEE when there is no PO ([D-089])
+  await assertApInvoicePayee(input.supplierContactId, ctx.tenantId, {
+    linkedToPurchaseOrder: Boolean(input.purchaseOrderId),
+  });
 
   // Optional PO link: only when invoice is project-scoped (OC always belongs to a project)
   if (input.purchaseOrderId) {
@@ -621,8 +623,22 @@ export async function updateSupplierInvoice(
   }
   assertSupplierInvoiceEditable(existing);
 
+  if (
+    existing.subcontractCertificationId &&
+    input.supplierContactId &&
+    input.supplierContactId !== existing.supplierContactId
+  ) {
+    throw new ServiceError(
+      "CONFLICT",
+      "No se puede cambiar a quién se le paga en una factura originada por certificación de subcontrato",
+    );
+  }
+
   if (input.supplierContactId && input.supplierContactId !== existing.supplierContactId) {
-    await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
+    const poId = input.purchaseOrderId !== undefined ? input.purchaseOrderId : existing.purchaseOrderId;
+    await assertApInvoicePayee(input.supplierContactId, ctx.tenantId, {
+      linkedToPurchaseOrder: Boolean(poId),
+    });
   }
 
   // Optional PO link validation on update

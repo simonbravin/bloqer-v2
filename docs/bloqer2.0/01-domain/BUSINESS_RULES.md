@@ -322,6 +322,13 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 ### BR-AR-004 — Facturas anuladas anulan AR/AP
 - **Regla:** anular una `SalesInvoice` o `PurchaseInvoice` anula automáticamente su `Receivable` o `Payable` (cascada controlada).
 
+### BR-AP-001 — Payee de factura de compra / gasto
+- **Regla:** `SupplierInvoice.supplierContactId` es el contacto a quien se le paga.
+  - Factura **ligada a OC**: el contacto debe tener rol `SUPPLIER` activo y coincidir con el proveedor de la OC.
+  - Factura / gasto **sin OC**: el contacto debe tener rol `SUPPLIER` **o** `EMPLOYEE` activo.
+  - Factura generada desde certificación de subcontrato `APPROVED`: el payee es el `SUBCONTRACTOR` del subcontrato; no se exige rol `SUPPLIER`.
+- **Origen:** [D-089].
+
 ---
 
 ## 11. Reglas de impuestos y retenciones

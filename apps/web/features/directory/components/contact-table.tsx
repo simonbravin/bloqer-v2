@@ -18,7 +18,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { useClientTableSort } from "@/hooks/use-client-table-sort";
 import { RoleBadge } from "./role-badge";
 import { ContactStatusBadge } from "./contact-status-badge";
-import type { ContactWithRoles } from "@/features/directory/types";
+import { activeContactRoles, type ContactWithRoles } from "@/features/directory/types";
 
 interface ContactTableProps {
   contacts: ContactWithRoles[];
@@ -55,7 +55,9 @@ export function ContactTable({ contacts }: ContactTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sorted.map((contact) => (
+        {sorted.map((contact) => {
+          const roles = activeContactRoles(contact.roles);
+          return (
             <TableRow key={contact.id}>
               <TableCell className={tableNameStackCellClass}>
                 <div className="truncate font-medium" title={contact.legalName}>
@@ -72,10 +74,10 @@ export function ContactTable({ contacts }: ContactTableProps) {
               </TableCell>
               <TableCell className="whitespace-normal">
                 <div className="flex flex-wrap gap-1">
-                  {contact.roles.map((r) => (
+                  {roles.map((r) => (
                     <RoleBadge key={r.id} role={r.role} />
                   ))}
-                  {contact.roles.length === 0 && (
+                  {roles.length === 0 && (
                     <span className="text-xs text-muted-foreground">Sin roles</span>
                   )}
                 </div>
@@ -95,7 +97,8 @@ export function ContactTable({ contacts }: ContactTableProps) {
                 </Button>
               </TableCell>
             </TableRow>
-          ))}
+          );
+        })}
         </TableBody>
       </Table>
     </TableScroll>

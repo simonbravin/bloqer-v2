@@ -16,6 +16,7 @@ import {
   createContactSchema,
   updateContactSchema,
   assignContactRoleSchema,
+  contactRoleTypeSchema,
   updateClientProfileSchema,
   updateSupplierProfileSchema,
   updateSubcontractorProfileSchema,
@@ -50,6 +51,8 @@ export async function createContactAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const contact = await createContact(parsed.data, ctx);
+    revalidatePath("/directorio");
+    revalidatePath(`/directorio/${contact.id}`);
     return { id: contact.id };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -66,6 +69,7 @@ export async function updateContactAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateContact(id, parsed.data, ctx);
+    revalidatePath("/directorio");
     revalidatePath(`/directorio/${id}`);
     return { ok: true };
   } catch (err) {
@@ -78,6 +82,7 @@ export async function archiveContactAction(id: string): Promise<{ ok: true } | {
   const ctx = await getCtx();
   try {
     await archiveContact(id, ctx);
+    revalidatePath("/directorio");
     revalidatePath(`/directorio/${id}`);
     return { ok: true };
   } catch (err) {
@@ -90,6 +95,7 @@ export async function reactivateContactAction(id: string): Promise<{ ok: true } 
   const ctx = await getCtx();
   try {
     await reactivateContact(id, ctx);
+    revalidatePath("/directorio");
     revalidatePath(`/directorio/${id}`);
     return { ok: true };
   } catch (err) {
@@ -107,6 +113,7 @@ export async function assignContactRoleAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await assignContactRole(contactId, parsed.data, ctx);
+    revalidatePath("/directorio");
     revalidatePath(`/directorio/${contactId}`);
     return { ok: true };
   } catch (err) {
@@ -120,8 +127,11 @@ export async function removeContactRoleAction(
   role: ContactRoleType,
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
+  const parsedRole = contactRoleTypeSchema.safeParse(role);
+  if (!parsedRole.success) return { error: "Rol inválido" };
   try {
-    await removeContactRole(contactId, role, ctx);
+    await removeContactRole(contactId, parsedRole.data, ctx);
+    revalidatePath("/directorio");
     revalidatePath(`/directorio/${contactId}`);
     return { ok: true };
   } catch (err) {

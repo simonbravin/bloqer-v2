@@ -94,8 +94,8 @@ export function RoleManager({
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Assign role form
-  const [selectedRole, setSelectedRole] = useState<ContactRoleType>("CLIENT");
+  // Assign role form — no default: a CLIENT default caused suppliers to pick up an extra client role.
+  const [selectedRole, setSelectedRole] = useState<ContactRoleType | "">("");
   const [paymentTermsDays, setPaymentTermsDays] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
   const [bankAccount, setBankAccount] = useState("");
@@ -111,9 +111,10 @@ export function RoleManager({
 
   const activeRoles = roles.filter((r) => r.status === "ACTIVE");
   const inactiveRoles = roles.filter((r) => r.status === "INACTIVE");
+  const assignableRoles = ALL_ROLES.filter((role) => !activeRoles.some((r) => r.role === role));
 
   const resetAssignForm = () => {
-    setSelectedRole("CLIENT");
+    setSelectedRole("");
     setPaymentTermsDays("");
     setCreditLimit("");
     setBankAccount("");
@@ -142,10 +143,15 @@ export function RoleManager({
 
   const handleAssign = () => {
     setError(null);
+    if (!selectedRole) {
+      setError("Elegí un rol");
+      return;
+    }
     startTransition(async () => {
+      const paymentDays = paymentTermsDays.trim() ? Number(paymentTermsDays) : undefined;
       const result = await assignContactRoleAction(contactId, {
         role: selectedRole,
-        paymentTermsDays: paymentTermsDays ? Number(paymentTermsDays) : undefined,
+        paymentTermsDays: paymentDays != null && Number.isFinite(paymentDays) ? paymentDays : undefined,
         creditLimit: creditLimit.trim() ? creditLimit.trim() : undefined,
         bankAccount: bankAccount || undefined,
         specialty: specialty || undefined,
@@ -175,16 +181,18 @@ export function RoleManager({
     startTransition(async () => {
       let result: { ok: true } | { error: string };
       if (editTarget === "CLIENT") {
+        const days = editPaymentTermsDays.trim() ? Number(editPaymentTermsDays) : undefined;
         result = await updateClientProfileAction(contactId, {
-          paymentTermsDays: editPaymentTermsDays ? Number(editPaymentTermsDays) : undefined,
+          paymentTermsDays: days != null && Number.isFinite(days) ? days : undefined,
           creditLimit: editCreditLimit.trim() ? editCreditLimit.trim() : null,
-          defaultCurrency: editDefaultCurrency || undefined,
+          defaultCurrency: editDefaultCurrency.trim() || undefined,
           notes: editNotes || undefined,
         });
       } else if (editTarget === "SUPPLIER") {
+        const days = editPaymentTermsDays.trim() ? Number(editPaymentTermsDays) : undefined;
         result = await updateSupplierProfileAction(contactId, {
-          paymentTermsDays: editPaymentTermsDays ? Number(editPaymentTermsDays) : undefined,
-          defaultCurrency: editDefaultCurrency || undefined,
+          paymentTermsDays: days != null && Number.isFinite(days) ? days : undefined,
+          defaultCurrency: editDefaultCurrency.trim() || undefined,
           bankAccount: editBankAccount || undefined,
           notes: editNotes || undefined,
         });
@@ -225,11 +233,14 @@ export function RoleManager({
           <div className="flex flex-col gap-2">
             {activeRoles.map((r) => {
               const role = r.role as ContactRoleType;
-              const hasProfile = role === "CLIENT" || role === "SUPPLIER" || role === "SUBCONTRACTOR";
+              const profileReady =
+                (role === "CLIENT" && clientProfile) ||
+                (role === "SUPPLIER" && supplierProfile) ||
+                (role === "SUBCONTRACTOR" && subcontractorProfile);
               return (
                 <div key={r.id} className="flex items-center gap-2">
                   <RoleBadge role={role} />
-                  {hasProfile && (
+                  {profileReady && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -290,7 +301,7 @@ export function RoleManager({
         variant="outline"
         size="sm"
         onClick={() => { resetAssignForm(); setAssignOpen(true); }}
-        disabled={isPending}
+        disabled={isPending || assignableRoles.length === 0}
       >
         + Asignar rol
       </Button>
@@ -305,12 +316,12 @@ export function RoleManager({
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label>Rol</Label>
-              <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as ContactRoleType)}>
+              <Select value={selectedRole || undefined} onValueChange={(v) => setSelectedRole(v as ContactRoleType)}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Seleccionar rol" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ALL_ROLES.map((r) => (
+                  {assignableRoles.map((r) => (
                     <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
                   ))}
                 </SelectContent>
@@ -372,7 +383,7 @@ export function RoleManager({
             <Button variant="outline" onClick={() => setAssignOpen(false)} disabled={isPending}>
               Cancelar
             </Button>
-            <Button onClick={handleAssign} disabled={isPending}>
+            <Button onClick={handleAssign} disabled={isPending || !selectedRole}>
               {isPending ? "Guardando..." : "Asignar"}
             </Button>
           </DialogFooter>

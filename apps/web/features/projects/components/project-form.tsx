@@ -131,10 +131,10 @@ export function ProjectForm({
           <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-foreground">
             No hay contactos con rol <strong>Cliente</strong> activo. Los proyectos solo pueden asociarse a ese tipo
             de contacto. Podés{" "}
-            <Link href="/directorio/nuevo" className="font-medium text-primary underline underline-offset-2">
+            <Link href="/directorio/nuevo?role=CLIENT" className="font-medium text-primary underline underline-offset-2">
               crear un contacto
             </Link>{" "}
-            y elegir &quot;Cliente&quot; en <strong>Rol inicial</strong>, o editar uno existente en{" "}
+            y elegir &quot;Cliente&quot; en <strong>Rol</strong>, o editar uno existente en{" "}
             <Link href="/directorio" className="font-medium text-primary underline underline-offset-2">
               Directorio
             </Link>{" "}

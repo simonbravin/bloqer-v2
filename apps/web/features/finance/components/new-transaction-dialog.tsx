@@ -348,7 +348,7 @@ export function NewTransactionDialog({
     startTransition(async () => {
       if (kind === "AP_EXPENSE") {
         if (!supplierContactId) {
-          setError("Debe seleccionar un proveedor");
+          setError("Debe seleccionar a quién se le paga");
           return;
         }
         if (showLetterAp && !invoiceLetter) {
@@ -566,7 +566,7 @@ export function NewTransactionDialog({
         >
           {canAp && (
             <SegmentedOption active={kind === "AP_EXPENSE"} onClick={selectApTab} disabled={isPending}>
-              Gasto / factura proveedor
+              Gasto / factura
             </SegmentedOption>
           )}
           {showIncomeTab && (
@@ -584,7 +584,7 @@ export function NewTransactionDialog({
           {kind === "AP_EXPENSE" && (
             <>
               <div className="space-y-1">
-                <Label>Proveedor</Label>
+                <Label>A quién se le paga</Label>
                 <SearchableCombobox
                   options={toSearchableOptions(suppliers)}
                   value={supplierContactId}
@@ -592,9 +592,9 @@ export function NewTransactionDialog({
                     setSupplierContactId(id);
                     setLetterTouched(false);
                   }}
-                  placeholder="Seleccionar proveedor..."
-                  searchPlaceholder="Buscar proveedor..."
-                  emptyText="Ningún proveedor coincide."
+                  placeholder="Seleccionar proveedor o empleado..."
+                  searchPlaceholder="Buscar..."
+                  emptyText="Ningún contacto coincide."
                 />
               </div>
               {showLetterAp ? (

@@ -86,6 +86,9 @@ export default async function ContactoDetailPage({ params }: PageProps) {
       <div className="rounded-lg border bg-card">
         <div className="border-b px-6 py-4">
           <h2 className="font-semibold">Roles</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Un mismo contacto puede ser cliente y proveedor a la vez. Asigná o quitá roles acá.
+          </p>
         </div>
         <div className="px-6 py-4">
           <RoleManager

@@ -1,7 +1,7 @@
 # Gastos, facturas de compra y pagos
 
 ## 1. Objetivo
-Registrar **facturas de proveedor** (con o sin OC), generar **Payables**, aplicar **pagos parciales** y reflejar egresos en tesorería ([D-010], [D-006]).
+Registrar **facturas de proveedor** (con o sin OC), generar **Payables**, aplicar **pagos parciales** y reflejar egresos en tesorería ([D-010], [D-006]). El payee de un gasto sin OC puede ser proveedor o empleado ([D-089]).
 
 ## 2. Usuarios y roles que lo usan
 - **FINANCE**, **PROCUREMENT**, **ADMIN**, **OWNER**.
@@ -46,10 +46,11 @@ Ver PurchaseInvoice, Payable en [`STATE_MACHINES.md`](../01-domain/STATE_MACHINE
 ## 10. Reglas de negocio
 - **BR-PAY-001**: pago no excede saldo Payable ([BR-TRZ-005]).
 - AP sin proyecto permitido ([D-009]).
+- Payee de gasto/factura sin OC: Contact con rol `SUPPLIER` o `EMPLOYEE` ([BR-AP-001], [D-089]).
 - Letra de comprobante A/B/C/E sugerida y editable; requerida al emitir si operación AR ([D-084]).
 
 ## 11. Validaciones
-- Proveedor coherente en factura y pago.
+- Payee coherente en factura y pago ([BR-AP-001] / [D-089]): `SUPPLIER` o `EMPLOYEE` si no hay OC; `SUPPLIER` si hay OC.
 - Periodo abierto ([BR-TRZ-003]).
 - `invoice_letter` presente al emitir si empresa o proveedor tienen `country = AR` ([D-084]).
 
@@ -58,6 +59,7 @@ Ver PurchaseInvoice, Payable en [`STATE_MACHINES.md`](../01-domain/STATE_MACHINE
 
 ## 13. Casos borde
 - Pago anticipado sin factura: registrar anticipo como movimiento y compensar al facturar (Fase 2 cuenta puente).
+- Sueldo / reintegro: gasto AP al contacto `EMPLOYEE`; no es liquidación de haberes. Monotributista que factura: rol `SUPPLIER` (más `EMPLOYEE` si es personal interno).
 
 ## 14. Reportes relacionados
 - Aging AP, gastos por proveedor, cashflow egresos.

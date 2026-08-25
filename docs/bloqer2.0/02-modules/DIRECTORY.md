@@ -3,6 +3,8 @@
 ## 1. Objetivo
 Centralizar todas las personas físicas/jurídicas con las que opera la empresa constructora bajo una única entidad **Contact**, permitiendo **roles múltiples** (cliente, proveedor, subcontratista, empleado, otro). Eliminar duplicados y permitir el mismo contacto como cliente y proveedor sin registros duplicados.
 
+> Ver [D-016](../00-product/DECISION_LOG.md#d-016--directorio-unificado-contact-con-roles-múltiples), [D-089](../00-product/DECISION_LOG.md#d-089--payee-de-gasto-ap-proveedor-o-empleado-subcontrato--oc).
+
 ## 2. Usuarios y roles que lo usan
 - **ADMIN**, **OWNER**: alta/edición maestra de contactos.
 - **FINANCE**, **PROCUREMENT**, **SALES**, **PM**: alta rápida desde flujos operativos.
@@ -41,7 +43,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Contact: `ACTIVE` �
 
 ## 10. Reglas de negocio
 - **BR-DIR-001**: CUIT/CUIL único por tenant si está informado ([`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) BR-VAL-001).
-- **BR-DIR-002**: un contacto puede tener simultáneamente rol `CLIENT` y `SUPPLIER` ([D-016]).
+- **BR-DIR-002**: un contacto puede tener simultáneamente varios roles (p. ej. `CLIENT` + `SUPPLIER`, `EMPLOYEE` + `SUPPLIER`) ([D-016], [D-089]).
 - **BR-DIR-003**: archivar no elimina referencias históricas.
 
 ## 11. Validaciones
@@ -63,9 +65,12 @@ _No aplica directamente._ Reportes agregan datos de contacto vía joins.
 
 ## 15. Relación con otros módulos
 - **Proyectos**: `client_id` → Contact con rol CLIENT.
-- **Compras / OC / Facturas**: proveedor → Contact con rol SUPPLIER.
-- **Subcontratos**: subcontratista → Contact con rol SUBCONTRACTOR.
+- **Compras / OC**: proveedor → Contact con rol SUPPLIER.
+- **Gastos / facturas AP sin OC**: payee → Contact con rol SUPPLIER **o** EMPLOYEE ([D-089]).
+- **Subcontratos**: subcontratista → Contact con rol SUBCONTRACTOR (pago vía certificación, no vía OC).
 - **Tesorería**: contraparte en movimientos.
+
+Convención Argentina: un contacto puede ser **Empleado** (sueldo/reintegro) y a la vez **Proveedor** si emite factura (monotributo). No hace falta el segundo rol solo para reintegrar.
 
 ## 16. Permisos
 Ver [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md) fila Directorio.

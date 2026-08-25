@@ -9,6 +9,8 @@ import {
   NewProjectSupplierInvoiceDialog,
   SupplierInvoiceListFilters,
   SupplierInvoiceListSection,
+  LIST_AP_DIRECT_PAYEES,
+  toApPayeeOption,
   type POOption,
   type SupplierInvoiceListItem,
   type SupplierOption,
@@ -115,16 +117,11 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
 
     try {
       const [suppliersResult, linkablePOs, wbsNodes] = await Promise.all([
-        listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
+        listContacts(LIST_AP_DIRECT_PAYEES, ctx),
         listLinkablePurchaseOrders(id, ctx),
         listProcurementWbsOptions(id, ctx),
       ]);
-      suppliers = suppliersResult.data.map((c) => ({
-        id: c.id,
-        label: c.fantasyName ?? c.legalName,
-        country: c.country,
-        ivaCondition: c.ivaCondition,
-      }));
+      suppliers = suppliersResult.data.map(toApPayeeOption);
       poOptions = linkablePOs.map((po) => ({
         id: po.id,
         code: po.code,

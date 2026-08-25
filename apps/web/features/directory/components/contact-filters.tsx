@@ -56,7 +56,7 @@ export function ContactFilters() {
         className="h-9 w-64"
       />
       <Select
-        defaultValue={searchParams.get("role") ?? "ALL"}
+        value={searchParams.get("role") ?? "ALL"}
         onValueChange={(v) => updateParam("role", v)}
       >
         <SelectTrigger className="h-9 w-48">
@@ -71,7 +71,7 @@ export function ContactFilters() {
         </SelectContent>
       </Select>
       <Select
-        defaultValue={searchParams.get("status") ?? "ACTIVE"}
+        value={searchParams.get("status") ?? "ACTIVE"}
         onValueChange={(v) => updateParam("status", v)}
       >
         <SelectTrigger className="h-9 w-44">

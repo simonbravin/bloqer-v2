@@ -252,7 +252,7 @@ export function SupplierInvoiceForm({
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    if (!supplierContactId) { setError("Debe seleccionar un proveedor"); return; }
+    if (!supplierContactId) { setError("Debe seleccionar a quién se le paga"); return; }
     if (showLetter && !invoiceLetter) {
       setError("Seleccioná el tipo de factura (A, B, C o E)");
       return;
@@ -379,10 +379,10 @@ export function SupplierInvoiceForm({
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2 space-y-1">
-            <Label>Proveedor</Label>
+            <Label>A quién se le paga</Label>
             {suppliers.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No hay proveedores activos. Cree un contacto con rol Proveedor primero.
+                No hay proveedores ni empleados activos. Cree el contacto en Directorio primero.
               </p>
             ) : (
               <SearchableCombobox
@@ -392,9 +392,9 @@ export function SupplierInvoiceForm({
                   setSupplierContactId(id);
                   setLetterTouched(false);
                 }}
-                placeholder="Seleccionar proveedor…"
-                searchPlaceholder="Buscar proveedor…"
-                emptyText="Ningún proveedor coincide."
+                placeholder="Seleccionar proveedor o empleado…"
+                searchPlaceholder="Buscar…"
+                emptyText="Ningún contacto coincide."
               />
             )}
           </div>

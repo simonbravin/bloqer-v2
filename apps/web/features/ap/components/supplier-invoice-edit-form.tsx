@@ -99,7 +99,10 @@ export function SupplierInvoiceEditForm({
       : [{ description: "", quantity: "1", unitPrice: "", taxRate: "21", wbsNodeId: null, purchaseOrderLineId: null }],
   );
 
+  const payeeLocked = Boolean(invoice.subcontractCertificationId);
+
   function handleSupplierChange(id: string) {
+    if (payeeLocked) return;
     setSupplierContactId(id);
     if (letterTouched) return;
     const supplier = suppliers.find((s) => s.id === id);
@@ -129,7 +132,7 @@ export function SupplierInvoiceEditForm({
     const fd = new FormData(e.currentTarget);
     const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
     const payload = {
-      supplierContactId,
+      supplierContactId: payeeLocked ? invoice.supplierContactId : supplierContactId,
       issueDate:       fd.get("issueDate") as string,
       dueDate:         fd.get("dueDate")   as string,
       // Only patch letter when AR gating is known; avoid wiping on failed country load.
@@ -170,15 +173,21 @@ export function SupplierInvoiceEditForm({
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2 space-y-1">
-            <Label>Proveedor</Label>
+            <Label>A quién se le paga</Label>
             <SearchableCombobox
               options={toSearchableOptions(suppliers)}
               value={supplierContactId}
               onValueChange={handleSupplierChange}
-              placeholder="Seleccionar proveedor…"
-              searchPlaceholder="Buscar proveedor…"
-              emptyText="Ningún proveedor coincide."
+              disabled={payeeLocked}
+              placeholder="Seleccionar proveedor o empleado…"
+              searchPlaceholder="Buscar…"
+              emptyText="Ningún contacto coincide."
             />
+            {payeeLocked ? (
+              <p className="text-xs text-muted-foreground">
+                Esta factura nace de una certificación de subcontrato; el destinatario no se cambia acá.
+              </p>
+            ) : null}
           </div>
 
           {showLetter ? (

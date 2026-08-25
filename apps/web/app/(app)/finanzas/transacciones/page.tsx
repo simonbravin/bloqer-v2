@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Pagination } from "@/components/ui/pagination";
 import { isStorageConfigured } from "@bloqer/config";
 import { NewTransactionDialog } from "@/features/finance/components/new-transaction-dialog";
+import { LIST_AP_DIRECT_PAYEES, toApPayeeOption } from "@/features/ap/lib/ap-payee-options";
 import { ReportExportActions } from "@/features/reports";
 import { MovementFilters, MovementLedgerTable } from "@/features/treasury-reports";
 import { PageShell } from "@/components/layout/page-shell";
@@ -163,16 +164,8 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
 
   if (canEditAp) {
     try {
-      const suppliersResult = await listContacts(
-        { role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 },
-        ctx,
-      );
-      suppliersForDialog = suppliersResult.data.map((c) => ({
-        id: c.id,
-        label: c.fantasyName ?? c.legalName,
-        country: c.country,
-        ivaCondition: c.ivaCondition,
-      }));
+      const suppliersResult = await listContacts(LIST_AP_DIRECT_PAYEES, ctx);
+      suppliersForDialog = suppliersResult.data.map(toApPayeeOption);
     } catch {
       // VIEW DIRECTORY may be missing; keep AP dialog usable without supplier list
     }

@@ -1,5 +1,5 @@
-import { prisma } from "@bloqer/database";
-import type { Contact, ContactRole, ContactRoleType, Prisma } from "@bloqer/database";
+import { prisma, Prisma } from "@bloqer/database";
+import type { Contact, ContactRole, ContactRoleType } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type {
   CreateContactInput,
@@ -20,6 +20,25 @@ export type ContactWithRoles = Contact & {
   supplierProfile: SupplierProfile | null;
   subcontractorProfile: SubcontractorProfile | null;
 };
+
+const ROLE_LABEL_ES: Record<ContactRoleType, string> = {
+  CLIENT: "cliente",
+  SUPPLIER: "proveedor",
+  SUBCONTRACTOR: "subcontratista",
+  EMPLOYEE: "empleado",
+  OTHER: "otro",
+};
+
+function throwIfContactTaxIdConflict(err: unknown, taxId: string | null | undefined): void {
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+    throw new ServiceError(
+      "CONFLICT",
+      taxId
+        ? `Ya existe un contacto con ese CUIT/CUIL (${taxId})`
+        : "Ya existe un contacto con esos datos",
+    );
+  }
+}
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
@@ -49,35 +68,41 @@ export async function listContacts(
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to view contacts");
   }
 
+  const search = filters.search?.trim();
+  const page = Math.max(1, filters.page ?? 1);
+  const pageSize = Math.min(200, Math.max(1, filters.pageSize ?? 20));
+
   const where: Prisma.ContactWhereInput = {
     tenantId: ctx.tenantId,
     ...(filters.status ? { status: filters.status } : {}),
-    ...(filters.search
+    ...(search
       ? {
           OR: [
-            { legalName: { contains: filters.search, mode: "insensitive" } },
-            { fantasyName: { contains: filters.search, mode: "insensitive" } },
-            { taxId: { contains: filters.search } },
+            { legalName: { contains: search, mode: "insensitive" } },
+            { fantasyName: { contains: search, mode: "insensitive" } },
+            { taxId: { contains: search } },
           ],
         }
       : {}),
-    ...(filters.role
-      ? { roles: { some: { role: filters.role, status: "ACTIVE" } } }
-      : {}),
+    ...(filters.roles?.length
+      ? { roles: { some: { tenantId: ctx.tenantId, role: { in: filters.roles }, status: "ACTIVE" } } }
+      : filters.role
+        ? { roles: { some: { tenantId: ctx.tenantId, role: filters.role, status: "ACTIVE" } } }
+        : {}),
   };
 
   const [data, total] = await Promise.all([
     prisma.contact.findMany({
       where,
       include: {
-        roles: { where: { status: "ACTIVE" } },
+        roles: { where: { status: "ACTIVE" }, orderBy: { role: "asc" } },
         clientProfile: true,
         supplierProfile: true,
         subcontractorProfile: true,
       },
       orderBy: { legalName: "asc" },
-      skip: ((filters.page ?? 1) - 1) * (filters.pageSize ?? 20),
-      take: filters.pageSize ?? 20,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     }),
     prisma.contact.count({ where }),
   ]);
@@ -104,33 +129,39 @@ export async function createContact(
 
   const { initialRole, ...contactData } = input;
 
-  const contact = await prisma.$transaction(async (tx) => {
-    const created = await tx.contact.create({
-      data: {
-        ...contactData,
-        tenantId: ctx.tenantId,
-        createdBy: ctx.actorUserId,
-        updatedBy: ctx.actorUserId,
-      },
-    });
-
-    if (initialRole) {
-      await tx.contactRole.create({
-        data: { contactId: created.id, tenantId: ctx.tenantId, role: initialRole },
+  let contact: ContactWithRoles;
+  try {
+    contact = await prisma.$transaction(async (tx) => {
+      const created = await tx.contact.create({
+        data: {
+          ...contactData,
+          tenantId: ctx.tenantId,
+          createdBy: ctx.actorUserId,
+          updatedBy: ctx.actorUserId,
+        },
       });
-      await _createProfileIfNeeded(tx, created.id, initialRole, {});
-    }
 
-    return tx.contact.findUniqueOrThrow({
-      where: { id: created.id },
-      include: {
-        roles: { where: { status: "ACTIVE" } },
-        clientProfile: true,
-        supplierProfile: true,
-        subcontractorProfile: true,
-      },
+      if (initialRole) {
+        await tx.contactRole.create({
+          data: { contactId: created.id, tenantId: ctx.tenantId, role: initialRole },
+        });
+        await _createProfileIfNeeded(tx, created.id, initialRole, {});
+      }
+
+      return tx.contact.findUniqueOrThrow({
+        where: { id: created.id },
+        include: {
+          roles: { where: { status: "ACTIVE" }, orderBy: { role: "asc" } },
+          clientProfile: true,
+          supplierProfile: true,
+          subcontractorProfile: true,
+        },
+      });
     });
-  });
+  } catch (err) {
+    throwIfContactTaxIdConflict(err, input.taxId);
+    throw err;
+  }
 
   await log({
     tenantId: ctx.tenantId,
@@ -165,16 +196,22 @@ export async function updateContact(
     if (conflict) throw new ServiceError("CONFLICT", `Ya existe un contacto con ese CUIT/CUIL (${input.taxId})`);
   }
 
-  const updated = await prisma.contact.update({
-    where: { id },
-    data: { ...input, updatedBy: ctx.actorUserId },
-    include: {
-      roles: { where: { status: "ACTIVE" } },
-      clientProfile: true,
-      supplierProfile: true,
-      subcontractorProfile: true,
-    },
-  });
+  let updated: ContactWithRoles;
+  try {
+    updated = await prisma.contact.update({
+      where: { id },
+      data: { ...input, updatedBy: ctx.actorUserId },
+      include: {
+        roles: { where: { status: "ACTIVE" }, orderBy: { role: "asc" } },
+        clientProfile: true,
+        supplierProfile: true,
+        subcontractorProfile: true,
+      },
+    });
+  } catch (err) {
+    throwIfContactTaxIdConflict(err, input.taxId);
+    throw err;
+  }
 
   await log({
     tenantId: ctx.tenantId,
@@ -260,42 +297,44 @@ export async function assignContactRole(
   });
 
   let contactRole: ContactRole;
+  let action: "contact_role.reactivated" | "contact_role.assigned";
 
-  if (existing) {
-    if (existing.status === "ACTIVE") {
-      throw new ServiceError("CONFLICT", `El contacto ya tiene el rol ${input.role}`);
+  try {
+    contactRole = await prisma.$transaction(async (tx) => {
+      if (existing) {
+        if (existing.status === "ACTIVE") {
+          throw new ServiceError("CONFLICT", `El contacto ya tiene el rol ${ROLE_LABEL_ES[input.role]}`);
+        }
+        const reactivated = await tx.contactRole.update({
+          where: { id: existing.id },
+          data: { status: "ACTIVE", notes: input.notes ?? existing.notes },
+        });
+        await _createProfileIfNeeded(tx, contactId, input.role, input);
+        return reactivated;
+      }
+      const created = await tx.contactRole.create({
+        data: { contactId, tenantId: ctx.tenantId, role: input.role, notes: input.notes },
+      });
+      await _createProfileIfNeeded(tx, contactId, input.role, input);
+      return created;
+    });
+    action = existing ? "contact_role.reactivated" : "contact_role.assigned";
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      throw new ServiceError("CONFLICT", `El contacto ya tiene el rol ${ROLE_LABEL_ES[input.role]}`);
     }
-    // Reactivate
-    contactRole = await prisma.contactRole.update({
-      where: { id: existing.id },
-      data: { status: "ACTIVE", notes: input.notes ?? existing.notes },
-    });
-    await log({
-      tenantId: ctx.tenantId,
-      actorUserId: ctx.actorUserId,
-      action: "contact_role.reactivated",
-      entityType: "ContactRole",
-      entityId: contactRole.id,
-      after: { role: input.role, contactId },
-      ipAddress: ctx.ipAddress,
-    });
-  } else {
-    contactRole = await prisma.contactRole.create({
-      data: { contactId, tenantId: ctx.tenantId, role: input.role, notes: input.notes },
-    });
-    await log({
-      tenantId: ctx.tenantId,
-      actorUserId: ctx.actorUserId,
-      action: "contact_role.assigned",
-      entityType: "ContactRole",
-      entityId: contactRole.id,
-      after: { role: input.role, contactId },
-      ipAddress: ctx.ipAddress,
-    });
+    throw err;
   }
 
-  // Create profile if not exists
-  await _createProfileIfNeeded(prisma, contactId, input.role, input);
+  await log({
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    action,
+    entityType: "ContactRole",
+    entityId: contactRole.id,
+    after: { role: input.role, contactId },
+    ipAddress: ctx.ipAddress,
+  });
 
   return contactRole;
 }

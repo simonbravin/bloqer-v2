@@ -34,6 +34,7 @@ Hereda `ACTIVE` / `ARCHIVED` del Contact.
 
 ## 10. Reglas de negocio
 - **BR-SUP-001**: OC solo puede seleccionar Contact con rol SUPPLIER (o aviso si se fuerza alta rápida).
+- Gasto / factura **sin OC** también admite Contact con rol `EMPLOYEE` ([D-089]); eso no habilita al empleado en OC.
 
 ## 11. Validaciones
 - CBU/CVU formato si informado (Argentina).

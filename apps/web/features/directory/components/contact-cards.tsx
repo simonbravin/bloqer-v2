@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { RoleBadge } from "./role-badge";
 import { ContactStatusBadge } from "./contact-status-badge";
-import type { ContactWithRoles } from "@/features/directory/types";
+import { activeContactRoles, type ContactWithRoles } from "@/features/directory/types";
 
 interface ContactCardsProps {
   contacts: ContactWithRoles[];
@@ -17,7 +17,9 @@ export function ContactCards({ contacts }: ContactCardsProps) {
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-      {contacts.map((contact) => (
+      {contacts.map((contact) => {
+        const roles = activeContactRoles(contact.roles);
+        return (
         <Link
           key={contact.id}
           href={`/directorio/${contact.id}`}
@@ -43,15 +45,16 @@ export function ContactCards({ contacts }: ContactCardsProps) {
             <p className="mt-1 truncate text-sm text-muted-foreground">{contact.email}</p>
           ) : null}
           <div className="mt-3 flex flex-wrap gap-1">
-            {contact.roles.map((r) => (
+            {roles.map((r) => (
               <RoleBadge key={r.id} role={r.role} />
             ))}
-            {contact.roles.length === 0 ? (
+            {roles.length === 0 ? (
               <span className="text-xs text-muted-foreground">Sin roles</span>
             ) : null}
           </div>
         </Link>
-      ))}
+        );
+      })}
     </div>
   );
 }
