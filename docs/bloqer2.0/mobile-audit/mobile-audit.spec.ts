@@ -333,7 +333,7 @@ test.describe("Mobile UX audit", () => {
       ["/configuracion", "58-config-empresa-390.png"],
       ["/configuracion/equipo", "59-config-equipo-390.png"],
       ["/configuracion/permisos", "60-config-permisos-390.png"],
-      ["/configuracion/compras", "61-config-compras-390.png"],
+      ["/configuracion/politicas", "61-config-compras-390.png"],
       ["/contabilidad", "62-contabilidad-390.png"],
     ];
     for (const [route, file] of corp) {
@@ -426,7 +426,7 @@ test.describe("Mobile UX audit", () => {
       ["/configuracion", "58-config-empresa-390.png"],
       ["/configuracion/equipo", "59-config-equipo-390.png"],
       ["/configuracion/permisos", "60-config-permisos-390.png"],
-      ["/configuracion/compras", "61-config-compras-390.png"],
+      ["/configuracion/politicas", "61-config-compras-390.png"],
       ["/contabilidad", "62-contabilidad-390.png"],
     ];
     for (const [route, file] of rest) {

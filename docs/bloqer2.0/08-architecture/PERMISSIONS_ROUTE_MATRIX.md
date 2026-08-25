@@ -243,7 +243,7 @@ En **shell de app** (no `/platform`). No usa `PlatformAdmin`; solo RBAC por memb
 | `/configuracion/equipo/invitaciones/[invitationId]` | Idem | Idem read | `EDIT USERS_PERMISSIONS` — cancelar invitación **PENDING** |
 | `/configuracion/equipo/[membershipId]` | Idem | Idem read | `EDIT USERS_PERMISSIONS` para roles y estado `ACTIVE`/`INACTIVE` |
 | `/configuracion/permisos` | Idem | Idem read (matriz solo lectura `buildPermissionMatrixGrid`) | Notas por módulo: `EDIT USERS_PERMISSIONS` **o** `EDIT TENANT_SETTINGS` (persistencia `Tenant.permissionMatrixNotes`, ADR-Phase1-05) |
-| `/configuracion/presupuestos` | Idem | Idem read | OWNER/ADMIN — kill-switch tenant + flags por obra ([D-088] edición excepcional `APPROVED`) |
+| `/configuracion/politicas` | Idem | Idem read | Compras: `TENANT_SETTINGS` (o OWNER/ADMIN). Presupuestos: OWNER/ADMIN — kill-switch tenant + flags por obra ([D-088] edición excepcional `APPROVED`). Rutas previas `/configuracion/compras` y `/configuracion/presupuestos` redirigen acá. |
 | `/configuracion/reportes`, `/configuracion/reportes/nuevo`, `/configuracion/reportes/[id]` | Idem | **OWNER** o **ADMIN** (`canManageScheduledReports`) | CRUD envíos programados (Phase 17B); sin cron |
 | `/proyectos/[id]/reportes/programados` | Idem proyecto | **OWNER** o **ADMIN** | Listado filtrado por `projectId`; alta vía `/configuracion/reportes/nuevo?scope=PROJECT&projectId=` |
 | `/invitaciones/aceptar` | **Pública** (sin sesión: mensaje + login); con sesión: aceptar con token | Invitación válida (`peek` por token) | Aceptación: usuario autenticado cuyo **email** coincide con la invitación |

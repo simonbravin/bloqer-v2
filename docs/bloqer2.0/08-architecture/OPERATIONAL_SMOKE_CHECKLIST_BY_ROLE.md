@@ -48,7 +48,7 @@ Roles de proyecto `PROJECT_VIEWER`: fuera de alcance Fase 1 (portal externo).
 | A1 | `/dashboard` | Ingresar con Google | Shell carga; nav de empresa visible |
 | A2 | `/configuracion/equipo` | Abrir Equipo | Listado de miembros; CTA Invitar |
 | A3 | `/configuracion/permisos` | Abrir matriz | Banner **solo lectura**; módulos fantasma (Contratos, RFIs, etc.) marcados como no disponibles en esta versión |
-| A4 | `/configuracion/compras` | Abrir política de compras | Card / form de umbrales y auto-aprobación visibles desde Configuración |
+| A4 | `/configuracion/politicas` | Abrir políticas de compras y presupuesto | Form de umbrales/auto-aprobación y política de presupuestos aprobados visibles desde Configuración |
 | A5 | `/configuracion/reportes` | Crear o abrir un envío | Copy de **cron diario**; estados de última corrida con hint Omitido ≠ Fallido |
 | A6 | `/configuracion/reportes/[id]` | Ver historial + link a emails | Enlace a `/notificaciones/emails?…` funciona |
 | A7 | `/notificaciones` (campana) | Abrir inbox | **Sin** ítem “Notificaciones” en sidebar ([D-087]); campana del header con conteo |
@@ -97,7 +97,7 @@ Usar un usuario con rol de proyecto `PROJECT_MANAGER` (y sin roles globales que 
 | # | Ruta | Acción | Criterio de éxito |
 |---|------|--------|-------------------|
 | C1 | `/directorio` | Abrir / crear proveedor | Contacto `SUPPLIER` usable |
-| C2 | `/configuracion/compras` | Leer política | Umbrales PR/OC y texto de auto-aprobación claros |
+| C2 | `/configuracion/politicas` | Leer política de compras | Umbrales PR/OC y texto de auto-aprobación claros |
 | C3 | `/proyectos/[id]/ordenes-compra` | Crear o abrir OC | Flujo DRAFT → … → CONFIRMED según política |
 | C4 | `/ordenes-compra/[poId]/recepciones/nueva` | Registrar recepción | Recepción confirmable; stock si hay depósito |
 | C5 | `/proyectos/[id]/recepciones` | Ver listado | Visible desde menú Operación |

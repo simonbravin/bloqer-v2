@@ -48,7 +48,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
+import { formatBudgetQtyFromString, formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { WbsNodeForm } from "./wbs-node-form";
@@ -812,7 +812,7 @@ export function WbsTree({
             {metrics.unit ? budgetUnitLabel(metrics.unit) : "—"}
           </TableCell>
           <TableCell className="py-0.5 text-right font-mono text-sm w-24">
-            {metrics.quantity != null ? formatQtyFromString(String(metrics.quantity)) : "—"}
+            {node.costItem ? formatBudgetQtyFromString(node.costItem.quantity) : "—"}
           </TableCell>
 
           {renderNodeMoneyCells(node, metrics)}

@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updateCompanyProcurementSettingsAction } from "@/app/(app)/configuracion/compras/actions";
+import { updateCompanyProcurementSettingsAction } from "@/app/(app)/configuracion/politicas/actions";
 
 interface Props {
   companyId: string;

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { updateProjectApprovedBudgetEditsPolicyAction } from "@/app/(app)/configuracion/presupuestos/actions";
+import { updateProjectApprovedBudgetEditsPolicyAction } from "@/app/(app)/configuracion/politicas/actions";
 
 type Props = {
   projectId: string;

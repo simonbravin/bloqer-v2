@@ -125,6 +125,7 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
       { label: "Mi perfil", href: "/configuracion/perfil" },
       { label: "Equipo", href: "/configuracion/equipo" },
       { label: "Permisos", href: "/configuracion/permisos" },
+      { label: "Políticas", href: "/configuracion/politicas" },
       { label: "Reportes programados", href: "/configuracion/reportes" },
       { label: "Registro", href: "/configuracion/registro", require: { action: "VIEW", module: "AUDIT" } },
     ],

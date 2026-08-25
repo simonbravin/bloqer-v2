@@ -967,7 +967,7 @@
   2. `CompanyProcurementSettings.invoiceMatchTolerancePct` (default **0**, máximo **25**): si factura (monto o qty por línea vía [D-066]) supera recibido + tolerancia → **aviso** en detalle OC/factura; **no bloquea** emitir en esta fase.
   3. Panel de facturación OC muestra avisos por línea (ordenado / recibido / facturado).
   4. Justificación obligatoria / aprobación AP por matching fuera de tolerancia queda para fase posterior (sigue [BR-PUR-012] documentado).
-- **Implicancias:** settings UI `/configuracion/compras`; `purchase-receipt-guards`; `three-way-match-pure`; billing summary.
+- **Implicancias:** settings UI `/configuracion/politicas`; `purchase-receipt-guards`; `three-way-match-pure`; billing summary.
 - **Documentos afectados:** [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) BR-PUR-006/012, [`SESSION_HANDOFF.md`](../SESSION_HANDOFF.md) P-PROC-01/02, guía operativa.
 
 ---
@@ -1013,7 +1013,7 @@
   1. Campo `CompanyProcurementSettings.apPaymentNotificationChannel`: `IN_APP` | `IN_APP_AND_EMAIL`.
   2. **Default:** `IN_APP_AND_EMAIL` (recomendado para no atrasar pagos).
   3. Aplica a `PAYABLE_READY_TO_PAY` y `PAYMENT_CONFIRMED`. Email vía `sendNotificationEmailAsSystem` (best-effort; si Resend no está configurado, queda solo in-app).
-  4. UI en `/configuracion/compras`.
+  4. UI en `/configuracion/politicas`.
 - **Implicancias:** no cambia quién recibe (audiencia [D-069]); solo el canal.
 - **Documentos afectados:** [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) Q-056, [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md) §9.3b.
 

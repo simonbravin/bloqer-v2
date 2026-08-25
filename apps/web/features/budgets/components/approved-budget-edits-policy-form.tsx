@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   updateTenantApprovedBudgetEditsPolicyAction,
   updateProjectApprovedBudgetEditsPolicyAction,
-} from "@/app/(app)/configuracion/presupuestos/actions";
+} from "@/app/(app)/configuracion/politicas/actions";
 
 type Props = {
   policy: ApprovedBudgetEditsPolicyView;

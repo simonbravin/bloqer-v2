@@ -1,4 +1,4 @@
-import { compareDecimal, roundQty, serializeMoney, serializeUnitPrice } from "@bloqer/utils";
+import { compareDecimal, roundMoney, roundQty, serializeMoney, serializeUnitPrice } from "@bloqer/utils";
 
 function formatFixedDecimalString(s: string): string {
   const sign = s.startsWith("-") ? "-" : "";
@@ -28,6 +28,15 @@ export function formatDecimalArFromString(raw: string): string {
 export function formatQtyFromString(raw: string): string {
   try {
     return formatFixedDecimalString(roundQty(raw));
+  } catch {
+    return raw;
+  }
+}
+
+/** Cantidad de presupuesto en tabla: 2 dp de display (el valor persistido sigue en 4 dp). */
+export function formatBudgetQtyFromString(raw: string): string {
+  try {
+    return formatFixedDecimalString(roundMoney(raw, 2));
   } catch {
     return raw;
   }

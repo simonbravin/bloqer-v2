@@ -23,8 +23,7 @@ export function buildConfiguracionSubnavLinks(roles: UserRole[]): ModuleSubnavLi
     links.push(
       { href: "/configuracion/equipo", label: "Equipo" },
       { href: "/configuracion/permisos", label: "Permisos" },
-      { href: "/configuracion/compras", label: "Compras" },
-      { href: "/configuracion/presupuestos", label: "Presupuestos" },
+      { href: "/configuracion/politicas", label: "Políticas" },
     );
   }
 

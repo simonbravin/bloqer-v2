@@ -162,7 +162,7 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 - **Zona horaria:** desplegable con ciudades + offset **GMT** (ej. `Buenos Aires (GMT-3)`). No hay que escribir el id IANA a mano. Argentina (Buenos Aires) es **GMT-3 todo el año** (sin horario de verano).
 - Esa zona se usa en el **Registro de actividad** (tabla, detalle y exports CSV/PDF) y en **reportes programados**. Tabla y detalle deben mostrar **la misma hora**.
 - Razón social / CUIT son de solo lectura acá (datos fiscales de la empresa principal).
-- **Política de compras:** `/configuracion/compras` (subnavegación Configuración → **Compras**, o card desde `/configuracion`): umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos.
+- **Políticas:** `/configuracion/politicas` (Configuración → **Políticas** en sidebar y subnavegación): umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos; y política excepcional de presupuestos aprobados.
 
 <!-- capture:02 configuracion-zona-horaria -->
 ![Bloqer — Configuración + zona horaria](./guides/assets/screenshots/02-configuracion-zona-horaria.png)
@@ -721,7 +721,7 @@ flowchart LR
 1. **Nueva solicitud** (diálogo / `?create=1`), o llegar prellenada desde Materiales → **Pedir**.
 2. Líneas: cantidad, unidad, descripción y **partida EDT obligatoria**.
 3. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por partida EDT).
-4. Cargar **Cotizaciones** (precio + **plazo de entrega en días** + validez). Cumplir mínimo de cotizaciones de `/configuracion/compras`.
+4. Cargar **Cotizaciones** (precio + **plazo de entrega en días** + validez). Cumplir mínimo de cotizaciones de `/configuracion/politicas`.
 5. **Seleccionar** proveedor → genera **OC en borrador**.
 6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora. El email de nueva solicitud muestra organización, proyecto, solicitante e ítems; el asunto es `[organización] Nueva solicitud · SC-003`.
 
@@ -1215,7 +1215,7 @@ flowchart LR
 
 ### Compras
 
-- [ ] Política de compras revisada en `/configuracion/compras`
+- [ ] Política de compras revisada en `/configuracion/politicas`
 - [ ] Tablero **Materiales** / **Tablero de compras** como punto de partida del faltante
 - [ ] Todas las líneas con **partida EDT** (indirectos → partida de gastos generales)
 - [ ] Solicitudes cotizadas (mínimo según política), comparando **precio y plazo**

@@ -16,6 +16,7 @@ import {
   ListTree,
   Package,
   Receipt,
+  Scale,
   ScrollText,
   Settings,
   Shield,
@@ -50,6 +51,7 @@ const GLOBAL_NAV_ICON_BY_HREF: Record<string, LucideIcon> = {
   "/configuracion/perfil": User,
   "/configuracion/equipo": Users,
   "/configuracion/permisos": Shield,
+  "/configuracion/politicas": Scale,
   "/configuracion/reportes": CalendarClock,
   "/configuracion/registro": ScrollText,
 };

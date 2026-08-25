@@ -213,7 +213,7 @@
 - **Categoría:** Compras
 - **Estado:** CERRADA — ver [D-044](./DECISION_LOG.md#d-044--solicitud-de-compra-cotizaciones-y-flujo-de-oc)
 - **Decisión (Fase 1):** umbral configurable por empresa en `CompanyProcurementSettings.poApprovalThresholdArs`; OCs en ARS ≥ umbral requieren aprobador OWNER/ADMIN o varianza `EXTRA_APPROVAL`; workflow multinivel queda para Fase 2.
-- **Implementación:** `packages/services/src/procurement/purchase-order-workflow.service.ts`, UI `/configuracion/compras`.
+- **Implementación:** `packages/services/src/procurement/purchase-order-workflow.service.ts`, UI `/configuracion/politicas`.
 - **Documentos:** [`02-modules/PURCHASE_REQUESTS.md`](../02-modules/PURCHASE_REQUESTS.md), [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) [BR-PUR-008]–[BR-APR-005].
 
 ### Q-018 — Configuración del método de valuación de stock por depósito

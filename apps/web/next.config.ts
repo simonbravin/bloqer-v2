@@ -34,6 +34,16 @@ const nextConfig: NextConfig = {
         destination: "/tesoreria/flujo-caja",
         permanent: true,
       },
+      {
+        source: "/configuracion/compras",
+        destination: "/configuracion/politicas",
+        permanent: true,
+      },
+      {
+        source: "/configuracion/presupuestos",
+        destination: "/configuracion/politicas",
+        permanent: true,
+      },
     ];
   },
   serverExternalPackages: [

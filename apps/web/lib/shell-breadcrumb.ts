@@ -38,6 +38,7 @@ const PATH_SEGMENT_LABELS: Record<string, string> = {
   perfil: "Mi perfil",
   equipo: "Equipo",
   permisos: "Permisos",
+  politicas: "Políticas",
   registro: "Registro",
   invitaciones: "Invitaciones",
   invitar: "Invitar",
