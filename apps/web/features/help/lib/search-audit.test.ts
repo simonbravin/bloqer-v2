@@ -48,6 +48,20 @@ test("garbage query returns no results", () => {
   assert.equal(hits.length, 0);
 });
 
+test("«aprobar orden de compra» ranks OC approval, not budget/cert", () => {
+  const hits = searchHelpArticles(HELP_ARTICLES, { query: "aprobar orden de compra" });
+  assert.ok(hits.length > 0 && hits.length <= 8, `got ${hits.length}`);
+  assert.equal(hits[0]!.slug, "orden-de-compra-y-afectar-edt");
+  assert.ok(
+    hits.slice(0, 3).some((a) => a.slug === "circuito-comprar-material-hasta-pagarlo") ||
+      hits.slice(0, 3).some((a) => a.slug === "politicas-de-compras"),
+  );
+  assert.ok(!hits.some((a) => a.slug === "aprobar-el-presupuesto"));
+  assert.ok(!hits.some((a) => a.slug === "emitir-y-aprobar-certificacion"));
+  assert.ok(!hits.some((a) => a.slug === "inventario-corporativo-basico"));
+  assert.ok(!hits.some((a) => a.slug === "cargar-libro-de-obra"));
+});
+
 test("module filter tesoreria returns only treasury articles", () => {
   const hits = searchHelpArticles(HELP_ARTICLES, { module: "tesoreria" });
   assert.ok(hits.length >= 6);

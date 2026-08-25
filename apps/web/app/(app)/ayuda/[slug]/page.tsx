@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import { getHelpArticle } from "@/features/help/lib/catalog";
@@ -6,6 +7,16 @@ import { HelpArticleView } from "@/features/help/components/help-article-view";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const article = getHelpArticle(slug);
+  if (!article) return { title: "Ayuda" };
+  return {
+    title: `${article.title} · Ayuda`,
+    description: article.summary,
+  };
 }
 
 export default async function AyudaArticlePage({ params }: PageProps) {

@@ -73,7 +73,20 @@ export type HelpIntent =
   | "revertir-asiento"
   | "inventario"
   | "anticipo"
-  | "configurar-empresa";
+  | "configurar-empresa"
+  | "afectaciones"
+  | "dimensiones-avance"
+  | "adenda-presupuesto"
+  | "anular-documentos"
+  | "rentabilidad"
+  | "reportes-obra"
+  | "presupuesto-vs-real"
+  | "exportar-reportes"
+  | "montos-decimales"
+  | "registro-actividad"
+  | "checklist-roles"
+  | "limitaciones"
+  | "puesta-marcha-contable";
 
 export type HelpHref =
   | { kind: "company"; path: string; label?: string }
@@ -141,4 +154,9 @@ export const HELP_INTENT_LABELS: Partial<Record<HelpIntent, string>> = {
   inventario: "Inventario",
   anticipo: "Anticipo / venta rápida",
   "reportes-contables": "Reportes contables",
+  // Conceptual / niche intents stay on articles for search & related links,
+  // but are omitted from filter chips to keep the UI scannable.
+  "anular-documentos": "Anular / devolver / cancelar",
+  rentabilidad: "Rentabilidad de obra",
+  "reportes-obra": "Reportes de obra",
 };

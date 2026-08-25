@@ -5,6 +5,7 @@ import { SETUP_ARTICLES, TREASURY_ARTICLES } from "./articles/setup-treasury";
 import { PLANNING_ARTICLES, PROCUREMENT_ARTICLES } from "./articles/planning-procurement";
 import { AP_ARTICLES, SUBCONTRACT_AR_ARTICLES } from "./articles/finance";
 import { CONTROL_ARTICLES } from "./articles/control";
+import { CONCEPTS_REPORTS_ARTICLES } from "./articles/concepts-reports";
 
 export const HELP_ARTICLES: HelpArticle[] = [
   ...DIRECTORY_ARTICLES,
@@ -15,6 +16,23 @@ export const HELP_ARTICLES: HelpArticle[] = [
   ...SUBCONTRACT_AR_ARTICLES,
   ...AP_ARTICLES,
   ...CONTROL_ARTICLES,
+  ...CONCEPTS_REPORTS_ARTICLES,
+];
+
+/** Home browse (no query/chips): keep the list scannable as the catalog grows. */
+export const HELP_FEATURED_SLUGS: readonly string[] = [
+  "cargar-un-proveedor",
+  "circuito-comprar-material-hasta-pagarlo",
+  "orden-de-compra-y-afectar-edt",
+  "pagar-un-sueldo",
+  "hub-reportes-de-obra",
+  "presupuesto-vs-real",
+  "ver-rentabilidad-de-obra",
+  "exportar-reportes-csv-pdf",
+  "afectaciones-comprometido-devengado-pagado",
+  "leer-edt-y-costos",
+  "pagar-una-cuenta-por-pagar",
+  "errores-operativos-frecuentes",
 ];
 
 const BY_SLUG = new Map(HELP_ARTICLES.map((a) => [a.slug, a]));

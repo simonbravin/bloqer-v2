@@ -117,7 +117,7 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
       "Usá esa cuenta al cobrar (INFLOW) o pagar (OUTFLOW).",
     ],
     relatedSlugs: ["transferir-entre-cuentas", "ver-movimientos-de-tesoreria", "por-que-un-pago-se-bloquea"],
-    keywords: ["caja", "banco", "cuenta tesoreria", "saldo apertura", "nueva cuenta"],
+    keywords: ["caja", "banco", "cuenta tesoreria", "saldo apertura", "nueva cuenta", "caja chica"],
     guideRef: "§4",
   },
   {
@@ -136,7 +136,7 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
       "Confirmá. No puede dejar la origen en negativo.",
     ],
     relatedSlugs: ["crear-cuenta-tesoreria", "ver-movimientos-de-tesoreria"],
-    keywords: ["transferencia", "entre cuentas", "mover plata"],
+    keywords: ["transferencia", "entre cuentas", "mover plata", "transferir plata", "guita"],
     guideRef: "§4",
   },
   {
@@ -218,7 +218,7 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
       "Confirmá. Queda movimiento ADJUSTMENT.",
     ],
     relatedSlugs: ["conciliar-el-banco", "ver-movimientos-de-tesoreria"],
-    keywords: ["ajuste", "ajuste manual", "corregir saldo"],
+    keywords: ["ajuste", "ajuste manual", "corregir saldo", "caja chica"],
     guideRef: "§4.3",
   },
   {
@@ -240,7 +240,14 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
       "Movimiento conciliado: desemparejá / reabrí la conciliación antes de cancelar.",
     ],
     relatedSlugs: ["pagar-una-cuenta-por-pagar", "cerrar-el-mes", "conciliar-el-banco"],
-    keywords: ["pago bloqueado", "fondos insuficientes", "period closed", "no puedo pagar"],
+    keywords: [
+      "pago bloqueado",
+      "fondos insuficientes",
+      "period closed",
+      "no puedo pagar",
+      "no me deja pagar",
+      "bloqueado",
+    ],
     guideRef: "§4 · §12.2 · §17",
   },
 ];

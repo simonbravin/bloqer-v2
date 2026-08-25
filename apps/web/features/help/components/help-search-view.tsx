@@ -5,12 +5,14 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import {
   HELP_ARTICLES,
+  HELP_FEATURED_SLUGS,
   HELP_MODULE_LABELS,
+  getHelpArticle,
   listHelpIntentChips,
   listHelpModulesInUse,
 } from "@/features/help/lib/catalog";
 import { searchHelpArticles } from "@/features/help/lib/search";
-import type { HelpIntent, HelpModule } from "@/features/help/lib/types";
+import type { HelpArticle, HelpIntent, HelpModule } from "@/features/help/lib/types";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,6 +42,40 @@ function FilterChip({
   );
 }
 
+function ArticleResultList({ articles }: { articles: HelpArticle[] }) {
+  return (
+    <ul className="divide-y rounded-lg border bg-card">
+      {articles.map((article) => (
+        <li key={article.slug}>
+          <Link
+            href={`/ayuda/${article.slug}`}
+            className="block px-4 py-4 transition-colors hover:bg-muted/50"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <h2 className="text-base font-semibold tracking-tight text-foreground">
+                {article.title}
+              </h2>
+              <div className="flex flex-wrap gap-1">
+                {article.modules.slice(0, 2).map((m) => (
+                  <Badge key={m} variant="secondary" className="font-normal">
+                    {HELP_MODULE_LABELS[m]}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">{article.summary}</p>
+            {article.typicalRoles.length > 0 ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Quién: {article.typicalRoles.join(" · ")}
+              </p>
+            ) : null}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function HelpSearchView() {
   const [query, setQuery] = useState("");
   const [module, setModule] = useState<HelpModule | null>(null);
@@ -49,6 +85,15 @@ export function HelpSearchView() {
   const intents = useMemo(() => listHelpIntentChips(), []);
 
   const hasFilters = Boolean(query.trim() || module || intent);
+  const browsing = !hasFilters;
+
+  const featured = useMemo(
+    () =>
+      HELP_FEATURED_SLUGS.map((slug) => getHelpArticle(slug)).filter(
+        (a): a is HelpArticle => a != null,
+      ),
+    [],
+  );
 
   const results = useMemo(
     () => searchHelpArticles(HELP_ARTICLES, { query, module, intent }),
@@ -118,51 +163,35 @@ export function HelpSearchView() {
       </div>
 
       <div>
-        <p className="mb-3 text-sm text-muted-foreground">
-          {results.length === 1 ? "1 procedimiento" : `${results.length} procedimientos`}
-        </p>
-        {results.length === 0 ? (
-          <ListEmptyState
-            title="No encontramos eso"
-            description="Probá con otras palabras o limpiá los filtros. Objetivo y módulo se combinan (AND)."
-            action={
-              hasFilters ? (
-                <Button type="button" size="sm" variant="outline" onClick={clearFilters}>
-                  Limpiar filtros
-                </Button>
-              ) : undefined
-            }
-          />
+        {browsing ? (
+          <>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Empezá por un procedimiento frecuente, o buscá / filtrá arriba ({HELP_ARTICLES.length} en
+              total).
+            </p>
+            <ArticleResultList articles={featured} />
+          </>
         ) : (
-          <ul className="divide-y rounded-lg border bg-card">
-            {results.map((article) => (
-              <li key={article.slug}>
-                <Link
-                  href={`/ayuda/${article.slug}`}
-                  className="block px-4 py-4 transition-colors hover:bg-muted/50"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <h2 className="text-base font-semibold tracking-tight text-foreground">
-                      {article.title}
-                    </h2>
-                    <div className="flex flex-wrap gap-1">
-                      {article.modules.slice(0, 2).map((m) => (
-                        <Badge key={m} variant="secondary" className="font-normal">
-                          {HELP_MODULE_LABELS[m]}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{article.summary}</p>
-                  {article.typicalRoles.length > 0 ? (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Quién: {article.typicalRoles.join(" · ")}
-                    </p>
-                  ) : null}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <>
+            <p className="mb-3 text-sm text-muted-foreground">
+              {results.length === 1 ? "1 procedimiento" : `${results.length} procedimientos`}
+            </p>
+            {results.length === 0 ? (
+              <ListEmptyState
+                title="No encontramos eso"
+                description="Probá con otras palabras o limpiá los filtros. Objetivo y módulo se combinan (AND)."
+                action={
+                  hasFilters ? (
+                    <Button type="button" size="sm" variant="outline" onClick={clearFilters}>
+                      Limpiar filtros
+                    </Button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <ArticleResultList articles={results} />
+            )}
+          </>
         )}
       </div>
     </div>

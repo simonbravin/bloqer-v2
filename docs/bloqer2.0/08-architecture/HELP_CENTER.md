@@ -27,8 +27,12 @@ Acceso: membresía activa; **sin** permiso de módulo. Deep links a pantallas de
   - `lib/catalog.ts` — índice
 - Sin Prisma, sin CMS, sin dependencia de búsqueda externa.
 - Una ficha = un **objetivo** (ej. “Cargar un proveedor”), no un capítulo de la guía.
+- Incluye fichas conceptuales (afectaciones, dimensiones de avance), reportes de obra (hub, presupuesto vs real, rentabilidad, export PDF/CSV), excepciones (anular/devolver), setup contable y limitaciones (§19).
 - `guideRef` apunta a la sección de [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md).
-- Búsqueda: normalización es-AR, stopwords, sin bonus de ranking si no hay match (evitar falsos positivos).
+- Home sin búsqueda: lista **destacados** (`HELP_FEATURED_SLUGS`), no el catálogo completo (~70 fichas).
+- Búsqueda: normalización es-AR, stopwords, aliases de frases/modismos AR, AND por tokens, tope de 8 resultados y corte por score relativo (evitar listados largos).
+- Tokens genéricos y acrónimos cortos (`compra`, `pagar`, `obra`, `oc`, `pdf`…) solo matchean título/keywords.
+- Chips de objetivo: solo intents con label curado (los nicho siguen en fichas/keywords).
 - Filtros objetivo + módulo se combinan con **AND**; empty state con CTA “Limpiar filtros”.
 
 ## 4. Mantenimiento

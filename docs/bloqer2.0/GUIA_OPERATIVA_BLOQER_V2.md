@@ -1014,9 +1014,12 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 
 ### 13.2 Rentabilidad y reportes
 
+- **Hub:** Planificación → **Reportes** → `/proyectos/[id]/reportes` (título: **Reportes del proyecto**).
+- Cards típicas (según permisos/módulos): **Rentabilidad**, **Presupuesto vs real**, **EDT y costos**, **Composición presupuesto** (abre el mismo reporte de varianza), **Compras y proveedores**, **Materiales**, **Subcontratos**, **Certificaciones**, **Ingresos vs gastos**, **Caja y proyección**, **Flujo de caja (detalle)**, aging CxC/CxP.
 - **Rentabilidad:** `/proyectos/[id]/reportes/rentabilidad` (margen bruto; neto según overhead imputado, visible a `OWNER`/`ADMIN`).
-- **Hub de reportes:** `/proyectos/[id]/reportes` (presupuesto vs. real, compras y proveedores, materiales → `/materiales?tab=varianza`, subcontratos, certificaciones/ingresos‑gastos, caja).
-- **Exportaciones CSV/PDF** desde cada pantalla de reporte.
+- **Presupuesto vs real:** `/proyectos/[id]/reportes/presupuesto-vs-real`.
+- **Exportar:** en cada pantalla de reporte, menú **Exportar** → **CSV** / **PDF** (o botón **Exportar PDF** si solo hay PDF). Contabilidad/tesorería/finanzas/inventario/registro siguen el mismo patrón; algunos libros ofrecen también XLSX.
+- **Envíos programados por email:** `/proyectos/[id]/reportes/programados` (si el rol puede gestionarlos).
 
 ---
 

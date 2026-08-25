@@ -60,8 +60,9 @@ export function HelpArticleView({ article }: { article: HelpArticle }) {
           <div className="flex flex-wrap gap-2 pt-1">
             {article.hrefs.map((href, i) => {
               const resolved = resolveHelpHref(href, convenienceProjectId);
+              const key = href.kind === "company" ? href.path : href.suffix;
               return (
-                <Button key={`${href.kind}-${i}`} asChild size="sm" variant={i === 0 ? "default" : "outline"}>
+                <Button key={key} asChild size="sm" variant={i === 0 ? "default" : "outline"}>
                   <Link href={resolved.href}>
                     {resolved.needsProject ? "Elegí una obra" : resolved.label}
                     {!resolved.needsProject ? (

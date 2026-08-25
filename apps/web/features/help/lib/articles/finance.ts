@@ -61,7 +61,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
       "Emitir (ISSUED, inmutable) → Aprobar (APPROVED) o rechazar según el mandante.",
     ],
     relatedSlugs: ["facturar-una-certificacion", "aprobar-el-presupuesto"],
-    keywords: ["certificacion", "certificar", "avance cliente"],
+    keywords: ["certificacion", "certificar", "avance cliente", "certificado de avance", "certificado"],
     guideRef: "§11",
   },
   {
@@ -102,7 +102,14 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
       "Confirmá. Solo la cobranza confirmada mueve caja.",
     ],
     relatedSlugs: ["facturar-una-certificacion", "ingreso-corporativo-con-factura"],
-    keywords: ["cobrar", "cobranza", "cxc", "cuenta por cobrar"],
+    keywords: [
+      "cobrar",
+      "cobranza",
+      "cxc",
+      "cuenta por cobrar",
+      "cobrar factura",
+      "cuenta corriente",
+    ],
     guideRef: "§12.1",
   },
   {
@@ -209,6 +216,8 @@ export const AP_ARTICLES: HelpArticle[] = [
       "haberes",
       "salario",
       "empleado",
+      "liquidacion",
+      "liquidacion de sueldos",
     ],
     guideRef: "§12.2.1",
   },
@@ -255,7 +264,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "Crear → Emitir (o Emitir y pagar ahora).",
     ],
     relatedSlugs: ["reintegrar-gasto-a-empleado", "circuito-comprar-material-hasta-pagarlo"],
-    keywords: ["gasto obra", "sin oc", "factura chica", "partida edt"],
+    keywords: ["gasto obra", "sin oc", "factura chica", "partida edt", "boleta", "factura proveedor"],
     guideRef: "§12.2",
   },
   {
@@ -328,7 +337,14 @@ export const AP_ARTICLES: HelpArticle[] = [
       "por-que-un-pago-se-bloquea",
       "contabilizar-asientos",
     ],
-    keywords: ["pagar", "cxp", "cuenta por pagar", "pago proveedor"],
+    keywords: [
+      "pagar",
+      "cxp",
+      "cuenta por pagar",
+      "pago proveedor",
+      "cuenta corriente",
+      "saldar",
+    ],
     guideRef: "§12.2",
   },
 ];
