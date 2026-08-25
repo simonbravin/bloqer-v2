@@ -61,6 +61,6 @@ El seed mínimo (`db:seed`) crea usuario + tenant `demo`. Para capturas autentic
 
 Variables opcionales: `DOCS_PROJECT_ID`, `DOCS_PO_ID`, `DOCS_BUDGET_ID`, `DOCS_ACCOUNT_ID`.
 
-## Help Center (futuro)
+## Help Center ([D-090])
 
-Reutilizar el mismo manifest (`title`, `slug`, `section`, `relativePath`, `internalOnly`) como catálogo de assets para Ayuda/FAQ in-app.
+El centro de ayuda in-app (`/ayuda`) usa un **catálogo tipado** en `apps/web/features/help/`, no el manifest de capturas. Las capturas de la guía operativa pueden enlazarse desde fichas vía `guideRef`; no duplicar PNG en el help center. Ver [`HELP_CENTER.md`](../../08-architecture/HELP_CENTER.md).

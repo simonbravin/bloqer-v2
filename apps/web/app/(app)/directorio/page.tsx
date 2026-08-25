@@ -37,6 +37,7 @@ export default async function DirectorioPage({ searchParams }: PageProps) {
   const status = sp.status === "ARCHIVED" ? "ARCHIVED" as const : sp.status === "ALL" ? undefined : "ACTIVE" as const;
   const parsedPage = Number(sp.page);
   const page = Number.isFinite(parsedPage) && parsedPage >= 1 ? Math.trunc(parsedPage) : 1;
+  const hasActiveFilters = Boolean(role || sp.search || sp.status === "ARCHIVED" || sp.status === "ALL");
 
   const { data, total } = await listContacts({ role, status, search: sp.search, page, pageSize: PAGE_SIZE }, ctx);
 
@@ -67,7 +68,7 @@ export default async function DirectorioPage({ searchParams }: PageProps) {
         </Suspense>
       </div>
       <Suspense fallback={<ListSectionSkeleton />}>
-        <ContactListSection contacts={contacts} />
+        <ContactListSection contacts={contacts} hasActiveFilters={hasActiveFilters} />
       </Suspense>
       <Pagination page={page} pageSize={PAGE_SIZE} total={total} />
     </PageShell>

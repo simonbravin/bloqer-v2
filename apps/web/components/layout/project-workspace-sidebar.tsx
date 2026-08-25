@@ -14,6 +14,7 @@ import type { PermissionModule, UserRole } from "@bloqer/domain";
 import { useProjectShell } from "@/lib/project-shell-context";
 import { ProjectNavIcon } from "@/lib/project-nav-icons";
 import { isNavLinkActive } from "@/lib/nav-link-active";
+import { HelpSidebarFooter } from "./help-sidebar-footer";
 
 interface ProjectWorkspaceSidebarProps {
   projectId: string;
@@ -128,6 +129,7 @@ export function ProjectWorkspaceSidebar({
           );
         })}
       </nav>
+      <HelpSidebarFooter />
     </aside>
   );
 }

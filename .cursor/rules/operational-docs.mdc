@@ -1,0 +1,14 @@
+---
+description: Guía operativa + centro de ayuda deben actualizarse con todo cambio de UX/rutas/flujos visibles (D-090).
+alwaysApply: true
+---
+
+# Documentación operativa (guía + ayuda)
+
+Si el cambio afecta **rutas, menús, etiquetas UI o flujos** que ve el usuario (finanzas, compras, directorio, tesorería, obra, etc.):
+
+1. Actualizá `docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md` en el mismo PR.
+2. Actualizá el catálogo in-app `apps/web/features/help/` (ficha existente o nueva; keywords; related; `guideRef`).
+3. No inventes procedimientos: alineá a lo que hace el código hoy.
+
+Detalle: skill `operational-help-docs`, [D-090], `docs/bloqer2.0/08-architecture/HELP_CENTER.md`.

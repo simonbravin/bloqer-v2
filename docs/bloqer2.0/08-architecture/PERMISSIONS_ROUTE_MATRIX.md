@@ -94,6 +94,15 @@ Las rutas bajo **`/finanzas/**`** comparten layout: subnav filtrada por módulo 
 | `/finanzas/cuentas-por-cobrar` | Same | Aging AR tenant + `listCompanyReceivables`; detalle/cobro corporativo; adjuntos `SALES_INVOICE` en detalle CxC (`company-finanzas`). |
 | `/finanzas/pagos-proveedor/[paymentId]` | Same | `getCompanyPaymentById`; cancel pago `EDIT AP`; contabilidad draft igual que pago proyecto (`EDIT ACCOUNTING`). |
 
+## Help center ([D-090])
+
+| Route | Access | Notes |
+|-------|--------|-------|
+| `/ayuda` | Authenticated user with active tenant membership | Search + filters; **not** gated on a permission module. Sidebar footer (company + project) + header `?` + mobile **Más** |
+| `/ayuda/[slug]` | Same | Static article from `apps/web/features/help/`; deep links to app screens still enforce RBAC |
+
+See [`HELP_CENTER.md`](./HELP_CENTER.md).
+
 ## In-app notifications (Phase 8A–8D)
 
 | Route | Access | Notes |

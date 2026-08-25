@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { RoleBadge } from "./role-badge";
 import { ContactStatusBadge } from "./contact-status-badge";
 import { activeContactRoles, type ContactWithRoles } from "@/features/directory/types";
@@ -11,10 +10,6 @@ interface ContactCardsProps {
 }
 
 export function ContactCards({ contacts }: ContactCardsProps) {
-  if (contacts.length === 0) {
-    return <ListEmptyState message="No se encontraron contactos con los filtros aplicados." />;
-  }
-
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {contacts.map((contact) => {

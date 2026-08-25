@@ -8,6 +8,7 @@ import { AppShellBreadcrumb } from "@/components/layout/shell-breadcrumb";
 import { ShellHeaderLeading } from "@/components/layout/sidebar-shell-context";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { CircleHelp } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -17,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 interface HeaderProps {
   user: Session["user"];
@@ -50,6 +52,11 @@ export function Header({
         {tenantName ? <AppShellBreadcrumb tenantName={tenantName} /> : null}
       </ShellHeaderLeading>
       <div className="flex items-center gap-1 sm:gap-2">
+        <Button variant="ghost" size="icon" asChild className="h-9 w-9" title="Ayuda">
+          <Link href="/ayuda" aria-label="Ayuda">
+            <CircleHelp className="h-5 w-5" />
+          </Link>
+        </Button>
         <NotificationBell initialUnreadCount={notificationUnreadCount} />
         <ThemeToggle />
         <DropdownMenu>

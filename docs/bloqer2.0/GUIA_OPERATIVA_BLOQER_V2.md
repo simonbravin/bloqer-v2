@@ -153,6 +153,8 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 > **Visibilidad (D-056):** las secciones **Finanzas**, **Tesorería** y **Contabilidad** del menú de empresa solo aparecen para roles de **company finance**: `OWNER`, `ADMIN`, `FINANCE`, `TREASURER` y `VIEWER` (lectura). Roles operativos (`PROJECT_MANAGER`, `PROCUREMENT`, `SALES`, `PROJECT_FINANCE`, etc.) trabajan finanzas desde el **proyecto**, no desde el hub corporativo.
 
 > Las **notificaciones** se abren desde la **campana del encabezado** (no tienen ítem propio en el menú lateral). Ver §1.4.
+>
+> La **Ayuda** (centro de procedimientos / FAQ, [D-090](./00-product/DECISION_LOG.md)) está fija en el **pie del menú lateral** (empresa y obra), en el ícono `?` del encabezado y en mobile bajo **Más**. Ruta: `/ayuda`.
 
 ### 1.3 Datos de la empresa
 
@@ -1357,11 +1359,12 @@ flowchart LR
 
 1. **Fuente viva (única):** este archivo (`GUIA_OPERATIVA_BLOQER_V2.md`). Se **sobrescribe** en el mismo path ante cada cambio de producto.
 2. **Entregable cliente:** únicamente `docs/bloqer2.0/guides/Guía_Operativa_Bloqer_v2.docx`.
-3. **Cuándo actualizar:** todo PR que cambie rutas, menús, etiquetas, flujos de OC/CxP/CxC/tesorería/conciliación/cierres/contabilidad, presupuesto/EDT, notificaciones, permisos visibles o reglas de montos.
-4. **Cómo regenerar el DOCX:** `cd docs/bloqer2.0/guides && node build_guide.js`.
-5. **Capturas:** los bloques `📷 Captura sugerida` del DOCX aparecen como cajas grises con título y tip; **reemplazalos** con pantallazos reales del producto (no inventar UI). Priorizar las marcadas en §§4.2, 4.3 y 15.3 si el entregable incluye los módulos nuevos.
-6. **Smoke:** validar con [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) si el cambio afecta operación diaria.
+3. **Centro de ayuda in-app ([D-090](./00-product/DECISION_LOG.md)):** hermano de esta guía, no la reemplaza. Ruta `/ayuda`. Catálogo en `apps/web/features/help/`. Todo PR del punto 4 debe actualizar **también** las fichas afectadas (pasos, rutas, keywords, related). Ver [`08-architecture/HELP_CENTER.md`](./08-architecture/HELP_CENTER.md).
+4. **Cuándo actualizar:** todo PR que cambie rutas, menús, etiquetas, flujos de OC/CxP/CxC/tesorería/conciliación/cierres/contabilidad, presupuesto/EDT, notificaciones, permisos visibles o reglas de montos.
+5. **Cómo regenerar el DOCX:** `cd docs/bloqer2.0/guides && node build_guide.js`.
+6. **Capturas:** los bloques `📷 Captura sugerida` del DOCX aparecen como cajas grises con título y tip; **reemplazalos** con pantallazos reales del producto (no inventar UI). Priorizar las marcadas en §§4.2, 4.3 y 15.3 si el entregable incluye los módulos nuevos.
+7. **Smoke:** validar con [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) si el cambio afecta operación diaria.
 
 ---
 
-*Documento vivo. Actualizado agosto 2026: payee AP proveedor o empleado (D-089, §3 / §12.2), conciliación bancaria (§4.2), ajuste manual de caja (§4.3), cierre de períodos (§15.3), métodos de liquidación, estados Confirmado/Conciliado, invitaciones sin token en URL, menús Tesorería/Contabilidad. Antes: julio 2026 (zona horaria, EDT/APU, contabilidad D-061…D-063, auth). Actualizar en el mismo PR que el cambio de producto.*
+*Documento vivo. Actualizado agosto 2026: centro de ayuda in-app `/ayuda` ([D-090]); payee AP proveedor o empleado (D-089, §3 / §12.2), conciliación bancaria (§4.2), ajuste manual de caja (§4.3), cierre de períodos (§15.3), métodos de liquidación, estados Confirmado/Conciliado, invitaciones sin token en URL, menús Tesorería/Contabilidad. Antes: julio 2026 (zona horaria, EDT/APU, contabilidad D-061…D-063, auth). Actualizar en el mismo PR que el cambio de producto.*

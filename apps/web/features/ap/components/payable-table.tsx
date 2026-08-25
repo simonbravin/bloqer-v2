@@ -33,13 +33,18 @@ export function PayableTable({
     return (
       <ListEmptyState
         title="Sin cuentas por pagar"
-        description="Se generan al emitir una factura de proveedor."
+        description="Se generan al emitir una factura de proveedor. También podés ver el circuito completo en Ayuda."
         action={
-          supplierInvoiceHrefPrefix ? (
+          <div className="flex flex-wrap justify-center gap-2">
+            {supplierInvoiceHrefPrefix ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href={supplierInvoiceHrefPrefix}>Ver facturas proveedor</Link>
+              </Button>
+            ) : null}
             <Button asChild size="sm" variant="outline">
-              <Link href={supplierInvoiceHrefPrefix}>Ver facturas proveedor</Link>
+              <Link href="/ayuda/pagar-una-cuenta-por-pagar">Cómo se paga una CxP</Link>
             </Button>
-          ) : undefined
+          </div>
         }
       />
     );

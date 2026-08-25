@@ -7,6 +7,7 @@ import {
 } from "@bloqer/services";
 import { TreasuryMovementAccountingButton } from "@/features/accounting";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -50,6 +51,8 @@ interface Props {
   canLinkProjects?: boolean;
   accountingReturnPath?: string;
   canEditAccounting?: boolean;
+  /** When set, empty state links to help / register (Finanzas → Transacciones). */
+  showFinanceEmptyHelp?: boolean;
 }
 
 export function MovementLedgerTable({
@@ -59,9 +62,28 @@ export function MovementLedgerTable({
   canLinkProjects = false,
   accountingReturnPath,
   canEditAccounting,
+  showFinanceEmptyHelp = false,
 }: Props) {
   const showGl = Boolean(accountingReturnPath && canEditAccounting);
   if (rows.length === 0) {
+    if (showFinanceEmptyHelp) {
+      return (
+        <ListEmptyState
+          title="No hay movimientos en este período"
+          description="Los egresos e ingresos aparecen al pagar CxP, cobrar CxC o registrar transacciones. Para sueldos: Gasto / factura al empleado."
+          action={
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link href="/finanzas/transacciones?register=ap">Registrar gasto</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/ayuda/pagar-un-sueldo">Cómo pagar un sueldo</Link>
+              </Button>
+            </div>
+          }
+        />
+      );
+    }
     return <ListEmptyState message="No hay movimientos para los filtros seleccionados." />;
   }
 

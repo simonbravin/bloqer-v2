@@ -31,6 +31,7 @@ Leer en este orden:
 - **Los estados de las entidades son los documentados** en `docs/bloqer2.0/01-domain/STATE_MACHINES.md`. No inventar estados nuevos sin actualizar ese documento primero.
 - **Si una decisión es ambigua, parar y preguntar.** No improvisar arquitectura.
 - **No crear scripts one-off ni “parches” ejecutables** (bash, PowerShell, `scripts/*.ts` ad hoc, seeds de emergencia) para tapar bugs, migrar datos a mano o validar algo que debería quedar en el producto (cron, service layer, tests, docs de smoke manual). Si hace falta corregir algo, corregir la causa en código o documentar el procedimiento operativo en `docs/bloqer2.0/` — no dejar scripts sueltos en el repo.
+- **Guía operativa + centro de ayuda ([D-090]):** todo cambio de rutas, menús, etiquetas o flujos operativos/financieros **visibles al usuario** debe actualizar en el **mismo PR** (1) [`docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md`](./docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md) y (2) el catálogo in-app `apps/web/features/help/` (fichas, keywords, related). Ver skill `.cursor/skills/operational-help-docs/` y [`.cursor/rules/operational-docs.mdc`](./.cursor/rules/operational-docs.mdc).
 - **Migraciones Prisma y portal:** `portal.bloqer.app` usa Neon branch **`production`** (`ep-cold-mouse-appkpn84`). Si el usuario pide migrar / actualizar DB / arreglar columnas en portal, aplicar `migrate deploy` **ahí**. El `.env` local suele apuntar a `dev` (`ep-curly-math…`) — **no alcanza** migrar solo local. Ver `.cursor/rules/neon-production-migrations.mdc`.
 
 ---

@@ -52,7 +52,8 @@ Traducir la **fuente de verdad funcional** (producto, dominio, finanzas, fórmul
 34. [`FRONTEND_FEATURE_STRUCTURE.md`](./FRONTEND_FEATURE_STRUCTURE.md) — Features, tablas, Gantt adapter.  
 35. [`CODING_STANDARDS.md`](./CODING_STANDARDS.md) — TS, dinero, Zod, services.  
 36. [`AI_DEVELOPMENT_WORKFLOW.md`](./AI_DEVELOPMENT_WORKFLOW.md) — Flujo de trabajo con IA + prompts tipo.  
-37. [`AGENT_GUARDRAILS.md`](./AGENT_GUARDRAILS.md) — Límites duros para agentes.  
+37. [`AGENT_GUARDRAILS.md`](./AGENT_GUARDRAILS.md) — Límites duros para agentes.
+37b. [`HELP_CENTER.md`](./HELP_CENTER.md) — Centro de ayuda in-app ([D-090]).  
 38. [`TESTING_STRATEGY.md`](./TESTING_STRATEGY.md) — Pirámide y prioridades.  
 39. [`CODE_REVIEW_CHECKLIST.md`](./CODE_REVIEW_CHECKLIST.md) — Checklist de PR.  
 40. [`PENDING_ARCHITECTURE_ITEMS.md`](./PENDING_ARCHITECTURE_ITEMS.md) — **Pendientes técnicos** a cerrar (ERD, API, repo).  

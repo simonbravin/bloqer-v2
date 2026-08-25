@@ -253,6 +253,7 @@ Leer en este orden:
 | [`CODING_STANDARDS.md`](./08-architecture/CODING_STANDARDS.md) | Estándares de código |
 | [`AI_DEVELOPMENT_WORKFLOW.md`](./08-architecture/AI_DEVELOPMENT_WORKFLOW.md) | Workflow con IA |
 | [`AGENT_GUARDRAILS.md`](./08-architecture/AGENT_GUARDRAILS.md) | Guardrails agentes |
+| [`HELP_CENTER.md`](./08-architecture/HELP_CENTER.md) | Centro de ayuda in-app ([D-090]) |
 | [`TESTING_STRATEGY.md`](./08-architecture/TESTING_STRATEGY.md) | Estrategia de tests |
 | [`CODE_REVIEW_CHECKLIST.md`](./08-architecture/CODE_REVIEW_CHECKLIST.md) | Checklist de revisión |
 | [`PENDING_ARCHITECTURE_ITEMS.md`](./08-architecture/PENDING_ARCHITECTURE_ITEMS.md) | Pendientes técnicos |

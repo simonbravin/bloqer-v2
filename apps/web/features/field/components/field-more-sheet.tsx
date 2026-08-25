@@ -69,7 +69,11 @@ export function FieldMoreSheet({ open, onOpenChange, roles, moduleGateSnapshot, 
         ? { ...item, label: "Pendientes · todas las obras" }
         : item,
     );
-  const generalLinks = [...fromGlobal, { href: "/notificaciones", label: "Notificaciones" }];
+  const generalLinks = [
+    ...fromGlobal,
+    { href: "/notificaciones", label: "Notificaciones" },
+    { href: "/ayuda", label: "Ayuda" },
+  ];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

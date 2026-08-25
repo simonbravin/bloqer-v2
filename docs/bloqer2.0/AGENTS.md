@@ -240,6 +240,9 @@ Nunca tomes decisiones de producto unilaterales y las escondas en código.
 - ¿Nueva fórmula? Agregá a `04-formulas/<TEMA>.md` con plantilla del §6.
 - ¿Nuevo workflow? Agregá a `05-workflows/<NOMBRE>.md` con plantilla del §7.
 - **Siempre actualizá** [`README.md`](./README.md) §4 (índice) cuando agregues un archivo nuevo.
+- **Centro de ayuda in-app ([D-090](./00-product/DECISION_LOG.md)):** si el cambio afecta rutas, menús, etiquetas o procedimientos visibles, actualizá en el mismo PR:
+  1. [`GUIA_OPERATIVA_BLOQER_V2.md`](./GUIA_OPERATIVA_BLOQER_V2.md) (§21).
+  2. El catálogo `apps/web/features/help/` — editar ficha existente o crear una nueva (un objetivo = una ficha; no inventar pasos que el producto no haga). Keywords de búsqueda, `relatedSlugs` y `guideRef`. Arquitectura: [`08-architecture/HELP_CENTER.md`](./08-architecture/HELP_CENTER.md). Skill: `.cursor/skills/operational-help-docs/`.
 
 ---
 

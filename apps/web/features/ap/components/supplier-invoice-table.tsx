@@ -11,6 +11,7 @@ import {
   tableNameCellClass,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { UrlSortableTableHead } from "@/components/ui/url-sortable-table-head";
@@ -37,7 +38,20 @@ export function SupplierInvoiceTable({
 }) {
   if (invoices.length === 0) {
     return (
-      <ListEmptyState message="No hay facturas de proveedor registradas." />
+      <ListEmptyState
+        title="No hay facturas de proveedor"
+        description="Registrá un gasto o factura (con o sin OC). Para sueldos y reintegros, el payee es un Empleado del Directorio."
+        action={
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href="/ayuda/gasto-corporativo">Cómo cargar un gasto</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/ayuda/pagar-un-sueldo">Cómo pagar un sueldo</Link>
+            </Button>
+          </div>
+        }
+      />
     );
   }
 

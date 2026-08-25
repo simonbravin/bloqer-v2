@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { Button } from "@/components/ui/button";
 import { SupplierInvoiceStatusBadge } from "./supplier-invoice-status-badge";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { SupplierInvoiceListItem } from "./supplier-invoice-list";
@@ -23,7 +24,20 @@ export function SupplierInvoiceCards({
 }) {
   if (invoices.length === 0) {
     return (
-      <ListEmptyState message="No hay facturas de proveedor registradas." />
+      <ListEmptyState
+        title="No hay facturas de proveedor"
+        description="Registrá un gasto o factura (con o sin OC). Para sueldos y reintegros, el payee es un Empleado del Directorio."
+        action={
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href="/ayuda/gasto-corporativo">Cómo cargar un gasto</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/ayuda/pagar-un-sueldo">Cómo pagar un sueldo</Link>
+            </Button>
+          </div>
+        }
+      />
     );
   }
 

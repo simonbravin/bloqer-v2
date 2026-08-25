@@ -10,6 +10,7 @@ import type { PermissionModule, UserRole } from "@bloqer/domain";
 import { buildGlobalNavSections } from "@/lib/global-workspace-nav";
 import { GlobalNavIcon } from "@/lib/global-nav-icons";
 import { isNavLinkActive } from "@/lib/nav-link-active";
+import { HelpSidebarFooter } from "./help-sidebar-footer";
 
 interface SidebarProps {
   /** Membership roles; empty = only items without `require` (e.g. Inicio) */
@@ -91,6 +92,7 @@ export function Sidebar({
           );
         })}
       </nav>
+      <HelpSidebarFooter />
     </aside>
   );
 }

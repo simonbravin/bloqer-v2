@@ -12,7 +12,6 @@ import {
   TableRow,
   tableNameStackCellClass,
 } from "@/components/ui/table";
-import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { useClientTableSort } from "@/hooks/use-client-table-sort";
@@ -36,10 +35,6 @@ export function ContactTable({ contacts }: ContactTableProps) {
   );
 
   const { sorted, sortKey, sortDir, toggleSort } = useClientTableSort(contacts, accessors, "name");
-
-  if (contacts.length === 0) {
-    return <ListEmptyState message="No se encontraron contactos con los filtros aplicados." />;
-  }
 
   return (
     <TableScroll>

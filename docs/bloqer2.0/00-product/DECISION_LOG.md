@@ -1344,6 +1344,24 @@
 
 ---
 
+### D-090 — Centro de ayuda in-app (FAQ / wiki de procesos)
+
+- **Fecha:** 2026-08-25
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Los operadores preguntan procedimientos básicos (“¿cómo se carga un proveedor?”) aunque ya estén en la guía operativa. La guía es un manual lineal; hace falta un buscador in-app por **objetivo** (no un dump del PDF) y un vínculo de mantenimiento obligatorio para agentes.
+- **Decisión:**
+  1. **Centro de ayuda** en `/ayuda` (listado + buscador) y `/ayuda/[slug]` (ficha). Catálogo **estático en código** (`apps/web/features/help/`), sin CMS ni edición por tenant. Copy en español (Argentina); slugs/campos técnicos en inglés.
+  2. **Acceso:** cualquier usuario con membresía activa (mismo patrón que `/notificaciones`: autenticado, **sin** `can()` extra). Los deep links a pantallas destino **siguen** RBAC.
+  3. **Navegación:** pie fijo **Ayuda** en sidebar de empresa y de obra; ícono `?` en el header; en mobile, enlace en **Más**. **No** va bajo Configuración (gateada a OWNER/ADMIN).
+  4. **Fuente de verdad:** la guía operativa describe *qué hace el sistema hoy*; las fichas son **recetas cortas** (dónde, quién, pasos con labels de UI, efectos, errores frecuentes). Si hay duda, gana el código + la guía.
+  5. **Mantenimiento:** todo PR que cambie rutas, menús, etiquetas o flujos operativos/financieros visibles **debe** actualizar `GUIA_OPERATIVA_BLOQER_V2.md` **y** el catálogo de ayuda en el mismo PR ([AGENT_GUARDRAILS](../08-architecture/AGENT_GUARDRAILS.md), skill `operational-help-docs`).
+  6. **Fuera de alcance (v1):** command palette `Ctrl+K`, chatbot, contextual help en todos los empty states (solo Directorio y hubs AP de dolor alto).
+- **Implicancias:** matriz de rutas; docs de agentes/skills; empty states accionables con link a fichas.
+- **Documentos afectados:** [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md), [`PERMISSIONS_ROUTE_MATRIX.md`](../08-architecture/PERMISSIONS_ROUTE_MATRIX.md), [`HELP_CENTER.md`](../08-architecture/HELP_CENTER.md), [`AGENT_GUARDRAILS.md`](../08-architecture/AGENT_GUARDRAILS.md), [`AGENTS.md`](../AGENTS.md), [`README.md`](../README.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1352,7 +1370,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-090`…).
+1. Tomar el siguiente ID disponible (`D-091`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

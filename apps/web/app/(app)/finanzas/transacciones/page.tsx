@@ -277,6 +277,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
             showProjectColumn
             canLinkProjects={canViewProjects}
             canEditAccounting={false}
+            showFinanceEmptyHelp
           />
 
           <Suspense fallback={null}>
