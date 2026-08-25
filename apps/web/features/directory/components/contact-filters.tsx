@@ -33,6 +33,16 @@ export function ContactFilters() {
   const searchParams = useSearchParams();
   const { defaultValue: searchDefault, setDebounced: setSearchDebounced } = useDebouncedSearchParam("search");
 
+  const roleParam = searchParams.get("role") ?? "ALL";
+  const roleValue = ROLE_OPTIONS.some((o) => o.value === roleParam) ? roleParam : "ALL";
+  const statusParam = searchParams.get("status");
+  const statusValue =
+    statusParam == null
+      ? "ACTIVE"
+      : STATUS_OPTIONS.some((o) => o.value === statusParam)
+        ? statusParam
+        : "ACTIVE";
+
   const updateParam = useCallback(
     (key: string, value: string) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -56,7 +66,7 @@ export function ContactFilters() {
         className="h-9 w-64"
       />
       <Select
-        value={searchParams.get("role") ?? "ALL"}
+        value={roleValue}
         onValueChange={(v) => updateParam("role", v)}
       >
         <SelectTrigger className="h-9 w-48">
@@ -71,7 +81,7 @@ export function ContactFilters() {
         </SelectContent>
       </Select>
       <Select
-        value={searchParams.get("status") ?? "ACTIVE"}
+        value={statusValue}
         onValueChange={(v) => updateParam("status", v)}
       >
         <SelectTrigger className="h-9 w-44">

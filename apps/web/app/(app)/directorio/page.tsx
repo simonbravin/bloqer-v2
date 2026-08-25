@@ -35,7 +35,8 @@ export default async function DirectorioPage({ searchParams }: PageProps) {
 
   const role = VALID_ROLES.includes(sp.role as ContactRoleType) ? (sp.role as ContactRoleType) : undefined;
   const status = sp.status === "ARCHIVED" ? "ARCHIVED" as const : sp.status === "ALL" ? undefined : "ACTIVE" as const;
-  const page = Math.max(1, Number(sp.page ?? 1));
+  const parsedPage = Number(sp.page);
+  const page = Number.isFinite(parsedPage) && parsedPage >= 1 ? Math.trunc(parsedPage) : 1;
 
   const { data, total } = await listContacts({ role, status, search: sp.search, page, pageSize: PAGE_SIZE }, ctx);
 

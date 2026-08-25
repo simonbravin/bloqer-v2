@@ -4,7 +4,7 @@ import { RoleManager } from "@/features/directory/components/role-manager";
 import { getCurrentUser } from "@/lib/auth";
 import { formatIvaConditionLabel } from "@bloqer/domain";
 import { getContactById, ServiceError } from "@bloqer/services";
-import { archiveContactAction, reactivateContactAction } from "../actions";
+import { ContactArchiveActions } from "@/features/directory/components/contact-archive-actions";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 
@@ -22,15 +22,6 @@ export default async function ContactoDetailPage({ params }: PageProps) {
     tenantId: current.tenantCtx.tenantId,
     companyId: current.tenantCtx.companyId,
     roles: current.tenantCtx.roles,
-  };
-
-  const doArchive = async () => {
-    "use server";
-    await archiveContactAction(id);
-  };
-  const doReactivate = async () => {
-    "use server";
-    await reactivateContactAction(id);
   };
 
   let contact;
@@ -66,19 +57,7 @@ export default async function ContactoDetailPage({ params }: PageProps) {
           <Button variant="outline" size="sm" asChild>
             <Link href={`/directorio/${id}/editar`}>Editar</Link>
           </Button>
-          {contact.status === "ACTIVE" ? (
-            <form action={doArchive}>
-              <Button variant="ghost" size="sm" className="text-muted-foreground">
-                Archivar
-              </Button>
-            </form>
-          ) : (
-            <form action={doReactivate}>
-              <Button variant="ghost" size="sm">
-                Reactivar
-              </Button>
-            </form>
-          )}
+          <ContactArchiveActions contactId={id} status={contact.status} />
         </div>
       </div>
 

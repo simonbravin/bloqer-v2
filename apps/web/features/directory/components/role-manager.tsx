@@ -124,21 +124,29 @@ export function RoleManager({
 
   const openEditProfile = (target: EditTarget) => {
     setError(null);
-    if (target === "CLIENT" && clientProfile) {
-      setEditPaymentTermsDays(String(clientProfile.paymentTermsDays ?? ""));
-      setEditCreditLimit(clientProfile.creditLimit != null ? String(clientProfile.creditLimit) : "");
-      setEditDefaultCurrency(clientProfile.defaultCurrency ?? "ARS");
-      setEditNotes(clientProfile.notes ?? "");
-    } else if (target === "SUPPLIER" && supplierProfile) {
-      setEditPaymentTermsDays(String(supplierProfile.paymentTermsDays ?? ""));
-      setEditDefaultCurrency(supplierProfile.defaultCurrency ?? "ARS");
-      setEditBankAccount(supplierProfile.bankAccount ?? "");
-      setEditNotes(supplierProfile.notes ?? "");
-    } else if (target === "SUBCONTRACTOR" && subcontractorProfile) {
-      setEditSpecialty(subcontractorProfile.specialty ?? "");
-      setEditNotes(subcontractorProfile.notes ?? "");
+    if (target === "CLIENT") {
+      setEditPaymentTermsDays(String(clientProfile?.paymentTermsDays ?? "0"));
+      setEditCreditLimit(clientProfile?.creditLimit != null ? String(clientProfile.creditLimit) : "");
+      setEditDefaultCurrency(clientProfile?.defaultCurrency ?? "ARS");
+      setEditNotes(clientProfile?.notes ?? "");
+    } else if (target === "SUPPLIER") {
+      setEditPaymentTermsDays(String(supplierProfile?.paymentTermsDays ?? "0"));
+      setEditDefaultCurrency(supplierProfile?.defaultCurrency ?? "ARS");
+      setEditBankAccount(supplierProfile?.bankAccount ?? "");
+      setEditNotes(supplierProfile?.notes ?? "");
+    } else {
+      setEditSpecialty(subcontractorProfile?.specialty ?? "");
+      setEditNotes(subcontractorProfile?.notes ?? "");
     }
     setEditTarget(target);
+  };
+
+  const parseDays = (raw: string): { ok: true; value: number | undefined } | { ok: false } => {
+    const trimmed = raw.trim();
+    if (!trimmed) return { ok: true, value: undefined };
+    const days = Number(trimmed);
+    if (!Number.isFinite(days) || !Number.isInteger(days) || days < 0) return { ok: false };
+    return { ok: true, value: days };
   };
 
   const handleAssign = () => {
@@ -147,21 +155,29 @@ export function RoleManager({
       setError("Elegí un rol");
       return;
     }
+    const days = parseDays(paymentTermsDays);
+    if (!days.ok) {
+      setError("El plazo de pago debe ser un número entero mayor o igual a 0");
+      return;
+    }
     startTransition(async () => {
-      const paymentDays = paymentTermsDays.trim() ? Number(paymentTermsDays) : undefined;
-      const result = await assignContactRoleAction(contactId, {
-        role: selectedRole,
-        paymentTermsDays: paymentDays != null && Number.isFinite(paymentDays) ? paymentDays : undefined,
-        creditLimit: creditLimit.trim() ? creditLimit.trim() : undefined,
-        bankAccount: bankAccount || undefined,
-        specialty: specialty || undefined,
-      });
-      if ("error" in result) {
-        setError(result.error);
-      } else {
-        setAssignOpen(false);
-        resetAssignForm();
-        router.refresh();
+      try {
+        const result = await assignContactRoleAction(contactId, {
+          role: selectedRole,
+          paymentTermsDays: days.value,
+          creditLimit: creditLimit.trim() ? creditLimit.trim() : undefined,
+          bankAccount: bankAccount || undefined,
+          specialty: specialty || undefined,
+        });
+        if ("error" in result) {
+          setError(result.error);
+        } else {
+          setAssignOpen(false);
+          resetAssignForm();
+          router.refresh();
+        }
+      } catch {
+        setError("Error inesperado al asignar rol");
       }
     });
   };
@@ -169,44 +185,55 @@ export function RoleManager({
   const handleRemove = (role: ContactRoleType) => {
     setError(null);
     startTransition(async () => {
-      const result = await removeContactRoleAction(contactId, role);
-      if ("error" in result) setError(result.error);
-      else router.refresh();
+      try {
+        const result = await removeContactRoleAction(contactId, role);
+        if ("error" in result) setError(result.error);
+        else router.refresh();
+      } catch {
+        setError("Error inesperado al quitar rol");
+      }
     });
   };
 
   const handleSaveProfile = () => {
     if (!editTarget) return;
     setError(null);
+    const days = parseDays(editPaymentTermsDays);
+    if ((editTarget === "CLIENT" || editTarget === "SUPPLIER") && !days.ok) {
+      setError("El plazo de pago debe ser un número entero mayor o igual a 0");
+      return;
+    }
     startTransition(async () => {
-      let result: { ok: true } | { error: string };
-      if (editTarget === "CLIENT") {
-        const days = editPaymentTermsDays.trim() ? Number(editPaymentTermsDays) : undefined;
-        result = await updateClientProfileAction(contactId, {
-          paymentTermsDays: days != null && Number.isFinite(days) ? days : undefined,
-          creditLimit: editCreditLimit.trim() ? editCreditLimit.trim() : null,
-          defaultCurrency: editDefaultCurrency.trim() || undefined,
-          notes: editNotes || undefined,
-        });
-      } else if (editTarget === "SUPPLIER") {
-        const days = editPaymentTermsDays.trim() ? Number(editPaymentTermsDays) : undefined;
-        result = await updateSupplierProfileAction(contactId, {
-          paymentTermsDays: days != null && Number.isFinite(days) ? days : undefined,
-          defaultCurrency: editDefaultCurrency.trim() || undefined,
-          bankAccount: editBankAccount || undefined,
-          notes: editNotes || undefined,
-        });
-      } else {
-        result = await updateSubcontractorProfileAction(contactId, {
-          specialty: editSpecialty || undefined,
-          notes: editNotes || undefined,
-        });
-      }
-      if ("error" in result) {
-        setError(result.error);
-      } else {
-        setEditTarget(null);
-        router.refresh();
+      try {
+        let result: { ok: true } | { error: string };
+        if (editTarget === "CLIENT") {
+          result = await updateClientProfileAction(contactId, {
+            paymentTermsDays: days.ok ? days.value : undefined,
+            creditLimit: editCreditLimit.trim() ? editCreditLimit.trim() : null,
+            defaultCurrency: editDefaultCurrency.trim() || undefined,
+            notes: editNotes || undefined,
+          });
+        } else if (editTarget === "SUPPLIER") {
+          result = await updateSupplierProfileAction(contactId, {
+            paymentTermsDays: days.ok ? days.value : undefined,
+            defaultCurrency: editDefaultCurrency.trim() || undefined,
+            bankAccount: editBankAccount || undefined,
+            notes: editNotes || undefined,
+          });
+        } else {
+          result = await updateSubcontractorProfileAction(contactId, {
+            specialty: editSpecialty || undefined,
+            notes: editNotes || undefined,
+          });
+        }
+        if ("error" in result) {
+          setError(result.error);
+        } else {
+          setEditTarget(null);
+          router.refresh();
+        }
+      } catch {
+        setError("Error inesperado al actualizar perfil");
       }
     });
   };
@@ -233,14 +260,12 @@ export function RoleManager({
           <div className="flex flex-col gap-2">
             {activeRoles.map((r) => {
               const role = r.role as ContactRoleType;
-              const profileReady =
-                (role === "CLIENT" && clientProfile) ||
-                (role === "SUPPLIER" && supplierProfile) ||
-                (role === "SUBCONTRACTOR" && subcontractorProfile);
+              const hasProfileFields =
+                role === "CLIENT" || role === "SUPPLIER" || role === "SUBCONTRACTOR";
               return (
                 <div key={r.id} className="flex items-center gap-2">
                   <RoleBadge role={role} />
-                  {profileReady && (
+                  {hasProfileFields && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -281,11 +306,15 @@ export function RoleManager({
                   disabled={isPending}
                   onClick={() =>
                     startTransition(async () => {
-                      const result = await assignContactRoleAction(contactId, {
-                        role: r.role as ContactRoleType,
-                      });
-                      if ("error" in result) setError(result.error);
-                      else router.refresh();
+                      try {
+                        const result = await assignContactRoleAction(contactId, {
+                          role: r.role as ContactRoleType,
+                        });
+                        if ("error" in result) setError(result.error);
+                        else router.refresh();
+                      } catch {
+                        setError("Error inesperado al reactivar rol");
+                      }
                     })
                   }
                 >
