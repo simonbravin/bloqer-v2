@@ -29,14 +29,25 @@ const ROLE_LABEL_ES: Record<ContactRoleType, string> = {
   OTHER: "otro",
 };
 
+function isPrismaUniqueOnTaxId(err: unknown): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") return false;
+  const target = err.meta?.target;
+  if (Array.isArray(target)) return target.some((t) => String(t).toLowerCase().includes("taxid"));
+  if (typeof target === "string") return target.toLowerCase().includes("taxid");
+  return false;
+}
+
 function throwIfContactTaxIdConflict(err: unknown, taxId: string | null | undefined): void {
-  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+  if (isPrismaUniqueOnTaxId(err)) {
     throw new ServiceError(
       "CONFLICT",
       taxId
         ? `Ya existe un contacto con ese CUIT/CUIL (${taxId})`
-        : "Ya existe un contacto con esos datos",
+        : "Ya existe un contacto con ese CUIT/CUIL",
     );
+  }
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+    throw new ServiceError("CONFLICT", "No se pudo guardar: hay un dato duplicado");
   }
 }
 
@@ -69,8 +80,14 @@ export async function listContacts(
   }
 
   const search = filters.search?.trim();
-  const page = Math.max(1, filters.page ?? 1);
-  const pageSize = Math.min(200, Math.max(1, filters.pageSize ?? 20));
+  const rawPage = filters.page;
+  const page =
+    rawPage != null && Number.isFinite(rawPage) ? Math.max(1, Math.trunc(rawPage)) : 1;
+  const rawPageSize = filters.pageSize;
+  const pageSize =
+    rawPageSize != null && Number.isFinite(rawPageSize)
+      ? Math.min(200, Math.max(1, Math.trunc(rawPageSize)))
+      : 20;
 
   const where: Prisma.ContactWhereInput = {
     tenantId: ctx.tenantId,
@@ -128,6 +145,9 @@ export async function createContact(
   }
 
   const { initialRole, ...contactData } = input;
+  if (!initialRole) {
+    throw new ServiceError("VALIDATION", "Elegí un rol");
+  }
 
   let contact: ContactWithRoles;
   try {
@@ -141,12 +161,10 @@ export async function createContact(
         },
       });
 
-      if (initialRole) {
-        await tx.contactRole.create({
-          data: { contactId: created.id, tenantId: ctx.tenantId, role: initialRole },
-        });
-        await _createProfileIfNeeded(tx, created.id, initialRole, {});
-      }
+      await tx.contactRole.create({
+        data: { contactId: created.id, tenantId: ctx.tenantId, role: initialRole },
+      });
+      await _createProfileIfNeeded(tx, created.id, initialRole, {});
 
       return tx.contact.findUniqueOrThrow({
         where: { id: created.id },
@@ -407,14 +425,33 @@ async function _guardContactForProfile(contactId: string, ctx: ServiceContext) {
   return contact;
 }
 
+async function _requireActiveRole(
+  contactId: string,
+  role: ContactRoleType,
+  tenantId: string,
+): Promise<void> {
+  const contactRole = await prisma.contactRole.findUnique({
+    where: { contactId_role: { contactId, role } },
+    select: { status: true, tenantId: true },
+  });
+  if (!contactRole || contactRole.tenantId !== tenantId || contactRole.status !== "ACTIVE") {
+    throw new ServiceError("NOT_FOUND", `El contacto no tiene el rol ${ROLE_LABEL_ES[role]} activo`);
+  }
+}
+
 export async function updateClientProfile(
   contactId: string,
   input: UpdateClientProfileInput,
   ctx: ServiceContext,
 ): Promise<ClientProfile> {
   await _guardContactForProfile(contactId, ctx);
-  const profile = await prisma.clientProfile.findUnique({ where: { contactId } });
-  if (!profile) throw new ServiceError("NOT_FOUND", "Perfil de cliente no encontrado");
+  let profile = await prisma.clientProfile.findUnique({ where: { contactId } });
+  if (!profile) {
+    await _requireActiveRole(contactId, "CLIENT", ctx.tenantId);
+    profile = await prisma.clientProfile.create({
+      data: { contactId, paymentTermsDays: 0, defaultCurrency: "ARS" },
+    });
+  }
 
   const updated = await prisma.clientProfile.update({
     where: { contactId },
@@ -439,8 +476,13 @@ export async function updateSupplierProfile(
   ctx: ServiceContext,
 ): Promise<SupplierProfile> {
   await _guardContactForProfile(contactId, ctx);
-  const profile = await prisma.supplierProfile.findUnique({ where: { contactId } });
-  if (!profile) throw new ServiceError("NOT_FOUND", "Perfil de proveedor no encontrado");
+  let profile = await prisma.supplierProfile.findUnique({ where: { contactId } });
+  if (!profile) {
+    await _requireActiveRole(contactId, "SUPPLIER", ctx.tenantId);
+    profile = await prisma.supplierProfile.create({
+      data: { contactId, paymentTermsDays: 0, defaultCurrency: "ARS" },
+    });
+  }
 
   const updated = await prisma.supplierProfile.update({
     where: { contactId },
@@ -465,8 +507,13 @@ export async function updateSubcontractorProfile(
   ctx: ServiceContext,
 ): Promise<SubcontractorProfile> {
   await _guardContactForProfile(contactId, ctx);
-  const profile = await prisma.subcontractorProfile.findUnique({ where: { contactId } });
-  if (!profile) throw new ServiceError("NOT_FOUND", "Perfil de subcontratista no encontrado");
+  let profile = await prisma.subcontractorProfile.findUnique({ where: { contactId } });
+  if (!profile) {
+    await _requireActiveRole(contactId, "SUBCONTRACTOR", ctx.tenantId);
+    profile = await prisma.subcontractorProfile.create({
+      data: { contactId },
+    });
+  }
 
   const updated = await prisma.subcontractorProfile.update({
     where: { contactId },
