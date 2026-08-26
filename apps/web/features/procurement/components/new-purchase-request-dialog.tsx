@@ -79,6 +79,7 @@ export function NewPurchaseRequestDialog({
       Boolean(searchParams.get("description")) ||
       Boolean(searchParams.get("quantity")) ||
       Boolean(searchParams.get("productId")) ||
+      Boolean(searchParams.get("costAnalysisLineId")) ||
       Boolean(searchParams.get("unit"));
     if (!hasCreate && !hasPrefill) return;
 

@@ -19,7 +19,7 @@ const seed = (over: Partial<MaterialNeedSeed> = {}): MaterialNeedSeed => ({
   unit: "kg",
   unitCost: "100",
   needQty: 10,
-  needCost: 1000,
+  needCost: "1000.00",
   ...over,
 });
 
@@ -51,6 +51,7 @@ describe("material-commitment-pure", () => {
     });
     const view = serializeApuCommitment(map.get("apu-1")!);
     assert.equal(view.needQty, "10.0000");
+    assert.equal(view.needCost, "1000.00");
     assert.equal(view.orderedQty, "8.0000");
     assert.equal(view.shortfallQty, "2.0000");
     assert.equal(view.overCommitted, false);

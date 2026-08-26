@@ -10,6 +10,7 @@ import {
   MATERIALS_FIELD_SUPPLY_LABELS,
   materialsFieldPedirHref,
   materialsFieldSupplyLabel,
+  materialsPedirCtaLabel,
 } from "@bloqer/services/materials-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -119,27 +120,45 @@ export function MaterialFieldCard({
             data-testid="materials-field-pedir"
             onClick={(e) => e.stopPropagation()}
           >
-            Pedir
+            {materialsPedirCtaLabel(row)}
           </Link>
         </Button>
       ) : null}
-      {canRequest && row.relatedPurchaseRequestId ? (
+      {row.relatedPurchaseRequestId || row.relatedPurchaseOrderId ? (
         <div className="mt-3 flex flex-col gap-2">
-          <p className="text-xs text-muted-foreground" data-testid="materials-field-request-created">
-            Solicitud creada
-            {row.relatedPurchaseRequestNumber != null
-              ? ` · #${row.relatedPurchaseRequestNumber}`
-              : ""}
-          </p>
-          <Button asChild variant="outline" className="min-h-11 w-full" size="sm">
-            <Link
-              href={`/proyectos/${projectId}/solicitudes-compra/${row.relatedPurchaseRequestId}`}
-              data-testid="materials-field-ver-solicitud"
-              onClick={(e) => e.stopPropagation()}
-            >
-              Ver solicitud
-            </Link>
-          </Button>
+          {row.relatedPurchaseRequestId ? (
+            <>
+              <p className="text-xs text-muted-foreground" data-testid="materials-field-request-created">
+                Solicitud existente
+                {row.relatedPurchaseRequestNumber != null
+                  ? ` · #${row.relatedPurchaseRequestNumber}`
+                  : ""}
+              </p>
+              <Button asChild variant="outline" className="min-h-11 w-full" size="sm">
+                <Link
+                  href={`/proyectos/${projectId}/solicitudes-compra/${row.relatedPurchaseRequestId}`}
+                  data-testid="materials-field-ver-solicitud"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Ver solicitud
+                </Link>
+              </Button>
+            </>
+          ) : null}
+          {row.relatedPurchaseOrderId ? (
+            <Button asChild variant="outline" className="min-h-11 w-full" size="sm">
+              <Link
+                href={`/proyectos/${projectId}/ordenes-compra/${row.relatedPurchaseOrderId}`}
+                data-testid="materials-field-ver-oc"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Ver OC
+                {row.relatedPurchaseOrderNumber != null
+                  ? ` #${row.relatedPurchaseOrderNumber}`
+                  : ""}
+              </Link>
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>

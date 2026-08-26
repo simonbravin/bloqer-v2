@@ -122,7 +122,7 @@ test.describe("Materials Field", () => {
     const linked = page.getByTestId("materials-field-card").filter({ hasText: "Caño PVC" });
     if (await linked.isVisible().catch(() => false)) {
       await expect(linked.getByTestId("materials-field-ver-solicitud")).toBeVisible();
-      await expect(linked.getByTestId("materials-field-pedir")).toHaveCount(0);
+      // Pedir stays if the existing SC only covers part of the need.
     }
   });
 

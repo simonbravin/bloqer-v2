@@ -330,13 +330,13 @@ export function materialsFieldPrefillQuantity(raw: string): string {
   return trimmed ? `${i}.${trimmed}` : i;
 }
 
-export function materialsFieldPedirHref(
-  projectId: string,
-  row: Pick<
-    MaterialsFieldRow,
-    "wbsNodeId" | "description" | "shortfallQty" | "productId" | "costAnalysisLineId" | "unit"
-  >,
-): string {
+export type MaterialsPedirPrefillRow = Pick<
+  MaterialsFieldRow,
+  "wbsNodeId" | "description" | "shortfallQty" | "productId" | "costAnalysisLineId" | "unit"
+>;
+
+/** Shared Pedir query (faltante + APU). Desktop uses `?create=1`; Field uses `/nueva`. */
+export function materialsPedirQuery(row: MaterialsPedirPrefillRow): URLSearchParams {
   const q = new URLSearchParams();
   q.set("wbsNodeId", row.wbsNodeId);
   q.set("description", row.description);
@@ -345,12 +345,31 @@ export function materialsFieldPedirHref(
   if (row.costAnalysisLineId) q.set("costAnalysisLineId", row.costAnalysisLineId);
   if (row.unit) q.set("unit", row.unit);
   q.set("from", "materiales");
-  return `/proyectos/${projectId}/solicitudes-compra/nueva?${q.toString()}`;
+  return q;
 }
 
+export function materialsFieldPedirHref(projectId: string, row: MaterialsPedirPrefillRow): string {
+  return `/proyectos/${projectId}/solicitudes-compra/nueva?${materialsPedirQuery(row).toString()}`;
+}
+
+export function materialsBoardPedirHref(projectId: string, row: MaterialsPedirPrefillRow): string {
+  return `/proyectos/${projectId}/solicitudes-compra?create=1&${materialsPedirQuery(row).toString()}`;
+}
+
+/** When a unique SC/OC already exists, Pedir is for the remaining shortfall. */
+export function materialsPedirCtaLabel(
+  row: Pick<MaterialsFieldRow, "relatedPurchaseRequestId" | "relatedPurchaseOrderId">,
+): string {
+  return row.relatedPurchaseRequestId || row.relatedPurchaseOrderId ? "Pedir resto" : "Pedir";
+}
+
+/**
+ * Pedir when there is remaining shortfall.
+ * A unique related SC does not hide Pedir: that SC may only cover part of the need.
+ */
 export function canShowMaterialsFieldPedir(
   canRequest: boolean,
-  row: Pick<MaterialsFieldRow, "shortfallQty" | "relatedPurchaseRequestId">,
+  row: Pick<MaterialsFieldRow, "shortfallQty">,
 ): boolean {
-  return canRequest && isMaterialsFieldShortage(row) && !row.relatedPurchaseRequestId;
+  return canRequest && isMaterialsFieldShortage(row);
 }

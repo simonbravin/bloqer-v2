@@ -3,6 +3,12 @@
 import Link from "next/link";
 import type { MaterialsBoardRow } from "@bloqer/services";
 import {
+  canShowMaterialsFieldPedir,
+  isMaterialsFieldShortage,
+  materialsBoardPedirHref,
+  materialsPedirCtaLabel,
+} from "@bloqer/services/materials-field";
+import {
   Table,
   TableBody,
   TableCell,
@@ -13,26 +19,7 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { Button } from "@/components/ui/button";
 import { formatDecimalArFromString } from "@/lib/format-money";
-
-/** Qty display es-AR without IEEE float (trim trailing zeros). */
-function fmtQty(raw: string): string {
-  const t = raw.trim();
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return raw;
-  const sign = t.startsWith("-") ? "-" : "";
-  const abs = sign ? t.slice(1) : t;
-  const [intPart, decPart = ""] = abs.split(".");
-  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  const trimmedDec = decPart.replace(/0+$/, "").slice(0, 4);
-  return trimmedDec ? `${sign}${withThousands},${trimmedDec}` : `${sign}${withThousands}`;
-}
-
-function shortfallForPrefill(raw: string): string {
-  const t = raw.trim();
-  if (!/^\d+(\.\d+)?$/.test(t)) return t;
-  const [i, d = ""] = t.split(".");
-  const trimmed = d.replace(/0+$/, "").slice(0, 4);
-  return trimmed ? `${i}.${trimmed}` : i;
-}
+import { formatMaterialsFieldQty } from "./materials-field-format";
 
 type Props = {
   rows: MaterialsBoardRow[];
@@ -53,20 +40,25 @@ export function MaterialsBoardTable({ rows, projectId, canRequest = true }: Prop
 
   return (
     <div data-testid="materials-board-table">
-    <TableScroll>
-      <Table className="text-xs">
+      <TableScroll>
+        <Table className="text-xs">
         <TableHeader className="sticky top-0 z-10 bg-muted/50">
           <TableRow>
             <TableHead className="w-24">EDT</TableHead>
             <TableHead>Material</TableHead>
             <TableHead className="text-right">Necesidad</TableHead>
-            <TableHead className="text-right">$ Presup.</TableHead>
+            <TableHead
+              className="text-right"
+              title="Costo APU presupuestado de la línea (total). No baja con lo ya pedido."
+            >
+              $ Presup.
+            </TableHead>
             <TableHead className="text-right">Pedido</TableHead>
             <TableHead className="text-right">Recibido</TableHead>
             <TableHead className="text-right">Consumido</TableHead>
             <TableHead className="text-right">Faltante</TableHead>
             {canRequest ? (
-              <TableHead className="w-20">
+              <TableHead className="w-24">
                 <span className="sr-only">Acciones</span>
               </TableHead>
             ) : null}
@@ -74,8 +66,8 @@ export function MaterialsBoardTable({ rows, projectId, canRequest = true }: Prop
         </TableHeader>
         <TableBody>
           {rows.map((row) => {
-            const hasShortfall = !/^-?0+(\.0+)?$/.test(row.shortfallQty.trim());
-            const pedirHref = `/proyectos/${projectId}/solicitudes-compra?create=1&wbsNodeId=${encodeURIComponent(row.wbsNodeId)}&description=${encodeURIComponent(row.description)}&quantity=${encodeURIComponent(shortfallForPrefill(row.shortfallQty))}${row.productId ? `&productId=${encodeURIComponent(row.productId)}` : ""}${row.costAnalysisLineId ? `&costAnalysisLineId=${encodeURIComponent(row.costAnalysisLineId)}` : ""}${row.unit ? `&unit=${encodeURIComponent(row.unit)}` : ""}&from=materiales`;
+            const hasShortfall = isMaterialsFieldShortage(row);
+            const showPedir = canShowMaterialsFieldPedir(canRequest, row);
 
             return (
               <TableRow key={row.rowKey}>
@@ -102,32 +94,56 @@ export function MaterialsBoardTable({ rows, projectId, canRequest = true }: Prop
                   {row.overCommitted ? (
                     <span className="text-[10px] text-destructive block">Sobrecomprometido</span>
                   ) : null}
+                  {row.relatedPurchaseRequestId ? (
+                    <Link
+                      href={`/proyectos/${projectId}/solicitudes-compra/${row.relatedPurchaseRequestId}`}
+                      className="mt-0.5 block text-[10px] text-primary hover:underline"
+                    >
+                      SC
+                      {row.relatedPurchaseRequestNumber != null
+                        ? ` #${row.relatedPurchaseRequestNumber}`
+                        : ""}
+                    </Link>
+                  ) : null}
+                  {row.relatedPurchaseOrderId ? (
+                    <Link
+                      href={`/proyectos/${projectId}/ordenes-compra/${row.relatedPurchaseOrderId}`}
+                      className="mt-0.5 block text-[10px] text-primary hover:underline"
+                    >
+                      OC
+                      {row.relatedPurchaseOrderNumber != null
+                        ? ` #${row.relatedPurchaseOrderNumber}`
+                        : ""}
+                    </Link>
+                  ) : null}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums">
-                  {fmtQty(row.needQty)}
+                  {formatMaterialsFieldQty(row.needQty)}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums">
                   {formatDecimalArFromString(row.needCost)}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums">
-                  {fmtQty(row.orderedQty)}
+                  {formatMaterialsFieldQty(row.orderedQty)}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums">
-                  {fmtQty(row.receivedQty)}
+                  {formatMaterialsFieldQty(row.receivedQty)}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums">
-                  {fmtQty(row.consumedQty)}
+                  {formatMaterialsFieldQty(row.consumedQty)}
                 </TableCell>
                 <TableCell
                   className={`text-right font-mono tabular-nums ${hasShortfall ? "font-medium text-amber-700 dark:text-amber-400" : ""}`}
                 >
-                  {fmtQty(row.shortfallQty)}
+                  {formatMaterialsFieldQty(row.shortfallQty)}
                 </TableCell>
                 {canRequest ? (
                   <TableCell>
-                    {hasShortfall ? (
+                    {showPedir ? (
                       <Button asChild size="sm" variant="outline" className="h-7 text-xs">
-                        <Link href={pedirHref}>Pedir</Link>
+                        <Link href={materialsBoardPedirHref(projectId, row)}>
+                          {materialsPedirCtaLabel(row)}
+                        </Link>
                       </Button>
                     ) : null}
                   </TableCell>
@@ -136,8 +152,8 @@ export function MaterialsBoardTable({ rows, projectId, canRequest = true }: Prop
             );
           })}
         </TableBody>
-      </Table>
-    </TableScroll>
+        </Table>
+      </TableScroll>
     </div>
   );
 }

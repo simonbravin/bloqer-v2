@@ -35,7 +35,8 @@ export type MaterialNeedSeed = {
   unit: string;
   unitCost: string;
   needQty: number;
-  needCost: number;
+  /** Serialized money (2 dp). Never IEEE `number`. */
+  needCost: string;
 };
 
 export type MaterialCommitmentAgg = {
@@ -85,7 +86,7 @@ export function buildApuCommitmentMap(
       unit: s.unit,
       unitCost: s.unitCost,
       needQty: new Prisma.Decimal(s.needQty),
-      needCost: new Prisma.Decimal(s.needCost),
+      needCost: new Prisma.Decimal(s.needCost.toString()),
       orderedQty: ZERO,
       receivedQty: ZERO,
     });

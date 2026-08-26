@@ -11,7 +11,7 @@ import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { budgetUnitLabel } from "@/lib/budget-units";
-import { formatDecimalAr } from "@/lib/format-money";
+import { formatDecimalArFromString, isPositiveQty } from "@/lib/format-money";
 import type { WbsApuOption, WbsOption } from "./purchase-order-lines-editor";
 import { createPurchaseRequestAction } from "@/app/(app)/proyectos/[id]/solicitudes-compra/actions";
 
@@ -22,14 +22,6 @@ function fmtQtyHint(raw: string | null | undefined): string {
   const [i, d = ""] = t.split(".");
   const trimmed = d.replace(/0+$/, "");
   return trimmed ? `${i}.${trimmed}` : i;
-}
-
-function isPositiveQty(raw: string | null | undefined): boolean {
-  if (raw == null || raw === "") return false;
-  const t = raw.trim();
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return false;
-  const n = Number(t);
-  return Number.isFinite(n) && n > 0;
 }
 
 function apuCommitmentHint(apu: WbsApuOption): string {
@@ -267,9 +259,9 @@ export function PurchaseRequestForm({
             )}
             {selectedWbs?.budgetUnitCost != null ? (
               <p className="text-xs text-muted-foreground">
-                Costo ref. materiales: {formatDecimalAr(Number(selectedWbs.budgetUnitCost))}
+                Costo ref. materiales: {formatDecimalArFromString(selectedWbs.budgetUnitCost)}
                 {selectedWbs?.availableSaldo != null
-                  ? ` · Saldo disponible: ${formatDecimalAr(Number(selectedWbs.availableSaldo))}`
+                  ? ` · Saldo disponible: ${formatDecimalArFromString(selectedWbs.availableSaldo)}`
                   : ""}
               </p>
             ) : null}

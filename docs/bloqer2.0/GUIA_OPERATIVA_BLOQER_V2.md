@@ -716,9 +716,10 @@ En obra **no todo pasa por OC**. Tres caminos de egreso:
 1. Abrir vista **Operativo** (default). Ventana temporal: Esta semana · **Próximos 14 días** (default) · Este mes · Todo.
 2. Revisar KPIs: Presupuesto MAT · Filas con faltante · Cant. recibida · Cant. consumida.
 3. Columnas: EDT · Material · Necesidad · $ Presup. · Pedido · Recibido · Consumido · Faltante.
-4. En una fila con faltante, **Pedir** → prellena una **solicitud de compra**.
-5. Vista **Varianza ($)** (`?tab=varianza`): desvío monetario (export CSV/PDF).
-6. Atajos en pantalla: **EDT y costos** · Tablero de compras · Solicitudes · Consumos.
+4. En una fila con **faltante** (necesidad − ya pedido), **Pedir** (o **Pedir resto** si ya hay SC/OC de esa línea) prellena una **solicitud de compra** con la cantidad restante. Si ya hay una solicitud u orden inequívoca, también aparece el atajo.
+5. **$ Presup.** es el costo APU presupuestado de la línea (total); **no** baja con lo ya pedido. **Pedido** = SC enviada sin OC confirmada + cantidades de OC confirmada/recibida. **Varianza ($)** es presupuesto MAT vs consumo de stock, no vs pedido.
+6. Vista **Varianza ($)** (`?tab=varianza`): desvío monetario (export CSV/PDF).
+7. Atajos en pantalla: **EDT y costos** · Tablero de compras · Solicitudes · Consumos.
 
 <!-- capture:25 materiales-operativo-pedir -->
 ![Bloqer — Materiales Operativo + Pedir](./guides/assets/screenshots/25-materiales-operativo-pedir.png)

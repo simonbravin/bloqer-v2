@@ -8,7 +8,9 @@ import {
   isMaterialsFieldPendingReceipt,
   isMaterialsFieldShortage,
   limitMaterialsFieldRows,
+  materialsBoardPedirHref,
   materialsFieldPedirHref,
+  materialsPedirCtaLabel,
   materialsFieldSupplyLabel,
   materialsFieldUrgencyRank,
   parseMaterialsFieldFilter,
@@ -259,20 +261,27 @@ describe("Related SC uniqueness", () => {
 });
 
 describe("Pedir CTA", () => {
-  it("hidden without permission, without shortfall, or with unique SC", () => {
+  it("hidden without permission or without shortfall", () => {
     const shortage = row({ rowKey: "p", description: "P", shortfallQty: "5" });
     assert.equal(canShowMaterialsFieldPedir(false, shortage), false);
     assert.equal(
       canShowMaterialsFieldPedir(true, row({ rowKey: "c", description: "C", shortfallQty: "0" })),
       false,
     );
-    assert.equal(
-      canShowMaterialsFieldPedir(true, { ...shortage, relatedPurchaseRequestId: "pr-1" }),
-      false,
-    );
     assert.equal(canShowMaterialsFieldPedir(true, shortage), true);
   });
-  it("builds /nueva prefill href", () => {
+  it("still shows Pedir when a unique SC exists but shortfall remains", () => {
+    const remainder = row({
+      rowKey: "p2",
+      description: "P2",
+      needQty: "10.0000",
+      orderedQty: "8.0000",
+      shortfallQty: "2.0000",
+      relatedPurchaseRequestId: "pr-1",
+    });
+    assert.equal(canShowMaterialsFieldPedir(true, remainder), true);
+  });
+  it("builds /nueva and desktop ?create=1 prefill hrefs", () => {
     const href = materialsFieldPedirHref("proj", {
       wbsNodeId: "wbs-1",
       description: "Hormigón H21",
@@ -286,6 +295,32 @@ describe("Pedir CTA", () => {
     assert.match(href, /quantity=80/);
     assert.match(href, /from=materiales/);
     assert.match(href, /costAnalysisLineId=apu-1/);
+    const desktop = materialsBoardPedirHref("proj", {
+      wbsNodeId: "wbs-1",
+      description: "Hormigón H21",
+      shortfallQty: "2.0000",
+      productId: "prod-1",
+      costAnalysisLineId: "apu-1",
+      unit: "m3",
+    });
+    assert.match(desktop, /\/proyectos\/proj\/solicitudes-compra\?create=1/);
+    assert.match(desktop, /quantity=2/);
+    assert.match(desktop, /from=materiales/);
+  });
+  it("labels remainder Pedir when a unique SC or OC exists", () => {
+    assert.equal(materialsPedirCtaLabel(row({ rowKey: "p", description: "P" })), "Pedir");
+    assert.equal(
+      materialsPedirCtaLabel(
+        row({ rowKey: "p2", description: "P2", relatedPurchaseRequestId: "pr-1" }),
+      ),
+      "Pedir resto",
+    );
+    assert.equal(
+      materialsPedirCtaLabel(
+        row({ rowKey: "p3", description: "P3", relatedPurchaseOrderId: "po-1" }),
+      ),
+      "Pedir resto",
+    );
   });
 });
 

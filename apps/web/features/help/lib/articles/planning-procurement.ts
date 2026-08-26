@@ -179,7 +179,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
   {
     slug: "pedir-material-desde-faltante",
     title: "Pedir material desde faltante",
-    summary: "Tablero de cantidades: Pedir prellena una solicitud de compra.",
+    summary: "Tablero de cantidades: Pedir prellena una solicitud de compra con el faltante restante.",
     intents: ["pedir-material", "comprar-material"],
     modules: ["materiales", "compras"],
     level: "project",
@@ -188,8 +188,12 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "project", suffix: "/materiales", label: "Materiales" }],
     steps: [
       "Operación → Materiales (vista Operativo).",
-      "En una fila con faltante, pulsá Pedir.",
-      "Se prellena una solicitud de compra con partida EDT.",
+      "En una fila con faltante, pulsá Pedir. La cantidad prellenada es el resto (necesidad − ya pedido).",
+      "Si ya hay una SC u OC de esa línea, el botón dice Pedir resto y también podés abrir el documento.",
+    ],
+    pitfalls: [
+      "$ Presup. es el total APU de la línea, no el saldo por comprar.",
+      "Pedido no incluye OC en borrador ni aprobada sin confirmar.",
     ],
     relatedSlugs: ["solicitud-de-compra", "circuito-comprar-material-hasta-pagarlo"],
     keywords: ["pedir", "faltante", "materiales", "necesidad"],

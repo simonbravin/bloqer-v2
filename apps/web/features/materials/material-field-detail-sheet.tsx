@@ -10,6 +10,7 @@ import {
   MATERIALS_FIELD_SUPPLY_LABELS,
   materialsFieldPedirHref,
   materialsFieldSupplyLabel,
+  materialsPedirCtaLabel,
 } from "@bloqer/services/materials-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -128,13 +129,13 @@ export function MaterialFieldDetailSheet({
               {showPedir ? (
                 <Button asChild className="min-h-11 w-full">
                   <Link href={materialsFieldPedirHref(projectId, row)} data-testid="materials-field-sheet-pedir">
-                    Pedir
+                    {materialsPedirCtaLabel(row)}
                   </Link>
                 </Button>
               ) : null}
               {row.relatedPurchaseRequestId ? (
                 <Button asChild variant="outline" className="min-h-11 w-full">
-                  <Link href={`/proyectos/${projectId}/solicitudes-compra/${row.relatedPurchaseRequestId}`}>
+                  <Link href={`/proyectos/${projectId}/solicitudes-compra/${row.relatedPurchaseRequestId}`} data-testid="materials-field-sheet-ver-solicitud">
                     Ver solicitud
                   </Link>
                 </Button>
@@ -143,7 +144,7 @@ export function MaterialFieldDetailSheet({
                 <Button asChild variant="outline" className="min-h-11 w-full">
                   <Link
                     href={`/proyectos/${projectId}/ordenes-compra/${row.relatedPurchaseOrderId}`}
-                    data-testid="materials-field-ver-oc"
+                    data-testid="materials-field-sheet-ver-oc"
                   >
                     Ver OC
                   </Link>

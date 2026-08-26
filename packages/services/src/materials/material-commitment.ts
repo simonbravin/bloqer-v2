@@ -107,7 +107,7 @@ export async function loadMaterialApuCommitments(
         unit: line.unit,
         unitCost: serializeUnitPriceDecimal(line.unitCost),
         needQty: need,
-        needCost: Number(needCost.toString()),
+        needCost: serializeMoneyDecimal(needCost),
       });
     }
   }
