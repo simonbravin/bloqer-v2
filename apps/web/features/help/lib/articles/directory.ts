@@ -30,6 +30,7 @@ export const DIRECTORY_ARTICLES: HelpArticle[] = [
     pitfalls: [
       "No crees un contacto nuevo solo por rol: un mismo CUIT puede ser Proveedor + Subcontratista.",
       "Si es personal interno que solo cobra sueldo/reintegro, usá Empleado (no Proveedor).",
+      "Si lo cargaste como Cliente, no aparece en «A quién se le paga»: asignale rol Proveedor en la ficha.",
     ],
     relatedSlugs: [
       "proveedor-empleado-o-subcontratista",
@@ -45,6 +46,8 @@ export const DIRECTORY_ARTICLES: HelpArticle[] = [
       "directorio",
       "supplier",
       "ferretero",
+      "no aparece en facturas",
+      "no aparece proveedor",
     ],
     guideRef: "§3",
   },

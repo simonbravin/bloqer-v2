@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
+import { AP_PAYEE_PICKER_HINT } from "../lib/ap-payee-options";
 import { InvoiceLetterSelect, PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
@@ -188,14 +189,16 @@ export function SupplierInvoiceEditForm({
               onValueChange={handleSupplierChange}
               disabled={payeeLocked}
               placeholder="Seleccionar proveedor o empleado…"
-              searchPlaceholder="Buscar…"
-              emptyText="Ningún contacto coincide."
+              searchPlaceholder="Buscar por nombre o razón social…"
+              emptyText="Ningún proveedor o empleado coincide."
             />
             {payeeLocked ? (
               <p className="text-xs text-muted-foreground">
                 Esta factura nace de una certificación de subcontrato; el destinatario no se cambia acá.
               </p>
-            ) : null}
+            ) : (
+              <p className="text-xs text-muted-foreground">{AP_PAYEE_PICKER_HINT}</p>
+            )}
           </div>
 
           {showLetter ? (

@@ -6,10 +6,17 @@ export const LIST_AP_DIRECT_PAYEES = {
   status: "ACTIVE" as const,
 };
 
+export const AP_PAYEE_PICKER_HINT =
+  "Solo contactos con rol Proveedor o Empleado activo. Buscá por nombre fantasía o razón social. Si no aparece, asignale ese rol en su ficha del Directorio.";
+
 const PAYEE_ROLE_LABEL: Record<string, string> = {
   SUPPLIER: "Proveedor",
   EMPLOYEE: "Empleado",
 };
+
+function payeeSearchValue(parts: (string | null | undefined)[]): string {
+  return [...new Set(parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part)))].join(" ");
+}
 
 export function toApPayeeOption(contact: {
   id: string;
@@ -30,6 +37,7 @@ export function toApPayeeOption(contact: {
     label: tags.length > 0 ? `${name} · ${tags.join(" · ")}` : name,
     country: contact.country ?? undefined,
     ivaCondition: contact.ivaCondition,
+    searchValue: payeeSearchValue([name, contact.legalName, contact.fantasyName, ...tags]),
   };
 }
 

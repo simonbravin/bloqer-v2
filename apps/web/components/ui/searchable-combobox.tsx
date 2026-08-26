@@ -101,7 +101,7 @@ export function SearchableCombobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.searchValue ?? option.label}
+                  value={`${option.searchValue ?? option.label} ${option.value}`}
                   onSelect={() => {
                     const next =
                       allowClear && option.value === value ? "" : option.value;

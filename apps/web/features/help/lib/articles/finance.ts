@@ -282,11 +282,14 @@ export const AP_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Facturas y gastos → Nueva factura de gasto (sin proyecto), o Transacciones → Gasto / factura.",
-      "A quién se le paga: proveedor o empleado.",
+      "A quién se le paga: proveedor o empleado (no Cliente). Buscá por nombre fantasía o razón social.",
       "Opcional: Pagar ahora.",
     ],
+    pitfalls: [
+      "Si el contacto está en Directorio y no aparece, no tiene rol Proveedor o Empleado activo: asignalo en su ficha.",
+    ],
     relatedSlugs: ["pagar-un-sueldo", "pagar-una-cuenta-por-pagar"],
-    keywords: ["gasto corporativo", "estructura", "alquiler", "factura gasto"],
+    keywords: ["gasto corporativo", "estructura", "alquiler", "factura gasto", "no aparece proveedor", "no aparece en facturas"],
     guideRef: "§12.2 · §14",
   },
   {

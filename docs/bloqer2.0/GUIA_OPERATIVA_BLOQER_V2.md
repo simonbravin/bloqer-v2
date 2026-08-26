@@ -909,7 +909,7 @@ flowchart LR
   AP --> PAY["Pago"] --> TES["Tesorería: OUTFLOW"]
 ```
 
-Siempre existe la cadena **Factura → Payable → Payment → movimiento de caja**, aunque se pague en el mismo momento (“pagar ahora”). El campo **A quién se le paga** es el contacto del directorio (proveedor o empleado si no hay OC).
+Siempre existe la cadena **Factura → Payable → Payment → movimiento de caja**, aunque se pague en el mismo momento (“pagar ahora”). El campo **A quién se le paga** lista solo contactos **activos** con rol **Proveedor** o **Empleado** ([D-089]); no aparecen Cliente, Subcontratista u Otro. Se puede buscar por nombre fantasía o razón social. Si el contacto está en Directorio y no sale: abrí su ficha y asignale rol Proveedor (o Empleado).
 
 #### Proyecto
 

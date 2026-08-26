@@ -16,6 +16,7 @@ import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
+import { AP_PAYEE_PICKER_HINT } from "../lib/ap-payee-options";
 import { InvoiceLetterSelect, PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
@@ -32,6 +33,7 @@ export type SupplierOption = {
   label: string;
   country?: string;
   ivaCondition?: string | null;
+  searchValue?: string;
 };
 export type POOption = { id: string; code: string; supplierContactId: string; currency: string };
 export type TreasuryAccountOption = { id: string; label: string; currency: string };
@@ -382,20 +384,24 @@ export function SupplierInvoiceForm({
             <Label>A quién se le paga</Label>
             {suppliers.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No hay proveedores ni empleados activos. Cree el contacto en Directorio primero.
+                No hay proveedores ni empleados activos. En Directorio el contacto tiene que tener
+                rol Proveedor o Empleado; no alcanza con Cliente.
               </p>
             ) : (
-              <SearchableCombobox
-                options={toSearchableOptions(suppliers)}
-                value={supplierContactId}
-                onValueChange={(id) => {
-                  setSupplierContactId(id);
-                  setLetterTouched(false);
-                }}
-                placeholder="Seleccionar proveedor o empleado…"
-                searchPlaceholder="Buscar…"
-                emptyText="Ningún contacto coincide."
-              />
+              <>
+                <SearchableCombobox
+                  options={toSearchableOptions(suppliers)}
+                  value={supplierContactId}
+                  onValueChange={(id) => {
+                    setSupplierContactId(id);
+                    setLetterTouched(false);
+                  }}
+                  placeholder="Seleccionar proveedor o empleado…"
+                  searchPlaceholder="Buscar por nombre o razón social…"
+                  emptyText="Ningún proveedor o empleado coincide."
+                />
+                <p className="text-xs text-muted-foreground">{AP_PAYEE_PICKER_HINT}</p>
+              </>
             )}
           </div>
 

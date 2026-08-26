@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
+import { AP_PAYEE_PICKER_HINT } from "@/features/ap/lib/ap-payee-options";
 import { cn } from "@/lib/utils";
 import { InvoiceLinesEditor } from "@/features/ap/components/invoice-lines-editor";
 import type { InvoiceLine } from "@/features/ap/components/invoice-lines-editor";
@@ -41,6 +42,7 @@ export type SupplierOption = {
   label: string;
   country?: string;
   ivaCondition?: string | null;
+  searchValue?: string;
 };
 export type ClientOption = {
   id: string;
@@ -593,9 +595,10 @@ export function NewTransactionDialog({
                     setLetterTouched(false);
                   }}
                   placeholder="Seleccionar proveedor o empleado..."
-                  searchPlaceholder="Buscar..."
-                  emptyText="Ningún contacto coincide."
+                  searchPlaceholder="Buscar por nombre o razón social..."
+                  emptyText="Ningún proveedor o empleado coincide."
                 />
+                <p className="text-xs text-muted-foreground">{AP_PAYEE_PICKER_HINT}</p>
               </div>
               {showLetterAp ? (
                 <div className="space-y-3">

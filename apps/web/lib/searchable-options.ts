@@ -12,12 +12,12 @@ export type SearchableComboboxOption = {
 
 /** Convierte opciones `{ id, label }` del directorio / AP / ventas. */
 export function toSearchableOptions(
-  items: { id: string; label: string }[],
+  items: { id: string; label: string; searchValue?: string }[],
 ): SearchableComboboxOption[] {
   return items.map((item) => ({
     value: item.id,
     label: item.label,
-    searchValue: item.label,
+    searchValue: item.searchValue ?? item.label,
   }));
 }
 
