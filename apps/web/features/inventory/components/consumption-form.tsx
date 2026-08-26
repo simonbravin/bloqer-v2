@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { SEARCHABLE_NONE, productsToSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
@@ -49,6 +50,7 @@ export function ConsumptionForm({
   const [productId, setProductId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [wbsNodeId, setWbsNodeId] = useState<string>(SEARCHABLE_NONE);
+  const [quantity, setQuantity] = useState("");
   const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
 
   const productOptions = useMemo(() => productsToSearchableOptions(products), [products]);
@@ -146,7 +148,15 @@ export function ConsumptionForm({
             <Label htmlFor="quantity">
               Cantidad{selectedProduct?.unit ? ` (${selectedProduct.unit})` : ""}
             </Label>
-            <Input id="quantity" name="quantity" required placeholder="0" inputMode="decimal" className="min-h-11 md:min-h-10" />
+            <DecimalInput
+              id="quantity"
+              name="quantity"
+              required
+              placeholder="0,00"
+              className="min-h-11 md:min-h-10"
+              value={quantity}
+              onValueChange={setQuantity}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="movementDate">Fecha</Label>

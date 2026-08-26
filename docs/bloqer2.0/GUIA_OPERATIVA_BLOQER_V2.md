@@ -341,10 +341,12 @@ Para operadores: **no hace falta pensar en “escalas de base de datos”**. En 
 
 | Qué | Cómo se ve / se carga |
 |-----|------------------------|
-| **Dinero** (totales, saldos, pagos, cobros, caja) | Siempre **2 decimales** (ej. `1.234,56`). Redondeo comercial half-up. |
+| **Dinero** (totales, saldos, pagos, cobros, caja) | Siempre **2 decimales** con miles (ej. `1.234,56` o `$ 1.200.000,00`). Redondeo comercial half-up. |
 | **Tipo de cambio** | Hasta **6** decimales. |
-| **Cantidades** (líneas, stock) y **%** (IVA, descuento comercial, etc.) | Hasta **4** decimales. |
+| **Cantidades y precios unitarios** | En pantalla **2 decimales** con miles (ej. `1,00` / `1.200.000,00`). |
+| **%** (IVA, descuento comercial) | En pantalla **2 decimales** (ej. `0,00` o `10,50`). |
 
+- En **cualquier** formulario de dinero, cantidad, precio unitario o %, usá coma decimal y punto de miles (`1.200.000,00`). Enteros (días, cotizaciones, personas) se cargan sin decimales.
 - Al **pagar o cobrar el total**, usá el saldo que muestra el sistema (o el default del formulario). El servidor aplica el saldo almacenado; no reescribás a mano un redondeo distinto.
 - Si la cuenta no tiene fondos suficientes para el pago, la operación **se rechaza** con el disponible.
 
@@ -752,7 +754,7 @@ flowchart LR
 1. **Nueva solicitud** (diálogo / `?create=1`) desde **Solicitudes de compra** o **Tablero de compras** (**Nueva solicitud** / **Todas las solicitudes**), o llegar prellenada desde Materiales → **Pedir**.
 2. Líneas: cantidad, unidad, descripción y **partida EDT obligatoria**.
 3. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por partida EDT).
-4. Cargar **Cotizaciones**: elegí proveedor (buscador: razón social o nombre fantasía), **precio unit.**, **Desc. %** (opcional, antes de IVA) + **plazo de entrega en días** + validez. Cumplir mínimo de cotizaciones de `/configuracion/politicas`. El umbral que obliga SC+cotizaciones vs OC directa lo setea cada empresa en políticas de compras (no es un monto fijo del producto).
+4. Cargar **Cotizaciones**: elegí proveedor (buscador: razón social o nombre fantasía), **precio unit.**, **Desc. %** (opcional, antes de IVA) + **plazo de entrega en días** + validez. En el listado de cotizaciones se ve el total y, debajo del proveedor, cada línea con precio de lista y **Desc. %**. Cumplir mínimo de cotizaciones de `/configuracion/politicas`. El umbral que obliga SC+cotizaciones vs OC directa lo setea cada empresa en políticas de compras (no es un monto fijo del producto).
 5. **Seleccionar** proveedor → genera **OC en borrador**.
 6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora. El email de nueva solicitud muestra organización, proyecto, solicitante e ítems; el asunto es `[organización] Nueva solicitud · SC-003`.
 
@@ -763,14 +765,14 @@ flowchart LR
 **Estados en pantalla:** Borrador → Pend. aprobación → Aprobada → Confirmada → Recepción parcial / Recibida · Anulada.  
 **Enum:** `DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED` (o `CANCELLED`).
 
-1. **Nueva OC** desde listado/tablero (`?create=1`) o desde SC seleccionada. Proveedor: buscador por razón social o nombre fantasía. Cada línea: **partida hoja** + cantidades/precios y **Desc. %** (antes de IVA). **Descuento general %** + **Aplicar a todas** copia el mismo % a cada línea. Al elegir partida se muestran **costo ref. materiales** y **saldo de partida** (alerta, no bloqueo).
+1. **Nueva OC** desde listado/tablero (`?create=1`) o desde SC seleccionada. Proveedor: buscador por razón social o nombre fantasía. Cada línea: **partida hoja** + cantidades/precios y **Desc. %** (antes de IVA). **Descuento general %** + **Aplicar a todas** copia el mismo % a cada línea (hay que ingresar un número; 0 limpia todas). Al elegir partida se muestran **Ref. presup.** (insumo MATERIAL del APU, o **costo dir. /u** de la partida si no hay materiales) y **saldo de partida** (alerta, no bloqueo).
 2. **Enviar a aprobación** → `SUBMITTED`.
 3. Aprobador: **Aprobar** → `APPROVED`, o **Devolver a borrador** con **motivo obligatorio**.
 4. **Confirmar al proveedor** → `CONFIRMED` = **comprometido** en EDT y costos.  
    > No existe atajo “Emitir y confirmar (rápido)”: siempre Enviar → Aprobar → Confirmar.
 5. **Registrar recepción** (parcial o total).
 6. Con cantidades recibidas: **Registrar factura desde OC** (o alta manual en Facturas proveedor).
-7. Desvíos de precio vs referencia: alerta → justificación → tramos altos con aprobación admin.
+7. Desvíos de precio vs referencia: si el PU **supera** el referencial (umbrales de políticas), pide **Justificación desvío**. Comprar por debajo del presupuesto no exige nota. Sin referencial de partida (APU y costo dir. /u en cero) sí pide justificación.
 8. **OC directa** (sin SC): solo si la política de compras lo habilita; umbrales altos pueden exigir motivo de emergencia (`OWNER`/`ADMIN`).
 
 | Hito | Impacto |

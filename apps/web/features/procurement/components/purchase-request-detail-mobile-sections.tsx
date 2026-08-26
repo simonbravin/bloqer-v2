@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, formatUnitPriceFromString, formatQtyWithUnit, isZeroRatePct } from "@/lib/format-money";
 import { PurchaseRequestStatusBadge } from "./purchase-request-status-badge";
 import { ProcurementQuoteStatusBadge } from "./procurement-quote-status-badge";
 import type { PurchaseRequestView } from "@bloqer/services";
@@ -13,6 +13,11 @@ type QuoteCard = {
   totalAmount: string;
   currency: string;
   leadTimeDays: number | null;
+  lines?: Array<{
+    description: string;
+    unitPrice: string;
+    discountPct: string;
+  }>;
 };
 
 export function PurchaseRequestDetailMobileSections({
@@ -60,7 +65,7 @@ export function PurchaseRequestDetailMobileSections({
           <div key={item.id} className="space-y-1 rounded-md border p-3">
             <p className="font-medium">{item.description}</p>
             <p className="text-sm tabular-nums text-muted-foreground">
-              {item.quantity} {item.unit}
+              {formatQtyWithUnit(item.quantity, item.unit)}
             </p>
             {item.wbsNodeCode ? (
               <p className="text-sm text-muted-foreground">
@@ -90,6 +95,18 @@ export function PurchaseRequestDetailMobileSections({
               <p className="text-sm tabular-nums">
                 {formatMoneyAmount(q.totalAmount, q.currency)}
               </p>
+              {q.lines && q.lines.length > 0 ? (
+                <ul className="text-xs text-muted-foreground space-y-0.5">
+                  {q.lines.map((l, i) => (
+                    <li key={`${q.id}-${i}`}>
+                      {l.description}: {formatUnitPriceFromString(l.unitPrice)}
+                      {!isZeroRatePct(l.discountPct)
+                        ? ` · desc. ${formatRatePctFromString(l.discountPct)}%`
+                        : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               <p className="text-sm text-muted-foreground">
                 Plazo {q.leadTimeDays != null ? `${q.leadTimeDays} días` : "—"}
               </p>

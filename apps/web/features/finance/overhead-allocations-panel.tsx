@@ -16,6 +16,7 @@ import {
 } from "@/app/(app)/finanzas/gastos-generales/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DecimalInput, numberFromCanonicalDecimal } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -260,16 +261,13 @@ export function OverheadAllocationsPanel({
             <CardContent className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">
                 <Label htmlFor="overhead-pct">% sobre CD devengado</Label>
-                <Input
+                <DecimalInput
                   id="overhead-pct"
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.01}
                   className="w-32"
                   value={pct}
                   disabled={!canEdit || pending}
-                  onChange={(e) => setPct(e.target.value)}
+                  onValueChange={setPct}
+                  placeholder="0,00"
                 />
               </div>
               {canEdit ? (
@@ -279,7 +277,11 @@ export function OverheadAllocationsPanel({
                   onClick={() => {
                     setError(null);
                     startTransition(async () => {
-                      const parsed = parseFloat(pct);
+                      if (!pct.trim()) {
+                        setError("El porcentaje debe estar entre 0 y 100");
+                        return;
+                      }
+                      const parsed = numberFromCanonicalDecimal(pct);
                       if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
                         setError("El porcentaje debe estar entre 0 y 100");
                         return;
@@ -353,13 +355,13 @@ export function OverheadAllocationsPanel({
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="oh-amount">Monto ({allocationCurrency})</Label>
-                    <Input
+                    <DecimalInput
                       id="oh-amount"
-                      inputMode="decimal"
                       value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
+                      onValueChange={setAmount}
                       disabled={pending}
                       required
+                      placeholder="0,00"
                     />
                     <p className="text-xs text-muted-foreground">
                       Moneda del presupuesto aprobado del proyecto.

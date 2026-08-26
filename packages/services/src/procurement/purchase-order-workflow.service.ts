@@ -522,6 +522,9 @@ export async function confirmPurchaseOrder(
   await prisma.$transaction(async (tx) => {
     await recalcPurchaseOrderTotals(tx, id);
     const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
+    if (po.totalAmount.lessThanOrEqualTo(0)) {
+      throw new ServiceError("CONFLICT", "El monto total debe ser mayor a cero");
+    }
     const fx = computeDocumentFxAmounts(
       po.currency,
       po.totalAmount,

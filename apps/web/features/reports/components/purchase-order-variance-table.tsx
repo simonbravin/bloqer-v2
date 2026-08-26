@@ -10,13 +10,8 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { Badge } from "@/components/ui/badge";
-
-const TIER_LABELS: Record<string, string> = {
-  NOTE_REQUIRED: "Nota requerida",
-  EXTRA_APPROVAL: "Aprobación extra",
-  UNIT_MISMATCH: "Unidad distinta",
-  NO_BUDGET_BASELINE: "Sin baseline",
-};
+import { formatRatePctWithSymbol, formatUnitPriceFromString } from "@/lib/format-money";
+import { purchaseVarianceTierLabel } from "@/features/procurement/lib/variance-tier-labels";
 
 export function PurchaseOrderVarianceTable({
   rows,
@@ -44,6 +39,7 @@ export function PurchaseOrderVarianceTable({
             <TableHead>Tier</TableHead>
             <TableHead className="text-right">Desvío %</TableHead>
             <TableHead className="text-right">P. unit.</TableHead>
+            <TableHead className="text-right">Desc. %</TableHead>
             <TableHead className="text-right">Presup.</TableHead>
           </TableRow>
         </TableHeader>
@@ -61,14 +57,17 @@ export function PurchaseOrderVarianceTable({
               <TableCell className="max-w-[200px] truncate">{r.description}</TableCell>
               <TableCell className="text-muted-foreground text-xs">{r.wbsCode ?? "—"}</TableCell>
               <TableCell>
-                <Badge variant="outline">{TIER_LABELS[r.varianceTier] ?? r.varianceTier}</Badge>
+                <Badge variant="outline">{purchaseVarianceTierLabel(r.varianceTier)}</Badge>
               </TableCell>
               <TableCell className="text-right tabular-nums">
-                {r.variancePct != null ? `${r.variancePct}%` : "—"}
+                {r.variancePct != null ? formatRatePctWithSymbol(r.variancePct) : "—"}
               </TableCell>
-              <TableCell className="text-right tabular-nums">{r.unitPrice}</TableCell>
+              <TableCell className="text-right tabular-nums">{formatUnitPriceFromString(r.unitPrice)}</TableCell>
               <TableCell className="text-right tabular-nums">
-                {r.budgetUnitCostSnapshot ?? "—"}
+                {formatRatePctWithSymbol(r.discountPct)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {r.budgetUnitCostSnapshot ? formatUnitPriceFromString(r.budgetUnitCostSnapshot) : "—"}
               </TableCell>
             </TableRow>
           ))}

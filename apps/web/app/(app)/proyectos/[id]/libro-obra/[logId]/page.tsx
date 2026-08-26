@@ -17,7 +17,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import { getJobsiteLogById, getJobsiteLogActivityLog, getProjectOperationalMutationBlockReason, getProjectShellInfo, getWbsIncrementalProgressSnapshot, listEntityDocuments, listStockMovements, ServiceError } from "@bloqer/services";
-import { formatQtyFromString } from "@/lib/format-money";
+import { addDecimal } from "@bloqer/utils";
+import { formatQtyFromString, formatRatePctDisplay } from "@/lib/format-money";
 import {
   JobsiteLogStatusBadge,
   JobsiteLogIssueSeverityBadge,
@@ -128,15 +129,15 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
   );
 
   const progressRows = log.progress.map((p, idx) => {
-    const approved = parseFloat(wbsProgressSnapshot[p.wbsNodeId]?.approvedIncrementalPct ?? "0");
-    let logSum = 0;
+    const approved = wbsProgressSnapshot[p.wbsNodeId]?.approvedIncrementalPct ?? "0";
+    let logSum = "0";
     for (let j = 0; j <= idx; j++) {
       const row = log.progress[j]!;
       if (row.wbsNodeId === p.wbsNodeId && row.physicalPct) {
-        logSum += parseFloat(row.physicalPct);
+        logSum = addDecimal(logSum, row.physicalPct);
       }
     }
-    return { ...p, cumulativePct: approved + logSum };
+    return { ...p, cumulativePct: addDecimal(approved, logSum) };
   });
 
   return (
@@ -286,10 +287,10 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                       {p.wbsNode.unit}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {p.physicalPct ? `${p.physicalPct}%` : "—"}
+                      {p.physicalPct ? `${formatRatePctDisplay(p.physicalPct)}%` : "—"}
                     </TableCell>
                     <TableCell className="text-right tabular-nums font-mono text-xs">
-                      {p.cumulativePct.toFixed(2).replace(/\.?0+$/, "")} / 100
+                      {formatRatePctDisplay(p.cumulativePct)} / 100
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {p.notes ?? "—"}
@@ -324,7 +325,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{lb.workersCount}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {lb.hoursWorked ?? "—"}
+                      {lb.hoursWorked ? formatQtyFromString(lb.hoursWorked) : "—"}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {lb.notes ?? "—"}

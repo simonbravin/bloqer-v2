@@ -14,9 +14,36 @@ import { cn } from "@/lib/utils";
 type DecimalInputProps = Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "type"> & {
   value: string;
   onValueChange: (canonical: string) => void;
-  /** Fractional digits on blur / emit. Money, qty and unit prices use 2. */
+  /** Fractional digits on blur / emit. Default 2 (D-053 display). Do not use type="number" for money/qty/%. */
   scale?: number;
 };
+
+/** Canonical DecimalInput string → number for RHF `valueAsNumber` fields. */
+export function numberFromCanonicalDecimal(canonical: string): number {
+  const t = canonical.trim();
+  if (!t) return 0;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** RHF number / unknown → canonical string for DecimalInput. */
+export function stringFromRhfNumber(value: unknown): string {
+  if (value == null || value === "") return "";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+  const t = String(value).trim();
+  return t;
+}
+
+/** Bind DecimalInput to an RHF numeric field without type="number". */
+export function bindRhfNumberDecimal(
+  value: unknown,
+  setNumber: (n: number) => void,
+): { value: string; onValueChange: (canonical: string) => void } {
+  return {
+    value: stringFromRhfNumber(value),
+    onValueChange: (canonical) => setNumber(numberFromCanonicalDecimal(canonical)),
+  };
+}
 
 function displayFromCanonical(canonical: string, scale: number): string {
   const t = canonical.trim();

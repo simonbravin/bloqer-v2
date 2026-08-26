@@ -1,8 +1,8 @@
 import { formatDate } from "@/lib/format";
-import { compareDecimal } from "@bloqer/utils";
-import { formatMoneyAmount, formatRatePctFromString } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, formatUnitPriceFromString, isZeroRatePct } from "@/lib/format-money";
 import { Badge } from "@/components/ui/badge";
 import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
+import { purchaseVarianceTierLabel } from "../lib/variance-tier-labels";
 import type { PurchaseOrderView } from "@bloqer/services";
 import type { ReactNode } from "react";
 
@@ -26,8 +26,8 @@ function varianceAlerts(order: PurchaseOrderView): string[] {
   const alerts: string[] = [];
   for (const line of order.lines) {
     if (!line.varianceTier || line.varianceTier === "NONE") continue;
-    const pct = line.variancePct ? ` (${line.variancePct}%)` : "";
-    alerts.push(`${line.description}: ${line.varianceTier}${pct}`);
+    const pct = line.variancePct ? ` (${formatRatePctFromString(line.variancePct)}%)` : "";
+    alerts.push(`${line.description}: ${purchaseVarianceTierLabel(line.varianceTier)}${pct}`);
   }
   return alerts;
 }
@@ -133,8 +133,8 @@ export function PurchaseOrderMobileFiche({
           <article key={line.id} className="rounded-lg border bg-card p-4 space-y-2" data-testid="po-line-card">
             <p className="font-medium leading-snug">{line.description}</p>
             <p className="text-sm tabular-nums text-muted-foreground">
-              {line.quantity} × {formatMoneyAmount(line.unitPrice)}
-              {compareDecimal(line.discountPct, "0") > 0
+              {formatQtyFromString(line.quantity)} × {formatUnitPriceFromString(line.unitPrice)}
+              {!isZeroRatePct(line.discountPct)
                 ? ` · desc. ${formatRatePctFromString(line.discountPct)}%`
                 : ""}
             </p>
@@ -146,13 +146,13 @@ export function PurchaseOrderMobileFiche({
             ) : null}
             {line.varianceTier && line.varianceTier !== "NONE" ? (
               <p className="text-xs text-muted-foreground">
-                Desvío {line.varianceTier}
-                {line.variancePct ? ` (${line.variancePct}%)` : ""}
-                {line.budgetUnitCostSnapshot ? ` · ref. ${formatMoneyAmount(line.budgetUnitCostSnapshot)}` : ""}
+                Desvío {purchaseVarianceTierLabel(line.varianceTier)}
+                {line.variancePct ? ` (${formatRatePctFromString(line.variancePct)}%)` : ""}
+                {line.budgetUnitCostSnapshot ? ` · ref. ${formatUnitPriceFromString(line.budgetUnitCostSnapshot)}` : ""}
               </p>
             ) : line.budgetUnitCostSnapshot ? (
               <p className="text-xs text-muted-foreground">
-                Ref. {formatMoneyAmount(line.budgetUnitCostSnapshot)}
+                Ref. {formatUnitPriceFromString(line.budgetUnitCostSnapshot)}
               </p>
             ) : null}
           </article>

@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { CertificationProgressPoint } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatRatePctFromString } from "@/lib/format-money";
 import { REPORT_CHART_FRAME_CLASS, REPORT_CHART_Y_AXIS_WIDTH } from "./report-layout";
 
 type Props = {
@@ -58,7 +59,7 @@ export function CertificationProgressChart({ series }: Props) {
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} unit="%" domain={[0, "auto"]} tickLine={false} width={REPORT_CHART_Y_AXIS_WIDTH} />
-              <Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} />
+              <Tooltip formatter={(v: number) => `${formatRatePctFromString(String(v))}%`} />
               <Legend />
               <Line type="monotone" dataKey="Avance económico %" stroke="#2563eb" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="Avance financiero %" stroke="#16a34a" strokeWidth={2} dot={false} />

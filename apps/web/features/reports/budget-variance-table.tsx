@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { CostVarianceBadge } from "@/features/cost-control/components/cost-variance-badge";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatRatePctWithSymbol } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<BudgetVarianceRow["varianceStatus"], string> = {
@@ -77,7 +77,7 @@ export function BudgetVarianceTable({ report, projectId }: Props) {
                 <CostVarianceBadge variance={row.costVariance} label={formatMoneyAmount(row.costVariance)} />
               </TableCell>
               <TableCell className="text-right text-muted-foreground">
-                {row.variancePct != null ? `${row.variancePct}%` : "—"}
+                {formatRatePctWithSymbol(row.variancePct)}
               </TableCell>
               <TableCell className="text-right">
                 <span
@@ -104,7 +104,7 @@ export function BudgetVarianceTable({ report, projectId }: Props) {
               <CostVarianceBadge variance={totals.costVariance} label={formatMoneyAmount(totals.costVariance)} />
             </TableCell>
             <TableCell className="text-right text-muted-foreground">
-              {totals.variancePct != null ? `${totals.variancePct}%` : "—"}
+              {formatRatePctWithSymbol(totals.variancePct)}
             </TableCell>
             <TableCell />
           </TableRow>

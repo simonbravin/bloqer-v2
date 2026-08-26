@@ -25,10 +25,29 @@ type AnalysisLineRow = {
   isLumpSum: boolean;
 };
 
+type CostItemDirectFields = {
+  unit: string | null;
+  quantity: Prisma.Decimal;
+  unitCostDirect: Prisma.Decimal;
+};
+
+/**
+ * When the WBS item has no purchasable MATERIAL APU, use CostItem.unitCostDirect
+ * (costo dir. /u of the partida — labor/equipment/sub included) as the purchase referential.
+ */
+export function fallbackBudgetFromCostItem(item: CostItemDirectFields): BudgetLineBaseline {
+  return {
+    unitCost: item.unitCostDirect.greaterThan(0) ? item.unitCostDirect : null,
+    unit: item.unit?.trim() ? item.unit : null,
+    quantity: item.quantity,
+  };
+}
+
 /**
  * Match a purchase line to a MATERIAL APU resource line
  * (costAnalysisLineId → productId → desc+unit → desc).
  * Returns resource unit + resource unit price + physical need qty — not CostItem.unit.
+ * If nothing matches, falls back to CostItem.unitCostDirect ([BR-PUR-011]).
  */
 export async function budgetBaselineForPurchaseLine(
   wbsNodeId: string,
@@ -43,7 +62,9 @@ export async function budgetBaselineForPurchaseLine(
   const item = await db.costItem.findFirst({
     where: { wbsNodeId },
     select: {
+      unit: true,
       quantity: true,
+      unitCostDirect: true,
       analysisLines: {
         where: { category: "MATERIAL" },
         select: {
@@ -108,7 +129,7 @@ export async function budgetBaselineForPurchaseLine(
 
   const line = pick(purchasable) ?? pick(item.analysisLines);
   if (!line) {
-    return { unitCost: null, unit: null, quantity: item.quantity };
+    return fallbackBudgetFromCostItem(item);
   }
 
   const need = physicalNeedQty(
@@ -128,6 +149,7 @@ export async function budgetBaselineForPurchaseLine(
 /**
  * Aggregated purchasable MATERIAL baseline for a WBS ITEM.
  * Money = Σ totalCost×qty of purchasable lines; unitCost = money/qty when qty>0 (partida $/und ítem).
+ * If there is no purchasable MATERIAL money, falls back to CostItem.unitCostDirect.
  * Prefer {@link budgetBaselineForPurchaseLine} for OC/SC line variance (resource units).
  */
 export async function budgetBaselineForWbs(
@@ -139,6 +161,7 @@ export async function budgetBaselineForWbs(
     select: {
       unit: true,
       quantity: true,
+      unitCostDirect: true,
       analysisLines: {
         where: { category: "MATERIAL" },
         select: {
@@ -154,7 +177,7 @@ export async function budgetBaselineForWbs(
   });
   if (!item) return { unitCost: null, unit: null, quantity: null };
   if (item.analysisLines.length === 0) {
-    return { unitCost: null, unit: item.unit || null, quantity: item.quantity };
+    return fallbackBudgetFromCostItem(item);
   }
 
   let partidaMoney = new Prisma.Decimal(0);
@@ -170,7 +193,7 @@ export async function budgetBaselineForWbs(
   }
 
   if (partidaMoney.isZero()) {
-    return { unitCost: null, unit: item.unit || null, quantity: item.quantity };
+    return fallbackBudgetFromCostItem(item);
   }
 
   const unitCost = item.quantity.gt(0)

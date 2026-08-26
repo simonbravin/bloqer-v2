@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DecimalInput, numberFromCanonicalDecimal } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -28,17 +28,10 @@ import {
   compareQty,
   formatMoneyAmount,
   formatQtyFromString,
+  formatRatePctWithSymbol,
   formatUnitPriceFromString,
   isNegativeQty,
 } from "@/lib/format-money";
-
-function fmt4(v: string) {
-  return formatQtyFromString(v);
-}
-
-function fmt2(v: string) {
-  return formatMoneyAmount(v);
-}
 
 export type WbsItemOption = {
   id: string;
@@ -158,12 +151,12 @@ export function CertificationLineEditor({
                     <TableCell className="font-mono text-xs">{line.wbsNode.code}</TableCell>
                     <TableCell className="text-sm max-w-[200px] truncate">{line.wbsNode.name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{line.wbsNode.unit}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{fmt4(line.budgetQty)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm text-muted-foreground">{fmt4(line.previousQty)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm font-medium">{fmt4(line.currentQty)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{fmt4(line.physicalPct)}%</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{formatQtyFromString(line.budgetQty)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm text-muted-foreground">{formatQtyFromString(line.previousQty)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm font-medium">{formatQtyFromString(line.currentQty)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{formatRatePctWithSymbol(line.physicalPct)}</TableCell>
                     <TableCell className={cn("text-right font-mono text-sm font-semibold", isOverCert && "text-amber-600 dark:text-amber-400")}>
-                      {fmt4(line.cumulativeQty)}
+                      {formatQtyFromString(line.cumulativeQty)}
                       {isOverCert && (
                         <Badge variant="outline" className="ml-1 text-xs border-amber-500 text-amber-600 dark:text-amber-400">
                           Supera
@@ -171,10 +164,10 @@ export function CertificationLineEditor({
                       )}
                     </TableCell>
                     <TableCell className={cn("text-right font-mono text-sm", isNegativeQty(line.remainingQty) && "text-amber-600 dark:text-amber-400")}>
-                      {fmt4(line.remainingQty)}
+                      {formatQtyFromString(line.remainingQty)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm font-medium">
-                      {fmt2(line.periodAmount)} {currency}
+                      {formatMoneyAmount(line.periodAmount)} {currency}
                     </TableCell>
                     {editable && (
                       <TableCell>
@@ -295,8 +288,8 @@ function AddLineForm({
       const result = await onSubmit({
         certificationId,
         wbsNodeId,
-        physicalPct: parseFloat(physicalPct) || 0,
-        currentQty: parseFloat(currentQty) || 0,
+        physicalPct: numberFromCanonicalDecimal(physicalPct),
+        currentQty: numberFromCanonicalDecimal(currentQty),
         notes: notes || undefined,
       });
       if ("error" in result) {
@@ -334,19 +327,19 @@ function AddLineForm({
           <div>
             <p className="text-xs">Qty ppto.</p>
             <p className="font-mono font-medium text-foreground">
-              {fmt4(selected.budgetQty ?? "0")}
+              {formatQtyFromString(selected.budgetQty ?? "0")}
             </p>
           </div>
           <div>
             <p className="text-xs">Qty previa</p>
             <p className="font-mono font-medium text-foreground">
-              {fmt4(selected.previousQty ?? "0")}
+              {formatQtyFromString(selected.previousQty ?? "0")}
             </p>
           </div>
           <div>
             <p className="text-xs">Saldo pend.</p>
             <p className="font-mono font-medium text-foreground">
-              {fmt4(selected.remainingQty ?? "0")}
+              {formatQtyFromString(selected.remainingQty ?? "0")}
             </p>
           </div>
         </div>
@@ -355,12 +348,10 @@ function AddLineForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label>Cantidad económica certificada</Label>
-          <Input
-            type="number"
-            step="0.0001"
-            min="0"
+          <DecimalInput
             value={currentQty}
-            onChange={(e) => setCurrentQty(e.target.value)}
+            onValueChange={setCurrentQty}
+            placeholder="0,00"
           />
           <p className="text-[11px] text-muted-foreground">
             Precargado con el saldo pendiente (editable).
@@ -368,13 +359,10 @@ function AddLineForm({
         </div>
         <div className="space-y-1.5">
           <Label>% Físico (período)</Label>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
+          <DecimalInput
             value={physicalPct}
-            onChange={(e) => setPhysicalPct(e.target.value)}
+            onValueChange={setPhysicalPct}
+            placeholder="0"
           />
           <p className="text-[11px] text-muted-foreground">
             Independiente de la qty económica (BR-CERT-003).
@@ -384,7 +372,7 @@ function AddLineForm({
 
       {isOver ? (
         <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-          Aviso: el acumulado ({previewCumulative}) supera el presupuesto ({fmt4(budgetQty)}).
+          Aviso: el acumulado ({formatQtyFromString(previewCumulative)}) supera el presupuesto ({formatQtyFromString(budgetQty)}).
         </div>
       ) : null}
 
@@ -446,8 +434,8 @@ function EditLineForm({
     setError(null);
     startTransition(async () => {
       const result = await onSubmit({
-        physicalPct: parseFloat(physicalPct) || 0,
-        currentQty:  parseFloat(currentQty)  || 0,
+        physicalPct: numberFromCanonicalDecimal(physicalPct),
+        currentQty: numberFromCanonicalDecimal(currentQty),
         notes: notes || undefined,
       });
       if ("error" in result) {
@@ -468,45 +456,40 @@ function EditLineForm({
       <div className="grid grid-cols-3 gap-3 text-sm text-muted-foreground">
         <div>
           <p className="text-xs">Qty presupuestada</p>
-          <p className="font-mono font-medium text-foreground">{fmt4(line.budgetQty)}</p>
+          <p className="font-mono font-medium text-foreground">{formatQtyFromString(line.budgetQty)}</p>
         </div>
         <div>
           <p className="text-xs">Qty certificada previa</p>
-          <p className="font-mono font-medium text-foreground">{fmt4(line.previousQty)}</p>
+          <p className="font-mono font-medium text-foreground">{formatQtyFromString(line.previousQty)}</p>
         </div>
         <div>
           <p className="text-xs">Saldo pend.</p>
-          <p className="font-mono font-medium text-foreground">{fmt4(periodRemaining)}</p>
+          <p className="font-mono font-medium text-foreground">{formatQtyFromString(periodRemaining)}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label>Cantidad económica certificada</Label>
-          <Input
-            type="number"
-            step="0.0001"
-            min="0"
+          <DecimalInput
             value={currentQty}
-            onChange={(e) => setCurrentQty(e.target.value)}
+            onValueChange={setCurrentQty}
+            placeholder="0,00"
           />
         </div>
         <div className="space-y-1.5">
           <Label>% Físico</Label>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
+          <DecimalInput
             value={physicalPct}
-            onChange={(e) => setPhysicalPct(e.target.value)}
+            onValueChange={setPhysicalPct}
+            placeholder="0"
           />
         </div>
       </div>
 
       {isOver && (
         <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-          Aviso: la cantidad acumulada ({previewCumulative}) supera el presupuesto ({fmt4(line.budgetQty)}).
+          Aviso: la cantidad acumulada ({formatQtyFromString(previewCumulative)}) supera el presupuesto ({formatQtyFromString(line.budgetQty)}).
           En obra pública esto bloqueará la emisión.
         </div>
       )}

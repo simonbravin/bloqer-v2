@@ -13,6 +13,7 @@ export type PurchaseOrderVarianceRow = {
   wbsCode: string | null;
   unit: string;
   unitPrice: string;
+  discountPct: string;
   budgetUnitCostSnapshot: string | null;
   variancePct: string | null;
   varianceTier: string;
@@ -70,6 +71,7 @@ export async function getPurchaseOrderVarianceReport(
       wbsCode: l.wbsNode?.code ?? null,
       unit: l.unit,
       unitPrice: serializeUnitPriceDecimal(l.unitPrice),
+      discountPct: serializeRatePctDecimal(l.discountPct),
       budgetUnitCostSnapshot: l.budgetUnitCostSnapshot != null
         ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot)
         : null,

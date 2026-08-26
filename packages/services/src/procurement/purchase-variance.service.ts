@@ -63,10 +63,11 @@ export function evaluateLineVariance(
     };
   }
 
+  // Signed overrun vs APU ([BR-PUR-009] / COST_FORMULAS §4.1). Savings (PU < referential)
+  // stay NONE — justification is only when the line exceeds budget ("Si supera presupuesto").
   const pct = price.minus(baseline).div(baseline).times(100);
-  const abs = pct.abs();
 
-  if (abs.lessThan(soft)) {
+  if (pct.lessThan(soft)) {
     return {
       variancePct: pct.toFixed(4),
       varianceTier: "NONE",
@@ -76,7 +77,7 @@ export function evaluateLineVariance(
     };
   }
 
-  if (abs.lessThan(extra)) {
+  if (pct.lessThan(extra)) {
     return {
       variancePct: pct.toFixed(4),
       varianceTier: "NOTE_REQUIRED",

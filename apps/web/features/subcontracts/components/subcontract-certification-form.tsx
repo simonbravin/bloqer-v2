@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button }   from "@/components/ui/button";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -168,15 +169,12 @@ export function SubcontractCertificationForm({
                       {formatUnitPriceFromString(l.unitPrice)}
                     </TableCell>
                     <TableCell>
-                      <Input
+                      <DecimalInput
                         className="h-8 text-xs text-right"
-                        type="number"
-                        step="any"
-                        min="0"
-                        max={l.remainingQty}
                         value={quantities[l.id] ?? ""}
-                        onChange={(e) => setQuantities((prev) => ({ ...prev, [l.id]: e.target.value }))}
+                        onValueChange={(v) => setQuantities((prev) => ({ ...prev, [l.id]: v }))}
                         disabled={!remainingOpen}
+                        placeholder="0,00"
                       />
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums">

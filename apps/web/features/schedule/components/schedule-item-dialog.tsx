@@ -18,6 +18,7 @@ type ScheduleItemAuditEntryView = {
   summary: string;
 };
 import { Button } from "@/components/ui/button";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
@@ -48,7 +49,7 @@ import {
 } from "../actions/schedule-actions";
 import { STATUS_LABELS, primaryWbsLink, scheduleItemHasActiveChildren } from "../adapters/schedule-view-types";
 import { formatDateAr } from "@/lib/gantt-date-format";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatRatePctDisplay, formatRatePctFromString } from "@/lib/format-money";
 import { ScheduleCancelDialog } from "./schedule-cancel-dialog";
 import { ScheduleWbsPicker } from "./schedule-wbs-picker";
 import { ScheduleMissingEdtBadge } from "./schedule-missing-edt-badge";
@@ -179,7 +180,9 @@ export function ScheduleItemDialog({
       const res = await copyProgressFromPhysicalAction(projectId, item!.id, Number(pct));
       if ("error" in res) toast.error(res.error);
       else {
-        toast.success(`Cronograma actualizado al ${pct}% (libro de obra)`);
+        toast.success(
+          `Cronograma actualizado al ${formatRatePctFromString(pct)}% (libro de obra)`,
+        );
         router.refresh();
       }
     });
@@ -416,13 +419,10 @@ export function ScheduleItemDialog({
                 <div className="flex gap-2 items-end pt-2">
                   <div className="space-y-1 flex-1">
                     <Label className="text-xs">Avance real %</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.01}
+                    <DecimalInput
                       value={progressInput}
-                      onChange={(e) => setProgressInput(e.target.value)}
+                      onValueChange={setProgressInput}
+                      placeholder="0,00"
                     />
                   </div>
                   <Button size="sm" disabled={pending} onClick={saveProgress}>
@@ -691,7 +691,7 @@ export function ScheduleItemDialog({
               <p className="text-xs text-muted-foreground mb-2">
                 % del día por parte. Acumulado aprobado:{" "}
                 {context?.jobsitePhysicalPctCumulative != null
-                  ? `${context.jobsitePhysicalPctCumulative} / 100`
+                  ? `${formatRatePctDisplay(context.jobsitePhysicalPctCumulative)} / 100`
                   : "—"}
                 . El avance operativo del cronograma también puede usar cantidades.
               </p>
@@ -705,7 +705,7 @@ export function ScheduleItemDialog({
                         {j.logDate}
                       </Link>
                       <span className="tabular-nums text-muted-foreground">
-                        {j.physicalPct != null ? `${j.physicalPct}%` : "—"}
+                        {j.physicalPct != null ? `${formatRatePctDisplay(j.physicalPct)}%` : "—"}
                       </span>
                     </li>
                   ))}

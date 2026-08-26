@@ -3,6 +3,7 @@
 import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,6 +41,7 @@ export function AdvanceInvoiceForm({
   const [clientContactId, setClientContactId] = useState(defaultClientId ?? "");
   const [accountId, setAccountId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<SettlementMethodValue | "">("");
+  const [amount, setAmount] = useState("");
   const { idempotencyKey: saleKey, rotateIdempotencyKey: rotateSaleKey } = useIdempotencyKey();
   const { idempotencyKey: collectNowKey, rotateIdempotencyKey: rotateCollectNowKey } =
     useIdempotencyKey();
@@ -175,12 +177,12 @@ export function AdvanceInvoiceForm({
             <Label htmlFor="amount">
               Monto del anticipo ({currency})
             </Label>
-            <Input
+            <DecimalInput
               id="amount"
               name="amount"
-              type="text"
-              inputMode="decimal"
-              placeholder="0.00"
+              value={amount}
+              onValueChange={setAmount}
+              placeholder="0,00"
               required
               disabled={!accountId}
             />

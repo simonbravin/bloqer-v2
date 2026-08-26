@@ -1,5 +1,6 @@
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import type { ScheduleWorkspaceDto } from "@bloqer/services";
+import { formatRatePctWithSymbol } from "@/lib/format-money";
 
 export function ScheduleSummaryCards({ workspace }: { workspace: ScheduleWorkspaceDto }) {
   const { summary } = workspace;
@@ -10,7 +11,7 @@ export function ScheduleSummaryCards({ workspace }: { workspace: ScheduleWorkspa
       <KpiStatCard
         iconKey="schedule_progress"
         label="Avance cronograma"
-        value={summary.scheduleProgressPct != null ? `${summary.scheduleProgressPct}%` : "—"}
+        value={formatRatePctWithSymbol(summary.scheduleProgressPct)}
         helper="Ponderado por duración (BR-SCH-002: distinto de certificado)"
         tone={
           summary.scheduleProgressPct != null && Number(summary.scheduleProgressPct) >= 100

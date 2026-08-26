@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DecimalInput, bindRhfNumberDecimal } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -121,11 +122,10 @@ function CreateForm({
           </div>
           <div className="space-y-1.5">
             <Label>Cantidad</Label>
-            <Input
-              type="number"
-              step="0.0001"
-              min="0"
-              {...form.register("quantity", { valueAsNumber: true })}
+            <DecimalInput
+              {...bindRhfNumberDecimal(form.watch("quantity"), (n) =>
+                form.setValue("quantity", n, { shouldValidate: true, shouldDirty: true }),
+              )}
             />
           </div>
         </div>

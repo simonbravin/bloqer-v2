@@ -336,7 +336,7 @@ export function ManualInvoiceForm({
           </div>
           <div className="space-y-1">
             <Label htmlFor="discountPct">Desc. %</Label>
-            <DecimalInput id="discountPct" name="discountPct" value={discountPct} onValueChange={setDiscountPct} placeholder="0" scale={4} />
+            <DecimalInput id="discountPct" name="discountPct" value={discountPct} onValueChange={setDiscountPct} placeholder="0" />
           </div>
           <div className="space-y-1">
             <TaxRateSelect

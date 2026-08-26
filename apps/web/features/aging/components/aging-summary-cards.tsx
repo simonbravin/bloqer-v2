@@ -1,6 +1,6 @@
 import type { AgingReport, AgingTotals } from "@bloqer/services";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
-import { formatDecimalAr } from "@/lib/format-money";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -19,8 +19,7 @@ const EMPTY_TOTALS: AgingTotals = {
 };
 
 function fmt(v: string) {
-  const n = Number(v);
-  return formatDecimalAr(Number.isFinite(n) ? n : 0);
+  return formatMoneyAmount(v);
 }
 
 function resolveTotals(report: AgingReport, currency?: string): AgingTotals {

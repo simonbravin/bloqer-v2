@@ -1,4 +1,4 @@
-import { formatQtyFromString } from "@/lib/format-money";
+import { formatQtyFromString, formatRatePctDisplay } from "@/lib/format-money";
 import { formatDateLong } from "@/lib/format";
 import Link from "next/link";
 import {
@@ -7,7 +7,7 @@ import {
 } from "./jobsite-log-issue-badge";
 import type { JobsiteLogView } from "@bloqer/services";
 
-type ProgressRow = JobsiteLogView["progress"][number] & { cumulativePct: number };
+type ProgressRow = JobsiteLogView["progress"][number] & { cumulativePct: string };
 
 export function JobsiteLogDetailMobileSections({
   log,
@@ -32,10 +32,10 @@ export function JobsiteLogDetailMobileSections({
                 {p.description ? <p className="mt-1 text-sm">{p.description}</p> : null}
                 <p className="mt-2 text-sm tabular-nums">
                   {formatQtyFromString(p.quantityCompleted)} {p.wbsNode.unit}
-                  {p.physicalPct ? ` · ${p.physicalPct}%` : ""}
+                  {p.physicalPct ? ` · ${formatRatePctDisplay(p.physicalPct)}%` : ""}
                 </p>
                 <p className="text-xs tabular-nums text-muted-foreground">
-                  Acumulado {p.cumulativePct.toFixed(2).replace(/\.?0+$/, "")} / 100
+                  Acumulado {formatRatePctDisplay(p.cumulativePct)} / 100
                 </p>
               </li>
             ))}
@@ -55,7 +55,7 @@ export function JobsiteLogDetailMobileSections({
                 ) : null}
                 <p className="mt-1 text-xs text-muted-foreground">
                   {lb.workersCount} {lb.workersCount === 1 ? "trabajador" : "trabajadores"}
-                  {lb.hoursWorked ? ` · ${lb.hoursWorked} h` : ""}
+                  {lb.hoursWorked ? ` · ${formatQtyFromString(lb.hoursWorked)} h` : ""}
                 </p>
               </li>
             ))}

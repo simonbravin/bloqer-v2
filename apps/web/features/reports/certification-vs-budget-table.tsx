@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatRatePctWithSymbol, isPositiveMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   rows: CertificationVsBudgetRow[];
@@ -48,7 +48,7 @@ export function CertificationVsBudgetTable({ rows }: Props) {
                 <TableCell className="text-right font-mono">{formatMoneyAmount(row.budgetSale)}</TableCell>
                 <TableCell className="text-right font-mono">{formatMoneyAmount(row.certifiedCumulative)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {row.certifiedPct != null ? `${row.certifiedPct}%` : "—"}
+                  {formatRatePctWithSymbol(row.certifiedPct)}
                 </TableCell>
                 <TableCell className="text-right font-mono">
                   {isPositiveMoneyAmount(row.pendingCertify) ? formatMoneyAmount(row.pendingCertify) : "—"}

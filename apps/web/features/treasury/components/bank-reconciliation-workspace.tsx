@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -73,6 +74,7 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
   const [direction, setDirection] = useState<"CREDIT" | "DEBIT">("CREDIT");
+  const [lineAmount, setLineAmount] = useState("");
   const [dialog, setDialog] = useState<PendingDialog | null>(null);
 
   const editable = canEdit && (session.status === "DRAFT" || session.status === "IN_PROGRESS");
@@ -126,7 +128,10 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
         direction,
         reference: String(fd.get("reference") ?? "").trim() || null,
       });
-      if (!("error" in res)) form.reset();
+      if (!("error" in res)) {
+        form.reset();
+        setLineAmount("");
+      }
       return res;
     });
   }
@@ -395,7 +400,14 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
             </div>
             <div className="space-y-1">
               <Label htmlFor="amount">Monto</Label>
-              <Input id="amount" name="amount" inputMode="decimal" required placeholder="0.00" />
+              <DecimalInput
+                id="amount"
+                name="amount"
+                value={lineAmount}
+                onValueChange={setLineAmount}
+                required
+                placeholder="0,00"
+              />
             </div>
             <div className="space-y-1">
               <Label htmlFor="line-direction">Dirección</Label>

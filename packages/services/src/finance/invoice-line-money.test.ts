@@ -84,6 +84,23 @@ describe("resolveInvoiceLineMoney", () => {
     assert.equal(reSaved.lineSubtotal.toFixed(2), created.lineSubtotal.toFixed(2));
     assert.equal(reSaved.lineTotal.toFixed(2), created.lineTotal.toFixed(2));
   });
+
+  it("rejects out-of-range discount with a Spanish validation error", () => {
+    assert.throws(
+      () =>
+        resolveInvoiceLineMoney({
+          quantity: new Prisma.Decimal("1"),
+          unitPrice: new Prisma.Decimal("100"),
+          taxRate: new Prisma.Decimal("21"),
+          discountPct: new Prisma.Decimal("101"),
+        }),
+      (err: unknown) => {
+        assert.ok(err instanceof ServiceError);
+        assert.equal(err.code, "VALIDATION");
+        return true;
+      },
+    );
+  });
 });
 
 describe("parseDiscountPct", () => {

@@ -2,6 +2,7 @@
 
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
 import { cn } from "@/lib/utils";
+import { formatProgressPctDisplay } from "../adapters/schedule-field-labels";
 
 export function scheduleProgressValues(item: ScheduleWorkspaceItemDto) {
   const real = item.progressPct;
@@ -23,23 +24,23 @@ export function ScheduleProgressDimensions({
   const { real, timePlan, quantity, certified } = scheduleProgressValues(item);
 
   const chips = [
-    { key: "real", label: "Real", value: `${real}%`, title: "Avance real en cronograma (libro de obra al aprobar)" },
+    { key: "real", label: "Real", value: formatProgressPctDisplay(real), title: "Avance real en cronograma (libro de obra al aprobar)" },
     {
       key: "time",
       label: "Plan (t)",
-      value: timePlan != null ? `${timePlan}%` : "—",
+      value: formatProgressPctDisplay(timePlan),
       title: "Avance esperado según fechas vs hoy",
     },
     {
       key: "quantity",
       label: "Cant.",
-      value: quantity != null ? `${quantity}%` : "—",
+      value: formatProgressPctDisplay(quantity),
       title: "Avance por cantidad ejecutada (libro aprobado / presupuesto)",
     },
     {
       key: "cert",
       label: "Cert.",
-      value: certified != null ? `${certified}%` : "—",
+      value: formatProgressPctDisplay(certified),
       title: "Avance económico certificado",
     },
   ] as const;

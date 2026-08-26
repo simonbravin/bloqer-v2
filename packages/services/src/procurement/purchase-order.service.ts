@@ -370,7 +370,28 @@ export async function getPurchaseOrderById(id: string, ctx: ServiceContext): Pro
   const po = await prisma.purchaseOrder.findUnique({ where: { id }, include: poInclude });
   if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  return toPurchaseOrderView(po);
+  return hydrateLiveBudgetRefs(await toPurchaseOrderView(po));
+}
+
+/** Fill Ref. presup. on read when the stored snapshot was empty (labor-only APU, etc.). */
+async function hydrateLiveBudgetRefs(view: PurchaseOrderView): Promise<PurchaseOrderView> {
+  const lines = await Promise.all(
+    view.lines.map(async (line) => {
+      if (line.budgetUnitCostSnapshot != null || !line.wbsNodeId) return line;
+      const baseline = await budgetBaselineForPurchaseLine(line.wbsNodeId, {
+        productId: line.productId,
+        description: line.description,
+        unit: line.unit,
+        costAnalysisLineId: line.costAnalysisLineId,
+      });
+      if (!baseline.unitCost) return line;
+      return {
+        ...line,
+        budgetUnitCostSnapshot: serializeUnitPriceDecimal(baseline.unitCost),
+      };
+    }),
+  );
+  return { ...view, lines };
 }
 
 export async function listPurchaseOrdersByProject(

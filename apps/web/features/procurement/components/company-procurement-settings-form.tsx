@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CompanyProcurementSettingsView } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,12 @@ export function CompanyProcurementSettingsForm({
   const [allowDirectPo, setAllowDirectPo] = useState(settings.allowDirectPo);
   const [allowSelfApproval, setAllowSelfApproval] = useState(settings.allowSelfApproval);
   const [allowEmergencyDirectPo, setAllowEmergencyDirectPo] = useState(settings.allowEmergencyDirectPo);
+  const [poThreshold, setPoThreshold] = useState(settings.poApprovalThresholdArs ?? "");
+  const [prThreshold, setPrThreshold] = useState(settings.purchaseRequestRequiredAboveArs ?? "");
+  const [softPct, setSoftPct] = useState(settings.varianceSoftAlertPct);
+  const [extraPct, setExtraPct] = useState(settings.varianceExtraApprovalPct);
+  const [overReceiptPct, setOverReceiptPct] = useState(settings.overReceiptTolerancePct);
+  const [invoiceMatchPct, setInvoiceMatchPct] = useState(settings.invoiceMatchTolerancePct);
   const [apPaymentNotificationChannel, setApPaymentNotificationChannel] = useState(
     settings.apPaymentNotificationChannel,
   );
@@ -95,11 +102,12 @@ export function CompanyProcurementSettingsForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="poApprovalThresholdArs">Umbral aprobación OC (ARS)</Label>
-              <Input
+              <DecimalInput
                 id="poApprovalThresholdArs"
                 name="poApprovalThresholdArs"
-                defaultValue={settings.poApprovalThresholdArs ?? ""}
-                placeholder="3000000"
+                value={poThreshold}
+                onValueChange={setPoThreshold}
+                placeholder="3.000.000,00"
                 disabled={!canEdit || pending}
               />
               <p className="text-xs text-muted-foreground">
@@ -108,10 +116,11 @@ export function CompanyProcurementSettingsForm({
             </div>
             <div className="space-y-2">
               <Label htmlFor="purchaseRequestRequiredAboveArs">Umbral solicitud obligatoria (ARS)</Label>
-              <Input
+              <DecimalInput
                 id="purchaseRequestRequiredAboveArs"
                 name="purchaseRequestRequiredAboveArs"
-                defaultValue={settings.purchaseRequestRequiredAboveArs ?? ""}
+                value={prThreshold}
+                onValueChange={setPrThreshold}
                 placeholder="Opcional"
                 disabled={!canEdit || pending}
               />
@@ -152,10 +161,11 @@ export function CompanyProcurementSettingsForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="varianceSoftAlertPct">Nota / alerta por desvío desde (%)</Label>
-              <Input
+              <DecimalInput
                 id="varianceSoftAlertPct"
                 name="varianceSoftAlertPct"
-                defaultValue={settings.varianceSoftAlertPct}
+                value={softPct}
+                onValueChange={setSoftPct}
                 disabled={!canEdit || pending}
               />
               <p className="text-xs text-muted-foreground">
@@ -165,10 +175,11 @@ export function CompanyProcurementSettingsForm({
             </div>
             <div className="space-y-2">
               <Label htmlFor="varianceExtraApprovalPct">Aprobación administración desde (%)</Label>
-              <Input
+              <DecimalInput
                 id="varianceExtraApprovalPct"
                 name="varianceExtraApprovalPct"
-                defaultValue={settings.varianceExtraApprovalPct}
+                value={extraPct}
+                onValueChange={setExtraPct}
                 disabled={!canEdit || pending}
               />
             </div>
@@ -177,10 +188,11 @@ export function CompanyProcurementSettingsForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="overReceiptTolerancePct">Tolerancia sobrecantidad recepción (%)</Label>
-              <Input
+              <DecimalInput
                 id="overReceiptTolerancePct"
                 name="overReceiptTolerancePct"
-                defaultValue={settings.overReceiptTolerancePct}
+                value={overReceiptPct}
+                onValueChange={setOverReceiptPct}
                 disabled={!canEdit || pending}
               />
               <p className="text-xs text-muted-foreground">
@@ -189,10 +201,11 @@ export function CompanyProcurementSettingsForm({
             </div>
             <div className="space-y-2">
               <Label htmlFor="invoiceMatchTolerancePct">Tolerancia matching factura (%)</Label>
-              <Input
+              <DecimalInput
                 id="invoiceMatchTolerancePct"
                 name="invoiceMatchTolerancePct"
-                defaultValue={settings.invoiceMatchTolerancePct}
+                value={invoiceMatchPct}
+                onValueChange={setInvoiceMatchPct}
                 disabled={!canEdit || pending}
               />
               <p className="text-xs text-muted-foreground">

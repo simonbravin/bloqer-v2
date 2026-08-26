@@ -13,6 +13,7 @@ import {
   type IvaConditionCode,
 } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import {
   Dialog,
   DialogContent,
@@ -161,6 +162,7 @@ export function NewTransactionDialog({
 
   const [inflowAccountId, setInflowAccountId] = useState("");
   const [counterpartyContactId, setCounterpartyContactId] = useState<string | null>(null);
+  const [inflowAmount, setInflowAmount] = useState("");
 
   useEffect(() => {
     rotateAttachmentKey();
@@ -921,7 +923,14 @@ export function NewTransactionDialog({
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="amount">Monto</Label>
-                      <Input id="amount" name="amount" inputMode="decimal" required />
+                      <DecimalInput
+                        id="amount"
+                        name="amount"
+                        value={inflowAmount}
+                        onValueChange={setInflowAmount}
+                        required
+                        placeholder="0,00"
+                      />
                     </div>
                   </div>
                   <div className="space-y-1">

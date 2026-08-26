@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatMoneyAmount, formatQtyFromString } from "@/lib/format-money";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { CATEGORY_LABELS, VISIBLE_COST_CATEGORIES, type VisibleCostCategory } from "@/lib/budget-categories";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { UnitSelect } from "./unit-select";
@@ -87,10 +88,7 @@ function displayResourceQtyLabel(line: LocalLine, itemQty: number): string {
   const d = apuResourceQtyDisplay(line, itemQty);
   // Legacy lump: no physical need — show em dash (not the word "global").
   if (d.kind === "lump") return "—";
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  }).format(d.qty);
+  return formatQtyFromString(String(d.qty));
 }
 
 /** Partida money for dialog table — resource uses cant×precio (stable while typing qty). */
@@ -233,6 +231,8 @@ export function CostItemApuDialog({
 
   const [unit, setUnit] = useState("");
   const [quantity, setQuantity] = useState("");
+  const quantityRef = useRef(quantity);
+  quantityRef.current = quantity;
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<LocalLine[]>([]);
   const [initialSnapshot, setInitialSnapshot] = useState<string>("");
@@ -527,14 +527,14 @@ export function CostItemApuDialog({
                 <div className="space-y-0.5">
                   <Label className="text-[11px]">Cantidad</Label>
                   {editable ? (
-                    <Input
-                      type="number"
-                      step="0.0001"
-                      min="0"
+                    <DecimalInput
                       value={quantity}
-                      onChange={(e) => setQuantity(e.target.value)}
+                      onValueChange={(v) => {
+                        quantityRef.current = v;
+                        setQuantity(v);
+                      }}
                       onBlur={() => {
-                        const next = parseFloat(quantity) || 0;
+                        const next = parseFloat(quantityRef.current) || 0;
                         if (next > 0) syncLinesToQuantity(next);
                       }}
                       className="h-8 font-mono"
@@ -661,17 +661,17 @@ export function CostItemApuDialog({
                       <Label className="text-[11px]">
                         {entryMode === "total" ? "Cant. recurso" : "Rendim."}
                       </Label>
-                      <Input
+                      <DecimalInput
                         value={newCoef}
-                        onChange={(e) => setNewCoef(e.target.value)}
+                        onValueChange={setNewCoef}
                         className="h-8 font-mono"
                       />
                     </div>
                     <div className="space-y-0.5">
                       <Label className="text-[11px]">Precio</Label>
-                      <Input
+                      <DecimalInput
                         value={newUnitCost}
-                        onChange={(e) => setNewUnitCost(e.target.value)}
+                        onValueChange={setNewUnitCost}
                         className="h-8 font-mono"
                       />
                     </div>

@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatRatePctWithSymbol, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   rows: ProcurementWbsDeviationRow[];
@@ -50,7 +50,7 @@ export function ProcurementWbsDeviationTable({ rows }: Props) {
                   {formatMoneyAmount(row.varianceAmount)}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {row.variancePct != null ? `${row.variancePct}%` : "—"}
+                  {formatRatePctWithSymbol(row.variancePct)}
                 </TableCell>
               </TableRow>
             );

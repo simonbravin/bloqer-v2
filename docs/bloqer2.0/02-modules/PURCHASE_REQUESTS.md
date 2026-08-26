@@ -74,7 +74,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b.
 ## 13. Casos borde
 - Anular SC con OC `DRAFT`: se puede; con OC activa no-DRAFT: bloqueado.
 - Anular OC `DRAFT` vinculada: SC vuelve a `SUBMITTED` y cotización seleccionada vuelve a `RECEIVED`.
-- Sin baseline APU en la partida: al enviar la OC → `NO_BUDGET_BASELINE` + justificación ([BR-PUR-009]).
+- Sin baseline de partida (ni insumo MATERIAL ni costo dir. /u): al enviar la OC → `NO_BUDGET_BASELINE` + justificación ([BR-PUR-009]).
 
 ## 14. Reportes relacionados
 - SC pendientes de cotización; tiempo promedio SC → OC confirmada; desvío cotización vs presupuesto.

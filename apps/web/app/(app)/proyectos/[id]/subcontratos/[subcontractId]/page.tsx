@@ -12,7 +12,7 @@ import { addDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
 import {
   SubcontractStatusBadge,
   SubcontractCertificationStatusBadge,
@@ -213,15 +213,15 @@ export default async function SubcontratoPage({ params, searchParams }: PageProp
                   <TableCell className="text-right text-muted-foreground">
                     {l.unit || "—"}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{l.quantity}</TableCell>
-                  <TableCell className="text-right tabular-nums">{l.unitPrice}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatQtyFromString(l.quantity)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatUnitPriceFromString(l.unitPrice)}</TableCell>
                   <TableCell className="text-right font-medium tabular-nums">
                     {formatMoneyAmount(l.lineTotal, subcontract.currency)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {l.certifiedQuantity}
+                    {formatQtyFromString(l.certifiedQuantity)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{l.remainingQty}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatQtyFromString(l.remainingQty)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

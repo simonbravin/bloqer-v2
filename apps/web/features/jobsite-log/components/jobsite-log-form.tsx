@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button }   from "@/components/ui/button";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +19,8 @@ import {
 } from "@/lib/searchable-options";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { WbsIncrementalProgressSnapshot } from "@bloqer/services";
-import { toIsoDateInTimeZone } from "@bloqer/utils";
+import { addDecimal, compareDecimal, DISPLAY_DECIMALS, multiplyDecimal, roundToDecimals, toIsoDateInTimeZone } from "@bloqer/utils";
+import { compareQty, formatQtyDisplay, formatRatePctFromString } from "@/lib/format-money";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import {
   JOBSITE_SHIFT_OPTIONS,
@@ -52,11 +54,6 @@ const DEFAULT_ISSUE: IssueLine        = { type: "INCIDENT", severity: "MEDIUM", 
 
 const QTY_RE = /^\d+(\.\d+)?$/;
 
-function parseNum(v: string): number {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
 function isValidProgressLine(p: ProgressLine): boolean {
   return p.wbsNodeId !== "__none__" && QTY_RE.test(p.quantityCompleted);
 }
@@ -73,15 +70,6 @@ function isMeaningfulLaborLine(l: LaborLine): boolean {
   );
 }
 
-function fmtHintQty(raw: string | undefined): string {
-  if (raw == null || raw === "") return "—";
-  const t = raw.trim();
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return t;
-  const [i, d = ""] = t.split(".");
-  const trimmed = d.replace(/0+$/, "");
-  return trimmed ? `${i}.${trimmed}` : i;
-}
-
 function remainingPctForWbs(
   wbsNodeId: string,
   snapshot: WbsIncrementalProgressSnapshot,
@@ -91,17 +79,21 @@ function remainingPctForWbs(
 ): string {
   if (wbsNodeId === "__none__") return "";
   const entry = snapshot[wbsNodeId];
-  const baseRem = entry?.remainingPct != null ? parseNum(entry.remainingPct) : 100;
-  let draftUsed = 0;
+  let rem = entry?.remainingPct != null ? entry.remainingPct : "100";
   if (draftProgress) {
     for (let i = 0; i < draftProgress.length; i++) {
       if (excludeIndex != null && i === excludeIndex) continue;
       const row = draftProgress[i]!;
       if (row.wbsNodeId !== wbsNodeId || !row.physicalPct) continue;
-      draftUsed += parseNum(row.physicalPct);
+      rem = addDecimal(rem, multiplyDecimal(row.physicalPct, "-1"));
     }
   }
-  return Math.max(0, baseRem - draftUsed).toFixed(2);
+  if (compareDecimal(rem, "0") < 0) rem = "0";
+  try {
+    return roundToDecimals(rem, DISPLAY_DECIMALS);
+  } catch {
+    return rem;
+  }
 }
 
 function approvedPctForWbs(
@@ -118,15 +110,12 @@ function cumulativePctLabel(
   snapshot: WbsIncrementalProgressSnapshot,
 ): string {
   if (wbsNodeId === "__none__") return "— / 100";
-  const approved = parseNum(approvedPctForWbs(wbsNodeId, snapshot));
-  let draftSum = 0;
+  let total = approvedPctForWbs(wbsNodeId, snapshot);
   for (const row of progress) {
     if (row.wbsNodeId !== wbsNodeId || !row.physicalPct) continue;
-    draftSum += parseNum(row.physicalPct);
+    total = addDecimal(total, row.physicalPct);
   }
-  const total = approved + draftSum;
-  const formatted = Number.isInteger(total) ? String(total) : total.toFixed(2);
-  return `${formatted} / 100`;
+  return `${formatRatePctFromString(total)} / 100`;
 }
 
 type Props = {
@@ -237,15 +226,15 @@ export function JobsiteLogForm({
 
   const stockExceeded = useMemo(() => {
     if (!inventoryModuleEnabled) return false;
-    const qtyByPair = new Map<string, number>();
+    const qtyByPair = new Map<string, string>();
     for (const m of materials) {
       if (m.productId === "__none__" || m.warehouseId === "__none__" || !QTY_RE.test(m.quantity)) continue;
       const key = `${m.productId}:${m.warehouseId}`;
-      qtyByPair.set(key, (qtyByPair.get(key) ?? 0) + parseNum(m.quantity));
+      qtyByPair.set(key, addDecimal(qtyByPair.get(key) ?? "0", m.quantity));
     }
     for (const [key, qty] of qtyByPair) {
       const balance = stockByKey[key];
-      if (balance !== undefined && qty > parseNum(balance)) return true;
+      if (balance !== undefined && compareQty(qty, balance) > 0) return true;
     }
     return false;
   }, [materials, stockByKey, inventoryModuleEnabled]);
@@ -553,16 +542,15 @@ export function JobsiteLogForm({
                     <Label className="text-xs">
                       Cantidad{wbs?.unit ? ` (${wbs.unit})` : ""}
                     </Label>
-                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.quantityCompleted} onChange={(e) => updateProgress(i, "quantityCompleted", e.target.value)} placeholder="0.00" />
+                    <DecimalInput className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.quantityCompleted} onValueChange={(v) => updateProgress(i, "quantityCompleted", v)} placeholder="0,00" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">% del día</Label>
-                    <Input
+                    <DecimalInput
                       className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"
                       value={row.physicalPct}
-                      onChange={(e) => updateProgress(i, "physicalPct", e.target.value)}
-                      placeholder="0"
-                      inputMode="decimal"
+                      onValueChange={(v) => updateProgress(i, "physicalPct", v)}
+                      placeholder="0,00"
                     />
                   </div>
                   <div className="space-y-1">
@@ -578,13 +566,13 @@ export function JobsiteLogForm({
                 </div>
                 {row.wbsNodeId !== "__none__" ? (
                   <p className="text-[11px] text-muted-foreground">
-                    Ya {fmtHintQty(approvedPct)}%
-                    {approvedQty != null ? ` · Qty aprobada ${fmtHintQty(approvedQty)}` : ""}
+                    Ya {formatRatePctFromString(approvedPct)}%
+                    {approvedQty != null ? ` · Qty aprobada ${formatQtyDisplay(approvedQty)}` : ""}
                     {wbs?.budgetQty
-                      ? ` / ppto ${fmtHintQty(wbs.budgetQty)}${wbs.unit ? ` ${wbs.unit}` : ""}`
+                      ? ` / ppto ${formatQtyDisplay(wbs.budgetQty)}${wbs.unit ? ` ${wbs.unit}` : ""}`
                       : ""}
                     {" · "}
-                    Restante sugerido {fmtHintQty(remPct)}% (editable)
+                    Restante sugerido {formatRatePctFromString(remPct)}% (editable)
                   </p>
                 ) : null}
                 <div className="flex justify-end">
@@ -648,7 +636,7 @@ export function JobsiteLogForm({
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Horas</Label>
-                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.hoursWorked} onChange={(e) => updateLabor(i, "hoursWorked", e.target.value)} placeholder="0.00" />
+                    <DecimalInput className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.hoursWorked} onValueChange={(v) => updateLabor(i, "hoursWorked", v)} placeholder="0,00" />
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -695,7 +683,7 @@ export function JobsiteLogForm({
                 ? `${row.productId}:${row.warehouseId}` : null;
               const exceedsStock = stockKey && stockByKey[stockKey] !== undefined
                 && QTY_RE.test(row.quantity)
-                && parseNum(row.quantity) > parseNum(stockByKey[stockKey]!);
+                && compareQty(row.quantity, stockByKey[stockKey]!) > 0;
 
               return (
                 <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset">
@@ -736,7 +724,7 @@ export function JobsiteLogForm({
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Cantidad</Label>
-                      <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.quantity} onChange={(e) => updateMaterial(i, "quantity", e.target.value)} placeholder="0.00" />
+                      <DecimalInput className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.quantity} onValueChange={(v) => updateMaterial(i, "quantity", v)} placeholder="0,00" />
                     </div>
                   </div>
                   <div className="space-y-1">

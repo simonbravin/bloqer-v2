@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -27,6 +28,7 @@ export function InternalTransferForm({ accounts }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [sourceAccountId, setSourceAccountId] = useState("");
   const [destinationAccountId, setDestinationAccountId] = useState("");
+  const [amount, setAmount] = useState("");
   const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -99,12 +101,13 @@ export function InternalTransferForm({ accounts }: Props) {
 
           <div className="space-y-1">
             <Label htmlFor="amount">Monto</Label>
-            <Input
+            <DecimalInput
               id="amount"
               name="amount"
+              value={amount}
+              onValueChange={setAmount}
               required
-              placeholder="0.00"
-              pattern="^\d+(\.\d+)?$"
+              placeholder="0,00"
             />
           </div>
 

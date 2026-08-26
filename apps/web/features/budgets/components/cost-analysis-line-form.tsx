@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DecimalInput, bindRhfNumberDecimal } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +30,7 @@ import { CATEGORY_LABELS, VISIBLE_COST_CATEGORIES } from "@/lib/budget-categorie
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { UnitSelect } from "./unit-select";
 import { ApuEntryModeToggle } from "./apu-entry-mode-toggle";
+import { formatQtyFromString } from "@/lib/format-money";
 
 type CreateMode = {
   mode: "create";
@@ -262,10 +264,7 @@ function EditLineForm({
 }
 
 function formatPreview(n: number) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  }).format(n);
+  return formatQtyFromString(String(n));
 }
 
 function LineFormFields({
@@ -356,20 +355,18 @@ function LineFormFields({
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1.5">
           <Label>{entryMode === "total" ? "Cant. recurso" : "Rendim."}</Label>
-          <Input
-            type="number"
-            step="0.0001"
-            min="0"
-            {...form.register("coefficient", { valueAsNumber: true })}
+          <DecimalInput
+            {...bindRhfNumberDecimal(form.watch("coefficient"), (n) =>
+              form.setValue("coefficient", n, { shouldValidate: true, shouldDirty: true }),
+            )}
           />
         </div>
         <div className="space-y-1.5">
           <Label>Precio</Label>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            {...form.register("unitCost", { valueAsNumber: true })}
+          <DecimalInput
+            {...bindRhfNumberDecimal(form.watch("unitCost"), (n) =>
+              form.setValue("unitCost", n, { shouldValidate: true, shouldDirty: true }),
+            )}
           />
         </div>
         <div className="space-y-1.5">

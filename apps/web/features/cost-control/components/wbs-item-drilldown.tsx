@@ -13,13 +13,17 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { budgetUnitLabel } from "@/lib/budget-units";
-import { formatMoneyAmount, formatQtyFromString } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString } from "@/lib/format-money";
 
 function fmt(v: string) {
   return formatMoneyAmount(v);
 }
 function fmtQty(v: string) {
   return formatQtyFromString(v);
+}
+function fmtPct(v: string | null | undefined): string {
+  if (v == null || v === "") return "—";
+  return `${formatRatePctFromString(v)} %`;
 }
 function fmtDate(d: Date) {
   return formatDate(d);
@@ -56,14 +60,14 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
           <ProgressCol
             title="Físico (libro)"
             rows={[
-              { label: "% acum.", value: `${ps.physicalPctAcum} %` },
+              { label: "% acum.", value: fmtPct(ps.physicalPctAcum) },
               {
                 label: "Qty acum.",
                 value: unit
                   ? `${fmtQty(ps.physicalQtyAcum)} ${budgetUnitLabel(unit) || unit}`
                   : fmtQty(ps.physicalQtyAcum),
               },
-              { label: "Restante", value: `${ps.physicalRemainingPct} %` },
+              { label: "Restante", value: fmtPct(ps.physicalRemainingPct) },
             ]}
           />
           <ProgressCol
@@ -78,7 +82,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
               { label: "Importe", value: fmt(ps.certifiedAmount) },
               {
                 label: "% venta",
-                value: ps.economicPctOfSale != null ? `${ps.economicPctOfSale} %` : "—",
+                value: fmtPct(ps.economicPctOfSale),
               },
               {
                 label: "Saldo qty",
@@ -93,18 +97,15 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
             rows={[
               {
                 label: "% comprometido",
-                value: ps.committedPctOfCost != null ? `${ps.committedPctOfCost} %` : "—",
+                value: fmtPct(ps.committedPctOfCost),
               },
               {
                 label: "% devengado",
-                value: ps.accruedPctOfCost != null ? `${ps.accruedPctOfCost} %` : "—",
+                value: fmtPct(ps.accruedPctOfCost),
               },
               {
                 label: "% exposición",
-                value:
-                  ps.expectedExposurePctOfCost != null
-                    ? `${ps.expectedExposurePctOfCost} %`
-                    : "—",
+                value: fmtPct(ps.expectedExposurePctOfCost),
               },
             ]}
           />
@@ -118,7 +119,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
         <Section title="Análisis de presupuesto">
           <div className="grid grid-cols-3 gap-4 text-sm">
             <Kv label="Unidad"     value={budgetUnitLabel(detail.budgetItem.unit) || detail.budgetItem.unit} />
-            <Kv label="Cantidad"   value={detail.budgetItem.quantity} />
+            <Kv label="Cantidad"   value={fmtQty(detail.budgetItem.quantity)} />
             <Kv label="PU costo"   value={fmt(detail.budgetItem.unitCostDirect)} />
             <Kv label="Total costo" value={fmt(detail.budgetItem.totalCostDirect)} />
             <Kv label="PU venta"   value={fmt(detail.budgetItem.unitSalePrice)} />
@@ -199,10 +200,10 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
               </Link>,
               pol.poStatus,
               pol.description,
-              pol.quantity,
+              fmtQty(pol.quantity),
               fmt(pol.unitPrice),
               fmt(pol.lineTotal),
-              pol.receivedQty,
+              fmtQty(pol.receivedQty),
             ])}
           />
         </Section>
@@ -222,10 +223,10 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
               </Link>,
               sl.subcontractStatus,
               sl.description,
-              sl.quantity,
+              fmtQty(sl.quantity),
               fmt(sl.unitPrice),
               fmt(sl.lineTotal),
-              sl.certifiedQuantity,
+              fmtQty(sl.certifiedQuantity),
             ])}
           />
         </Section>
@@ -245,7 +246,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
               </Link>,
               scl.certStatus,
               fmtDate(scl.certificationDate),
-              scl.currentQty,
+              fmtQty(scl.currentQty),
               fmt(scl.lineTotal),
             ])}
           />
@@ -316,7 +317,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
             headers={["Fecha", "Cantidad", "Costo unit.", "Costo total"]}
             rows={detail.stockMovements.map((sm) => [
               fmtDate(sm.movementDate),
-              sm.quantity,
+              fmtQty(sm.quantity),
               sm.unitCost ? fmt(sm.unitCost) : "—",
               sm.totalCost ? fmt(sm.totalCost) : "—",
             ])}
@@ -331,8 +332,8 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
             rows={detail.jobsiteProgress.map((jp) => [
               fmtDate(jp.logDate),
               jp.logStatus,
-              jp.quantityCompleted,
-              jp.physicalPct ?? "—",
+              fmtQty(jp.quantityCompleted),
+              jp.physicalPct != null ? `${formatRatePctFromString(jp.physicalPct)}%` : "—",
             ])}
           />
         </Section>

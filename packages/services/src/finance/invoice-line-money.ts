@@ -24,13 +24,23 @@ export function resolveInvoiceLineMoney(params: {
   lineTax: Prisma.Decimal;
   lineTotal: Prisma.Decimal;
 } {
-  const r = resolveDocumentLineAmounts({
-    quantity: serializeQtyDecimal(params.quantity),
-    unitPrice: serializeUnitPriceDecimal(params.unitPrice),
-    taxRatePercent: serializeRatePctDecimal(params.taxRate),
-    discountPct: params.discountPct != null ? serializeRatePctDecimal(params.discountPct) : "0",
-    pricesIncludeTax: params.pricesIncludeTax,
-  });
+  const r = (() => {
+    try {
+      return resolveDocumentLineAmounts({
+        quantity: serializeQtyDecimal(params.quantity),
+        unitPrice: serializeUnitPriceDecimal(params.unitPrice),
+        taxRatePercent: serializeRatePctDecimal(params.taxRate),
+        discountPct: params.discountPct != null ? serializeRatePctDecimal(params.discountPct) : "0",
+        pricesIncludeTax: params.pricesIncludeTax,
+      });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "";
+      if (code === "DISCOUNT_PCT_OUT_OF_RANGE") {
+        throw new ServiceError("VALIDATION", "El descuento debe estar entre 0 y 100");
+      }
+      throw new ServiceError("VALIDATION", "No se pudo calcular el importe de la línea");
+    }
+  })();
   return {
     unitPriceNet: new Prisma.Decimal(r.unitPriceNet),
     lineSubtotal: new Prisma.Decimal(r.lineSubtotal),

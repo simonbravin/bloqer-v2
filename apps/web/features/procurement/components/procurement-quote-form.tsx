@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import type { SupplierOption } from "./purchase-order-form";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
+import { formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
 import {
   createProcurementQuoteAction,
   selectQuoteAndCreatePoAction,
@@ -121,9 +122,9 @@ export function ProcurementQuoteForm({
           <div className="col-span-2">
             <p className="font-medium">{line.description}</p>
             <p className="text-muted-foreground">
-              {line.quantity} {line.unit}
+              {formatQtyFromString(line.quantity)} {line.unit}
               {line.budgetUnitCostSnapshot
-                ? ` · ref. presup. ${line.budgetUnitCostSnapshot}`
+                ? ` · ref. presup. ${formatUnitPriceFromString(line.budgetUnitCostSnapshot)}`
                 : ""}
             </p>
           </div>
@@ -153,7 +154,6 @@ export function ProcurementQuoteForm({
                 }))
               }
               placeholder="0"
-              scale={4}
             />
           </div>
         </div>

@@ -9,27 +9,19 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { budgetUnitLabel } from "@/lib/budget-units";
-import { formatDecimalArFromString, isPositiveQty } from "@/lib/format-money";
+import { formatDecimalArFromString, formatQtyDisplay, isPositiveQty } from "@/lib/format-money";
 import type { WbsApuOption, WbsOption } from "./purchase-order-lines-editor";
 import { createPurchaseRequestAction } from "@/app/(app)/proyectos/[id]/solicitudes-compra/actions";
-
-function fmtQtyHint(raw: string | null | undefined): string {
-  if (raw == null || raw === "") return "—";
-  const t = raw.trim();
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return t;
-  const [i, d = ""] = t.split(".");
-  const trimmed = d.replace(/0+$/, "");
-  return trimmed ? `${i}.${trimmed}` : i;
-}
 
 function apuCommitmentHint(apu: WbsApuOption): string {
   const u = budgetUnitLabel(apu.unit);
   if (apu.needQty != null || apu.orderedQty != null) {
-    return `Necesidad ${fmtQtyHint(apu.needQty)} · Pedido ${fmtQtyHint(apu.orderedQty)} · Faltante ${fmtQtyHint(apu.shortfallQty ?? apu.quantity)} ${u}`;
+    return `Necesidad ${formatQtyDisplay(apu.needQty)} · Pedido ${formatQtyDisplay(apu.orderedQty)} · Faltante ${formatQtyDisplay(apu.shortfallQty ?? apu.quantity)} ${u}`;
   }
-  return `Ref. APU: ${fmtQtyHint(apu.quantity)} ${u}`;
+  return `Ref. APU: ${formatQtyDisplay(apu.quantity)} ${u}`;
 }
 
 interface PurchaseRequestFormProps {
@@ -85,7 +77,7 @@ export function PurchaseRequestForm({
             id: a.id,
             label:
               a.shortfallQty != null || a.quantity != null
-                ? `${a.description} (faltante ${fmtQtyHint(a.shortfallQty ?? a.quantity)} ${budgetUnitLabel(a.unit)})`
+                ? `${a.description} (faltante ${formatQtyDisplay(a.shortfallQty ?? a.quantity)} ${budgetUnitLabel(a.unit)})`
                 : `${a.description} (${budgetUnitLabel(a.unit)})`,
           })),
         ),
@@ -111,7 +103,7 @@ export function PurchaseRequestForm({
     setUnit(apu.unit);
     setProductId(apu.productId);
     if (!opts?.keepQuantity && isPositiveQty(apu.quantity)) {
-      setQuantity(fmtQtyHint(apu.quantity));
+      setQuantity(apu.quantity ?? "");
     }
     setApuHint(apuCommitmentHint(apu));
   }
@@ -221,13 +213,13 @@ export function PurchaseRequestForm({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quantity">Cantidad</Label>
-              <Input
+              <DecimalInput
                 id="quantity"
                 name="quantity"
-                inputMode="decimal"
                 className="min-h-11 md:min-h-9"
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                onValueChange={setQuantity}
+                placeholder="1,00"
                 required
               />
             </div>

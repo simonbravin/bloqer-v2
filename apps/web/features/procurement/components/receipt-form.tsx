@@ -22,6 +22,7 @@ import {
 import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { createPurchaseReceiptAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 import type { PurchaseOrderLineView } from "@bloqer/services";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { formatQtyFromString, isPositiveQty, compareQty } from "@/lib/format-money";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 
@@ -62,12 +63,11 @@ function ReceiptQtyInput({
 }) {
   const inputId = `receipt-qty-${line.purchaseOrderLineId}`;
   return (
-    <Input
+    <DecimalInput
       id={inputId}
       value={line.quantityReceived}
-      onChange={(e) => onChange(index, e.target.value)}
-      placeholder="0"
-      inputMode="decimal"
+      onValueChange={(v) => onChange(index, v)}
+      placeholder="0,00"
       className="h-11 min-h-11 text-base tabular-nums md:h-8 md:min-h-8 md:text-sm"
       aria-label={`Cantidad recibida de ${line.description}`}
     />

@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { DecimalInput, bindRhfNumberDecimal } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -199,22 +200,18 @@ export function BudgetForm({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>Gastos generales (%)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              {...form.register("overheadPct", { valueAsNumber: true })}
+            <DecimalInput
+              {...bindRhfNumberDecimal(form.watch("overheadPct"), (n) =>
+                form.setValue("overheadPct", n, { shouldValidate: true, shouldDirty: true }),
+              )}
             />
           </div>
           <div className="space-y-1.5">
             <Label>Costo financiero — tasa anual (%)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              {...form.register("financialCostPct", { valueAsNumber: true })}
+            <DecimalInput
+              {...bindRhfNumberDecimal(form.watch("financialCostPct"), (n) =>
+                form.setValue("financialCostPct", n, { shouldValidate: true, shouldDirty: true }),
+              )}
             />
           </div>
           <div className="space-y-1.5">
@@ -231,22 +228,18 @@ export function BudgetForm({
           </div>
           <div className="space-y-1.5">
             <Label>Utilidad (%)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              {...form.register("profitPct", { valueAsNumber: true })}
+            <DecimalInput
+              {...bindRhfNumberDecimal(form.watch("profitPct"), (n) =>
+                form.setValue("profitPct", n, { shouldValidate: true, shouldDirty: true }),
+              )}
             />
           </div>
           <div className="space-y-1.5">
             <Label>IVA / Impuesto (%)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              {...form.register("taxPct", { valueAsNumber: true })}
+            <DecimalInput
+              {...bindRhfNumberDecimal(form.watch("taxPct"), (n) =>
+                form.setValue("taxPct", n, { shouldValidate: true, shouldDirty: true }),
+              )}
             />
           </div>
         </div>

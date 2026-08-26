@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
@@ -32,6 +33,8 @@ export function BankReconciliationForm({ accounts }: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [accountId, setAccountId] = useState("");
+  const [openingBalance, setOpeningBalance] = useState("");
+  const [closingBalance, setClosingBalance] = useState("");
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -106,21 +109,23 @@ export function BankReconciliationForm({ accounts }: Props) {
         </div>
         <div className="space-y-1">
           <Label htmlFor="openingBalance">Saldo inicial (extracto)</Label>
-          <Input
+          <DecimalInput
             id="openingBalance"
             name="openingBalance"
-            inputMode="decimal"
-            placeholder="0.00"
+            value={openingBalance}
+            onValueChange={setOpeningBalance}
+            placeholder="0,00"
             required
           />
         </div>
         <div className="space-y-1">
           <Label htmlFor="closingBalance">Saldo final (extracto)</Label>
-          <Input
+          <DecimalInput
             id="closingBalance"
             name="closingBalance"
-            inputMode="decimal"
-            placeholder="0.00"
+            value={closingBalance}
+            onValueChange={setClosingBalance}
+            placeholder="0,00"
             required
           />
         </div>

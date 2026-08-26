@@ -7,10 +7,11 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DecimalInput, bindRhfNumberDecimal } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateBudgetSettingsSchema, type UpdateBudgetSettingsInput } from "@bloqer/validators";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatRatePctFromString } from "@/lib/format-money";
 import { computeBudgetSaleBreakdown } from "../lib/budget-sale-calc";
 import type { SettingsDefaults } from "./budget-settings-form";
 
@@ -110,25 +111,21 @@ export function BudgetMarginConfigSection({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Gastos generales %</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
+              <DecimalInput
                 disabled={!editable}
-                {...form.register("overheadPct", { valueAsNumber: true })}
+                {...bindRhfNumberDecimal(form.watch("overheadPct"), (n) =>
+                  form.setValue("overheadPct", n, { shouldValidate: true, shouldDirty: true }),
+                )}
               />
               <p className="text-xs font-mono text-muted-foreground">{fmt(breakdown.overhead, currency)}</p>
             </div>
             <div className="space-y-1.5">
               <Label>Gastos financieros — tasa anual %</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
+              <DecimalInput
                 disabled={!editable}
-                {...form.register("financialCostPct", { valueAsNumber: true })}
+                {...bindRhfNumberDecimal(form.watch("financialCostPct"), (n) =>
+                  form.setValue("financialCostPct", n, { shouldValidate: true, shouldDirty: true }),
+                )}
               />
               <p className="text-xs font-mono text-muted-foreground">{fmt(breakdown.financialCost, currency)}</p>
             </div>
@@ -143,31 +140,27 @@ export function BudgetMarginConfigSection({
               />
               <p className="text-xs text-muted-foreground">
                 {financialDaysAvg > 0
-                  ? `Efectivo ≈ ${breakdown.financialEffectivePct.toFixed(2)}% del subtotal 1`
+                  ? `Efectivo ≈ ${formatRatePctFromString(String(breakdown.financialEffectivePct))}% del subtotal 1`
                   : "0 = % plano (sin prorrateo anual)"}
               </p>
             </div>
             <div className="space-y-1.5">
               <Label>Utilidad %</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
+              <DecimalInput
                 disabled={!editable}
-                {...form.register("profitPct", { valueAsNumber: true })}
+                {...bindRhfNumberDecimal(form.watch("profitPct"), (n) =>
+                  form.setValue("profitPct", n, { shouldValidate: true, shouldDirty: true }),
+                )}
               />
               <p className="text-xs font-mono text-muted-foreground">{fmt(breakdown.profit, currency)}</p>
             </div>
             <div className="space-y-1.5">
               <Label>IVA %</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
+              <DecimalInput
                 disabled={!editable}
-                {...form.register("taxPct", { valueAsNumber: true })}
+                {...bindRhfNumberDecimal(form.watch("taxPct"), (n) =>
+                  form.setValue("taxPct", n, { shouldValidate: true, shouldDirty: true }),
+                )}
               />
               <p className="text-xs font-mono text-muted-foreground">{fmt(breakdown.tax, currency)}</p>
             </div>
@@ -190,7 +183,7 @@ export function BudgetMarginConfigSection({
               <dd className="font-mono tabular-nums">{fmt(breakdown.directCost, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">+ GG ({overheadPct}%)</dt>
+              <dt className="text-muted-foreground">+ GG ({formatRatePctFromString(String(overheadPct))}%)</dt>
               <dd className="font-mono tabular-nums">{fmt(breakdown.overhead, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2 font-medium">
@@ -201,8 +194,8 @@ export function BudgetMarginConfigSection({
               <dt className="text-muted-foreground">
                 + GF (
                 {financialDaysAvg > 0
-                  ? `${financialCostPct}% × ${financialDaysAvg}/365 ≈ ${breakdown.financialEffectivePct.toFixed(2)}%`
-                  : `${financialCostPct}%`}
+                  ? `${formatRatePctFromString(String(financialCostPct))}% × ${financialDaysAvg}/365 ≈ ${formatRatePctFromString(String(breakdown.financialEffectivePct))}%`
+                  : `${formatRatePctFromString(String(financialCostPct))}%`}
                 )
               </dt>
               <dd className="font-mono tabular-nums">{fmt(breakdown.financialCost, currency)}</dd>
@@ -212,11 +205,11 @@ export function BudgetMarginConfigSection({
               <dd className="font-mono tabular-nums">{fmt(breakdown.subtotal2, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">+ Utilidad ({profitPct}%)</dt>
+              <dt className="text-muted-foreground">+ Utilidad ({formatRatePctFromString(String(profitPct))}%)</dt>
               <dd className="font-mono tabular-nums">{fmt(breakdown.profit, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">+ IVA ({taxPct}%)</dt>
+              <dt className="text-muted-foreground">+ IVA ({formatRatePctFromString(String(taxPct))}%)</dt>
               <dd className="font-mono tabular-nums">{fmt(breakdown.tax, currency)}</dd>
             </div>
             <div className="flex justify-between gap-2 border-t pt-2 text-base font-bold">

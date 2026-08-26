@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,6 +29,7 @@ export function ManualTreasuryAdjustmentForm({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [amount, setAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [direction, setDirection] = useState<"INFLOW" | "OUTFLOW">("INFLOW");
   const { idempotencyKey } = useIdempotencyKey();
@@ -90,12 +92,12 @@ export function ManualTreasuryAdjustmentForm({
 
           <div className="space-y-1">
             <Label htmlFor="amount">Monto ({currency})</Label>
-            <Input
+            <DecimalInput
               id="amount"
               name="amount"
-              type="text"
-              inputMode="decimal"
-              placeholder="0.00"
+              value={amount}
+              onValueChange={setAmount}
+              placeholder="0,00"
               required
             />
           </div>

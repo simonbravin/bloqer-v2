@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { RoleBadge } from "./role-badge";
 import type { ContactRoleType } from "@bloqer/database";
@@ -373,11 +374,9 @@ export function RoleManager({
             {selectedRole === "CLIENT" && (
               <div className="space-y-1.5">
                 <Label>Límite de crédito (opcional)</Label>
-                <Input
-                  type="number"
-                  min={0}
+                <DecimalInput
                   value={creditLimit}
-                  onChange={(e) => setCreditLimit(e.target.value)}
+                  onValueChange={setCreditLimit}
                   placeholder="Sin límite"
                 />
               </div>
@@ -454,11 +453,9 @@ export function RoleManager({
             {editTarget === "CLIENT" && (
               <div className="space-y-1.5">
                 <Label>Límite de crédito (vacío = sin límite)</Label>
-                <Input
-                  type="number"
-                  min={0}
+                <DecimalInput
                   value={editCreditLimit}
-                  onChange={(e) => setEditCreditLimit(e.target.value)}
+                  onValueChange={setEditCreditLimit}
                   placeholder="Sin límite"
                 />
               </div>

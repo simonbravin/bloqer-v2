@@ -1,5 +1,5 @@
 import { formatDate } from "@/lib/format";
-import { formatMoneyAmount, formatRatePctFromString } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, formatUnitPriceFromString } from "@/lib/format-money";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
@@ -139,8 +139,8 @@ export default async function FinanzasFacturaProveedorDetailPage({
               {invoice.lines.map((line) => (
                 <TableRow key={line.id}>
                   <TableCell>{line.description}</TableCell>
-                  <TableCell className="text-right tabular-nums">{line.quantity}</TableCell>
-                  <TableCell className="text-right tabular-nums">{line.unitPrice}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatQtyFromString(line.quantity)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatUnitPriceFromString(line.unitPrice)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatRatePctFromString(line.discountPct)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatRatePctFromString(line.taxRate)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatMoneyAmount(line.lineTotal)}</TableCell>

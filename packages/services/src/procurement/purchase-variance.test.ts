@@ -38,6 +38,16 @@ test("evaluateLineVariance requires a note between soft and extra thresholds", (
   assert.equal(r.requiresExtraApproval, false);
 });
 
+test("evaluateLineVariance savings vs baseline stay NONE (no justification)", () => {
+  const r = evaluateLineVariance(
+    { unit: "gl", unitPrice: "1200000", budgetUnitCost: "28000000", budgetUnit: "gl" },
+    settings,
+  );
+  assert.equal(r.varianceTier, "NONE");
+  assert.equal(r.requiresJustification, false);
+  assert.equal(r.requiresExtraApproval, false);
+});
+
 test("evaluateLineVariance requires a note when no budget baseline exists", () => {
   const r = evaluateLineVariance(
     { unit: "m2", unitPrice: "115", budgetUnitCost: null, budgetUnit: "m2" },

@@ -1,6 +1,11 @@
 import { Suspense } from "react";
 import { formatDate } from "@/lib/format";
-import { formatMoneyAmount, formatRatePctFromString } from "@/lib/format-money";
+import {
+  formatMoneyAmount,
+  formatQtyFromString,
+  formatRatePctFromString,
+  formatUnitPriceFromString,
+} from "@/lib/format-money";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import Link from "next/link";
@@ -42,6 +47,7 @@ import {
   listSupplierInvoicesByPurchaseOrder,
   ServiceError,
 } from "@bloqer/services";
+import { purchaseVarianceTierLabel } from "@/features/procurement/lib/variance-tier-labels";
 import { Badge } from "@/components/ui/badge";
 import { PageShell } from "@/components/layout/page-shell";
 import {
@@ -112,7 +118,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     status: r.status,
     receivedByName: r.receivedByName,
     lineCount: r.lines.length,
-    quantitySummary: r.lines.map((l) => `${l.quantityReceived}`).join(" · "),
+    quantitySummary: r.lines.map((l) => formatQtyFromString(l.quantityReceived)).join(" · "),
   }));
 
   const invoiceItems: SupplierInvoiceListItem[] = linkedInvoices.map((inv) => ({
@@ -200,22 +206,28 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                     {line.wbsNodeCode ? `${line.wbsNodeCode} — ${line.wbsNodeName}` : "—"}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{line.unit || "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{line.quantity}</TableCell>
-                  <TableCell className="text-right tabular-nums">{line.receivedQuantity}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatQtyFromString(line.quantity)}</TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {line.remainingQuantity}
+                    {formatQtyFromString(line.receivedQuantity)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{line.unitPrice}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatQtyFromString(line.remainingQuantity)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatUnitPriceFromString(line.unitPrice)}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">{formatRatePctFromString(line.discountPct)}</TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {line.budgetUnitCostSnapshot ?? "—"}
+                    {line.budgetUnitCostSnapshot
+                      ? formatUnitPriceFromString(line.budgetUnitCostSnapshot)
+                      : "—"}
                   </TableCell>
                   {showVarianceCols && (
                     <TableCell className="text-xs">
                       {line.varianceTier !== "NONE" ? (
                         <Badge variant="outline" className="font-normal">
-                          {line.varianceTier}
-                          {line.variancePct ? ` (${line.variancePct}%)` : ""}
+                          {purchaseVarianceTierLabel(line.varianceTier)}
+                          {line.variancePct ? ` (${formatRatePctFromString(line.variancePct)}%)` : ""}
                         </Badge>
                       ) : (
                         "—"

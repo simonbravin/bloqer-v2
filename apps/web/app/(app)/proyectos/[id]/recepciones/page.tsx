@@ -10,6 +10,7 @@ import type { PurchaseReceiptListItem } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectShellInfo, listReceiptsByProject, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+import { formatQtyFromString } from "@/lib/format-money";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -52,7 +53,7 @@ export default async function RecepcionesPage({ params }: PageProps) {
     status: r.status,
     receivedByName: r.receivedByName,
     lineCount: r.lines.length,
-    quantitySummary: r.lines.map((l) => `${l.quantityReceived}`).join(" · "),
+    quantitySummary: r.lines.map((l) => formatQtyFromString(l.quantityReceived)).join(" · "),
   }));
 
   return (

@@ -192,7 +192,7 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Origen:** [D-044](../00-product/DECISION_LOG.md), [D-050](../00-product/DECISION_LOG.md).
 
 ### BR-PUR-009 — Tiers de varianza presupuestaria en OC
-- **Regla:** al enviar una OC, cada línea calcula `varianceTier`: `NONE` (&lt; soft %), `NOTE_REQUIRED` (soft–extra %), `EXTRA_APPROVAL` (≥ extra %), `UNIT_MISMATCH` (unidad distinta al WBS), `NO_BUDGET_BASELINE` (sin costo APU). `NOTE_REQUIRED` y superiores exigen `varianceJustification`; `EXTRA_APPROVAL` exige aprobador de alto nivel. **OC directa y OC desde solicitud** usan el mismo cálculo; la OC directa debe capturar `budgetUnitCostSnapshot` al crear/enviar si el WBS tiene baseline.
+- **Regla:** al enviar una OC, cada línea calcula `varianceTier` sobre el **sobrecosto** (`PUefectivo` vs referencial): `NONE` (ahorro o &lt; soft %), `NOTE_REQUIRED` (soft–extra % de sobrecosto), `EXTRA_APPROVAL` (≥ extra %), `UNIT_MISMATCH` (unidad distinta al WBS), `NO_BUDGET_BASELINE` (sin costo APU de materiales **y** sin `unitCostDirect` de la partida). `NOTE_REQUIRED` y superiores exigen `varianceJustification`; `EXTRA_APPROVAL` exige aprobador de alto nivel. **OC directa y OC desde solicitud** usan el mismo cálculo; la OC directa debe capturar `budgetUnitCostSnapshot` al crear/enviar si el WBS tiene baseline. El referencial es el insumo MATERIAL del APU; si la partida no tiene materiales comprables, se usa el costo dir. /u del ítem.
 - **Origen:** [D-044](../00-product/DECISION_LOG.md), [D-050](../00-product/DECISION_LOG.md).
 
 ### BR-PUR-010 — Cotizaciones mínimas antes de seleccionar

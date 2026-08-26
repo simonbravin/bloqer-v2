@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { toSearchableOptions } from "@/lib/searchable-options";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { formatQtyFromString } from "@/lib/format-money";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 
@@ -45,6 +46,8 @@ export function WarehouseTransferForm({
   const [productId, setProductId] = useState(selectedProductId ?? "");
   const [sourceWarehouseId, setSourceWarehouseId] = useState(selectedSourceId ?? "");
   const [destinationWarehouseId, setDestinationWarehouseId] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [unitCost, setUnitCost] = useState("");
   const { idempotencyKey } = useIdempotencyKey();
 
   const productOptions = useMemo(
@@ -154,24 +157,22 @@ export function WarehouseTransferForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="quantity">Cantidad</Label>
-          <Input
+          <DecimalInput
             id="quantity"
             name="quantity"
-            type="number"
-            min="0.0001"
-            step="any"
-            placeholder="0"
+            value={quantity}
+            onValueChange={setQuantity}
+            placeholder="0,00"
             required
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="unitCost">Costo unitario (opcional)</Label>
-          <Input
+          <DecimalInput
             id="unitCost"
             name="unitCost"
-            type="number"
-            min="0"
-            step="any"
+            value={unitCost}
+            onValueChange={setUnitCost}
             placeholder="—"
           />
         </div>

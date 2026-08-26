@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ProjectProfitabilityReport } from "@bloqer/services";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
-import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatRatePctWithSymbol, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const LAYER_LABELS: Record<ProjectProfitabilityReport["costLayer"], string> = {
@@ -60,7 +60,7 @@ export function ProfitabilitySummary({ report }: Props) {
         <KpiStatCard
           compact
           label="MB %"
-          value={report.grossMarginPct != null ? `${report.grossMarginPct}%` : "—"}
+          value={formatRatePctWithSymbol(report.grossMarginPct)}
           tone={gmTone}
         />
       </KpiStatGrid>
@@ -92,7 +92,7 @@ export function ProfitabilitySummary({ report }: Props) {
                 <span className="font-mono font-medium">{slice.currency}</span>
                 <span>
                   MB {formatMoneyAmount(slice.grossMargin, slice.currency)}
-                  {slice.grossMarginPct != null ? ` (${slice.grossMarginPct}%)` : ""}
+                  {slice.grossMarginPct != null ? ` (${formatRatePctWithSymbol(slice.grossMarginPct)})` : ""}
                 </span>
               </div>
             ))}
@@ -130,8 +130,8 @@ export function ProfitabilitySummary({ report }: Props) {
                 <p className="text-muted-foreground">
                   ·{" "}
                   {isAutoWeight
-                    ? `Prorrateo por peso del CD${report.overheadCompanyPct ? ` (peso ${report.overheadCompanyPct}%)` : ""}`
-                    : `${report.overheadCompanyPct ?? "0"}% empresa sobre CD devengado`}
+                    ? `Prorrateo por peso del CD${report.overheadCompanyPct ? ` (peso ${formatRatePctWithSymbol(report.overheadCompanyPct)})` : ""}`
+                    : `${formatRatePctWithSymbol(report.overheadCompanyPct ?? "0")} empresa sobre CD devengado`}
                   :{" "}
                   {formatMoneyAmount(report.overheadCalculatedAmount, ggCurrency)}
                 </p>

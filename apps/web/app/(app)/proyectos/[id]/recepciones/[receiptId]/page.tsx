@@ -25,6 +25,7 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+import { formatQtyFromString } from "@/lib/format-money";
 import {
   confirmPurchaseReceiptAction,
   cancelPurchaseReceiptAction,
@@ -122,7 +123,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
             <div key={line.id} className="rounded-lg border p-4">
               <p className="font-medium">{line.lineDescription}</p>
               <p className="mt-1 text-sm tabular-nums text-muted-foreground">
-                Recibido {line.quantityReceived}
+                Recibido {formatQtyFromString(line.quantityReceived)}
               </p>
               {line.notes ? <p className="mt-1 text-sm">{line.notes}</p> : null}
             </div>
@@ -143,7 +144,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
               {receipt.lines.map((line) => (
                 <TableRow key={line.id}>
                   <TableCell>{line.lineDescription}</TableCell>
-                  <TableCell className="text-right tabular-nums">{line.quantityReceived}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatQtyFromString(line.quantityReceived)}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {line.notes ?? "—"}
                   </TableCell>

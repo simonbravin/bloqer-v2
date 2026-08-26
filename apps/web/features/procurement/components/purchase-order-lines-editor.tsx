@@ -7,11 +7,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, productsToSearchableOptions, toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { budgetUnitLabel } from "@/lib/budget-units";
-import { formatDecimalArFromString, formatQtyFromString, isPositiveMoneyAmount } from "@/lib/format-money";
+import { formatDecimalArFromString, formatQtyDisplay, isPositiveMoneyAmount, isPositiveQty } from "@/lib/format-money";
+import { IVA_RATE_PRESETS, IVA_RATE_LABEL_ES, normalizeIvaRatePreset } from "@bloqer/domain";
 
 export type PurchaseOrderLine = {
   wbsNodeId: string | null;
@@ -51,20 +59,6 @@ export type WbsOption = {
   apuLines?: WbsApuOption[];
 };
 export type ProductOption = { id: string; sku: string; name: string; unit: string };
-
-function fmtQtyHint(raw: string | null | undefined): string {
-  if (raw == null || raw === "") return "—";
-  return formatQtyFromString(raw);
-}
-
-/** True when qty string is a finite number > 0 (avoid prefill 0). */
-function isPositiveQty(raw: string | null | undefined): boolean {
-  if (raw == null || raw === "") return false;
-  const t = raw.trim();
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return false;
-  const n = Number(t);
-  return Number.isFinite(n) && n > 0;
-}
 
 function linePreview(l: PurchaseOrderLine) {
   try {
@@ -160,8 +154,8 @@ export function PurchaseOrderLinesEditor({
       update(i, "costAnalysisLineId", apuId);
       return;
     }
-    const prefillQty = isPositiveQty(apu.quantity)
-      ? fmtQtyHint(apu.quantity)
+    const prefillQty = isPositiveQty(apu.quantity) && apu.quantity
+      ? apu.quantity
       : line.quantity;
     const next: PurchaseOrderLine = {
       ...line,
@@ -175,8 +169,8 @@ export function PurchaseOrderLinesEditor({
     onChange(lines.map((l, idx) => (idx === i ? next : l)));
     const hint =
       apu.needQty != null || apu.orderedQty != null
-        ? `Necesidad ${fmtQtyHint(apu.needQty)} · Pedido ${fmtQtyHint(apu.orderedQty)} · Faltante ${fmtQtyHint(apu.shortfallQty ?? apu.quantity)}`
-        : `faltante ${fmtQtyHint(apu.quantity)}`;
+        ? `Necesidad ${formatQtyDisplay(apu.needQty)} · Pedido ${formatQtyDisplay(apu.orderedQty)} · Faltante ${formatQtyDisplay(apu.shortfallQty ?? apu.quantity)}`
+        : `faltante ${formatQtyDisplay(apu.quantity)}`;
     toast.success(`Insumo APU aplicado (${hint}). Podés ajustar cantidad y unidad.`);
   }
 
@@ -261,22 +255,26 @@ export function PurchaseOrderLinesEditor({
           <Label htmlFor="po-header-discount" className="text-xs text-muted-foreground whitespace-nowrap">
             Descuento general %
           </Label>
-          <DecimalInput
-            id="po-header-discount"
-            value={headerDiscount}
-            onValueChange={setHeaderDiscount}
-            placeholder="0"
-            className="h-8 w-20 text-sm"
-            scale={4}
-          />
+                  <DecimalInput
+                    id="po-header-discount"
+                    value={headerDiscount}
+                    onValueChange={setHeaderDiscount}
+                    placeholder="0"
+                    className="h-8 w-20 text-sm"
+                  />
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => {
+              if (headerDiscount.trim() === "") {
+                toast.error("Ingresá un descuento entre 0 y 100");
+                return;
+              }
               try {
                 const pct = normalizeDiscountPct(headerDiscount);
                 onChange(lines.map((l) => ({ ...l, discountPct: pct })));
+                toast.success("Descuento copiado a todas las líneas");
               } catch {
                 toast.error("El descuento debe estar entre 0 y 100");
               }
@@ -367,7 +365,7 @@ export function PurchaseOrderLinesEditor({
                           id: a.id,
                           label:
                             a.shortfallQty != null || a.quantity != null
-                              ? `${a.description} (faltante ${fmtQtyHint(a.shortfallQty ?? a.quantity)} ${budgetUnitLabel(a.unit)})`
+                              ? `${a.description} (faltante ${formatQtyDisplay(a.shortfallQty ?? a.quantity)} ${budgetUnitLabel(a.unit)})`
                               : `${a.description} (${budgetUnitLabel(a.unit)})`,
                         })),
                       ),
@@ -384,8 +382,8 @@ export function PurchaseOrderLinesEditor({
                   {selectedApu ? (
                     <p className="text-[10px] text-muted-foreground">
                       {selectedApu.needQty != null || selectedApu.orderedQty != null
-                        ? `Necesidad ${fmtQtyHint(selectedApu.needQty)} · Pedido ${fmtQtyHint(selectedApu.orderedQty)} · Faltante ${fmtQtyHint(selectedApu.shortfallQty ?? selectedApu.quantity)} ${budgetUnitLabel(selectedApu.unit)}`
-                        : `Ref. APU: ${fmtQtyHint(selectedApu.quantity)} ${budgetUnitLabel(selectedApu.unit)}`}
+                        ? `Necesidad ${formatQtyDisplay(selectedApu.needQty)} · Pedido ${formatQtyDisplay(selectedApu.orderedQty)} · Faltante ${formatQtyDisplay(selectedApu.shortfallQty ?? selectedApu.quantity)} ${budgetUnitLabel(selectedApu.unit)}`
+                        : `Ref. APU: ${formatQtyDisplay(selectedApu.quantity)} ${budgetUnitLabel(selectedApu.unit)}`}
                       {selectedApu.unitCost
                         ? ` · ${formatDecimalArFromString(selectedApu.unitCost)}/u`
                         : ""}
@@ -467,7 +465,6 @@ export function PurchaseOrderLinesEditor({
                     onValueChange={(v) => update(i, "discountPct", v)}
                     placeholder="0"
                     className="h-9 text-sm"
-                    scale={4}
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
@@ -490,13 +487,21 @@ export function PurchaseOrderLinesEditor({
                 </div>
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">IVA %</Label>
-                  <Input
-                    value={line.taxRate}
-                    onChange={(e) => update(i, "taxRate", e.target.value)}
-                    placeholder="21"
-                    inputMode="decimal"
-                    className="h-9 text-sm tabular-nums"
-                  />
+                  <Select
+                    value={normalizeIvaRatePreset(line.taxRate) ?? undefined}
+                    onValueChange={(v) => update(i, "taxRate", v)}
+                  >
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder={line.taxRate || "21"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {IVA_RATE_PRESETS.map((rate) => (
+                        <SelectItem key={rate} value={rate}>
+                          {IVA_RATE_LABEL_ES[rate]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Total</Label>

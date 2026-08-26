@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +23,7 @@ export function TreasuryAccountForm(_props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [type, setType] = useState<string>("");
   const [currency, setCurrency] = useState("ARS");
+  const [openingBalance, setOpeningBalance] = useState("0");
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -96,12 +98,12 @@ export function TreasuryAccountForm(_props: Props) {
 
           <div className="space-y-1">
             <Label htmlFor="openingBalance">Saldo inicial</Label>
-            <Input
+            <DecimalInput
               id="openingBalance"
               name="openingBalance"
-              defaultValue="0"
-              placeholder="0.00"
-              pattern="^\d+(\.\d+)?$"
+              value={openingBalance}
+              onValueChange={setOpeningBalance}
+              placeholder="0,00"
             />
             <p className="text-xs text-muted-foreground">
               Si el saldo inicial es mayor a 0, necesitás una empresa en el contexto de tu membresía

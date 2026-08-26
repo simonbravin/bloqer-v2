@@ -17,13 +17,13 @@ import {
 import type { SupplierOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, formatUnitPriceFromString, isZeroRatePct } from "@/lib/format-money";
 import {
   canEditPurchaseRequests,
   canManageProcurementQuotes,
   getActivePurchaseOrderForRequest,
   getPurchaseRequestById,
-  listProcurementQuotesForRequest,
+  listProcurementQuotesDetailedForRequest,
   listAllContacts,
   ServiceError,
 } from "@bloqer/services";
@@ -75,7 +75,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
   let linkedPo;
   try {
     [quotes, linkedPo] = await Promise.all([
-      listProcurementQuotesForRequest(prId, ctx),
+      listProcurementQuotesDetailedForRequest(prId, ctx),
       getActivePurchaseOrderForRequest(prId, ctx),
     ]);
   } catch (err) {
@@ -181,6 +181,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
           totalAmount: q.totalAmount,
           currency: q.currency,
           leadTimeDays: q.leadTimeDays,
+          lines: q.lines,
         }))}
         documents={
           <EntityDocumentsPanel
@@ -221,10 +222,12 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
               {pr.lines.map((line) => (
                 <TableRow key={line.id}>
                   <TableCell>{line.description}</TableCell>
-                  <TableCell className="text-right tabular-nums">{line.quantity}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatQtyFromString(line.quantity)}</TableCell>
                   <TableCell className="text-right">{line.unit}</TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {line.budgetUnitCostSnapshot ?? "—"}
+                    {line.budgetUnitCostSnapshot
+                      ? formatUnitPriceFromString(line.budgetUnitCostSnapshot)
+                      : "—"}
                   </TableCell>
                 </TableRow>
               ))}
@@ -258,7 +261,21 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
                 ) : (
                   quotes.map((q) => (
                     <TableRow key={q.id}>
-                      <TableCell>{q.supplierName}</TableCell>
+                      <TableCell>
+                        <p>{q.supplierName}</p>
+                        {q.lines.length > 0 ? (
+                          <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                            {q.lines.map((l, i) => (
+                              <li key={`${q.id}-${i}`}>
+                                {l.description}: {formatUnitPriceFromString(l.unitPrice)}
+                                {!isZeroRatePct(l.discountPct)
+                                  ? ` · desc. ${formatRatePctFromString(l.discountPct)}%`
+                                  : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </TableCell>
                       <TableCell>
                         <ProcurementQuoteStatusBadge status={q.status} />
                       </TableCell>

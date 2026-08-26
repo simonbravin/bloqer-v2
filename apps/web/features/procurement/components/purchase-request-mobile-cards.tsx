@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { PurchaseRequestStatusBadge } from "./purchase-request-status-badge";
 import type { PurchaseRequestView } from "@bloqer/services";
 import type { ReactNode } from "react";
+import { formatQtyFromString } from "@/lib/format-money";
 
 function primaryLine(pr: PurchaseRequestView) {
   return pr.lines[0] ?? null;
@@ -56,7 +57,7 @@ export function PurchaseRequestMobileCards({
             ) : null}
             {line && pr.lines.length === 1 ? (
               <p className="mt-1 text-sm tabular-nums text-muted-foreground">
-                {line.quantity} {line.unit}
+                {formatQtyFromString(line.quantity)} {line.unit}
               </p>
             ) : pr.lines.length > 1 ? (
               <p className="mt-1 text-sm text-muted-foreground">{pr.lines.length} líneas</p>

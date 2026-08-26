@@ -168,16 +168,20 @@ export function InvoiceLinesEditor({
             onValueChange={setHeaderDiscount}
             placeholder="0"
             className="h-8 w-20 text-sm"
-            scale={4}
           />
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => {
+              if (headerDiscount.trim() === "") {
+                toast.error("Ingresá un descuento entre 0 y 100");
+                return;
+              }
               try {
                 const pct = normalizeDiscountPct(headerDiscount);
                 onChange(lines.map((l) => ({ ...l, discountPct: pct })));
+                toast.success("Descuento copiado a todas las líneas");
               } catch {
                 toast.error("El descuento debe estar entre 0 y 100");
               }
@@ -297,7 +301,6 @@ export function InvoiceLinesEditor({
                     onValueChange={(v) => update(i, "discountPct", v)}
                     placeholder="0"
                     className="h-9 text-sm"
-                    scale={4}
                   />
                 </div>
                 <div className="space-y-1 min-w-0">

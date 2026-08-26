@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -109,13 +109,10 @@ export function CostItemPanel({
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Cantidad</Label>
-                <Input
+                <DecimalInput
                   className="h-8 text-sm font-mono"
-                  type="number"
-                  step="0.0001"
-                  min="0"
                   value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
+                  onValueChange={setQuantity}
                 />
               </div>
             </div>
