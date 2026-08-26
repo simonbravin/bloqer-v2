@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createPaymentSchema, qtyString, unitPriceString } from "@bloqer/validators";
+import {
+  createPaymentSchema,
+  positiveQtyString,
+  qtyString,
+  unitPriceString,
+} from "@bloqer/validators";
 
 describe("money validators non-negative (BUG-040/049)", () => {
   it("rejects negative qty", () => {
@@ -16,6 +21,14 @@ describe("money validators non-negative (BUG-040/049)", () => {
   it("accepts zero qty", () => {
     const r = qtyString.safeParse("0");
     assert.equal(r.success, true);
+  });
+
+  it("positiveQtyString rejects zero and dust that rounds to zero", () => {
+    assert.equal(positiveQtyString.safeParse("0").success, false);
+    assert.equal(positiveQtyString.safeParse("0.00004").success, false);
+    const ok = positiveQtyString.safeParse("1");
+    assert.equal(ok.success, true);
+    if (ok.success) assert.equal(ok.data, "1.0000");
   });
 
   it("rejects negative payment amount", () => {

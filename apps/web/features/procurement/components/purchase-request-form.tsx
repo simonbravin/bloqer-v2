@@ -145,6 +145,10 @@ export function PurchaseRequestForm({
               setError("Seleccioná un ítem EDT");
               return;
             }
+            if (!isPositiveQty(quantity)) {
+              setError("La cantidad debe ser mayor a cero");
+              return;
+            }
             const result = await createPurchaseRequestAction(projectId, {
               projectId,
               neededByDate: fd.get("neededByDate")?.toString() || null,
@@ -157,7 +161,7 @@ export function PurchaseRequestForm({
                   costAnalysisLineId,
                   description: description.trim() || (fd.get("description")?.toString() ?? ""),
                   unit: unit || selectedWbs?.budgetUnit || "un",
-                  quantity: quantity || "1",
+                  quantity,
                   sortOrder: 0,
                 },
               ],
@@ -184,7 +188,7 @@ export function PurchaseRequestForm({
               return;
             }
             onSuccess?.();
-            router.push(`/proyectos/${projectId}/solicitudes-compra/${result.id}`);
+            router.replace(`/proyectos/${projectId}/solicitudes-compra/${result.id}`);
             router.refresh();
           });
         }}

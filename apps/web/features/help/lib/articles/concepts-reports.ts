@@ -327,6 +327,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Pulsá Exportar y elegí CSV o PDF. Si solo hay PDF, el botón dice Exportar PDF.",
       "En sumas y saldos / diario / ESP / EERR también hay XLSX cuando la pantalla lo ofrece.",
       "Presupuesto EDT: export desde el detalle del presupuesto.",
+      "Materiales → Varianza ($): Exportar (CSV/PDF) en la misma fila que Operativo / Varianza.",
       "Libro de obra (parte): Exportar PDF del parte.",
       "Registro de actividad: CSV/PDF en zona horaria de la empresa.",
     ],

@@ -76,6 +76,11 @@ test.describe("Materials Field", () => {
     await assertDemoTenantSafe(page);
 
     await expect(page.getByRole("heading", { name: "Materiales" })).toBeVisible({ timeout: 40_000 });
+    await expect(page.getByTestId("materials-toolbar")).toBeVisible();
+    await expect(page.getByTestId("materials-toolbar").getByRole("link", { name: "EDT y costos" })).toBeVisible();
+    await expect(
+      page.getByTestId("materials-toolbar").getByRole("link", { name: "Solicitudes", exact: true }),
+    ).toHaveCount(0);
     await expect(page.getByTestId("materials-field-view")).toBeVisible({ timeout: 40_000 });
     await expect(page.getByTestId("materials-desktop-view")).toHaveCount(0);
     await expect(page.getByTestId("materials-board-table")).toHaveCount(0);
@@ -163,8 +168,13 @@ test.describe("Materials Field", () => {
     await expect(page.getByTestId("materials-desktop-view")).toBeVisible({ timeout: 40_000 });
     await expect(page.getByTestId("materials-board-table")).toBeVisible();
     await expect(page.getByTestId("materials-field-view")).toHaveCount(0);
+    await expect(page.getByTestId("materials-toolbar")).toBeVisible();
     await expect(page.getByRole("tab", { name: "Operativo" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Varianza ($)" })).toBeVisible();
+    await expect(page.getByTestId("materials-toolbar").getByRole("link", { name: "Tablero de compras" })).toBeVisible();
+    await expect(
+      page.getByTestId("materials-toolbar").getByRole("link", { name: "Solicitudes", exact: true }),
+    ).toHaveCount(0);
     await capture(page, "10-materiales-desktop-1440.png");
   });
 });

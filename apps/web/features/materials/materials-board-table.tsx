@@ -58,7 +58,7 @@ export function MaterialsBoardTable({ rows, projectId, canRequest = true }: Prop
             <TableHead className="text-right">Consumido</TableHead>
             <TableHead className="text-right">Faltante</TableHead>
             {canRequest ? (
-              <TableHead className="w-24">
+              <TableHead className="w-28">
                 <span className="sr-only">Acciones</span>
               </TableHead>
             ) : null}
@@ -140,7 +140,7 @@ export function MaterialsBoardTable({ rows, projectId, canRequest = true }: Prop
                 {canRequest ? (
                   <TableCell>
                     {showPedir ? (
-                      <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+                      <Button asChild size="sm" variant="outline" className="h-7 whitespace-nowrap text-xs">
                         <Link href={materialsBoardPedirHref(projectId, row)}>
                           {materialsPedirCtaLabel(row)}
                         </Link>

@@ -21,7 +21,8 @@ import {
 import type { MaterialsFieldRow } from "@bloqer/services/materials-field";
 import { MaterialsBoardTable } from "@/features/materials/materials-board-table";
 import { MaterialsFieldExperience } from "@/features/materials/materials-field-experience";
-import { MaterialWbsTable, ReportDateFilters, ReportExportActions } from "@/features/reports";
+import { MaterialsToolbar } from "@/features/materials/materials-toolbar";
+import { MaterialWbsTable, ReportDateFilters } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
@@ -146,6 +147,10 @@ export default async function ProyectoMaterialesPage({ params, searchParams }: P
 
   const gate = await getTenantModuleGate(ctx);
   const canRequest = gate.isEnabled("PROCUREMENT") && canEditPurchaseRequests(ctx.roles);
+  const showCompras =
+    gate.isEnabled("PROCUREMENT") &&
+    (canViewPurchaseRequests(ctx.roles) || can(ctx.roles, "VIEW", "PROJECTS"));
+  const showConsumos = gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY");
 
   if (loadField) {
     const started = Date.now();
@@ -160,7 +165,15 @@ export default async function ProyectoMaterialesPage({ params, searchParams }: P
     const rows = board.type === "REPORT" ? board.rows.map(toMaterialsFieldRow) : [];
     return (
       <PageShell variant="default" className="space-y-6">
-        <ProjectPageHeader title="Materiales" subtitle="Necesidad, pedido y recepción de la obra" />
+        <div className="space-y-3">
+          <ProjectPageHeader title="Materiales" subtitle="Necesidad, pedido y recepción de la obra" />
+          <MaterialsToolbar
+            mode="field"
+            projectId={projectId}
+            showCompras={showCompras}
+            showConsumos={showConsumos}
+          />
+        </div>
         {board.type === "NO_APPROVED_BUDGETS" ? (
           <div className="rounded-lg border bg-card p-8 text-center space-y-3" data-testid="materials-field-empty">
             <p className="font-semibold">Todavía no hay necesidades de materiales para esta obra.</p>
@@ -189,75 +202,38 @@ export default async function ProyectoMaterialesPage({ params, searchParams }: P
   const availableBudgets =
     budgetProbe.type === "NO_APPROVED_BUDGETS" ? [] : budgetProbe.availableBudgets;
 
-  const showCompras =
-    gate.isEnabled("PROCUREMENT") &&
-    (canViewPurchaseRequests(ctx.roles) || can(ctx.roles, "VIEW", "PROJECTS"));
-  const showConsumos = gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY");
-
   return (
     <PageShell variant="default" className="space-y-6">
-      <ProjectPageHeader
-        title="Materiales del proyecto"
-        subtitle="Cantidades APU vs pedido, recibido y consumido. El control de $ está en EDT y costos."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {tab === "varianza" ? (
-              <ReportExportActions
-                exportPath={`/api/reports/proyectos/${projectId}/materiales.csv`}
-                params={sp}
-                pdf
-              />
-            ) : null}
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/proyectos/${projectId}/control-costos`}>EDT y costos</Link>
-            </Button>
-            {showCompras ? (
-              <>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/proyectos/${projectId}/compras`}>Tablero de compras</Link>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/proyectos/${projectId}/solicitudes-compra`}>Solicitudes</Link>
-                </Button>
-              </>
-            ) : null}
-            {showConsumos ? (
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/proyectos/${projectId}/consumos`}>Consumos</Link>
-              </Button>
-            ) : null}
-          </div>
-        }
-      />
+      <div className="space-y-3">
+        <ProjectPageHeader
+          title="Materiales del proyecto"
+          subtitle="Cantidades APU vs pedido, recibido y consumido. El control de $ está en EDT y costos."
+        />
 
-      <div className="flex flex-wrap gap-2 text-sm" role="tablist" aria-label="Vistas de materiales">
-        <Button variant={tab === "operativo" ? "default" : "ghost"} size="sm" asChild>
-          <Link
-            href={`/proyectos/${projectId}/materiales${materialsQuery({
-              window,
-              budgetId: sp.budgetId,
-              wbsNodeId: sp.wbsNodeId,
-            })}`}
-            role="tab"
-            aria-selected={tab === "operativo"}
-          >
-            Operativo
-          </Link>
-        </Button>
-        <Button variant={tab === "varianza" ? "default" : "ghost"} size="sm" asChild>
-          <Link
-            href={`/proyectos/${projectId}/materiales${materialsQuery({
-              tab: "varianza",
-              budgetId: sp.budgetId,
-              dateFrom: sp.dateFrom,
-              dateTo: sp.dateTo,
-            })}`}
-            role="tab"
-            aria-selected={tab === "varianza"}
-          >
-            Varianza ($)
-          </Link>
-        </Button>
+        <MaterialsToolbar
+          mode="desktop"
+          projectId={projectId}
+          tab={tab}
+          operativoHref={`/proyectos/${projectId}/materiales${materialsQuery({
+            window,
+            budgetId: sp.budgetId,
+            wbsNodeId: sp.wbsNodeId,
+          })}`}
+          varianzaHref={`/proyectos/${projectId}/materiales${materialsQuery({
+            tab: "varianza",
+            budgetId: sp.budgetId,
+            dateFrom: sp.dateFrom,
+            dateTo: sp.dateTo,
+          })}`}
+        showExport={tab === "varianza"}
+        exportParams={{
+          budgetId: sp.budgetId,
+          dateFrom: sp.dateFrom,
+          dateTo: sp.dateTo,
+        }}
+          showCompras={showCompras}
+          showConsumos={showConsumos}
+        />
       </div>
 
       {tab === "operativo" ? (

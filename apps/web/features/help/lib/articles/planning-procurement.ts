@@ -112,12 +112,52 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     where: { menu: "Operación → Consumos" },
     hrefs: [{ kind: "project", suffix: "/consumos", label: "Consumos" }],
     steps: [
-      "Operación → Consumos (o desde el flujo de libro de obra).",
+      "Operación → Consumos (o el atajo Consumos en Materiales, o desde el flujo de libro de obra).",
       "Indicá material, cantidad y partida EDT si el parte toca varias partidas.",
     ],
-    relatedSlugs: ["cargar-libro-de-obra", "pedir-material-desde-faltante"],
+    relatedSlugs: ["cargar-libro-de-obra", "pedir-material-desde-faltante", "tablero-materiales"],
     keywords: ["consumo", "consumos", "stock", "materiales"],
     guideRef: "§8",
+  },
+  {
+    slug: "tablero-materiales",
+    title: "Tablero de materiales",
+    summary:
+      "Cantidades APU vs pedido, recibido y consumido. Operativo y Varianza ($) en una fila; atajos a EDT, compras y consumos.",
+    intents: ["pedir-material"],
+    modules: ["materiales", "compras"],
+    level: "project",
+    typicalRoles: ["PM", "Compras", "Capataz"],
+    where: { menu: "Operación → Materiales" },
+    hrefs: [
+      { kind: "project", suffix: "/materiales", label: "Materiales" },
+      { kind: "project", suffix: "/compras", label: "Tablero de compras" },
+      { kind: "project", suffix: "/control-costos", label: "EDT y costos" },
+      { kind: "project", suffix: "/consumos", label: "Consumos" },
+    ],
+    steps: [
+      "Operación → Materiales.",
+      "En escritorio: a la izquierda Operativo / Varianza ($); a la derecha EDT y costos, Tablero de compras y Consumos (Exportar solo en Varianza).",
+      "Operativo es cantidades (faltante → Pedir). Varianza ($) es desvío de $ vs consumo de stock.",
+      "Para ver o crear solicitudes, entrá a Tablero de compras (Nueva solicitud / Todas las solicitudes). No hay atajo Solicitudes en Materiales.",
+      "En celular o tablet chica: tarjetas de necesidad/faltante (sin Operativo/Varianza). Los mismos atajos quedan en una franja que se desplaza de costado; las etiquetas se acortan (EDT, Compras).",
+    ],
+    pitfalls: [
+      "Materiales no reemplaza EDT y costos: acá son cantidades; el $ por partida está en Planificación → EDT y costos.",
+    ],
+    relatedSlugs: [
+      "pedir-material-desde-faltante",
+      "registrar-consumo-materiales",
+      "circuito-comprar-material-hasta-pagarlo",
+      "leer-edt-y-costos",
+    ],
+    keywords: [
+      "tablero materiales",
+      "materiales operativo",
+      "varianza materiales",
+      "atajos materiales",
+    ],
+    guideRef: "§9.0",
   },
 ];
 
@@ -139,7 +179,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       { kind: "project", suffix: "/cuentas-por-pagar", label: "Cuentas por pagar" },
     ],
     steps: [
-      "1. Pedí desde Materiales (faltante) o creá Solicitud de compra con partida EDT.",
+      "1. Pedí desde Materiales (faltante) o creá la solicitud desde Tablero de compras / Solicitudes de compra, con partida EDT.",
       "2. Cotizá → seleccioná proveedor → OC en borrador (o OC directa si la política lo permite).",
       "3. Enviar → Aprobar → Confirmar al proveedor = Comprometido en EDT y costos.",
       "4. Registrar recepción (stock; no crea CxP sola).",
@@ -157,6 +197,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     ],
     relatedSlugs: [
       "pedir-material-desde-faltante",
+      "tablero-materiales",
       "solicitud-de-compra",
       "orden-de-compra-y-afectar-edt",
       "recibir-una-oc",
@@ -185,17 +226,21 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     level: "project",
     typicalRoles: ["PM", "Compras"],
     where: { menu: "Operación → Materiales" },
-    hrefs: [{ kind: "project", suffix: "/materiales", label: "Materiales" }],
+    hrefs: [
+      { kind: "project", suffix: "/materiales", label: "Materiales" },
+      { kind: "project", suffix: "/compras", label: "Tablero de compras" },
+    ],
     steps: [
-      "Operación → Materiales (vista Operativo).",
+      "Operación → Materiales (vista Operativo; en la misma fila, a la derecha, están los atajos).",
       "En una fila con faltante, pulsá Pedir. La cantidad prellenada es el resto (necesidad − ya pedido).",
       "Si ya hay una SC u OC de esa línea, el botón dice Pedir resto y también podés abrir el documento.",
+      "Para el listado de solicitudes: atajo Tablero de compras → Todas las solicitudes / Nueva solicitud.",
     ],
     pitfalls: [
       "$ Presup. es el total APU de la línea, no el saldo por comprar.",
       "Pedido no incluye OC en borrador ni aprobada sin confirmar.",
     ],
-    relatedSlugs: ["solicitud-de-compra", "circuito-comprar-material-hasta-pagarlo"],
+    relatedSlugs: ["tablero-materiales", "solicitud-de-compra", "circuito-comprar-material-hasta-pagarlo"],
     keywords: ["pedir", "faltante", "materiales", "necesidad"],
     guideRef: "§9.0",
   },
@@ -208,15 +253,18 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     level: "project",
     typicalRoles: ["PM", "Compras"],
     where: { menu: "Compras → Solicitudes de compra" },
-    hrefs: [{ kind: "project", suffix: "/solicitudes-compra", label: "Solicitudes de compra" }],
+    hrefs: [
+      { kind: "project", suffix: "/solicitudes-compra", label: "Solicitudes de compra" },
+      { kind: "project", suffix: "/compras", label: "Tablero de compras" },
+    ],
     steps: [
-      "Nueva solicitud (o desde Materiales → Pedir).",
+      "Nueva solicitud desde Compras → Solicitudes de compra o Tablero de compras (Nueva solicitud / Todas las solicitudes). También desde Materiales → Pedir.",
       "Líneas con cantidad, unidad, descripción y partida EDT obligatoria.",
       "Guardar DRAFT → Enviar (SUBMITTED).",
       "Cargar cotizaciones (precio + plazo) según política.",
       "Seleccionar proveedor → genera OC en borrador.",
     ],
-    relatedSlugs: ["orden-de-compra-y-afectar-edt", "politicas-de-compras"],
+    relatedSlugs: ["tablero-materiales", "orden-de-compra-y-afectar-edt", "politicas-de-compras"],
     keywords: [
       "solicitud",
       "sc",

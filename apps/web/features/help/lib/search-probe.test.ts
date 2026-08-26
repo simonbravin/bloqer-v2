@@ -97,6 +97,7 @@ test("new concept/report articles are findable", () => {
     { q: "2 decimales", expectSlugIncludes: "montos" },
     { q: "checklist", expectSlugIncludes: "checklist" },
     { q: "puesta en marcha contable", expectSlugIncludes: "puesta-en-marcha" },
+    { q: "tablero materiales", expectSlugIncludes: "tablero-materiales" },
   ];
   for (const c of cases) {
     const hits = searchHelpArticles(HELP_ARTICLES, { query: c.q });

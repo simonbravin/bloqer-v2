@@ -56,6 +56,17 @@ export const qtyString = z
   .transform((v) => roundQty(v))
   .refine((v) => !v.startsWith("-"), "La cantidad no puede ser negativa");
 
+/** True after qty round: not zero, not negative. */
+export function isPositiveRoundedQty(v: string): boolean {
+  return !v.startsWith("-") && !/^-?0+(\.0+)?$/.test(v);
+}
+
+/** Quantity > 0 after 4 dp round ([D-053]). */
+export const positiveQtyString = qtyString.refine(
+  isPositiveRoundedQty,
+  "La cantidad debe ser mayor a cero",
+);
+
 /**
  * Line unit price: 4 dp (schema Decimal 18,4).
  * Needed so Factura B inclusive nets survive DRAFT re-save ([D-086]).

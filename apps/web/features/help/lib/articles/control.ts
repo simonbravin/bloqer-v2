@@ -22,6 +22,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     pitfalls: ["No sumes OC + factura como costo total (doble conteo): mirá exposición esperada."],
     relatedSlugs: [
       "circuito-comprar-material-hasta-pagarlo",
+      "tablero-materiales",
       "orden-de-compra-y-afectar-edt",
       "afectaciones-comprometido-devengado-pagado",
       "presupuesto-vs-real",

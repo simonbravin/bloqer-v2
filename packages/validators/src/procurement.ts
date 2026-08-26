@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { idempotencyKeySchema } from "./idempotency";
+import { isPositiveRoundedQty, positiveQtyString, qtyString, unitPriceString } from "./money";
 
 const purchaseOrderLineSchema = z.object({
   wbsNodeId: z.string().uuid({ message: "Cada línea debe imputar a un ítem EDT" }),
@@ -8,14 +9,8 @@ const purchaseOrderLineSchema = z.object({
   costAnalysisLineId: z.string().uuid().optional().nullable(),
   description: z.string().min(1, "Descripción requerida"),
   unit: z.string().default(""),
-  quantity: z
-    .string()
-    .regex(/^\d+(\.\d+)?$/, "Cantidad inválida")
-    .refine((v) => Number(v) > 0, { message: "La cantidad debe ser mayor a cero" }),
-  unitPrice: z
-    .string()
-    .regex(/^\d+(\.\d+)?$/, "Precio inválido")
-    .refine((v) => Number(v) >= 0, { message: "Precio inválido" }),
+  quantity: positiveQtyString,
+  unitPrice: unitPriceString,
   taxRate: z.string().regex(/^\d+(\.\d+)?$/).default("21"),
   sortOrder: z.number().int().default(0),
   varianceJustification: z.string().max(2000).optional().nullable(),
@@ -49,10 +44,10 @@ export const returnPurchaseOrderSchema = z.object({
 
 const receiptLineSchema = z.object({
   purchaseOrderLineId: z.string().uuid(),
-  quantityReceived: z
-    .string()
-    .regex(/^\d+(\.\d+)?$/, "Cantidad recibida inválida")
-    .refine((v) => Number(v) > 0, { message: "La cantidad recibida debe ser mayor a cero" }),
+  quantityReceived: qtyString.refine(
+    isPositiveRoundedQty,
+    "La cantidad recibida debe ser mayor a cero",
+  ),
   notes: z.string().optional().nullable(),
 });
 

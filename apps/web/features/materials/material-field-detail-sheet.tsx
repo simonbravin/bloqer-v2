@@ -114,15 +114,16 @@ export function MaterialFieldDetailSheet({
                 <br />
                 #{row.relatedPurchaseRequestNumber ?? "—"}
               </p>
-            ) : (
-              <p className="text-muted-foreground">Sin solicitud vinculada de forma inequívoca.</p>
-            )}
+            ) : null}
             {row.relatedPurchaseOrderId ? (
               <p>
                 <span className="text-muted-foreground">Orden de compra</span>
                 <br />
                 #{row.relatedPurchaseOrderNumber ?? "—"}
               </p>
+            ) : null}
+            {!row.relatedPurchaseRequestId && !row.relatedPurchaseOrderId ? (
+              <p className="text-muted-foreground">Sin solicitud vinculada de forma inequívoca.</p>
             ) : null}
 
             <div className="flex flex-col gap-2 pt-2">
