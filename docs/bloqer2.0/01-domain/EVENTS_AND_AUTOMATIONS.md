@@ -200,6 +200,7 @@ La **facturación** no emite transición de `Certification.status` ([BR-CERT-007
 | `rfi.overdue` | alerta / bandera; **no** cambia `status` ([BR-RFI-002]) |
 | `jobsite_log.submitted` | parte enviado |
 | `jobsite_log.approved` | parte aprobado |
+| `jobsite_log.returned` | parte devuelto a borrador con observaciones |
 
 ### 2.14b SubcontractCertification
 
@@ -386,6 +387,9 @@ Cada evento puede generar una **Notification** para roles específicos. Tabla re
 | `period.closed` | OWNER, ADMIN, FINANCE |
 | `stock_low_threshold` (Fase 2) | WAREHOUSE, PROCUREMENT |
 | `payment.confirmed` | FINANCE; OWNER si > umbral |
+| `jobsite_log.submitted` | OWNER/ADMIN ∪ equipo de obra ∩ puede aprobar ([D-091]) |
+| `jobsite_log.returned` | creador del parte ∪ OWNER/ADMIN ([D-091]) |
+| `jobsite_log.approved` | creador del parte ∪ OWNER/ADMIN ([D-091]) |
 
 Detalles configurables por usuario en módulo [`02-modules/NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md) (Fase B).
 

@@ -3,6 +3,11 @@ import type { UserMembership, UserRole } from "@bloqer/database";
 import { can, type UserRole as DomainUserRole } from "@bloqer/domain";
 import { isUuid } from "@bloqer/utils";
 import { log } from "../audit/audit.service";
+import {
+  findActiveCompanyInTenant,
+  getSoleActiveCompanyIdForTenant,
+  resolveDefaultCompanyIdForTenant,
+} from "../company/company.service";
 import { ServiceContext, ServiceError } from "../types";
 
 /** Tenant + roles for session shell (`resolveTenantContext`); built only from DB — no Prisma in `apps/web`. */
@@ -31,7 +36,10 @@ export async function getSessionTenantContext(
         return {
           tenantId: preferredMembership.tenantId,
           tenantName: preferredTenant.name,
-          companyId: preferredMembership.companyId,
+          companyId: await sessionCompanyId(
+            preferredMembership.tenantId,
+            preferredMembership.companyId,
+          ),
           roles: preferredMembership.roles as DomainUserRole[],
         };
       }
@@ -49,9 +57,21 @@ export async function getSessionTenantContext(
   return {
     tenantId: membership.tenantId,
     tenantName: membership.tenant.name,
-    companyId: membership.companyId,
+    companyId: await sessionCompanyId(membership.tenantId, membership.companyId),
     roles: membership.roles as DomainUserRole[],
   };
+}
+
+/** Session: ACTIVE membership company, else sole tenant company ([D-092]). Never swap to another company. */
+async function sessionCompanyId(
+  tenantId: string,
+  membershipCompanyId: string | null,
+): Promise<string | null> {
+  const membership = membershipCompanyId?.trim() || null;
+  if (membership) {
+    return findActiveCompanyInTenant(membership, tenantId);
+  }
+  return getSoleActiveCompanyIdForTenant(tenantId);
 }
 
 export interface CreateMembershipInput {
@@ -93,20 +113,15 @@ export async function createMembership(
     throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   }
 
-  if (input.companyId) {
-    const company = await prisma.company.findFirst({
-      where: { id: input.companyId, tenantId: ctx.tenantId },
-      select: { id: true },
-    });
-    if (!company) {
-      throw new ServiceError("VALIDATION", "La empresa no pertenece a este espacio de trabajo");
-    }
-  }
+  const companyId =
+    (await resolveDefaultCompanyIdForTenant(ctx.tenantId, input.companyId)) ?? undefined;
 
   const existing = await getMembership(input.userId, input.tenantId);
   if (existing) throw new ServiceError("CONFLICT", "User already has a membership in this tenant");
 
-  const membership = await prisma.userMembership.create({ data: input });
+  const membership = await prisma.userMembership.create({
+    data: { ...input, companyId },
+  });
 
   await log({
     tenantId: ctx.tenantId,

@@ -93,6 +93,8 @@ describe("notification email context formatters", () => {
     );
     assert.equal(actionLabelForNotification("DOCUMENT_UPLOAD_CONFIRMED", "PROJECT"), "Ver documento");
     assert.equal(actionLabelForNotification("JOBSITE_LOG_RETURNED", "JOBSITE_LOG"), "Corregir parte");
+    assert.equal(actionLabelForNotification("JOBSITE_LOG_SUBMITTED", "JOBSITE_LOG"), "Revisar parte");
+    assert.equal(actionLabelForNotification("JOBSITE_LOG_APPROVED", "JOBSITE_LOG"), "Ver parte");
     assert.equal(actionLabelForNotification("STALE_DOCUMENT_UPLOAD", null), "Ver documento");
   });
 });

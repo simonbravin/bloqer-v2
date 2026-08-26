@@ -1,5 +1,6 @@
 import { prisma } from "@bloqer/database";
-import { can, type PermissionAction, type PermissionModule } from "@bloqer/domain";
+import { can, type PermissionAction, type PermissionModule, type UserRole } from "@bloqer/domain";
+import { canSuperviseJobsiteLog } from "../jobsite-log/jobsite-log-access";
 
 export type NotificationPermissionTarget = {
   action: PermissionAction;
@@ -48,6 +49,59 @@ export async function findActiveOwnerAdminUserIds(tenantId: string): Promise<str
     select: { userId: true },
   });
   return [...new Set(rows.map((r) => r.userId))];
+}
+
+/** User ids on the project notification roster ([D-091]). Does not filter by ACTIVE membership. */
+export async function listProjectTeamUserIds(
+  tenantId: string,
+  projectId: string,
+): Promise<string[]> {
+  const rows = await prisma.projectTeamMember.findMany({
+    where: { tenantId, projectId },
+    select: { userId: true },
+  });
+  return [...new Set(rows.map((r) => r.userId))];
+}
+
+/**
+ * SUBMITTED jobsite-log audience ([D-091]):
+ * project team members whose **global** roles can supervise ∪ OWNER/ADMIN CC, minus actor.
+ * Capataz on the roster without supervise ceiling is excluded.
+ */
+export async function resolveJobsiteLogSubmittedAudience(params: {
+  tenantId: string;
+  projectId: string;
+  excludeUserId?: string | null;
+}): Promise<string[]> {
+  const teamIds = await listProjectTeamUserIds(params.tenantId, params.projectId);
+  if (teamIds.length === 0) {
+    return resolveNotificationAudience({
+      tenantId: params.tenantId,
+      primaryUserIds: [],
+      excludeUserId: params.excludeUserId,
+      alwaysCcOwnerAdmin: true,
+    });
+  }
+
+  const memberships = await prisma.userMembership.findMany({
+    where: {
+      tenantId: params.tenantId,
+      status: "ACTIVE",
+      userId: { in: teamIds },
+    },
+    select: { userId: true, roles: true },
+  });
+
+  const supervisingTeam = memberships
+    .filter((m) => canSuperviseJobsiteLog(m.roles as UserRole[]))
+    .map((m) => m.userId);
+
+  return resolveNotificationAudience({
+    tenantId: params.tenantId,
+    primaryUserIds: supervisingTeam,
+    excludeUserId: params.excludeUserId,
+    alwaysCcOwnerAdmin: true,
+  });
 }
 
 /**

@@ -15,6 +15,7 @@ import {
 } from "../tenant-settings/tenant-invitation-shared";
 import type { CreateTenantInvitationResult, TenantInvitationDetail, TenantInvitationRow } from "../tenant-settings/tenant-invitations.service";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { resolveDefaultCompanyIdForTenant } from "../company/company.service";
 import { ServiceError } from "../types";
 import { assertPlatformAccess, type PlatformServiceContext } from "./platform-auth.service";
 import { createPlatformAuditLog } from "./platform-audit.service";
@@ -139,15 +140,7 @@ export async function createPlatformTenantInvitation(
   const { tenantId } = parsed.data;
   const emailNorm = normalizeInvitationEmail(parsed.data.email);
   const uniqueRoles = dedupeInvitationRoles(parsed.data.roles as UserRole[]);
-  let companyId: string | null = parsed.data.companyId ?? null;
-  if (companyId === "" || companyId === null) companyId = null;
-  if (companyId) {
-    const co = await prisma.company.findFirst({
-      where: { id: companyId, tenantId },
-      select: { id: true },
-    });
-    if (!co) throw new ServiceError("NOT_FOUND", "Empresa no encontrada en el tenant");
-  }
+  const companyId = await resolveDefaultCompanyIdForTenant(tenantId, parsed.data.companyId);
 
   await markExpiredPendingInvitationsForTenant(tenantId);
 

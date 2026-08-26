@@ -17,6 +17,7 @@ export {
   formatAuditLogExportFilterLine,
 } from "./audit/audit-display";
 export * from "./project/project.service";
+export * from "./project/project-team.service";
 export * from "./project/project-overview-dashboard.service";
 export * from "./budget/budget.service";
 export * from "./budget/approved-budget-edits.service";
@@ -112,6 +113,8 @@ export * from "./subcontracts/subcontract-cert-succession";
 export * from "./security/tenant-isolation";
 export * from "./jobsite-log/jobsite-log.service";
 export * from "./jobsite-log/jobsite-log-export.service";
+export * from "./jobsite-log/jobsite-log-notifications.service";
+export * from "./jobsite-log/jobsite-log-access";
 export * from "./schedule/schedule-access";
 export * from "./schedule/schedule.service";
 export * from "./schedule/schedule-workspace.service";

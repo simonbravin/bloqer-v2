@@ -9,6 +9,7 @@ import { resolveNotificationAudience } from "../notifications/notification-audie
 import { formatCertificationCode, formatNotificationTitle } from "../notifications/notification-copy";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { resolveActiveCompanyId } from "../company/company.service";
 import { ServiceContext, ServiceError } from "../types";
 import { _computePreviousQty, _recalcCertificationTotals } from "./certification-calc.service";
 import {
@@ -105,7 +106,7 @@ export async function createCertification(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear certificaciones");
   }
 
-  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+  const project = await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
 
   if (input.periodEnd < input.periodStart) {
     throw new ServiceError("VALIDATION", "La fecha de fin del período no puede ser anterior al inicio");
@@ -120,6 +121,8 @@ export async function createCertification(
     throw new ServiceError("CONFLICT", "Solo se puede certificar contra presupuestos aprobados o cerrados (BR-CERT-001)");
   }
 
+  const companyId = (await resolveActiveCompanyId(ctx, project.companyId)) ?? undefined;
+
   let cert;
   try {
     cert = await prisma.$transaction(async (tx) => {
@@ -131,7 +134,7 @@ export async function createCertification(
       return tx.certification.create({
         data: {
           tenantId: ctx.tenantId,
-          companyId: ctx.companyId ?? undefined,
+          companyId,
           projectId: input.projectId,
           budgetId: input.budgetId,
           number,

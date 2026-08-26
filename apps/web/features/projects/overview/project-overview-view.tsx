@@ -8,6 +8,11 @@ import { DashboardKpiCard } from "@/features/dashboard/dashboard-kpi-card";
 import { ProjectOverviewActivityCard } from "./project-overview-activity-card";
 import { ProjectOverviewAlerts } from "./project-overview-alerts";
 import { ProjectOverviewCharts } from "./project-overview-charts";
+import {
+  ProjectTeamCard,
+  type ProjectTeamMemberView,
+  type ProjectTeamPickerOptionView,
+} from "@/features/projects/components/project-team-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -76,11 +81,18 @@ export function ProjectOverviewView({
   projectId,
   fullProject,
   lifecycleActions,
+  team,
 }: {
   dashboard: ProjectOverviewDashboard;
   projectId: string;
   fullProject: ProjectWithClient | null;
   lifecycleActions: React.ReactNode;
+  team?: {
+    members: ProjectTeamMemberView[];
+    pickerOptions: ProjectTeamPickerOptionView[];
+    canEdit: boolean;
+    visible: boolean;
+  };
 }) {
   const p = dashboard.project;
 
@@ -175,6 +187,15 @@ export function ProjectOverviewView({
             )}
           </CardContent>
         </Card>
+      ) : null}
+
+      {team?.visible ? (
+        <ProjectTeamCard
+          projectId={projectId}
+          members={team.members}
+          pickerOptions={team.pickerOptions}
+          canEdit={team.canEdit}
+        />
       ) : null}
 
       <KpiStatGrid title="Indicadores" columns={4}>

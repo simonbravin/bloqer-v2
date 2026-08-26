@@ -2,10 +2,12 @@ import { Prisma, prisma, JobsiteLog } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreateJobsiteLogInput, UpdateJobsiteLogInput, ReturnJobsiteLogInput } from "@bloqer/validators";
 import { listEntityAuditLogs, log } from "../audit/audit.service";
-import { createSystemNotification } from "../notifications/notification.service";
-import { resolveNotificationAudience } from "../notifications/notification-audience.service";
-import { formatJobsiteLogDate, formatNotificationTitle } from "../notifications/notification-copy";
 import { getStockBalance } from "../inventory/stock-balance.service";
+import {
+  notifyJobsiteLogApproved,
+  notifyJobsiteLogReturned,
+  notifyJobsiteLogSubmitted,
+} from "./jobsite-log-notifications.service";
 import { createJobsiteLogMaterialStockMovements } from "../inventory/stock-movement.service";
 import { syncScheduleProgressFromJobsiteLog } from "../schedule/schedule-progress-sync.service";
 import {
@@ -1055,6 +1057,16 @@ export async function submitJobsiteLog(id: string, ctx: ServiceContext): Promise
     before: { status: existing.status },
     after: { status: "SUBMITTED" },
   });
+
+  await notifyJobsiteLogSubmitted({
+    ctx,
+    jobsiteLogId: id,
+    projectId: existing.projectId,
+    companyId: existing.companyId,
+    logDate: existing.logDate,
+    createdBy: existing.createdBy,
+  }).catch(() => undefined);
+
   return serializeLog(updated);
 }
 
@@ -1138,6 +1150,16 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
     before: { status: existing.status },
     after: { status: "APPROVED" },
   });
+
+  await notifyJobsiteLogApproved({
+    ctx,
+    jobsiteLogId: id,
+    projectId: existing.projectId,
+    companyId: existing.companyId,
+    logDate: existing.logDate,
+    createdBy: existing.createdBy,
+  }).catch(() => undefined);
+
   return serializeLog(updated);
 }
 
@@ -1183,38 +1205,15 @@ export async function returnJobsiteLog(
     after: { status: "DRAFT", returnNotes: input.returnNotes },
   });
 
-  const creatorId = existing.createdBy;
-  const notes = input.returnNotes?.trim();
-  const body = notes
-    ? `Motivo: ${notes.length > 500 ? `${notes.slice(0, 500)}…` : notes}`
-    : "Un supervisor devolvió el parte a borrador.";
-
-  const recipients = await resolveNotificationAudience({
-    tenantId: ctx.tenantId,
-    primaryUserIds: creatorId ? [creatorId] : [],
-    excludeUserId: ctx.actorUserId,
-  });
-
-  for (const recipientUserId of recipients) {
-    try {
-      await createSystemNotification({
-        tenantId: ctx.tenantId,
-        companyId: existing.companyId,
-        recipientUserId,
-        type: "JOBSITE_LOG_RETURNED",
-        title: formatNotificationTitle("Parte devuelto", formatJobsiteLogDate(existing.logDate)),
-        body,
-        severity: "WARNING",
-        linkedEntityType: "JOBSITE_LOG",
-        linkedEntityId: id,
-        projectId: existing.projectId,
-        actionUrl: `/proyectos/${existing.projectId}/libro-obra/${id}/editar`,
-        metadata: { jobsiteLogId: id },
-      });
-    } catch {
-      /* best-effort in-app notification (Phase 8A) */
-    }
-  }
+  await notifyJobsiteLogReturned({
+    ctx,
+    jobsiteLogId: id,
+    projectId: existing.projectId,
+    companyId: existing.companyId,
+    logDate: existing.logDate,
+    createdBy: existing.createdBy,
+    returnNotes: input.returnNotes,
+  }).catch(() => undefined);
 
   return serializeLog(updated);
 }

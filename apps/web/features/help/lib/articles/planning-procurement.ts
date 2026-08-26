@@ -94,11 +94,15 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     steps: [
       "Operación → Libro de obra → nuevo parte.",
       "Clima, cuadrilla, avance por partida EDT, fotos.",
-      "Enviar (SUBMITTED) para que el PM apruebe.",
+      "Enviar (SUBMITTED): el PM del Equipo de obra (y OWNER/ADMIN) reciben campana + email.",
+      "Si te lo devuelven, corregí desde el enlace de la notificación.",
     ],
-    effects: ["Al aprobar: avance real del cronograma (+ consumo stock si aplica)."],
-    relatedSlugs: ["registrar-consumo-materiales"],
-    keywords: ["libro de obra", "parte diario", "capataz", "avance"],
+    effects: [
+      "Al aprobar: avance real del cronograma (+ consumo stock si aplica).",
+      "Al aprobar/devolver: el autor recibe campana + email.",
+    ],
+    relatedSlugs: ["registrar-consumo-materiales", "asignar-equipo-de-obra", "usar-notificaciones"],
+    keywords: ["libro de obra", "parte diario", "capataz", "avance", "parte pendiente"],
     guideRef: "§8",
   },
   {

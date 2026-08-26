@@ -18,7 +18,9 @@ import {
   canCancelDraftProject,
   canReactivateProject,
 } from "./project-lifecycle-access";
+import { maybeAutoAddCreatorToProjectTeam } from "./project-team.service";
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
+import { resolveActiveCompanyId } from "../company/company.service";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
 
@@ -225,11 +227,13 @@ export async function createProject(
   });
   if (existing) throw new ServiceError("CONFLICT", `Ya existe un proyecto con el código "${input.code}"`);
 
+  const companyId = (await resolveActiveCompanyId(ctx)) ?? undefined;
+
   const project = await prisma.project.create({
     data: {
       ...input,
       tenantId: ctx.tenantId,
-      companyId: ctx.companyId ?? undefined,
+      companyId,
       createdBy: ctx.actorUserId,
       updatedBy: ctx.actorUserId,
     },
@@ -241,8 +245,15 @@ export async function createProject(
     action: "project.created",
     entityType: "Project",
     entityId: project.id,
-    after: { code: project.code, name: project.name, status: project.status },
+    after: { code: project.code, name: project.name, status: project.status, companyId: project.companyId },
     ipAddress: ctx.ipAddress,
+  });
+
+  await maybeAutoAddCreatorToProjectTeam({
+    projectId: project.id,
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    roles: ctx.roles,
   });
 
   return project;

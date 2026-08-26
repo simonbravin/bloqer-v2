@@ -19,6 +19,7 @@ import {
 } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { resolveDefaultCompanyIdForTenant, findActiveCompanyInTenant } from "../company/company.service";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditTeamMembership, canReadTenantConfigArea } from "./tenant-settings-guards";
 
@@ -233,15 +234,10 @@ export async function createTenantInvitation(
   }
   const emailNorm = normalizeInvitationEmail(parsed.data.email);
   const uniqueRoles = dedupeInvitationRoles(parsed.data.roles as UserRole[]);
-  let companyId: string | null = parsed.data.companyId ?? null;
-  if (companyId === "" || companyId === null) companyId = null;
-  if (companyId) {
-    const co = await prisma.company.findFirst({
-      where: { id: companyId, tenantId: ctx.tenantId },
-      select: { id: true },
-    });
-    if (!co) throw new ServiceError("NOT_FOUND", "Empresa no encontrada en el tenant");
-  }
+  const companyId = await resolveDefaultCompanyIdForTenant(
+    ctx.tenantId,
+    parsed.data.companyId,
+  );
 
   await markExpiredPendingInvitationsForTenant(ctx.tenantId);
 
@@ -435,7 +431,7 @@ export async function acceptTenantInvitation(
 
     const existing = await tx.userMembership.findUnique({
       where: { userId_tenantId: { userId: actorUser.id, tenantId: inv.tenantId } },
-      select: { id: true, status: true, roles: true },
+      select: { id: true, status: true, roles: true, companyId: true },
     });
 
     if (existing?.status === "ACTIVE") {
@@ -450,6 +446,10 @@ export async function acceptTenantInvitation(
 
     const invitedRoles = dedupeInvitationRoles(inv.roles as UserRole[]);
     const now = new Date();
+    let companyId = await resolveDefaultCompanyIdForTenant(inv.tenantId, inv.companyId, tx);
+    if (!companyId && existing?.companyId) {
+      companyId = await findActiveCompanyInTenant(existing.companyId, inv.tenantId, tx);
+    }
 
     // Claim PENDING → ACCEPTED first so cancel cannot win the race mid-accept.
     const claimed = await tx.tenantInvitation.updateMany({
@@ -471,7 +471,7 @@ export async function acceptTenantInvitation(
         data: {
           status:    "ACTIVE",
           roles:     invitedRoles,
-          companyId: inv.companyId,
+          companyId,
         },
       });
     } else {
@@ -479,7 +479,7 @@ export async function acceptTenantInvitation(
         data: {
           userId:    actorUser.id,
           tenantId:  inv.tenantId,
-          companyId: inv.companyId,
+          companyId,
           roles:     invitedRoles,
           status:    "ACTIVE",
         },
@@ -492,10 +492,11 @@ export async function acceptTenantInvitation(
       action:      "TENANT_INVITATION_ACCEPTED",
       entityType:  "TenantInvitation",
       entityId:    inv.id,
+      companyId,
       before:      { status: "PENDING" },
       after:       { status: "ACCEPTED", userId: actorUser.id },
       ipAddress:   actor.ipAddress,
-    });
+    }, tx);
 
     return { tenantId: inv.tenantId };
   });

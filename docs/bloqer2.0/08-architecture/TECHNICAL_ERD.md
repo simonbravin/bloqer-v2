@@ -20,6 +20,8 @@ erDiagram
   COMPANY ||--o{ USER_MEMBERSHIP : "scoped optional"
   TENANT ||--o{ PROJECT : "owns"
   COMPANY ||--o{ PROJECT : "operates optional FK"
+  PROJECT ||--o{ PROJECT_TEAM_MEMBER : "notification roster D-091"
+  USER ||--o{ PROJECT_TEAM_MEMBER : "assigned"
 
   PROJECT ||--o{ CONTRACT : "has"
   PROJECT ||--o{ BUDGET : "has"

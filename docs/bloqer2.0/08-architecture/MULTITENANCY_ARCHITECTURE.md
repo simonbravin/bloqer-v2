@@ -26,6 +26,7 @@ Implementar **aislamiento lógico estricto** por `tenant_id` en **todas** las en
 ## UserMembership y contexto de empresa (Q-001)
 
 - **Hoy:** una fila `UserMembership` por `(userId, tenantId)` y un solo `companyId` opcional → **una** empresa anclada o membresía global al tenant.
+- **Default hasta selector ([D-092]):** si el tenant tiene exactamente una `Company` ACTIVE, sesión, invitaciones, membresías y proyectos nuevos se anclan a esa empresa. No se elige entre varias.
 - **Selector de empresa en el shell:** adecuado para cambiar el contexto **dentro** de esa semántica; no sustituye por sí solo membresías múltiples por usuario sin migración (ver Q-001).
 
 ## Estrategia de defensa en profundidad (conceptual)

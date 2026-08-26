@@ -20,6 +20,7 @@ Sin proyecto formal no hay imputación clara de costos ni certificaciones cohere
 
 ## 6. Entidades principales
 - **Project** — núcleo.
+- **ProjectTeamMember** — roster de avisos por obra ([D-091]); etiqueta `PROJECT_MANAGER` \| `SITE_FOREMAN` \| `OTHER` (no otorga permisos).
 
 ## 7. Estados y transiciones
 Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Project: `DRAFT` → `ACTIVE` → `ON_HOLD` / `COMPLETED` / `CANCELLED`.
@@ -29,7 +30,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Project: `DRAFT` �
 - Activar, pausar, reanudar, completar, cancelar (con confirmación en UI).
 - Cancelar obra `ACTIVE`/`ON_HOLD`: solo OWNER/ADMIN ([BR-PROJ-005], [PERM-007]).
 - Reactivar obra `CANCELLED`: solo OWNER/ADMIN ([BR-PROJ-006], [PERM-007]).
-- Asignar equipo / usuarios por proyecto (roles por proyecto).
+- **Equipo de obra** (`ProjectTeamMember`, [D-091]): asignar usuarios del tenant al roster de avisos (card en Resumen). **No** implementa aún RBAC “solo su proyecto” (R-USR-007); el techo de permisos sigue siendo global.
 
 ## 9. Pantallas y vistas necesarias
 - Lista de proyectos con filtros estado, cliente, PM.
@@ -67,7 +68,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Project: `DRAFT` �
 - **Presupuestos**, **Cronograma**, **Contratos**, **Certificaciones**, **Compras**, **Inventario**, **Tesorería** (imputación).
 
 ## 16. Permisos
-Ver [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md); PM edita solo proyectos asignados.
+Ver [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md). Editar equipo de obra: `EDIT PROJECTS`. El techo “PM edita solo proyectos asignados” sigue **sin** enforcement en servicio (deuda R-USR-007).
 
 ## 17. Eventos disparados / consumidos
 - `project.*` ([`EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md)).

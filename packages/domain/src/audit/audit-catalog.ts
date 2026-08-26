@@ -190,6 +190,8 @@ export const AUDIT_ACTION_LABELS_ES: Record<string, string> = {
   JOBSITE_LOG_APPROVED: "Parte de obra aprobado",
   JOBSITE_LOG_RETURNED: "Parte de obra devuelto",
   JOBSITE_LOG_CANCELLED: "Parte de obra anulado",
+  PROJECT_TEAM_MEMBER_ADDED: "Miembro agregado al equipo de obra",
+  PROJECT_TEAM_MEMBER_REMOVED: "Miembro quitado del equipo de obra",
   // Accounting
   "journal_entry.created": "Asiento creado",
   "journal_entry.updated": "Asiento actualizado",

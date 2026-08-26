@@ -213,11 +213,12 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     steps: [
       "Abrí la campana (badge si hay no leídas).",
       "Ver todas → /notificaciones (filtros Todas / No leídas / Leídas / Archivadas).",
+      "Libro de obra: Parte pendiente / Parte devuelto / Parte aprobado también llegan por email.",
       "OWNER/ADMIN: Alertas operativas en /notificaciones/alertas.",
       "En mobile: Más → Notificaciones.",
     ],
-    relatedSlugs: ["errores-operativos-frecuentes"],
-    keywords: ["notificaciones", "campana", "alertas", "inbox", "avisos"],
+    relatedSlugs: ["errores-operativos-frecuentes", "cargar-libro-de-obra", "asignar-equipo-de-obra"],
+    keywords: ["notificaciones", "campana", "alertas", "inbox", "avisos", "parte pendiente", "email"],
     guideRef: "§1.4",
   },
   {

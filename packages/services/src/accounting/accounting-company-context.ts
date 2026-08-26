@@ -1,10 +1,12 @@
 import { prisma } from "@bloqer/database";
+import { getSoleActiveCompanyIdForTenant } from "../company/company.service";
 import { ServiceContext, ServiceError } from "../types";
 
 /**
  * Resolves the company scope for accounting reads/writes.
  * If `ctx.companyId` is set, it must be an ACTIVE company in the tenant (membership context).
- * Otherwise `inputCompanyId` or the first ACTIVE company (name ASC) is used.
+ * Otherwise `inputCompanyId`, or the tenant's sole ACTIVE company ([D-092]).
+ * Does not pick among several companies by name.
  */
 export async function resolveAccountingCompanyId(
   ctx: ServiceContext,
@@ -28,12 +30,9 @@ export async function resolveAccountingCompanyId(
     }
     return inputCompanyId;
   }
-  const first = await prisma.company.findFirst({
-    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
-    orderBy: { name: "asc" },
-  });
-  if (!first) {
+  const sole = await getSoleActiveCompanyIdForTenant(ctx.tenantId);
+  if (!sole) {
     throw new ServiceError("VALIDATION", "No hay empresa activa en el tenant");
   }
-  return first.id;
+  return sole;
 }

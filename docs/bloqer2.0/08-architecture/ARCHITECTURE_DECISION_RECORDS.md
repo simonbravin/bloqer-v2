@@ -204,7 +204,7 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 - **Estado:** ACEPTADO
 - **Contexto:** [Q-001](../00-product/OPEN_QUESTIONS.md) distingue multi-empresa en datos (`Company` N:1 `Tenant`) del sub-problema “misma persona en dos sociedades” simultáneas, que exige relajar `@@unique([userId, tenantId])` u otro modelo.
 - **Decisión:** en Phase 1 el schema Prisma **conserva** la unicidad `@@unique([userId, tenantId])`. El contexto de razón social activa en `UserMembership.companyId` (nullable) o en evoluciones de UI que **actualicen** esa única fila — no se introducen filas paralelas sin ADR de migración ([D-036](../00-product/DECISION_LOG.md)).
-- **Consecuencias:** `getMembershipByUserId` / `resolveTenantContext` permanecen alineados a **como máximo una** membresía por tenant por usuario; variante “0B” queda explícitamente fuera hasta nuevo ADR.
+- **Consecuencias:** `getMembershipByUserId` / `resolveTenantContext` permanecen alineados a **como máximo una** membresía por tenant por usuario; variante “0B” queda explícitamente fuera hasta nuevo ADR. Hasta el selector, [D-092](../00-product/DECISION_LOG.md) ancla sesión/invitaciones/proyectos a la única `Company` ACTIVE del tenant.
 
 ---
 

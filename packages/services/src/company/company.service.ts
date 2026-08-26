@@ -1,8 +1,74 @@
-import { prisma } from "@bloqer/database";
-import type { Company } from "@bloqer/database";
+import { prisma, type Prisma, type Company } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
+
+type CompanyDb = Prisma.TransactionClient | typeof prisma;
+
+/**
+ * Auto-anchor default until a company selector exists ([D-092]): use the tenant
+ * company only when there is exactly one ACTIVE `Company`. 0 or 2+ → null.
+ */
+export function pickSoleCompanyId(ids: readonly string[]): string | null {
+  return ids.length === 1 ? (ids[0] ?? null) : null;
+}
+
+export async function getSoleActiveCompanyIdForTenant(
+  tenantId: string,
+  db: CompanyDb = prisma,
+): Promise<string | null> {
+  const rows = await db.company.findMany({
+    where: { tenantId, status: "ACTIVE" },
+    select: { id: true },
+    take: 2,
+  });
+  return pickSoleCompanyId(rows.map((r) => r.id));
+}
+
+/**
+ * [D-092] Never substitute a different company when a candidate was provided
+ * but is missing/inactive. Sole-company fallback only if there was no candidate.
+ */
+export function pickResolvedCompanyId(
+  candidate: string | null,
+  candidateOk: boolean,
+  soleCompanyId: string | null,
+): string | null {
+  if (candidate) return candidateOk ? candidate : null;
+  return soleCompanyId;
+}
+
+export async function findActiveCompanyInTenant(
+  companyId: string,
+  tenantId: string,
+  db: CompanyDb = prisma,
+): Promise<string | null> {
+  const scoped = await db.company.findFirst({
+    where: { id: companyId, tenantId, status: "ACTIVE" },
+    select: { id: true },
+  });
+  return scoped?.id ?? null;
+}
+
+/**
+ * Explicit company must be ACTIVE in the tenant; otherwise the tenant's sole
+ * ACTIVE company. Does not pick among several companies.
+ */
+export async function resolveDefaultCompanyIdForTenant(
+  tenantId: string,
+  explicitCompanyId?: string | null,
+  db: CompanyDb = prisma,
+): Promise<string | null> {
+  const explicit = explicitCompanyId?.trim() || null;
+  if (explicit) {
+    const scoped = await findActiveCompanyInTenant(explicit, tenantId, db);
+    if (!scoped) {
+      throw new ServiceError("NOT_FOUND", "Empresa no encontrada en el tenant");
+    }
+    return scoped;
+  }
+  return getSoleActiveCompanyIdForTenant(tenantId, db);
+}
 
 export interface CreateCompanyInput {
   name: string;
@@ -64,31 +130,25 @@ export function preferCompanyIdCandidate(
  * Resolves an ACTIVE company id for operational writes when membership/project
  * may lack `companyId` (tenant-wide users / shared projects).
  * Explicit preferred (e.g. project company) wins over membership company.
+ * If both are unset, [D-092] auto-anchors only when the tenant has exactly one
+ * ACTIVE company (no silent pick among several).
  */
 export async function resolveActiveCompanyId(
   ctx: ServiceContext,
   preferredCompanyId?: string | null,
 ): Promise<string | null> {
-  const companyId = preferCompanyIdCandidate(preferredCompanyId, ctx.companyId);
-  if (companyId) {
-    const scoped = await prisma.company.findFirst({
-      where: { id: companyId, tenantId: ctx.tenantId, status: "ACTIVE" },
-      select: { id: true },
-    });
-    if (scoped) return scoped.id;
+  const candidate = preferCompanyIdCandidate(preferredCompanyId, ctx.companyId);
+  if (candidate) {
+    const scoped = await findActiveCompanyInTenant(candidate, ctx.tenantId);
+    return pickResolvedCompanyId(candidate, scoped != null, null);
   }
-  const first = await prisma.company.findFirst({
-    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
-    orderBy: { name: "asc" },
-    select: { id: true },
-  });
-  return first?.id ?? null;
+  return getSoleActiveCompanyIdForTenant(ctx.tenantId);
 }
 
 /**
  * Fiscal defaults for AR invoice letter UX ([D-084]).
  * Memberships often have `companyId` null (tenant-wide users); fall back to the
- * first ACTIVE company so letter A/B/C/E still appears when the tenant operates in AR.
+ * tenant's sole ACTIVE company ([D-092]) so letter A/B/C/E still appears in AR.
  */
 export async function getCompanyFiscalContext(
   ctx: ServiceContext,

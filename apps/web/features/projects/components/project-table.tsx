@@ -105,33 +105,51 @@ export function ProjectTable({ projects }: ProjectTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sorted.map((p) => (
-            <TableRow key={p.id}>
-              <TableCell className="truncate font-mono text-sm" title={p.code}>
-                {p.code}
-              </TableCell>
-              <TableCell className="truncate font-medium" title={p.name}>
-                {p.name}
-              </TableCell>
-              <TableCell
-                className="truncate text-sm text-muted-foreground"
-                title={p.client.fantasyName ?? p.client.legalName}
-              >
-                {p.client.fantasyName ?? p.client.legalName}
-              </TableCell>
-              <TableCell className="truncate text-sm text-muted-foreground">
-                {TYPE_LABELS[p.type]}
-              </TableCell>
-              <TableCell>
-                <ProjectStatusBadge status={p.status} />
-              </TableCell>
-              <TableCell>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/proyectos/${p.id}`}>Ver</Link>
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
+          {sorted.map((p) => {
+            const href = `/proyectos/${p.id}`;
+            const openLabel = `Abrir ${p.name}`;
+            return (
+              <TableRow key={p.id}>
+                <TableCell className="p-0 font-mono text-sm">
+                  <Link
+                    href={href}
+                    title={p.code || undefined}
+                    aria-label={openLabel}
+                    className="block truncate px-3 py-3 text-primary hover:underline"
+                  >
+                    {p.code || "—"}
+                  </Link>
+                </TableCell>
+                <TableCell className="p-0 font-medium">
+                  <Link
+                    href={href}
+                    title={p.name}
+                    aria-label={openLabel}
+                    className="block truncate px-3 py-3 hover:underline"
+                  >
+                    {p.name}
+                  </Link>
+                </TableCell>
+                <TableCell
+                  className="truncate text-sm text-muted-foreground"
+                  title={p.client.fantasyName ?? p.client.legalName}
+                >
+                  {p.client.fantasyName ?? p.client.legalName}
+                </TableCell>
+                <TableCell className="truncate text-sm text-muted-foreground">
+                  {TYPE_LABELS[p.type]}
+                </TableCell>
+                <TableCell>
+                  <ProjectStatusBadge status={p.status} />
+                </TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href={href}>Ver</Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </TableScroll>

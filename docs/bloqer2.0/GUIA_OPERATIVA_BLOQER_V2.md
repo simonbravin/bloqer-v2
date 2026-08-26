@@ -178,7 +178,7 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 - **Fechas y horas** en la zona de la empresa (§1.3), no en UTC del servidor ni en la zona del navegador. El detalle al hacer click debe coincidir con la columna Fecha.
 - Exports CSV/PDF usan la misma zona (el encabezado CSV indica la zona, ej. `Fecha (Buenos Aires (GMT-3))`).
 
-### 1.4 Notificaciones (campana, inbox, alertas y emails) — D-054
+### 1.4 Notificaciones (campana, inbox, alertas y emails) — D-054 / D-091
 
 Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **campana del encabezado**.
 
@@ -193,8 +193,9 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 
 - Destinatarios primarios y/o por permiso del evento, con **CC siempre a OWNER/ADMIN** activos (salvo exclusiones del actor).
 - **Excepción anti-ruido:** `CERTIFICATION_APPROVED` llega al creador ∪ OWNER/ADMIN (no se difunde a todo quien tenga VER certificaciones).
+- **Libro de obra ([D-091]):** al **enviar** un parte → campana + email a OWNER/ADMIN y a miembros del **Equipo de obra** que puedan aprobar (PM); al **devolver** o **aprobar** → autor del parte ∪ OWNER/ADMIN. Ver §8.1.
 - Cada usuario tiene su propia fila: marcar leída **no** afecta la copia de otro.
-- Compras (SC/OC), CxP/CxC y reportes: el **asunto** lleva `[organización]` y el cuerpo identifica proyecto, contraparte y actor cuando aplica. Invitaciones al equipo muestran organización, quién invitó y roles. Útil si el mismo usuario es OWNER/ADMIN de más de un workspace.
+- Compras (SC/OC), CxP/CxC, libro de obra y reportes: el **asunto** lleva `[organización]` y el cuerpo identifica proyecto, contraparte y actor cuando aplica. Invitaciones al equipo muestran organización, quién invitó y roles. Útil si el mismo usuario es OWNER/ADMIN de más de un workspace.
 
 > **Montos en notificaciones:** saldos y montos se muestran a **2 decimales** (D-053), igual que en el resto de la UI.
 
@@ -212,7 +213,7 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 - **Ruta:** `/configuracion/equipo` → **Invitar** (`/configuracion/equipo/invitar`).
 - El sistema envía un email con un enlace a **`/invitaciones/aceptar`**. El asunto va como `[organización] Invitación a Bloqer` y el cuerpo indica quién invitó y los roles. El token de invitación **no queda visible en la URL** de la pantalla de aceptación (se guarda en cookie httpOnly al hacer clic en el enlace); no hay que copiar/pegar tokens a mano.
 - Si el invitado **aún no tiene cuenta**, primero se registra / inicia sesión; al volver a aceptar, la cookie sigue vigente hasta que acepte o expire.
-- Tras aceptar, queda como miembro con uno o más roles.
+- Tras aceptar, queda como miembro con uno o más roles, anclado a la empresa del tenant cuando hay una sola razón social (no hay que elegirla).
 - Gestión de cada miembro: `/configuracion/equipo/[membershipId]`.
 - **Tenant suspendido:** no se puede aceptar una invitación a una empresa inactiva; el mensaje lo indica en pantalla.
 
@@ -434,6 +435,8 @@ Para diferencias de caja/banco que no vienen de un cobro/pago (cargos bancarios,
 
 ## 5. Crear y operar un proyecto (nivel proyecto)
 
+En el listado **Proyectos** (`/proyectos`), para entrar a una obra: **Ver**, o clic en el **código** o el **nombre**. En vista tarjetas, toda la tarjeta abre el proyecto.
+
 ### 5.1 Procedimiento — Alta de proyecto
 
 **Prerrequisitos**
@@ -452,7 +455,7 @@ Para diferencias de caja/banco que no vienen de un cobro/pago (cargos bancarios,
    - **Nombre \***
    - **Cliente \*** (buscador de contactos Cliente)
    - Ubicación / país (default AR) y fechas contractuales si aplica (metadata; **no** reemplazan al cronograma)
-3. Pulsar **Crear proyecto**.
+3. Pulsar **Crear proyecto**. El proyecto queda asociado a la empresa del tenant (si hay una sola razón social); no hay selector de empresa en el alta.
 4. El sistema abre el **Resumen** de la obra (`/proyectos/[id]`). El estado inicial es `DRAFT`.
 5. En el resumen / acciones de ciclo de vida, pulsar **Activar** (**Activar obra**) → estado `ACTIVE`. Sin activar, la operación diaria queda limitada.
 
@@ -651,11 +654,13 @@ En el Gantt: relleno oscuro de la barra = **Real**; franja/borde ámbar = **Cert
 
 **Ruta:** Operación → **Libro de obra** → `/proyectos/[id]/libro-obra`
 
+**Equipo de obra (avisos):** en el **Resumen** del proyecto, card **Equipo de obra**. Ahí se asignan usuarios activos de la organización (etiqueta PM / Capataz / Otro). Eso **no** cambia permisos de acceso: solo define quién recibe campana + email cuando hay un parte pendiente. Sin PM **con membresía activa** en el equipo, esos avisos van solo a OWNER/ADMIN. Un miembro del roster con membresía inactiva se muestra como **membresía inactiva** y no cuenta como supervisor. `/pendientes` sigue mostrando partes de todas las obras para quien puede aprobar.
+
 1. **Nuevo parte** (fecha no futura, clima, cuadrilla, tareas).
 2. Cargar **avance por partida EDT** (cantidades / % según lo que pida el formulario).
 3. Adjuntar fotos y observaciones.
-4. **Enviar a revisión** → `SUBMITTED`.
-5. El PM abre el parte y pulsa **Aprobar parte** → `APPROVED` (queda inmutable salvo anulación con motivo). Si hace falta, devolver.
+4. **Enviar a revisión** → `SUBMITTED` → **campana + email** a OWNER/ADMIN y al PM (u otros supervisores) del **Equipo de obra**.
+5. El PM abre el parte (campana, Pendientes o listado) y pulsa **Aprobar parte** → `APPROVED` (queda inmutable salvo anulación con motivo). Si hace falta, **devolver** → el autor recibe campana + email con el motivo.
 
 ```mermaid
 flowchart LR
@@ -1332,8 +1337,8 @@ flowchart LR
 | **Anticipo a proveedor** | Servicio stub (ADR-013); **sin** CTA en UI. |
 | **Cobrar ahora en factura de obra** | Disponible en alta manual de factura de proyecto ([D-077] / Q-055); requiere `EDIT TREASURY`. Certificación sigue: emitir → cobrar aparte. Corporativo: cobro opcional en Transacciones. |
 | **Ajustes de caja** | **Hay UI** de ajuste manual por cuenta (§4.3). Ajustes de **stock** siguen sin pantalla dedicada de ajuste genérico. |
-| **Notificaciones** | Sin Web Push / preferencias mute; polling 30 s en pestaña visible (D-054). |
-| **Permisos** | La matriz es de solo lectura; los roles son fijos. Techos “solo su proyecto” aún sin `ProjectMembership`. |
+| **Notificaciones** | Sin Web Push / preferencias mute; polling 30 s en pestaña visible (D-054). Libro de obra: in-app + email ([D-091]). |
+| **Permisos** | La matriz es de solo lectura; los roles son fijos. Roster `ProjectTeamMember` solo para avisos ([D-091]); techos “solo su proyecto” (R-USR-007) aún sin enforcement. |
 | **Nómina / RRHH** | Bloqer **no** liquida haberes ni aportes. El sueldo se registra como **gasto** ligado al empleado (§12.2.1). |
 | **Segundo factor (2FA)** | No disponible; acceso con Google o email/contraseña. |
 | **DOCX de guía** | Un solo entregable: `guides/Guía_Operativa_Bloqer_v2.docx`. Regenerar con `node build_guide.js` tras editar **esta** MD. |

@@ -8,6 +8,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { canViewBudgetsArea } from "../project/project-nav-guards";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { resolveActiveCompanyId } from "../company/company.service";
 
 export { canViewBudgetsArea };
 
@@ -277,11 +278,7 @@ export async function createBudget(
   if (!can(ctx.roles, "EDIT", "BUDGETS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to create budgets");
   }
-  await assertProjectAllowsBudgetPlanning(input.projectId, ctx.tenantId);
-  const projectCountry = await prisma.project.findUnique({
-    where: { id: input.projectId },
-    select: { country: true },
-  });
+  const project = await assertProjectAllowsBudgetPlanning(input.projectId, ctx.tenantId);
 
   const { name, currency, internalNotes, projectId, parentBudgetId, overheadPct, financialCostPct, financialDaysAvg, profitPct, taxPct } = input;
 
@@ -338,6 +335,7 @@ export async function createBudget(
     financialDaysAvg ?? parentSettingsDefaults?.financialDaysAvg ?? 0;
   const resolvedProfit = profitPct ?? parentSettingsDefaults?.profitPct ?? 0;
   const resolvedTax = taxPct ?? parentSettingsDefaults?.taxPct ?? 0;
+  const companyId = (await resolveActiveCompanyId(ctx, project.companyId)) ?? undefined;
 
   let budget: BudgetWithSettings;
   try {
@@ -351,12 +349,12 @@ export async function createBudget(
       const b = await tx.budget.create({
         data: {
           tenantId: ctx.tenantId,
-          companyId: ctx.companyId ?? undefined,
+          companyId,
           projectId,
           parentBudgetId: resolvedParentId,
           versionNumber,
           name,
-          currency: currency ?? (projectCountry?.country === "AR" ? "ARS" : "USD"),
+          currency: currency ?? (project.country === "AR" ? "ARS" : "USD"),
           internalNotes,
           createdBy: ctx.actorUserId,
           updatedBy: ctx.actorUserId,

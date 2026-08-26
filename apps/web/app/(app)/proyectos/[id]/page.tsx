@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { can } from "@bloqer/domain";
 import {
@@ -6,6 +5,8 @@ import {
   getProjectOverviewDashboard,
   canCancelActiveProject,
   canReactivateProject,
+  listProjectTeam,
+  listActiveMembersForProjectTeamPicker,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -51,13 +52,28 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
 
   const project = fullProject;
   const roles = current.tenantCtx.roles;
+  const canEditTeam = can(roles, "EDIT", "PROJECTS");
+  const canViewTeam = can(roles, "VIEW", "PROJECTS") || canEditTeam;
+
+  let teamMembers: Awaited<ReturnType<typeof listProjectTeam>> = [];
+  let teamPickerOptions: Awaited<ReturnType<typeof listActiveMembersForProjectTeamPicker>> = [];
+  if (canViewTeam) {
+    try {
+      teamMembers = await listProjectTeam(id, ctx);
+      if (canEditTeam) {
+        teamPickerOptions = await listActiveMembersForProjectTeamPicker(id, ctx);
+      }
+    } catch (err) {
+      if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
+    }
+  }
 
   const lifecycleActions =
     project ? (
       <ProjectLifecycleActions
         projectId={id}
         status={project.status}
-        canEditProject={can(roles, "EDIT", "PROJECTS")}
+        canEditProject={canEditTeam}
         canCancelActive={canCancelActiveProject(roles)}
         canReactivate={canReactivateProject(roles)}
       />
@@ -70,6 +86,24 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
         projectId={id}
         fullProject={fullProject}
         lifecycleActions={lifecycleActions}
+        team={{
+          members: teamMembers.map((m) => ({
+            id: m.id,
+            userId: m.userId,
+            email: m.email,
+            name: m.name,
+            kind: m.kind,
+            membershipActive: m.membershipActive,
+            canSuperviseJobsiteLog: m.canSuperviseJobsiteLog,
+          })),
+          pickerOptions: teamPickerOptions.map((o) => ({
+            userId: o.userId,
+            email: o.email,
+            name: o.name,
+          })),
+          canEdit: canEditTeam,
+          visible: canViewTeam,
+        }}
       />
     </PageShell>
   );

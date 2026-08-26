@@ -25,6 +25,8 @@ Indexes: `[tenantId, recipientUserId, status, createdAt]`, `[tenantId, projectId
 
 **Phase 8A (event-driven):** `DOCUMENT_UPLOAD_CONFIRMED`, `JOBSITE_LOG_RETURNED`, `CERTIFICATION_APPROVED`.
 
+**Jobsite log lifecycle ([D-091]):** `JOBSITE_LOG_SUBMITTED`, `JOBSITE_LOG_APPROVED` (plus existing `JOBSITE_LOG_RETURNED` with email). In-app + automatic email via `jobsite-log-notifications.service.ts`.
+
 **Phase 8B (operational alerts):** `RECEIVABLE_OVERDUE`, `PAYABLE_OVERDUE`, `NEGATIVE_STOCK`, `CERTIFICATION_APPROVED_WITHOUT_INVOICE`, `STALE_DOCUMENT_UPLOAD`.
 
 **Accounting queue (D-063):** `ACCOUNTING_DRAFTS_PENDING` — in-app only; audience `EDIT ACCOUNTING`; **24h dedupe** per `(tenant, type, recipient, company)`; `LinkedEntityType.OTHER` + `linkedEntityId = companyId`; soft-fail from `ensureDraftJournal*` after create.
@@ -42,7 +44,7 @@ Indexes: `[tenantId, recipientUserId, status, createdAt]`, `[tenantId, projectId
   - **`alwaysCcOwnerAdmin` default true** — active OWNER/ADMIN always receive a copy
   - `excludeUserId` for the actor / supervisor
 - Read/unread is **per recipient row**: marking read for user A does not affect user B’s copy.
-- No project-scoped fan-out yet (no `ProjectMembership` model).
+- **Project roster ([D-091]):** `ProjectTeamMember` is a **notification roster** (not RBAC). `resolveJobsiteLogSubmittedAudience` = team ∩ `canSuperviseJobsiteLog` ∪ OWNER/ADMIN. Full `ProjectMembership` / R-USR-007 still deferred.
 
 **Server-only** `createSystemNotification` also validates: optional **`projectId`** belongs to **`tenantId`**, and **`actionUrl`** is `null` or a same-origin path starting with `/` (not `//`).
 
@@ -174,21 +176,24 @@ Contexto de sistema: `buildOperationalAlertsCronServiceContext` + `runAllOperati
 - **Phase 8B:** new `NotificationType` values render like existing ones (title/body/severity badges).
 - **Phase 8C:** `/notificaciones/alertas` — formularios que disparan `runOperationalAlertsDispatchAction` (todas o una alerta); muestra contadores y lista breve de mensajes de error (sin stack traces); tras éxito se llama `revalidatePath` de `/notificaciones` y `/notificaciones/alertas` para refrescar badge SSR en navegación posterior.
 
-## Initial integrations (event → notification, Phase 8A)
+## Initial integrations (event → notification, Phase 8A + D-091)
 
-Best-effort `try/catch` so core flows never fail if notification insert fails. Recipients via `resolveNotificationAudience` (OWNER/ADMIN CC; actor excluded):
+Best-effort `try/catch` so core flows never fail if notification insert fails. Recipients via `resolveNotificationAudience` / `resolveJobsiteLogSubmittedAudience` (OWNER/ADMIN CC; actor excluded):
 
 1. **`confirmDocumentUpload`** — `DOCUMENT_UPLOAD_CONFIRMED` → `uploadedBy` ∪ OWNER/ADMIN; `actionUrl` when `projectId` present. Title includes the linked entity (`Documento listo · Factura FP-00005`, parte por fecha, `CERT-…`, `OC-…`) via `notification-copy.ts`.
-2. **`returnJobsiteLog`** — `JOBSITE_LOG_RETURNED` → `createdBy` ∪ OWNER/ADMIN; title `Parte devuelto · dd/mm/yyyy`; `body` includes a truncated return-notes snippet; `metadata` stores only `{ jobsiteLogId }`.
-3. **`approveCertification`** — `CERTIFICATION_APPROVED` → `createdBy` ∪ OWNER/ADMIN (sin fan-out por `VIEW CERTIFICATIONS` hasta existir asignación a obra / `ProjectMembership`); title `Certificación aprobada · CERT-007`.
+2. **Jobsite log ([D-091])** — `jobsite-log-notifications.service.ts` (in-app + email, post-commit):
+   - **`submitJobsiteLog`** — `JOBSITE_LOG_SUBMITTED` → OWNER/ADMIN ∪ `ProjectTeamMember` ∩ `canSuperviseJobsiteLog`; title `Parte pendiente · dd/mm/yyyy`; CTA detalle.
+   - **`returnJobsiteLog`** — `JOBSITE_LOG_RETURNED` → `createdBy` ∪ OWNER/ADMIN; title `Parte devuelto · dd/mm/yyyy`; CTA editar.
+   - **`approveJobsiteLog`** — `JOBSITE_LOG_APPROVED` → `createdBy` ∪ OWNER/ADMIN; title `Parte aprobado · dd/mm/yyyy`; CTA detalle.
+3. **`approveCertification`** — `CERTIFICATION_APPROVED` → `createdBy` ∪ OWNER/ADMIN (sin fan-out por `VIEW CERTIFICATIONS` hasta R-USR-007); title `Certificación aprobada · CERT-007`.
 
-## Limitations (Phase 8A–8E + D-054)
+## Limitations (Phase 8A–8E + D-054 + D-091)
 
-- **Email:** Resend **opcional** (Phase 8E); la app arranca sin `RESEND_*`. No hay envío automático desde cron ni desde creación de notificación genérica (sí best-effort en procurement). **Phase 9D:** los intentos explícitos de email quedan en `EmailDeliveryLog`.
+- **Email:** Resend **opcional** (Phase 8E); la app arranca sin `RESEND_*`. No hay envío automático desde cron ni desde creación de notificación genérica (sí best-effort en procurement, CxP/CxC y libro de obra [D-091]). **Phase 9D:** los intentos explícitos de email quedan en `EmailDeliveryLog`.
 - No **browser Web Push**, no WebSocket/SSE (polling 30s only).
 - Cron HTTP implementado (8D); **sin** cola de reintentos dedicada ni lock distribuido (dos invocaciones solapadas pueden correr en paralelo hasta que exista lock).
 - No templates UI, **no per-user notification preferences**, no dedupe beyond the 7-day window above.
-- No project-scoped routing (requires future `ProjectMembership`).
+- **Roster vs RBAC:** `ProjectTeamMember` routes jobsite-log SUBMITTED mail/campana only; does **not** filter `/pendientes` or `listProjects`. Full project-scoped permissions (R-USR-007) still deferred.
 - Operational alerts: AR/AP overdue **do** set `status` to `OVERDUE` when OPEN/PARTIAL; other alerts (stock, stale upload, cert without invoice) do **not** mutate source entities (stale uploads remain alert-only; cleanup is separate).
 - No persisted **run history** for manual operational alert executions (8C) **nor** for cron responses (8D).
 
@@ -199,7 +204,8 @@ Best-effort `try/catch` so core flows never fail if notification insert fails. R
 - Stronger dedupe (e.g. entity-level digest) if product requires it
 - Browser / mobile Web Push
 - SSE/WebSocket realtime
-- Project-scoped recipient routing
+- R-USR-007 / filter pendientes by `ProjectTeamMember`
+- Jobsite-log SUBMITTED SLA reminder (mirror procurement)
 - New event types (collections, internal transfers, etc.) when product requires them
 
 See also: [`02-modules/NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md).

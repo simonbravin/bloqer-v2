@@ -1362,6 +1362,41 @@
 
 ---
 
+### D-091 — Equipo de obra (roster) + notificaciones de libro de obra
+
+- **Fecha:** 2026-08-26
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Nadie recibía aviso de un parte pendiente de aprobación; solo “devolver” creaba in-app sin email. No hay `ProjectMembership` / R-USR-007; fan-out tenant-wide a todos los PM sería ruido. Hace falta un roster por obra para campana/mail sin fingir RBAC “solo su proyecto”.
+- **Decisión:**
+  1. Tabla **`ProjectTeamMember`** (`tenantId`, `projectId`, `userId`, `kind` etiqueta `PROJECT_MANAGER` \| `SITE_FOREMAN` \| `OTHER`). **No** se llama `ProjectMembership` y **no** cambia `can()` ni listados / `/pendientes`.
+  2. UI: card **Equipo de obra** en el resumen del proyecto; editable con `EDIT PROJECTS`. Picker de membresías ACTIVE del tenant (no reusar Configuración → Equipo).
+  3. Auto-alta al crear obra si el actor es `PROJECT_MANAGER` o `SITE_FOREMAN`. OWNER/ADMIN no se auto-agregan (ya reciben CC [D-054]). Obras existentes: roster vacío → avisos SUBMITTED solo a OWNER/ADMIN.
+  4. **Notificaciones libro de obra (in-app + email automático, best-effort):**
+     - `JOBSITE_LOG_SUBMITTED` → OWNER/ADMIN ∪ miembros del roster que `canSuperviseJobsiteLog`, menos el actor.
+     - `JOBSITE_LOG_RETURNED` → `createdBy` ∪ OWNER/ADMIN, menos el actor (+ email; antes solo in-app).
+     - `JOBSITE_LOG_APPROVED` → `createdBy` ∪ OWNER/ADMIN, menos el actor.
+  5. Fuera de alcance: filtrar `/pendientes` o `listProjects` por roster; roles distintos por obra (R-USR-007); SLA de partes viejos; mute / Web Push.
+- **Implicancias:** migración Prisma; `jobsite-log-notifications.service`; guía §8.1 / ayuda; Q-032 puede reutilizar el roster más adelante.
+- **Documentos afectados:** [`NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md), [`NOTIFICATIONS_ARCHITECTURE.md`](../08-architecture/NOTIFICATIONS_ARCHITECTURE.md), [`EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md), [`PROJECTS.md`](../02-modules/PROJECTS.md), [`JOBSITE_LOG.md`](../02-modules/JOBSITE_LOG.md), [`TECHNICAL_ERD.md`](../08-architecture/TECHNICAL_ERD.md), [`PENDING_ARCHITECTURE_ITEMS.md`](../08-architecture/PENDING_ARCHITECTURE_ITEMS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md).
+
+---
+
+### D-092 — Anclaje automático a la única empresa del tenant (hasta selector)
+
+- **Fecha:** 2026-08-26
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** `Project.companyId` y `UserMembership.companyId` son nullable. Sin selector de empresa, invitaciones y altas de obra copiaban `ctx.companyId` (a menudo null en membresías globales) y compras/facturas fallaban con “El proyecto no tiene empresa asignada”. En operación actual cada tenant es **una** razón social.
+- **Decisión:** hasta que exista selector de empresa (Q-001 / variante 0B), si el tenant tiene **exactamente una** `Company` ACTIVE:
+  1. La sesión (`getSessionTenantContext`) usa esa empresa cuando la membresía no tiene `companyId`.
+  2. Invitaciones, altas de membresía y **crear proyecto** anclan a esa empresa si no viene una explícita.
+  3. Si hay **0 o 2+** empresas ACTIVE, no se elige en silencio: queda null (haría falta selector).
+- **Implicancias:** no cambia el schema ni permite pertenencia simultánea a dos sociedades ([D-036]). Finanzas multi-empresa siguen pendientes del selector. No adivinar “la primera por nombre”.
+- **Documentos afectados:** [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md) (Q-001), [`MULTITENANCY_ARCHITECTURE.md`](../08-architecture/MULTITENANCY_ARCHITECTURE.md), [`TENANT_COMPANY_SCOPING.md`](../08-architecture/TENANT_COMPANY_SCOPING.md), [`ARCHITECTURE_DECISION_RECORDS.md`](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md) (ADR-Phase1-06), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1370,7 +1405,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-091`…).
+1. Tomar el siguiente ID disponible (`D-092`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

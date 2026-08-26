@@ -59,7 +59,7 @@ _No directas_; cruza con avance físico en [`../04-formulas/PROGRESS_FORMULAS.md
 FOREMAN crea; PM aprueba.
 
 ## 17. Eventos disparados / consumidos
-- `jobsite_log.submitted`, `jobsite_log.approved`.
+- `jobsite_log.submitted`, `jobsite_log.approved`, `jobsite_log.returned` ([D-091] notifica in-app + email).
 
 ## 18. Fase de implementación
 **Fase 1** web; **Fase 2** móvil offline.

@@ -193,6 +193,13 @@ enum ProjectType {
   PRIVATE
 }
 
+/// Roster label on a project team member ([D-091]). Does **not** grant permissions.
+enum ProjectTeamMemberKind {
+  PROJECT_MANAGER
+  SITE_FOREMAN
+  OTHER
+}
+
 enum BudgetStatus {
   DRAFT
   IN_REVIEW
@@ -540,6 +547,7 @@ model User {
   journalEntriesUpdated     JournalEntry[]             @relation("JournalEntryUpdatedBy")
   scheduledReportsCreated   ScheduledReport[]          @relation("ScheduledReportCreatedBy")
   scheduledReportRecipients ScheduledReportRecipient[] @relation("ScheduledReportRecipientUser")
+  projectTeamMemberships    ProjectTeamMember[]
 
   @@map("users")
 }
@@ -660,6 +668,7 @@ model Tenant {
   overheadAutoPeriodSnapshots OverheadAutoPeriodSnapshot[]
   periods                     Period[]
   scheduledReports            ScheduledReport[]
+  projectTeamMembers          ProjectTeamMember[]
 
   @@map("tenants")
 }
@@ -1129,11 +1138,33 @@ model Project {
   overheadAutoPeriodSnapshots OverheadAutoPeriodSnapshot[]
   auditLogs                   AuditLog[]
   scheduledReports            ScheduledReport[]
+  teamMembers                 ProjectTeamMember[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
   @@index([tenantId, clientContactId])
   @@map("projects")
+}
+
+/// Project notification roster ([D-091]). Not RBAC / R-USR-007 — labels only; fan-out uses global roles ∩ roster.
+model ProjectTeamMember {
+  id        String                @id @default(uuid())
+  tenantId  String
+  projectId String
+  userId    String
+  kind      ProjectTeamMemberKind @default(OTHER)
+  createdBy String?
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, projectId, userId])
+  @@index([tenantId, projectId])
+  @@index([tenantId, userId])
+  @@map("project_team_members")
 }
 
 // ─── Schedule / Cronograma ────────────────────────────────────────────────────
@@ -2914,6 +2945,10 @@ model DocumentAttachment {
 enum NotificationType {
   DOCUMENT_UPLOAD_CONFIRMED
   JOBSITE_LOG_RETURNED
+  /// Parte enviado a revisión ([D-091]).
+  JOBSITE_LOG_SUBMITTED
+  /// Parte aprobado ([D-091]).
+  JOBSITE_LOG_APPROVED
   CERTIFICATION_APPROVED
   RECEIVABLE_OVERDUE
   PAYABLE_OVERDUE

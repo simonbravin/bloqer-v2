@@ -17,7 +17,9 @@ Helpers canónicos: [`packages/services/src/company-scope.ts`](../../../packages
 ## 1. Modelo mental
 
 - `UserMembership.companyId` puede ser `null` (**membresía global** al tenant) o estar
-  **anclada** a una empresa. `ctx.companyId` refleja ese anclaje.
+  **anclada** a una empresa. `ctx.companyId` refleja ese anclaje. Si la membresía no
+  tiene empresa y el tenant tiene **exactamente una** `Company` ACTIVE, la sesión
+  rellena `ctx.companyId` con esa empresa ([D-092]) — no es un selector.
 - Un registro con `companyId = null` es **compartido / corporativo**: pertenece al tenant
   y debe ser visible para **cualquier** contexto de empresa.
 - Multi-empresa por tenant está permitido físicamente (N `Company` por `Tenant`); ver

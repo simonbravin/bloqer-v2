@@ -27,6 +27,7 @@ export type HelpIntent =
   | "cargar-subcontratista"
   | "roles-contacto"
   | "crear-obra"
+  | "equipo-obra"
   | "invitar-usuario"
   | "roles-permisos"
   | "politicas-compras"
@@ -140,6 +141,7 @@ export const HELP_INTENT_LABELS: Partial<Record<HelpIntent, string>> = {
   "pagar-cxp": "Pagar una cuenta por pagar",
   cobrar: "Cobrar",
   "crear-obra": "Crear una obra",
+  "equipo-obra": "Equipo de obra",
   "certificacion-cliente": "Certificar al cliente",
   conciliacion: "Conciliar el banco",
   "edt-costos": "Ver EDT y costos",

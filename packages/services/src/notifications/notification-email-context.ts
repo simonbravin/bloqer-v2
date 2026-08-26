@@ -157,6 +157,10 @@ export function actionLabelForNotification(
       return documentUploadActionLabel(linked, actionUrl);
     case "JOBSITE_LOG_RETURNED":
       return "Corregir parte";
+    case "JOBSITE_LOG_SUBMITTED":
+      return "Revisar parte";
+    case "JOBSITE_LOG_APPROVED":
+      return "Ver parte";
     default:
       return actionLabelForLinkedEntity(linked);
   }

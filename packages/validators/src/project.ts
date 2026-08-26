@@ -73,3 +73,20 @@ export const projectCancelActiveInputSchema = projectLifecycleInputSchema.extend
 export type ProjectLifecycleInput = z.infer<typeof projectLifecycleInputSchema>;
 export type ProjectReactivateInput = z.infer<typeof projectReactivateInputSchema>;
 export type ProjectCancelActiveInput = z.infer<typeof projectCancelActiveInputSchema>;
+
+/** Roster label only — does not grant permissions ([D-091]). */
+export const projectTeamMemberKindSchema = z.enum([
+  "PROJECT_MANAGER",
+  "SITE_FOREMAN",
+  "OTHER",
+]);
+
+export const addProjectTeamMemberSchema = z.object({
+  userId: z.string().uuid("Seleccioná un usuario válido"),
+  kind: projectTeamMemberKindSchema.default("OTHER"),
+});
+
+export const projectTeamMemberIdSchema = z.string().uuid("Miembro del equipo no encontrado");
+
+export type AddProjectTeamMemberInput = z.infer<typeof addProjectTeamMemberSchema>;
+export type ProjectTeamMemberKindInput = z.infer<typeof projectTeamMemberKindSchema>;

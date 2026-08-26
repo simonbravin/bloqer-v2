@@ -16,7 +16,7 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 
 ## 5. Datos que produce (outputs)
 - **Notification** in-app (obligatorio).
-- **Email transaccional** para procurement (SC/OC y recordatorios SLA) según [D-050] / [BR-PUR-015], CxP/CxC ([D-069]/[D-072]), invitaciones y reportes. Todas las plantillas usan el mismo layout: organización (tenant) en encabezado y Subject, contexto de proyecto/entidad/actor, CTA. Auth (verificar / reset) no lleva tenant. Resto del producto: ver [Q-009](../00-product/OPEN_QUESTIONS.md) (cerrada parcial).
+- **Email transaccional** para procurement (SC/OC y recordatorios SLA) según [D-050] / [BR-PUR-015], CxP/CxC ([D-069]/[D-072]), **libro de obra** ([D-091]), invitaciones y reportes. Todas las plantillas usan el mismo layout: organización (tenant) en encabezado y Subject, contexto de proyecto/entidad/actor, CTA. Auth (verificar / reset) no lleva tenant. Resto del producto: ver [Q-009](../00-product/OPEN_QUESTIONS.md) (cerrada parcial).
 
 ## 6. Entidades principales
 - **Notification**, preferencias usuario (Fase 2).
@@ -40,7 +40,8 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 - Dedupe de alertas operativas: misma entidad + destinatario en ventana de 7 días.
 - Alertas operativas de estado (AR/AP, stock, etc.): job batch automático (cron) + runner manual opcional; AR/AP vencidos **materializan** `OVERDUE` y notifican.
 - **Compras ([D-050], [BR-PUR-015]):** in-app + email en cambios de estado de SC/OC; recordatorio por antigüedad con escalamiento a OWNER/ADMIN. El cuerpo in-app y el email incluyen organización, proyecto y solicitante; el Subject del mail va prefijado con el tenant (`[Indari] …`). Fallo de email = best-effort (no aborta la mutación).
-- **Título identificable:** el título in-app (y el Subject del mail) es `{evento} · {identificador}` — p. ej. `Documento listo · Factura FP-00005`, `Listo para pagar · FP-00005`, `Parte devuelto · 24/08/2026`, `Nueva solicitud · SC-003`. El cuerpo conserva archivo, montos y notas. Helper: `packages/services/src/notifications/notification-copy.ts`. Las filas ya persistidas no se reescriben.
+- **Libro de obra ([D-091]):** in-app + email en `JOBSITE_LOG_SUBMITTED` (OWNER/ADMIN ∪ equipo de obra ∩ `canSuperviseJobsiteLog`), `JOBSITE_LOG_RETURNED` y `JOBSITE_LOG_APPROVED` (`createdBy` ∪ OWNER/ADMIN). Roster = `ProjectTeamMember` (no es RBAC). Fallo de email = best-effort.
+- **Título identificable:** el título in-app (y el Subject del mail) es `{evento} · {identificador}` — p. ej. `Documento listo · Factura FP-00005`, `Listo para pagar · FP-00005`, `Parte pendiente · 24/08/2026`, `Parte devuelto · 24/08/2026`, `Nueva solicitud · SC-003`. El cuerpo conserva archivo, montos y notas. Helper: `packages/services/src/notifications/notification-copy.ts`. Las filas ya persistidas no se reescriben.
 
 ## 11. Validaciones
 - Payload JSON schema-valid por tipo de evento.
@@ -51,7 +52,8 @@ _No aplica._
 
 ## 13. Casos borde
 - Usuario suspendido / sin membresía ACTIVE: no encolar.
-- Sin asignación usuario↔proyecto: el fan-out por permiso es a nivel tenant.
+- Sin miembros en el **Equipo de obra** (`ProjectTeamMember`): `JOBSITE_LOG_SUBMITTED` llega solo a OWNER/ADMIN ([D-091]). El fan-out genérico por permiso (sin roster) sigue siendo a nivel tenant para otros módulos.
+- Capataz en el roster sin techo de supervisión: no recibe avisos de partes pendientes; sí recibe devolución/aprobación de *su* parte vía `createdBy`.
 
 ## 14. Reportes relacionados
 _No usuario final_; métricas internas uso email (`EmailDeliveryLog`).
@@ -69,4 +71,4 @@ Bandeja personal: cualquier usuario autenticado con tenant. Alertas operativas y
 In-app + campana con polling ([D-054]); email según [Q-009] / [D-050].
 
 ## 19. Preguntas abiertas
-- Preferencias / mute, Web Push, routing por obra, nuevos tipos (cobros, transferencias): diferidos — ver limitaciones en arquitectura.
+- Preferencias / mute, Web Push, RBAC “solo su proyecto” (R-USR-007 sobre `ProjectTeamMember`), SLA de partes SUBMITTED, nuevos tipos (cobros, transferencias): diferidos — ver limitaciones en arquitectura.

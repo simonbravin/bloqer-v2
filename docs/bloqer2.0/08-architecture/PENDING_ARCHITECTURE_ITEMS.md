@@ -14,6 +14,7 @@
 | P-ERD-05 | Modelo fino de **`tax_line`** y polimorfismos | Normalización vs pragmatismo Fase 1 |
 | P-ERD-06 | Entidad **línea de extracto** en conciliación bancaria | **HECHO 2026-08-08** — tabla `BankStatementLine` ([D-081]) |
 | P-ERD-07 | **UUID v4 vs v7** | **HECHO 2026-05-07** — UUID v4 elegido. Ver ADR-Phase1-01. |
+| P-ERD-08 | **Equipo de obra / R-USR-007** | **Parcial 2026-08-26 ([D-091]):** tabla `ProjectTeamMember` = roster de notificaciones. RBAC “solo su proyecto” / filtrar `/pendientes` **pendiente**. |
 
 ## Gastos generales → obra (D-040)
 
