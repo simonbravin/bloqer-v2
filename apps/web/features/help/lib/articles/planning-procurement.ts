@@ -93,7 +93,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "project", suffix: "/libro-obra", label: "Libro de obra" }],
     steps: [
       "Operación → Libro de obra → nuevo parte.",
-      "Clima, cuadrilla, avance por partida EDT, fotos. En mano de obra, buscá el contacto por razón social o nombre fantasía.",
+      "Clima, cuadrilla, fotos. En avance: agregá una fila, elegí la partida EDT y la cantidad (% del día se precarga). En mano de obra, buscá el contacto por razón social o nombre fantasía.",
       "Enviar (SUBMITTED): el PM del Equipo de obra (y OWNER/ADMIN) reciben campana + email.",
       "Si te lo devuelven, corregí desde el enlace de la notificación.",
     ],
@@ -101,8 +101,12 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Al aprobar: avance real del cronograma (+ consumo stock si aplica).",
       "Al aprobar/devolver: el autor recibe campana + email.",
     ],
+    pitfalls: [
+      "Cada fila de avance necesita partida EDT y cantidad. Si falta alguno, el parte no se guarda.",
+      "En materiales, descripción y cantidad son obligatorios: una fila a medias no se graba.",
+    ],
     relatedSlugs: ["registrar-consumo-materiales", "asignar-equipo-de-obra", "usar-notificaciones"],
-    keywords: ["libro de obra", "parte diario", "capataz", "avance", "parte pendiente"],
+    keywords: ["libro de obra", "parte diario", "capataz", "avance", "parte pendiente", "avance de obra"],
     guideRef: "§8",
   },
   {
@@ -292,7 +296,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     steps: [
       "Nueva OC o desde SC seleccionada. Proveedor: buscá por razón social o nombre fantasía. Cada línea: partida hoja, cantidades/precios y Desc. % (antes de IVA). Descuento general % + Aplicar a todas copia el mismo % (hay que ingresar un número; 0 limpia todas).",
       "Ref. presup. muestra el insumo de materiales del APU, o el costo dir. /u de la partida si esa partida no tiene materiales (p. ej. solo mano de obra).",
-      "Enviar a aprobación → Aprobar (o Devolver a borrador con motivo). Si el precio supera el referencial, completá Justificación desvío. Comprar por debajo no pide nota.",
+      "Enviar a aprobación → Aprobar (o Devolver a borrador con motivo). Si el precio supera el referencial, completá Justificación desvío. Comprar por debajo no pide nota. El % de desvío se ve en rojo si se gasta más y en verde si se gasta menos.",
       "Confirmar al proveedor → CONFIRMED = Comprometido en EDT y costos.",
       "Luego recepción y factura.",
     ],
@@ -322,6 +326,8 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "ref presup",
       "valor referencial",
       "justificacion desvio",
+      "desvio verde",
+      "desvio rojo",
     ],
     guideRef: "§9.2",
   },

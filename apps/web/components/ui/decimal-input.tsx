@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   DISPLAY_DECIMALS,
   formatDecimalEditBuffer,
@@ -110,7 +111,10 @@ export function DecimalInput({
     const form = visibleRef.current?.form;
     if (!form) return;
     const onSubmit = () => {
-      commitRef.current(draftRef.current);
+      // Capture-phase: commit before the form reads React state (jobsite log qty, money, etc.).
+      flushSync(() => {
+        commitRef.current(draftRef.current);
+      });
     };
     form.addEventListener("submit", onSubmit, true);
     return () => form.removeEventListener("submit", onSubmit, true);
@@ -144,7 +148,7 @@ export function DecimalInput({
             return;
           }
           try {
-            emitCanonical(roundToDecimals(parsed, scale));
+            emitCanonical(roundToDecimals(parsed, scaleRef.current));
           } catch {
             /* incomplete token */
           }

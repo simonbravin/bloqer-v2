@@ -661,7 +661,7 @@ En el Gantt: relleno oscuro de la barra = **Real**; franja/borde ámbar = **Cert
 **Equipo de obra (avisos):** en el **Resumen** del proyecto, card **Equipo de obra**. Ahí se asignan usuarios activos de la organización (etiqueta PM / Capataz / Otro). Eso **no** cambia permisos de acceso: solo define quién recibe campana + email cuando hay un parte pendiente. Sin PM **con membresía activa** en el equipo, esos avisos van solo a OWNER/ADMIN. Un miembro del roster con membresía inactiva se muestra como **membresía inactiva** y no cuenta como supervisor. `/pendientes` sigue mostrando partes de todas las obras para quien puede aprobar.
 
 1. **Nuevo parte** (fecha no futura, clima, cuadrilla, tareas). En **mano de obra**, el contacto se busca por razón social o nombre fantasía.
-2. Cargar **avance por partida EDT** (cantidades / % según lo que pida el formulario).
+2. Cargar **avance por partida EDT**: cada fila necesita **partida** y **cantidad** (el % del día y la cantidad sugerida se precargan al elegir partida). Si falta alguno, el parte **no se guarda** y se muestra el error.
 3. Adjuntar fotos y observaciones.
 4. **Enviar a revisión** → `SUBMITTED` → **campana + email** a OWNER/ADMIN y al PM (u otros supervisores) del **Equipo de obra**.
 5. El PM abre el parte (campana, Pendientes o listado) y pulsa **Aprobar parte** → `APPROVED` (queda inmutable salvo anulación con motivo). Si hace falta, **devolver** → el autor recibe campana + email con el motivo.
@@ -772,7 +772,7 @@ flowchart LR
    > No existe atajo “Emitir y confirmar (rápido)”: siempre Enviar → Aprobar → Confirmar.
 5. **Registrar recepción** (parcial o total).
 6. Con cantidades recibidas: **Registrar factura desde OC** (o alta manual en Facturas proveedor).
-7. Desvíos de precio vs referencia: si el PU **supera** el referencial (umbrales de políticas), pide **Justificación desvío**. Comprar por debajo del presupuesto no exige nota. Sin referencial de partida (APU y costo dir. /u en cero) sí pide justificación.
+7. Desvíos de precio vs referencia: si el PU **supera** el referencial (umbrales de políticas), pide **Justificación desvío**. Comprar por debajo no exige nota. En la ficha, el % se muestra en **rojo** si se gasta más y en **verde** si se gasta menos; la nota de justificación queda debajo (sin códigos internos de estado). Sin referencial de partida (APU y costo dir. /u en cero) sí pide justificación.
 8. **OC directa** (sin SC): solo si la política de compras lo habilita; umbrales altos pueden exigir motivo de emergencia (`OWNER`/`ADMIN`).
 
 | Hito | Impacto |

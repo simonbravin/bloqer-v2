@@ -47,7 +47,7 @@ export default async function NuevoParteObraPage({ params }: PageProps) {
   let wbsProgressSnapshot: Awaited<ReturnType<typeof getWbsIncrementalProgressSnapshot>>;
   try {
     [wbsRaw, pickList, wbsProgressSnapshot] = await Promise.all([
-      listProjectWbsItemsForLog(projectId, ctx).catch(() => []),
+      listProjectWbsItemsForLog(projectId, ctx),
       getJobsiteLogFormPickList(projectId, ctx),
       getWbsIncrementalProgressSnapshot(projectId, ctx),
     ]);

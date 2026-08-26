@@ -19,7 +19,7 @@ import {
 } from "@/lib/searchable-options";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { WbsIncrementalProgressSnapshot } from "@bloqer/services";
-import { addDecimal, compareDecimal, DISPLAY_DECIMALS, multiplyDecimal, roundToDecimals, toIsoDateInTimeZone } from "@bloqer/utils";
+import { addDecimal, compareDecimal, DISPLAY_DECIMALS, multiplyDecimal, QTY_DECIMALS, roundToDecimals, toIsoDateInTimeZone } from "@bloqer/utils";
 import { compareQty, formatQtyDisplay, formatRatePctFromString } from "@/lib/format-money";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import {
@@ -28,6 +28,15 @@ import {
   isKnownJobsiteShift,
   isKnownJobsiteWeather,
 } from "../lib/jobsite-log-options";
+import {
+  applyProgressWbsSelection,
+  JOBSITE_PROGRESS_NONE,
+  JOBSITE_QTY_RE,
+  prepareMaterialLinesForSubmit,
+  prepareProgressLinesForSubmit,
+  type JobsiteLogMaterialDraft,
+  type JobsiteLogProgressDraft,
+} from "../lib/jobsite-log-form-lines";
 
 export type WbsItemOption = {
   id: string;
@@ -42,20 +51,34 @@ export type ProductOption  = { id: string; name: string };
 export type WarehouseOption = { id: string; name: string };
 export type SubcontractOption = { id: string; code: string; title: string };
 
-type ProgressLine = { wbsNodeId: string; description: string; quantityCompleted: string; physicalPct: string; notes: string };
-type LaborLine    = { contactId: string; subcontractId: string; crewDescription: string; workersCount: string; hoursWorked: string; notes: string };
-type MaterialLine = { productId: string; warehouseId: string; description: string; quantity: string; notes: string };
-type IssueLine    = { type: string; severity: string; description: string; status: string; notes: string };
+type ProgressLine = JobsiteLogProgressDraft & { rowKey: string };
+type LaborLine    = { rowKey: string; contactId: string; subcontractId: string; crewDescription: string; workersCount: string; hoursWorked: string; notes: string };
+type MaterialLine = JobsiteLogMaterialDraft & { rowKey: string };
+type IssueLine    = { rowKey: string; type: string; severity: string; description: string; status: string; notes: string };
 
-const DEFAULT_PROGRESS: ProgressLine  = { wbsNodeId: "__none__", description: "", quantityCompleted: "", physicalPct: "", notes: "" };
-const DEFAULT_LABOR: LaborLine        = { contactId: "__none__", subcontractId: "__none__", crewDescription: "", workersCount: "1", hoursWorked: "", notes: "" };
-const DEFAULT_MATERIAL: MaterialLine  = { productId: "__none__", warehouseId: "__none__", description: "", quantity: "", notes: "" };
-const DEFAULT_ISSUE: IssueLine        = { type: "INCIDENT", severity: "MEDIUM", description: "", status: "OPEN", notes: "" };
+function newRowKey(): string {
+  return crypto.randomUUID();
+}
 
-const QTY_RE = /^\d+(\.\d+)?$/;
+function withRowKeys<T>(rows: T[]): (T & { rowKey: string })[] {
+  return rows.map((row) => ({ ...row, rowKey: newRowKey() }));
+}
 
-function isValidProgressLine(p: ProgressLine): boolean {
-  return p.wbsNodeId !== "__none__" && QTY_RE.test(p.quantityCompleted);
+const DEFAULT_PROGRESS: Omit<ProgressLine, "rowKey"> = { wbsNodeId: JOBSITE_PROGRESS_NONE, description: "", quantityCompleted: "", physicalPct: "", notes: "" };
+const DEFAULT_LABOR: Omit<LaborLine, "rowKey">        = { contactId: "__none__", subcontractId: "__none__", crewDescription: "", workersCount: "1", hoursWorked: "", notes: "" };
+const DEFAULT_MATERIAL: Omit<MaterialLine, "rowKey">  = { productId: "__none__", warehouseId: "__none__", description: "", quantity: "", notes: "" };
+const DEFAULT_ISSUE: Omit<IssueLine, "rowKey">        = { type: "INCIDENT", severity: "MEDIUM", description: "", status: "OPEN", notes: "" };
+
+function useSyncedList<T>(initial: T[]) {
+  const [items, setItems] = useState(initial);
+  const ref = useRef(items);
+  const set = useCallback((updater: T[] | ((prev: T[]) => T[])) => {
+    const prev = ref.current;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    ref.current = next;
+    setItems(next);
+  }, []);
+  return [items, set, ref] as const;
 }
 
 /** Drop blank draft rows (defaults are workersCount=1 with no other fields). */
@@ -77,7 +100,7 @@ function remainingPctForWbs(
   draftProgress?: ProgressLine[],
   excludeIndex?: number,
 ): string {
-  if (wbsNodeId === "__none__") return "";
+  if (wbsNodeId === JOBSITE_PROGRESS_NONE) return "";
   const entry = snapshot[wbsNodeId];
   let rem = entry?.remainingPct != null ? entry.remainingPct : "100";
   if (draftProgress) {
@@ -100,7 +123,7 @@ function approvedPctForWbs(
   wbsNodeId: string,
   snapshot: WbsIncrementalProgressSnapshot,
 ): string {
-  if (wbsNodeId === "__none__") return "0";
+  if (wbsNodeId === JOBSITE_PROGRESS_NONE) return "0";
   return snapshot[wbsNodeId]?.approvedIncrementalPct ?? "0";
 }
 
@@ -109,7 +132,7 @@ function cumulativePctLabel(
   progress: ProgressLine[],
   snapshot: WbsIncrementalProgressSnapshot,
 ): string {
-  if (wbsNodeId === "__none__") return "— / 100";
+  if (wbsNodeId === JOBSITE_PROGRESS_NONE) return "— / 100";
   let total = approvedPctForWbs(wbsNodeId, snapshot);
   for (const row of progress) {
     if (row.wbsNodeId !== wbsNodeId || !row.physicalPct) continue;
@@ -138,10 +161,10 @@ type Props = {
     shift: string;
     weather: string;
     generalNotes: string;
-    progress: ProgressLine[];
-    labor: LaborLine[];
-    materials: MaterialLine[];
-    issues: IssueLine[];
+    progress: JobsiteLogProgressDraft[];
+    labor: Omit<LaborLine, "rowKey">[];
+    materials: JobsiteLogMaterialDraft[];
+    issues: Omit<IssueLine, "rowKey">[];
   };
   submitLabel?: string;
   mode?: "create" | "edit";
@@ -174,10 +197,10 @@ export function JobsiteLogForm({
   const router = useRouter();
   const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
 
-  const [progress,  setProgress]  = useState<ProgressLine[]>(defaultValues?.progress  ?? []);
-  const [labor,     setLabor]     = useState<LaborLine[]>(defaultValues?.labor     ?? []);
-  const [materials, setMaterials] = useState<MaterialLine[]>(defaultValues?.materials ?? []);
-  const [issues,    setIssues]    = useState<IssueLine[]>(defaultValues?.issues    ?? []);
+  const [progress,  setProgress, progressRef]  = useSyncedList<ProgressLine>(withRowKeys(defaultValues?.progress  ?? []));
+  const [labor,     setLabor, laborRef]        = useSyncedList<LaborLine>(withRowKeys(defaultValues?.labor     ?? []));
+  const [materials, setMaterials, materialsRef] = useSyncedList<MaterialLine>(withRowKeys(defaultValues?.materials ?? []));
+  const [issues,    setIssues, issuesRef]      = useSyncedList<IssueLine>(withRowKeys(defaultValues?.issues    ?? []));
   const [shift, setShift] = useState(defaultValues?.shift ?? "");
   const [weather, setWeather] = useState(defaultValues?.weather ?? "");
   const [error,     setError]     = useState<string | null>(null);
@@ -228,7 +251,7 @@ export function JobsiteLogForm({
     if (!inventoryModuleEnabled) return false;
     const qtyByPair = new Map<string, string>();
     for (const m of materials) {
-      if (m.productId === "__none__" || m.warehouseId === "__none__" || !QTY_RE.test(m.quantity)) continue;
+      if (m.productId === "__none__" || m.warehouseId === "__none__" || !JOBSITE_QTY_RE.test(m.quantity)) continue;
       const key = `${m.productId}:${m.warehouseId}`;
       qtyByPair.set(key, addDecimal(qtyByPair.get(key) ?? "0", m.quantity));
     }
@@ -284,15 +307,7 @@ export function JobsiteLogForm({
         if (val === r.wbsNodeId) return r;
         const rem = remainingPctForWbs(val, wbsProgressSnapshot, prev, i);
         const wbs = wbsOptions.find((w) => w.id === val);
-        const next: ProgressLine = {
-          ...r,
-          wbsNodeId: val,
-          physicalPct: rem,
-        };
-        if (!r.description.trim() && wbs) {
-          next.description = `${wbs.code} — ${wbs.name}`;
-        }
-        return next;
+        return { ...applyProgressWbsSelection(r, wbs, rem), rowKey: r.rowKey };
       }),
     );
   }
@@ -319,6 +334,34 @@ export function JobsiteLogForm({
       setError("Una o más líneas de material superan el stock disponible.");
       return;
     }
+    const prepared = prepareProgressLinesForSubmit(progressRef.current, wbsOptions);
+    if ("error" in prepared) {
+      setError(prepared.error);
+      return;
+    }
+    setProgress(
+      prepared.filled.map((line, i) => ({
+        ...line,
+        rowKey: progressRef.current[i]?.rowKey ?? newRowKey(),
+      })),
+    );
+
+    const preparedMaterials = prepareMaterialLinesForSubmit(materialsRef.current);
+    if ("error" in preparedMaterials) {
+      setError(preparedMaterials.error);
+      return;
+    }
+    const laborForSave = laborRef.current.filter(isMeaningfulLaborLine);
+    if (laborForSave.some((l) => l.hoursWorked.trim() && !JOBSITE_QTY_RE.test(l.hoursWorked.trim()))) {
+      setError("Las horas de mano de obra deben ser un número válido.");
+      return;
+    }
+    const issuesForSave = issuesRef.current.filter((iss) => iss.description.trim() || iss.notes.trim());
+    if (issuesForSave.some((iss) => !iss.description.trim())) {
+      setError("Cada incidencia necesita descripción.");
+      return;
+    }
+
     setPending(true);
     setError(null);
     const fd = new FormData(e.currentTarget);
@@ -328,16 +371,8 @@ export function JobsiteLogForm({
       fd.set("idempotencyKey", idempotencyKey);
     }
 
-    const validProgress = progress.filter(isValidProgressLine);
-    fd.set("progress",  JSON.stringify(validProgress.map((p, i) => ({
-      wbsNodeId: p.wbsNodeId,
-      description: p.description || undefined,
-      quantityCompleted: p.quantityCompleted,
-      physicalPct: p.physicalPct || undefined,
-      notes: p.notes || undefined,
-      sortOrder: i,
-    }))));
-    fd.set("labor", JSON.stringify(labor.filter(isMeaningfulLaborLine).map((l, i) => ({
+    fd.set("progress", JSON.stringify(prepared.payload));
+    fd.set("labor", JSON.stringify(laborForSave.map((l, i) => ({
       contactId: l.contactId === "__none__" ? undefined : l.contactId,
       subcontractId: l.subcontractId === "__none__" ? undefined : l.subcontractId,
       crewDescription: l.crewDescription || undefined,
@@ -346,15 +381,8 @@ export function JobsiteLogForm({
       notes: l.notes || undefined,
       sortOrder: i,
     }))));
-    fd.set("materials", JSON.stringify(materials.filter((m) => m.description.trim() && QTY_RE.test(m.quantity)).map((m, i) => ({
-      productId: m.productId === "__none__" ? undefined : m.productId,
-      warehouseId: m.warehouseId === "__none__" ? undefined : m.warehouseId,
-      description: m.description,
-      quantity: m.quantity,
-      notes: m.notes || undefined,
-      sortOrder: i,
-    }))));
-    fd.set("issues", JSON.stringify(issues.filter((iss) => iss.description.trim()).map((iss, i) => ({
+    fd.set("materials", JSON.stringify(preparedMaterials.payload));
+    fd.set("issues", JSON.stringify(issuesForSave.map((iss, i) => ({
       type: iss.type,
       severity: iss.severity,
       description: iss.description,
@@ -397,6 +425,8 @@ export function JobsiteLogForm({
         }
         router.refresh();
       }
+    } catch {
+      setError("Error inesperado al guardar el parte.");
     } finally {
       setPending(false);
     }
@@ -501,12 +531,23 @@ export function JobsiteLogForm({
       <section className="form-section space-y-3 p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Avance de obra</h2>
-          <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={() => setProgress((p) => [...p, { ...DEFAULT_PROGRESS }])}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-11 md:min-h-8"
+            disabled={wbsOptions.length === 0}
+            onClick={() => setProgress((p) => [...p, { ...DEFAULT_PROGRESS, rowKey: newRowKey() }])}
+          >
             + Agregar fila
           </Button>
         </div>
-        {progress.length === 0 ? (
-          <ListEmptyState message="Sin registros de avance." className="p-6" />
+        {wbsOptions.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No hay partidas EDT de un presupuesto aprobado. Sin partida no se puede guardar el avance.
+          </p>
+        ) : progress.length === 0 ? (
+          <ListEmptyState message="Sin registros de avance. Agregá una fila, elegí la partida EDT y la cantidad." className="p-6" />
         ) : (
           <div className="space-y-3">
             {progress.map((row, i) => {
@@ -520,9 +561,9 @@ export function JobsiteLogForm({
               );
               const approvedQty = wbsProgressSnapshot[row.wbsNodeId]?.approvedQty;
               return (
-              <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset">
+              <div key={row.rowKey} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                 <div className="space-y-1">
-                  <Label className="text-xs">Partida EDT</Label>
+                  <Label className="text-xs">Partida EDT *</Label>
                   <SearchableCombobox
                     popoverWidth="wide"
                     className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"
@@ -540,9 +581,15 @@ export function JobsiteLogForm({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">
-                      Cantidad{wbs?.unit ? ` (${wbs.unit})` : ""}
+                      Cantidad *{wbs?.unit ? ` (${wbs.unit})` : ""}
                     </Label>
-                    <DecimalInput className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.quantityCompleted} onValueChange={(v) => updateProgress(i, "quantityCompleted", v)} placeholder="0,00" />
+                    <DecimalInput
+                      className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"
+                      value={row.quantityCompleted}
+                      onValueChange={(v) => updateProgress(i, "quantityCompleted", v)}
+                      placeholder="0,00"
+                      scale={QTY_DECIMALS}
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">% del día</Label>
@@ -564,7 +611,7 @@ export function JobsiteLogForm({
                     <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateProgress(i, "notes", e.target.value)} />
                   </div>
                 </div>
-                {row.wbsNodeId !== "__none__" ? (
+                {row.wbsNodeId !== JOBSITE_PROGRESS_NONE ? (
                   <p className="text-[11px] text-muted-foreground">
                     Ya {formatRatePctFromString(approvedPct)}%
                     {approvedQty != null ? ` · Qty aprobada ${formatQtyDisplay(approvedQty)}` : ""}
@@ -589,7 +636,7 @@ export function JobsiteLogForm({
       <section className="form-section space-y-3 p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Mano de obra</h2>
-          <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={() => setLabor((p) => [...p, { ...DEFAULT_LABOR }])}>
+          <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={() => setLabor((p) => [...p, { ...DEFAULT_LABOR, rowKey: newRowKey() }])}>
             + Agregar fila
           </Button>
         </div>
@@ -598,7 +645,7 @@ export function JobsiteLogForm({
         ) : (
           <div className="space-y-3">
             {labor.map((row, i) => (
-              <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset">
+              <div key={row.rowKey} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Contacto</Label>
@@ -669,7 +716,7 @@ export function JobsiteLogForm({
               <p className="text-xs text-muted-foreground mt-0.5">Sin control de stock (módulo inventario no disponible).</p>
             )}
           </div>
-          <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={() => setMaterials((p) => [...p, { ...DEFAULT_MATERIAL }])}>
+          <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={() => setMaterials((p) => [...p, { ...DEFAULT_MATERIAL, rowKey: newRowKey() }])}>
             + Agregar fila
           </Button>
         </div>
@@ -682,11 +729,11 @@ export function JobsiteLogForm({
               const stockKey = row.productId !== "__none__" && row.warehouseId !== "__none__"
                 ? `${row.productId}:${row.warehouseId}` : null;
               const exceedsStock = stockKey && stockByKey[stockKey] !== undefined
-                && QTY_RE.test(row.quantity)
+                && JOBSITE_QTY_RE.test(row.quantity)
                 && compareQty(row.quantity, stockByKey[stockKey]!) > 0;
 
               return (
-                <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset">
+                <div key={row.rowKey} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label className="text-xs">Producto</Label>
@@ -724,7 +771,7 @@ export function JobsiteLogForm({
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Cantidad</Label>
-                      <DecimalInput className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.quantity} onValueChange={(v) => updateMaterial(i, "quantity", v)} placeholder="0,00" />
+                      <DecimalInput className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.quantity} onValueChange={(v) => updateMaterial(i, "quantity", v)} placeholder="0,00" scale={QTY_DECIMALS} />
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -747,7 +794,7 @@ export function JobsiteLogForm({
       <section className="form-section space-y-3 p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Problemas / Incidencias</h2>
-          <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={() => setIssues((p) => [...p, { ...DEFAULT_ISSUE }])}>
+          <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={() => setIssues((p) => [...p, { ...DEFAULT_ISSUE, rowKey: newRowKey() }])}>
             + Agregar fila
           </Button>
         </div>
@@ -756,7 +803,7 @@ export function JobsiteLogForm({
         ) : (
           <div className="space-y-3">
             {issues.map((row, i) => (
-              <div key={i} className="rounded-md border p-4 space-y-3 shell-surface-inset">
+              <div key={row.rowKey} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Tipo</Label>

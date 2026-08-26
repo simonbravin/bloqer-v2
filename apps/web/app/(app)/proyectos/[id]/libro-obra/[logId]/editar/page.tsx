@@ -60,13 +60,12 @@ export default async function EditarParteObraPage({ params }: PageProps) {
   let wbsProgressSnapshot: Awaited<ReturnType<typeof getWbsIncrementalProgressSnapshot>>;
   try {
     [wbsRaw, pickList, wbsProgressSnapshot] = await Promise.all([
-      listProjectWbsItemsForLog(projectId, ctx).catch(() => []),
+      listProjectWbsItemsForLog(projectId, ctx),
       getJobsiteLogFormPickList(projectId, ctx),
       getWbsIncrementalProgressSnapshot(projectId, ctx, { excludeLogId: logId }),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
-    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
