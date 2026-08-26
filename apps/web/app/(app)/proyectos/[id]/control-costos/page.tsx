@@ -178,7 +178,12 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
               {sp.wbsSearch ? ` que coincidan con "${sp.wbsSearch}"` : ""}.
             </div>
           ) : (
-            <CostControlTable rows={result.rows} totals={result.totals} projectId={projectId} />
+            <CostControlTable
+              rows={result.rows}
+              totals={result.totals}
+              projectId={projectId}
+              filters={{ budgetId: sp.budgetId, dateFrom: sp.dateFrom, dateTo: sp.dateTo }}
+            />
           )}
 
           {(Number(result.unallocatedCommittedCost) > 0 ||

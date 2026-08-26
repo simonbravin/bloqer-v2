@@ -990,22 +990,23 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 ### 13.1 EDT y costos (control de costos)
 
 - **Menú:** Planificación → **EDT y costos**.
-- **Ruta:** `/proyectos/[id]/control-costos` (título de pantalla: **Estructura de Desglose de Trabajo y Costos**; drill-down en `/control-costos/[wbsNodeId]`).
+- **Ruta:** `/proyectos/[id]/control-costos` (título de pantalla: **Estructura de Desglose de Trabajo y Costos**).
+- **Detalle de partida:** en el listado, tocá una fila (código o nombre, p. ej. `1.1 Replanteo de Obra`) para abrir el detalle en un **diálogo**, sin salir del tablero. La ruta directa `/control-costos/[wbsNodeId]` sigue disponible (p. ej. Ctrl+clic o desde Materiales / reportes).
 - Es el **tablero de control de costos** del proyecto. Materiales (cantidades) y Compras (documentos) alimentan este tablero; no lo reemplazan.
 - Compara **presupuesto baseline vs. real** por partida EDT, en capas: **comprometido**, **recibido** (informativo), **devengado**, **pagado**, más **certificado acumulado**. Es el tablero de **afectaciones** por partida (§0.2).
 - Si las líneas de factura de proveedor tienen partida EDT, el devengado/pagado se imputa **por línea**; si hay vínculo a línea de OC (`purchaseOrderLineId`, D-066), se usa esa partida; si no (legacy), se prorratea vía OC (D-055).
 - **Exposición esperada** = **devengado + comprometido abierto** ([BR-COS-002] / [D-065]). Comprometido abierto = comprometido − devengado ligado al mismo compromiso. **No** usar `max(comprometido, recibido, devengado)` ni sumar OC + factura en bruto.
-- **Drill-down de partida:** links a OC, subcontratos, facturas de proveedor y pagos (trazabilidad partida → documento).
+- **Detalle de partida (diálogo):** links a OC, subcontratos, facturas de proveedor y pagos (trazabilidad partida → documento).
 - **Matching 3 vías (compras):** en detalle de OC, avisos si facturado supera recibido ± tolerancia de empresa ([D-067]); la recepción respeta tolerancia de sobrecantidad (0–5%).
 - **Insumo APU en OC (opcional):** se puede elegir un material del APU de la partida para prellenar; la imputación de $ sigue en la partida EDT ([D-068] / [D-057]).
 
 **Smoke manual — trazabilidad partida → pago**
 
-1. Planificación → **EDT y costos** → abrir una partida con saldo.
+1. Planificación → **EDT y costos** → abrir una partida con saldo (diálogo).
 2. Compras → crear/confirmar **OC** imputada a esa partida (insumo APU opcional).
 3. Registrar **recepción**; crear **factura de proveedor** desde la OC (“Traer líneas”) y **emitir**.
 4. Registrar **pago** de la CxP.
-5. Volver al drill-down de la partida: deben aparecer links a OC, factura y pago; la exposición = devengado + comprometido abierto.
+5. Volvé a abrir la partida en el diálogo: deben aparecer links a OC, factura y pago; la exposición = devengado + comprometido abierto.
 
 <!-- capture:36 edt-y-costos -->
 ![Bloqer — EDT y costos](./guides/assets/screenshots/36-edt-y-costos.png)
@@ -1017,7 +1018,7 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 - **Hub:** Planificación → **Reportes** → `/proyectos/[id]/reportes` (título: **Reportes del proyecto**).
 - Cards típicas (según permisos/módulos): **Rentabilidad**, **Presupuesto vs real**, **EDT y costos**, **Composición presupuesto** (abre el mismo reporte de varianza), **Compras y proveedores**, **Materiales**, **Subcontratos**, **Certificaciones**, **Ingresos vs gastos**, **Caja y proyección**, **Flujo de caja (detalle)**, aging CxC/CxP.
 - **Rentabilidad:** `/proyectos/[id]/reportes/rentabilidad` (margen bruto; neto según overhead imputado, visible a `OWNER`/`ADMIN`).
-- **Presupuesto vs real:** `/proyectos/[id]/reportes/presupuesto-vs-real`.
+- **Presupuesto vs real:** `/proyectos/[id]/reportes/presupuesto-vs-real` (indicadores en una fila, gráfico de composición y tabla de varianza por partida).
 - **Exportar:** en cada pantalla de reporte, menú **Exportar** → **CSV** / **PDF** (o botón **Exportar PDF** si solo hay PDF). Contabilidad/tesorería/finanzas/inventario/registro siguen el mismo patrón; algunos libros ofrecen también XLSX.
 - **Envíos programados por email:** `/proyectos/[id]/reportes/programados` (si el rol puede gestionarlos).
 
@@ -1264,7 +1265,7 @@ flowchart LR
 - [ ] Certificaciones periódicas (y CTA a factura cuando corresponda)
 - [ ] Recepciones (Compras) y consumos (Operación) al día
 - [ ] **EDT y costos** revisado semanalmente (tablero de $; Materiales = cantidades; Compras = documentos)
-- [ ] Smoke: partida → OC → factura → pago visible en drill-down de EDT y costos
+- [ ] Smoke: partida → OC → factura → pago visible en el diálogo de la partida en EDT y costos
 
 ### Capataz
 

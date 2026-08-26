@@ -10,6 +10,7 @@ import {
 import {
   ReportDateFilters,
   ReportExportActions,
+  ReportSubnav,
   SubcontractCertChart,
   SubcontractContractsTable,
   SubcontractWbsVarianceTable,
@@ -92,14 +93,14 @@ export default async function ReporteSubcontratosPage({ params, searchParams }: 
         }
       />
 
-      <div className="flex flex-wrap gap-2 text-sm">
+      <ReportSubnav>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/reportes`}>← Reportes</Link>
         </Button>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/subcontratos`}>Ir a subcontratos</Link>
         </Button>
-      </div>
+      </ReportSubnav>
 
       <ReportDateFilters budgets={availableBudgets} currentBudgetId={sp.budgetId} />
 

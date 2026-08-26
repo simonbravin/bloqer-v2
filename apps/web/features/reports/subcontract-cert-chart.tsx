@@ -13,7 +13,8 @@ import {
 } from "recharts";
 import type { SubcontractCertEvolutionPoint } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatChartMoney } from "@/lib/format-money";
+import { formatChartAxis, formatChartMoney } from "@/lib/format-money";
+import { REPORT_CHART_FRAME_CLASS, REPORT_CHART_Y_AXIS_WIDTH } from "./report-layout";
 
 type Props = {
   series: SubcontractCertEvolutionPoint[];
@@ -51,12 +52,12 @@ export function SubcontractCertChart({ series }: Props) {
         <CardDescription>Montos mensuales de certificaciones y pagos a subcontratos</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[280px] w-full">
+        <div className={REPORT_CHART_FRAME_CLASS}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
+            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatChartMoney(v)} width={72} />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
               <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="Certificado" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} />

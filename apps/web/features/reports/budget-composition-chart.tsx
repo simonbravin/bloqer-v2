@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { BudgetCompositionReport } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatChartMoney } from "@/lib/format-money";
@@ -35,7 +35,7 @@ export function BudgetCompositionChart({ composition }: Props) {
           <CardTitle className="text-base">Composición del presupuesto</CardTitle>
           <CardDescription>Costo directo por categoría APU</CardDescription>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground py-8 text-center">
+        <CardContent className="py-8 text-center text-sm text-muted-foreground">
           Sin líneas de análisis de costo en este presupuesto.
         </CardContent>
       </Card>
@@ -47,48 +47,48 @@ export function BudgetCompositionChart({ composition }: Props) {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Composición del presupuesto</CardTitle>
         <CardDescription>
-          Costo directo planificado · Total{" "}
-          {formatChartMoney(composition.totalDirectCost)}
+          Costo directo planificado · Total {formatChartMoney(composition.totalDirectCost)}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[260px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={52}
-                outerRadius={88}
-                paddingAngle={2}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={entry.name} fill={entry.fill ?? COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(value: number) => moneyTooltip(value)}
-                labelFormatter={(label) => label}
-              />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+          <div className="h-[200px] w-full min-w-0 sm:h-[240px] md:flex-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={48}
+                  outerRadius={80}
+                  paddingAngle={2}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={entry.name} fill={entry.fill ?? COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value: number) => moneyTooltip(value)}
+                  labelFormatter={(label) => label}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs md:w-56 md:shrink-0 md:grid-cols-1">
+            {composition.slices.map((s, i) => (
+              <li key={s.category} className="flex items-center gap-2 min-w-0">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                />
+                <span className="truncate text-muted-foreground">{s.label}</span>
+                <span className="ml-auto shrink-0 font-mono tabular-nums">{s.percent}%</span>
+              </li>
+            ))}
+          </ul>
         </div>
-        <ul className="mt-4 grid grid-cols-2 gap-2 text-xs">
-          {composition.slices.map((s, i) => (
-            <li key={s.category} className="flex items-center gap-2">
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: COLORS[i % COLORS.length] }}
-              />
-              <span className="text-muted-foreground">{s.label}</span>
-              <span className="ml-auto font-mono">{s.percent}%</span>
-            </li>
-          ))}
-        </ul>
       </CardContent>
     </Card>
   );

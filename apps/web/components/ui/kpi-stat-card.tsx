@@ -93,7 +93,9 @@ export function KpiStatCard({
         >
           {value}
         </p>
-        {subtitle ? <p className="text-xs text-muted-foreground">{subtitle}</p> : null}
+        {subtitle ? (
+          <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">{subtitle}</p>
+        ) : null}
         {helper ? <p className="text-xs leading-snug text-muted-foreground/90">{helper}</p> : null}
       </CardContent>
     </Card>

@@ -13,6 +13,7 @@ import {
   CertificationProgressChart,
   CertificationVsBudgetTable,
   ReportDateFilters,
+  ReportSubnav,
 } from "@/features/reports";
 import { ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
@@ -85,14 +86,14 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
         }
       />
 
-      <div className="flex flex-wrap gap-2 text-sm">
+      <ReportSubnav>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/reportes`}>← Reportes</Link>
         </Button>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/certificaciones`}>Ir a certificaciones</Link>
         </Button>
-      </div>
+      </ReportSubnav>
 
       <ReportDateFilters budgets={availableBudgets} currentBudgetId={sp.budgetId} />
 
@@ -115,7 +116,7 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
             </div>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <CertificationEvolutionChart series={report.monthlySeries} />
             <CertificationProgressChart series={report.progressSeries} />
           </div>

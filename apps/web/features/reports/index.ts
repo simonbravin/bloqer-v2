@@ -3,6 +3,7 @@ export { BudgetVarianceFilters } from "./budget-variance-filters";
 export { BudgetVarianceTable } from "./budget-variance-table";
 export { BudgetCompositionChart } from "./budget-composition-chart";
 export { ReportDateFilters } from "./report-date-filters";
+export { ReportSubnav } from "./report-subnav";
 export {
   ReportExportActions,
 } from "./report-export-actions";

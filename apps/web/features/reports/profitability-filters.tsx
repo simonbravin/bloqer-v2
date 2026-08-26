@@ -11,6 +11,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { AvailableBudget } from "@bloqer/services";
+import {
+  REPORT_FILTER_CONTROL_CLASS,
+  REPORT_FILTER_FIELD_CLASS,
+  REPORT_FILTER_FORM_CLASS,
+} from "./report-layout";
 type Props = {
   budgets: AvailableBudget[];
   currentBudgetId?: string;
@@ -45,7 +50,7 @@ export function ProfitabilityFilters({
 
   return (
     <form
-      className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
+      className={REPORT_FILTER_FORM_CLASS}
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
@@ -58,10 +63,10 @@ export function ProfitabilityFilters({
       }}
     >
         {budgets.length > 1 && (
-          <div className="space-y-1">
+          <div className={REPORT_FILTER_FIELD_CLASS}>
             <Label className="text-xs">Presupuesto</Label>
             <Select name="budgetId" defaultValue={currentBudgetId ?? budgets[0]?.id ?? "__all__"}>
-              <SelectTrigger className="w-52 h-8 text-xs">
+              <SelectTrigger className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-52`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -74,10 +79,10 @@ export function ProfitabilityFilters({
             </Select>
           </div>
         )}
-        <div className="space-y-1">
+        <div className={REPORT_FILTER_FIELD_CLASS}>
           <Label className="text-xs">Capa de costo</Label>
           <Select name="costLayer" defaultValue={currentCostLayer ?? "accrued"}>
-            <SelectTrigger className="w-44 h-8 text-xs">
+            <SelectTrigger className={REPORT_FILTER_CONTROL_CLASS}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -88,10 +93,10 @@ export function ProfitabilityFilters({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
+        <div className={REPORT_FILTER_FIELD_CLASS}>
           <Label className="text-xs">Base ingresos</Label>
           <Select name="revenueBasis" defaultValue={currentRevenueBasis ?? "certified"}>
-            <SelectTrigger className="w-40 h-8 text-xs">
+            <SelectTrigger className={REPORT_FILTER_CONTROL_CLASS}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -100,10 +105,10 @@ export function ProfitabilityFilters({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
+        <div className={REPORT_FILTER_FIELD_CLASS}>
           <Label className="text-xs">Moneda</Label>
           <Select name="currencyView" defaultValue={currentCurrencyView ?? "ARS"}>
-            <SelectTrigger className="w-36 h-8 text-xs">
+            <SelectTrigger className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-36`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

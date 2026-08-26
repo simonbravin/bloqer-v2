@@ -6,7 +6,7 @@ const columnClass: Record<KpiStatGridColumns, string> = {
   2: "sm:grid-cols-2",
   3: "sm:grid-cols-2 lg:grid-cols-3",
   4: "sm:grid-cols-2 xl:grid-cols-4",
-  5: "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5",
+  5: "grid-cols-2 lg:grid-cols-5 max-lg:[&>*:nth-child(5)]:col-span-2",
   7: "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7",
 };
 
@@ -38,7 +38,9 @@ export function KpiStatGrid({
           {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
         </div>
       ) : null}
-      <div className={cn("grid grid-cols-1 gap-4", columnClass[columns])}>{children}</div>
+      <div className={cn("grid grid-cols-1 gap-3 sm:gap-4 [&>*]:min-w-0", columnClass[columns])}>
+        {children}
+      </div>
     </section>
   );
 }

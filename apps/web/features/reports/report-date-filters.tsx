@@ -13,6 +13,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { AvailableBudget } from "@bloqer/services";
+import {
+  REPORT_FILTER_CONTROL_CLASS,
+  REPORT_FILTER_FIELD_CLASS,
+  REPORT_FILTER_FORM_CLASS,
+} from "./report-layout";
 
 type Props = {
   budgets?: AvailableBudget[];
@@ -71,15 +76,15 @@ export function ReportDateFilters({
   if (!showBudgetSelect && !showDateRange && !showCurrencyView) return null;
 
   return (
-    <form onSubmit={apply} className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
+    <form onSubmit={apply} className={REPORT_FILTER_FORM_CLASS}>
       {showBudgetSelect ? (
-        <div className="space-y-1">
+        <div className={REPORT_FILTER_FIELD_CLASS}>
           <Label className="text-xs" htmlFor="report-budget-filter">
             Presupuesto
           </Label>
           <input type="hidden" name="budgetId" value={budgetId} />
           <Select value={budgetId} onValueChange={setBudgetId}>
-            <SelectTrigger id="report-budget-filter" className="w-52 h-8 text-xs">
+            <SelectTrigger id="report-budget-filter" className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-52`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -95,7 +100,7 @@ export function ReportDateFilters({
       ) : null}
       {showDateRange ? (
         <>
-          <div className="space-y-1">
+          <div className={REPORT_FILTER_FIELD_CLASS}>
             <Label className="text-xs" htmlFor="report-date-from">
               Desde
             </Label>
@@ -103,11 +108,11 @@ export function ReportDateFilters({
               id="report-date-from"
               name="dateFrom"
               type="date"
-              className="h-8 text-xs w-36"
+              className={REPORT_FILTER_CONTROL_CLASS}
               defaultValue={params.get("dateFrom") ?? ""}
             />
           </div>
-          <div className="space-y-1">
+          <div className={REPORT_FILTER_FIELD_CLASS}>
             <Label className="text-xs" htmlFor="report-date-to">
               Hasta
             </Label>
@@ -115,19 +120,19 @@ export function ReportDateFilters({
               id="report-date-to"
               name="dateTo"
               type="date"
-              className="h-8 text-xs w-36"
+              className={REPORT_FILTER_CONTROL_CLASS}
               defaultValue={params.get("dateTo") ?? ""}
             />
           </div>
         </>
       ) : null}
       {showCurrencyView ? (
-        <div className="space-y-1">
+        <div className={REPORT_FILTER_FIELD_CLASS}>
           <Label className="text-xs" htmlFor="report-currency-view">
             Moneda
           </Label>
           <Select value={currencyView} onValueChange={setCurrencyView}>
-            <SelectTrigger id="report-currency-view" className="w-36 h-8 text-xs">
+            <SelectTrigger id="report-currency-view" className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-36`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

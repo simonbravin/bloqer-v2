@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { CertificationProgressPoint } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { REPORT_CHART_FRAME_CLASS, REPORT_CHART_Y_AXIS_WIDTH } from "./report-layout";
 
 type Props = {
   series: CertificationProgressPoint[];
@@ -51,12 +52,12 @@ export function CertificationProgressChart({ series }: Props) {
         <CardDescription>% acumulado sobre venta total del presupuesto</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[280px] w-full">
+        <div className={REPORT_CHART_FRAME_CLASS}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
+            <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} unit="%" domain={[0, "auto"]} />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 11 }} unit="%" domain={[0, "auto"]} tickLine={false} width={REPORT_CHART_Y_AXIS_WIDTH} />
               <Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} />
               <Legend />
               <Line type="monotone" dataKey="Avance económico %" stroke="#2563eb" strokeWidth={2} dot={false} />

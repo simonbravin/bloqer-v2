@@ -14,6 +14,7 @@ import {
   ProcurementWbsDeviationTable,
   PurchaseOrderVarianceTable,
   ReportDateFilters,
+  ReportSubnav,
 } from "@/features/reports";
 import { ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
@@ -87,7 +88,7 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
         }
       />
 
-      <div className="flex flex-wrap gap-2 text-sm">
+      <ReportSubnav>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/reportes`}>← Reportes</Link>
         </Button>
@@ -103,7 +104,7 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/cuentas-por-pagar`}>Cuentas por pagar</Link>
         </Button>
-      </div>
+      </ReportSubnav>
 
       <ReportDateFilters budgets={availableBudgets} currentBudgetId={sp.budgetId} />
 

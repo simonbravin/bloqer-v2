@@ -9,7 +9,7 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { CashProjectionChart } from "@/features/reports/cash-projection-chart";
-import { ReportExportActions } from "@/features/reports";
+import { ReportExportActions, ReportSubnav } from "@/features/reports";
 import { ProjectCashFlowChart, ProjectCashFlowFilters } from "@/features/project-cash-flow";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
@@ -94,7 +94,7 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
         }
       />
 
-      <div className="flex flex-wrap gap-2 text-sm">
+      <ReportSubnav>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/reportes`}>← Reportes</Link>
         </Button>
@@ -104,7 +104,7 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/cuentas-por-pagar`}>Cuentas por pagar</Link>
         </Button>
-      </div>
+      </ReportSubnav>
 
       {projection.warnings.map((w, i) => (
         <p key={i} className="text-xs text-muted-foreground rounded-lg border p-3 bg-muted/30">
@@ -128,16 +128,19 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
           <>
             <KpiStatGrid title={null} columns={3}>
               <KpiStatCard
+                compact
                 label="Ingresos (caja)"
                 value={formatMoneyAmount(cashCur.totalInflows, cashCur.currency)}
                 tone="success"
               />
               <KpiStatCard
+                compact
                 label="Egresos (caja)"
                 value={formatMoneyAmount(cashCur.totalOutflows, cashCur.currency)}
                 tone="danger"
               />
               <KpiStatCard
+                compact
                 label="Neto"
                 value={formatMoneyAmount(cashCur.netCashFlow, cashCur.currency)}
               />
@@ -165,16 +168,19 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
           <>
             <KpiStatGrid title={null} columns={3}>
               <KpiStatCard
+                compact
                 label="Cobros esperados"
                 value={formatMoneyAmount(projCur.totalExpectedInflows, projCur.currency)}
                 tone="success"
               />
               <KpiStatCard
+                compact
                 label="Pagos esperados"
                 value={formatMoneyAmount(projCur.totalExpectedOutflows, projCur.currency)}
                 tone="danger"
               />
               <KpiStatCard
+                compact
                 label="Neto esperado"
                 value={formatMoneyAmount(projCur.netExpected, projCur.currency)}
               />

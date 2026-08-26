@@ -40,6 +40,16 @@ export function formatChartMoney(value: number | string, currency?: string): str
   return formatMoneyAmount(String(value), currency);
 }
 
+/** Eje Y compacto (solo labels de Recharts; no es cálculo financiero). */
+export function formatChartAxis(value: number): string {
+  if (!Number.isFinite(value)) return "";
+  const n = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (n >= 1_000_000) return `${sign}${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${sign}${(n / 1_000).toFixed(0)}k`;
+  return value.toLocaleString("es-AR", { maximumFractionDigits: 0 });
+}
+
 /** Formatea un monto decimal string con moneda ISO (es-AR). */
 export function formatMoneyAmount(raw: string, currency?: string): string {
   const body = formatDecimalArFromString(raw);

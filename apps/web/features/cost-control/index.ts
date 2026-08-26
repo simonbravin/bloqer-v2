@@ -3,3 +3,4 @@ export { CostControlTable } from "./components/cost-control-table";
 export { CostVarianceBadge } from "./components/cost-variance-badge";
 export { CostControlFilters } from "./components/cost-control-filters";
 export { WbsItemDrilldown } from "./components/wbs-item-drilldown";
+export { WbsItemDrilldownDialog } from "./components/wbs-item-drilldown-dialog";

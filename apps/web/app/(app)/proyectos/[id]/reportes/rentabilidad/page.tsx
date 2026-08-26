@@ -9,7 +9,7 @@ import {
   parseCurrencyView,
   ServiceError,
 } from "@bloqer/services";
-import { ProfitabilityFilters, ProfitabilitySummary, ReportExportActions } from "@/features/reports";
+import { ProfitabilityFilters, ProfitabilitySummary, ReportExportActions, ReportSubnav } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
@@ -83,17 +83,17 @@ export default async function ReporteRentabilidadPage({ params, searchParams }: 
         }
       />
 
-      <div className="flex flex-wrap gap-2 text-sm">
+      <ReportSubnav>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/reportes`}>← Reportes</Link>
         </Button>
         <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${projectId}/control-costos`}>Control de costos</Link>
+          <Link href={`/proyectos/${projectId}/control-costos`}>EDT y costos</Link>
         </Button>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/reportes/ingresos-gastos`}>Ingresos vs gastos</Link>
         </Button>
-      </div>
+      </ReportSubnav>
 
       <ProfitabilityFilters
         budgets={availableBudgets}

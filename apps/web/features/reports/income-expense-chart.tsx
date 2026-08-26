@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import {
   Bar,
-  BarChart,
   CartesianGrid,
   Legend,
   Line,
@@ -15,13 +14,8 @@ import {
 } from "recharts";
 import type { IncomeExpensePoint } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatChartMoney } from "@/lib/format-money";
-
-function fmtAxis(v: number) {
-  if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
-  return formatChartMoney(v);
-}
+import { formatChartAxis, formatChartMoney } from "@/lib/format-money";
+import { REPORT_CHART_FRAME_CLASS, REPORT_CHART_Y_AXIS_WIDTH } from "./report-layout";
 
 type Props = {
   series: IncomeExpensePoint[];
@@ -75,19 +69,19 @@ export function IncomeExpenseChart({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-[280px] w-full">
+          <div className={REPORT_CHART_FRAME_CLASS}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
+              <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis
                   dataKey="name"
                   tick={{ fontSize: 10 }}
-                  interval={0}
+                  interval="preserveStartEnd"
                   angle={-20}
                   textAnchor="end"
-                  height={56}
+                  height={48}
                 />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtAxis(v)} width={64} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
                 <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Line
@@ -130,12 +124,19 @@ export function IncomeExpenseChart({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] w-full">
+        <div className={REPORT_CHART_FRAME_CLASS}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
+            <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={56} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtAxis(v)} width={64} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 10 }}
+                interval="preserveStartEnd"
+                angle={-20}
+                textAnchor="end"
+                height={48}
+              />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
               <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="Certificado" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} />

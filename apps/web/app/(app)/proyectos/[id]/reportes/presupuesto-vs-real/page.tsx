@@ -12,9 +12,10 @@ import {
   BudgetVarianceFilters,
   BudgetVarianceTable,
   BudgetCompositionChart,
+  ReportExportActions,
+  ReportSubnav,
 } from "@/features/reports";
 import { CostControlSummaryCards } from "@/features/cost-control";
-import { ReportExportActions } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,14 @@ export default async function PresupuestoVsRealPage({ params, searchParams }: Pa
     varianceResult.type === "NO_APPROVED_BUDGETS" ? [] : varianceResult.availableBudgets;
 
   const exportParams = { ...sp, costLayer };
+  const costControlQuery = new URLSearchParams();
+  for (const [key, value] of Object.entries(sp)) {
+    if (typeof value === "string" && value) costControlQuery.set(key, value);
+  }
+  const costControlQs = costControlQuery.toString();
+  const costControlHref = costControlQs
+    ? `/proyectos/${projectId}/control-costos?${costControlQs}`
+    : `/proyectos/${projectId}/control-costos`;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -99,16 +108,16 @@ export default async function PresupuestoVsRealPage({ params, searchParams }: Pa
         }
       />
 
-      <div className="flex flex-wrap gap-2 text-sm">
+      <ReportSubnav>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/reportes`}>← Reportes</Link>
         </Button>
         <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${projectId}/control-costos?${new URLSearchParams(sp as Record<string, string>).toString()}`}>
-            Control de costos detallado
+          <Link href={costControlHref}>
+            EDT y costos
           </Link>
         </Button>
-      </div>
+      </ReportSubnav>
 
       <BudgetVarianceFilters
         budgets={availableBudgets}
@@ -153,23 +162,22 @@ export default async function PresupuestoVsRealPage({ params, searchParams }: Pa
             </div>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-1">
-              {compositionResult.type === "COMPOSITION" ? (
-                <BudgetCompositionChart composition={compositionResult} />
-              ) : null}
-            </div>
-            <div className="lg:col-span-2 space-y-4">
-              <CostControlSummaryCards totals={varianceResult.totals} />
-              {varianceResult.rows.length === 0 ? (
-                <div className="rounded-lg border bg-card p-12 text-center text-muted-foreground text-sm">
-                  No hay partidas en este presupuesto
-                  {sp.wbsSearch ? ` que coincidan con "${sp.wbsSearch}"` : ""}.
-                </div>
-              ) : (
+          <div className="space-y-6">
+            <CostControlSummaryCards totals={varianceResult.totals} />
+            {compositionResult.type === "COMPOSITION" ? (
+              <BudgetCompositionChart composition={compositionResult} />
+            ) : null}
+            {varianceResult.rows.length === 0 ? (
+              <div className="rounded-lg border bg-card p-12 text-center text-sm text-muted-foreground">
+                No hay partidas en este presupuesto
+                {sp.wbsSearch ? ` que coincidan con "${sp.wbsSearch}"` : ""}.
+              </div>
+            ) : (
+              <section className="space-y-2">
+                <h2 className="text-sm font-semibold">Varianza por partida</h2>
                 <BudgetVarianceTable report={varianceResult} projectId={projectId} />
-              )}
-            </div>
+              </section>
+            )}
           </div>
         </>
       )}

@@ -8,7 +8,7 @@ import {
   parseCurrencyView,
   ServiceError,
 } from "@bloqer/services";
-import { IncomeExpenseChart, ReportDateFilters, ReportExportActions } from "@/features/reports";
+import { IncomeExpenseChart, ReportDateFilters, ReportExportActions, ReportSubnav } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
@@ -86,14 +86,14 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
         }
       />
 
-      <div className="flex flex-wrap gap-2 text-sm">
+      <ReportSubnav>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/reportes`}>← Reportes</Link>
         </Button>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/reportes/rentabilidad`}>Rentabilidad</Link>
         </Button>
-      </div>
+      </ReportSubnav>
 
       <ReportDateFilters
         budgets={availableBudgets}
@@ -119,34 +119,41 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
 
       <KpiStatGrid title="Totales del período (devengado vs caja)" columns={4}>
         <KpiStatCard
+          compact
           label="Certificado"
           value={formatMoneyAmount(report.totals.certifiedAmount, report.displayCurrency)}
         />
         <KpiStatCard
+          compact
           label="Costo devengado"
           value={formatMoneyAmount(report.totals.costAccrued, report.displayCurrency)}
         />
         <KpiStatCard
+          compact
           label="MB devengado"
           value={formatMoneyAmount(report.totals.grossMarginAccrued, report.displayCurrency)}
           tone={isZeroMoneyAmount(report.totals.grossMarginAccrued) ? "muted" : isPositiveMoneyAmount(report.totals.grossMarginAccrued) ? "success" : "danger"}
         />
         <KpiStatCard
+          compact
           label="MB devengado %"
           value={report.totals.grossMarginAccruedPct ?? "—"}
         />
       </KpiStatGrid>
 
-      <KpiStatGrid title={null} columns={3}>
+      <KpiStatGrid title="Caja del período" columns={3}>
         <KpiStatCard
+          compact
           label="Cobrado"
           value={formatMoneyAmount(report.totals.collectedAmount, report.displayCurrency)}
         />
         <KpiStatCard
+          compact
           label="Pagado"
           value={formatMoneyAmount(report.totals.costPaid, report.displayCurrency)}
         />
         <KpiStatCard
+          compact
           label="MB caja"
           value={formatMoneyAmount(report.totals.grossMarginCash, report.displayCurrency)}
           tone={isZeroMoneyAmount(report.totals.grossMarginCash) ? "muted" : isPositiveMoneyAmount(report.totals.grossMarginCash) ? "success" : "danger"}

@@ -239,7 +239,8 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Planificación → Reportes → Presupuesto vs real (también card Composición presupuesto).",
-      "Revisá desvíos por partida / composición del presupuesto.",
+      "Arriba: 5 indicadores (presupuesto, exposición, certificado, variación, consumo).",
+      "Abajo: gráfico de composición APU y la tabla de varianza por partida.",
       "Para el día a día por capas (comprometido/devengado/pagado) usá EDT y costos.",
       "Exportá con Exportar → CSV o PDF.",
     ],

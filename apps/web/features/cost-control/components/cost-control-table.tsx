@@ -1,7 +1,8 @@
 "use client";
 
+import { useState, type MouseEvent } from "react";
 import Link from "next/link";
-import type { CostControlRow, CostControlTotals } from "@bloqer/services";
+import type { CostControlFilters, CostControlRow, CostControlTotals } from "@bloqer/services";
 import {
   Table,
   TableBody,
@@ -19,7 +20,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { cn } from "@/lib/utils";
 import { CostVarianceBadge } from "./cost-variance-badge";
+import { WbsItemDrilldownDialog } from "./wbs-item-drilldown-dialog";
 
 const COLUMN_HINTS: Record<string, string> = {
   committed:
@@ -52,13 +55,38 @@ function HintHead({ label, hint }: { label: string; hint: string }) {
   );
 }
 
+type DrilldownFilters = Pick<CostControlFilters, "budgetId" | "dateFrom" | "dateTo">;
+
 type Props = {
   rows: CostControlRow[];
   totals: CostControlTotals;
   projectId: string;
+  filters?: DrilldownFilters;
 };
 
-export function CostControlTable({ rows, totals, projectId }: Props) {
+function itemPageHref(projectId: string, wbsNodeId: string, filters?: DrilldownFilters) {
+  const sp = new URLSearchParams();
+  if (filters?.budgetId) sp.set("budgetId", filters.budgetId);
+  if (filters?.dateFrom) sp.set("dateFrom", filters.dateFrom);
+  if (filters?.dateTo) sp.set("dateTo", filters.dateTo);
+  const q = sp.toString();
+  return `/proyectos/${projectId}/control-costos/${wbsNodeId}${q ? `?${q}` : ""}`;
+}
+
+function isModifiedClick(e: MouseEvent) {
+  return e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0;
+}
+
+export function CostControlTable({ rows, totals, projectId, filters = {} }: Props) {
+  const [openItem, setOpenItem] = useState<CostControlRow | null>(null);
+
+  function openFromList(e: MouseEvent, row: CostControlRow) {
+    if (isModifiedClick(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setOpenItem(row);
+  }
+
   return (
     <TooltipProvider delayDuration={200}>
       <TableScroll stickyFirstColumn>
@@ -85,20 +113,29 @@ export function CostControlTable({ rows, totals, projectId }: Props) {
             {rows.map((row) => (
               <TableRow
                 key={row.wbsNodeId}
-                className={row.flags.overBudget ? "bg-red-50/50 dark:bg-red-950/10" : ""}
+                className={cn(
+                  "cursor-pointer",
+                  row.flags.overBudget && "bg-red-50/50 dark:bg-red-950/10",
+                )}
+                onClick={(e) => {
+                  if (isModifiedClick(e)) return;
+                  setOpenItem(row);
+                }}
               >
                 <TableCell className="font-mono font-medium">
                   <Link
-                    href={`/proyectos/${projectId}/control-costos/${row.wbsNodeId}`}
+                    href={itemPageHref(projectId, row.wbsNodeId, filters)}
                     className="hover:underline text-primary"
+                    onClick={(e) => openFromList(e, row)}
                   >
                     {row.wbsCode}
                   </Link>
                 </TableCell>
                 <TableCell className="max-w-48 truncate">
                   <Link
-                    href={`/proyectos/${projectId}/control-costos/${row.wbsNodeId}`}
+                    href={itemPageHref(projectId, row.wbsNodeId, filters)}
                     className="hover:underline"
+                    onClick={(e) => openFromList(e, row)}
                   >
                     {row.wbsName}
                   </Link>
@@ -166,6 +203,18 @@ export function CostControlTable({ rows, totals, projectId }: Props) {
           </TableFooter>
         </Table>
       </TableScroll>
+
+      <WbsItemDrilldownDialog
+        open={openItem !== null}
+        onOpenChange={(next) => {
+          if (!next) setOpenItem(null);
+        }}
+        projectId={projectId}
+        wbsNodeId={openItem?.wbsNodeId ?? null}
+        wbsCode={openItem?.wbsCode ?? ""}
+        wbsName={openItem?.wbsName ?? ""}
+        filters={filters}
+      />
     </TooltipProvider>
   );
 }

@@ -16,7 +16,8 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Comprometido = OC confirmada / subcontrato.",
       "Devengado = factura emitida.",
       "Pagado = egreso de caja aplicado.",
-      "Usá drill-down a OC, facturas y pagos por partida.",
+      "Tocá una fila de la tabla (código o nombre, p. ej. 1.1 Replanteo de Obra) para abrir el detalle en un diálogo.",
+      "Desde el diálogo hay links a OC, facturas y pagos de esa partida.",
     ],
     pitfalls: ["No sumes OC + factura como costo total (doble conteo): mirá exposición esperada."],
     relatedSlugs: [
@@ -33,6 +34,8 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "devengado",
       "exposición",
       "presupuestado vs real",
+      "detalle partida",
+      "abrir partida",
     ],
     guideRef: "§13 · §0.2 · §16",
   },

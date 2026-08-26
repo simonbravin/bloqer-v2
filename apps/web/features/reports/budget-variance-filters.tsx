@@ -12,6 +12,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { AvailableBudget, CostVarianceLayer } from "@bloqer/services";
+import {
+  REPORT_FILTER_CONTROL_CLASS,
+  REPORT_FILTER_FIELD_CLASS,
+  REPORT_FILTER_FORM_CLASS,
+} from "./report-layout";
 
 const LAYER_OPTIONS: { value: CostVarianceLayer; label: string }[] = [
   { value: "exposure", label: "Exposición esperada" },
@@ -53,12 +58,12 @@ export function BudgetVarianceFilters({ budgets, currentBudgetId, currentLayer =
   }
 
   return (
-    <form onSubmit={apply} className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
+    <form onSubmit={apply} className={REPORT_FILTER_FORM_CLASS}>
       {budgets.length > 1 && (
-        <div className="space-y-1">
+        <div className={REPORT_FILTER_FIELD_CLASS}>
           <Label className="text-xs">Presupuesto</Label>
           <Select name="budgetId" defaultValue={currentBudgetId ?? "__all__"}>
-            <SelectTrigger className="w-52 h-8 text-xs">
+            <SelectTrigger className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-52`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -72,10 +77,10 @@ export function BudgetVarianceFilters({ budgets, currentBudgetId, currentLayer =
           </Select>
         </div>
       )}
-      <div className="space-y-1">
+      <div className={REPORT_FILTER_FIELD_CLASS}>
         <Label className="text-xs">Capa de costo</Label>
         <Select name="costLayer" defaultValue={currentLayer}>
-          <SelectTrigger className="w-44 h-8 text-xs">
+          <SelectTrigger className={REPORT_FILTER_CONTROL_CLASS}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -87,29 +92,29 @@ export function BudgetVarianceFilters({ budgets, currentBudgetId, currentLayer =
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1">
+      <div className={REPORT_FILTER_FIELD_CLASS}>
         <Label className="text-xs">Desde</Label>
         <Input
           name="dateFrom"
           type="date"
-          className="h-8 text-xs w-36"
+          className={REPORT_FILTER_CONTROL_CLASS}
           defaultValue={params.get("dateFrom") ?? ""}
         />
       </div>
-      <div className="space-y-1">
+      <div className={REPORT_FILTER_FIELD_CLASS}>
         <Label className="text-xs">Hasta</Label>
         <Input
           name="dateTo"
           type="date"
-          className="h-8 text-xs w-36"
+          className={REPORT_FILTER_CONTROL_CLASS}
           defaultValue={params.get("dateTo") ?? ""}
         />
       </div>
-      <div className="space-y-1">
+      <div className={REPORT_FILTER_FIELD_CLASS}>
         <Label className="text-xs">Buscar partida</Label>
         <Input
           name="wbsSearch"
-          className="h-8 text-xs w-40"
+          className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-40`}
           placeholder="Código o nombre…"
           defaultValue={params.get("wbsSearch") ?? ""}
         />

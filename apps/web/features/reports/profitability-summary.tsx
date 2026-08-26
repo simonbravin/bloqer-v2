@@ -42,19 +42,23 @@ export function ProfitabilitySummary({ report }: Props) {
 
       <KpiStatGrid title={null} columns={4}>
         <KpiStatCard
+          compact
           label="Ingresos"
           value={formatMoneyAmount(report.revenue, report.currency)}
         />
         <KpiStatCard
+          compact
           label="Costos directos"
           value={formatMoneyAmount(report.directCost, report.currency)}
         />
         <KpiStatCard
+          compact
           label="Margen bruto"
           value={formatMoneyAmount(report.grossMargin, report.currency)}
           tone={gmTone}
         />
         <KpiStatCard
+          compact
           label="MB %"
           value={report.grossMarginPct != null ? `${report.grossMarginPct}%` : "—"}
           tone={gmTone}
@@ -63,10 +67,12 @@ export function ProfitabilitySummary({ report }: Props) {
 
       <KpiStatGrid title={null} columns={2}>
         <KpiStatCard
+          compact
           label="Venta presupuestada"
           value={formatMoneyAmount(report.budgetTotalSale, report.budgetCurrency)}
         />
         <KpiStatCard
+          compact
           label="Margen proyectado (presup.)"
           value={formatMoneyAmount(report.projectedMargin, report.budgetCurrency)}
         />
