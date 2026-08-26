@@ -10,6 +10,64 @@ export type SearchableComboboxOption = {
   searchValue?: string;
 };
 
+/** Lowercase, strip diacritics, collapse spaces — for combobox / contact name match. */
+export function foldSearchText(raw: string): string {
+  return raw
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Search haystack: razón social and nombre fantasía (no CUIT, no role tags). */
+export function contactNameSearchValue(
+  legalName: string,
+  fantasyName?: string | null,
+): string {
+  const legal = legalName.trim();
+  const fantasy = fantasyName?.trim() || "";
+  return [...new Set([legal, fantasy].filter(Boolean))].join(" ");
+}
+
+/** `Razón social (fantasía)` when they differ; otherwise just razón social. */
+export function formatContactPickerLabel(
+  legalName: string,
+  fantasyName?: string | null,
+): string {
+  const legal = legalName.trim();
+  const fantasy = fantasyName?.trim() || "";
+  if (!fantasy) return legal;
+  if (legal.localeCompare(fantasy, "es", { sensitivity: "accent" }) === 0) return legal;
+  return `${legal} (${fantasy})`;
+}
+
+export function toContactPickerOption(contact: {
+  id: string;
+  legalName: string;
+  fantasyName?: string | null;
+  country?: string | null;
+  ivaCondition?: string | null;
+}): {
+  id: string;
+  label: string;
+  searchValue: string;
+  country?: string;
+  ivaCondition?: string | null;
+} {
+  return {
+    id: contact.id,
+    label: formatContactPickerLabel(contact.legalName, contact.fantasyName),
+    searchValue: contactNameSearchValue(contact.legalName, contact.fantasyName),
+    country: contact.country ?? undefined,
+    ivaCondition: contact.ivaCondition,
+  };
+}
+
+/** Placeholder for directory contact pickers (legal + fantasy search). */
+export const CONTACT_PICKER_SEARCH_PLACEHOLDER =
+  "Buscar por razón social o nombre fantasía…";
+
 /** Convierte opciones `{ id, label }` del directorio / AP / ventas. */
 export function toSearchableOptions(
   items: { id: string; label: string; searchValue?: string }[],
@@ -25,15 +83,11 @@ export function toSearchableOptions(
 export function contactsToSearchableOptions(
   contacts: { id: string; fantasyName?: string | null; legalName: string }[],
 ): SearchableComboboxOption[] {
-  return contacts.map((c) => {
-    const primary = c.fantasyName ?? c.legalName;
-    const secondary = c.fantasyName && c.fantasyName !== c.legalName ? c.legalName : null;
-    return {
-      value: c.id,
-      label: primary,
-      searchValue: secondary ? `${primary} ${secondary}` : primary,
-    };
-  });
+  return contacts.map((c) => ({
+    value: c.id,
+    label: formatContactPickerLabel(c.legalName, c.fantasyName),
+    searchValue: contactNameSearchValue(c.legalName, c.fantasyName),
+  }));
 }
 
 /** Valor interno para opción vacía en campos opcionales (WBS, OC, depósito, etc.). */

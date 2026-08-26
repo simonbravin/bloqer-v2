@@ -3,11 +3,12 @@ import { PurchaseOrderEditForm } from "@/features/procurement";
 import type { SupplierOption, WbsOption, ProductOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
+import { toContactPickerOption } from "@/lib/searchable-options";
 import {
   getPurchaseOrderById,
   getCompanyProcurementSettingsForProject,
   listProcurementWbsOptions,
-  listContacts,
+  listAllContacts,
   listProducts,
   ServiceError,
 } from "@bloqer/services";
@@ -43,16 +44,13 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
   }
 
   const [suppliersResult, wbsNodes, productsResult] = await Promise.all([
-    listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
+    listAllContacts({ role: "SUPPLIER", status: "ACTIVE" }, ctx),
     listProcurementWbsOptions(id, ctx),
     listProducts({ status: "ACTIVE" }, ctx),
   ]);
   const products = productsResult.data;
 
-  const suppliers: SupplierOption[] = suppliersResult.data.map((c) => ({
-    id: c.id,
-    label: c.fantasyName ?? c.legalName,
-  }));
+  const suppliers: SupplierOption[] = suppliersResult.map(toContactPickerOption);
 
   const wbsOptions: WbsOption[] = wbsNodes.map((n) => ({
     id: n.id,

@@ -20,7 +20,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { SearchableComboboxOption } from "@/lib/searchable-options";
+import { foldSearchText, type SearchableComboboxOption } from "@/lib/searchable-options";
 
 export type { SearchableComboboxOption };
 
@@ -89,9 +89,11 @@ export function SearchableCombobox({
         align="start"
       >
         <Command
-          filter={(itemValue, search) => {
-            if (!search.trim()) return 1;
-            return itemValue.toLowerCase().includes(search.trim().toLowerCase()) ? 1 : 0;
+          filter={(_itemValue, search, keywords) => {
+            const query = foldSearchText(search);
+            if (!query) return 1;
+            const haystack = foldSearchText((keywords ?? []).join(" "));
+            return haystack.includes(query) ? 1 : 0;
           }}
         >
           <CommandInput placeholder={searchPlaceholder} />
@@ -101,7 +103,8 @@ export function SearchableCombobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={`${option.searchValue ?? option.label} ${option.value}`}
+                  value={option.value}
+                  keywords={[option.searchValue ?? option.label]}
                   onSelect={() => {
                     const next =
                       allowClear && option.value === value ? "" : option.value;

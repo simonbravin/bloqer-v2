@@ -5,11 +5,12 @@ import {
   canEditArArea,
   getProjectClientContactId,
   getProjectShellInfo,
-  listContacts,
+  listAllContacts,
   listSelectableTreasuryAccounts,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+import { toContactPickerOption } from "@/lib/searchable-options";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -47,15 +48,12 @@ export default async function NuevaAnticipoPage({ params }: PageProps) {
     throw err;
   }
 
-  const [{ data: contacts }, accounts] = await Promise.all([
-    listContacts({ role: "CLIENT", status: "ACTIVE" }, ctx),
+  const [contacts, accounts] = await Promise.all([
+    listAllContacts({ role: "CLIENT", status: "ACTIVE" }, ctx),
     listSelectableTreasuryAccounts(ctx),
   ]);
 
-  const clients = contacts.map((c) => ({
-    id: c.id,
-    label: c.fantasyName ?? c.legalName,
-  }));
+  const clients = contacts.map(toContactPickerOption);
 
   const treasuryAccounts = accounts
     .filter(

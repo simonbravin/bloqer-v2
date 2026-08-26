@@ -93,7 +93,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "project", suffix: "/libro-obra", label: "Libro de obra" }],
     steps: [
       "Operación → Libro de obra → nuevo parte.",
-      "Clima, cuadrilla, avance por partida EDT, fotos.",
+      "Clima, cuadrilla, avance por partida EDT, fotos. En mano de obra, buscá el contacto por razón social o nombre fantasía.",
       "Enviar (SUBMITTED): el PM del Equipo de obra (y OWNER/ADMIN) reciben campana + email.",
       "Si te lo devuelven, corregí desde el enlace de la notificación.",
     ],
@@ -265,7 +265,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Nueva solicitud desde Compras → Solicitudes de compra o Tablero de compras (Nueva solicitud / Todas las solicitudes). También desde Materiales → Pedir.",
       "Líneas con cantidad, unidad, descripción y partida EDT obligatoria.",
       "Guardar DRAFT → Enviar (SUBMITTED).",
-      "Cargar cotizaciones (precio + plazo) según política.",
+      "Cargar cotizaciones: elegí proveedor por razón social o nombre fantasía, precio y plazo según política.",
       "Seleccionar proveedor → genera OC en borrador.",
     ],
     relatedSlugs: ["tablero-materiales", "orden-de-compra-y-afectar-edt", "politicas-de-compras"],
@@ -290,7 +290,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     where: { menu: "Compras → Órdenes de compra" },
     hrefs: [{ kind: "project", suffix: "/ordenes-compra", label: "Órdenes de compra" }],
     steps: [
-      "Nueva OC o desde SC seleccionada. Cada línea: partida hoja + cantidades/precios.",
+      "Nueva OC o desde SC seleccionada. Proveedor: buscá por razón social o nombre fantasía. Cada línea: partida hoja + cantidades/precios.",
       "Enviar a aprobación → Aprobar (o Devolver a borrador con motivo).",
       "Confirmar al proveedor → CONFIRMED = Comprometido en EDT y costos.",
       "Luego recepción y factura.",

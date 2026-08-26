@@ -18,13 +18,14 @@ import {
   canEditPurchaseOrders,
   getCompanyProcurementSettingsForProject,
   getProjectShellInfo,
-  listContacts,
+  listAllContacts,
   listProcurementWbsOptions,
   listProducts,
   listPurchaseOrdersByProject,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+import { toContactPickerOption } from "@/lib/searchable-options";
 
 const PO_STATUS_FILTERS = [
   "DRAFT",
@@ -97,14 +98,11 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
   if (canCreatePo) {
     try {
       const [suppliersResult, wbsNodes, productsResult] = await Promise.all([
-        listContacts({ role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 }, ctx),
+        listAllContacts({ role: "SUPPLIER", status: "ACTIVE" }, ctx),
         listProcurementWbsOptions(id, ctx),
         listProducts({ status: "ACTIVE" }, ctx),
       ]);
-      suppliers = suppliersResult.data.map((c) => ({
-        id: c.id,
-        label: c.fantasyName ?? c.legalName,
-      }));
+      suppliers = suppliersResult.map(toContactPickerOption);
       wbsOptions = wbsNodes.map((n) => ({
         id: n.id,
         code: n.code,

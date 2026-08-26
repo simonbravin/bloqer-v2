@@ -20,13 +20,14 @@ import {
   getCompanyFiscalContext,
   getProjectShellInfo,
   getTenantModuleGate,
-  listContacts,
+  listAllContacts,
   listInvoicesByProject,
   listSelectableTreasuryAccounts,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { parsePage } from "@/lib/parse-page";
+import { toContactPickerOption } from "@/lib/searchable-options";
 
 const PAGE_SIZE = 20;
 
@@ -90,13 +91,8 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
   let companyIvaCondition: string | null = null;
 
   if (canCreate) {
-    const { data: contacts } = await listContacts({ role: "CLIENT", status: "ACTIVE" }, ctx);
-    clients = contacts.map((c) => ({
-      id: c.id,
-      label: c.fantasyName ?? c.legalName,
-      country: c.country,
-      ivaCondition: c.ivaCondition,
-    }));
+    const contacts = await listAllContacts({ role: "CLIENT", status: "ACTIVE" }, ctx);
+    clients = contacts.map(toContactPickerOption);
 
     try {
       const fiscal = await getCompanyFiscalContext(ctx, shell.companyId);

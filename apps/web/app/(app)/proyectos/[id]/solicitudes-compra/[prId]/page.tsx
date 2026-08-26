@@ -24,13 +24,14 @@ import {
   getActivePurchaseOrderForRequest,
   getPurchaseRequestById,
   listProcurementQuotesForRequest,
-  listContacts,
+  listAllContacts,
   ServiceError,
 } from "@bloqer/services";
 import { ProcurementQuoteStatusBadge } from "@/features/procurement/components/procurement-quote-status-badge";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { PageShell } from "@/components/layout/page-shell";
+import { toContactPickerOption } from "@/lib/searchable-options";
 import { Button } from "@/components/ui/button";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { PurchaseRequestDetailMobileSections } from "@/features/procurement/components/purchase-request-detail-mobile-sections";
@@ -86,14 +87,11 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
 
   let suppliers: SupplierOption[] = [];
   if (canQuote && ["SUBMITTED", "QUOTE_SELECTED"].includes(pr.status)) {
-    const suppliersResult = await listContacts(
-      { role: "SUPPLIER", status: "ACTIVE", page: 1, pageSize: 200 },
+    const suppliersResult = await listAllContacts(
+      { role: "SUPPLIER", status: "ACTIVE" },
       ctx,
     );
-    suppliers = suppliersResult.data.map((c) => ({
-      id: c.id,
-      label: c.fantasyName ?? c.legalName,
-    }));
+    suppliers = suppliersResult.map(toContactPickerOption);
   }
 
   const isDraft = pr.status === "DRAFT";

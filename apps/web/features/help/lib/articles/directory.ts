@@ -24,7 +24,7 @@ export const DIRECTORY_ARTICLES: HelpArticle[] = [
       "Guardá. El contacto queda activo y disponible en OC y en «A quién se le paga».",
     ],
     effects: [
-      "Aparece en selectores de proveedor de OC y cotizaciones.",
+      "Aparece en selectores de proveedor de OC y cotizaciones: se busca por razón social o nombre fantasía.",
       "Puede ser payee de facturas de proveedor / gastos.",
     ],
     pitfalls: [
@@ -68,12 +68,12 @@ export const DIRECTORY_ARTICLES: HelpArticle[] = [
       "Abrí Directorio → + Nuevo contacto (o ?role=CLIENT).",
       "Marcá el rol Cliente.",
       "Guardá el contacto activo.",
-      "Al crear el proyecto, elegilo en el campo Cliente.",
+      "Al crear el proyecto (o una factura de venta), buscalo por razón social o nombre fantasía.",
     ],
     effects: ["Habilita el alta de proyecto y las cobranzas / CxC de obra."],
     pitfalls: ["No dupliques el mandante: un contacto, rol Cliente."],
     relatedSlugs: ["crear-y-activar-una-obra", "un-contacto-varios-roles"],
-    keywords: ["cliente", "cargar cliente", "mandante", "comitente", "directorio"],
+    keywords: ["cliente", "cargar cliente", "mandante", "comitente", "directorio", "razón social", "nombre fantasía"],
     guideRef: "§3",
   },
   {
@@ -126,7 +126,7 @@ export const DIRECTORY_ARTICLES: HelpArticle[] = [
       "Marcá Subcontratista (podés sumar Proveedor si también vende materiales).",
       "En la obra: Finanzas del proyecto → Subcontratos → Nuevo subcontrato.",
     ],
-    effects: ["Queda disponible al crear un Subcontrato."],
+    effects: ["Queda disponible al crear un Subcontrato (buscá por razón social o nombre fantasía)."],
     pitfalls: ["No pagues un paquete de obra con OC ni con gasto genérico: usá el flujo de subcontrato."],
     relatedSlugs: ["crear-un-subcontrato", "certificar-y-pagar-subcontrato", "proveedor-empleado-o-subcontratista"],
     keywords: ["subcontratista", "cargar subcontratista", "albañil", "electricista"],
@@ -145,7 +145,7 @@ export const DIRECTORY_ARTICLES: HelpArticle[] = [
     steps: [
       "Buscá el contacto existente.",
       "Editá y marcá todos los roles que correspondan.",
-      "Guardá. Los selectores filtran por rol según la pantalla.",
+      "Guardá. Los selectores filtran por rol según la pantalla y se buscan por razón social o nombre fantasía (no por CUIT).",
     ],
     pitfalls: ["Duplicar contactos parte los datos y complica pagos/OC."],
     relatedSlugs: ["proveedor-empleado-o-subcontratista", "cargar-un-proveedor"],

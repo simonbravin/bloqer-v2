@@ -78,8 +78,8 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
   if (canCreateInvoice) {
     try {
       suppliersResult = await listAllContacts(LIST_AP_DIRECT_PAYEES, ctx);
-    } catch {
-      // VIEW DIRECTORY may be missing; keep invoice list, create dialog without suppliers
+    } catch (err) {
+      if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
     }
   }
 

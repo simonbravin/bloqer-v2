@@ -61,6 +61,51 @@ export default async function ContactoDetailPage({ params }: PageProps) {
         </div>
       </div>
 
+      {/* General data */}
+      <div className="rounded-lg border bg-card">
+        <div className="border-b px-6 py-4">
+          <h2 className="font-semibold">Datos generales</h2>
+        </div>
+        <dl className="grid grid-cols-2 gap-4 px-6 py-4 text-sm">
+          <div>
+            <dt className="text-muted-foreground">CUIT / ID Fiscal</dt>
+            <dd className="font-medium">{contact.taxId ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Tipo ID</dt>
+            <dd className="font-medium">{contact.taxIdType ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Condición frente al IVA</dt>
+            <dd className="font-medium">{formatIvaConditionLabel(contact.ivaCondition)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">País</dt>
+            <dd className="font-medium">{contact.country ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Email</dt>
+            <dd className="font-medium">{contact.email ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Teléfono</dt>
+            <dd className="font-medium">{contact.phone ?? "—"}</dd>
+          </div>
+          <div className="col-span-2">
+            <dt className="text-muted-foreground">Dirección</dt>
+            <dd className="font-medium">
+              {[contact.address, contact.city, contact.province].filter(Boolean).join(", ") || "—"}
+            </dd>
+          </div>
+          {contact.notes && (
+            <div className="col-span-2">
+              <dt className="text-muted-foreground">Notas</dt>
+              <dd className="whitespace-pre-wrap font-medium">{contact.notes}</dd>
+            </div>
+          )}
+        </dl>
+      </div>
+
       {/* Roles */}
       <div className="rounded-lg border bg-card">
         <div className="border-b px-6 py-4">
@@ -110,51 +155,6 @@ export default async function ContactoDetailPage({ params }: PageProps) {
             }
           />
         </div>
-      </div>
-
-      {/* General data */}
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Datos generales</h2>
-        </div>
-        <dl className="grid grid-cols-2 gap-4 px-6 py-4 text-sm">
-          <div>
-            <dt className="text-muted-foreground">CUIT / ID Fiscal</dt>
-            <dd className="font-medium">{contact.taxId ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Tipo ID</dt>
-            <dd className="font-medium">{contact.taxIdType ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Condición frente al IVA</dt>
-            <dd className="font-medium">{formatIvaConditionLabel(contact.ivaCondition)}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">País</dt>
-            <dd className="font-medium">{contact.country ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Email</dt>
-            <dd className="font-medium">{contact.email ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Teléfono</dt>
-            <dd className="font-medium">{contact.phone ?? "—"}</dd>
-          </div>
-          <div className="col-span-2">
-            <dt className="text-muted-foreground">Dirección</dt>
-            <dd className="font-medium">
-              {[contact.address, contact.city, contact.province].filter(Boolean).join(", ") || "—"}
-            </dd>
-          </div>
-          {contact.notes && (
-            <div className="col-span-2">
-              <dt className="text-muted-foreground">Notas</dt>
-              <dd className="whitespace-pre-wrap font-medium">{contact.notes}</dd>
-            </div>
-          )}
-        </dl>
       </div>
     </PageShell>
   );

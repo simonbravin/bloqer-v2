@@ -285,6 +285,8 @@ Bloqer separa herramientas de **empresa** y de **proyecto** (estilo Procore):
 | **Empleado** | Personal interno | Gasto **sin OC**: sueldo como costo o reintegro ([D-089]) |
 | **Otro** | Residuo / no operativo | No entra en OC ni en el desplegable de gasto |
 
+**Selectores de contacto.** En alta de obra, OC, cotizaciones, facturas de venta, subcontratos, transacciones y mano de obra del parte, el buscador lista **todos** los contactos activos del rol que corresponde (no recorta a 20). Cada opción muestra **razón social** y, si es distinta, el **nombre fantasía** entre paréntesis. Se filtra por cualquiera de los dos nombres (sin CUIT). El listado de `/directorio` sigue paginado y tiene su propia búsqueda.
+
 **Convención Argentina**
 
 - Relación de dependencia / reintegro → rol **Empleado**. No hace falta marcar **Proveedor** solo para pagarle.
@@ -453,7 +455,7 @@ En el listado **Proyectos** (`/proyectos`), para entrar a una obra: **Ver**, o c
      - Público: techo estricto **100%** en certificaciones.
      - Privado: permite exceder 100% con **nota obligatoria**.
    - **Nombre \***
-   - **Cliente \*** (buscador de contactos Cliente)
+   - **Cliente \*** (buscador de contactos Cliente: razón social o nombre fantasía)
    - Ubicación / país (default AR) y fechas contractuales si aplica (metadata; **no** reemplazan al cronograma)
 3. Pulsar **Crear proyecto**. El proyecto queda asociado a la empresa del tenant (si hay una sola razón social); no hay selector de empresa en el alta.
 4. El sistema abre el **Resumen** de la obra (`/proyectos/[id]`). El estado inicial es `DRAFT`.
@@ -656,7 +658,7 @@ En el Gantt: relleno oscuro de la barra = **Real**; franja/borde ámbar = **Cert
 
 **Equipo de obra (avisos):** en el **Resumen** del proyecto, card **Equipo de obra**. Ahí se asignan usuarios activos de la organización (etiqueta PM / Capataz / Otro). Eso **no** cambia permisos de acceso: solo define quién recibe campana + email cuando hay un parte pendiente. Sin PM **con membresía activa** en el equipo, esos avisos van solo a OWNER/ADMIN. Un miembro del roster con membresía inactiva se muestra como **membresía inactiva** y no cuenta como supervisor. `/pendientes` sigue mostrando partes de todas las obras para quien puede aprobar.
 
-1. **Nuevo parte** (fecha no futura, clima, cuadrilla, tareas).
+1. **Nuevo parte** (fecha no futura, clima, cuadrilla, tareas). En **mano de obra**, el contacto se busca por razón social o nombre fantasía.
 2. Cargar **avance por partida EDT** (cantidades / % según lo que pida el formulario).
 3. Adjuntar fotos y observaciones.
 4. **Enviar a revisión** → `SUBMITTED` → **campana + email** a OWNER/ADMIN y al PM (u otros supervisores) del **Equipo de obra**.
@@ -750,7 +752,7 @@ flowchart LR
 1. **Nueva solicitud** (diálogo / `?create=1`) desde **Solicitudes de compra** o **Tablero de compras** (**Nueva solicitud** / **Todas las solicitudes**), o llegar prellenada desde Materiales → **Pedir**.
 2. Líneas: cantidad, unidad, descripción y **partida EDT obligatoria**.
 3. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por partida EDT).
-4. Cargar **Cotizaciones** (precio + **plazo de entrega en días** + validez). Cumplir mínimo de cotizaciones de `/configuracion/politicas`.
+4. Cargar **Cotizaciones**: elegí proveedor (buscador: razón social o nombre fantasía), precio + **plazo de entrega en días** + validez. Cumplir mínimo de cotizaciones de `/configuracion/politicas`.
 5. **Seleccionar** proveedor → genera **OC en borrador**.
 6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora. El email de nueva solicitud muestra organización, proyecto, solicitante e ítems; el asunto es `[organización] Nueva solicitud · SC-003`.
 
@@ -761,7 +763,7 @@ flowchart LR
 **Estados en pantalla:** Borrador → Pend. aprobación → Aprobada → Confirmada → Recepción parcial / Recibida · Anulada.  
 **Enum:** `DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED` (o `CANCELLED`).
 
-1. **Nueva OC** desde listado/tablero (`?create=1`) o desde SC seleccionada. Cada línea: **partida hoja** + cantidades/precios. Al elegir partida se muestran **costo ref. materiales** y **saldo de partida** (alerta, no bloqueo).
+1. **Nueva OC** desde listado/tablero (`?create=1`) o desde SC seleccionada. Proveedor: buscador por razón social o nombre fantasía. Cada línea: **partida hoja** + cantidades/precios. Al elegir partida se muestran **costo ref. materiales** y **saldo de partida** (alerta, no bloqueo).
 2. **Enviar a aprobación** → `SUBMITTED`.
 3. Aprobador: **Aprobar** → `APPROVED`, o **Devolver a borrador** con **motivo obligatorio**.
 4. **Confirmar al proveedor** → `CONFIRMED` = **comprometido** en EDT y costos.  
@@ -802,7 +804,7 @@ flowchart LR
 
 ### 10.1 Procedimiento
 
-1. **Nuevo subcontrato** (diálogo/`?create=1` si aplica): subcontratista del directorio (rol **Subcontratista**), alcance e imputación a partidas con categoría **SUB** en APU cuando corresponda.
+1. **Nuevo subcontrato** (diálogo/`?create=1` si aplica): subcontratista del directorio (rol **Subcontratista**; buscador: razón social o nombre fantasía), alcance e imputación a partidas con categoría **SUB** en APU cuando corresponda.
 2. Crear **certificación de subcontrato** del período.
 3. Ciclo (enum `SubcontractCertificationStatus`): `DRAFT` → emitir (`ISSUED`) → **Aprobar** (`APPROVED`) (o `REJECTED` / `CANCELLED`).
 4. Al **aprobar**, el sistema genera / ofrece CTA hacia una **factura de proveedor en borrador** (el payee es el subcontratista); hay que **emitirla** para crear la CxP y poder pagar. **No** se paga el subcontrato creando una OC ni eligiendo al subcontratista en el gasto genérico.
@@ -876,7 +878,7 @@ flowchart LR
 
 #### Obra (proyecto)
 
-- **Facturas emitidas** (`/proyectos/[id]/facturas`, estados Borrador / Emitida / Anulada): una vez emitidas son inmutables; solo se pueden **anular**. Detalle: **Emitir** desde borrador; panel de **adjuntos** del comprobante.
+- **Facturas emitidas** (`/proyectos/[id]/facturas`, estados Borrador / Emitida / Anulada): una vez emitidas son inmutables; solo se pueden **anular**. Detalle: **Emitir** desde borrador; panel de **adjuntos** del comprobante. Al crear, el cliente se busca por razón social o nombre fantasía.
 - **Cuentas por cobrar** (`/proyectos/[id]/cuentas-por-cobrar`): estados Pendiente / Parcial / Pagado / Vencido. Desde el detalle → **Cobrar** (`…/[receivableId]/cobrar`): cuenta, fecha, monto (2 decimales), **método** (Efectivo / Transferencia / Cheque / Tarjeta / Otro) y referencia opcional. Para saldar el total, dejá el saldo que muestra el sistema. Solo la **cobranza confirmada** acredita tesorería ([D-072]).
 - **Cobranzas** (`/proyectos/[id]/cobranzas`): ingresan dinero (`INFLOW`) y bajan el saldo. En el detalle, **Cancelar** muestra el error en pantalla si falla (p. ej. movimiento ya conciliado o período cerrado); no se “traga” el mensaje.
 - **Venta rápida / anticipo** (`/proyectos/[id]/facturas/anticipo/nueva`): factura + CxC (+ cobro opcional) en un paso.

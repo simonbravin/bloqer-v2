@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { toSearchableOptions } from "@/lib/searchable-options";
+import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { toIsoDateInTimeZone } from "@bloqer/utils";
@@ -121,11 +121,12 @@ export function AdvanceInvoiceForm({
               </p>
             ) : (
               <SearchableCombobox
+                popoverWidth="wide"
                 options={toSearchableOptions(clients)}
                 value={clientContactId}
                 onValueChange={setClientContactId}
                 placeholder="Seleccionar cliente…"
-                searchPlaceholder="Buscar cliente…"
+                searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
                 emptyText="Ningún cliente coincide."
               />
             )}

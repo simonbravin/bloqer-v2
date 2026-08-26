@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { contactsToSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
+import { CONTACT_PICKER_SEARCH_PLACEHOLDER, contactsToSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { addDecimal, divideDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
@@ -191,7 +191,7 @@ export function SubcontractForm({
             value={subcontractorId}
             onValueChange={setSubcontractorId}
             placeholder="Seleccionar subcontratista…"
-            searchPlaceholder="Buscar subcontratista…"
+            searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
             emptyText="Ningún subcontratista coincide."
           />
         </div>

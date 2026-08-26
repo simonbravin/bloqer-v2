@@ -17,7 +17,7 @@ export const SETUP_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Prerrequisito: contacto con rol Cliente activo en Directorio.",
-      "Proyectos → Nuevo proyecto: código, tipo (Privado/Público), nombre, cliente.",
+      "Proyectos → Nuevo proyecto: código, tipo (Privado/Público), nombre, cliente (buscá por razón social o nombre fantasía).",
       "Crear proyecto → estado DRAFT (queda asociado a la empresa del tenant si hay una sola).",
       "En el resumen, Activar obra → ACTIVE.",
       "Para volver a entrar: en /proyectos, clic en el código, el nombre o Ver (en tarjetas, toda la tarjeta).",

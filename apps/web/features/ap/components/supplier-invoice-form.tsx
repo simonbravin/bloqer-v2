@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
+import { CONTACT_PICKER_SEARCH_PLACEHOLDER, SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
 import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
@@ -397,7 +397,7 @@ export function SupplierInvoiceForm({
                     setLetterTouched(false);
                   }}
                   placeholder="Seleccionar proveedor o empleado…"
-                  searchPlaceholder="Buscar por razón social o nombre fantasía…"
+                  searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
                   emptyText="Ningún proveedor o empleado coincide."
                   popoverWidth="wide"
                 />

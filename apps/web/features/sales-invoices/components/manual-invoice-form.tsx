@@ -10,7 +10,7 @@ import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { toSearchableOptions } from "@/lib/searchable-options";
+import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
 import { InvoiceLetterSelect, PricesIncludeTaxCheckbox, TaxRateSelect } from "@/features/finance/components/invoice-letter-fields";
@@ -27,6 +27,7 @@ export type ClientOption = {
   label: string;
   country?: string;
   ivaCondition?: string | null;
+  searchValue?: string;
 };
 
 export type TreasuryAccountOption = {
@@ -254,6 +255,7 @@ export function ManualInvoiceForm({
               </p>
             ) : (
               <SearchableCombobox
+                popoverWidth="wide"
                 options={toSearchableOptions(clients)}
                 value={clientContactId}
                 onValueChange={(id) => {
@@ -261,7 +263,7 @@ export function ManualInvoiceForm({
                   setLetterTouched(false);
                 }}
                 placeholder="Seleccionar cliente…"
-                searchPlaceholder="Buscar cliente…"
+                searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
                 emptyText="Ningún cliente coincide."
               />
             )}

@@ -6,14 +6,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import type { SupplierOption } from "./purchase-order-form";
+import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
 import {
   createProcurementQuoteAction,
   selectQuoteAndCreatePoAction,
@@ -88,18 +83,21 @@ export function ProcurementQuoteForm({
 
       <div className="space-y-2">
         <Label>Proveedor</Label>
-        <Select value={supplierId} onValueChange={setSupplierId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Elegir proveedor" />
-          </SelectTrigger>
-          <SelectContent>
-            {suppliers.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {suppliers.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No hay proveedores activos. Cree un contacto con rol Proveedor primero.
+          </p>
+        ) : (
+          <SearchableCombobox
+            popoverWidth="wide"
+            options={toSearchableOptions(suppliers)}
+            value={supplierId}
+            onValueChange={setSupplierId}
+            placeholder="Elegir proveedor…"
+            searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
+            emptyText="Ningún proveedor coincide."
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">

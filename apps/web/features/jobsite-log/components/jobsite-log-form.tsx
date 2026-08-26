@@ -9,7 +9,13 @@ import { Label }    from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
+import {
+  CONTACT_PICKER_SEARCH_PLACEHOLDER,
+  contactsToSearchableOptions,
+  toSearchableOptions,
+  withNoneOption,
+  wbsToSearchableOptions,
+} from "@/lib/searchable-options";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { WbsIncrementalProgressSnapshot } from "@bloqer/services";
 import { toIsoDateInTimeZone } from "@bloqer/utils";
@@ -29,7 +35,7 @@ export type WbsItemOption = {
   /** CostItem.quantity — techo operativo de la partida. */
   budgetQty?: string;
 };
-export type ContactOption  = { id: string; name: string };
+export type ContactOption = { id: string; legalName: string; fantasyName: string | null };
 export type ProductOption  = { id: string; name: string };
 export type WarehouseOption = { id: string; name: string };
 export type SubcontractOption = { id: string; code: string; title: string };
@@ -207,10 +213,9 @@ export function JobsiteLogForm({
   );
   const contactComboboxOptions = useMemo(
     () =>
-      withNoneOption(
-        toSearchableOptions(contactOptions.map((c) => ({ id: c.id, label: c.name }))),
-        { label: "— ninguno —" },
-      ),
+      withNoneOption(contactsToSearchableOptions(contactOptions), {
+        label: "— ninguno —",
+      }),
     [contactOptions],
   );
   const subcontractComboboxOptions = useMemo(
@@ -616,7 +621,7 @@ export function JobsiteLogForm({
                       value={row.contactId}
                       onValueChange={(v) => updateLabor(i, "contactId", v)}
                       placeholder="— ninguno —"
-                      searchPlaceholder="Buscar contacto…"
+                      searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
                     />
                   </div>
                   <div className="space-y-1">

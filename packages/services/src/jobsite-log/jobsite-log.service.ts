@@ -754,7 +754,7 @@ export async function listJobsiteLogsByProject(
 export type JobsiteLogFormPickList = {
   companyId: string;
   inventoryModuleEnabled: boolean;
-  contactOptions: Array<{ id: string; name: string }>;
+  contactOptions: Array<{ id: string; legalName: string; fantasyName: string | null }>;
   productOptions: Array<{ id: string; name: string }>;
   warehouseOptions: Array<{ id: string; name: string }>;
   subcontractOptions: Array<{ id: string; number: number; title: string }>;
@@ -806,7 +806,11 @@ export async function getJobsiteLogFormPickList(
   return {
     companyId: resolvedCompanyId ?? "",
     inventoryModuleEnabled,
-    contactOptions: contacts.map((c) => ({ id: c.id, name: c.fantasyName ?? c.legalName })),
+    contactOptions: contacts.map((c) => ({
+      id: c.id,
+      legalName: c.legalName,
+      fantasyName: c.fantasyName,
+    })),
     productOptions: products,
     warehouseOptions: warehouses,
     subcontractOptions: subcontracts,

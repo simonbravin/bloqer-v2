@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { ProjectForm } from "@/features/projects";
 import { getCurrentUser } from "@/lib/auth";
-import { listContacts } from "@bloqer/services";
+import { listAllContacts } from "@bloqer/services";
 import { createProjectAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageListHeader } from "@/components/ui/page-list-header";
@@ -17,8 +17,8 @@ export default async function NuevoProyectoPage() {
     roles: current.tenantCtx.roles,
   };
 
-  const { data: clients } = await listContacts(
-    { role: "CLIENT", status: "ACTIVE", pageSize: 100 },
+  const clients = await listAllContacts(
+    { role: "CLIENT", status: "ACTIVE" },
     ctx,
   );
 

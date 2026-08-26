@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
+import { CONTACT_PICKER_SEARCH_PLACEHOLDER, SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
 import { AP_PAYEE_PICKER_HINT } from "@/features/ap/lib/ap-payee-options";
 import { cn } from "@/lib/utils";
 import { InvoiceLinesEditor } from "@/features/ap/components/invoice-lines-editor";
@@ -49,6 +49,7 @@ export type ClientOption = {
   label: string;
   country?: string;
   ivaCondition?: string | null;
+  searchValue?: string;
 };
 export type TreasuryAccountOption = { id: string; label: string; currency: string };
 
@@ -595,7 +596,7 @@ export function NewTransactionDialog({
                     setLetterTouched(false);
                   }}
                   placeholder="Seleccionar proveedor o empleado..."
-                  searchPlaceholder="Buscar por razón social o nombre fantasía..."
+                  searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
                   emptyText="Ningún proveedor o empleado coincide."
                   popoverWidth="wide"
                 />
@@ -748,6 +749,7 @@ export function NewTransactionDialog({
                   <div className="space-y-1">
                     <Label>Cliente</Label>
                     <SearchableCombobox
+                      popoverWidth="wide"
                       options={clientOptionsRequired}
                       value={clientContactId}
                       onValueChange={(id) => {
@@ -755,7 +757,7 @@ export function NewTransactionDialog({
                         setLetterTouched(false);
                       }}
                       placeholder="Seleccionar cliente..."
-                      searchPlaceholder="Buscar cliente..."
+                      searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
                       emptyText="Ningún cliente coincide."
                     />
                   </div>
@@ -900,13 +902,14 @@ export function NewTransactionDialog({
                   <div className="space-y-1">
                     <Label>Cliente / contraparte (opcional)</Label>
                     <SearchableCombobox
+                      popoverWidth="wide"
                       options={clientOptionsOptional}
                       value={counterpartyContactId ?? SEARCHABLE_NONE}
                       onValueChange={(v) =>
                         setCounterpartyContactId(v === SEARCHABLE_NONE ? null : v)
                       }
                       placeholder="Sin cliente / contraparte"
-                      searchPlaceholder="Buscar cliente..."
+                      searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
                       emptyText="Ningún cliente coincide."
                     />
                   </div>

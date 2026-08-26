@@ -13,7 +13,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "project", suffix: "/subcontratos", label: "Subcontratos" }],
     steps: [
       "Prerrequisito: contacto con rol Subcontratista.",
-      "Finanzas del proyecto → Subcontratos → Nuevo.",
+      "Finanzas del proyecto → Subcontratos → Nuevo (buscá al subcontratista por razón social o nombre fantasía).",
       "Alcance e imputación a partidas (categoría SUB en APU cuando corresponda).",
     ],
     relatedSlugs: ["cargar-un-subcontratista", "certificar-y-pagar-subcontrato"],
@@ -125,7 +125,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     steps: [
       "Entrá a la obra → Facturas emitidas.",
       "Alta de anticipo / venta rápida (`/facturas/anticipo/nueva`).",
-      "Completá cliente/líneas; cobro opcional si tenés permiso de tesorería.",
+      "Completá cliente (buscá por razón social o nombre fantasía) y líneas; cobro opcional si tenés permiso de tesorería.",
       "Para facturar una certificación aprobada usá el CTA Emitir factura (otro flujo).",
     ],
     relatedSlugs: ["facturar-una-certificacion", "cobrar-una-cxc-de-obra"],

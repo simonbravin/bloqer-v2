@@ -5,6 +5,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { isStorageConfigured } from "@bloqer/config";
 import { NewTransactionDialog } from "@/features/finance/components/new-transaction-dialog";
 import { LIST_AP_DIRECT_PAYEES, toApPayeeOption } from "@/features/ap/lib/ap-payee-options";
+import { toContactPickerOption } from "@/lib/searchable-options";
 import { ReportExportActions } from "@/features/reports";
 import { MovementFilters, MovementLedgerTable } from "@/features/treasury-reports";
 import { PageShell } from "@/components/layout/page-shell";
@@ -166,22 +167,17 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
     try {
       const payees = await listAllContacts(LIST_AP_DIRECT_PAYEES, ctx);
       suppliersForDialog = payees.map(toApPayeeOption);
-    } catch {
-      // VIEW DIRECTORY may be missing; keep AP dialog usable without supplier list
+    } catch (err) {
+      if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
     }
   }
 
   if (canEditTreasury || canEditAr) {
     try {
       const clients = await listAllContacts({ role: "CLIENT", status: "ACTIVE" }, ctx);
-      clientsForDialog = clients.map((c) => ({
-        id: c.id,
-        label: c.fantasyName ?? c.legalName,
-        country: c.country,
-        ivaCondition: c.ivaCondition,
-      }));
-    } catch {
-      // VIEW DIRECTORY may be missing
+      clientsForDialog = clients.map(toContactPickerOption);
+    } catch (err) {
+      if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
     }
   }
 

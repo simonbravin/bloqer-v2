@@ -12,6 +12,7 @@ test("AP payee label is legal name with fantasy beside it", () => {
   assert.equal(option.label, "GOMEZ OSCAR DAVID (OBDECO - MIP SOLUTIONS) · Proveedor");
   assert.match(option.searchValue ?? "", /GOMEZ OSCAR DAVID/);
   assert.match(option.searchValue ?? "", /OBDECO - MIP SOLUTIONS/);
+  assert.equal((option.searchValue ?? "").includes("Proveedor"), false);
 });
 
 test("AP payee label omits fantasy when it matches legal name", () => {

@@ -7,12 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { toSearchableOptions } from "@/lib/searchable-options";
+import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
 import { PurchaseOrderLinesEditor } from "./purchase-order-lines-editor";
 import type { PurchaseOrderLine, WbsOption, ProductOption } from "./purchase-order-lines-editor";
 import { createPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 
-export type SupplierOption = { id: string; label: string };
+export type SupplierOption = { id: string; label: string; searchValue?: string };
 
 interface Props {
   projectId: string;
@@ -124,11 +124,12 @@ export function PurchaseOrderForm({
             ) : (
               <SearchableCombobox
                 id="po-supplier"
+                popoverWidth="wide"
                 options={toSearchableOptions(suppliers)}
                 value={supplierContactId}
                 onValueChange={setSupplierContactId}
                 placeholder="Seleccionar proveedor…"
-                searchPlaceholder="Buscar proveedor…"
+                searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
                 emptyText="Ningún proveedor coincide."
               />
             )}

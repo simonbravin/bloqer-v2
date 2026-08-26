@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { contactsToSearchableOptions } from "@/lib/searchable-options";
+import { CONTACT_PICKER_SEARCH_PLACEHOLDER, contactsToSearchableOptions } from "@/lib/searchable-options";
 import { createProjectSchema, type CreateProjectInput, type ProjectFormInput } from "@bloqer/validators";
 import { invalidateProjectShellCache } from "@/lib/project-shell-context";
 
@@ -142,11 +142,12 @@ export function ProjectForm({
           </p>
         ) : (
           <SearchableCombobox
+            popoverWidth="wide"
             options={contactsToSearchableOptions(clients)}
             value={clientContactId ?? ""}
             onValueChange={(v) => form.setValue("clientContactId", v, { shouldValidate: true })}
             placeholder="Seleccionar cliente…"
-            searchPlaceholder="Buscar cliente…"
+            searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
             emptyText="Ningún cliente coincide."
           />
         )}
