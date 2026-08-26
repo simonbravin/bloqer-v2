@@ -17,6 +17,7 @@ const sampleLine: PoLineForInvoiceDraft = {
   description: "Cemento",
   unitPrice: "100",
   taxRate: "21",
+  discountPct: "0",
   orderQuantity: "10",
   receivedQuantity: "5",
   lineTotal: "1210",
@@ -52,6 +53,18 @@ test("computePendingToInvoiceAmount never goes negative", () => {
   );
 });
 
+test("buildInvoiceDraftLinesFromPo copies discountPct [D-093]", () => {
+  const lines = buildInvoiceDraftLinesFromPo(
+    [{ ...sampleLine, discountPct: "10.0000" }],
+    {
+      basis: "received",
+      receivedAmount: new Prisma.Decimal(605),
+      invoicedAmount: new Prisma.Decimal(0),
+    },
+  );
+  assert.equal(lines[0]!.discountPct, "10.0000");
+});
+
 test("buildInvoiceDraftLinesFromPo uses received quantities", () => {
   const lines = buildInvoiceDraftLinesFromPo([sampleLine], {
     basis: "received",
@@ -63,6 +76,7 @@ test("buildInvoiceDraftLinesFromPo uses received quantities", () => {
   assert.equal(lines[0]!.unitPrice, "100");
   assert.equal(lines[0]!.purchaseOrderLineId, "line-1");
   assert.equal(lines[0]!.wbsNodeId, "wbs-1");
+  assert.equal(lines[0]!.discountPct, "0");
 });
 
 test("buildInvoiceDraftLinesFromPo scales remaining basis", () => {

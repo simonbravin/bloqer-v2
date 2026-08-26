@@ -6,7 +6,8 @@ import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-e
 import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseOrders, canViewPurchaseRequests } from "./procurement-access";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
-import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import { parseDiscountPct } from "../finance/invoice-line-money";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 
@@ -84,7 +85,7 @@ export async function createProcurementQuote(
       const qty = prLine.quantity;
       const price = new Prisma.Decimal(line.unitPrice);
       const rate = new Prisma.Decimal(line.taxRate ?? "0");
-      const calc = calcLine(qty, price, rate);
+      const calc = calcLine(qty, price, rate, parseDiscountPct(line.discountPct));
       subtotal = subtotal.plus(calc.lineSubtotal);
       taxAmount = taxAmount.plus(calc.lineTax);
       totalAmount = totalAmount.plus(calc.lineTotal);
@@ -94,6 +95,7 @@ export async function createProcurementQuote(
           purchaseRequestLineId: line.purchaseRequestLineId,
           unitPrice: price,
           taxRate: rate,
+          discountPct: parseDiscountPct(line.discountPct),
           lineSubtotal: calc.lineSubtotal,
           lineTax: calc.lineTax,
           lineTotal: calc.lineTotal,
@@ -190,6 +192,7 @@ export async function listProcurementQuotesDetailedForRequest(
       unit: string;
       quantity: string;
       unitPrice: string;
+      discountPct: string;
       budgetUnitCostSnapshot: string | null;
     }>;
   }>
@@ -232,6 +235,7 @@ export async function listProcurementQuotesDetailedForRequest(
       unit: l.purchaseRequestLine.unit,
       quantity: serializeQtyDecimal(l.purchaseRequestLine.quantity),
       unitPrice: serializeUnitPriceDecimal(l.unitPrice),
+      discountPct: serializeRatePctDecimal(l.discountPct),
       budgetUnitCostSnapshot: l.purchaseRequestLine.budgetUnitCostSnapshot != null
         ? serializeUnitPriceDecimal(l.purchaseRequestLine.budgetUnitCostSnapshot)
         : null,

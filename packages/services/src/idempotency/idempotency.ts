@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@bloqer/database";
 import { isUuid } from "@bloqer/utils";
-import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
+import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import {
   serializeMoneyDecimal,
   serializeQtyDecimal,
@@ -222,6 +222,7 @@ export type InvoiceLineReplayInput = {
   quantity: string;
   unitPrice: string;
   taxRate?: string;
+  discountPct?: string;
   sortOrder?: number;
   wbsNodeId?: string | null;
   purchaseOrderLineId?: string | null;
@@ -233,6 +234,7 @@ type InvoiceLineReplayExisting = {
   quantity: { toString(): string };
   unitPrice: { toString(): string };
   taxRate: { toString(): string };
+  discountPct?: { toString(): string };
   sortOrder: number;
   wbsNodeId?: string | null;
   purchaseOrderLineId?: string | null;
@@ -257,10 +259,12 @@ function invoiceLinesReplayMatch(
     const qty = new Prisma.Decimal(line.quantity);
     const price = new Prisma.Decimal(line.unitPrice);
     const rate = new Prisma.Decimal(opts.forceZeroTax ? "0" : (line.taxRate ?? "0"));
+    const discountPct = parseDiscountPct(line.discountPct);
     const expected = resolveInvoiceLineMoney({
       quantity: qty,
       unitPrice: price,
       taxRate: rate,
+      discountPct,
       pricesIncludeTax: opts.pricesIncludeTax,
     });
     if (got.description !== line.description) return false;
@@ -269,6 +273,11 @@ function invoiceLinesReplayMatch(
       return false;
     }
     if (serializeRatePctDecimal(got.taxRate) !== serializeRatePctDecimal(rate)) return false;
+    if (
+      serializeRatePctDecimal(got.discountPct ?? 0) !== serializeRatePctDecimal(discountPct)
+    ) {
+      return false;
+    }
     if (got.sortOrder !== (line.sortOrder ?? 0)) return false;
     if (opts.kind === "ap") {
       if ((got.wbsNodeId ?? null) !== (line.wbsNodeId ?? null)) return false;

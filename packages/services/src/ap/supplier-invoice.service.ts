@@ -13,7 +13,7 @@ import { resolvePagination } from "../finance/pagination";
 import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { notifyPayableReadyToPay } from "./ap-notifications.service";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
-import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
+import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -54,6 +54,7 @@ export type SupplierInvoiceLineView = {
   quantity: string;
   unitPrice: string;
   taxRate: string;
+  discountPct: string;
   lineSubtotal: string;
   lineTax: string;
   lineTotal: string;
@@ -499,6 +500,7 @@ export async function createSupplierInvoice(
         quantity: qty,
         unitPrice: price,
         taxRate: rate,
+        discountPct: parseDiscountPct(line.discountPct),
         pricesIncludeTax,
       }).lineTotal,
     );
@@ -556,6 +558,7 @@ export async function createSupplierInvoice(
         quantity: qty,
         unitPrice: price,
         taxRate: rate,
+        discountPct: parseDiscountPct(line.discountPct),
         pricesIncludeTax,
       });
       await tx.supplierInvoiceLine.create({
@@ -567,6 +570,7 @@ export async function createSupplierInvoice(
           quantity:    qty,
           unitPrice:   unitPriceNet,
           taxRate:     rate,
+          discountPct: parseDiscountPct(line.discountPct),
           lineSubtotal,
           lineTax,
           lineTotal,
@@ -739,6 +743,7 @@ export async function updateSupplierInvoice(
           quantity: qty,
           unitPrice: price,
           taxRate: rate,
+          discountPct: parseDiscountPct(line.discountPct),
           pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
         });
         await tx.supplierInvoiceLine.create({
@@ -750,6 +755,7 @@ export async function updateSupplierInvoice(
             quantity: qty,
             unitPrice: unitPriceNet,
             taxRate: rate,
+            discountPct: parseDiscountPct(line.discountPct),
             lineSubtotal,
             lineTax,
             lineTotal,
@@ -769,6 +775,7 @@ export async function updateSupplierInvoice(
           line.quantity,
           line.unitPrice,
           new Prisma.Decimal(0),
+          line.discountPct,
         );
         await tx.supplierInvoiceLine.update({
           where: { id: line.id },
@@ -1117,6 +1124,7 @@ type RawInvoice = SupplierInvoice & {
     quantity: Prisma.Decimal;
     unitPrice: Prisma.Decimal;
     taxRate: Prisma.Decimal;
+    discountPct: Prisma.Decimal;
     lineSubtotal: Prisma.Decimal;
     lineTax: Prisma.Decimal;
     lineTotal: Prisma.Decimal;
@@ -1166,6 +1174,7 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
       quantity:    serializeQtyDecimal(l.quantity),
       unitPrice:   serializeUnitPriceDecimal(l.unitPrice),
       taxRate:     serializeRatePctDecimal(l.taxRate),
+      discountPct: serializeRatePctDecimal(l.discountPct),
       lineSubtotal: serializeMoneyDecimal(l.lineSubtotal),
       lineTax:     serializeMoneyDecimal(l.lineTax),
       lineTotal:   serializeMoneyDecimal(l.lineTotal),

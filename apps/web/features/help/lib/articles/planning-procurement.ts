@@ -265,10 +265,10 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Nueva solicitud desde Compras → Solicitudes de compra o Tablero de compras (Nueva solicitud / Todas las solicitudes). También desde Materiales → Pedir.",
       "Líneas con cantidad, unidad, descripción y partida EDT obligatoria.",
       "Guardar DRAFT → Enviar (SUBMITTED).",
-      "Cargar cotizaciones: elegí proveedor por razón social o nombre fantasía, precio y plazo según política.",
+      "Cargar cotizaciones: elegí proveedor por razón social o nombre fantasía, precio unitario, Desc. % opcional (antes de IVA) y plazo según política. El umbral SC vs OC directa lo setea la empresa en políticas de compras.",
       "Seleccionar proveedor → genera OC en borrador.",
     ],
-    relatedSlugs: ["tablero-materiales", "orden-de-compra-y-afectar-edt", "politicas-de-compras"],
+    relatedSlugs: ["tablero-materiales", "orden-de-compra-y-afectar-edt", "politicas-de-compras", "descuento-porcentual-en-lineas"],
     keywords: [
       "solicitud",
       "sc",
@@ -290,7 +290,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     where: { menu: "Compras → Órdenes de compra" },
     hrefs: [{ kind: "project", suffix: "/ordenes-compra", label: "Órdenes de compra" }],
     steps: [
-      "Nueva OC o desde SC seleccionada. Proveedor: buscá por razón social o nombre fantasía. Cada línea: partida hoja + cantidades/precios.",
+      "Nueva OC o desde SC seleccionada. Proveedor: buscá por razón social o nombre fantasía. Cada línea: partida hoja, cantidades/precios y Desc. % (antes de IVA). Descuento general % + Aplicar a todas copia el mismo % a todas las líneas.",
       "Enviar a aprobación → Aprobar (o Devolver a borrador con motivo).",
       "Confirmar al proveedor → CONFIRMED = Comprometido en EDT y costos.",
       "Luego recepción y factura.",
@@ -303,6 +303,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "leer-edt-y-costos",
       "anular-devolver-cancelar-documentos",
       "afectaciones-comprometido-devengado-pagado",
+      "descuento-porcentual-en-lineas",
     ],
     keywords: [
       "orden de compra",
@@ -368,7 +369,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Crear → borrador → Emitir (o Emitir y pagar ahora).",
     ],
     effects: ["Emitir → Devengado + CxP + asiento DRAFT."],
-    relatedSlugs: ["pagar-una-cuenta-por-pagar", "emitir-y-pagar-ahora"],
+    relatedSlugs: ["pagar-una-cuenta-por-pagar", "emitir-y-pagar-ahora", "descuento-porcentual-en-lineas"],
     keywords: [
       "factura desde oc",
       "traer lineas",

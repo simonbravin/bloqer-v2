@@ -5,6 +5,8 @@ import {
   roundMoney,
   roundQty,
   roundRatePct,
+  compareDecimal,
+  tryParseUserDecimal,
 } from "@bloqer/utils";
 
 const LOOSE_DECIMAL = /^-?\d+(\.\d+)?$/;
@@ -84,6 +86,20 @@ export const ratePctString = z
   .trim()
   .regex(LOOSE_DECIMAL, "Porcentaje inválido")
   .transform((v) => roundRatePct(v));
+
+/** Line commercial discount % ([D-093]): 0–100 inclusive, 4 dp. Empty → 0. Accepts es-AR commas. */
+export const discountPctString = z
+  .string()
+  .trim()
+  .transform((v) => {
+    if (v === "") return "0";
+    const parsed = tryParseUserDecimal(v, "commit");
+    return parsed == null || parsed === "" ? v : parsed;
+  })
+  .pipe(ratePctString)
+  .refine((v) => {
+    return compareDecimal(v, "0") >= 0 && compareDecimal(v, "100") <= 0;
+  }, "El descuento debe estar entre 0 y 100");
 
 /** Assert a raw string looks like a decimal before other transforms. */
 export function isDecimalString(v: string): boolean {

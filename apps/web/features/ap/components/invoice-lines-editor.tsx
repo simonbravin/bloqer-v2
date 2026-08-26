@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   addDecimal,
-  divideDecimal,
-  multiplyDecimal,
+  normalizeDiscountPct,
   roundMoney,
-  serializeMoney,
-  calcLineAmountsFromGrossInclusive,
+  resolveDocumentLineAmounts,
 } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +29,7 @@ export type InvoiceLine = {
   quantity: string;
   unitPrice: string;
   taxRate: string;
+  discountPct: string;
   wbsNodeId?: string | null;
   /** Set when line comes from OC draft ([D-066]); kept for submit. */
   purchaseOrderLineId?: string | null;
@@ -51,29 +51,30 @@ function safeDecimal(v: string): string {
   return t;
 }
 
-/** Client preview aligned with UI 2 dp display ([D-053] / [D-086]). */
+const EMPTY_LINE: InvoiceLine = {
+  description: "",
+  quantity: "1",
+  unitPrice: "",
+  taxRate: "21",
+  discountPct: "0",
+  wbsNodeId: null,
+  purchaseOrderLineId: null,
+};
+
+/** Client preview aligned with UI 2 dp display ([D-053] / [D-086] / [D-093]). */
 function linePreview(l: InvoiceLine, pricesIncludeTax: boolean) {
-  let qty: string;
-  let price: string;
   try {
-    qty = serializeMoney(safeDecimal(l.quantity));
-    price = serializeMoney(safeDecimal(l.unitPrice));
+    const r = resolveDocumentLineAmounts({
+      quantity: safeDecimal(l.quantity),
+      unitPrice: safeDecimal(l.unitPrice),
+      taxRatePercent: safeDecimal(l.taxRate),
+      discountPct: safeDecimal(l.discountPct ?? "0"),
+      pricesIncludeTax,
+    });
+    return { subtotal: r.lineSubtotal, tax: r.lineTax, total: r.lineTotal };
   } catch {
     return { subtotal: "0.00", tax: "0.00", total: "0.00" };
   }
-  const rate = safeDecimal(l.taxRate);
-  if (pricesIncludeTax) {
-    const r = calcLineAmountsFromGrossInclusive({
-      quantity: qty,
-      unitPriceGross: price,
-      taxRatePercent: rate,
-    });
-    return { subtotal: r.lineSubtotal, tax: r.lineTax, total: r.lineTotal };
-  }
-  const subtotal = roundMoney(multiplyDecimal(qty, price));
-  const tax = roundMoney(divideDecimal(multiplyDecimal(subtotal, rate), "100"));
-  const total = roundMoney(addDecimal(subtotal, tax));
-  return { subtotal, tax, total };
 }
 
 interface Props {
@@ -94,6 +95,7 @@ export function InvoiceLinesEditor({
   pricesIncludeTax = false,
 }: Props) {
   const wbsCombobox = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
+  const [headerDiscount, setHeaderDiscount] = useState("");
   const [lineKeys, setLineKeys] = useState<string[]>(() =>
     Array.from({ length: Math.max(lines.length, 1) }, createLineKey),
   );
@@ -130,7 +132,7 @@ export function InvoiceLinesEditor({
     setLineKeys((keys) => [...keys, createLineKey()]);
     onChange([
       ...lines,
-      { description: "", quantity: "1", unitPrice: "", taxRate: "21", wbsNodeId: null, purchaseOrderLineId: null },
+      { ...EMPTY_LINE },
     ]);
   }
 
@@ -154,12 +156,44 @@ export function InvoiceLinesEditor({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Líneas</p>
-        <Button type="button" variant="outline" size="sm" onClick={addLine}>
-          + Agregar línea
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Label htmlFor="invoice-header-discount" className="text-xs text-muted-foreground whitespace-nowrap">
+            Descuento general %
+          </Label>
+          <DecimalInput
+            id="invoice-header-discount"
+            value={headerDiscount}
+            onValueChange={setHeaderDiscount}
+            placeholder="0"
+            className="h-8 w-20 text-sm"
+            scale={4}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              try {
+                const pct = normalizeDiscountPct(headerDiscount);
+                onChange(lines.map((l) => ({ ...l, discountPct: pct })));
+              } catch {
+                toast.error("El descuento debe estar entre 0 y 100");
+              }
+            }}
+          >
+            Aplicar a todas
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={addLine}>
+            + Agregar línea
+          </Button>
+        </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        El descuento % se aplica al subtotal de la línea, antes de IVA. El precio unitario de lista no cambia.
+        «Descuento general %» copia el mismo porcentaje a todas las líneas.
+      </p>
 
       <div className="space-y-3">
         {lines.map((line, i) => {
@@ -226,7 +260,7 @@ export function InvoiceLinesEditor({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
                 <div className="space-y-1 min-w-0">
                   <Label htmlFor={quantityId} className="text-xs">
                     Cantidad
@@ -251,6 +285,19 @@ export function InvoiceLinesEditor({
                     onValueChange={(v) => update(i, "unitPrice", v)}
                     placeholder="0,00"
                     className="h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <Label htmlFor={`${lineKey}-discount`} className="text-xs">
+                    Desc. %
+                  </Label>
+                  <DecimalInput
+                    id={`${lineKey}-discount`}
+                    value={line.discountPct ?? "0"}
+                    onValueChange={(v) => update(i, "discountPct", v)}
+                    placeholder="0"
+                    className="h-9 text-sm"
+                    scale={4}
                   />
                 </div>
                 <div className="space-y-1 min-w-0">

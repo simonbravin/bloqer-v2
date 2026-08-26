@@ -1,13 +1,21 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { toMoneyDecimal } from "../finance/money-decimal";
+import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
 
 type TxClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
-/** Canonical line math [D-053]: round each money component to 2 dp, then sum at header. */
-export function calcLine(quantity: Prisma.Decimal, unitPrice: Prisma.Decimal, taxRate: Prisma.Decimal) {
-  const lineSubtotal = toMoneyDecimal(quantity.times(unitPrice));
-  const lineTax = toMoneyDecimal(lineSubtotal.times(taxRate).dividedBy(100));
-  const lineTotal = toMoneyDecimal(lineSubtotal.plus(lineTax));
+/** Canonical line math [D-053]/[D-093]: discount on rounded subtotal, then IVA; header = sum. */
+export function calcLine(
+  quantity: Prisma.Decimal,
+  unitPrice: Prisma.Decimal,
+  taxRate: Prisma.Decimal,
+  discountPct: Prisma.Decimal = new Prisma.Decimal(0),
+) {
+  const { lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+    quantity,
+    unitPrice,
+    taxRate,
+    discountPct,
+  });
   return { lineSubtotal, lineTax, lineTotal };
 }
 

@@ -3,6 +3,7 @@ import {
   DISPLAY_DECIMALS,
   formatGroupedDecimal,
   roundQty,
+  roundRatePct,
   serializeMoney,
 } from "@bloqer/utils";
 
@@ -33,6 +34,17 @@ export function formatBudgetQtyFromString(raw: string): string {
 /** Precios unitarios en UI: 2 dp + miles (el DTO puede traer 4 dp). */
 export function formatUnitPriceFromString(raw: string): string {
   return formatDecimalArFromString(raw);
+}
+
+/** IVA / desc. %: recorta ceros y usa coma es-AR (storage 4 dp). */
+export function formatRatePctFromString(raw: string): string {
+  try {
+    const canonical = roundRatePct(raw);
+    const trimmed = canonical.replace(/0+$/, "").replace(/\.$/, "");
+    return trimmed.replace(".", ",");
+  } catch {
+    return raw;
+  }
 }
 
 /** Tooltip/eje de chart: Recharts entrega number; el texto sale por el kernel. */

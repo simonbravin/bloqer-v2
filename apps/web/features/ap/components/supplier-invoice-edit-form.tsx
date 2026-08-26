@@ -95,10 +95,11 @@ export function SupplierInvoiceEditForm({
           quantity:    l.quantity,
           unitPrice:   l.unitPrice,
           taxRate:     l.taxRate,
+          discountPct: l.discountPct ?? "0",
           wbsNodeId:   l.wbsNodeId,
           purchaseOrderLineId: l.purchaseOrderLineId,
         }))
-      : [{ description: "", quantity: "1", unitPrice: "", taxRate: "21", wbsNodeId: null, purchaseOrderLineId: null }],
+      : [{ description: "", quantity: "1", unitPrice: "", taxRate: "21", discountPct: "0", wbsNodeId: null, purchaseOrderLineId: null }],
   );
 
   useEffect(() => {

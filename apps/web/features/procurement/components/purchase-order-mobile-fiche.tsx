@@ -1,5 +1,6 @@
 import { formatDate } from "@/lib/format";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { compareDecimal } from "@bloqer/utils";
+import { formatMoneyAmount, formatRatePctFromString } from "@/lib/format-money";
 import { Badge } from "@/components/ui/badge";
 import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
 import type { PurchaseOrderView } from "@bloqer/services";
@@ -133,6 +134,9 @@ export function PurchaseOrderMobileFiche({
             <p className="font-medium leading-snug">{line.description}</p>
             <p className="text-sm tabular-nums text-muted-foreground">
               {line.quantity} × {formatMoneyAmount(line.unitPrice)}
+              {compareDecimal(line.discountPct, "0") > 0
+                ? ` · desc. ${formatRatePctFromString(line.discountPct)}%`
+                : ""}
             </p>
             <p className="text-sm font-semibold tabular-nums">{formatMoneyAmount(line.lineTotal)}</p>
             {line.wbsNodeCode ? (

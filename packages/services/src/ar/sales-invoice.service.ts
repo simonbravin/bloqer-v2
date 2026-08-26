@@ -15,7 +15,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea, canMutateArForScope, canViewArProjectArea } from "./ar-access";
 import { resolvePagination } from "../finance/pagination";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
-import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
+import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { isCrossCompany } from "../company-scope";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
@@ -37,6 +37,7 @@ export type SalesInvoiceLineView = {
   quantity: string;
   unitPrice: string;
   taxRate: string;
+  discountPct: string;
   lineSubtotal: string;
   lineTax: string;
   lineTotal: string;
@@ -293,6 +294,7 @@ export async function createSalesInvoice(
         quantity: qty,
         unitPrice: price,
         taxRate: rate,
+        discountPct: parseDiscountPct(line.discountPct),
         pricesIncludeTax,
       });
       await tx.salesInvoiceLine.create({
@@ -302,6 +304,7 @@ export async function createSalesInvoice(
           quantity: qty,
           unitPrice: unitPriceNet,
           taxRate: rate,
+          discountPct: parseDiscountPct(line.discountPct),
           lineSubtotal,
           lineTax,
           lineTotal,
@@ -515,6 +518,7 @@ export async function updateSalesInvoice(
           line.quantity,
           line.unitPrice,
           new Prisma.Decimal(0),
+          line.discountPct,
         );
         await tx.salesInvoiceLine.update({
           where: { id: line.id },
@@ -605,13 +609,18 @@ export async function issueSalesInvoice(
       counterpartyCountry: inv.clientContact.country,
       documentLabel: "factura de venta",
     });
+    await recalcInvoiceTotals(tx as never, id);
+    const refreshed = await tx.salesInvoice.findUniqueOrThrow({ where: { id } });
+    if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
+      throw new ServiceError("CONFLICT", "El total de la factura debe ser mayor a 0");
+    }
     assertInvoiceLetterTaxConsistencyOnIssue({
       invoiceLetter: inv.invoiceLetter,
-      taxAmount: inv.taxAmount,
+      taxAmount: refreshed.taxAmount,
     });
 
     const { computeDocumentFxAmounts } = await import("../finance/fx-amount.service");
-    const fx = computeDocumentFxAmounts(inv.currency, inv.totalAmount, inv.fxRate);
+    const fx = computeDocumentFxAmounts(refreshed.currency, refreshed.totalAmount, refreshed.fxRate);
 
     // Conditional flip prevents issue↔cancel races leaving orphan receivables.
     const flipped = await tx.salesInvoice.updateMany({
@@ -639,7 +648,7 @@ export async function issueSalesInvoice(
         issueDate: inv.issueDate,
         dueDate: inv.dueDate,
         currency: inv.currency,
-        originalAmount: inv.totalAmount,
+        originalAmount: refreshed.totalAmount,
         createdBy: ctx.actorUserId,
         updatedBy: ctx.actorUserId,
       },
@@ -847,6 +856,7 @@ type RawInvoice = SalesInvoice & {
     quantity: Prisma.Decimal;
     unitPrice: Prisma.Decimal;
     taxRate: Prisma.Decimal;
+    discountPct: Prisma.Decimal;
     lineSubtotal: Prisma.Decimal;
     lineTax: Prisma.Decimal;
     lineTotal: Prisma.Decimal;
@@ -871,6 +881,7 @@ function serializeInvoice(inv: RawInvoice): SalesInvoiceWithLines {
       quantity: serializeQtyDecimal(l.quantity),
       unitPrice: serializeUnitPriceDecimal(l.unitPrice),
       taxRate: serializeRatePctDecimal(l.taxRate),
+      discountPct: serializeRatePctDecimal(l.discountPct),
       lineSubtotal: serializeMoneyDecimal(l.lineSubtotal),
       lineTax: serializeMoneyDecimal(l.lineTax),
       lineTotal: serializeMoneyDecimal(l.lineTotal),

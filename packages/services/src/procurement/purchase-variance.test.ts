@@ -64,6 +64,17 @@ test("poRequiresHighLevelApproval is true at threshold", () => {
   );
 });
 
+test("evaluateLineVariance uses effective unit price after discount [D-093]", () => {
+  const r = evaluateLineVariance(
+    { unit: "m2", unitPrice: "130", discountPct: "10", budgetUnitCost: "100", budgetUnit: "m2" },
+    settings,
+  );
+  // 130 × (1−10%) = 117 vs 100 → 17% → NOTE_REQUIRED (soft 10, extra 25)
+  assert.equal(r.varianceTier, "NOTE_REQUIRED");
+  assert.equal(r.requiresExtraApproval, false);
+  assert.equal(r.requiresJustification, true);
+});
+
 test("poRequiresHighLevelApproval is false below threshold", () => {
   assert.equal(
     poRequiresHighLevelApproval(new Prisma.Decimal("99999"), { poApprovalThresholdArs: "100000" }),

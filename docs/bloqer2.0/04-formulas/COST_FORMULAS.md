@@ -127,13 +127,24 @@ Positivo = **ahorro**; negativo = **sobrecosto**. La vista debe etiquetarse: *co
 
 **Precisión:** 2 decimales ARS.
 
-### 4.1 Varianza unitaria en líneas de OC ([D-044])
+### 4.1 Varianza unitaria en líneas de OC ([D-044] / [D-093])
 
 Al enviar una OC, por cada línea con baseline APU (`budgetUnitCostSnapshot`):
 
 \[
-\text{variance\_pct} = \frac{\text{unitPrice} - \text{budgetUnitCost}}{\text{budgetUnitCost}} \times 100
+grossSubtotal = round(qty \times unitPrice)
 \]
+\[
+descuento = round(grossSubtotal \times discountPct / 100)
+\]
+\[
+\text{PUefectivo} = \frac{round(grossSubtotal - descuento)}{qty}
+\]
+\[
+\text{variance\_pct} = \frac{\text{PUefectivo} - \text{budgetUnitCost}}{\text{budgetUnitCost}} \times 100
+\]
+
+(`unitPrice` es list net; el descuento % baja el PU efectivo comparado con el APU.)
 
 Tiers (umbrales en `CompanyProcurementSettings`): `NONE` &lt; soft %; `NOTE_REQUIRED` entre soft y extra %; `EXTRA_APPROVAL` ≥ extra %; casos especiales `UNIT_MISMATCH` y `NO_BUDGET_BASELINE`.
 

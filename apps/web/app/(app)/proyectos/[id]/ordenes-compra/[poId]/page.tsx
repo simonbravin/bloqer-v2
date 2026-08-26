@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { formatDate } from "@/lib/format";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatRatePctFromString } from "@/lib/format-money";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import Link from "next/link";
@@ -186,6 +186,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                 <TableHead className="text-right">Recibido</TableHead>
                 <TableHead className="text-right">Pendiente</TableHead>
                 <TableHead className="text-right">Precio unit.</TableHead>
+                <TableHead className="text-right">Desc. %</TableHead>
                 <TableHead className="text-right">Ref. presup.</TableHead>
                 {showVarianceCols && <TableHead>Desvío</TableHead>}
                 <TableHead className="text-right">Total</TableHead>
@@ -205,6 +206,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                     {line.remainingQuantity}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{line.unitPrice}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatRatePctFromString(line.discountPct)}</TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
                     {line.budgetUnitCostSnapshot ?? "—"}
                   </TableCell>

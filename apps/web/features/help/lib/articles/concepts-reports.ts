@@ -372,7 +372,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     steps: [
       "Dinero (totales, saldos, caja): siempre 2 decimales (ej. 1.234,56), redondeo comercial half-up.",
       "Tipo de cambio: hasta 6 decimales.",
-      "Cantidades y % (IVA, etc.): hasta 4 decimales.",
+      "Cantidades y % (IVA, descuento comercial, etc.): hasta 4 decimales.",
       "Al pagar o cobrar el total: click en el saldo pendiente o dejá el default; no reescribas un redondeo distinto.",
       "Sin fondos suficientes en la cuenta, el pago se rechaza.",
     ],
@@ -385,6 +385,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "cobrar-una-cxc-de-obra",
       "por-que-un-pago-se-bloquea",
       "errores-operativos-frecuentes",
+      "descuento-porcentual-en-lineas",
     ],
     keywords: [
       "decimales",

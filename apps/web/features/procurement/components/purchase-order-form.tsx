@@ -35,6 +35,7 @@ const DEFAULT_LINE: PurchaseOrderLine = {
   quantity: "1",
   unitPrice: "",
   taxRate: "21",
+  discountPct: "0",
 };
 
 export function PurchaseOrderForm({

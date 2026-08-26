@@ -1,5 +1,5 @@
 import { formatDate } from "@/lib/format";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatRatePctFromString } from "@/lib/format-money";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
@@ -130,6 +130,7 @@ export default async function FinanzasFacturaProveedorDetailPage({
                 <TableHead>Descripción</TableHead>
                 <TableHead className="text-right">Qty</TableHead>
                 <TableHead className="text-right">Precio</TableHead>
+                <TableHead className="text-right">Desc. %</TableHead>
                 <TableHead className="text-right">IVA %</TableHead>
                 <TableHead className="text-right">Total</TableHead>
               </TableRow>
@@ -140,7 +141,8 @@ export default async function FinanzasFacturaProveedorDetailPage({
                   <TableCell>{line.description}</TableCell>
                   <TableCell className="text-right tabular-nums">{line.quantity}</TableCell>
                   <TableCell className="text-right tabular-nums">{line.unitPrice}</TableCell>
-                  <TableCell className="text-right tabular-nums">{line.taxRate}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatRatePctFromString(line.discountPct)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatRatePctFromString(line.taxRate)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatMoneyAmount(line.lineTotal)}</TableCell>
                 </TableRow>
               ))}

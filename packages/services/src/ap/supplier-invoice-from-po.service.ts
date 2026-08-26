@@ -80,6 +80,7 @@ function toPoLineDraft(
     quantity: Prisma.Decimal;
     unitPrice: Prisma.Decimal;
     taxRate: Prisma.Decimal;
+    discountPct: Prisma.Decimal;
     lineTotal: Prisma.Decimal;
     receivedQuantity: Prisma.Decimal;
     wbsNodeId: string | null;
@@ -90,6 +91,7 @@ function toPoLineDraft(
     description: line.description,
     unitPrice: serializeUnitPriceDecimal(line.unitPrice),
     taxRate: serializeRatePctDecimal(line.taxRate),
+    discountPct: serializeRatePctDecimal(line.discountPct),
     orderQuantity: serializeQtyDecimal(line.quantity),
     receivedQuantity: serializeQtyDecimal(line.receivedQuantity),
     lineTotal: serializeMoneyDecimal(line.lineTotal),
@@ -503,6 +505,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
         : `Generada desde OC-${String(po.number).padStart(3, "0")}`,
       lines: draftLines.map((l, i) => ({
         ...l,
+        discountPct: l.discountPct,
         // Monotributo/Exento → Factura C: OC often has 21%; force 0 so DRAFT/issue stay consistent ([D-084]).
         taxRate: zeroTax ? "0" : l.taxRate,
         sortOrder: i,

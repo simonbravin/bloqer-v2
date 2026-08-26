@@ -1397,6 +1397,27 @@
 
 ---
 
+### D-093 — Descuento comercial % en líneas de documento (antes de IVA)
+
+- **Fecha:** 2026-08-26
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Hace falta un descuento porcentual comercial en facturas de gasto, facturas de venta, OC y cotizaciones, alineado a Odoo/Xero/AFIP (descuento sobre neto, IVA sobre el restante). No copiar Procore (sin descuento en línea de OC) ni QuickBooks (solo cabecera).
+- **Decisión:**
+  1. Persistir **`discountPct`** `DECIMAL(8,4) NOT NULL DEFAULT 0` en `PurchaseOrderLine`, `ProcurementQuoteLine`, `SupplierInvoiceLine` y `SalesInvoiceLine`. No persistir monto de descuento (se deriva).
+  2. Kernel exclusivo ([D-053]): `grossSubtotal = round(qty × unitPriceNet)` → `discountAmount = round(grossSubtotal × pct / 100)` → `lineSubtotal = round(grossSubtotal − discountAmount)` → IVA sobre `lineSubtotal`. Rango 0–100 inclusive; 100% permitido en `DRAFT`.
+  3. **Cabecera «Descuento general %»** es solo UX: al pulsar **Aplicar a todas** copia el mismo % a cada línea. No hay descuento de cabecera en pesos ni prorrateo por monto.
+  4. Factura B ([D-086]): extraer list net del bruto **primero**, aplicar el % sobre ese neto; persistir `unitPrice` como list net (no neto descontado) para no doble-descontar al regrabar.
+  5. Copiar `discountPct` en hops cotización → OC y OC → factura. `forceZeroTax` (letra C/E) recalcula con el %. Matching 3-way sigue por cantidad.
+  6. Varianza vs APU, techo de cotización y «consumir saldo de partida» usan **precio unitario efectivo** (neto descontado), no el de lista.
+  7. Emitir / confirmar exige `totalAmount > 0` (una línea al 100% es válida si el documento no queda en cero).
+  8. **Fuera de alcance v1:** descuento en pesos de cabecera, tesorería solo-caja, recepciones, subcontratos/certificaciones.
+  9. El umbral SC vs OC directa **no** cambia: sigue en `CompanyProcurementSettings` **por empresa/tenant** (no hay monto hardcodeado).
+- **Implicancias:** kernel `@bloqer/utils` (`calcExclusiveLineAmounts` / `resolveDocumentLineAmounts`); migración Prisma; UI **Desc. %** + **Descuento general %**.
+- **Documentos afectados:** [`MONEY_MODEL.md`](../03-finance/MONEY_MODEL.md), [`TAX_FORMULAS.md`](../04-formulas/TAX_FORMULAS.md), [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md), [`TAXES_AND_WITHHOLDINGS.md`](../03-finance/TAXES_AND_WITHHOLDINGS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1405,7 +1426,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-092`…).
+1. Tomar el siguiente ID disponible (`D-094`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

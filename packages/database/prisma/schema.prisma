@@ -1546,6 +1546,8 @@ model SalesInvoiceLine {
   quantity            Decimal  @db.Decimal(18, 4)
   unitPrice           Decimal  @db.Decimal(18, 4)
   taxRate             Decimal  @default(0) @db.Decimal(8, 4)
+  /// Commercial % off list net, before IVA ([D-093]).
+  discountPct         Decimal  @default(0) @db.Decimal(8, 4)
   lineSubtotal        Decimal  @db.Decimal(18, 4)
   lineTax             Decimal  @default(0) @db.Decimal(18, 4)
   lineTotal           Decimal  @db.Decimal(18, 4)
@@ -2020,6 +2022,8 @@ model SupplierInvoiceLine {
   quantity            Decimal  @db.Decimal(18, 4)
   unitPrice           Decimal  @db.Decimal(18, 4)
   taxRate             Decimal  @default(0) @db.Decimal(8, 4)
+  /// Commercial % off list net, before IVA ([D-093]).
+  discountPct         Decimal  @default(0) @db.Decimal(8, 4)
   lineSubtotal        Decimal  @db.Decimal(18, 4)
   lineTax             Decimal  @default(0) @db.Decimal(18, 4)
   lineTotal           Decimal  @db.Decimal(18, 4)
@@ -2259,6 +2263,8 @@ model ProcurementQuoteLine {
   purchaseRequestLineId String
   unitPrice             Decimal @db.Decimal(18, 4)
   taxRate               Decimal @default(0) @db.Decimal(8, 4)
+  /// Commercial % off list net, before IVA ([D-093]).
+  discountPct           Decimal @default(0) @db.Decimal(8, 4)
   lineSubtotal          Decimal @db.Decimal(18, 4)
   lineTax               Decimal @default(0) @db.Decimal(18, 4)
   lineTotal             Decimal @db.Decimal(18, 4)
@@ -2340,6 +2346,8 @@ model PurchaseOrderLine {
   quantity               Decimal                   @db.Decimal(18, 4)
   unitPrice              Decimal                   @db.Decimal(18, 4)
   taxRate                Decimal                   @default(0) @db.Decimal(8, 4)
+  /// Commercial % off list net, before IVA ([D-093]).
+  discountPct            Decimal                   @default(0) @db.Decimal(8, 4)
   lineSubtotal           Decimal                   @db.Decimal(18, 4)
   lineTax                Decimal                   @default(0) @db.Decimal(18, 4)
   lineTotal              Decimal                   @db.Decimal(18, 4)

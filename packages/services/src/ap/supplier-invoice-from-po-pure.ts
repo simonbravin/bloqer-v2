@@ -5,6 +5,7 @@ export type PoLineForInvoiceDraft = {
   description: string;
   unitPrice: string;
   taxRate: string;
+  discountPct: string;
   orderQuantity: string;
   receivedQuantity: string;
   lineTotal: string;
@@ -16,6 +17,7 @@ export type InvoiceDraftLineInput = {
   quantity: string;
   unitPrice: string;
   taxRate: string;
+  discountPct: string;
   wbsNodeId?: string | null;
   purchaseOrderLineId?: string | null;
 };
@@ -130,6 +132,7 @@ export function buildInvoiceDraftLinesFromPo(
       quantity: formatInvoiceLineQuantity(qty),
       unitPrice: line.unitPrice,
       taxRate: line.taxRate,
+      discountPct: line.discountPct,
       wbsNodeId: line.wbsNodeId,
       purchaseOrderLineId: line.id,
     });

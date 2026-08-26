@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { idempotencyKeySchema } from "./idempotency";
-import { isPositiveRoundedQty, positiveQtyString, qtyString, unitPriceString } from "./money";
+import { isPositiveRoundedQty, positiveQtyString, qtyString, unitPriceString, discountPctString } from "./money";
 
 const purchaseOrderLineSchema = z.object({
   wbsNodeId: z.string().uuid({ message: "Cada línea debe imputar a un ítem EDT" }),
@@ -12,6 +12,7 @@ const purchaseOrderLineSchema = z.object({
   quantity: positiveQtyString,
   unitPrice: unitPriceString,
   taxRate: z.string().regex(/^\d+(\.\d+)?$/).default("21"),
+  discountPct: discountPctString.optional().default("0.0000"),
   sortOrder: z.number().int().default(0),
   varianceJustification: z.string().max(2000).optional().nullable(),
 });

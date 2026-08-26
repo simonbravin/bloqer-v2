@@ -343,7 +343,7 @@ Para operadores: **no hace falta pensar en “escalas de base de datos”**. En 
 |-----|------------------------|
 | **Dinero** (totales, saldos, pagos, cobros, caja) | Siempre **2 decimales** (ej. `1.234,56`). Redondeo comercial half-up. |
 | **Tipo de cambio** | Hasta **6** decimales. |
-| **Cantidades** (líneas, stock) y **%** (IVA, etc.) | Hasta **4** decimales. |
+| **Cantidades** (líneas, stock) y **%** (IVA, descuento comercial, etc.) | Hasta **4** decimales. |
 
 - Al **pagar o cobrar el total**, usá el saldo que muestra el sistema (o el default del formulario). El servidor aplica el saldo almacenado; no reescribás a mano un redondeo distinto.
 - Si la cuenta no tiene fondos suficientes para el pago, la operación **se rechaza** con el disponible.
@@ -752,7 +752,7 @@ flowchart LR
 1. **Nueva solicitud** (diálogo / `?create=1`) desde **Solicitudes de compra** o **Tablero de compras** (**Nueva solicitud** / **Todas las solicitudes**), o llegar prellenada desde Materiales → **Pedir**.
 2. Líneas: cantidad, unidad, descripción y **partida EDT obligatoria**.
 3. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por partida EDT).
-4. Cargar **Cotizaciones**: elegí proveedor (buscador: razón social o nombre fantasía), precio + **plazo de entrega en días** + validez. Cumplir mínimo de cotizaciones de `/configuracion/politicas`.
+4. Cargar **Cotizaciones**: elegí proveedor (buscador: razón social o nombre fantasía), **precio unit.**, **Desc. %** (opcional, antes de IVA) + **plazo de entrega en días** + validez. Cumplir mínimo de cotizaciones de `/configuracion/politicas`. El umbral que obliga SC+cotizaciones vs OC directa lo setea cada empresa en políticas de compras (no es un monto fijo del producto).
 5. **Seleccionar** proveedor → genera **OC en borrador**.
 6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora. El email de nueva solicitud muestra organización, proyecto, solicitante e ítems; el asunto es `[organización] Nueva solicitud · SC-003`.
 
@@ -763,7 +763,7 @@ flowchart LR
 **Estados en pantalla:** Borrador → Pend. aprobación → Aprobada → Confirmada → Recepción parcial / Recibida · Anulada.  
 **Enum:** `DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED` (o `CANCELLED`).
 
-1. **Nueva OC** desde listado/tablero (`?create=1`) o desde SC seleccionada. Proveedor: buscador por razón social o nombre fantasía. Cada línea: **partida hoja** + cantidades/precios. Al elegir partida se muestran **costo ref. materiales** y **saldo de partida** (alerta, no bloqueo).
+1. **Nueva OC** desde listado/tablero (`?create=1`) o desde SC seleccionada. Proveedor: buscador por razón social o nombre fantasía. Cada línea: **partida hoja** + cantidades/precios y **Desc. %** (antes de IVA). **Descuento general %** + **Aplicar a todas** copia el mismo % a cada línea. Al elegir partida se muestran **costo ref. materiales** y **saldo de partida** (alerta, no bloqueo).
 2. **Enviar a aprobación** → `SUBMITTED`.
 3. Aprobador: **Aprobar** → `APPROVED`, o **Devolver a borrador** con **motivo obligatorio**.
 4. **Confirmar al proveedor** → `CONFIRMED` = **comprometido** en EDT y costos.  
@@ -878,7 +878,7 @@ flowchart LR
 
 #### Obra (proyecto)
 
-- **Facturas emitidas** (`/proyectos/[id]/facturas`, estados Borrador / Emitida / Anulada): una vez emitidas son inmutables; solo se pueden **anular**. Detalle: **Emitir** desde borrador; panel de **adjuntos** del comprobante. Al crear, el cliente se busca por razón social o nombre fantasía.
+- **Facturas emitidas** (`/proyectos/[id]/facturas`, estados Borrador / Emitida / Anulada): una vez emitidas son inmutables; solo se pueden **anular**. Detalle: **Emitir** desde borrador; panel de **adjuntos** del comprobante. Al crear, el cliente se busca por razón social o nombre fantasía. En la línea: **Desc. %** opcional (antes de IVA; el precio unitario es de lista).
 - **Cuentas por cobrar** (`/proyectos/[id]/cuentas-por-cobrar`): estados Pendiente / Parcial / Pagado / Vencido. Desde el detalle → **Cobrar** (`…/[receivableId]/cobrar`): cuenta, fecha, monto (2 decimales), **método** (Efectivo / Transferencia / Cheque / Tarjeta / Otro) y referencia opcional. Para saldar el total, dejá el saldo que muestra el sistema. Solo la **cobranza confirmada** acredita tesorería ([D-072]).
 - **Cobranzas** (`/proyectos/[id]/cobranzas`): ingresan dinero (`INFLOW`) y bajan el saldo. En el detalle, **Cancelar** muestra el error en pantalla si falla (p. ej. movimiento ya conciliado o período cerrado); no se “traga” el mensaje.
 - **Venta rápida / anticipo** (`/proyectos/[id]/facturas/anticipo/nueva`): factura + CxC (+ cobro opcional) en un paso.
@@ -889,7 +889,7 @@ flowchart LR
 Casos como capacitaciones, venta de materiales o servicios de estructura **sin proyecto**:
 
 1. **Finanzas → Transacciones** (`/finanzas/transacciones`) → **Registrar transacción** → tab **Ingreso / cobro**.
-2. Modo **Factura / cuenta por cobrar** (`AR_INCOME`): cliente, fechas, líneas, impuestos, vencimiento; N° comprobante externo opcional; **Cobrar ahora (ingreso a caja)** opcional (cuenta + fecha; requiere permiso de tesorería).
+2. Modo **Factura / cuenta por cobrar** (`AR_INCOME`): cliente, fechas, líneas (cantidad, precio, **Desc. %**, IVA), vencimiento; N° comprobante externo opcional; **Cobrar ahora (ingreso a caja)** opcional (cuenta + fecha; requiere permiso de tesorería).
 3. Si solo necesitás mover caja **sin** CxC (aportes de socios, préstamos recibidos, un tercero que **devuelve plata a la empresa**): modo **Solo caja** (`TREASURY_INFLOW`). Eso **no** es el reintegro a un empleado (ese es un **egreso**, §12.2.2).
 4. Gestionar saldos en **Cuentas por cobrar** (`/finanzas/cuentas-por-cobrar` → **Cobrar**). Filas sin obra se etiquetan **Empresa**.
 
@@ -924,7 +924,7 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 
 **Alta en obra (`/nueva`):**
 
-1. **A quién se le paga** (proveedor o empleado si no hay OC), fechas, líneas (cada línea con **partida EDT obligatoria**, D-055), OC opcional (**solo si el payee es el proveedor de esa OC**), **adjunto** opcional (foto/PDF del comprobante).
+1. **A quién se le paga** (proveedor o empleado si no hay OC), fechas, líneas (cada línea con **partida EDT obligatoria**, D-055; **Desc. %** opcional antes de IVA; **Descuento general %** para copiar el mismo % a todas), OC opcional (**solo si el payee es el proveedor de esa OC**), **adjunto** opcional (foto/PDF del comprobante).
 2. Desde OC: **Registrar factura desde OC** copia la partida EDT de cada línea de la orden.
 3. Sin más: **Crear factura** → queda en **borrador** → luego **Emitir** en el detalle (crea CxP + **asiento DRAFT** en contabilidad, ver §15).
 4. Con permiso **EDIT tesorería** y módulo Tesorería activo: checkbox **Emitir y pagar ahora (egreso de caja)** → cuenta de pago + fecha → **Emitir y pagar**. Crea factura emitida + CxP + pago + egreso en un paso. Si no hay fondos suficientes, **bloquea**.
@@ -1379,4 +1379,4 @@ flowchart LR
 
 ---
 
-*Documento vivo. Actualizado agosto 2026: centro de ayuda in-app `/ayuda` ([D-090]); payee AP proveedor o empleado (D-089, §3 / §12.2), conciliación bancaria (§4.2), ajuste manual de caja (§4.3), cierre de períodos (§15.3), métodos de liquidación, estados Confirmado/Conciliado, invitaciones sin token en URL, menús Tesorería/Contabilidad. Antes: julio 2026 (zona horaria, EDT/APU, contabilidad D-061…D-063, auth). Actualizar en el mismo PR que el cambio de producto.*
+*Documento vivo. Actualizado agosto 2026: descuento % en líneas de OC/facturas/cotizaciones ([D-093]); centro de ayuda in-app `/ayuda` ([D-090]); payee AP proveedor o empleado (D-089, §3 / §12.2), conciliación bancaria (§4.2), ajuste manual de caja (§4.3), cierre de períodos (§15.3), métodos de liquidación, estados Confirmado/Conciliado, invitaciones sin token en URL, menús Tesorería/Contabilidad. Antes: julio 2026 (zona horaria, EDT/APU, contabilidad D-061…D-063, auth). Actualizar en el mismo PR que el cambio de producto.*

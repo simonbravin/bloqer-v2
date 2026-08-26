@@ -28,7 +28,7 @@ import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
-import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, formatUnitPriceFromString } from "@/lib/format-money";
 
 interface PageProps {
   params: Promise<{ id: string; invoiceId: string }>;
@@ -225,6 +225,7 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
                 <TableHead>Descripción</TableHead>
                 <TableHead className="text-right">Cant.</TableHead>
                 <TableHead className="text-right">P. Unit.</TableHead>
+                <TableHead className="text-right">Desc. %</TableHead>
                 <TableHead className="text-right">IVA %</TableHead>
                 <TableHead className="text-right">Total</TableHead>
               </TableRow>
@@ -237,7 +238,8 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
                   <TableCell className="text-right font-mono">
                     {formatUnitPriceFromString(l.unitPrice)}
                   </TableCell>
-                  <TableCell className="text-right font-mono">{l.taxRate}%</TableCell>
+                  <TableCell className="text-right font-mono">{formatRatePctFromString(l.discountPct)}%</TableCell>
+                  <TableCell className="text-right font-mono">{formatRatePctFromString(l.taxRate)}%</TableCell>
                   <TableCell className="text-right font-mono">
                     {fmtMoney(l.lineTotal, invoice.currency)}
                   </TableCell>

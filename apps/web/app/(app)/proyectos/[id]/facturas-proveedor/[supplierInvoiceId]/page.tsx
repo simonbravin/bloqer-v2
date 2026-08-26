@@ -16,7 +16,7 @@ import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatRatePctFromString } from "@/lib/format-money";
 import {
   getPayableBySupplierInvoiceId,
   getPurchaseOrderCodeForApLink,
@@ -178,6 +178,7 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
                 <TableHead>Descripción</TableHead>
                 <TableHead className="text-right">Qty</TableHead>
                 <TableHead className="text-right">Precio</TableHead>
+                <TableHead className="text-right">Desc. %</TableHead>
                 <TableHead className="text-right">IVA %</TableHead>
                 <TableHead className="text-right">Total</TableHead>
               </TableRow>
@@ -188,7 +189,8 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
                   <TableCell>{line.description}</TableCell>
                   <TableCell className="text-right tabular-nums">{line.quantity}</TableCell>
                   <TableCell className="text-right tabular-nums">{line.unitPrice}</TableCell>
-                  <TableCell className="text-right tabular-nums">{line.taxRate}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatRatePctFromString(line.discountPct)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatRatePctFromString(line.taxRate)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatMoneyAmount(line.lineTotal)}</TableCell>
                 </TableRow>
               ))}

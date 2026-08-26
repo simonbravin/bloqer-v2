@@ -6,6 +6,7 @@ IVA, IIBB, Ganancias, SUSS, percepciones — **sin motor fiscal automático** ([
 > Ver también [D-084]: letra de factura A/B/C/E y condición frente al IVA en Company/Contact. La letra **guía UX** (defaults/warnings); no cambia la fórmula de cálculo.
 > Ver también [D-085]: presets de alícuota (0 / 10,5 / 21 / 27) y asiento GL con IVA discriminado cuando `taxAmount > 0`.
 > Ver también [D-086]: en Factura B (u otras) se puede ingresar **precio unitario con IVA incluido**; al guardar se persiste neto + IVA.
+> Ver también [D-093]: descuento comercial % por línea **antes de IVA**; el precio unitario persistido es list net.
 
 ## Modelo TaxLine
 Por cada documento o movimiento:

@@ -11,7 +11,7 @@ import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/register-transaction.types";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
 import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
-import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
+import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { assertArTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
@@ -110,6 +110,7 @@ type ArSaleReplay = {
     quantity: Prisma.Decimal;
     unitPrice: Prisma.Decimal;
     taxRate: Prisma.Decimal;
+    discountPct: Prisma.Decimal;
     sortOrder: number;
     certificationLineId: string | null;
   }>;
@@ -324,6 +325,7 @@ export async function registerArSale(
             quantity: qty,
             unitPrice: price,
             taxRate: rate,
+            discountPct: parseDiscountPct(line.discountPct),
             pricesIncludeTax: pricesIncludeTaxForGuard,
           }).lineTax,
         );
@@ -379,6 +381,7 @@ export async function registerArSale(
             unitPrice: price,
             taxRate: rate,
             pricesIncludeTax,
+            discountPct: parseDiscountPct(line.discountPct),
           });
           await tx.salesInvoiceLine.create({
             data: {
@@ -387,6 +390,7 @@ export async function registerArSale(
               quantity: qty,
               unitPrice: unitPriceNet,
               taxRate: rate,
+              discountPct: parseDiscountPct(line.discountPct),
               lineSubtotal,
               lineTax,
               lineTotal,

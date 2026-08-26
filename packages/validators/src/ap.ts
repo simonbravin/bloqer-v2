@@ -7,6 +7,7 @@ import {
   positiveMoneyAmountString,
   qtyString,
   ratePctString,
+  discountPctString,
   unitPriceString,
 } from "./money";
 import { treasurySettlementFieldsSchema } from "./treasury-settlement";
@@ -18,6 +19,7 @@ const supplierInvoiceLineSchema = z.object({
   quantity:    qtyString,
   unitPrice:   unitPriceString,
   taxRate:     ratePctString.optional().default("0.0000"),
+  discountPct: discountPctString.optional().default("0.0000"),
   sortOrder:   z.number().int().min(0).optional().default(0),
   /** Required when invoice has projectId ([D-055]). */
   wbsNodeId:   z.string().uuid().optional().nullable(),

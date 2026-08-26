@@ -70,5 +70,13 @@ export {
   netUnitFromGrossInclusive,
   type GrossInclusiveLineAmounts,
 } from "./tax-inclusive";
+export {
+  calcExclusiveLineAmounts,
+  effectiveUnitPriceNet,
+  normalizeDiscountPct,
+  resolveDocumentLineAmounts,
+  type DocumentLineAmounts,
+  type ExclusiveLineAmounts,
+} from "./line-amounts";
 export { isUuid } from "./uuid";
 export { sortTreeOrder } from "./sort-tree-order";

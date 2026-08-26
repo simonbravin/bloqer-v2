@@ -33,11 +33,14 @@ Definir cómo Bloqer representa **montos monetarios** de forma consistente, sin 
 
 ## Redondeo
 - Redondeo **half-up** a la precisión del campo destino ([D-053](../00-product/DECISION_LOG.md)).
-- **Líneas de documento (canónico):**
-  1. `lineSubtotal = roundMoney(quantity × unitPrice)` (2 dp)
-  2. `lineTax = roundMoney(lineSubtotal × taxRate / 100)` (2 dp)
-  3. `lineTotal = roundMoney(lineSubtotal + lineTax)` (2 dp)
-  4. Totales de cabecera = **suma** de líneas (sin re-redondear la suma).
+- **Líneas de documento (canónico, [D-053] / [D-093]):**
+  1. `grossSubtotal = roundMoney(quantity × unitPrice)` (2 dp) — `unitPrice` es list net
+  2. `discountAmount = roundMoney(grossSubtotal × discountPct / 100)` (2 dp)
+  3. `lineSubtotal = roundMoney(grossSubtotal − discountAmount)` (2 dp)
+  4. `lineTax = roundMoney(lineSubtotal × taxRate / 100)` (2 dp)
+  5. `lineTotal = roundMoney(lineSubtotal + lineTax)` (2 dp)
+  6. Totales de cabecera = **suma** de líneas (sin re-redondear la suma).
+  7. El % de cabecera no se persiste: es sello del mismo `discountPct` en cada línea.
 - Tolerancia de validación documento vs suma: **0.01** en moneda del documento.
 - `amount_ars = roundMoney(amount × fx_rate)` a **2** dp; `fx_rate` a **6** dp.
 - **Pagar/cobrar todo:** aplicar saldo **almacenado** en servidor; display siempre 2 dp.

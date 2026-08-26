@@ -79,6 +79,7 @@ const DEFAULT_LINE: InvoiceLine = {
   quantity: "1",
   unitPrice: "",
   taxRate: "21",
+  discountPct: "0",
   wbsNodeId: null,
   purchaseOrderLineId: null,
 };

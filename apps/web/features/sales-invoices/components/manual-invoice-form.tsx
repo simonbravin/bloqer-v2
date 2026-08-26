@@ -76,6 +76,7 @@ export function ManualInvoiceForm({
   const [taxRate, setTaxRate] = useState("21");
   const [quantity, setQuantity] = useState("1.00");
   const [unitPrice, setUnitPrice] = useState("");
+  const [discountPct, setDiscountPct] = useState("0");
   const [attachment, setAttachment] = useState<File | null>(null);
   const [collectNow, setCollectNow] = useState(false);
   const [collectAccountId, setCollectAccountId] = useState("");
@@ -180,6 +181,7 @@ export function ManualInvoiceForm({
             quantity: String(fd.get("quantity") ?? "").trim() || quantity,
             unitPrice: String(fd.get("unitPrice") ?? "").trim() || unitPrice,
             taxRate: forceZeroTax ? "0" : (taxRate || "0"),
+            discountPct: String(fd.get("discountPct") ?? "").trim() || discountPct,
             sortOrder: 0,
           }],
           collectNow: {
@@ -223,6 +225,7 @@ export function ManualInvoiceForm({
           quantity:    String(fd.get("quantity") ?? "").trim() || quantity,
           unitPrice:   String(fd.get("unitPrice") ?? "").trim() || unitPrice,
           taxRate:     forceZeroTax ? "0" : (taxRate || "0"),
+          discountPct: String(fd.get("discountPct") ?? "").trim() || discountPct,
           sortOrder:   0,
         }],
       });
@@ -330,6 +333,10 @@ export function ManualInvoiceForm({
               {pricesIncludeTax ? "Precio unitario (c/IVA)" : "Precio unitario"}
             </Label>
             <DecimalInput id="unitPrice" name="unitPrice" required value={unitPrice} onValueChange={setUnitPrice} placeholder="0,00" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="discountPct">Desc. %</Label>
+            <DecimalInput id="discountPct" name="discountPct" value={discountPct} onValueChange={setDiscountPct} placeholder="0" scale={4} />
           </div>
           <div className="space-y-1">
             <TaxRateSelect

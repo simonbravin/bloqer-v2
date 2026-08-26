@@ -51,9 +51,10 @@ export function PurchaseOrderEditForm({
           quantity:    l.quantity,
           unitPrice:   l.unitPrice,
           taxRate:     l.taxRate,
+          discountPct: l.discountPct ?? "0",
           varianceJustification: l.varianceJustification,
         }))
-      : [{ wbsNodeId: null, productId: null, costAnalysisLineId: null, description: "", unit: "", quantity: "1", unitPrice: "", taxRate: "21" }],
+      : [{ wbsNodeId: null, productId: null, costAnalysisLineId: null, description: "", unit: "", quantity: "1", unitPrice: "", taxRate: "21", discountPct: "0" }],
   );
 
   const showEmergency =

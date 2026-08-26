@@ -1,3 +1,4 @@
+import { effectiveUnitPriceNet } from "@bloqer/utils";
 import { Prisma } from "@bloqer/database";
 import type { PurchaseOrderVarianceTier } from "@bloqer/database";
 import type { CompanyProcurementSettingsView } from "./company-procurement-settings.service";
@@ -5,6 +6,7 @@ import type { CompanyProcurementSettingsView } from "./company-procurement-setti
 export type VarianceLineInput = {
   unit: string;
   unitPrice: string;
+  discountPct?: string;
   budgetUnitCost: string | null;
   budgetUnit: string | null;
   varianceJustification?: string | null;
@@ -42,7 +44,14 @@ export function evaluateLineVariance(
   }
 
   const baseline = line.budgetUnitCost ? new Prisma.Decimal(line.budgetUnitCost) : null;
-  const price = new Prisma.Decimal(line.unitPrice);
+  // Unit-level vs APU snapshot ([D-044]): qty=1 so rounding matches a single unit, not the line qty.
+  const price = new Prisma.Decimal(
+    effectiveUnitPriceNet({
+      quantity: "1",
+      unitPriceNet: line.unitPrice,
+      discountPct: line.discountPct ?? "0",
+    }),
+  );
 
   if (!baseline || baseline.isZero()) {
     return {

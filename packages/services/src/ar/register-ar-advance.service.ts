@@ -83,6 +83,7 @@ export async function registerArAdvance(
           quantity: "1",
           unitPrice: amount,
           taxRate: "0",
+          discountPct: "0",
           sortOrder: 0,
         },
       ],

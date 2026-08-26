@@ -7,7 +7,7 @@ import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/register-transaction.types";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
 import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
-import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
+import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { isCrossCompany } from "../company-scope";
@@ -115,6 +115,7 @@ type ApExpenseReplay = {
     quantity: Prisma.Decimal;
     unitPrice: Prisma.Decimal;
     taxRate: Prisma.Decimal;
+    discountPct: Prisma.Decimal;
     sortOrder: number;
     wbsNodeId: string | null;
     purchaseOrderLineId: string | null;
@@ -345,6 +346,7 @@ export async function registerApExpense(
         quantity: qty,
         unitPrice: price,
         taxRate: rate,
+        discountPct: parseDiscountPct(line.discountPct),
         pricesIncludeTax: pricesIncludeTaxEarly,
       }).lineTotal,
     );
@@ -393,6 +395,7 @@ export async function registerApExpense(
             quantity: qty,
             unitPrice: price,
             taxRate: rate,
+            discountPct: parseDiscountPct(line.discountPct),
             pricesIncludeTax,
           }).lineTax,
         );
@@ -447,6 +450,7 @@ export async function registerApExpense(
                 unitPrice: price,
                 taxRate: rate,
                 pricesIncludeTax,
+                discountPct: parseDiscountPct(line.discountPct),
               });
               await tx.supplierInvoiceLine.create({
                 data: {
@@ -457,6 +461,7 @@ export async function registerApExpense(
                   quantity: qty,
                   unitPrice: unitPriceNet,
                   taxRate: rate,
+                  discountPct: parseDiscountPct(line.discountPct),
                   lineSubtotal,
                   lineTax,
                   lineTotal,

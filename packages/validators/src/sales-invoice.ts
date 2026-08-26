@@ -4,6 +4,7 @@ import {
   optionalMoneyAmountString,
   qtyString,
   ratePctString,
+  discountPctString,
   unitPriceString,
 } from "./money";
 import { treasurySettlementFieldsSchema } from "./treasury-settlement";
@@ -15,6 +16,7 @@ const invoiceLineSchema = z.object({
   quantity:    qtyString,
   unitPrice:   unitPriceString,
   taxRate:     ratePctString.optional().default("0.0000"),
+  discountPct: discountPctString.optional().default("0.0000"),
   sortOrder:   z.number().int().min(0).optional().default(0),
   certificationLineId: z.string().uuid().optional().nullable(),
 });

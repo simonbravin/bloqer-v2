@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { positiveQtyString } from "./money";
+import { positiveQtyString, discountPctString, unitPriceString } from "./money";
 
 const purchaseRequestLineSchema = z.object({
   wbsNodeId: z.string().uuid({ message: "Cada línea debe imputar a un ítem EDT" }),
@@ -28,8 +28,9 @@ export const updatePurchaseRequestSchema = z.object({
 
 const quoteLineSchema = z.object({
   purchaseRequestLineId: z.string().uuid(),
-  unitPrice: z.string().regex(/^\d+(\.\d+)?$/),
+  unitPrice: unitPriceString,
   taxRate: z.string().regex(/^\d+(\.\d+)?$/).default("21"),
+  discountPct: discountPctString.optional().default("0.0000"),
   sortOrder: z.number().int().default(0),
 });
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { addDecimal, divideDecimal, multiplyDecimal, roundMoney, serializeMoney, roundQty, QTY_DECIMALS } from "@bloqer/utils";
+import { addDecimal, divideDecimal, roundMoney, roundQty, QTY_DECIMALS, resolveDocumentLineAmounts, effectiveUnitPriceNet, normalizeDiscountPct } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -22,6 +22,7 @@ export type PurchaseOrderLine = {
   quantity: string;
   unitPrice: string;
   taxRate: string;
+  discountPct: string;
   varianceJustification?: string | null;
 };
 
@@ -67,13 +68,13 @@ function isPositiveQty(raw: string | null | undefined): boolean {
 
 function linePreview(l: PurchaseOrderLine) {
   try {
-    const qty = serializeMoney(l.quantity.trim() || "0");
-    const price = serializeMoney(l.unitPrice.trim() || "0");
-    const rate = l.taxRate.trim() || "0";
-    const subtotal = roundMoney(multiplyDecimal(qty, price));
-    const tax = roundMoney(divideDecimal(multiplyDecimal(subtotal, rate), "100"));
-    const total = roundMoney(addDecimal(subtotal, tax));
-    return { subtotal, tax, total };
+    const r = resolveDocumentLineAmounts({
+      quantity: l.quantity.trim() || "0",
+      unitPrice: l.unitPrice.trim() || "0",
+      taxRatePercent: l.taxRate.trim() || "0",
+      discountPct: l.discountPct?.trim() || "0",
+    });
+    return { subtotal: r.lineSubtotal, tax: r.lineTax, total: r.lineTotal };
   } catch {
     return { subtotal: "0.00", tax: "0.00", total: "0.00" };
   }
@@ -96,6 +97,7 @@ const DEFAULT_LINE: PurchaseOrderLine = {
   quantity: "1",
   unitPrice: "",
   taxRate: "21",
+  discountPct: "0",
 };
 
 function createLineKey(): string {
@@ -117,6 +119,7 @@ export function PurchaseOrderLinesEditor({
     () => withNoneOption(productsToSearchableOptions(productOptions), { label: "Sin producto" }),
     [productOptions],
   );
+  const [headerDiscount, setHeaderDiscount] = useState("");
   const [lineKeys, setLineKeys] = useState<string[]>(() =>
     Array.from({ length: Math.max(lines.length, 1) }, createLineKey),
   );
@@ -196,9 +199,24 @@ export function PurchaseOrderLinesEditor({
       toast.error("Definí primero un precio unitario (o usá el referencial).");
       return;
     }
+    let effective: string;
+    try {
+      effective = effectiveUnitPriceNet({
+        quantity: "1",
+        unitPriceNet: price,
+        discountPct: line.discountPct?.trim() || "0",
+      });
+    } catch {
+      toast.error("No se pudo calcular el precio con descuento.");
+      return;
+    }
+    if (!isPositiveMoneyAmount(effective)) {
+      toast.error("El precio efectivo queda en cero con ese descuento.");
+      return;
+    }
     let qty: string;
     try {
-      qty = roundQty(divideDecimal(wbs.availableSaldo, price, QTY_DECIMALS));
+      qty = roundQty(divideDecimal(wbs.availableSaldo, effective, QTY_DECIMALS));
     } catch {
       toast.error("No se pudo calcular la cantidad para el saldo de la partida.");
       return;
@@ -237,12 +255,44 @@ export function PurchaseOrderLinesEditor({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Líneas</p>
-        <Button type="button" variant="outline" size="sm" onClick={addLine}>
-          + Agregar línea
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Label htmlFor="po-header-discount" className="text-xs text-muted-foreground whitespace-nowrap">
+            Descuento general %
+          </Label>
+          <DecimalInput
+            id="po-header-discount"
+            value={headerDiscount}
+            onValueChange={setHeaderDiscount}
+            placeholder="0"
+            className="h-8 w-20 text-sm"
+            scale={4}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              try {
+                const pct = normalizeDiscountPct(headerDiscount);
+                onChange(lines.map((l) => ({ ...l, discountPct: pct })));
+              } catch {
+                toast.error("El descuento debe estar entre 0 y 100");
+              }
+            }}
+          >
+            Aplicar a todas
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={addLine}>
+            + Agregar línea
+          </Button>
+        </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        El descuento % se aplica al subtotal de la línea, antes de IVA. El precio unitario de lista no cambia.
+        «Descuento general %» copia el mismo porcentaje a todas las líneas.
+      </p>
       <p className="text-xs text-muted-foreground">
         Cada línea debe imputar a un ítem EDT. Para gastos generales usá la partida de
         indirectos del presupuesto.
@@ -380,7 +430,7 @@ export function PurchaseOrderLinesEditor({
               </div>
 
               {/* Montos: una fila con columnas legibles. */}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Unidad</Label>
                   <UnitSelect
@@ -408,6 +458,16 @@ export function PurchaseOrderLinesEditor({
                     onValueChange={(v) => update(i, "unitPrice", v)}
                     placeholder="0,00"
                     className="h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <Label className="text-xs">Desc. %</Label>
+                  <DecimalInput
+                    value={line.discountPct ?? "0"}
+                    onValueChange={(v) => update(i, "discountPct", v)}
+                    placeholder="0"
+                    className="h-9 text-sm"
+                    scale={4}
                   />
                 </div>
                 <div className="space-y-1 min-w-0">

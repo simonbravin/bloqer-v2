@@ -64,6 +64,7 @@ const DEFAULT_LINE: InvoiceLine = {
   quantity: "1",
   unitPrice: "",
   taxRate: "21",
+  discountPct: "0",
   wbsNodeId: null,
   purchaseOrderLineId: null,
 };
@@ -180,6 +181,7 @@ export function SupplierInvoiceForm({
         quantity: l.quantity,
         unitPrice: l.unitPrice,
         taxRate: forceZeroTax ? "0" : l.taxRate,
+        discountPct: l.discountPct ?? "0",
         wbsNodeId: l.wbsNodeId ?? null,
         purchaseOrderLineId: l.purchaseOrderLineId ?? null,
       })),

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import type { SupplierOption } from "./purchase-order-form";
@@ -39,6 +40,9 @@ export function ProcurementQuoteForm({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [supplierId, setSupplierId] = useState("");
+  const [lineMoney, setLineMoney] = useState<Record<string, { unitPrice: string; discountPct: string }>>(
+    () => Object.fromEntries(lines.map((l) => [l.id, { unitPrice: "0", discountPct: "0" }])),
+  );
 
   return (
     <form
@@ -65,8 +69,9 @@ export function ProcurementQuoteForm({
             leadTimeDays,
             lines: lines.map((line, i) => ({
               purchaseRequestLineId: line.id,
-              unitPrice: fd.get(`unitPrice_${line.id}`)?.toString() ?? "0",
+              unitPrice: lineMoney[line.id]?.unitPrice ?? "0",
               taxRate: "21",
+              discountPct: lineMoney[line.id]?.discountPct ?? "0",
               sortOrder: i,
             })),
           });
@@ -112,7 +117,7 @@ export function ProcurementQuoteForm({
       </div>
 
       {lines.map((line) => (
-        <div key={line.id} className="grid grid-cols-4 gap-2 items-end text-sm">
+        <div key={line.id} className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end text-sm">
           <div className="col-span-2">
             <p className="font-medium">{line.description}</p>
             <p className="text-muted-foreground">
@@ -124,11 +129,31 @@ export function ProcurementQuoteForm({
           </div>
           <div className="space-y-1">
             <Label htmlFor={`unitPrice_${line.id}`}>Precio unit.</Label>
-            <Input
+            <DecimalInput
               id={`unitPrice_${line.id}`}
-              name={`unitPrice_${line.id}`}
-              defaultValue="0"
-              required
+              value={lineMoney[line.id]?.unitPrice ?? "0"}
+              onValueChange={(v) =>
+                setLineMoney((prev) => ({
+                  ...prev,
+                  [line.id]: { unitPrice: v, discountPct: prev[line.id]?.discountPct ?? "0" },
+                }))
+              }
+              placeholder="0,00"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor={`discountPct_${line.id}`}>Desc. %</Label>
+            <DecimalInput
+              id={`discountPct_${line.id}`}
+              value={lineMoney[line.id]?.discountPct ?? "0"}
+              onValueChange={(v) =>
+                setLineMoney((prev) => ({
+                  ...prev,
+                  [line.id]: { unitPrice: prev[line.id]?.unitPrice ?? "0", discountPct: v },
+                }))
+              }
+              placeholder="0"
+              scale={4}
             />
           </div>
         </div>

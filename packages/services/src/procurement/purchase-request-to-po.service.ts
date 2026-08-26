@@ -1,3 +1,5 @@
+import { effectiveUnitPriceNet } from "@bloqer/utils";
+import { parseDiscountPct } from "../finance/invoice-line-money";
 import { Prisma, prisma, PurchaseOrderStatus } from "@bloqer/database";
 import { auditProcurement } from "./procurement-audit";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
@@ -122,6 +124,7 @@ export async function selectProcurementQuoteAndCreatePo(
           quantity: prl.quantity,
           unitPrice: ql.unitPrice,
           taxRate: ql.taxRate,
+          discountPct: ql.discountPct,
           lineSubtotal: ql.lineSubtotal,
           lineTax: ql.lineTax,
           lineTotal: ql.lineTotal,
@@ -246,6 +249,7 @@ export async function assertPoLinesWithinSelectedQuote(
     wbsNodeId: string | null;
     quantity: string | Prisma.Decimal;
     unitPrice: string | Prisma.Decimal;
+    discountPct?: string | Prisma.Decimal;
     sortOrder?: number;
   }>,
   tenantId: string,
@@ -287,6 +291,9 @@ export async function assertPoLinesWithinSelectedQuote(
     const line = sorted[i]!;
     const qty = new Prisma.Decimal(line.quantity);
     const price = new Prisma.Decimal(line.unitPrice);
+    const discountPct = parseDiscountPct(
+      line.discountPct == null ? undefined : String(line.discountPct),
+    );
 
     if (line.wbsNodeId && prl.wbsNodeId && line.wbsNodeId !== prl.wbsNodeId) {
       throw new ServiceError(
@@ -304,6 +311,22 @@ export async function assertPoLinesWithinSelectedQuote(
       throw new ServiceError(
         "CONFLICT",
         `El precio de "${line.description}" no puede superar el de la cotización seleccionada (${ql.unitPrice})`,
+      );
+    }
+    const quoteEffective = effectiveUnitPriceNet({
+      quantity: qty.toString(),
+      unitPriceNet: ql.unitPrice.toString(),
+      discountPct: ql.discountPct.toString(),
+    });
+    const poEffective = effectiveUnitPriceNet({
+      quantity: qty.toString(),
+      unitPriceNet: price.toString(),
+      discountPct: discountPct.toString(),
+    });
+    if (new Prisma.Decimal(poEffective).greaterThan(new Prisma.Decimal(quoteEffective))) {
+      throw new ServiceError(
+        "CONFLICT",
+        `El precio con descuento de "${line.description}" no puede superar el de la cotización seleccionada`,
       );
     }
   }

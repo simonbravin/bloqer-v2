@@ -8,7 +8,7 @@ import {
   canEditPurchaseOrders,
 } from "./procurement-access";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
-import { serializeMoneyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import {
@@ -114,6 +114,7 @@ async function applyVarianceSnapshots(
       {
         unit: line.unit,
         unitPrice: serializeUnitPriceDecimal(line.unitPrice),
+        discountPct: serializeRatePctDecimal(line.discountPct),
         budgetUnitCost: budgetUnitCost != null ? serializeUnitPriceDecimal(budgetUnitCost) : null,
         budgetUnit: baseline.unit,
         varianceJustification: line.varianceJustification,
@@ -200,6 +201,7 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
         wbsNodeId: true,
         quantity: true,
         unitPrice: true,
+        discountPct: true,
         sortOrder: true,
       },
     });

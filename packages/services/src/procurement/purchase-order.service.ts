@@ -18,6 +18,7 @@ import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import { assertDirectPoAllowed } from "./procurement-policy.service";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
+import { parseDiscountPct } from "../finance/invoice-line-money";
 import {
   serializeMoneyDecimal,
   serializeQtyDecimal,
@@ -61,6 +62,7 @@ export type PurchaseOrderLineView = {
   quantity: string;
   unitPrice: string;
   taxRate: string;
+  discountPct: string;
   lineSubtotal: string;
   lineTax: string;
   lineTotal: string;
@@ -93,6 +95,7 @@ function serializeLine(
     costAnalysisLineId: string | null;
     description: string; unit: string;
     quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; taxRate: Prisma.Decimal;
+    discountPct: Prisma.Decimal;
     lineSubtotal: Prisma.Decimal; lineTax: Prisma.Decimal; lineTotal: Prisma.Decimal;
     receivedQuantity: Prisma.Decimal; sortOrder: number;
     budgetUnitCostSnapshot: Prisma.Decimal | null;
@@ -116,6 +119,7 @@ function serializeLine(
     quantity:          serializeQtyDecimal(l.quantity),
     unitPrice:         serializeUnitPriceDecimal(l.unitPrice),
     taxRate:           serializeRatePctDecimal(l.taxRate),
+    discountPct:       serializeRatePctDecimal(l.discountPct),
     lineSubtotal:      serializeMoneyDecimal(l.lineSubtotal),
     lineTax:           serializeMoneyDecimal(l.lineTax),
     lineTotal:         serializeMoneyDecimal(l.lineTotal),
@@ -427,7 +431,9 @@ export async function createPurchaseOrder(
     const qty = new Prisma.Decimal(line.quantity);
     const price = new Prisma.Decimal(line.unitPrice);
     const rate = new Prisma.Decimal(line.taxRate ?? "0");
-    estimatedTotal = estimatedTotal.plus(calcLine(qty, price, rate).lineTotal);
+    estimatedTotal = estimatedTotal.plus(
+      calcLine(qty, price, rate, parseDiscountPct(line.discountPct)).lineTotal,
+    );
   }
   const settings = await getCompanyProcurementSettingsForProject(input.projectId, ctx);
   const fx = computeDocumentFxAmounts(input.currency ?? "ARS", estimatedTotal, null);
@@ -467,7 +473,12 @@ export async function createPurchaseOrder(
       const qty = new Prisma.Decimal(line.quantity);
       const price = new Prisma.Decimal(line.unitPrice);
       const rate = new Prisma.Decimal(line.taxRate ?? "0");
-      const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, rate);
+      const { lineSubtotal, lineTax, lineTotal } = calcLine(
+        qty,
+        price,
+        rate,
+        parseDiscountPct(line.discountPct),
+      );
       const baseline = await budgetBaselineForPurchaseLine(
         line.wbsNodeId,
         {
@@ -489,6 +500,7 @@ export async function createPurchaseOrder(
           quantity: qty,
           unitPrice: price,
           taxRate: rate,
+          discountPct: parseDiscountPct(line.discountPct),
           lineSubtotal,
           lineTax,
           lineTotal,
@@ -554,6 +566,7 @@ export async function updatePurchaseOrder(
         wbsNodeId: l.wbsNodeId,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
+        discountPct: l.discountPct,
         sortOrder: l.sortOrder ?? i,
       })),
       ctx.tenantId,
@@ -596,7 +609,12 @@ export async function updatePurchaseOrder(
         const qty   = new Prisma.Decimal(line.quantity);
         const price = new Prisma.Decimal(line.unitPrice);
         const rate  = new Prisma.Decimal(line.taxRate ?? "0");
-        const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, rate);
+        const { lineSubtotal, lineTax, lineTotal } = calcLine(
+          qty,
+          price,
+          rate,
+          parseDiscountPct(line.discountPct),
+        );
         const baseline = await budgetBaselineForPurchaseLine(
           line.wbsNodeId,
           {
@@ -624,6 +642,7 @@ export async function updatePurchaseOrder(
             quantity:        qty,
             unitPrice:       price,
             taxRate:         rate,
+            discountPct:     parseDiscountPct(line.discountPct),
             lineSubtotal,
             lineTax,
             lineTotal,
