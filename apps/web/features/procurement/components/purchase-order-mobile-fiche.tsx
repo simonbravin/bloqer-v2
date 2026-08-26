@@ -1,8 +1,6 @@
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, formatUnitPriceFromString, isZeroRatePct } from "@/lib/format-money";
-import { Badge } from "@/components/ui/badge";
-import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
-import { purchaseVarianceTierLabel } from "../lib/variance-tier-labels";
+import { PurchaseOrderVarianceReadout } from "./purchase-order-variance-readout";
 import type { PurchaseOrderView } from "@bloqer/services";
 import type { ReactNode } from "react";
 
@@ -22,16 +20,6 @@ function uniqueWbs(order: PurchaseOrderView): string[] {
   return labels;
 }
 
-function varianceAlerts(order: PurchaseOrderView): string[] {
-  const alerts: string[] = [];
-  for (const line of order.lines) {
-    if (!line.varianceTier || line.varianceTier === "NONE") continue;
-    const pct = line.variancePct ? ` (${formatRatePctFromString(line.variancePct)}%)` : "";
-    alerts.push(`${line.description}: ${purchaseVarianceTierLabel(line.varianceTier)}${pct}`);
-  }
-  return alerts;
-}
-
 export function PurchaseOrderMobileFiche({
   order,
   projectCode,
@@ -44,16 +32,11 @@ export function PurchaseOrderMobileFiche({
   documents: ReactNode;
 }) {
   const wbs = uniqueWbs(order);
-  const alerts = varianceAlerts(order);
   const requester = order.originRequestedByName ?? order.createdByName;
 
   return (
     <div className="space-y-4 md:hidden">
       <section className="rounded-lg border bg-card p-4 space-y-3" data-testid="po-mobile-fiche">
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="text-xl font-bold tracking-tight">{order.code}</h1>
-          <PurchaseOrderStatusBadge status={order.status} />
-        </div>
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div className="col-span-2">
             <dt className="text-xs text-muted-foreground">Proyecto</dt>
@@ -103,16 +86,6 @@ export function PurchaseOrderMobileFiche({
             </ul>
           </div>
         ) : null}
-        {alerts.length > 0 ? (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Desvíos / alertas</p>
-            {alerts.map((alert) => (
-              <Badge key={alert} variant="outline" className="mr-1 font-normal">
-                {alert}
-              </Badge>
-            ))}
-          </div>
-        ) : null}
         {order.emergencyReason ? (
           <div>
             <p className="text-xs text-muted-foreground">Motivo de emergencia</p>
@@ -144,17 +117,17 @@ export function PurchaseOrderMobileFiche({
                 {line.wbsNodeName ? `${line.wbsNodeCode} — ${line.wbsNodeName}` : line.wbsNodeCode}
               </p>
             ) : null}
-            {line.varianceTier && line.varianceTier !== "NONE" ? (
-              <p className="text-xs text-muted-foreground">
-                Desvío {purchaseVarianceTierLabel(line.varianceTier)}
-                {line.variancePct ? ` (${formatRatePctFromString(line.variancePct)}%)` : ""}
-                {line.budgetUnitCostSnapshot ? ` · ref. ${formatUnitPriceFromString(line.budgetUnitCostSnapshot)}` : ""}
-              </p>
-            ) : line.budgetUnitCostSnapshot ? (
+            {line.budgetUnitCostSnapshot ? (
               <p className="text-xs text-muted-foreground">
                 Ref. {formatUnitPriceFromString(line.budgetUnitCostSnapshot)}
               </p>
             ) : null}
+            <PurchaseOrderVarianceReadout
+              variancePct={line.variancePct}
+              varianceTier={line.varianceTier}
+              justification={line.varianceJustification}
+              compact
+            />
           </article>
         ))}
       </section>

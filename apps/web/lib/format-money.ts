@@ -208,3 +208,13 @@ export function moneyAmountTone(raw: string): "success" | "danger" | "muted" {
   if (isZeroMoneyAmount(raw)) return "muted";
   return isPositiveMoneyAmount(raw) ? "success" : "danger";
 }
+
+/** Overrun (spend more than referential) is danger; savings (negative %) is success. */
+export function variancePctTone(raw: string | null | undefined): "success" | "danger" | "muted" {
+  if (raw == null || raw === "" || isZeroRatePct(raw)) return "muted";
+  try {
+    return roundRatePct(raw).startsWith("-") ? "success" : "danger";
+  } catch {
+    return String(raw).trim().startsWith("-") ? "success" : "danger";
+  }
+}

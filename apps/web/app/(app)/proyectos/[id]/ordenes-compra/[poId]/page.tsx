@@ -5,6 +5,7 @@ import {
   formatQtyFromString,
   formatRatePctFromString,
   formatUnitPriceFromString,
+  isZeroRatePct,
 } from "@/lib/format-money";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
@@ -29,6 +30,7 @@ import {
 } from "@/features/procurement";
 import { PurchaseOrderMobileFiche } from "@/features/procurement/components/purchase-order-mobile-fiche";
 import { PurchaseOrderApprovalActions } from "@/features/procurement/components/purchase-order-approval-actions";
+import { PurchaseOrderVarianceReadout } from "@/features/procurement/components/purchase-order-variance-readout";
 import { SupplierInvoiceTable } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
 import type { PurchaseReceiptListItem } from "@/features/procurement";
@@ -47,8 +49,6 @@ import {
   listSupplierInvoicesByPurchaseOrder,
   ServiceError,
 } from "@bloqer/services";
-import { purchaseVarianceTierLabel } from "@/features/procurement/lib/variance-tier-labels";
-import { Badge } from "@/components/ui/badge";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   submitPurchaseOrderAction,
@@ -104,7 +104,26 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   const canEditPo = canEditPurchaseOrders(current.tenantCtx.roles);
   const canReceive = canEditPurchaseReceipts(current.tenantCtx.roles);
   const showBilling = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status);
-  const showVarianceCols = order.lines.some((l) => l.varianceTier && l.varianceTier !== "NONE");
+  const showReceiptQty = showBilling;
+  const showDiscountCol = order.lines.some((l) => !isZeroRatePct(l.discountPct));
+  const showVarianceCols = order.lines.some(
+    (l) =>
+      (l.variancePct != null && l.variancePct !== "" && !isZeroRatePct(l.variancePct)) ||
+      Boolean(l.varianceJustification?.trim()) ||
+      l.varianceTier === "UNIT_MISMATCH" ||
+      l.varianceTier === "NO_BUDGET_BASELINE" ||
+      l.varianceTier === "EXTRA_APPROVAL" ||
+      l.varianceTier === "NOTE_REQUIRED",
+  );
+  const canCancel =
+    !isCancelled && canEditPo && !["PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status);
+  const hasActions =
+    (isDraft && canEditPo) ||
+    (isSubmitted && canApprovePo) ||
+    (isApproved && canEditPo) ||
+    (isReceivable && canReceive) ||
+    canCancel;
+  const actionBtn = "min-h-11 w-full sm:w-auto md:min-h-9";
 
   const canEditAp = canRegisterApInvoice(current.tenantCtx.roles);
   const poPath = `/proyectos/${id}/ordenes-compra/${poId}`;
@@ -135,9 +154,63 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={order.code}>
-      <div className="hidden items-center gap-4 md:flex">
-        <h1 className="text-2xl font-bold tracking-tight">{order.code}</h1>
-        <PurchaseOrderStatusBadge status={order.status} />
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight">{order.code}</h1>
+          <PurchaseOrderStatusBadge status={order.status} />
+        </div>
+        {hasActions ? (
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+            {isDraft && canEditPo && (
+              <>
+                <Button asChild variant="outline" className={actionBtn}>
+                  <Link href={`/proyectos/${id}/ordenes-compra/${poId}/editar`}>Editar</Link>
+                </Button>
+                <form
+                  className="w-full sm:w-auto"
+                  action={async () => {
+                    "use server";
+                    const res = await submitPurchaseOrderAction(poId, id);
+                    if ("error" in res) redirectWithActionError(poPath, res.error);
+                    redirect(poPath);
+                  }}
+                >
+                  <Button type="submit" className={actionBtn}>
+                    Enviar a aprobación
+                  </Button>
+                </form>
+              </>
+            )}
+            {isSubmitted && canApprovePo && (
+              <PurchaseOrderApprovalActions poId={poId} projectId={id} />
+            )}
+            {isApproved && canEditPo && (
+              <form
+                className="w-full sm:w-auto"
+                action={async () => {
+                  "use server";
+                  const res = await confirmPurchaseOrderAction(poId, id);
+                  if ("error" in res) redirectWithActionError(poPath, res.error);
+                  redirect(poPath);
+                }}
+              >
+                <Button type="submit" className={actionBtn}>
+                  Confirmar al proveedor
+                </Button>
+              </form>
+            )}
+            {isReceivable && canReceive && (
+              <Button asChild className={actionBtn} data-testid="po-register-receipt">
+                <Link href={`/proyectos/${id}/ordenes-compra/${poId}/recepciones/nueva`}>
+                  Registrar recepción
+                </Link>
+              </Button>
+            )}
+            {canCancel && (
+              <CancelPurchaseOrderButton poId={poId} projectId={id} className={actionBtn} />
+            )}
+          </div>
+        ) : null}
       </div>
 
       <ActionErrorBanner message={sp.actionError} />
@@ -189,10 +262,14 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                 <TableHead>EDT</TableHead>
                 <TableHead className="text-right">Unidad</TableHead>
                 <TableHead className="text-right">Cant.</TableHead>
-                <TableHead className="text-right">Recibido</TableHead>
-                <TableHead className="text-right">Pendiente</TableHead>
+                {showReceiptQty && (
+                  <>
+                    <TableHead className="text-right">Recibido</TableHead>
+                    <TableHead className="text-right">Pendiente</TableHead>
+                  </>
+                )}
                 <TableHead className="text-right">Precio unit.</TableHead>
-                <TableHead className="text-right">Desc. %</TableHead>
+                {showDiscountCol && <TableHead className="text-right">Desc. %</TableHead>}
                 <TableHead className="text-right">Ref. presup.</TableHead>
                 {showVarianceCols && <TableHead>Desvío</TableHead>}
                 <TableHead className="text-right">Total</TableHead>
@@ -207,34 +284,36 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{line.unit || "—"}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatQtyFromString(line.quantity)}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatQtyFromString(line.receivedQuantity)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatQtyFromString(line.remainingQuantity)}
-                  </TableCell>
+                  {showReceiptQty && (
+                    <>
+                      <TableCell className="text-right tabular-nums">
+                        {formatQtyFromString(line.receivedQuantity)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatQtyFromString(line.remainingQuantity)}
+                      </TableCell>
+                    </>
+                  )}
                   <TableCell className="text-right tabular-nums">
                     {formatUnitPriceFromString(line.unitPrice)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatRatePctFromString(line.discountPct)}</TableCell>
+                  {showDiscountCol && (
+                    <TableCell className="text-right tabular-nums">
+                      {formatRatePctFromString(line.discountPct)}
+                    </TableCell>
+                  )}
                   <TableCell className="text-right tabular-nums text-muted-foreground">
                     {line.budgetUnitCostSnapshot
                       ? formatUnitPriceFromString(line.budgetUnitCostSnapshot)
                       : "—"}
                   </TableCell>
                   {showVarianceCols && (
-                    <TableCell className="text-xs">
-                      {line.varianceTier !== "NONE" ? (
-                        <Badge variant="outline" className="font-normal">
-                          {purchaseVarianceTierLabel(line.varianceTier)}
-                          {line.variancePct ? ` (${formatRatePctFromString(line.variancePct)}%)` : ""}
-                        </Badge>
-                      ) : (
-                        "—"
-                      )}
-                      {line.varianceJustification ? (
-                        <p className="text-muted-foreground mt-1 line-clamp-2">{line.varianceJustification}</p>
-                      ) : null}
+                    <TableCell>
+                      <PurchaseOrderVarianceReadout
+                        variancePct={line.variancePct}
+                        varianceTier={line.varianceTier}
+                        justification={line.varianceJustification}
+                      />
                     </TableCell>
                   )}
                   <TableCell className="text-right tabular-nums">{formatMoneyAmount(line.lineTotal)}</TableCell>
@@ -284,51 +363,6 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           errorReturnPath={`/proyectos/${id}/ordenes-compra/${poId}`}
         />
       )}
-
-      <div className="flex gap-2 flex-wrap">
-        {isDraft && canEditPo && (
-          <>
-            <Button asChild variant="outline">
-              <Link href={`/proyectos/${id}/ordenes-compra/${poId}/editar`}>Editar</Link>
-            </Button>
-            <form
-              action={async () => {
-                "use server";
-                const res = await submitPurchaseOrderAction(poId, id);
-                if ("error" in res) redirectWithActionError(poPath, res.error);
-                redirect(poPath);
-              }}
-            >
-              <Button type="submit">Enviar a aprobación</Button>
-            </form>
-          </>
-        )}
-        {isSubmitted && canApprovePo && (
-          <PurchaseOrderApprovalActions poId={poId} projectId={id} />
-        )}
-        {isApproved && canEditPo && (
-          <form
-            action={async () => {
-              "use server";
-              const res = await confirmPurchaseOrderAction(poId, id);
-              if ("error" in res) redirectWithActionError(poPath, res.error);
-              redirect(poPath);
-            }}
-          >
-            <Button type="submit">Confirmar al proveedor</Button>
-          </form>
-        )}
-        {isReceivable && canReceive && (
-          <Button asChild className="min-h-11 w-full md:min-h-9 md:w-auto" data-testid="po-register-receipt">
-            <Link href={`/proyectos/${id}/ordenes-compra/${poId}/recepciones/nueva`}>
-              Registrar recepción
-            </Link>
-          </Button>
-        )}
-        {!isCancelled && canEditPo && !["PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status) && (
-          <CancelPurchaseOrderButton poId={poId} projectId={id} />
-        )}
-      </div>
 
       <DataTableSection
         title="Recepciones"

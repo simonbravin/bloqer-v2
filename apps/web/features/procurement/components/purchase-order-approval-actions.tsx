@@ -74,15 +74,15 @@ export function PurchaseOrderApprovalActions({ poId, projectId }: Props) {
   }
 
   return (
-    <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
+    <>
       {error ? (
-        <p className="w-full rounded bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+        <p className="w-full rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert">
           {error}
         </p>
       ) : null}
       <Button
         type="button"
-        className="min-h-11 md:min-h-9"
+        className="min-h-11 w-full sm:w-auto md:min-h-9"
         data-testid="po-approve-button"
         disabled={pending}
         onClick={() => setApproveOpen(true)}
@@ -92,7 +92,7 @@ export function PurchaseOrderApprovalActions({ poId, projectId }: Props) {
       <Button
         type="button"
         variant="outline"
-        className="min-h-11 md:min-h-9"
+        className="min-h-11 w-full sm:w-auto md:min-h-9"
         data-testid="po-return-button"
         disabled={pending}
         onClick={() => setReturnOpen(true)}
@@ -170,6 +170,6 @@ export function PurchaseOrderApprovalActions({ poId, projectId }: Props) {
           </div>
         </SheetContent>
       </Sheet>
-    </div>
+    </>
   );
 }

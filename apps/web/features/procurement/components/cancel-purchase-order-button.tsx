@@ -10,9 +10,11 @@ import { cancelPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-co
 export function CancelPurchaseOrderButton({
   poId,
   projectId,
+  className,
 }: {
   poId: string;
   projectId: string;
+  className?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -21,7 +23,12 @@ export function CancelPurchaseOrderButton({
 
   return (
     <>
-      <Button type="button" variant="destructive" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant="destructive"
+        className={className}
+        onClick={() => setOpen(true)}
+      >
         Anular
       </Button>
       <ConfirmAlertDialog
