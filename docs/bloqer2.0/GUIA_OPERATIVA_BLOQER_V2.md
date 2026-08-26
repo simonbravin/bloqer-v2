@@ -909,7 +909,7 @@ flowchart LR
   AP --> PAY["Pago"] --> TES["Tesorería: OUTFLOW"]
 ```
 
-Siempre existe la cadena **Factura → Payable → Payment → movimiento de caja**, aunque se pague en el mismo momento (“pagar ahora”). El campo **A quién se le paga** lista solo contactos **activos** con rol **Proveedor** o **Empleado** ([D-089]); no aparecen Cliente, Subcontratista u Otro. Se puede buscar por nombre fantasía o razón social. Si el contacto está en Directorio y no sale: abrí su ficha y asignale rol Proveedor (o Empleado).
+Siempre existe la cadena **Factura → Payable → Payment → movimiento de caja**, aunque se pague en el mismo momento (“pagar ahora”). El campo **A quién se le paga** lista solo contactos **activos** con rol **Proveedor** o **Empleado** ([D-089]); no aparecen Cliente, Subcontratista u Otro. Cada opción muestra **razón social** y, si es distinta, el **nombre fantasía** entre paréntesis. Si el contacto está en Directorio y no sale: abrí su ficha y asignale rol Proveedor (o Empleado).
 
 #### Proyecto
 
@@ -943,7 +943,7 @@ Bloqer **no** liquida haberes ni aportes. Se registra el egreso como gasto corpo
 1. Directorio → el contacto existe con rol **Empleado** (activo).
 2. Finanzas → **Transacciones** (`/finanzas/transacciones`) → **Registrar transacción**.
 3. Tab **Gasto / factura**.
-4. **A quién se le paga:** elegir al empleado (en el listado figura `Nombre · Empleado`).
+4. **A quién se le paga:** elegir al empleado (en el listado figura `Razón social · Empleado`, con fantasía entre paréntesis si es distinta).
 5. Fecha, líneas (descripción p. ej. `Sueldo agosto 2026`, cantidad 1, importe).
 6. Marcar **Pagar ahora (egreso de caja)** → cuenta de tesorería + fecha + método.
 7. Confirmar. Queda factura emitida + CxP saldada + egreso de caja, **mapeado al contacto** (no solo en la descripción).

@@ -95,7 +95,7 @@ export const DIRECTORY_ARTICLES: HelpArticle[] = [
       "Marcá el rol Empleado y dejalo activo.",
       "Para pagarle: Finanzas → Transacciones → Gasto / factura → «A quién se le paga» = el empleado.",
     ],
-    effects: ["Aparece en el picker de gasto como «Nombre · Empleado»."],
+    effects: ["Aparece en el picker de gasto como «Razón social · Empleado» (fantasía al lado si es distinta)."],
     pitfalls: [
       "No lo marques Proveedor solo para pagarle (ensucia el listado de OC).",
       "Monotributista que te factura → rol Proveedor (y Empleado si también es de la casa).",

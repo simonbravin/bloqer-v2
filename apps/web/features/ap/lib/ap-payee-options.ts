@@ -7,7 +7,7 @@ export const LIST_AP_DIRECT_PAYEES = {
 };
 
 export const AP_PAYEE_PICKER_HINT =
-  "Solo contactos con rol Proveedor o Empleado activo. Buscá por nombre fantasía o razón social. Si no aparece, asignale ese rol en su ficha del Directorio.";
+  "Solo contactos con rol Proveedor o Empleado activo. Se muestra razón social (nombre fantasía). Si no aparece, asignale ese rol en su ficha del Directorio.";
 
 const PAYEE_ROLE_LABEL: Record<string, string> = {
   SUPPLIER: "Proveedor",
@@ -18,6 +18,28 @@ function payeeSearchValue(parts: (string | null | undefined)[]): string {
   return [...new Set(parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part)))].join(" ");
 }
 
+function namesEqualIgnoreCase(a: string, b: string): boolean {
+  return a.localeCompare(b, "es", { sensitivity: "accent" }) === 0;
+}
+
+/** Razón social first; fantasy only when it adds something (`LEGAL (fantasía) · Rol`). */
+export function formatApPayeeLabel(contact: {
+  legalName: string;
+  fantasyName?: string | null;
+  roles?: { role: string }[];
+}): string {
+  const legal = contact.legalName.trim();
+  const fantasy = contact.fantasyName?.trim() || "";
+  const primary =
+    fantasy && !namesEqualIgnoreCase(legal, fantasy) ? `${legal} (${fantasy})` : legal;
+  const tags = [...new Set(
+    (contact.roles ?? [])
+      .map((r) => PAYEE_ROLE_LABEL[r.role])
+      .filter((label): label is string => Boolean(label)),
+  )];
+  return tags.length > 0 ? `${primary} · ${tags.join(" · ")}` : primary;
+}
+
 export function toApPayeeOption(contact: {
   id: string;
   legalName: string;
@@ -26,7 +48,8 @@ export function toApPayeeOption(contact: {
   ivaCondition?: string | null;
   roles?: { role: string }[];
 }): SupplierOption {
-  const name = contact.fantasyName ?? contact.legalName;
+  const legal = contact.legalName.trim();
+  const fantasy = contact.fantasyName?.trim() || null;
   const tags = [...new Set(
     (contact.roles ?? [])
       .map((r) => PAYEE_ROLE_LABEL[r.role])
@@ -34,10 +57,10 @@ export function toApPayeeOption(contact: {
   )];
   return {
     id: contact.id,
-    label: tags.length > 0 ? `${name} · ${tags.join(" · ")}` : name,
+    label: formatApPayeeLabel(contact),
     country: contact.country ?? undefined,
     ivaCondition: contact.ivaCondition,
-    searchValue: payeeSearchValue([name, contact.legalName, contact.fantasyName, ...tags]),
+    searchValue: payeeSearchValue([legal, fantasy, ...tags]),
   };
 }
 

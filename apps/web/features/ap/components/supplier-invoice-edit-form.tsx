@@ -189,8 +189,9 @@ export function SupplierInvoiceEditForm({
               onValueChange={handleSupplierChange}
               disabled={payeeLocked}
               placeholder="Seleccionar proveedor o empleado…"
-              searchPlaceholder="Buscar por nombre o razón social…"
+              searchPlaceholder="Buscar por razón social o nombre fantasía…"
               emptyText="Ningún proveedor o empleado coincide."
+              popoverWidth="wide"
             />
             {payeeLocked ? (
               <p className="text-xs text-muted-foreground">

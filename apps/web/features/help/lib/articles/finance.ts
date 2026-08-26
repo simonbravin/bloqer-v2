@@ -194,7 +194,7 @@ export const AP_ARTICLES: HelpArticle[] = [
     steps: [
       "Directorio: el contacto existe con rol Empleado (activo).",
       "Finanzas → Transacciones → Registrar → tab Gasto / factura.",
-      "A quién se le paga: elegí al empleado (figura «Nombre · Empleado»).",
+      "A quién se le paga: elegí al empleado (figura «Razón social · Empleado»).",
       "Líneas / monto. Opcional: Pagar ahora (egreso de caja).",
       "Emití / pagá según el flujo.",
     ],
@@ -282,7 +282,7 @@ export const AP_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Facturas y gastos → Nueva factura de gasto (sin proyecto), o Transacciones → Gasto / factura.",
-      "A quién se le paga: proveedor o empleado (no Cliente). Buscá por nombre fantasía o razón social.",
+      "A quién se le paga: proveedor o empleado (no Cliente). Se lista razón social (fantasía al lado si es distinta).",
       "Opcional: Pagar ahora.",
     ],
     pitfalls: [

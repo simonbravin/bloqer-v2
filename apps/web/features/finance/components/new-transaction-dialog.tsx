@@ -595,8 +595,9 @@ export function NewTransactionDialog({
                     setLetterTouched(false);
                   }}
                   placeholder="Seleccionar proveedor o empleado..."
-                  searchPlaceholder="Buscar por nombre o razón social..."
+                  searchPlaceholder="Buscar por razón social o nombre fantasía..."
                   emptyText="Ningún proveedor o empleado coincide."
+                  popoverWidth="wide"
                 />
                 <p className="text-xs text-muted-foreground">{AP_PAYEE_PICKER_HINT}</p>
               </div>
