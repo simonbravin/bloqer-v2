@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import type { TenantMemberListRow } from "@bloqer/services";
+import { formatUserRoleList } from "@/lib/user-role-label";
 
 function membershipStatusLabel(s: string) {
   return s === "ACTIVE" ? "Activo" : "Inactivo";
@@ -47,8 +48,8 @@ export function TeamMemberTable({ members }: { members: TenantMemberListRow[] })
                 {r.email}
               </TableCell>
               <TableCell>{membershipStatusLabel(r.status)}</TableCell>
-              <TableCell className="max-w-[10rem] truncate text-xs" title={r.roles.join(", ")}>
-                {r.roles.join(", ")}
+              <TableCell className="max-w-[14rem] truncate text-xs" title={formatUserRoleList(r.roles)}>
+                {formatUserRoleList(r.roles)}
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">{formatDate(r.createdAt)}</TableCell>
               <TableCell>

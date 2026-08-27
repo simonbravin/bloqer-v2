@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { ProjectTeamMemberKind } from "@bloqer/database";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,12 +58,25 @@ export function ProjectTeamCard({
   pickerOptions: ProjectTeamPickerOptionView[];
   canEdit: boolean;
 }) {
+  const router = useRouter();
   const [userId, setUserId] = useState("");
   const [kind, setKind] = useState<ProjectTeamMemberKind>("PROJECT_MANAGER");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const hasAssignedPm = members.some((m) => m.kind === "PROJECT_MANAGER" && m.membershipActive);
   const hasSupervisor = members.some((m) => m.canSuperviseJobsiteLog);
+
+  useEffect(() => {
+    const scrollToTeam = () => {
+      if (window.location.hash !== "#equipo-de-obra") return;
+      document.getElementById("equipo-de-obra")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    scrollToTeam();
+    window.addEventListener("hashchange", scrollToTeam);
+    return () => window.removeEventListener("hashchange", scrollToTeam);
+  }, []);
+
   const comboboxOptions = useMemo(
     () =>
       pickerOptions.map((o) => ({
@@ -85,6 +99,7 @@ export function ProjectTeamCard({
         return;
       }
       setUserId("");
+      router.refresh();
     });
   }
 
@@ -92,12 +107,16 @@ export function ProjectTeamCard({
     setError(null);
     startTransition(async () => {
       const result = await removeProjectTeamMemberAction(projectId, memberId);
-      if ("error" in result) setError(result.error);
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
     });
   }
 
   return (
-    <Card className="rounded-xl border bg-card shadow-sm">
+    <Card id="equipo-de-obra" className="scroll-mt-6 rounded-xl border bg-card shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Equipo de obra</CardTitle>
         <p className="text-sm text-muted-foreground">
@@ -106,10 +125,17 @@ export function ProjectTeamCard({
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!hasSupervisor ? (
+        {!hasAssignedPm ? (
           <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
-            Sin PM (u otro supervisor) en el equipo, los avisos de partes pendientes van solo a
-            OWNER/ADMIN.
+            Hay que asignar un jefe de obra (PM).
+            {!hasSupervisor
+              ? " Sin alguien que pueda aprobar partes, los avisos pendientes van solo a OWNER/ADMIN."
+              : null}
+          </p>
+        ) : !hasSupervisor ? (
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+            El PM del equipo no puede aprobar partes (revisá su rol en Configuración → Equipo). Los
+            avisos pendientes van solo a OWNER/ADMIN.
           </p>
         ) : null}
 

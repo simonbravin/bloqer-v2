@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomBytes } from "crypto";
 import { prisma, type Prisma, type UserRole as PrismaUserRole } from "@bloqer/database";
-import type { UserRole } from "@bloqer/domain";
+import { USER_ROLE_LABEL_ES, type UserRole } from "@bloqer/domain";
 import { getPublicAppBaseUrl, isEmailConfigured } from "@bloqer/config";
 import {
   formatNotificationEmailSubject,
@@ -30,24 +30,9 @@ export function buildTenantInvitationLink(rawToken: string): string {
   return base ? `${base}${path}` : path;
 }
 
-const INVITE_ROLE_LABEL_ES: Record<string, string> = {
-  OWNER: "Propietario",
-  ADMIN: "Administrador",
-  FINANCE: "Finanzas",
-  TREASURER: "Tesorería",
-  PROJECT_FINANCE: "Finanzas de obra",
-  PROCUREMENT: "Compras",
-  WAREHOUSE: "Depósito",
-  SALES: "Ventas",
-  VIEWER: "Solo lectura",
-  PROJECT_MANAGER: "Jefe de obra",
-  SITE_FOREMAN: "Capataz",
-  PROJECT_VIEWER: "Visor de proyecto",
-};
-
 function rolesLabelEs(roles: string[] | undefined): string | null {
   if (!roles || roles.length === 0) return null;
-  return roles.map((r) => INVITE_ROLE_LABEL_ES[r] ?? r).join(", ");
+  return roles.map((r) => USER_ROLE_LABEL_ES[r as UserRole] ?? r).join(", ");
 }
 
 export type TenantInvitationEmailDispatch = {

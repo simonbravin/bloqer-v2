@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { UserRole } from "@bloqer/domain";
-import { isActiveJobsiteSupervisor } from "./project-team.service";
+import { hasAssignedProjectManager, isActiveJobsiteSupervisor } from "./project-team.service";
 
 describe("isActiveJobsiteSupervisor", () => {
   it("is false without membership", () => {
@@ -35,6 +35,36 @@ describe("isActiveJobsiteSupervisor", () => {
         roles: ["SITE_FOREMAN"] as UserRole[],
       }),
       false,
+    );
+  });
+});
+
+describe("hasAssignedProjectManager", () => {
+  it("is false when the roster is empty", () => {
+    assert.equal(hasAssignedProjectManager([]), false);
+  });
+
+  it("is false when only a capataz is on the roster", () => {
+    assert.equal(
+      hasAssignedProjectManager([{ kind: "SITE_FOREMAN", membershipActive: true }]),
+      false,
+    );
+  });
+
+  it("is false when the PM membership is inactive", () => {
+    assert.equal(
+      hasAssignedProjectManager([{ kind: "PROJECT_MANAGER", membershipActive: false }]),
+      false,
+    );
+  });
+
+  it("is true when an active PM is on the roster", () => {
+    assert.equal(
+      hasAssignedProjectManager([
+        { kind: "SITE_FOREMAN", membershipActive: true },
+        { kind: "PROJECT_MANAGER", membershipActive: true },
+      ]),
+      true,
     );
   });
 });

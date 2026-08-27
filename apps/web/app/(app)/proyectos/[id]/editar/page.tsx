@@ -1,7 +1,15 @@
 import { notFound, redirect } from "next/navigation";
-import { ProjectForm } from "@/features/projects";
+import { can } from "@bloqer/domain";
+import { ProjectForm, ProjectTeamCard } from "@/features/projects";
 import { getCurrentUser } from "@/lib/auth";
-import { getProjectById, isProjectTypeLocked, listAllContacts, ServiceError } from "@bloqer/services";
+import {
+  getProjectById,
+  isProjectTypeLocked,
+  listAllContacts,
+  listActiveMembersForProjectTeamPicker,
+  listProjectTeam,
+  ServiceError,
+} from "@bloqer/services";
 import { updateProjectAction } from "../../actions";
 import type { ProjectFormInput } from "@bloqer/validators";
 import { toDateInput } from "@/lib/date-input";
@@ -24,6 +32,10 @@ export default async function EditarProyectoPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
+  if (!can(ctx.roles, "EDIT", "PROJECTS")) {
+    redirect(`/proyectos/${id}`);
+  }
+
   let project;
   try {
     project = await getProjectById(id, ctx);
@@ -35,10 +47,37 @@ export default async function EditarProyectoPage({ params }: PageProps) {
   if (project.status === "COMPLETED" || project.status === "CANCELLED")
     redirect(`/proyectos/${id}`);
 
-  const [clients, typeLocked] = await Promise.all([
-    listAllContacts({ role: "CLIENT", status: "ACTIVE" }, ctx),
+  const [typeLocked, listedClients] = await Promise.all([
     isProjectTypeLocked(id, ctx),
+    listAllContacts({ role: "CLIENT", status: "ACTIVE" }, ctx).catch((err: unknown) => {
+      if (err instanceof ServiceError && err.code === "FORBIDDEN") return [];
+      throw err;
+    }),
   ]);
+
+  const clients = listedClients.map((c) => ({
+    id: c.id,
+    legalName: c.legalName,
+    fantasyName: c.fantasyName ?? null,
+  }));
+  if (!clients.some((c) => c.id === project.clientContactId)) {
+    clients.unshift({
+      id: project.client.id,
+      legalName: project.client.legalName,
+      fantasyName: project.client.fantasyName ?? null,
+    });
+  }
+
+  let teamMembers: Awaited<ReturnType<typeof listProjectTeam>> = [];
+  let teamPickerOptions: Awaited<ReturnType<typeof listActiveMembersForProjectTeamPicker>> = [];
+  try {
+    [teamMembers, teamPickerOptions] = await Promise.all([
+      listProjectTeam(id, ctx),
+      listActiveMembersForProjectTeamPicker(id, ctx),
+    ]);
+  } catch (err) {
+    if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
+  }
 
   const defaultValues: Partial<ProjectFormInput> = {
     code: project.code,
@@ -57,15 +96,11 @@ export default async function EditarProyectoPage({ params }: PageProps) {
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={project.name}>
-      <PageListHeader title="Editar proyecto" subtitle="Datos generales de la obra" />
+      <PageListHeader title="Editar proyecto" subtitle="Datos generales de la obra y equipo" />
 
       <div className="rounded-xl border bg-card p-6 shadow-sm">
         <ProjectForm
-          clients={clients.map((c) => ({
-            id: c.id,
-            legalName: c.legalName,
-            fantasyName: c.fantasyName ?? null,
-          }))}
+          clients={clients}
           defaultValues={defaultValues}
           submitLabel="Guardar cambios"
           successRedirect={`/proyectos/${id}`}
@@ -73,6 +108,25 @@ export default async function EditarProyectoPage({ params }: PageProps) {
           onSubmit={updateProjectAction.bind(null, id)}
         />
       </div>
+
+      <ProjectTeamCard
+        projectId={id}
+        members={teamMembers.map((m) => ({
+          id: m.id,
+          userId: m.userId,
+          email: m.email,
+          name: m.name,
+          kind: m.kind,
+          membershipActive: m.membershipActive,
+          canSuperviseJobsiteLog: m.canSuperviseJobsiteLog,
+        }))}
+        pickerOptions={teamPickerOptions.map((o) => ({
+          userId: o.userId,
+          email: o.email,
+          name: o.name,
+        }))}
+        canEdit
+      />
     </PageShell>
   );
 }

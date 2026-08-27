@@ -1370,7 +1370,7 @@
 - **Contexto:** Nadie recibía aviso de un parte pendiente de aprobación; solo “devolver” creaba in-app sin email. No hay `ProjectMembership` / R-USR-007; fan-out tenant-wide a todos los PM sería ruido. Hace falta un roster por obra para campana/mail sin fingir RBAC “solo su proyecto”.
 - **Decisión:**
   1. Tabla **`ProjectTeamMember`** (`tenantId`, `projectId`, `userId`, `kind` etiqueta `PROJECT_MANAGER` \| `SITE_FOREMAN` \| `OTHER`). **No** se llama `ProjectMembership` y **no** cambia `can()` ni listados / `/pendientes`.
-  2. UI: card **Equipo de obra** en el resumen del proyecto; editable con `EDIT PROJECTS`. Picker de membresías ACTIVE del tenant (no reusar Configuración → Equipo).
+  2. UI: card **Equipo de obra** al final de **Configuración** del proyecto (`/proyectos/[id]/editar`); editable con `EDIT PROJECTS`. En el **Resumen**, aviso si no hay PM activo en el roster (con enlace a Configuración si el actor puede editar). Picker de membresías ACTIVE del tenant (no reusar Configuración → Equipo).
   3. Auto-alta al crear obra si el actor es `PROJECT_MANAGER` o `SITE_FOREMAN`. OWNER/ADMIN no se auto-agregan (ya reciben CC [D-054]). Obras existentes: roster vacío → avisos SUBMITTED solo a OWNER/ADMIN.
   4. **Notificaciones libro de obra (in-app + email automático, best-effort):**
      - `JOBSITE_LOG_SUBMITTED` → OWNER/ADMIN ∪ miembros del roster que `canSuperviseJobsiteLog`, menos el actor.

@@ -5,8 +5,8 @@ import {
   getProjectOverviewDashboard,
   canCancelActiveProject,
   canReactivateProject,
+  hasAssignedProjectManager,
   listProjectTeam,
-  listActiveMembersForProjectTeamPicker,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -54,14 +54,18 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
   const roles = current.tenantCtx.roles;
   const canEditTeam = can(roles, "EDIT", "PROJECTS");
   const canViewTeam = can(roles, "VIEW", "PROJECTS") || canEditTeam;
+  const projectStatus = fullProject?.status ?? dashboard.project.status;
+  const canOpenProjectConfig =
+    canEditTeam && projectStatus !== "COMPLETED" && projectStatus !== "CANCELLED";
 
-  let teamMembers: Awaited<ReturnType<typeof listProjectTeam>> = [];
-  let teamPickerOptions: Awaited<ReturnType<typeof listActiveMembersForProjectTeamPicker>> = [];
+  let missingPm: { assignHref: string | null } | undefined;
   if (canViewTeam) {
     try {
-      teamMembers = await listProjectTeam(id, ctx);
-      if (canEditTeam) {
-        teamPickerOptions = await listActiveMembersForProjectTeamPicker(id, ctx);
+      const teamMembers = await listProjectTeam(id, ctx);
+      if (!hasAssignedProjectManager(teamMembers)) {
+        missingPm = {
+          assignHref: canOpenProjectConfig ? `/proyectos/${id}/editar#equipo-de-obra` : null,
+        };
       }
     } catch (err) {
       if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
@@ -86,24 +90,7 @@ export default async function ProyectoDetailPage({ params }: PageProps) {
         projectId={id}
         fullProject={fullProject}
         lifecycleActions={lifecycleActions}
-        team={{
-          members: teamMembers.map((m) => ({
-            id: m.id,
-            userId: m.userId,
-            email: m.email,
-            name: m.name,
-            kind: m.kind,
-            membershipActive: m.membershipActive,
-            canSuperviseJobsiteLog: m.canSuperviseJobsiteLog,
-          })),
-          pickerOptions: teamPickerOptions.map((o) => ({
-            userId: o.userId,
-            email: o.email,
-            name: o.name,
-          })),
-          canEdit: canEditTeam,
-          visible: canViewTeam,
-        }}
+        missingPm={missingPm}
       />
     </PageShell>
   );

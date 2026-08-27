@@ -15,6 +15,7 @@ import { useProjectShell } from "@/lib/project-shell-context";
 import { ProjectNavIcon } from "@/lib/project-nav-icons";
 import { isNavLinkActive } from "@/lib/nav-link-active";
 import { HelpSidebarFooter } from "./help-sidebar-footer";
+import { usePendingInboxCount } from "@/lib/pending-inbox-count-context";
 
 interface ProjectWorkspaceSidebarProps {
   projectId: string;
@@ -33,6 +34,7 @@ export function ProjectWorkspaceSidebar({
 }: ProjectWorkspaceSidebarProps) {
   const pathname = usePathname();
   const { state: shellState } = useProjectShell();
+  const { projectCount } = usePendingInboxCount();
   const gate = useMemo(() => tenantGateFromSnapshot(moduleGateSnapshot), [moduleGateSnapshot]);
   const sections = useMemo(
     () => buildProjectWorkspaceNavSections(projectId, gate, roles),
@@ -124,6 +126,8 @@ export function ProjectWorkspaceSidebar({
               items={section.items.map((item) => ({
                 ...item,
                 icon: <ProjectNavIcon label={item.label} />,
+                badgeCount:
+                  item.href === `/proyectos/${projectId}/pendientes` ? (projectCount ?? 0) : undefined,
               }))}
             />
           );

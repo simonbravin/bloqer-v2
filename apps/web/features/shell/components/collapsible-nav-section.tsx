@@ -2,6 +2,7 @@
 
 import { ChevronRight } from "lucide-react";
 import { NavItem } from "@/features/shell/components/nav-item";
+import { PendingCountBadge } from "@/components/ui/pending-count-badge";
 import { cn } from "@/lib/utils";
 
 export type CollapsibleNavLink = {
@@ -10,6 +11,7 @@ export type CollapsibleNavLink = {
   matchExact?: boolean;
   activeWhenPathPrefix?: string;
   icon?: React.ReactNode;
+  badgeCount?: number;
 };
 
 interface CollapsibleNavSectionProps {
@@ -28,6 +30,7 @@ export function CollapsibleNavSection({
   items,
 }: CollapsibleNavSectionProps) {
   const panelId = `nav-section-${sectionIndex}`;
+  const collapsedBadge = items.reduce((sum, item) => sum + (item.badgeCount ?? 0), 0);
   return (
     <div className="rounded-md">
       <button
@@ -35,6 +38,11 @@ export function CollapsibleNavSection({
         id={`${panelId}-trigger`}
         aria-expanded={open}
         aria-controls={panelId}
+        aria-label={
+          !open && collapsedBadge > 0
+            ? `${title}, ${collapsedBadge} pendiente${collapsedBadge === 1 ? "" : "s"}`
+            : undefined
+        }
         onClick={onToggle}
         className={cn(
           "flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors duration-150",
@@ -50,6 +58,7 @@ export function CollapsibleNavSection({
           aria-hidden
         />
         <span className="min-w-0 flex-1 truncate">{title}</span>
+        {!open ? <PendingCountBadge count={collapsedBadge} /> : null}
       </button>
       {open ? (
         <div
@@ -66,6 +75,7 @@ export function CollapsibleNavSection({
               icon={item.icon}
               matchExact={item.matchExact}
               activeWhenPathPrefix={item.activeWhenPathPrefix}
+              badgeCount={item.badgeCount}
             />
           ))}
         </div>

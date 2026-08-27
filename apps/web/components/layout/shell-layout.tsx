@@ -22,6 +22,7 @@ import { isFieldImmersivePath } from "@/lib/field-immersive-routes";
 import { FieldBottomNav } from "@/features/field/components/field-bottom-nav";
 import type { PermissionModule, UserRole } from "@bloqer/domain";
 import { usePathname } from "next/navigation";
+import { PendingInboxCountProvider } from "@/lib/pending-inbox-count-context";
 
 interface ShellLayoutProps {
   sidebar: ReactNode;
@@ -87,29 +88,30 @@ export function ShellLayout({
       <BreadcrumbOverrideProvider>
         <ProjectShellProvider>
           <FieldProjectProvider>
-            <div className="flex h-dvh overflow-hidden bg-background">
-              <SidebarRail>
-                <ShellSidebarPanel>{sidebar}</ShellSidebarPanel>
-              </SidebarRail>
-              <MobileNavSheet>{overlaySidebar}</MobileNavSheet>
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-workspace">
-                {header}
-                <main
-                  className={cn(
-                    "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-4 sm:p-6 lg:p-8",
-                    !immersive &&
-                      "pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-6 lg:pb-8",
-                  )}
-                >
-                  {children}
-                </main>
-                <FieldBottomNav
-                  pendingCount={pendingCount}
-                  roles={roles}
-                  moduleGateSnapshot={moduleGateSnapshot}
-                />
+            <PendingInboxCountProvider tenantInitial={pendingCount}>
+              <div className="flex h-dvh overflow-hidden bg-background">
+                <SidebarRail>
+                  <ShellSidebarPanel>{sidebar}</ShellSidebarPanel>
+                </SidebarRail>
+                <MobileNavSheet>{overlaySidebar}</MobileNavSheet>
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-workspace">
+                  {header}
+                  <main
+                    className={cn(
+                      "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-4 sm:p-6 lg:p-8",
+                      !immersive &&
+                        "pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-6 lg:pb-8",
+                    )}
+                  >
+                    {children}
+                  </main>
+                  <FieldBottomNav
+                    roles={roles}
+                    moduleGateSnapshot={moduleGateSnapshot}
+                  />
+                </div>
               </div>
-            </div>
+            </PendingInboxCountProvider>
           </FieldProjectProvider>
         </ProjectShellProvider>
       </BreadcrumbOverrideProvider>

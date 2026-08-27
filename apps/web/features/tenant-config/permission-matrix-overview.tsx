@@ -6,8 +6,8 @@ import type {
   PermissionMatrixGrid,
   PermissionModule,
   PermissionModuleGroupSection,
-  UserRole,
 } from "@bloqer/domain";
+import { USER_ROLE_LABEL_ES } from "@bloqer/domain";
 import { useRouter } from "next/navigation";
 import { formatDateTime } from "@/lib/format";
 import { updateTenantPermissionMatrixNotesAction } from "@/app/(app)/configuracion/permission-matrix-actions";
@@ -63,21 +63,6 @@ function ceilingLabel(v: PermissionAction | null): string {
   return "Aprobar";
 }
 
-const ROLE_LABEL_ES: Record<UserRole, string> = {
-  OWNER: "Propietario",
-  ADMIN: "Administrador",
-  FINANCE: "Finanzas",
-  TREASURER: "Tesorería",
-  PROJECT_FINANCE: "Finanzas de obra",
-  PROCUREMENT: "Compras",
-  WAREHOUSE: "Depósito",
-  SALES: "Ventas",
-  VIEWER: "Solo lectura",
-  PROJECT_MANAGER: "Jefe de obra",
-  SITE_FOREMAN: "Capataz",
-  PROJECT_VIEWER: "Visor de proyecto",
-};
-
 export function PermissionMatrixOverview({
   sections,
   matrix,
@@ -120,11 +105,7 @@ export function PermissionMatrixOverview({
 
   return (
     <TooltipProvider delayDuration={200}>
-      <Accordion
-        type="multiple"
-        className="w-full space-y-2"
-        defaultValue={[...sections.map((s) => s.id)]}
-      >
+      <Accordion type="single" collapsible className="w-full space-y-2">
         {sections.map((section) => (
           <AccordionItem
             key={section.id}
@@ -180,7 +161,7 @@ export function PermissionMatrixOverview({
                     {matrix.roles.map((role) => (
                       <TableRow key={role}>
                         <TableCell className="sticky left-0 z-10 bg-card text-xs font-medium">
-                          <span className="block text-foreground">{ROLE_LABEL_ES[role] ?? role}</span>
+                          <span className="block text-foreground">{USER_ROLE_LABEL_ES[role] ?? role}</span>
                           <span className="text-[10px] font-normal text-muted-foreground">{role}</span>
                         </TableCell>
                         {section.modules.map((m) => (

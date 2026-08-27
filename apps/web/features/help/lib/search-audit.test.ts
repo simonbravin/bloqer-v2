@@ -43,6 +43,12 @@ test("intent + module filters compose (AND)", () => {
   assert.equal(hits.length, 0);
 });
 
+test("search «pendientes» ranks the inbox article", () => {
+  const hits = searchHelpArticles(HELP_ARTICLES, { query: "pendientes" });
+  assert.ok(hits.length > 0);
+  assert.equal(hits[0]!.slug, "revisar-pendientes");
+});
+
 test("garbage query returns no results", () => {
   const hits = searchHelpArticles(HELP_ARTICLES, { query: "xyzzyplugh" });
   assert.equal(hits.length, 0);

@@ -12,6 +12,7 @@ import {
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
+import { formatUserRoleList } from "@/lib/user-role-label";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageListHeader } from "@/components/ui/page-list-header";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
@@ -78,7 +79,7 @@ export default async function ConfiguracionEquipoPage() {
                 {pendingInvitations.map((inv) => (
                   <TableRow key={inv.id}>
                     <TableCell>{inv.email}</TableCell>
-                    <TableCell className="text-xs">{inv.roles.join(", ")}</TableCell>
+                    <TableCell className="text-xs">{formatUserRoleList(inv.roles)}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {formatDateTime(inv.expiresAt)}
                     </TableCell>

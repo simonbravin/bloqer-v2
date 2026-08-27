@@ -8,11 +8,6 @@ import { DashboardKpiCard } from "@/features/dashboard/dashboard-kpi-card";
 import { ProjectOverviewActivityCard } from "./project-overview-activity-card";
 import { ProjectOverviewAlerts } from "./project-overview-alerts";
 import { ProjectOverviewCharts } from "./project-overview-charts";
-import {
-  ProjectTeamCard,
-  type ProjectTeamMemberView,
-  type ProjectTeamPickerOptionView,
-} from "@/features/projects/components/project-team-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -81,18 +76,14 @@ export function ProjectOverviewView({
   projectId,
   fullProject,
   lifecycleActions,
-  team,
+  missingPm,
 }: {
   dashboard: ProjectOverviewDashboard;
   projectId: string;
   fullProject: ProjectWithClient | null;
   lifecycleActions: React.ReactNode;
-  team?: {
-    members: ProjectTeamMemberView[];
-    pickerOptions: ProjectTeamPickerOptionView[];
-    canEdit: boolean;
-    visible: boolean;
-  };
+  /** Banner when the obra roster has no active PM ([D-091]). */
+  missingPm?: { assignHref: string | null };
 }) {
   const p = dashboard.project;
 
@@ -108,6 +99,26 @@ export function ProjectOverviewView({
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{lifecycleActions}</div>
       </div>
+
+      {missingPm ? (
+        <div
+          role="status"
+          className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100"
+        >
+          Hay que asignar un jefe de obra (PM) a este proyecto.
+          {missingPm.assignHref ? (
+            <>
+              {" "}
+              <Link
+                href={missingPm.assignHref}
+                className="font-medium underline underline-offset-2"
+              >
+                Asignar en Configuración
+              </Link>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       {fullProject ? (
         <Card className="rounded-xl border bg-card shadow-sm">
@@ -187,15 +198,6 @@ export function ProjectOverviewView({
             )}
           </CardContent>
         </Card>
-      ) : null}
-
-      {team?.visible ? (
-        <ProjectTeamCard
-          projectId={projectId}
-          members={team.members}
-          pickerOptions={team.pickerOptions}
-          canEdit={team.canEdit}
-        />
       ) : null}
 
       <KpiStatGrid title="Indicadores" columns={4}>

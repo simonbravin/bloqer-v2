@@ -3,7 +3,6 @@
 import {
   addProjectTeamMember,
   removeProjectTeamMember,
-  listActiveMembersForProjectTeamPicker,
   ServiceError,
 } from "@bloqer/services";
 import { addProjectTeamMemberSchema, projectTeamMemberIdSchema } from "@bloqer/validators";
@@ -32,6 +31,7 @@ export async function addProjectTeamMemberAction(
   try {
     await addProjectTeamMember(projectId, parsed.data, ctx);
     revalidatePath(`/proyectos/${projectId}`);
+    revalidatePath(`/proyectos/${projectId}/editar`);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -50,25 +50,10 @@ export async function removeProjectTeamMemberAction(
   try {
     await removeProjectTeamMember(projectId, memberId, ctx);
     revalidatePath(`/proyectos/${projectId}`);
+    revalidatePath(`/proyectos/${projectId}/editar`);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
     return { error: "Error inesperado al quitar del equipo" };
-  }
-}
-
-export async function listProjectTeamPickerAction(
-  projectId: string,
-): Promise<
-  | { ok: true; options: Array<{ userId: string; email: string; name: string | null; roles: string[] }> }
-  | { error: string }
-> {
-  const ctx = await getCtx();
-  try {
-    const options = await listActiveMembersForProjectTeamPicker(projectId, ctx);
-    return { ok: true, options };
-  } catch (err) {
-    if (err instanceof ServiceError) return { error: err.message };
-    return { error: "Error al cargar usuarios" };
   }
 }

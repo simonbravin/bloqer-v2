@@ -144,7 +144,7 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 
 | Sección | Ítems (etiqueta → ruta) |
 |---------|--------------------------|
-| General | Inicio → `/dashboard` · Proyectos → `/proyectos` · Directorio → `/directorio` · Inventario → `/inventario` |
+| General | Inicio → `/dashboard` · **Pendientes** → `/pendientes` · Proyectos → `/proyectos` · Directorio → `/directorio` · Inventario → `/inventario` |
 | Finanzas | Tablero → `/finanzas` · Transacciones → `/finanzas/transacciones` · Facturas y gastos → `/finanzas/facturas-proveedor` · Cuentas por cobrar → `/finanzas/cuentas-por-cobrar` · Cuentas por pagar → `/finanzas/cuentas-por-pagar` · Imputación GG → `/finanzas/gastos-generales` |
 | Tesorería | Resumen → `/tesoreria` · Cuentas → `/tesoreria/cuentas` · Movimientos → `/tesoreria/movimientos` · Flujo de caja → `/tesoreria/flujo-caja` · Transferencias → `/tesoreria/transferencias` · **Conciliación** → `/tesoreria/conciliacion` |
 | Contabilidad | Resumen → `/contabilidad` · Cuentas → `/contabilidad/cuentas` · Asientos → `/contabilidad/asientos` · **Cierres** → `/contabilidad/cierres` · Reglas → `/contabilidad/reglas` · Libro diario → `/contabilidad/libro-diario` · Sumas y saldos → `/contabilidad/sumas-y-saldos` · Situación → `/contabilidad/situacion-patrimonial` · Resultados → `/contabilidad/estado-resultados` |
@@ -152,6 +152,8 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 
 > **Visibilidad (D-056):** las secciones **Finanzas**, **Tesorería** y **Contabilidad** del menú de empresa solo aparecen para roles de **company finance**: `OWNER`, `ADMIN`, `FINANCE`, `TREASURER` y `VIEWER` (lectura). Roles operativos (`PROJECT_MANAGER`, `PROCUREMENT`, `SALES`, `PROJECT_FINANCE`, etc.) trabajan finanzas desde el **proyecto**, no desde el hub corporativo.
 
+> **Pendientes (bandeja personal, D-087):** `/pendientes` lista cosas que **vos** todavía tenés que aprobar o revisar (órdenes de compra, partes de libro de obra, certificaciones de cliente y de subcontrato), filtradas por tu rol y por los módulos activos. **No** es un listado único de la empresa: un OWNER ve más fuentes que un PM; un VIEWER ve cero. El **globo rojo** en el ítem Pendientes del menú (y en mobile en la barra inferior) muestra ese recuento. En el menú de una obra, **Resumen → Pendientes** (`/proyectos/[id]/pendientes`) y su globo cuentan solo esa obra. El globo se refresca al entrar y cada 30 s con la pestaña visible. No confundir con la **campana** (§1.4): esa es el historial de avisos, no la cola de acciones.
+>
 > Las **notificaciones** se abren desde la **campana del encabezado** (no tienen ítem propio en el menú lateral). Ver §1.4.
 >
 > La **Ayuda** (centro de procedimientos / FAQ, [D-090](./00-product/DECISION_LOG.md)) está fija en el **pie del menú lateral** (empresa y obra), en el ícono `?` del encabezado y en mobile bajo **Más**. Ruta: `/ayuda`.
@@ -234,13 +236,13 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 | Empresa | `OWNER`, `ADMIN`, `FINANCE`, `TREASURER`, `PROJECT_FINANCE`, `PROCUREMENT`, `WAREHOUSE`, `SALES`, `VIEWER` |
 | Proyecto | `PROJECT_MANAGER`, `SITE_FOREMAN`, `PROJECT_VIEWER` |
 
-- **Los roles son fijos** (no se crean roles personalizados).
+- **Los roles son fijos** (no se crean roles personalizados). En Equipo se muestran como `PROJECT_MANAGER (Jefe de obra)`.
 - Un usuario puede tener **varios roles**; sus permisos efectivos son la **unión** de todos.
 
 ### 2.3 Modelo de permisos
 
 - Acciones jerárquicas: **VER < EDITAR < APROBAR** sobre cada módulo.
-- **Ruta:** `/configuracion/permisos` muestra la matriz de permisos. **Es una vista de solo lectura** (informativa); no se editan asignaciones desde ahí. Un banner lo aclara y remite a **Equipo** para asignar roles.
+- **Ruta:** `/configuracion/permisos` muestra la matriz de permisos. **Es una vista de solo lectura** (informativa); no se editan asignaciones desde ahí. Un banner lo aclara y remite a **Equipo** para asignar roles. Los grupos de módulos empiezan **replegados**; abrí el que quieras consultar.
 - En la matriz, algunos módulos aparecen como **no disponibles en esta versión** (p. ej. contratos formales, órdenes de cambio, RFIs, impuestos dedicados): no hay pantallas operativas. **Conciliación bancaria** y **cierre de períodos** **sí** están operativos (ver §4.2 y §15.3).
 - La autorización se aplica **también en el backend** (servicios), no solo en la interfaz.
 
@@ -488,7 +490,7 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
 | Operación | Libro de obra → `/libro-obra` · Certificaciones → `/certificaciones` · **Materiales** → `/materiales` · Inventario → `/inventario` · Consumos → `/consumos` · Documentos → `/documentos` |
 | Compras | **Tablero de compras** → `/compras` · **Solicitudes de compra** → `/solicitudes-compra` · **Órdenes de compra** → `/ordenes-compra` · **Recepciones** → `/recepciones` |
 | Finanzas del proyecto | **Tablero de finanzas** → `/finanzas` · Flujo de caja → `/flujo-caja` · Subcontratos → `/subcontratos` · CxP → `/cuentas-por-pagar` · CxC → `/cuentas-por-cobrar` · Facturas proveedor → `/facturas-proveedor` · Facturas emitidas → `/facturas` |
-| Administración | Configuración → `/editar` |
+| Administración | Configuración → `/editar` (datos de la obra + **Equipo de obra** al final) |
 
 > En UI, **EDT** = Estructura de Desglose de Trabajo (WBS técnico = `WbsNode`).  
 > **Recepciones** viven bajo **Compras**, no bajo Operación. **Consumos** viven bajo **Operación**.
@@ -658,7 +660,7 @@ En el Gantt: relleno oscuro de la barra = **Real**; franja/borde ámbar = **Cert
 
 **Ruta:** Operación → **Libro de obra** → `/proyectos/[id]/libro-obra`
 
-**Equipo de obra (avisos):** en el **Resumen** del proyecto, card **Equipo de obra**. Ahí se asignan usuarios activos de la organización (etiqueta PM / Capataz / Otro). Eso **no** cambia permisos de acceso: solo define quién recibe campana + email cuando hay un parte pendiente. Sin PM **con membresía activa** en el equipo, esos avisos van solo a OWNER/ADMIN. Un miembro del roster con membresía inactiva se muestra como **membresía inactiva** y no cuenta como supervisor. `/pendientes` sigue mostrando partes de todas las obras para quien puede aprobar.
+**Equipo de obra (avisos):** en **Administración → Configuración** (`/editar`), al final, card **Equipo de obra**. Ahí se asignan usuarios activos de la organización (etiqueta PM / Capataz / Otro). Eso **no** cambia permisos de acceso: solo define quién recibe campana + email cuando hay un parte pendiente. Pueden editar el roster quienes tienen permiso de **editar proyectos** (OWNER, ADMIN y PM de la organización; no el capataz). En el **Resumen**, si no hay PM con membresía activa, aparece un aviso con enlace a Configuración. Sin PM activo, esos avisos van solo a OWNER/ADMIN. Un miembro del roster con membresía inactiva se muestra como **membresía inactiva** y no cuenta como supervisor. `/pendientes` sigue mostrando partes de todas las obras para quien puede aprobar.
 
 1. **Nuevo parte** (fecha no futura, clima, cuadrilla, tareas). En **mano de obra**, el contacto se busca por razón social o nombre fantasía.
 2. Cargar **avance por partida EDT**: cada fila necesita **partida** y **cantidad** (el % del día y la cantidad sugerida se precargan al elegir partida). Si falta alguno, el parte **no se guarda** y se muestra el error.

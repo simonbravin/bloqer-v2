@@ -8,6 +8,10 @@ import { buildProjectWorkspaceNavSections } from "@bloqer/services/project-works
 import { buildGlobalNavSections } from "@/lib/global-workspace-nav";
 import { tenantGateFromSnapshot } from "@/features/projects/tenant-gate-from-snapshot";
 import { clearActiveTenantCookieAction } from "@/lib/auth-session-actions";
+import { pendingCountAriaLabel } from "@/lib/pending-count-badge";
+import { isPendingInboxPath } from "@/lib/field-pending-path";
+import { usePendingInboxCount } from "@/lib/pending-inbox-count-context";
+import { PendingCountBadge } from "@/components/ui/pending-count-badge";
 import {
   Sheet,
   SheetContent,
@@ -52,6 +56,7 @@ export function FieldMoreSheet({ open, onOpenChange, roles, moduleGateSnapshot, 
     () => buildGlobalNavSections(roles, (m) => gate.isEnabled(m)),
     [roles, gate],
   );
+  const { tenantCount, projectCount } = usePendingInboxCount();
 
   const projectLinks = projectId
     ? PROJECT_HREF_SUFFIXES.map((want) => {
@@ -96,8 +101,16 @@ export function FieldMoreSheet({ open, onOpenChange, roles, moduleGateSnapshot, 
                       href={link.href}
                       className="flex min-h-11 items-center rounded-md px-3 text-sm hover:bg-muted"
                       onClick={() => onOpenChange(false)}
+                      aria-label={
+                        isPendingInboxPath(link.href) && (projectCount ?? 0) > 0
+                          ? pendingCountAriaLabel(projectCount ?? 0, link.label)
+                          : undefined
+                      }
                     >
-                      {link.label}
+                      <span className="min-w-0 flex-1 truncate">{link.label}</span>
+                      {isPendingInboxPath(link.href) ? (
+                        <PendingCountBadge count={projectCount ?? 0} />
+                      ) : null}
                     </Link>
                   </li>
                 ))}
@@ -113,8 +126,14 @@ export function FieldMoreSheet({ open, onOpenChange, roles, moduleGateSnapshot, 
                     href={link.href}
                     className="flex min-h-11 items-center rounded-md px-3 text-sm hover:bg-muted"
                     onClick={() => onOpenChange(false)}
+                    aria-label={
+                      link.href === "/pendientes" && tenantCount > 0
+                        ? pendingCountAriaLabel(tenantCount, link.label)
+                        : undefined
+                    }
                   >
-                    {link.label}
+                    <span className="min-w-0 flex-1 truncate">{link.label}</span>
+                    {link.href === "/pendientes" ? <PendingCountBadge count={tenantCount} /> : null}
                   </Link>
                 </li>
               ))}

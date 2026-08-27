@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { OVERVIEW_ROLES } from "@bloqer/domain";
+import { formatUserRoleLabel } from "@/lib/user-role-label";
 import { getCurrentUser } from "@/lib/auth";
 import { canEditTeamMembership, canReadTenantConfigArea } from "@bloqer/services";
 import { Input } from "@/components/ui/input";
@@ -77,7 +78,7 @@ export default async function ConfiguracionEquipoInvitarPage({ searchParams }: P
                       name={`role_${role}`}
                       className="h-4 w-4 rounded border border-input"
                     />
-                    <span>{role}</span>
+                    <span>{formatUserRoleLabel(role)}</span>
                   </label>
                 ))}
               </div>

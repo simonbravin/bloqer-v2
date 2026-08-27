@@ -9,23 +9,21 @@ import { cn } from "@/lib/utils";
 import { isFieldImmersivePath } from "@/lib/field-immersive-routes";
 import { isPendingInboxPath } from "@/lib/field-pending-path";
 import { useFieldProjectContext } from "@/lib/field-project-context";
+import { pendingCountAriaLabel } from "@/lib/pending-count-badge";
+import { usePendingInboxCount } from "@/lib/pending-inbox-count-context";
+import { PendingCountBadge } from "@/components/ui/pending-count-badge";
 import { FieldPlusSheet } from "./field-plus-sheet";
 import { FieldMoreSheet } from "./field-more-sheet";
 
 type Props = {
-  pendingCount: number;
   roles: UserRole[];
   moduleGateSnapshot: Partial<Record<PermissionModule, boolean>>;
 };
 
-function badgeLabel(n: number): string {
-  if (n <= 0) return "";
-  return n > 9 ? "9+" : String(n);
-}
-
-export function FieldBottomNav({ pendingCount, roles, moduleGateSnapshot }: Props) {
+export function FieldBottomNav({ roles, moduleGateSnapshot }: Props) {
   const pathname = usePathname();
   const { convenienceProjectId } = useFieldProjectContext();
+  const { tenantCount } = usePendingInboxCount();
   const [plusOpen, setPlusOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -35,7 +33,6 @@ export function FieldBottomNav({ pendingCount, roles, moduleGateSnapshot }: Prop
   const homeActive = pathname === "/dashboard";
   const pendingActive = isPendingInboxPath(pathname);
   const obraActive = pathname.startsWith("/proyectos/") && !pendingActive;
-  const badge = badgeLabel(pendingCount);
 
   return (
     <>
@@ -88,6 +85,7 @@ export function FieldBottomNav({ pendingCount, roles, moduleGateSnapshot }: Prop
             <Link
               href="/pendientes"
               aria-current={pendingActive ? "page" : undefined}
+              aria-label={tenantCount > 0 ? pendingCountAriaLabel(tenantCount) : undefined}
               className={cn(
                 "relative flex min-h-11 flex-col items-center justify-center gap-0.5 px-1 pt-2 text-[11px]",
                 pendingActive ? "font-semibold text-foreground" : "text-muted-foreground",
@@ -95,11 +93,7 @@ export function FieldBottomNav({ pendingCount, roles, moduleGateSnapshot }: Prop
             >
               <span className="relative">
                 <ClipboardList className="h-5 w-5" aria-hidden />
-                {badge ? (
-                  <span className="absolute -right-2 -top-1 rounded-full bg-destructive px-1 text-[9px] font-semibold leading-4 text-destructive-foreground">
-                    {badge}
-                  </span>
-                ) : null}
+                <PendingCountBadge count={tenantCount} density="compact" />
               </span>
               Pendientes
             </Link>

@@ -30,11 +30,12 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Project: `DRAFT` �
 - Activar, pausar, reanudar, completar, cancelar (con confirmación en UI).
 - Cancelar obra `ACTIVE`/`ON_HOLD`: solo OWNER/ADMIN ([BR-PROJ-005], [PERM-007]).
 - Reactivar obra `CANCELLED`: solo OWNER/ADMIN ([BR-PROJ-006], [PERM-007]).
-- **Equipo de obra** (`ProjectTeamMember`, [D-091]): asignar usuarios del tenant al roster de avisos (card en Resumen). **No** implementa aún RBAC “solo su proyecto” (R-USR-007); el techo de permisos sigue siendo global.
+- **Equipo de obra** (`ProjectTeamMember`, [D-091]): asignar usuarios del tenant al roster de avisos (card al final de Configuración `/editar`). El Resumen muestra un aviso si no hay PM activo. **No** implementa aún RBAC “solo su proyecto” (R-USR-007); el techo de permisos sigue siendo global.
 
 ## 9. Pantallas y vistas necesarias
 - Lista de proyectos con filtros estado, cliente, PM.
 - Ficha proyecto: resumen, pestañas presupuesto, cronograma, certificaciones, compras, inventario, documentos.
+- Configuración del proyecto (`/editar`): datos generales + **Equipo de obra**.
 - Selector de proyecto global en cabecera de la app.
 
 ## 10. Reglas de negocio

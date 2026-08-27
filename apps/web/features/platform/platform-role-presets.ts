@@ -1,4 +1,4 @@
-import type { UserRole } from "@bloqer/domain";
+import { USER_ROLE_LABEL_ES, type UserRole } from "@bloqer/domain";
 
 export type PlatformRolePreset = {
   id: string;
@@ -53,17 +53,4 @@ export const PLATFORM_ROLE_PRESETS: readonly PlatformRolePreset[] = [
   },
 ] as const;
 
-export const PLATFORM_ROLE_LABEL_ES: Record<UserRole, string> = {
-  OWNER: "Propietario",
-  ADMIN: "Administrador",
-  FINANCE: "Finanzas",
-  TREASURER: "Tesorería",
-  PROJECT_FINANCE: "Finanzas de obra",
-  PROCUREMENT: "Compras",
-  WAREHOUSE: "Depósito",
-  SALES: "Ventas",
-  VIEWER: "Solo lectura",
-  PROJECT_MANAGER: "Jefe de obra",
-  SITE_FOREMAN: "Capataz",
-  PROJECT_VIEWER: "Visor de proyecto",
-};
+export const PLATFORM_ROLE_LABEL_ES: Record<UserRole, string> = { ...USER_ROLE_LABEL_ES };

@@ -70,6 +70,7 @@ export type HelpIntent =
   | "flujo-caja"
   | "movimientos-tesoreria"
   | "notificaciones"
+  | "pendientes"
   | "reportes-contables"
   | "revertir-asiento"
   | "inventario"

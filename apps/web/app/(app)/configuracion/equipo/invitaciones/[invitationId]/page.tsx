@@ -14,6 +14,7 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { cancelTenantInvitationAction } from "../../invitation-actions";
+import { formatUserRoleList } from "@/lib/user-role-label";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageListHeader } from "@/components/ui/page-list-header";
 import { DetailField, DetailFieldGrid } from "@/components/ui/detail-field-grid";
@@ -88,7 +89,7 @@ export default async function ConfiguracionEquipoInvitacionDetallePage({ params 
         <CardContent>
           <DetailFieldGrid>
             <DetailField label="Estado">{invitationStatusLabel(inv.status)}</DetailField>
-            <DetailField label="Roles">{inv.roles.join(", ")}</DetailField>
+            <DetailField label="Roles">{formatUserRoleList(inv.roles)}</DetailField>
             <DetailField label="Invitó">{inv.invitedByEmail}</DetailField>
             <DetailField label="Vence">{formatDateTime(inv.expiresAt)}</DetailField>
             <DetailField label="Creada">{formatDateTime(inv.createdAt)}</DetailField>

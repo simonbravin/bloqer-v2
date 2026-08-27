@@ -105,7 +105,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Cada fila de avance necesita partida EDT y cantidad. Si falta alguno, el parte no se guarda.",
       "En materiales, descripción y cantidad son obligatorios: una fila a medias no se graba.",
     ],
-    relatedSlugs: ["registrar-consumo-materiales", "asignar-equipo-de-obra", "usar-notificaciones"],
+    relatedSlugs: ["registrar-consumo-materiales", "asignar-equipo-de-obra", "usar-notificaciones", "revisar-pendientes"],
     keywords: ["libro de obra", "parte diario", "capataz", "avance", "parte pendiente", "avance de obra"],
     guideRef: "§8",
   },

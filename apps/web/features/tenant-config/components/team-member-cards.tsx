@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formatDate } from "@/lib/format";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { TenantMemberListRow } from "@bloqer/services";
+import { formatUserRoleList } from "@/lib/user-role-label";
 
 function membershipStatusLabel(s: string) {
   return s === "ACTIVE" ? "Activo" : "Inactivo";
@@ -26,7 +27,7 @@ export function TeamMemberCards({ members }: { members: TenantMemberListRow[] })
           </div>
           <h3 className="mt-2 font-semibold leading-snug">{r.name ?? r.email}</h3>
           {r.name ? <p className="mt-1 text-sm text-muted-foreground">{r.email}</p> : null}
-          <p className="mt-3 line-clamp-2 text-xs text-muted-foreground">{r.roles.join(", ")}</p>
+          <p className="mt-3 line-clamp-2 text-xs text-muted-foreground">{formatUserRoleList(r.roles)}</p>
         </Link>
       ))}
     </div>

@@ -1,5 +1,5 @@
 export type { UserRole } from "./permissions/roles";
-export { COMPANY_FINANCE_ROLES, hasCompanyFinanceRole } from "./permissions/roles";
+export { COMPANY_FINANCE_ROLES, hasCompanyFinanceRole, USER_ROLE_LABEL_ES } from "./permissions/roles";
 export type { PermissionAction, PermissionModule } from "./permissions/matrix";
 export { can, canManageProjectLifecycleAdmin } from "./permissions/matrix";
 export {

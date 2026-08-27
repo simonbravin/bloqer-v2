@@ -27,3 +27,19 @@ export const COMPANY_FINANCE_ROLES: readonly UserRole[] = [
 export function hasCompanyFinanceRole(roles: readonly UserRole[]): boolean {
   return roles.some((r) => (COMPANY_FINANCE_ROLES as readonly string[]).includes(r));
 }
+
+/** UI / email labels (es-AR). Canonical enum stays English. */
+export const USER_ROLE_LABEL_ES: Record<UserRole, string> = {
+  OWNER: "Propietario",
+  ADMIN: "Administrador",
+  FINANCE: "Finanzas",
+  TREASURER: "Tesorería",
+  PROJECT_FINANCE: "Finanzas de obra",
+  PROCUREMENT: "Compras",
+  WAREHOUSE: "Depósito",
+  SALES: "Ventas",
+  VIEWER: "Solo lectura",
+  PROJECT_MANAGER: "Jefe de obra",
+  SITE_FOREMAN: "Capataz",
+  PROJECT_VIEWER: "Visor de proyecto",
+};

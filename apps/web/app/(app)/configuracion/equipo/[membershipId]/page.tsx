@@ -1,6 +1,7 @@
 import { formatDateTime } from "@/lib/format";
 import { notFound, redirect } from "next/navigation";
 import { OVERVIEW_ROLES } from "@bloqer/domain";
+import { formatUserRoleLabel, formatUserRoleList } from "@/lib/user-role-label";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import {
@@ -66,7 +67,7 @@ export default async function ConfiguracionEquipoDetallePage({ params }: PagePro
             <DetailField label="Nombre">{member.name ?? "—"}</DetailField>
             <DetailField label="Estado">{membershipStatusLabel(member.status)}</DetailField>
             <DetailField label="Alta">{formatDateTime(member.createdAt)}</DetailField>
-            <DetailField label="Roles">{member.roles.join(", ") || "—"}</DetailField>
+            <DetailField label="Roles">{formatUserRoleList(member.roles)}</DetailField>
           </DetailFieldGrid>
         </CardContent>
       </Card>
@@ -89,7 +90,7 @@ export default async function ConfiguracionEquipoDetallePage({ params }: PagePro
                         defaultChecked={member.roles.includes(role)}
                         className="h-4 w-4 rounded border border-input"
                       />
-                      <span>{role}</span>
+                      <span>{formatUserRoleLabel(role)}</span>
                     </label>
                   ))}
                 </div>

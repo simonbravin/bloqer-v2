@@ -11,6 +11,7 @@ import { buildGlobalNavSections } from "@/lib/global-workspace-nav";
 import { GlobalNavIcon } from "@/lib/global-nav-icons";
 import { isNavLinkActive } from "@/lib/nav-link-active";
 import { HelpSidebarFooter } from "./help-sidebar-footer";
+import { usePendingInboxCount } from "@/lib/pending-inbox-count-context";
 
 interface SidebarProps {
   /** Membership roles; empty = only items without `require` (e.g. Inicio) */
@@ -30,6 +31,7 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { tenantCount } = usePendingInboxCount();
   const gate = useMemo(() => tenantGateFromSnapshot(moduleGateSnapshot ?? {}), [moduleGateSnapshot]);
   const sections = useMemo(
     () => buildGlobalNavSections(roles, (m) => gate.isEnabled(m)),
@@ -87,6 +89,7 @@ export function Sidebar({
               items={section.items.map((item) => ({
                 ...item,
                 icon: <GlobalNavIcon href={item.href} />,
+                badgeCount: item.href === "/pendientes" ? tenantCount : undefined,
               }))}
             />
           );

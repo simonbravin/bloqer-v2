@@ -282,3 +282,10 @@ export async function maybeAutoAddCreatorToProjectTeam(params: {
 export function projectTeamHasJobsiteSupervisor(members: ProjectTeamMemberRow[]): boolean {
   return members.some((m) => m.canSuperviseJobsiteLog);
 }
+
+/** Roster has an active membership labeled PM ([D-091] UI banner). */
+export function hasAssignedProjectManager(
+  members: Array<{ kind: ProjectTeamMemberKind; membershipActive: boolean }>,
+): boolean {
+  return members.some((m) => m.kind === "PROJECT_MANAGER" && m.membershipActive);
+}
