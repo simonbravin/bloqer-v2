@@ -33,7 +33,7 @@ export function FieldPendingCard({ item }: { item: FieldPendingItem }) {
         {item.occurredAt ? ` · ${formatDate(item.occurredAt)}` : ""}
       </p>
       <Button asChild className="min-h-11 w-full">
-        <Link href={item.href}>Revisar</Link>
+        <Link href={item.href}>{item.actionLabel}</Link>
       </Button>
     </article>
   );

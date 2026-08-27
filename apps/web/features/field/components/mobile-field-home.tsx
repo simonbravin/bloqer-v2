@@ -56,9 +56,24 @@ export function MobileFieldHome({ home }: Props) {
       ? `/proyectos/${featured.id}/cronograma?field=today`
       : "/proyectos";
   const pendingBits: string[] = [];
+  if (home.pendingCounts.purchaseRequests > 0) {
+    pendingBits.push(
+      `${home.pendingCounts.purchaseRequests} solicitud${home.pendingCounts.purchaseRequests === 1 ? "" : "es"} de compra por gestionar`,
+    );
+  }
   if (home.pendingCounts.purchaseOrders > 0) {
     pendingBits.push(
       `${home.pendingCounts.purchaseOrders} orden${home.pendingCounts.purchaseOrders === 1 ? "" : "es"} por aprobar`,
+    );
+  }
+  if (home.pendingCounts.purchaseOrdersToConfirm > 0) {
+    pendingBits.push(
+      `${home.pendingCounts.purchaseOrdersToConfirm} orden${home.pendingCounts.purchaseOrdersToConfirm === 1 ? "" : "es"} por confirmar`,
+    );
+  }
+  if (home.pendingCounts.purchaseOrdersToReceive > 0) {
+    pendingBits.push(
+      `${home.pendingCounts.purchaseOrdersToReceive} orden${home.pendingCounts.purchaseOrdersToReceive === 1 ? "" : "es"} por recibir`,
     );
   }
   if (home.pendingCounts.jobsiteLogs > 0) {

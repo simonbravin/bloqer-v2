@@ -5,6 +5,7 @@ import { sendNotificationEmailAsSystem } from "../notifications/notification-ema
 import {
   findActiveOwnerAdminUserIds,
   resolveNotificationAudience,
+  type NotificationPermissionTarget,
 } from "../notifications/notification-audience.service";
 import {
   formatNotificationIdentityBody,
@@ -22,6 +23,20 @@ type ProcurementNotifyType =
   | "PURCHASE_ORDER_CONFIRMED"
   | "PROCUREMENT_SLA_REMINDER";
 
+/** Who can confirm OC to the supplier ([D-094] / canEditPurchaseOrders). */
+const PO_CONFIRM_AUDIENCE: NotificationPermissionTarget[] = [
+  { action: "EDIT", module: "PROCUREMENT" },
+  { action: "APPROVE", module: "PURCHASE_ORDERS" },
+  { action: "APPROVE", module: "PROCUREMENT" },
+];
+
+/** Who can register a receipt ([D-094] / canEditPurchaseReceipts). */
+const PO_RECEIPT_AUDIENCE: NotificationPermissionTarget[] = [
+  { action: "EDIT", module: "PURCHASE_ORDERS" },
+  { action: "EDIT", module: "PROCUREMENT" },
+  { action: "EDIT", module: "INVENTORY" },
+];
+
 async function notifyRecipients(params: {
   ctx: ServiceContext;
   recipients: string[];
@@ -37,10 +52,12 @@ async function notifyRecipients(params: {
   excludeUserId?: string;
   /** Default true. SLA reminders pass false because recipients are already OWNER/ADMIN. */
   alwaysCcOwnerAdmin?: boolean;
+  permissionTargets?: NotificationPermissionTarget[];
 }): Promise<number> {
   const unique = await resolveNotificationAudience({
     tenantId: params.ctx.tenantId,
     primaryUserIds: params.recipients,
+    permissionTargets: params.permissionTargets,
     excludeUserId: params.excludeUserId,
     alwaysCcOwnerAdmin: params.alwaysCcOwnerAdmin ?? true,
   });
@@ -207,6 +224,8 @@ export async function notifyPurchaseOrderApproved(params: {
     companyId: params.companyId,
     actionUrl: `/proyectos/${params.projectId}/ordenes-compra/${params.purchaseOrderId}`,
     excludeUserId: params.ctx.actorUserId,
+    // Origin + creator + who can confirm ([D-094]); OWNER/ADMIN still CC'd.
+    permissionTargets: PO_CONFIRM_AUDIENCE,
   });
 }
 
@@ -257,23 +276,63 @@ export async function notifyPurchaseOrderConfirmed(params: {
     actorUserId: params.ctx.actorUserId,
   });
 
-  await notifyRecipients({
-    ctx: params.ctx,
-    recipients: params.recipientUserIds,
-    type: "PURCHASE_ORDER_CONFIRMED",
-    title: formatNotificationTitle("OC confirmada", params.code),
-    body: formatNotificationIdentityBody(
-      `La orden ${params.code} fue confirmada. Ya compromete costo y admite recepciones.`,
-      facts,
-    ),
-    severity: "SUCCESS",
-    linkedEntityType: "PURCHASE_ORDER",
-    linkedEntityId: params.purchaseOrderId,
-    projectId: params.projectId,
-    companyId: params.companyId,
-    actionUrl: `/proyectos/${params.projectId}/ordenes-compra/${params.purchaseOrderId}`,
+  const poHref = `/proyectos/${params.projectId}/ordenes-compra/${params.purchaseOrderId}`;
+  const receiveHref = `${poHref}/recepciones/nueva`;
+
+  // Who can register the receipt ([D-094]) — deep-link to the form.
+  const receiverIds = await resolveNotificationAudience({
+    tenantId: params.ctx.tenantId,
+    permissionTargets: PO_RECEIPT_AUDIENCE,
     excludeUserId: params.ctx.actorUserId,
+    alwaysCcOwnerAdmin: true,
   });
+  const receiverSet = new Set(receiverIds);
+
+  if (receiverIds.length > 0) {
+    await notifyRecipients({
+      ctx: params.ctx,
+      recipients: receiverIds,
+      type: "PURCHASE_ORDER_CONFIRMED",
+      title: formatNotificationTitle("OC confirmada", params.code),
+      body: formatNotificationIdentityBody(
+        `La orden ${params.code} fue confirmada. Ya se puede registrar la recepción.`,
+        facts,
+      ),
+      severity: "SUCCESS",
+      linkedEntityType: "PURCHASE_ORDER",
+      linkedEntityId: params.purchaseOrderId,
+      projectId: params.projectId,
+      companyId: params.companyId,
+      actionUrl: receiveHref,
+      excludeUserId: params.ctx.actorUserId,
+      alwaysCcOwnerAdmin: false,
+    });
+  }
+
+  // Origin / creator who cannot receive: informational only (OC detail, not the form).
+  const informees = [...new Set(params.recipientUserIds.filter(Boolean))].filter(
+    (id) => id !== params.ctx.actorUserId && !receiverSet.has(id),
+  );
+  if (informees.length > 0) {
+    await notifyRecipients({
+      ctx: params.ctx,
+      recipients: informees,
+      type: "PURCHASE_ORDER_CONFIRMED",
+      title: formatNotificationTitle("OC confirmada", params.code),
+      body: formatNotificationIdentityBody(
+        `La orden ${params.code} fue confirmada. Ya compromete costo y admite recepciones.`,
+        facts,
+      ),
+      severity: "SUCCESS",
+      linkedEntityType: "PURCHASE_ORDER",
+      linkedEntityId: params.purchaseOrderId,
+      projectId: params.projectId,
+      companyId: params.companyId,
+      actionUrl: poHref,
+      excludeUserId: params.ctx.actorUserId,
+      alwaysCcOwnerAdmin: false,
+    });
+  }
 }
 
 export type ProcurementSlaRunSummary = {

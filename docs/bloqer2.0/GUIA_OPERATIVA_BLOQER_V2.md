@@ -152,7 +152,7 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 
 > **Visibilidad (D-056):** las secciones **Finanzas**, **Tesorería** y **Contabilidad** del menú de empresa solo aparecen para roles de **company finance**: `OWNER`, `ADMIN`, `FINANCE`, `TREASURER` y `VIEWER` (lectura). Roles operativos (`PROJECT_MANAGER`, `PROCUREMENT`, `SALES`, `PROJECT_FINANCE`, etc.) trabajan finanzas desde el **proyecto**, no desde el hub corporativo.
 
-> **Pendientes (bandeja personal, D-087):** `/pendientes` lista cosas que **vos** todavía tenés que aprobar o revisar (órdenes de compra, partes de libro de obra, certificaciones de cliente y de subcontrato), filtradas por tu rol y por los módulos activos. **No** es un listado único de la empresa: un OWNER ve más fuentes que un PM; un VIEWER ve cero. El **globo rojo** en el ítem Pendientes del menú (y en mobile en la barra inferior) muestra ese recuento. En el menú de una obra, **Resumen → Pendientes** (`/proyectos/[id]/pendientes`) y su globo cuentan solo esa obra. El globo se refresca al entrar y cada 30 s con la pestaña visible. No confundir con la **campana** (§1.4): esa es el historial de avisos, no la cola de acciones.
+> **Pendientes (bandeja personal, D-087 + D-094):** `/pendientes` lista cosas que **vos** todavía tenés que cerrar, filtradas por tu rol y por los módulos activos. Incluye **aprobaciones** (OC en Pend. aprobación, partes de libro de obra, certificaciones) y el **follow-through de compras**: SC enviada a cotizar/elegir, OC aprobada a confirmar al proveedor, OC confirmada (o parcial) a recibir. Los botones de cada card coinciden con la acción (`Cotizar` / `Elegir cotización` / `Revisar` / `Confirmar` / `Recibir`). **Recibir** abre el formulario de recepción (`…/recepciones/nueva`). **No** mezcla CxP ni “Listo para pagar” (eso va por la **campana**, §1.4). **No** es un listado único de la empresa: un OWNER ve más fuentes que un PM; Depósito ve recepciones; un VIEWER ve cero. El **globo rojo** en el ítem Pendientes del menú (y en mobile en la barra inferior) muestra ese recuento. En el menú de una obra, **Resumen → Pendientes** (`/proyectos/[id]/pendientes`) y su globo cuentan solo esa obra. El globo se refresca al entrar y cada 30 s con la pestaña visible. No confundir con la **campana** (§1.4): esa es el historial de avisos; Pendientes es la cola de acciones.
 >
 > Las **notificaciones** se abren desde la **campana del encabezado** (no tienen ítem propio en el menú lateral). Ver §1.4.
 >
@@ -180,7 +180,7 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 - **Fechas y horas** en la zona de la empresa (§1.3), no en UTC del servidor ni en la zona del navegador. El detalle al hacer click debe coincidir con la columna Fecha.
 - Exports CSV/PDF usan la misma zona (el encabezado CSV indica la zona, ej. `Fecha (Buenos Aires (GMT-3))`).
 
-### 1.4 Notificaciones (campana, inbox, alertas y emails) — D-054 / D-091
+### 1.4 Notificaciones (campana, inbox, alertas y emails) — D-054 / D-091 / D-094
 
 Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **campana del encabezado**.
 
@@ -196,6 +196,7 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 - Destinatarios primarios y/o por permiso del evento, con **CC siempre a OWNER/ADMIN** activos (salvo exclusiones del actor).
 - **Excepción anti-ruido:** `CERTIFICATION_APPROVED` llega al creador ∪ OWNER/ADMIN (no se difunde a todo quien tenga VER certificaciones).
 - **Libro de obra ([D-091]):** al **enviar** un parte → campana + email a OWNER/ADMIN y a miembros del **Equipo de obra** que puedan aprobar (PM); al **devolver** o **aprobar** → autor del parte ∪ OWNER/ADMIN. Ver §8.1.
+- **Compras ([D-094]):** SC enviada → campana a quien **aprueba** SC/OC (no a todo el que puede cotizar: un PM la ve en **Pendientes** aunque no le llegue ese aviso). OC aprobada → origen + quien puede confirmar. OC confirmada → quien puede **recibir** con CTA **Registrar recepción** (abre el formulario); el origen solo informativo ve la ficha de la OC. CxP **Listo para pagar** sigue solo en campana (no en el globo de Pendientes).
 - Cada usuario tiene su propia fila: marcar leída **no** afecta la copia de otro.
 - Compras (SC/OC), CxP/CxC, libro de obra y reportes: el **asunto** lleva `[organización]` y el cuerpo identifica proyecto, contraparte y actor cuando aplica. Invitaciones al equipo muestran organización, quién invitó y roles. Útil si el mismo usuario es OWNER/ADMIN de más de un workspace.
 
@@ -758,7 +759,7 @@ flowchart LR
 3. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por partida EDT).
 4. Cargar **Cotizaciones**: elegí proveedor (buscador: razón social o nombre fantasía), **precio unit.**, **Desc. %** (opcional, antes de IVA) + **plazo de entrega en días** + validez. En el listado de cotizaciones se ve el total y, debajo del proveedor, cada línea con precio de lista y **Desc. %**. Cumplir mínimo de cotizaciones de `/configuracion/politicas`. El umbral que obliga SC+cotizaciones vs OC directa lo setea cada empresa en políticas de compras (no es un monto fijo del producto).
 5. **Seleccionar** proveedor → genera **OC en borrador**.
-6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora. El email de nueva solicitud muestra organización, proyecto, solicitante e ítems; el asunto es `[organización] Nueva solicitud · SC-003`.
+6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora. Quienes pueden cotizar también ven la SC en **Pendientes** hasta elegir proveedor ([D-094]). El email de nueva solicitud muestra organización, proyecto, solicitante e ítems; el asunto es `[organización] Nueva solicitud · SC-003`.
 
 ### 9.2 Procedimiento — Orden de compra (OC)
 
@@ -768,11 +769,11 @@ flowchart LR
 **Enum:** `DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED` (o `CANCELLED`).
 
 1. **Nueva OC** desde listado/tablero (`?create=1`) o desde SC seleccionada. Proveedor: buscador por razón social o nombre fantasía. Cada línea: **partida hoja** + cantidades/precios y **Desc. %** (antes de IVA). **Descuento general %** + **Aplicar a todas** copia el mismo % a cada línea (hay que ingresar un número; 0 limpia todas). Al elegir partida se muestran **Ref. presup.** (insumo MATERIAL del APU, o **costo dir. /u** de la partida si no hay materiales) y **saldo de partida** (alerta, no bloqueo).
-2. **Enviar a aprobación** → `SUBMITTED`.
-3. Aprobador: **Aprobar** → `APPROVED`, o **Devolver a borrador** con **motivo obligatorio**.
+2. **Enviar a aprobación** → `SUBMITTED` (aprobadores: Pendientes + campana).
+3. Aprobador: **Aprobar** → `APPROVED`, o **Devolver a borrador** con **motivo obligatorio**. Quien puede confirmar la ve en **Pendientes**; campana de “OC aprobada” llega a origen + quien confirma.
 4. **Confirmar al proveedor** → `CONFIRMED` = **comprometido** en EDT y costos.  
    > No existe atajo “Emitir y confirmar (rápido)”: siempre Enviar → Aprobar → Confirmar.
-5. **Registrar recepción** (parcial o total).
+5. **Registrar recepción** (parcial o total). Quien puede recibir (Compras / Depósito / PM) la ve en **Pendientes** con botón **Recibir** (abre `…/recepciones/nueva`). La campana de confirmación avisa “Ya se puede registrar la recepción” con CTA **Registrar recepción** a ese mismo formulario.
 6. Con cantidades recibidas: **Registrar factura desde OC** (o alta manual en Facturas proveedor).
 7. Desvíos de precio vs referencia: si el PU **supera** el referencial (umbrales de políticas), pide **Justificación desvío**. Comprar por debajo no exige nota. En la ficha, el % se muestra en **rojo** si se gasta más y en **verde** si se gasta menos; la nota de justificación queda debajo (sin códigos internos de estado). Sin referencial de partida (APU y costo dir. /u en cero) sí pide justificación.
 8. **OC directa** (sin SC): solo si la política de compras lo habilita; umbrales altos pueden exigir motivo de emergencia (`OWNER`/`ADMIN`).
@@ -791,9 +792,9 @@ flowchart LR
 
 ### 9.3 Procedimiento — Recepciones
 
-1. Compras → **Recepciones**, o desde la OC → **Nueva recepción** (`/ordenes-compra/[poId]/recepciones/nueva`).
-2. Indicar cantidades recibidas por línea; confirmar.
-3. Si hay producto/depósito → **entrada de stock** (el movimiento IN puede copiar `wbsNodeId`).
+1. Desde **Pendientes** (botón **Recibir**), desde la **campana** (CTA **Registrar recepción**), Compras → **Recepciones**, o desde la OC → **Nueva recepción** (`/ordenes-compra/[poId]/recepciones/nueva`).
+2. Indicar cantidades recibidas por línea; depósito opcional si el módulo Inventario está activo.
+3. Confirmar. Si hay producto/depósito → **entrada de stock** (el movimiento IN puede copiar `wbsNodeId`).
 
 <!-- capture:27 listado-recepciones -->
 ![Bloqer — Listado Recepciones](./guides/assets/screenshots/27-listado-recepciones.png)

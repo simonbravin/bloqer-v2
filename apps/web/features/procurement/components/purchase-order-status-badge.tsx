@@ -5,7 +5,6 @@ const MAP = {
   SUBMITTED:           { label: "Pend. aprobación",    variant: "outline" },
   APPROVED:            { label: "Aprobada",             variant: "default" },
   CONFIRMED:           { label: "Confirmada",           variant: "default" },
-  ISSUED:              { label: "Confirmada",           variant: "default" },
   PARTIALLY_RECEIVED:  { label: "Recepción parcial",   variant: "outline" },
   RECEIVED:            { label: "Recibida",             variant: "default" },
   CANCELLED:           { label: "Anulada",              variant: "destructive" },

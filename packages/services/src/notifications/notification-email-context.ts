@@ -161,6 +161,18 @@ export function actionLabelForNotification(
       return "Revisar parte";
     case "JOBSITE_LOG_APPROVED":
       return "Ver parte";
+    case "PURCHASE_REQUEST_SUBMITTED":
+      return "Cotizar solicitud";
+    case "PURCHASE_ORDER_PENDING_APPROVAL":
+      return "Revisar orden";
+    case "PURCHASE_ORDER_APPROVED":
+      // Informees (origen) keep the OC detail URL; confirmers deep-link to the same ficha.
+      return "Confirmar orden";
+    case "PURCHASE_ORDER_RETURNED":
+      return "Corregir orden";
+    case "PURCHASE_ORDER_CONFIRMED":
+      // Receivers get …/recepciones/nueva; informees get the OC detail.
+      return actionUrl?.includes("/recepciones/nueva") ? "Registrar recepción" : "Ver orden";
     default:
       return actionLabelForLinkedEntity(linked);
   }

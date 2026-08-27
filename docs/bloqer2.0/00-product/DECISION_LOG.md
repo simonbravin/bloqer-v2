@@ -1418,6 +1418,26 @@
 
 ---
 
+### D-094 — Pendientes: follow-through de compras (cotizar / confirmar / recibir)
+
+- **Fecha:** 2026-08-27
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** [D-087] definió Pendientes como bandeja personal de cosas que el actor puede cerrar (aprobar/revisar). En operación de obra, después de aprobar una OC (o enviar una SC) el trabajo sigue: cotizar, confirmar al proveedor y registrar recepción. Eso vivía solo en listados/tablero; el globo no avisaba a Compras ni a Depósito. CxP ya tiene campana **Listo para pagar** ([D-069]) y no debe mezclarse en el globo.
+- **Decisión:**
+  1. **Pendientes amplía fuentes de compras** (misma proyección, sin tabla `Pending`):
+     - `PURCHASE_REQUEST` — SC `SUBMITTED` (cotizar / elegir cotización) → quien `canManageProcurementQuotes`.
+     - `PURCHASE_ORDER` — OC `SUBMITTED` (aprobar) → quien `canApprovePurchaseOrders` (sin cambio).
+     - `PURCHASE_ORDER_CONFIRM` — OC `APPROVED` → quien `canEditPurchaseOrders`.
+     - `PURCHASE_ORDER_RECEIPT` — OC `CONFIRMED` o `PARTIALLY_RECEIVED` → quien `canEditPurchaseReceipts` (incluye Depósito).
+  2. **No entran:** SC `QUOTE_SELECTED`, OC `DRAFT`, factura / CxP / “Listo para pagar”.
+  3. **Campana:** reutilizar tipos existentes. `PURCHASE_ORDER_APPROVED` fanea también a quien puede confirmar; `PURCHASE_ORDER_CONFIRMED` a quien puede recibir (copy: “Ya se puede registrar la recepción”). `PURCHASE_REQUEST_SUBMITTED` no se duplica.
+  4. Complementa [D-087]: la bandeja sigue siendo personal y por permiso; deja de ser solo aprobaciones y pasa a **aprobaciones + follow-through de compras**.
+- **Implicancias:** WAREHOUSE pasa a tener globo (recepciones). Un PM no ve OC a aprobar (igual que hoy) pero sí SC a cotizar, OC a confirmar y a recibir. OWNER ve más ítems en el globo.
+- **Documentos afectados:** [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md), [`NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md), [`NOTIFICATIONS_ARCHITECTURE.md`](../08-architecture/NOTIFICATIONS_ARCHITECTURE.md), help in-app (`revisar-pendientes`, SC/OC/recepción).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1426,7 +1446,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-094`…).
+1. Tomar el siguiente ID disponible (`D-095`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

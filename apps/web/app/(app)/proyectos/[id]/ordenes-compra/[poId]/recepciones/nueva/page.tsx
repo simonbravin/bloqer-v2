@@ -1,7 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import { ReceiptCreateComposer } from "@/features/procurement/components/receipt-create-composer";
 import { getCurrentUser } from "@/lib/auth";
-import { getPurchaseOrderById, listWarehouses, ServiceError } from "@bloqer/services";
+import {
+  canEditPurchaseReceipts,
+  getPurchaseOrderById,
+  listWarehouses,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
@@ -20,24 +25,40 @@ export default async function NuevaRecepcionPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
-  let order, warehouses;
+  const poHref = `/proyectos/${id}/ordenes-compra/${poId}`;
+
+  // Deep-links from Pendientes/campana ([D-094]) land here; only receivers may use the form.
+  if (!canEditPurchaseReceipts(ctx.roles)) {
+    redirect(poHref);
+  }
+
+  let order;
   try {
-    [order, warehouses] = await Promise.all([
-      getPurchaseOrderById(poId, ctx),
-      listWarehouses({ status: "ACTIVE" }, ctx),
-    ]);
+    order = await getPurchaseOrderById(poId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) {
+      notFound();
+    }
     throw err;
   }
 
   if (order.projectId !== id) notFound();
 
   if (!["CONFIRMED", "PARTIALLY_RECEIVED"].includes(order.status)) {
-    redirect(`/proyectos/${id}/ordenes-compra/${poId}`);
+    redirect(poHref);
   }
 
-  const warehouseOptions = warehouses.map((w) => ({ id: w.id, name: w.name }));
+  // Warehouse list needs INVENTORY module + VIEW; receipt itself does not (warehouse optional).
+  // Never 404 the receive form when deposits are unavailable.
+  let warehouseOptions: Array<{ id: string; name: string }> = [];
+  try {
+    const warehouses = await listWarehouses({ status: "ACTIVE" }, ctx);
+    warehouseOptions = warehouses.map((w) => ({ id: w.id, name: w.name }));
+  } catch (err) {
+    if (!(err instanceof ServiceError && (err.code === "FORBIDDEN" || err.code === "NOT_FOUND"))) {
+      throw err;
+    }
+  }
 
   return (
     <PageShell

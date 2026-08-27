@@ -25,6 +25,8 @@ export type FieldPendingItem = {
   title: string;
   description: string | null;
   statusLabel: string;
+  /** Primary CTA on the card (Cotizar / Revisar / Confirmar / Recibir). */
+  actionLabel: string;
   amount: string | null;
   currency: string | null;
   requestedByName: string | null;
@@ -35,7 +37,10 @@ export type FieldPendingItem = {
 
 export type FieldPendingCounts = {
   total: number;
+  purchaseRequests: number;
   purchaseOrders: number;
+  purchaseOrdersToConfirm: number;
+  purchaseOrdersToReceive: number;
   jobsiteLogs: number;
   certifications: number;
   subcontractCertifications: number;
@@ -59,7 +64,10 @@ function stalePriority(occurredAt: Date): "normal" | "stale" {
 function emptyCounts(): FieldPendingCounts {
   return {
     total: 0,
+    purchaseRequests: 0,
     purchaseOrders: 0,
+    purchaseOrdersToConfirm: 0,
+    purchaseOrdersToReceive: 0,
     jobsiteLogs: 0,
     certifications: 0,
     subcontractCertifications: 0,
@@ -93,10 +101,46 @@ export async function getMyFieldPendingItems(
   const counts = emptyCounts();
   const items: FieldPendingItem[] = [];
 
+  const runPr = activeSources.includes("PURCHASE_REQUEST");
   const runPo = activeSources.includes("PURCHASE_ORDER");
+  const runPoConfirm = activeSources.includes("PURCHASE_ORDER_CONFIRM");
+  const runPoReceipt = activeSources.includes("PURCHASE_ORDER_RECEIPT");
   const runLog = activeSources.includes("JOBSITE_LOG");
   const runCert = activeSources.includes("CERTIFICATION");
   const runSubCert = activeSources.includes("SUBCONTRACT_CERTIFICATION");
+
+  const poReceiptStatuses = ["CONFIRMED", "PARTIALLY_RECEIVED"] as Array<
+    "CONFIRMED" | "PARTIALLY_RECEIVED"
+  >;
+  const poReceiptWhere = {
+    tenantId: ctx.tenantId,
+    status: { in: poReceiptStatuses },
+    ...projectWhere,
+  };
+
+  const prListPromise =
+    runPr && !countsOnly
+      ? prisma.purchaseRequest.findMany({
+          where: { tenantId: ctx.tenantId, status: "SUBMITTED", ...projectWhere },
+          orderBy: [{ submittedAt: "asc" }, { createdAt: "asc" }],
+          take: INBOX_LIMIT,
+          select: {
+            id: true,
+            number: true,
+            createdAt: true,
+            submittedAt: true,
+            requestedByUserId: true,
+            createdBy: true,
+            projectId: true,
+            project: { select: { code: true, name: true } },
+            quotes: {
+              where: { status: { in: ["RECEIVED", "SELECTED"] } },
+              select: { id: true },
+              take: 1,
+            },
+          },
+        })
+      : Promise.resolve(null);
 
   const poListPromise =
     runPo && !countsOnly
@@ -110,6 +154,52 @@ export async function getMyFieldPendingItems(
             totalAmount: true,
             currency: true,
             createdAt: true,
+            createdBy: true,
+            originRequestedByUserId: true,
+            projectId: true,
+            project: { select: { code: true, name: true } },
+            supplierContact: { select: { fantasyName: true, legalName: true } },
+          },
+        })
+      : Promise.resolve(null);
+
+  const poConfirmListPromise =
+    runPoConfirm && !countsOnly
+      ? prisma.purchaseOrder.findMany({
+          where: { tenantId: ctx.tenantId, status: "APPROVED", ...projectWhere },
+          // FIFO by approval time (not OC creation) so recently-approved old drafts don't starve.
+          orderBy: [{ approvedAt: "asc" }, { createdAt: "asc" }],
+          take: INBOX_LIMIT,
+          select: {
+            id: true,
+            number: true,
+            totalAmount: true,
+            currency: true,
+            createdAt: true,
+            approvedAt: true,
+            createdBy: true,
+            originRequestedByUserId: true,
+            projectId: true,
+            project: { select: { code: true, name: true } },
+            supplierContact: { select: { fantasyName: true, legalName: true } },
+          },
+        })
+      : Promise.resolve(null);
+
+  const poReceiptListPromise =
+    runPoReceipt && !countsOnly
+      ? prisma.purchaseOrder.findMany({
+          where: poReceiptWhere,
+          orderBy: [{ confirmedAt: "asc" }, { createdAt: "asc" }],
+          take: INBOX_LIMIT,
+          select: {
+            id: true,
+            number: true,
+            totalAmount: true,
+            currency: true,
+            createdAt: true,
+            confirmedAt: true,
+            status: true,
             createdBy: true,
             originRequestedByUserId: true,
             projectId: true,
@@ -175,15 +265,46 @@ export async function getMyFieldPendingItems(
         })
       : Promise.resolve(null);
 
-  const [pos, logs, certs, subCerts, poCount, logCount, certCount, subCertCount] = await Promise.all([
+  const [
+    prs,
+    pos,
+    posConfirm,
+    posReceipt,
+    logs,
+    certs,
+    subCerts,
+    prCount,
+    poCount,
+    poConfirmCount,
+    poReceiptCount,
+    logCount,
+    certCount,
+    subCertCount,
+  ] = await Promise.all([
+    prListPromise,
     poListPromise,
+    poConfirmListPromise,
+    poReceiptListPromise,
     logListPromise,
     certListPromise,
     subCertListPromise,
+    runPr
+      ? prisma.purchaseRequest.count({
+          where: { tenantId: ctx.tenantId, status: "SUBMITTED", ...projectWhere },
+        })
+      : Promise.resolve(0),
     runPo
       ? prisma.purchaseOrder.count({
           where: { tenantId: ctx.tenantId, status: "SUBMITTED", ...projectWhere },
         })
+      : Promise.resolve(0),
+    runPoConfirm
+      ? prisma.purchaseOrder.count({
+          where: { tenantId: ctx.tenantId, status: "APPROVED", ...projectWhere },
+        })
+      : Promise.resolve(0),
+    runPoReceipt
+      ? prisma.purchaseOrder.count({ where: poReceiptWhere })
       : Promise.resolve(0),
     runLog
       ? prisma.jobsiteLog.count({
@@ -202,12 +323,18 @@ export async function getMyFieldPendingItems(
       : Promise.resolve(0),
   ]);
 
+  counts.purchaseRequests = prCount;
   counts.purchaseOrders = poCount;
+  counts.purchaseOrdersToConfirm = poConfirmCount;
+  counts.purchaseOrdersToReceive = poReceiptCount;
   counts.jobsiteLogs = logCount;
   counts.certifications = certCount;
   counts.subcontractCertifications = subCertCount;
   counts.total =
+    counts.purchaseRequests +
     counts.purchaseOrders +
+    counts.purchaseOrdersToConfirm +
+    counts.purchaseOrdersToReceive +
     counts.jobsiteLogs +
     counts.certifications +
     counts.subcontractCertifications;
@@ -217,8 +344,17 @@ export async function getMyFieldPendingItems(
   }
 
   const actorIds: Array<string | null> = [];
+  if (Array.isArray(prs)) {
+    for (const row of prs) actorIds.push(row.requestedByUserId, row.createdBy);
+  }
   if (Array.isArray(pos)) {
     for (const row of pos) actorIds.push(row.originRequestedByUserId, row.createdBy);
+  }
+  if (Array.isArray(posConfirm)) {
+    for (const row of posConfirm) actorIds.push(row.originRequestedByUserId, row.createdBy);
+  }
+  if (Array.isArray(posReceipt)) {
+    for (const row of posReceipt) actorIds.push(row.originRequestedByUserId, row.createdBy);
   }
   if (Array.isArray(logs)) {
     for (const row of logs) actorIds.push(row.createdBy);
@@ -230,6 +366,35 @@ export async function getMyFieldPendingItems(
     for (const row of subCerts) actorIds.push(row.createdBy);
   }
   const names = await resolveUserDisplayNames(actorIds);
+
+  if (Array.isArray(prs)) {
+    for (const row of prs) {
+      const occurredAt = row.submittedAt ?? row.createdAt;
+      const hasQuotes = row.quotes.length > 0;
+      items.push({
+        entityType: "PURCHASE_REQUEST",
+        entityId: row.id,
+        projectId: row.projectId,
+        projectCode: row.project.code,
+        projectName: row.project.name,
+        group: "compras",
+        typeLabel: "Solicitud de compra",
+        title: `SC-${String(row.number).padStart(3, "0")}`,
+        description: null,
+        statusLabel: hasQuotes ? "Elegir cotización" : "Espera cotizaciones",
+        actionLabel: hasQuotes ? "Elegir cotización" : "Cotizar",
+        amount: null,
+        currency: null,
+        requestedByName:
+          (row.requestedByUserId && names.get(row.requestedByUserId)) ||
+          (row.createdBy && names.get(row.createdBy)) ||
+          null,
+        occurredAt,
+        href: `/proyectos/${row.projectId}/solicitudes-compra/${row.id}`,
+        priority: stalePriority(occurredAt),
+      });
+    }
+  }
 
   if (Array.isArray(pos)) {
     for (const row of pos) {
@@ -248,12 +413,75 @@ export async function getMyFieldPendingItems(
         title: `OC-${String(row.number).padStart(3, "0")}`,
         description: row.supplierContact.fantasyName ?? row.supplierContact.legalName,
         statusLabel: "Pendiente de aprobación",
+        actionLabel: "Revisar",
         amount: serializeMoneyDecimal(row.totalAmount),
         currency: row.currency,
         requestedByName: requestedBy,
         occurredAt: row.createdAt,
         href: `/proyectos/${row.projectId}/ordenes-compra/${row.id}`,
         priority: stalePriority(row.createdAt),
+      });
+    }
+  }
+
+  if (Array.isArray(posConfirm)) {
+    for (const row of posConfirm) {
+      const occurredAt = row.approvedAt ?? row.createdAt;
+      const requestedBy =
+        (row.originRequestedByUserId && names.get(row.originRequestedByUserId)) ||
+        (row.createdBy && names.get(row.createdBy)) ||
+        null;
+      items.push({
+        entityType: "PURCHASE_ORDER_CONFIRM",
+        entityId: row.id,
+        projectId: row.projectId,
+        projectCode: row.project.code,
+        projectName: row.project.name,
+        group: "compras",
+        typeLabel: "Orden de compra",
+        title: `OC-${String(row.number).padStart(3, "0")}`,
+        description: row.supplierContact.fantasyName ?? row.supplierContact.legalName,
+        statusLabel: "Pendiente de confirmar",
+        actionLabel: "Confirmar",
+        amount: serializeMoneyDecimal(row.totalAmount),
+        currency: row.currency,
+        requestedByName: requestedBy,
+        occurredAt,
+        href: `/proyectos/${row.projectId}/ordenes-compra/${row.id}`,
+        priority: stalePriority(occurredAt),
+      });
+    }
+  }
+
+  if (Array.isArray(posReceipt)) {
+    for (const row of posReceipt) {
+      const occurredAt = row.confirmedAt ?? row.createdAt;
+      const requestedBy =
+        (row.originRequestedByUserId && names.get(row.originRequestedByUserId)) ||
+        (row.createdBy && names.get(row.createdBy)) ||
+        null;
+      items.push({
+        entityType: "PURCHASE_ORDER_RECEIPT",
+        entityId: row.id,
+        projectId: row.projectId,
+        projectCode: row.project.code,
+        projectName: row.project.name,
+        group: "compras",
+        typeLabel: "Orden de compra",
+        title: `OC-${String(row.number).padStart(3, "0")}`,
+        description: row.supplierContact.fantasyName ?? row.supplierContact.legalName,
+        statusLabel:
+          row.status === "PARTIALLY_RECEIVED"
+            ? "Recepción parcial"
+            : "Pendiente de recepción",
+        actionLabel: "Recibir",
+        amount: serializeMoneyDecimal(row.totalAmount),
+        currency: row.currency,
+        requestedByName: requestedBy,
+        occurredAt,
+        // Deep-link to the receive form (CTA says Recibir, not Revisar).
+        href: `/proyectos/${row.projectId}/ordenes-compra/${row.id}/recepciones/nueva`,
+        priority: stalePriority(occurredAt),
       });
     }
   }
@@ -271,6 +499,7 @@ export async function getMyFieldPendingItems(
         title: row.title?.trim() || "Parte de obra",
         description: null,
         statusLabel: "Pendiente de aprobación",
+        actionLabel: "Revisar",
         amount: null,
         currency: null,
         requestedByName: (row.createdBy && names.get(row.createdBy)) || null,
@@ -294,6 +523,7 @@ export async function getMyFieldPendingItems(
         title: `CERT-${String(row.number).padStart(3, "0")}`,
         description: null,
         statusLabel: "Pendiente de aprobación",
+        actionLabel: "Revisar",
         amount: serializeMoneyDecimal(row.totalAmount),
         currency: "ARS",
         requestedByName: (row.createdBy && names.get(row.createdBy)) || null,
@@ -318,6 +548,7 @@ export async function getMyFieldPendingItems(
         description:
           row.subcontractorContact.fantasyName ?? row.subcontractorContact.legalName,
         statusLabel: "Pendiente de aprobación",
+        actionLabel: "Revisar",
         amount: null,
         currency: null,
         requestedByName: (row.createdBy && names.get(row.createdBy)) || null,

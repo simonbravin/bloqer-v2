@@ -146,7 +146,9 @@ test.describe("Field Navigation flows", () => {
     await settle(page);
     await expect(page.getByTestId("field-pending-card").first()).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('[data-entity-type="PURCHASE_ORDER"]').first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /^revisar$/i }).first()).toBeVisible();
+    await expect(
+      page.locator('[data-entity-type="PURCHASE_ORDER"]').getByRole("link", { name: /^revisar$/i }).first(),
+    ).toBeVisible();
     await page.getByRole("link", { name: /^compras$/i }).click();
     await expect(page).toHaveURL(/grupo=compras/);
 

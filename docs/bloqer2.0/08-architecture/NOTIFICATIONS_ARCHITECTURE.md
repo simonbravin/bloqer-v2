@@ -186,8 +186,14 @@ Best-effort `try/catch` so core flows never fail if notification insert fails. R
    - **`returnJobsiteLog`** — `JOBSITE_LOG_RETURNED` → `createdBy` ∪ OWNER/ADMIN; title `Parte devuelto · dd/mm/yyyy`; CTA editar.
    - **`approveJobsiteLog`** — `JOBSITE_LOG_APPROVED` → `createdBy` ∪ OWNER/ADMIN; title `Parte aprobado · dd/mm/yyyy`; CTA detalle.
 3. **`approveCertification`** — `CERTIFICATION_APPROVED` → `createdBy` ∪ OWNER/ADMIN (sin fan-out por `VIEW CERTIFICATIONS` hasta R-USR-007); title `Certificación aprobada · CERT-007`.
+4. **Procurement ([D-050] / [D-094])** — `procurement-notifications.service.ts` (in-app + email, post-commit):
+   - **`PURCHASE_REQUEST_SUBMITTED`** → APPROVE `PURCHASE_REQUESTS` ∪ APPROVE `PURCHASE_ORDERS` ∪ OWNER/ADMIN.
+   - **`PURCHASE_ORDER_PENDING_APPROVAL`** → APPROVE `PURCHASE_ORDERS` (o solo OWNER/ADMIN si umbral alto).
+   - **`PURCHASE_ORDER_APPROVED`** → origen/creador ∪ quien puede confirmar (`EDIT PROCUREMENT` / `APPROVE PURCHASE_ORDERS|PROCUREMENT`) ∪ OWNER/ADMIN.
+   - **`PURCHASE_ORDER_CONFIRMED`** → quien puede recibir (`EDIT PURCHASE_ORDERS|PROCUREMENT|INVENTORY`) ∪ OWNER/ADMIN con CTA → `/ordenes-compra/…/recepciones/nueva`; origen/creador sin permiso de recepción recibe aviso informativo a la ficha OC. Body receptores: “Ya se puede registrar la recepción”.
+   - Pendientes proyecta las mismas colas (SC `SUBMITTED`, OC `APPROVED`, OC `CONFIRMED`/`PARTIALLY_RECEIVED`) sin tabla `Pending`. CTA **Recibir** deep-linkea al formulario de recepción. La página de recepción no falla si Inventario/depósitos no están disponibles (depósito opcional).
 
-## Limitations (Phase 8A–8E + D-054 + D-091)
+## Limitations (Phase 8A–8E + D-054 + D-091 + D-094)
 
 - **Email:** Resend **opcional** (Phase 8E); la app arranca sin `RESEND_*`. No hay envío automático desde cron ni desde creación de notificación genérica (sí best-effort en procurement, CxP/CxC y libro de obra [D-091]). **Phase 9D:** los intentos explícitos de email quedan en `EmailDeliveryLog`.
 - No **browser Web Push**, no WebSocket/SSE (polling 30s only).
