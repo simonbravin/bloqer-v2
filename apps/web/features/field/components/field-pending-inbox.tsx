@@ -1,8 +1,28 @@
 import Link from "next/link";
-import type { FieldPendingGroup, FieldPendingList } from "@bloqer/services";
+import type { FieldPendingGroup, FieldPendingList, FieldPendingCounts } from "@bloqer/services";
 import { FieldPendingCard } from "./field-pending-card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { fieldPendingEmptyObraCta } from "@/lib/field-pending-empty-cta";
+
+function groupCount(counts: FieldPendingCounts, id: "todos" | FieldPendingGroup): number {
+  switch (id) {
+    case "todos":
+      return counts.total;
+    case "compras":
+      return (
+        counts.purchaseRequests +
+        counts.purchaseOrders +
+        counts.purchaseOrdersToConfirm +
+        counts.purchaseOrdersToReceive
+      );
+    case "obra":
+      return counts.jobsiteLogs;
+    case "certificaciones":
+      return counts.certifications + counts.subcontractCertifications;
+  }
+}
 
 const FILTERS: { id: "todos" | FieldPendingGroup; label: string }[] = [
   { id: "todos", label: "Todos" },
@@ -43,19 +63,33 @@ export function FieldPendingInbox({
   const obraCta = fieldPendingEmptyObraCta({ projectId, projects, lastProjectId });
 
   return (
-    <div className="space-y-4" data-testid="field-pending-inbox" data-query-ms={list.queryMs}>
+    <div className="space-y-3" data-testid="field-pending-inbox" data-query-ms={list.queryMs}>
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((filter) => {
           const active = (group ?? "todos") === filter.id;
+          const count = groupCount(list.counts, filter.id);
           return (
             <Button
               key={filter.id}
               variant={active ? "default" : "outline"}
               size="sm"
-              className="min-h-11"
+              className="min-h-11 gap-1.5"
               asChild
             >
-              <Link href={filterHref(filter.id)}>{filter.label}</Link>
+              <Link href={filterHref(filter.id)}>
+                {filter.label}
+                {count > 0 && (
+                  <Badge
+                    variant={active ? "outline" : "secondary"}
+                    className={cn(
+                      "ml-0.5 px-1.5 py-0 text-[10px] leading-4",
+                      active && "border-primary-foreground/30 text-primary-foreground",
+                    )}
+                  >
+                    {count}
+                  </Badge>
+                )}
+              </Link>
             </Button>
           );
         })}
@@ -99,7 +133,7 @@ export function FieldPendingInbox({
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {list.items.map((item) => (
             <FieldPendingCard key={`${item.entityType}-${item.entityId}`} item={item} />
           ))}

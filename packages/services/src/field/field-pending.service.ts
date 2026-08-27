@@ -109,6 +109,14 @@ export async function getMyFieldPendingItems(
   const runCert = activeSources.includes("CERTIFICATION");
   const runSubCert = activeSources.includes("SUBCONTRACT_CERTIFICATION");
 
+  const countPr = sources.includes("PURCHASE_REQUEST");
+  const countPo = sources.includes("PURCHASE_ORDER");
+  const countPoConfirm = sources.includes("PURCHASE_ORDER_CONFIRM");
+  const countPoReceipt = sources.includes("PURCHASE_ORDER_RECEIPT");
+  const countLog = sources.includes("JOBSITE_LOG");
+  const countCert = sources.includes("CERTIFICATION");
+  const countSubCert = sources.includes("SUBCONTRACT_CERTIFICATION");
+
   const poReceiptStatuses = ["CONFIRMED", "PARTIALLY_RECEIVED"] as Array<
     "CONFIRMED" | "PARTIALLY_RECEIVED"
   >;
@@ -288,35 +296,35 @@ export async function getMyFieldPendingItems(
     logListPromise,
     certListPromise,
     subCertListPromise,
-    runPr
+    countPr
       ? prisma.purchaseRequest.count({
           where: { tenantId: ctx.tenantId, status: "SUBMITTED", ...projectWhere },
         })
       : Promise.resolve(0),
-    runPo
+    countPo
       ? prisma.purchaseOrder.count({
           where: { tenantId: ctx.tenantId, status: "SUBMITTED", ...projectWhere },
         })
       : Promise.resolve(0),
-    runPoConfirm
+    countPoConfirm
       ? prisma.purchaseOrder.count({
           where: { tenantId: ctx.tenantId, status: "APPROVED", ...projectWhere },
         })
       : Promise.resolve(0),
-    runPoReceipt
+    countPoReceipt
       ? prisma.purchaseOrder.count({ where: poReceiptWhere })
       : Promise.resolve(0),
-    runLog
+    countLog
       ? prisma.jobsiteLog.count({
           where: { tenantId: ctx.tenantId, status: "SUBMITTED", ...projectWhere },
         })
       : Promise.resolve(0),
-    runCert
+    countCert
       ? prisma.certification.count({
           where: { tenantId: ctx.tenantId, status: "ISSUED", ...projectWhere },
         })
       : Promise.resolve(0),
-    runSubCert
+    countSubCert
       ? prisma.subcontractCertification.count({
           where: { tenantId: ctx.tenantId, status: "ISSUED", ...projectWhere },
         })
