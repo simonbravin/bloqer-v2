@@ -7,7 +7,6 @@ import {
   Package,
   PieChart,
   Percent,
-  TrendingUp,
   Users,
   Wallet,
 } from "lucide-react";
@@ -74,7 +73,7 @@ export function ReportsHub({
       available: canCertReports,
     },
     {
-      title: "Compras y proveedores",
+      title: "Análisis de compras",
       description:
         "Desvío proveedor vs presupuesto/OC/facturas. El control de $ por partida está en EDT y costos.",
       href: `${base}/compras-proveedores`,
@@ -98,27 +97,21 @@ export function ReportsHub({
       available: canSubcontractReports,
     },
     {
-      title: "Presupuesto vs real",
-      description: "Varianzas por partida EDT con capa de costo seleccionable y composición del presupuesto.",
-      href: `${base}/presupuesto-vs-real`,
-      icon: <TrendingUp className="h-5 w-5" />,
-      available: canCostReports,
-    },
-    {
       title: "EDT y costos",
       description:
-        "Tablero de $ por partida: comprometido, recibido, devengado, pagado y exposición. Materiales y Compras alimentan este tablero.",
+        "Tablero de $ por partida: comprometido, recibido, devengado, pagado, exposición, composición APU y vistas por columnas.",
       href: `/proyectos/${projectId}/control-costos`,
       icon: <BarChart3 className="h-5 w-5" />,
       available: canCostReports,
+      badge: "Incluye presupuesto vs real",
     },
     {
       title: "Composición presupuesto",
-      description: "Mismo gráfico integrado en Presupuesto vs real; acceso directo al reporte.",
-      href: `${base}/presupuesto-vs-real`,
+      description: "Gráfico APU integrado en EDT y costos; acceso directo al tablero.",
+      href: `/proyectos/${projectId}/control-costos`,
       icon: <PieChart className="h-5 w-5" />,
       available: canCostReports,
-      badge: "En presupuesto vs real",
+      badge: "En EDT y costos",
     },
     {
       title: "Caja y proyección",

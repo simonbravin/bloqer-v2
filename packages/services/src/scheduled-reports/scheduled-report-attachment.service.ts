@@ -19,6 +19,10 @@ import {
   exportTreasuryCashFlowCsv,
   exportTreasuryMovementsCsv,
   exportCashPositionCsv,
+  exportProjectPortfolioCsv,
+  exportPortfolioProfitabilityCsv,
+  exportOverheadByProjectCsv,
+  exportMultiProjectProcurementCsv,
   parseAgingFilters,
   parseBudgetVarianceFilters,
   parseCashFlowFilters,
@@ -259,6 +263,42 @@ async function buildScheduledReportCsvAttachment(
         parseProfitabilityFilters(sp),
         ctx,
       );
+      return {
+        reportKey,
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
+    }
+    case "TENANT_PROJECT_PORTFOLIO": {
+      const { content, filename } = await exportProjectPortfolioCsv(ctx, sp);
+      return {
+        reportKey,
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
+    }
+    case "TENANT_MULTI_PROJECT_RENTABILITY": {
+      const { content, filename } = await exportPortfolioProfitabilityCsv(ctx, sp);
+      return {
+        reportKey,
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
+    }
+    case "TENANT_OVERHEAD_BY_PROJECT": {
+      const { content, filename } = await exportOverheadByProjectCsv(ctx, sp);
+      return {
+        reportKey,
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
+    }
+    case "TENANT_MULTI_PROJECT_PROCUREMENT": {
+      const { content, filename } = await exportMultiProjectProcurementCsv(ctx, sp);
       return {
         reportKey,
         filename,

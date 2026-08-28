@@ -190,6 +190,14 @@ export async function buildScheduledReportPdfAttachment(
       );
       return toPdfAttachment(filename, buffer);
     }
+    case "TENANT_PROJECT_PORTFOLIO":
+    case "TENANT_MULTI_PROJECT_RENTABILITY":
+    case "TENANT_OVERHEAD_BY_PROJECT":
+    case "TENANT_MULTI_PROJECT_PROCUREMENT":
+      throw new ServiceError(
+        "VALIDATION",
+        `PDF no disponible aún para ${reportKey}; usá formato CSV`,
+      );
     default: {
       const _exhaustive: never = reportKey;
       throw new ServiceError("VALIDATION", `PDF no soportado: ${_exhaustive}`);

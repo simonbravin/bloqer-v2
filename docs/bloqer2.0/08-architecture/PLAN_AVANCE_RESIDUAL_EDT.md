@@ -117,6 +117,8 @@ Tabla/export por WBS con los mismos derivados P1. Curvas globales siguen en R-00
 3. `progressSummary` + panel drilldown (+ columnas tabla si cabe).
 4. Reporte/export P2.
 
+**Estado [D-098]:** columnas `%` (compra / físico / económico / exposición) y cantidades por partida están en `CostControlRow` + presets EDT en UI. Avance físico de libro sigue en `operationalProgressQty` / drilldown `progressSummary`.
+
 ## Archivos clave
 
 - Referencia schema: `CertificationLine`, `JobsiteLogProgress`, `CostItem`

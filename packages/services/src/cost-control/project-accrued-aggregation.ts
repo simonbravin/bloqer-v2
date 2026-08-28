@@ -1,7 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { ServiceContext } from "../types";
-import { monthKey } from "../reports/report-month";
+import { monthKey, parseFilterDate } from "../reports/report-month";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -24,8 +24,8 @@ export type ProjectAccruedAggregation = {
 function dateWhere(from?: string, to?: string) {
   if (!from && !to) return undefined;
   return {
-    ...(from ? { gte: new Date(from) } : {}),
-    ...(to ? { lte: new Date(to) } : {}),
+    ...(from ? { gte: parseFilterDate(from, false) } : {}),
+    ...(to ? { lte: parseFilterDate(to, true) } : {}),
   };
 }
 

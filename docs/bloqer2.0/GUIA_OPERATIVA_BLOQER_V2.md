@@ -144,7 +144,7 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 
 | Sección | Ítems (etiqueta → ruta) |
 |---------|--------------------------|
-| General | Inicio → `/dashboard` · **Pendientes** → `/pendientes` · Proyectos → `/proyectos` · Directorio → `/directorio` · Inventario → `/inventario` |
+| General | Inicio → `/dashboard` · **Pendientes** → `/pendientes` · Proyectos → `/proyectos` · **Reportes** → `/reportes` · Directorio → `/directorio` · Inventario → `/inventario` |
 | Finanzas | Tablero → `/finanzas` · Transacciones → `/finanzas/transacciones` · Facturas y gastos → `/finanzas/facturas-proveedor` · Cuentas por cobrar → `/finanzas/cuentas-por-cobrar` · Cuentas por pagar → `/finanzas/cuentas-por-pagar` · Imputación GG → `/finanzas/gastos-generales` |
 | Tesorería | Resumen → `/tesoreria` · Cuentas → `/tesoreria/cuentas` · Movimientos → `/tesoreria/movimientos` · Flujo de caja → `/tesoreria/flujo-caja` · Transferencias → `/tesoreria/transferencias` · **Conciliación** → `/tesoreria/conciliacion` |
 | Contabilidad | Resumen → `/contabilidad` · Cuentas → `/contabilidad/cuentas` · Asientos → `/contabilidad/asientos` · **Cierres** → `/contabilidad/cierres` · Reglas → `/contabilidad/reglas` · Libro diario → `/contabilidad/libro-diario` · Sumas y saldos → `/contabilidad/sumas-y-saldos` · Situación → `/contabilidad/situacion-patrimonial` · Resultados → `/contabilidad/estado-resultados` |
@@ -183,6 +183,8 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 ### 1.4 Notificaciones (campana, inbox, alertas y emails) — D-054 / D-091 / D-094
 
 Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **campana del encabezado**.
+
+**Reportes de la empresa ([D-098]):** menú General → **Reportes** → `/reportes`. Portafolio multi-obra, rentabilidad multi-obra, GG por proyecto, compras multi-obra, y accesos a aging CxC/CxP, flujo de caja e inventario. Los reportes de una obra siguen en Planificación → Reportes dentro del proyecto.
 
 | Superficie | Ruta / comportamiento |
 |------------|------------------------|
@@ -1013,12 +1015,14 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 - **Ruta:** `/proyectos/[id]/control-costos` (título de pantalla: **Estructura de Desglose de Trabajo y Costos**).
 - **Detalle de partida:** en el listado, tocá una fila (código o nombre, p. ej. `1.1 Replanteo de Obra`) para abrir el detalle en un **diálogo**, sin salir del tablero. La ruta directa `/control-costos/[wbsNodeId]` sigue disponible (p. ej. Ctrl+clic o desde Materiales / reportes).
 - Es el **tablero de control de costos** del proyecto. Materiales (cantidades) y Compras (documentos) alimentan este tablero; no lo reemplazan.
-- Compara **presupuesto baseline vs. real** por partida EDT, en capas: **comprometido**, **recibido** (informativo), **devengado**, **pagado**, más **certificado acumulado**. Es el tablero de **afectaciones** por partida (§0.2).
+- Compara **presupuesto baseline vs. real** por partida EDT, en capas: **comprometido**, **recibido** (informativo), **devengado**, **pagado**, más **certificado acumulado**. Es el tablero de **afectaciones** por partida (§0.2). Incluye **composición APU** (pie) y **vistas de columnas** (Financiero / Compacto / Cantidades / % Avance / Personalizado; preferencia en el navegador).
 - Si las líneas de factura de proveedor tienen partida EDT, el devengado/pagado se imputa **por línea**; si hay vínculo a línea de OC (`purchaseOrderLineId`, D-066), se usa esa partida; si no (legacy), se prorratea vía OC (D-055).
-- **Exposición esperada** = **devengado + comprometido abierto** ([BR-COS-002] / [D-065]). Comprometido abierto = comprometido − devengado ligado al mismo compromiso. **No** usar `max(comprometido, recibido, devengado)` ni sumar OC + factura en bruto.
+- **Exposición esperada** = **devengado + comprometido abierto** ([BR-COS-002] / [D-065]). Comprometido abierto = comprometido − devengado ligado al mismo compromiso. **No** usar `max(comprometido, recibido, devengado)` ni sumar OC + factura en bruto. Comprometido de OC = **neto** (`lineSubtotal`, [D-095]/[D-098]).
+- **% útiles:** % compra (comprometido/presup.), % físico (cant. recibida/presup.), % económico (devengado/presup.), % exposición (exposición/presup.).
 - **Detalle de partida (diálogo):** links a OC, subcontratos, facturas de proveedor y pagos (trazabilidad partida → documento).
 - **Matching 3 vías (compras):** en detalle de OC, avisos si facturado supera recibido ± tolerancia de empresa ([D-067]); la recepción respeta tolerancia de sobrecantidad (0–5%).
 - **Insumo APU en OC (opcional):** se puede elegir un material del APU de la partida para prellenar; la imputación de $ sigue en la partida EDT ([D-068] / [D-057]).
+- La ruta antigua `/reportes/presupuesto-vs-real` redirige acá ([D-098]).
 
 **Smoke manual — trazabilidad partida → pago**
 
@@ -1035,12 +1039,12 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 
 ### 13.2 Rentabilidad y reportes
 
-- **Hub:** Planificación → **Reportes** → `/proyectos/[id]/reportes` (título: **Reportes del proyecto**).
-- Cards típicas (según permisos/módulos): **Rentabilidad**, **Presupuesto vs real**, **EDT y costos**, **Composición presupuesto** (abre el mismo reporte de varianza), **Compras y proveedores**, **Materiales**, **Subcontratos**, **Certificaciones**, **Ingresos vs gastos**, **Caja y proyección**, **Flujo de caja (detalle)**, aging CxC/CxP.
+- **Hub de obra:** Planificación → **Reportes** → `/proyectos/[id]/reportes` (título: **Reportes del proyecto**).
+- Cards típicas (según permisos/módulos): **Rentabilidad**, **EDT y costos** (incluye presupuesto vs real + composición APU), **Análisis de compras**, **Materiales**, **Subcontratos**, **Certificaciones**, **Ingresos vs gastos**, **Caja y proyección**, **Flujo de caja (detalle)**, aging CxC/CxP.
 - **Rentabilidad:** `/proyectos/[id]/reportes/rentabilidad` (margen bruto; neto según overhead imputado, visible a `OWNER`/`ADMIN`).
-- **Presupuesto vs real:** `/proyectos/[id]/reportes/presupuesto-vs-real` (indicadores en una fila, gráfico de composición y tabla de varianza por partida).
+- **Hub de empresa:** General → **Reportes** → `/reportes` — portafolio multi-obra, rentabilidad multi-obra, GG por proyecto, compras multi-obra, y accesos a aging CxC/CxP, flujo de caja e inventario ([D-098]).
 - **Exportar:** en cada pantalla de reporte, menú **Exportar** → **CSV** / **PDF** (o botón **Exportar PDF** si solo hay PDF). Contabilidad/tesorería/finanzas/inventario/registro siguen el mismo patrón; algunos libros ofrecen también XLSX.
-- **Envíos programados por email:** `/proyectos/[id]/reportes/programados` (si el rol puede gestionarlos).
+- **Envíos programados por email:** `/proyectos/[id]/reportes/programados` (obra) y `/configuracion/reportes` (también keys tenant nuevas).
 
 ---
 

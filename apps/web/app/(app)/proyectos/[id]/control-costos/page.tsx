@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { getProjectCostControl, getProjectShellInfo, ServiceError } from "@bloqer/services";
+import {
+  getBudgetCompositionReport,
+  getProjectCostControl,
+  getProjectShellInfo,
+  ServiceError,
+} from "@bloqer/services";
 import {
   CostControlSummaryCards,
   CostControlTable,
   CostControlFilters,
 } from "@/features/cost-control";
-import { ReportExportActions } from "@/features/reports";
+import { BudgetCompositionChart, ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
@@ -61,6 +66,19 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
     throw err;
   }
 
+  let compositionResult = null;
+  if (result.type === "REPORT") {
+    try {
+      compositionResult = await getBudgetCompositionReport(
+        projectId,
+        { budgetId: result.budgetId },
+        ctx,
+      );
+    } catch {
+      compositionResult = null;
+    }
+  }
+
   // availableBudgets is present on REPORT and BUDGET_SELECTION_REQUIRED
   const availableBudgets = result.type === "NO_APPROVED_BUDGETS" ? [] : result.availableBudgets;
 
@@ -84,9 +102,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
           result.type === "REPORT" ? (
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/proyectos/${projectId}/reportes/presupuesto-vs-real?budgetId=${result.budgetId}`}>
-                  Presupuesto vs real
-                </Link>
+                <Link href={`/proyectos/${projectId}/reportes`}>Reportes</Link>
               </Button>
               <ReportExportActions
                 exportPath={`/api/reports/proyectos/${projectId}/control-costos.csv`}
@@ -171,6 +187,10 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
           )}
 
           <CostControlSummaryCards totals={result.totals} />
+
+          {compositionResult?.type === "COMPOSITION" ? (
+            <BudgetCompositionChart composition={compositionResult} />
+          ) : null}
 
           {result.rows.length === 0 ? (
             <div className="rounded-lg border bg-card p-12 text-center text-muted-foreground text-sm">

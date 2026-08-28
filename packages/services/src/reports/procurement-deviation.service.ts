@@ -7,6 +7,7 @@ import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenan
 import { ServiceContext, ServiceError } from "../types";
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { listApprovedBudgetsForProject, resolveApprovedBudgetForProject } from "./report-budget-resolve";
+import { parseFilterDate } from "./report-month";
 
 export type ProcurementReportFilters = {
   budgetId?: string;
@@ -156,7 +157,8 @@ export async function getProcurementDeviationReport(
       },
       select: {
         wbsNodeId: true,
-        lineTotal: true,
+        // D-095 / D-098: committed = lineSubtotal (neto), same basis as EDT cost-control.
+        lineSubtotal: true,
         description: true,
         purchaseOrder: {
           select: {
@@ -175,7 +177,7 @@ export async function getProcurementDeviationReport(
       supplierNames.set(supId, supName);
       supplierCommitted.set(
         supId,
-        (supplierCommitted.get(supId) ?? new Prisma.Decimal(0)).add(line.lineTotal),
+        (supplierCommitted.get(supId) ?? new Prisma.Decimal(0)).add(line.lineSubtotal),
       );
 
       if (!line.wbsNodeId) {
@@ -184,13 +186,13 @@ export async function getProcurementDeviationReport(
           documentCode: `OC-${line.purchaseOrder.number}`,
           supplierName: supName,
           description: line.description,
-          amount: line.lineTotal.toFixed(2),
+          amount: line.lineSubtotal.toFixed(2),
         });
         continue;
       }
       committedByWbs.set(
         line.wbsNodeId,
-        (committedByWbs.get(line.wbsNodeId) ?? new Prisma.Decimal(0)).add(line.lineTotal),
+        (committedByWbs.get(line.wbsNodeId) ?? new Prisma.Decimal(0)).add(line.lineSubtotal),
       );
     }
   }
@@ -211,6 +213,7 @@ export async function getProcurementDeviationReport(
         supplierContact: { select: { id: true, legalName: true, fantasyName: true } },
         lines: {
           select: {
+            lineSubtotal: true,
             lineTotal: true,
             wbsNodeId: true,
             purchaseOrderLineId: true,
@@ -219,7 +222,7 @@ export async function getProcurementDeviationReport(
         },
         purchaseOrder: {
           select: {
-            lines: { select: { wbsNodeId: true, lineTotal: true } },
+            lines: { select: { wbsNodeId: true, lineSubtotal: true, lineTotal: true } },
           },
         },
         payable: {
@@ -235,9 +238,13 @@ export async function getProcurementDeviationReport(
       const supId = inv.supplierContact.id;
       const supName = inv.supplierContact.fantasyName ?? inv.supplierContact.legalName;
       supplierNames.set(supId, supName);
+      const invNet =
+        inv.lines.length > 0
+          ? inv.lines.reduce((s, l) => s.plus(l.lineSubtotal), new Prisma.Decimal(0))
+          : inv.totalAmount;
       supplierAccrued.set(
         supId,
-        (supplierAccrued.get(supId) ?? new Prisma.Decimal(0)).add(inv.totalAmount),
+        (supplierAccrued.get(supId) ?? new Prisma.Decimal(0)).add(invNet),
       );
 
       const paidOnInvoice =
@@ -263,26 +270,26 @@ export async function getProcurementDeviationReport(
           if (!wbsId) continue;
           accruedByWbs.set(
             wbsId,
-            (accruedByWbs.get(wbsId) ?? new Prisma.Decimal(0)).add(line.lineTotal),
+            (accruedByWbs.get(wbsId) ?? new Prisma.Decimal(0)).add(line.lineSubtotal),
           );
         }
         for (const line of inv.lines.filter((l) => !l.purchaseOrderLineId)) {
           if (!line.wbsNodeId) continue;
           accruedByWbs.set(
             line.wbsNodeId,
-            (accruedByWbs.get(line.wbsNodeId) ?? new Prisma.Decimal(0)).add(line.lineTotal),
+            (accruedByWbs.get(line.wbsNodeId) ?? new Prisma.Decimal(0)).add(line.lineSubtotal),
           );
         }
         continue;
       }
 
       const poLines = inv.purchaseOrder.lines;
-      const poTotal = poLines.reduce((s, l) => s.plus(l.lineTotal), new Prisma.Decimal(0));
+      const poTotal = poLines.reduce((s, l) => s.plus(l.lineSubtotal), new Prisma.Decimal(0));
       if (poTotal.isZero()) continue;
 
       for (const pol of poLines) {
         if (!pol.wbsNodeId) continue;
-        const share = inv.totalAmount.mul(pol.lineTotal).div(poTotal);
+        const share = invNet.mul(pol.lineSubtotal).div(poTotal);
         accruedByWbs.set(
           pol.wbsNodeId,
           (accruedByWbs.get(pol.wbsNodeId) ?? new Prisma.Decimal(0)).add(share),
@@ -344,4 +351,179 @@ export async function listProcurementReportBudgets(projectId: string, ctx: Servi
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
   return listApprovedBudgetsForProject(projectId, ctx);
+}
+
+// ─── Multi-project procurement ──────────────────────────────────────────────
+
+export type MultiProjectProcurementFilters = {
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+export type MultiProjectSupplierRow = {
+  supplierContactId: string;
+  supplierName: string;
+  committedCost: string;
+  accruedCost: string;
+  paidCost: string;
+};
+
+export type MultiProjectOpenPoRow = {
+  projectId: string;
+  projectCode: string;
+  projectName: string;
+  poNumber: string;
+  supplierName: string;
+  status: string;
+  totalAmount: string;
+};
+
+export type MultiProjectProcurementReport = {
+  topSuppliers: MultiProjectSupplierRow[];
+  openPurchaseOrders: MultiProjectOpenPoRow[];
+  warnings: string[];
+};
+
+export async function getMultiProjectProcurementReport(
+  ctx: ServiceContext,
+  filters?: MultiProjectProcurementFilters,
+): Promise<MultiProjectProcurementReport> {
+  if (!canViewProcurementProjectArea(ctx.roles) && !can(ctx.roles, "VIEW", "PROJECTS")) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver compras multi-obra");
+  }
+
+  const gate = await getTenantModuleGate(ctx);
+  if (!gate.isEnabled("PROCUREMENT")) {
+    throw new ServiceError("FORBIDDEN", "Módulo de compras deshabilitado");
+  }
+
+  const warnings: string[] = [];
+
+  const dateFilter: Prisma.PurchaseOrderWhereInput = {};
+  if (filters?.dateFrom || filters?.dateTo) {
+    dateFilter.issueDate = {};
+    if (filters.dateFrom) dateFilter.issueDate.gte = parseFilterDate(filters.dateFrom, false);
+    if (filters.dateTo) dateFilter.issueDate.lte = parseFilterDate(filters.dateTo, true);
+  }
+
+  const poLines = await prisma.purchaseOrderLine.findMany({
+    where: {
+      purchaseOrder: {
+        tenantId: ctx.tenantId,
+        status: { in: ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] },
+        ...dateFilter,
+      },
+    },
+    select: {
+      lineSubtotal: true,
+      purchaseOrder: {
+        select: {
+          supplierContact: { select: { id: true, legalName: true, fantasyName: true } },
+        },
+      },
+    },
+  });
+
+  const supplierCommitted = new Map<string, Prisma.Decimal>();
+  const supplierNames = new Map<string, string>();
+
+  for (const line of poLines) {
+    const supId = line.purchaseOrder.supplierContact.id;
+    const supName =
+      line.purchaseOrder.supplierContact.fantasyName ??
+      line.purchaseOrder.supplierContact.legalName;
+    supplierNames.set(supId, supName);
+    supplierCommitted.set(
+      supId,
+      (supplierCommitted.get(supId) ?? new Prisma.Decimal(0)).add(line.lineSubtotal),
+    );
+  }
+
+  const invoices = await prisma.supplierInvoice.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      status: "ISSUED",
+      purchaseOrderId: { not: null },
+      subcontractCertificationId: null,
+      ...(filters?.dateFrom || filters?.dateTo
+        ? {
+            issueDate: {
+              ...(filters.dateFrom ? { gte: parseFilterDate(filters.dateFrom, false) } : {}),
+              ...(filters.dateTo ? { lte: parseFilterDate(filters.dateTo, true) } : {}),
+            },
+          }
+        : {}),
+    },
+    select: {
+      totalAmount: true,
+      lines: { select: { lineSubtotal: true } },
+      supplierContact: { select: { id: true, legalName: true, fantasyName: true } },
+      payable: {
+        select: {
+          payments: { where: { status: "CONFIRMED" }, select: { amount: true } },
+        },
+      },
+    },
+  });
+
+  const supplierAccrued = new Map<string, Prisma.Decimal>();
+  const supplierPaid = new Map<string, Prisma.Decimal>();
+
+  for (const inv of invoices) {
+    const supId = inv.supplierContact.id;
+    const supName = inv.supplierContact.fantasyName ?? inv.supplierContact.legalName;
+    supplierNames.set(supId, supName);
+    const invNet =
+      inv.lines.length > 0
+        ? inv.lines.reduce((s, l) => s.plus(l.lineSubtotal), new Prisma.Decimal(0))
+        : inv.totalAmount;
+    supplierAccrued.set(
+      supId,
+      (supplierAccrued.get(supId) ?? new Prisma.Decimal(0)).add(invNet),
+    );
+    const paid = inv.payable?.payments.reduce(
+      (s, p) => s.plus(p.amount),
+      new Prisma.Decimal(0),
+    ) ?? new Prisma.Decimal(0);
+    supplierPaid.set(supId, (supplierPaid.get(supId) ?? new Prisma.Decimal(0)).add(paid));
+  }
+
+  const topSuppliers: MultiProjectSupplierRow[] = [...supplierNames.entries()]
+    .map(([supplierContactId, supplierName]) => ({
+      supplierContactId,
+      supplierName,
+      committedCost: (supplierCommitted.get(supplierContactId) ?? new Prisma.Decimal(0)).toFixed(2),
+      accruedCost: (supplierAccrued.get(supplierContactId) ?? new Prisma.Decimal(0)).toFixed(2),
+      paidCost: (supplierPaid.get(supplierContactId) ?? new Prisma.Decimal(0)).toFixed(2),
+    }))
+    .sort((a, b) => Number(b.committedCost) - Number(a.committedCost));
+
+  const openPos = await prisma.purchaseOrder.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      status: { in: ["CONFIRMED", "PARTIALLY_RECEIVED"] },
+      ...dateFilter,
+    },
+    select: {
+      number: true,
+      status: true,
+      totalAmount: true,
+      project: { select: { id: true, code: true, name: true } },
+      supplierContact: { select: { legalName: true, fantasyName: true } },
+    },
+    orderBy: { totalAmount: "desc" },
+    take: 200,
+  });
+
+  const openPurchaseOrders: MultiProjectOpenPoRow[] = openPos.map((po) => ({
+    projectId: po.project?.id ?? "",
+    projectCode: po.project?.code ?? "",
+    projectName: po.project?.name ?? "Sin proyecto",
+    poNumber: `OC-${po.number}`,
+    supplierName: po.supplierContact.fantasyName ?? po.supplierContact.legalName,
+    status: po.status,
+    totalAmount: po.totalAmount.toFixed(2),
+  }));
+
+  return { topSuppliers, openPurchaseOrders, warnings };
 }

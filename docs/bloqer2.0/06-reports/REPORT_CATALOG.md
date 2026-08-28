@@ -6,7 +6,7 @@
 
 | ID | Nombre | Área | Descripción breve | Fase |
 |---|---|---|---|---|
-| R-001 | Presupuesto vs real (ítem) | OP | Comparativo presupuesto vs real; vistas: comprometido / devengado / pagado / exposición esperada (`expected_cost_exposure`, [BR-COS-001]) | 1 |
+| R-001 | Presupuesto vs real (ítem) | OP | Integrado en **EDT y costos** ([D-098]): capas + composición APU + vistas de columnas. Ruta legacy `/reportes/presupuesto-vs-real` → redirect | 1 |
 | R-002 | Avance físico/económico/financiero | PRJ | Tres curvas por proyecto | 1 |
 | R-003 | Rentabilidad bruta por proyecto | FIN | MB y MB% (costo según vista etiquetada: devengado / pagado / exposición esperada, [BR-COS-001]) | 1 |
 | R-004 | Rentabilidad neta por proyecto | FIN | MN y MN% (misma convención de capa de costo que R-003) | 1 |
@@ -14,8 +14,8 @@
 | R-006 | Proyección de caja | FIN | Saldo + cobros/pagos esperados por AR/AP (**liquidez**; no suma OC abiertas salvo política) | 1 |
 | R-007 | Aging cuentas por cobrar | FIN | Buckets por cliente/proyecto | 1 |
 | R-008 | Aging cuentas por pagar | FIN | Buckets por proveedor | 1 |
-| R-009 | Compras por proveedor | OP | Monto y documentos; capas comprometido/devengado/pagado según [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md) | 1 |
-| R-010 | Compras multi-proyecto | OP | Matriz proyecto × proveedor (misma convención anti doble conteo). **Diferido cierre Phase 4** ([D-083](../00-product/DECISION_LOG.md)) | 1 |
+| R-009 | Análisis de compras (ex Compras por proveedor) | OP | Monto y documentos; comprometido = `lineSubtotal` neto ([D-095]/[D-098]) | 1 |
+| R-010 | Compras multi-proyecto | OP | Hub empresa `/reportes/compras-multi-obra` ([D-098]; supersede diferimiento [D-083] para este card) | 1 |
 | R-011 | Materiales más caros | OP | Ranking por variación precio o monto. **Diferido cierre Phase 4** ([D-083](../00-product/DECISION_LOG.md)) | 1 |
 | R-012 | Evolución certificaciones | PRJ | Serie mensual certificado / facturado / cobrado: **facturado** = existe `SalesInvoice`/`Receivable` vinculada ([BR-CERT-007]); cobrado vía AR+tesorería; `payment_status` derivado; columnas no usan `INVOICED` como estado de certificación | 1 |
 | R-013 | Materiales por proyecto | INV / OP | Consumo/stock imputado | 1 |
@@ -57,7 +57,21 @@
 | R-004 | Rentabilidad neta | Completo (GG manual + % empresa [D-040]) | `/reportes/rentabilidad` |
 | — | Ingresos vs gastos | Sí | `/reportes/ingresos-gastos` |
 
-**R-001 (hub):** página *Presupuesto vs real* — capas de costo, composición APU, CSV `presupuesto-vs-real.csv`. Reutiliza agregados de control de costos.
+**R-001 / EDT ([D-098]):** tablero único `/proyectos/[id]/control-costos` — capas de costo, composición APU, presets de columnas (incl. % y cantidades), CSV `control-costos.csv`. La ruta `presupuesto-vs-real` redirige acá.
+
+### Hub reportes empresa ([D-098])
+
+| ID | Nombre | Impl. | Ruta UI |
+|----|--------|-------|---------|
+| R-PORT | Portafolio de proyectos | Sí | `/reportes/portafolio` |
+| R-RENT-M | Rentabilidad multi-obra | Sí | `/reportes/rentabilidad-multi-obra` |
+| R-007/8 | Aging CxC / CxP | Sí (link) | `/finanzas/cuentas-por-cobrar` · `/finanzas/cuentas-por-pagar` |
+| R-005/6 | Flujo caja consolidado | Sí (link) | `/tesoreria/flujo-caja` |
+| R-014 | Inventario | Sí (link) | `/inventario` |
+| R-GG | Gastos generales por proyecto | Sí | `/reportes/gastos-generales-por-proyecto` |
+| R-010 | Compras multi-obra | Sí | `/reportes/compras-multi-obra` |
+
+Ver [`TENANT_REPORTS_HUB.md`](../08-architecture/TENANT_REPORTS_HUB.md).
 
 ### Contabilidad GL (Phase 11F) — [D-062]
 
@@ -78,7 +92,7 @@ Solo asientos `POSTED`; saldos naturales; multi-moneda por bloque; gerencial (no
 
 | Reporte | Ruta |
 |---------|------|
-| R-001 | `/api/reports/proyectos/[projectId]/presupuesto-vs-real.csv` |
+| R-001 (EDT) | `/api/reports/proyectos/[projectId]/control-costos.csv` (legacy `presupuesto-vs-real.csv` puede seguir existiendo) |
 | R-012, R-CERT-* | `/api/reports/proyectos/[projectId]/certificaciones.csv` |
 | R-AP-01…03 | `/api/reports/proyectos/[projectId]/compras-proveedores.csv` |
 | R-SCC-*, R-SUB-* | `/api/reports/proyectos/[projectId]/subcontratos.csv` |

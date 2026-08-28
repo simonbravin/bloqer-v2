@@ -12,6 +12,10 @@ export const tenantScheduledReportKeySchema = z.enum([
   "TENANT_INVENTORY_MOVEMENTS",
   "TENANT_CORPORATE_PAYABLES",
   "TENANT_CORPORATE_SUPPLIER_INVOICES",
+  "TENANT_PROJECT_PORTFOLIO",
+  "TENANT_MULTI_PROJECT_RENTABILITY",
+  "TENANT_OVERHEAD_BY_PROJECT",
+  "TENANT_MULTI_PROJECT_PROCUREMENT",
 ]);
 
 export const projectScheduledReportKeySchema = z.enum([
@@ -176,6 +180,19 @@ function refineScheduledReportBody(
     });
   }
   scopeKeyRefine(data.scope, data.items, ctx);
+  const csvOnlyTenantKeys = new Set([
+    "TENANT_PROJECT_PORTFOLIO",
+    "TENANT_MULTI_PROJECT_RENTABILITY",
+    "TENANT_OVERHEAD_BY_PROJECT",
+    "TENANT_MULTI_PROJECT_PROCUREMENT",
+  ]);
+  if (data.format === "PDF" && data.items.some((i) => csvOnlyTenantKeys.has(i.reportKey))) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Portafolio, rentabilidad multi-obra, GG y compras multi-obra solo admiten CSV",
+      path: ["format"],
+    });
+  }
 }
 
 export const createScheduledReportSchema = scheduledReportBodySchema.superRefine(

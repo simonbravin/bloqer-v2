@@ -43,6 +43,26 @@ export const SCHEDULED_REPORT_KEY_META: Record<ScheduledReportKey, ScheduledRepo
     labelEs: "Facturas proveedor corporativas",
     requiredModules: ["AP"],
   },
+  TENANT_PROJECT_PORTFOLIO: {
+    scope: "TENANT",
+    labelEs: "Portafolio de proyectos",
+    requiredModules: ["PROJECTS"],
+  },
+  TENANT_MULTI_PROJECT_RENTABILITY: {
+    scope: "TENANT",
+    labelEs: "Rentabilidad multi-obra",
+    requiredModules: ["PROJECTS"],
+  },
+  TENANT_OVERHEAD_BY_PROJECT: {
+    scope: "TENANT",
+    labelEs: "Gastos generales por proyecto",
+    requiredModules: ["AP"],
+  },
+  TENANT_MULTI_PROJECT_PROCUREMENT: {
+    scope: "TENANT",
+    labelEs: "Compras multi-obra",
+    requiredModules: ["PROCUREMENT"],
+  },
   PROJECT_COST_CONTROL: {
     scope: "PROJECT",
     labelEs: "Control de costos",

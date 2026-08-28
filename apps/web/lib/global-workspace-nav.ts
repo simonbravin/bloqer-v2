@@ -48,6 +48,19 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
       { label: "Inicio", href: "/dashboard" },
       { label: "Pendientes", href: "/pendientes", matchExact: true },
       { label: "Proyectos", href: "/proyectos", require: { action: "VIEW", module: "PROJECTS" } },
+      {
+        label: "Reportes",
+        href: "/reportes",
+        require: {
+          anyOf: [
+            { action: "VIEW", module: "PROJECTS" },
+            { action: "VIEW", module: "AR" },
+            { action: "VIEW", module: "AP" },
+            { action: "VIEW", module: "TREASURY" },
+            { action: "VIEW", module: "INVENTORY" },
+          ],
+        },
+      },
       { label: "Directorio", href: "/directorio", require: { action: "VIEW", module: "DIRECTORY" } },
       { label: "Inventario", href: "/inventario", require: { action: "VIEW", module: "INVENTORY" } },
     ],

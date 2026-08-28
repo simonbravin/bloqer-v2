@@ -44,6 +44,12 @@ const nextConfig: NextConfig = {
         destination: "/configuracion/politicas",
         permanent: true,
       },
+      // D-098: Presupuesto vs real absorbed into EDT y costos
+      {
+        source: "/proyectos/:id/reportes/presupuesto-vs-real",
+        destination: "/proyectos/:id/control-costos",
+        permanent: true,
+      },
     ];
   },
   serverExternalPackages: [

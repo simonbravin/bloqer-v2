@@ -14,7 +14,6 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     where: { menu: "Planificación → EDT y costos (tablero de capas)" },
     hrefs: [
       { kind: "project", suffix: "/control-costos", label: "EDT y costos" },
-      { kind: "project", suffix: "/reportes/presupuesto-vs-real", label: "Presupuesto vs real" },
     ],
     steps: [
       "Confirmar OC (o activar subcontrato) → capa Comprometido.",
@@ -184,7 +183,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     slug: "hub-reportes-de-obra",
     title: "Dónde ver los reportes de la obra",
     summary:
-      "Planificación → Reportes: hub con rentabilidad, presupuesto vs real, compras, caja, certificaciones y más.",
+      "Planificación → Reportes: hub con rentabilidad, EDT y costos, análisis de compras, caja, certificaciones y más.",
     intents: ["reportes-obra", "exportar-reportes"],
     modules: ["presupuesto", "finanzas", "compras"],
     level: "project",
@@ -194,10 +193,12 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     hrefs: [
       { kind: "project", suffix: "/reportes", label: "Reportes del proyecto" },
       { kind: "project", suffix: "/reportes/programados", label: "Envíos programados" },
+      { kind: "company", path: "/reportes", label: "Reportes de la empresa" },
     ],
     steps: [
       "Planificación → Reportes (título: Reportes del proyecto).",
-      "Elegí la card: Rentabilidad, Presupuesto vs real, EDT y costos, Compras y proveedores, Materiales, Subcontratos, Certificaciones, Ingresos vs gastos, Caja y proyección, Flujo de caja, aging CxC/CxP.",
+      "Elegí la card: Rentabilidad, EDT y costos (incluye presupuesto vs real), Análisis de compras, Materiales, Subcontratos, Certificaciones, Ingresos vs gastos, Caja y proyección, Flujo de caja, aging CxC/CxP.",
+      "Para comparar varias obras: menú empresa → Reportes (/reportes).",
       "Dentro de cada reporte usá Exportar → CSV o PDF (o Exportar PDF si solo hay PDF).",
       "Si tenés permiso: Envíos programados por email desde el hub o /reportes/programados.",
     ],
@@ -220,32 +221,32 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "pdf",
       "csv",
       "envios programados",
+      "analisis de compras",
+      "reportes empresa",
     ],
-    guideRef: "§13.2",
+    guideRef: "§13.2 · [D-098]",
   },
   {
     slug: "presupuesto-vs-real",
     title: "Comparar presupuesto vs real",
     summary:
-      "Reporte de desvíos presupuesto baseline vs ejecución. Complementa el tablero EDT y costos.",
+      "Vive dentro de EDT y costos: capas, composición APU y variación por partida ([D-098]).",
     intents: ["presupuesto-vs-real", "edt-costos", "exportar-reportes"],
     modules: ["presupuesto", "finanzas"],
     level: "project",
     typicalRoles: ["PM", "Finanzas", "OWNER"],
-    where: { menu: "Planificación → Reportes → Presupuesto vs real" },
+    where: { menu: "Planificación → EDT y costos" },
     hrefs: [
-      { kind: "project", suffix: "/reportes/presupuesto-vs-real", label: "Presupuesto vs real" },
       { kind: "project", suffix: "/control-costos", label: "EDT y costos" },
     ],
     steps: [
-      "Planificación → Reportes → Presupuesto vs real (también card Composición presupuesto).",
-      "Arriba: 5 indicadores (presupuesto, exposición, certificado, variación, consumo).",
-      "Abajo: gráfico de composición APU y la tabla de varianza por partida.",
-      "Para el día a día por capas (comprometido/devengado/pagado) usá EDT y costos.",
+      "Planificación → EDT y costos (la ruta antigua /reportes/presupuesto-vs-real redirige acá).",
+      "Arriba: indicadores de resumen + gráfico de composición APU.",
+      "Elegí Vista de columnas (Financiero / Compacto / Cantidades / % Avance) según el análisis.",
       "Exportá con Exportar → CSV o PDF.",
     ],
     pitfalls: [
-      "Presupuesto vs real y EDT y costos se miran juntos: uno es reporte de varianza; el otro es tablero operativo de afectaciones.",
+      "Ya no hay una pantalla aparte de Presupuesto vs real: todo está en EDT y costos.",
     ],
     relatedSlugs: [
       "hub-reportes-de-obra",
@@ -263,7 +264,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "composicion presupuesto",
       "baseline",
     ],
-    guideRef: "§13.1 · §13.2",
+    guideRef: "§13.1 · §13.2 · [D-098]",
   },
   {
     slug: "ver-rentabilidad-de-obra",
@@ -566,5 +567,47 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "rfi",
     ],
     guideRef: "§19",
+  },
+  {
+    slug: "hub-reportes-de-empresa",
+    title: "Reportes de la empresa (multi-obra)",
+    summary:
+      "General → Reportes: portafolio, rentabilidad multi-obra, GG por proyecto, compras multi-obra y accesos a aging/caja/inventario.",
+    intents: ["reportes-obra", "exportar-reportes"],
+    modules: ["finanzas", "presupuesto", "compras"],
+    level: "company",
+    typicalRoles: ["OWNER / ADMIN", "Finanzas", "PM"],
+    where: { menu: "General → Reportes" },
+    hrefs: [
+      { kind: "company", path: "/reportes", label: "Reportes de la empresa" },
+      { kind: "company", path: "/reportes/portafolio", label: "Portafolio" },
+      { kind: "company", path: "/configuracion/reportes", label: "Envíos programados" },
+    ],
+    steps: [
+      "Menú empresa → Reportes.",
+      "Portafolio: costos y exposición de todas las obras; drill a EDT de cada una.",
+      "Rentabilidad multi-obra: margen bruto consolidado y por obra.",
+      "GG por proyecto / Compras multi-obra: matrices de empresa.",
+      "Aging CxC/CxP, flujo de caja e inventario abren las pantallas operativas.",
+      "Exportá CSV desde cada reporte nuevo; podés programar envíos en Configuración → Reportes.",
+    ],
+    pitfalls: [
+      "Los reportes de una sola obra siguen en Planificación → Reportes dentro del proyecto.",
+    ],
+    relatedSlugs: [
+      "hub-reportes-de-obra",
+      "leer-edt-y-costos",
+      "ver-rentabilidad-de-obra",
+      "exportar-reportes-csv-pdf",
+    ],
+    keywords: [
+      "reportes empresa",
+      "portafolio",
+      "multi obra",
+      "rentabilidad multi",
+      "gastos generales por proyecto",
+      "compras multi obra",
+    ],
+    guideRef: "§1.2 · §1.4 · §13.2 · [D-098]",
   },
 ];

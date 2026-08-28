@@ -1,4 +1,4 @@
-import type { AgingBucket, AgingFilters } from "../aging/aging.service";
+﻿import type { AgingBucket, AgingFilters } from "../aging/aging.service";
 import {
   getReceivableAgingReport,
   getPayableAgingReport,
@@ -58,7 +58,7 @@ function padCsvRow(cells: string[], columnCount: number): string[] {
   return r.slice(0, columnCount);
 }
 
-// ─── Parsers (query strings from routes; same semantics as App Router pages) ───
+// â”€â”€â”€ Parsers (query strings from routes; same semantics as App Router pages) â”€â”€â”€
 
 export function parseAgingFilters(sp: Record<string, string | undefined>): AgingFilters {
   const bucket = sp.bucket as AgingBucket | undefined;
@@ -249,7 +249,7 @@ export function parseProjectCashFlowFilters(sp: Record<string, string | undefine
   };
 }
 
-// ─── CSV builders ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ CSV builders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function exportReceivableAgingCsv(
   filters: AgingFilters,
@@ -652,6 +652,13 @@ export async function exportProjectCostControlCsv(
     "CostoDevengado",
     "CostoPagado",
     "ConsumoInventario",
+    "CantComprometida",
+    "CantRecibida",
+    "CantConsumida",
+    "PctCompra",
+    "PctFisico",
+    "PctEconomico",
+    "PctExposicion",
     "AvanceOperativoQty",
     "AvanceEnviadoQty",
     "ComprometidoAbierto",
@@ -679,6 +686,13 @@ export async function exportProjectCostControlCsv(
     x.accruedCost,
     x.paidCost,
     x.inventoryConsumedCost,
+    x.qtyCommitted,
+    x.qtyReceived,
+    x.qtyConsumed,
+    x.pctPurchased ?? "",
+    x.pctPhysical ?? "",
+    x.pctEconomic ?? "",
+    x.pctExposure ?? "",
     x.operationalProgressQty,
     x.submittedProgressQty,
     x.openCommittedCost,
@@ -706,6 +720,13 @@ export async function exportProjectCostControlCsv(
     r.totals.accruedCost,
     r.totals.paidCost,
     r.totals.inventoryConsumedCost,
+    "", // qtyCommitted
+    "", // qtyReceived
+    "", // qtyConsumed
+    "", // pctPurchased
+    "", // pctPhysical
+    "", // pctEconomic
+    "", // pctExposure
     r.totals.operationalProgressQty,
     "",
     r.totals.openCommittedCost,
@@ -733,6 +754,13 @@ export async function exportProjectCostControlCsv(
     r.unallocatedAccruedCost,
     r.unallocatedPaidCost,
     r.unallocatedInventoryConsumedCost,
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
     "",
     "",
     "",
@@ -1120,7 +1148,7 @@ export async function exportSubcontractVarianceCsv(
     rows.push([
       "CONTRATO",
       c.code,
-      `${c.title} — ${c.subcontractorName}`,
+      `${c.title} â€” ${c.subcontractorName}`,
       "",
       c.totalValue,
       c.certifiedCost,
@@ -1381,5 +1409,185 @@ export async function exportProjectCashFlowCsv(
   return {
     content: buildCsv(headers, rows),
     filename: safeReportFilename(`flujo_caja_proyecto_${slug}`, "csv"),
+  };
+}
+
+// â”€â”€â”€ Tenant-level portfolio exports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export async function exportProjectPortfolioCsv(
+  ctx: ServiceContext,
+  filters?: { status?: string },
+): Promise<ReportCsvPayload> {
+  const { getProjectPortfolioReport } = await import("../reports/project-portfolio.service");
+  type PS = import("@bloqer/database").ProjectStatus;
+  const allowed: PS[] = ["DRAFT", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"];
+  const status =
+    filters?.status && (allowed as string[]).includes(filters.status)
+      ? (filters.status as PS)
+      : undefined;
+  const report = await getProjectPortfolioReport(ctx, { status });
+  const headers = [
+    "Codigo",
+    "Proyecto",
+    "Estado",
+    "Presupuesto costo",
+    "Comprometido",
+    "Devengado",
+    "Exposicion esperada",
+    "Varianza costo",
+    "Certificado aprobado",
+    "% Exposicion",
+    "Advertencia",
+  ];
+  const rows: string[][] = report.rows.map((r) => [
+    r.code,
+    r.name,
+    r.status,
+    r.budgetTotalCost,
+    r.committedCost,
+    r.accruedCost,
+    r.expectedCostExposure,
+    r.costVariance,
+    r.certifiedApproved,
+    r.pctExposure ?? "",
+    r.warning ?? "",
+  ]);
+  return {
+    content: buildCsv(headers, rows),
+    filename: safeReportFilename("portafolio_proyectos", "csv"),
+  };
+}
+
+export async function exportPortfolioProfitabilityCsv(
+  ctx: ServiceContext,
+  filters?: { costLayer?: string; revenueBasis?: string; status?: string },
+): Promise<ReportCsvPayload> {
+  const { getPortfolioProfitabilityReport } = await import("../reports/project-profitability.service");
+  const parsedFilters = {
+    costLayer: filters?.costLayer as "exposure" | "committed" | "accrued" | "paid" | undefined,
+    revenueBasis: filters?.revenueBasis as "certified" | "invoiced" | undefined,
+    status: (() => {
+      type PS = import("@bloqer/database").ProjectStatus;
+      const allowed: PS[] = ["DRAFT", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"];
+      return filters?.status && (allowed as string[]).includes(filters.status)
+        ? (filters.status as PS)
+        : undefined;
+    })(),
+  };
+  const report = await getPortfolioProfitabilityReport(ctx, parsedFilters);
+  const headers = [
+    "Codigo",
+    "Proyecto",
+    "Estado",
+    "Moneda",
+    "Ingresos",
+    "Costos directos",
+    "Margen bruto",
+    "Margen bruto %",
+    "Advertencia",
+  ];
+  const rows: string[][] = report.rows.map((r) => [
+    r.code,
+    r.name,
+    r.status,
+    r.currency,
+    r.revenue,
+    r.directCost,
+    r.grossMargin,
+    r.grossMarginPct ?? "",
+    r.warning ?? "",
+  ]);
+  rows.push([
+    "",
+    "CONSOLIDADO",
+    "",
+    report.consolidatedCurrency ?? "",
+    report.consolidatedRevenue,
+    report.consolidatedDirectCost,
+    report.consolidatedGrossMargin,
+    report.consolidatedGrossMarginPct ?? "",
+    report.warnings.join(" | "),
+  ]);
+  return {
+    content: buildCsv(headers, rows),
+    filename: safeReportFilename("rentabilidad_multi_obra", "csv"),
+  };
+}
+
+export async function exportOverheadByProjectCsv(
+  ctx: ServiceContext,
+  filters?: { periodFrom?: string; periodTo?: string },
+): Promise<ReportCsvPayload> {
+  const { getOverheadByProjectReport } = await import("../reports/overhead-by-project.service");
+  const report = await getOverheadByProjectReport(ctx, filters);
+  const headers = [
+    "Codigo proyecto",
+    "Proyecto",
+    "Periodo",
+    "Moneda",
+    "Monto",
+    "Notas",
+  ];
+  const rows: string[][] = report.rows.map((r) => [
+    r.projectCode,
+    r.projectName,
+    r.period,
+    r.currency,
+    r.amount,
+    r.notes ?? "",
+  ]);
+  return {
+    content: buildCsv(headers, rows),
+    filename: safeReportFilename("gastos_generales_por_proyecto", "csv"),
+  };
+}
+
+export async function exportMultiProjectProcurementCsv(
+  ctx: ServiceContext,
+  filters?: { dateFrom?: string; dateTo?: string },
+): Promise<ReportCsvPayload> {
+  const { getMultiProjectProcurementReport } = await import("../reports/procurement-deviation.service");
+  const report = await getMultiProjectProcurementReport(ctx, filters);
+  const headers = [
+    "Seccion",
+    "Proveedor",
+    "Proyecto",
+    "OC",
+    "Estado",
+    "Comprometido",
+    "Devengado",
+    "Pagado",
+    "Monto total",
+  ];
+  const rows: string[][] = [];
+  for (const s of report.topSuppliers) {
+    rows.push([
+      "Proveedores",
+      s.supplierName,
+      "",
+      "",
+      "",
+      s.committedCost,
+      s.accruedCost,
+      s.paidCost,
+      "",
+    ]);
+  }
+  for (const po of report.openPurchaseOrders) {
+    rows.push([
+      "OC abiertas",
+      po.supplierName,
+      `${po.projectCode} - ${po.projectName}`,
+      po.poNumber,
+      po.status,
+      "",
+      "",
+      "",
+      po.totalAmount,
+    ]);
+  }
+  return {
+    content: buildCsv(headers, rows),
+    filename: safeReportFilename("compras_multi_obra", "csv"),
   };
 }

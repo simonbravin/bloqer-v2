@@ -9,6 +9,8 @@ export * from "./project-cash-projection.service";
 export * from "./company-cash-projection.service";
 export * from "./company-income-expense.service";
 export * from "./project-profitability.service";
+export * from "./project-portfolio.service";
+export * from "./overhead-by-project.service";
 export * from "./report-budget-resolve";
 export * from "./report-month";
 export * from "./report-currency-view";

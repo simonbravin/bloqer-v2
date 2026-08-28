@@ -1488,6 +1488,22 @@
 
 ---
 
+### D-098 — Consolidación EDT/reportes de obra + hub de reportes empresa
+
+- **Fecha:** 2026-08-28
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** El hub de reportes de obra listaba **Presupuesto vs real** casi duplicado de **EDT y costos** (mismo `getProjectCostControl` + pie APU). El reporte **Compras y proveedores** calculaba `committedCost` con `lineTotal` (bruto), divergente de EDT/`lineSubtotal` ([D-095]). A nivel empresa no existía un hub consolidado multi-obra (solo pantallas operativas de finanzas/tesorería/inventario).
+- **Decisión:**
+  1. **Absorber** Presupuesto vs real y composición APU dentro de `/proyectos/[id]/control-costos`. Redirect permanente desde `/reportes/presupuesto-vs-real`.
+  2. **Vista de columnas EDT** con presets (Financiero / Compacto / Cantidades / % Avance / Personalizado) persistidos en `localStorage` (`bloqer:edt:preset:{projectId}`). Columnas nuevas: cantidades (presup./compr./recib./consum.) y % (compra / físico / económico / exposición).
+  3. **Alinear** `getProcurementDeviationReport` a `lineSubtotal` para comprometido (mismo criterio [D-095]). Renombrar card del hub obra a **Análisis de compras**.
+  4. **Crear hub empresa** `/reportes` con 8 cards canónicos: Portafolio, Rentabilidad multi-obra, Aging CxC/CxP (links), Flujo caja (link), Inventario (link), GG por proyecto, Compras multi-obra. Ítem **Reportes** en menú General.
+- **Implicancias:** Los números de comprometido en Análisis de compras pueden bajar (corrección neto). Bookmarks a presupuesto-vs-real siguen funcionando vía redirect. Preferencias de columnas EDT no sincronizan entre dispositivos (localStorage a propósito).
+- **Documentos afectados:** [`REPORT_CATALOG.md`](../06-reports/REPORT_CATALOG.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §1.2 · §1.4 · §13, [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md), `08-architecture/TENANT_REPORTS_HUB.md`, help `leer-edt-y-costos` / conceptos de reportes.
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1496,7 +1512,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-095`…).
+1. Tomar el siguiente ID disponible (`D-099`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

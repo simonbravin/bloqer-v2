@@ -18,6 +18,7 @@ import {
   buildWbsProgressSummary,
   type WbsProgressSummary,
 } from "./wbs-progress-summary";
+import { parseFilterDate } from "../reports/report-month";
 
 function serializePct2(raw: string | number): string {
   return roundToDecimals(raw, 2);
@@ -59,20 +60,29 @@ export type CostControlRow = {
   // ─ Cost layers (shown separately — no double-counting) ─
   committedCost: string;         // CONFIRMED POs (lineSubtotal neto) + ACTIVE subcontracts
   receivedCost: string;          // CONFIRMED receipts (qty × unit price via POLine)
-  accruedCost: string;           // ISSUED SupplierInvoices (PO-linked proportional) + APPROVED SubcontractCertifications
+  accruedCost: string;           // ISSUED SupplierInvoices (lineSubtotal neto) + APPROVED SubcontractCertifications
   paidCost: string;              // CONFIRMED Payments traceable to WBS
   inventoryConsumedCost: string; // StockMovement OUT CONSUMPTION with wbsNodeId
+  // ─ Quantities (D-098 EDT presets) ─
+  qtyCommitted: string; // PO + subcontract line qty on this WBS
+  qtyReceived: string;  // CONFIRMED receipt qty
+  qtyConsumed: string;  // Stock OUT CONSUMPTION qty
   // ─ Progress ─
   operationalProgressQty: string;   // APPROVED logs only
   submittedProgressQty: string;     // SUBMITTED logs (informational)
   // ─ Derived ([BR-COS-002] / [D-065]) ─
-  // openCommittedCost = max(0, committed − accrued_linked)
+  // openCommittedCost = max(0, committed − accrued_linked) — both net ([D-095]/[D-098])
   // expectedCostExposure = accrued + openCommitted (received is informational only)
   openCommittedCost: string;
   expectedCostExposure: string;
   remainingBudgetCost: string; // budgetTotalCost - expectedCostExposure
   costVariance: string;        // same; positive = saving, negative = overrun
   projectedMargin: string;     // budgetTotalSale - expectedCostExposure
+  // ─ Percentages vs budget (null when budget is zero) ─
+  pctPurchased: string | null;  // committedCost / budgetTotalCost × 100
+  pctPhysical: string | null;   // qtyReceived / budgetQty × 100
+  pctEconomic: string | null;   // accruedCost / budgetTotalCost × 100
+  pctExposure: string | null;   // expectedCostExposure / budgetTotalCost × 100
   flags: CostControlRowFlags;
 };
 
@@ -139,6 +149,9 @@ type WbsAcc = {
   accruedLinkedCost: Prisma.Decimal;
   paidCost: Prisma.Decimal;
   inventoryConsumedCost: Prisma.Decimal;
+  qtyCommitted: Prisma.Decimal;
+  qtyReceived: Prisma.Decimal;
+  qtyConsumed: Prisma.Decimal;
   operationalProgressQty: Prisma.Decimal;
   submittedProgressQty: Prisma.Decimal;
 };
@@ -149,6 +162,7 @@ function newAcc(): WbsAcc {
     certifiedIssued: ZERO, certifiedApproved: ZERO,
     committedCost: ZERO, receivedCost: ZERO, accruedCost: ZERO, accruedLinkedCost: ZERO,
     paidCost: ZERO, inventoryConsumedCost: ZERO,
+    qtyCommitted: ZERO, qtyReceived: ZERO, qtyConsumed: ZERO,
     operationalProgressQty: ZERO, submittedProgressQty: ZERO,
   };
 }
@@ -175,8 +189,8 @@ function newUnalloc(): UnallocAcc {
 function dateWhere(from?: string, to?: string) {
   if (!from && !to) return undefined;
   return {
-    ...(from ? { gte: new Date(from) } : {}),
-    ...(to   ? { lte: new Date(to)   } : {}),
+    ...(from ? { gte: parseFilterDate(from, false) } : {}),
+    ...(to ? { lte: parseFilterDate(to, true) } : {}),
   };
 }
 
@@ -188,6 +202,12 @@ function add(map: Map<string, WbsAcc>, wbsId: string, field: keyof WbsAcc, amoun
   if (!map.has(wbsId)) return; // only budget WBS nodes get rows
   const acc = map.get(wbsId)!;
   (acc[field] as Prisma.Decimal) = (acc[field] as Prisma.Decimal).add(amount);
+}
+
+/** Percent of numerator/denominator × 100, or null when denominator is zero. */
+function pctOfBudget(num: Prisma.Decimal, den: Prisma.Decimal): string | null {
+  if (den.isZero()) return null;
+  return serializePct2(num.div(den).times(100).toString());
 }
 
 // ─── Main function ────────────────────────────────────────────────────────────
@@ -356,7 +376,7 @@ export async function getProjectCostControl(
     incSub
       ? prisma.subcontractLine.findMany({
           where: { subcontract: { projectId, tenantId: ctx.tenantId, status: "ACTIVE" } },
-          select: { wbsNodeId: true, lineTotal: true },
+          select: { wbsNodeId: true, lineTotal: true, quantity: true },
         })
       : Promise.resolve([]),
     incSub
@@ -386,17 +406,18 @@ export async function getProjectCostControl(
             id: true, totalAmount: true, purchaseOrderId: true,
             lines: {
               select: {
+                lineSubtotal: true,
                 lineTotal: true,
                 wbsNodeId: true,
                 purchaseOrderLineId: true,
-                purchaseOrderLine: { select: { wbsNodeId: true, lineTotal: true } },
+                purchaseOrderLine: { select: { wbsNodeId: true, lineSubtotal: true, lineTotal: true } },
               },
             },
             purchaseOrder: {
               select: {
                 id: true,
                 totalAmount: true,
-                lines: { select: { id: true, wbsNodeId: true, lineTotal: true } },
+                lines: { select: { id: true, wbsNodeId: true, lineSubtotal: true, lineTotal: true } },
               },
             },
           },
@@ -411,7 +432,7 @@ export async function getProjectCostControl(
           },
           select: {
             totalAmount: true,
-            lines: { select: { wbsNodeId: true, lineTotal: true } },
+            lines: { select: { wbsNodeId: true, lineSubtotal: true, lineTotal: true } },
           },
         })
       : Promise.resolve([]),
@@ -524,18 +545,20 @@ export async function getProjectCostControl(
     // Committed
     if (inBudget) {
       add(accMap, wbsId!, "committedCost", new Prisma.Decimal(pol.lineSubtotal));
+      add(accMap, wbsId!, "qtyCommitted", new Prisma.Decimal(pol.quantity));
     } else {
       unalloc.committedCost = unalloc.committedCost.add(pol.lineSubtotal);
     }
-    // Received (via CONFIRMED receipts)
-    const unitCostWithTax = pol.quantity.isZero()
+    // Received (via CONFIRMED receipts) — same net basis as committed ([D-095]/[D-098])
+    const unitCostNet = pol.quantity.isZero()
       ? ZERO
-      : new Prisma.Decimal(pol.lineTotal).div(pol.quantity);
+      : new Prisma.Decimal(pol.lineSubtotal).div(pol.quantity);
     for (const rl of pol.receiptLines) {
       if (rl.purchaseReceipt.status !== "CONFIRMED") continue;
-      const cost = unitCostWithTax.mul(rl.quantityReceived);
+      const cost = unitCostNet.mul(rl.quantityReceived);
       if (inBudget) {
         add(accMap, wbsId!, "receivedCost", cost);
+        add(accMap, wbsId!, "qtyReceived", new Prisma.Decimal(rl.quantityReceived));
       } else {
         unalloc.receivedCost = unalloc.receivedCost.add(cost);
       }
@@ -547,6 +570,7 @@ export async function getProjectCostControl(
     const wbsId = sl.wbsNodeId;
     if (wbsId && wbsNodeIds.has(wbsId)) {
       add(accMap, wbsId, "committedCost", new Prisma.Decimal(sl.lineTotal));
+      add(accMap, wbsId, "qtyCommitted", new Prisma.Decimal(sl.quantity));
     } else {
       unalloc.committedCost = unalloc.committedCost.add(sl.lineTotal);
     }
@@ -564,14 +588,15 @@ export async function getProjectCostControl(
     }
   }
 
-  // E. Accrued from ISSUED SupplierInvoices (PO-linked) — prefer line FK ([D-066]), else PO weights
+  // E. Accrued from ISSUED SupplierInvoices (PO-linked) — prefer line FK ([D-066]), else PO weights.
+  // Net basis (lineSubtotal) so accruedLinked consumes open_committed consistently with D-095.
   for (const inv of poLinkedInvoices) {
     if (!inv.purchaseOrder) continue;
     const linkedLines = inv.lines.filter((l) => l.purchaseOrderLineId);
     if (linkedLines.length > 0) {
       for (const line of linkedLines) {
         const wbsId = line.purchaseOrderLine?.wbsNodeId ?? line.wbsNodeId;
-        const amount = new Prisma.Decimal(line.lineTotal);
+        const amount = new Prisma.Decimal(line.lineSubtotal);
         if (wbsId && wbsNodeIds.has(wbsId)) {
           add(accMap, wbsId, "accruedCost", amount);
           // Only FK-mapped lines consume open_committed on that partida ([D-065]).
@@ -587,7 +612,7 @@ export async function getProjectCostControl(
         inv.purchaseOrder.lines.map((l) => l.wbsNodeId).filter((id): id is string => Boolean(id)),
       );
       for (const line of orphanLines) {
-        const amount = new Prisma.Decimal(line.lineTotal);
+        const amount = new Prisma.Decimal(line.lineSubtotal);
         const wbsId = line.wbsNodeId;
         if (wbsId && wbsNodeIds.has(wbsId)) {
           add(accMap, wbsId, "accruedCost", amount);
@@ -602,13 +627,16 @@ export async function getProjectCostControl(
     }
 
     const poLines2 = inv.purchaseOrder.lines;
-    const poTotal  = poLines2.reduce((s, l) => s.add(l.lineTotal), ZERO);
+    const poTotal = poLines2.reduce((s, l) => s.add(l.lineSubtotal), ZERO);
+    const invNet = inv.lines.length > 0
+      ? inv.lines.reduce((s, l) => s.add(l.lineSubtotal), ZERO)
+      : new Prisma.Decimal(inv.totalAmount);
     if (poTotal.isZero()) {
-      unalloc.accruedCost = unalloc.accruedCost.add(inv.totalAmount);
+      unalloc.accruedCost = unalloc.accruedCost.add(invNet);
       continue;
     }
     for (const pol of poLines2) {
-      const share = new Prisma.Decimal(pol.lineTotal).div(poTotal).mul(inv.totalAmount);
+      const share = new Prisma.Decimal(pol.lineSubtotal).div(poTotal).mul(invNet);
       const wbsId = pol.wbsNodeId;
       if (wbsId && wbsNodeIds.has(wbsId)) {
         add(accMap, wbsId, "accruedCost", share);
@@ -625,15 +653,16 @@ export async function getProjectCostControl(
     if (linesWithWbs.length > 0) {
       for (const line of linesWithWbs) {
         const wbsId = line.wbsNodeId!;
+        const amount = new Prisma.Decimal(line.lineSubtotal);
         if (wbsNodeIds.has(wbsId)) {
-          add(accMap, wbsId, "accruedCost", new Prisma.Decimal(line.lineTotal));
+          add(accMap, wbsId, "accruedCost", amount);
         } else {
-          unalloc.accruedCost = unalloc.accruedCost.add(line.lineTotal);
+          unalloc.accruedCost = unalloc.accruedCost.add(amount);
         }
       }
       const linesWithoutWbs = inv.lines.filter((l) => !l.wbsNodeId);
       for (const line of linesWithoutWbs) {
-        unalloc.accruedCost = unalloc.accruedCost.add(line.lineTotal);
+        unalloc.accruedCost = unalloc.accruedCost.add(line.lineSubtotal);
       }
     } else {
       unalloc.accruedCost = unalloc.accruedCost.add(inv.totalAmount);
@@ -698,8 +727,10 @@ export async function getProjectCostControl(
       ? new Prisma.Decimal(sm.quantity).mul(decOrZero(sm.unitCost))
       : decOrZero(sm.totalCost);
     const wbsId = sm.wbsNodeId!;
-    if (wbsNodeIds.has(wbsId)) add(accMap, wbsId, "inventoryConsumedCost", cost);
-    else unalloc.inventoryConsumedCost = unalloc.inventoryConsumedCost.add(cost);
+    if (wbsNodeIds.has(wbsId)) {
+      add(accMap, wbsId, "inventoryConsumedCost", cost);
+      add(accMap, wbsId, "qtyConsumed", new Prisma.Decimal(sm.quantity));
+    } else unalloc.inventoryConsumedCost = unalloc.inventoryConsumedCost.add(cost);
   }
 
   // I. Operational progress (APPROVED logs)
@@ -766,6 +797,9 @@ export async function getProjectCostControl(
       accruedCost:           serializeMoneyDecimal(accrued),
       paidCost:              serializeMoneyDecimal(acc.paidCost),
       inventoryConsumedCost: serializeMoneyDecimal(acc.inventoryConsumedCost),
+      qtyCommitted: serializeQtyDecimal(acc.qtyCommitted),
+      qtyReceived:  serializeQtyDecimal(acc.qtyReceived),
+      qtyConsumed:  serializeQtyDecimal(acc.qtyConsumed),
       operationalProgressQty: serializeQtyDecimal(acc.operationalProgressQty),
       submittedProgressQty:   serializeQtyDecimal(acc.submittedProgressQty),
       openCommittedCost:    serializeMoneyDecimal(openCommitted),
@@ -773,6 +807,10 @@ export async function getProjectCostControl(
       remainingBudgetCost:  serializeMoneyDecimal(remaining),
       costVariance:         serializeMoneyDecimal(variance),
       projectedMargin:      serializeMoneyDecimal(margin),
+      pctPurchased: pctOfBudget(committed, bCost),
+      pctPhysical:  pctOfBudget(acc.qtyReceived, bQty),
+      pctEconomic:  pctOfBudget(accrued, bCost),
+      pctExposure:  pctOfBudget(expected, bCost),
       flags,
     });
 

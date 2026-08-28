@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
+import type { ProjectStatus } from "@bloqer/database";
 import type { UserRole } from "@bloqer/domain";
 import {
   getProjectCostControl,
@@ -340,6 +341,181 @@ export async function getProjectProfitabilityReport(
     netMarginNote,
     warnings,
     sectionsExcluded,
+  };
+}
+
+// ─── Multi-project portfolio profitability ──────────────────────────────────
+
+export type PortfolioProfitabilityFilters = {
+  costLayer?: CostVarianceLayer;
+  revenueBasis?: "certified" | "invoiced";
+  status?: ProjectStatus;
+};
+
+export type PortfolioProfitabilityRow = {
+  projectId: string;
+  code: string;
+  name: string;
+  status: string;
+  currency: string;
+  revenue: string;
+  directCost: string;
+  grossMargin: string;
+  grossMarginPct: string | null;
+  warning: string | null;
+};
+
+export type PortfolioProfitabilityReport = {
+  rows: PortfolioProfitabilityRow[];
+  consolidatedRevenue: string;
+  consolidatedDirectCost: string;
+  consolidatedGrossMargin: string;
+  consolidatedGrossMarginPct: string | null;
+  /** Present when rows mix currencies — consolidated totals only sum the primary currency. */
+  consolidatedCurrency: string | null;
+  warnings: string[];
+};
+
+export async function getPortfolioProfitabilityReport(
+  ctx: ServiceContext,
+  filters?: PortfolioProfitabilityFilters,
+): Promise<PortfolioProfitabilityReport> {
+  if (!canViewProjectCostControlReport(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver rentabilidad multi-obra");
+  }
+
+  const gate = await getTenantModuleGate(ctx);
+  if (!gate.isEnabled("PROJECTS") || !gate.isEnabled("BUDGETS")) {
+    throw new ServiceError("FORBIDDEN", "Módulos de proyectos/presupuestos deshabilitados");
+  }
+
+  const statusFilter: Prisma.ProjectWhereInput = filters?.status
+    ? { status: filters.status }
+    : { status: { not: "CANCELLED" } };
+
+  const projects = await prisma.project.findMany({
+    where: { tenantId: ctx.tenantId, ...statusFilter },
+    select: { id: true, code: true, name: true, status: true },
+    orderBy: { code: "asc" },
+  });
+
+  const settled = await Promise.allSettled(
+    projects.map(async (project) => {
+      const report = await getProjectProfitabilityReport(
+        project.id,
+        {
+          costLayer: filters?.costLayer,
+          revenueBasis: filters?.revenueBasis,
+        },
+        ctx,
+      );
+      return { project, report };
+    }),
+  );
+
+  const rows: PortfolioProfitabilityRow[] = [];
+  const warnings: string[] = [];
+  const byCurrency = new Map<string, { revenue: Prisma.Decimal; directCost: Prisma.Decimal }>();
+
+  for (let i = 0; i < settled.length; i++) {
+    const project = projects[i]!;
+    const outcome = settled[i]!;
+    if (outcome.status === "rejected") {
+      warnings.push(`Error al obtener rentabilidad de ${project.code ?? project.name}`);
+      rows.push({
+        projectId: project.id,
+        code: project.code ?? "",
+        name: project.name,
+        status: project.status,
+        currency: "ARS",
+        revenue: "0.00",
+        directCost: "0.00",
+        grossMargin: "0.00",
+        grossMarginPct: null,
+        warning: "Error al obtener datos",
+      });
+      continue;
+    }
+    const { report } = outcome.value;
+    if (report.type === "NO_APPROVED_BUDGETS") {
+      rows.push({
+        projectId: project.id,
+        code: project.code ?? "",
+        name: project.name,
+        status: project.status,
+        currency: "ARS",
+        revenue: "0.00",
+        directCost: "0.00",
+        grossMargin: "0.00",
+        grossMarginPct: null,
+        warning: "Sin presupuesto aprobado",
+      });
+      continue;
+    }
+    const rev = new Prisma.Decimal(report.revenue);
+    const dc = new Prisma.Decimal(report.directCost);
+    const bucket = byCurrency.get(report.currency) ?? {
+      revenue: new Prisma.Decimal(0),
+      directCost: new Prisma.Decimal(0),
+    };
+    bucket.revenue = bucket.revenue.plus(rev);
+    bucket.directCost = bucket.directCost.plus(dc);
+    byCurrency.set(report.currency, bucket);
+    rows.push({
+      projectId: project.id,
+      code: project.code ?? "",
+      name: project.name,
+      status: project.status,
+      currency: report.currency,
+      revenue: report.revenue,
+      directCost: report.directCost,
+      grossMargin: report.grossMargin,
+      grossMarginPct: report.grossMarginPct,
+      warning: null,
+    });
+  }
+
+  // Consolidate preferring tenant base currency; never sum ARS+USD.
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: ctx.tenantId },
+    select: { baseCurrency: true },
+  });
+  const preferred = tenant?.baseCurrency ?? "ARS";
+
+  let primaryCurrency: string | null = null;
+  let primaryRev = new Prisma.Decimal(0);
+  let primaryDc = new Prisma.Decimal(0);
+
+  if (byCurrency.has(preferred)) {
+    primaryCurrency = preferred;
+    primaryRev = byCurrency.get(preferred)!.revenue;
+    primaryDc = byCurrency.get(preferred)!.directCost;
+  } else {
+    for (const [ccy, bucket] of byCurrency) {
+      if (bucket.revenue.abs().greaterThan(primaryRev.abs()) || primaryCurrency == null) {
+        primaryCurrency = ccy;
+        primaryRev = bucket.revenue;
+        primaryDc = bucket.directCost;
+      }
+    }
+  }
+  if (byCurrency.size > 1) {
+    warnings.push(
+      `Hay proyectos en ${[...byCurrency.keys()].join(", ")}. El consolidado suma solo ${primaryCurrency}.`,
+    );
+  }
+
+  const consolidatedGrossMargin = primaryRev.minus(primaryDc);
+  return {
+    rows,
+    consolidatedRevenue: primaryRev.toFixed(2),
+    consolidatedDirectCost: primaryDc.toFixed(2),
+    consolidatedGrossMargin: consolidatedGrossMargin.toFixed(2),
+    consolidatedGrossMarginPct: primaryRev.isZero()
+      ? null
+      : consolidatedGrossMargin.div(primaryRev).times(100).toFixed(2),
+    consolidatedCurrency: primaryCurrency,
+    warnings,
   };
 }
 
