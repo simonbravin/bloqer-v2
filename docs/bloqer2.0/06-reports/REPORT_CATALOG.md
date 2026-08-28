@@ -57,7 +57,7 @@
 | R-004 | Rentabilidad neta | Completo (GG manual + % empresa [D-040]) | `/reportes/rentabilidad` |
 | — | Ingresos vs gastos | Sí | `/reportes/ingresos-gastos` |
 
-**R-001 / EDT ([D-098]):** tablero único `/proyectos/[id]/control-costos` — capas de costo, composición APU, presets de columnas (incl. % y cantidades), CSV `control-costos.csv`. La ruta `presupuesto-vs-real` redirige acá.
+**R-001 / EDT ([D-098] · [D-099]):** tablero único `/proyectos/[id]/control-costos` — capas de costo, composición APU, presets de columnas (incl. % y cantidades), expand por `CostCategory` en partidas hoja, CSV `control-costos.csv` (filas EDT; CSV por tipo opcional post-v1). La ruta `presupuesto-vs-real` redirige acá.
 
 ### Hub reportes empresa ([D-098])
 

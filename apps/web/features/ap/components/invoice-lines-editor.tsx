@@ -33,6 +33,8 @@ export type InvoiceLine = {
   wbsNodeId?: string | null;
   /** Set when line comes from OC draft ([D-066]); kept for submit. */
   purchaseOrderLineId?: string | null;
+  /** Job-cost nature ([D-099]). */
+  costType?: "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER" | null;
 };
 
 export type InvoiceWbsOption = {
@@ -40,6 +42,14 @@ export type InvoiceWbsOption = {
   code: string;
   name: string;
 };
+
+const COST_TYPE_OPTIONS = [
+  { value: "MATERIAL", label: "Materiales" },
+  { value: "LABOR", label: "Mano de obra" },
+  { value: "EQUIPMENT", label: "Equipos" },
+  { value: "SUBCONTRACT", label: "Subcontratos" },
+  { value: "OTHER", label: "Otros" },
+] as const;
 
 function createLineKey(): string {
   return crypto.randomUUID();
@@ -59,6 +69,7 @@ const EMPTY_LINE: InvoiceLine = {
   discountPct: "0",
   wbsNodeId: null,
   purchaseOrderLineId: null,
+  costType: "MATERIAL",
 };
 
 /** Client preview aligned with UI 2 dp display ([D-053] / [D-086] / [D-093]). */
@@ -230,23 +241,53 @@ export function InvoiceLinesEditor({
               </div>
 
               {requireWbs ? (
-                <div className="space-y-1">
-                  <Label htmlFor={wbsId} className="text-xs">
-                    Partida EDT (obligatorio)
-                  </Label>
-                  <SearchableCombobox
-                    id={wbsId}
-                    popoverWidth="wide"
-                    options={wbsCombobox}
-                    value={line.wbsNodeId ?? ""}
-                    onValueChange={(v) =>
-                      update(i, "wbsNodeId", !v || v === SEARCHABLE_NONE ? null : v)
-                    }
-                    placeholder="Partida…"
-                    searchPlaceholder="Buscar partida…"
-                    emptyText="Sin partidas"
-                    className="h-9 text-xs"
-                  />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor={wbsId} className="text-xs">
+                      Partida EDT (obligatorio)
+                    </Label>
+                    <SearchableCombobox
+                      id={wbsId}
+                      popoverWidth="wide"
+                      options={wbsCombobox}
+                      value={line.wbsNodeId ?? ""}
+                      onValueChange={(v) =>
+                        update(i, "wbsNodeId", !v || v === SEARCHABLE_NONE ? null : v)
+                      }
+                      placeholder="Partida…"
+                      searchPlaceholder="Buscar partida…"
+                      emptyText="Sin partidas"
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`invoice-line-${lineKey}-cost-type`} className="text-xs">
+                      Tipo de costo
+                    </Label>
+                    <Select
+                      value={line.costType ?? "MATERIAL"}
+                      onValueChange={(v) =>
+                        update(i, "costType", v as NonNullable<InvoiceLine["costType"]>)
+                      }
+                    >
+                      <SelectTrigger
+                        id={`invoice-line-${lineKey}-cost-type`}
+                        className="h-9 text-xs"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COST_TYPE_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      Usá Mano de obra o Equipos para liquidaciones / alquileres imputados a la partida.
+                    </p>
+                  </div>
                 </div>
               ) : null}
 

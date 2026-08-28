@@ -1,4 +1,4 @@
-import { prisma } from "@bloqer/database";
+import { prisma, type CostCategory } from "@bloqer/database";
 import { ServiceError } from "../types";
 import { assertCompanyProjectScopeMatch } from "./assert-company-project-scope";
 
@@ -43,19 +43,19 @@ export async function assertCompanyMatchesProject(
   });
 }
 
-/** [D-068] Optional APU hint must belong to the same WBS ITEM cost item. */
+/** [D-068] Optional APU hint must belong to the same WBS ITEM cost item. Returns APU category for [D-099]. */
 export async function assertCostAnalysisLineForWbs(
   costAnalysisLineId: string,
   wbsNodeId: string,
   tenantId: string,
-): Promise<void> {
+): Promise<CostCategory> {
   const line = await prisma.costAnalysisLine.findFirst({
     where: {
       id: costAnalysisLineId,
       budget: { tenantId },
       costItem: { wbsNodeId },
     },
-    select: { id: true },
+    select: { id: true, category: true },
   });
   if (!line) {
     throw new ServiceError(
@@ -63,4 +63,5 @@ export async function assertCostAnalysisLineForWbs(
       "El insumo APU no pertenece a la partida EDT seleccionada",
     );
   }
+  return line.category;
 }

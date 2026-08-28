@@ -25,6 +25,8 @@ export type PurchaseOrderLine = {
   wbsNodeId: string | null;
   productId: string | null;
   costAnalysisLineId: string | null;
+  /** Job-cost nature ([D-099]). */
+  costType: "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER";
   description: string;
   unit: string;
   quantity: string;
@@ -40,6 +42,7 @@ export type WbsApuOption = {
   unit: string;
   unitCost: string;
   productId: string | null;
+  category?: string;
   /** Prefill qty = shortfall (need − ordered); null when unknown / non-purchasable. */
   quantity: string | null;
   needQty?: string | null;
@@ -82,10 +85,19 @@ interface Props {
   showVarianceJustification?: boolean;
 }
 
+const COST_TYPE_OPTIONS = [
+  { value: "MATERIAL", label: "Materiales" },
+  { value: "LABOR", label: "Mano de obra" },
+  { value: "EQUIPMENT", label: "Equipos" },
+  { value: "SUBCONTRACT", label: "Subcontratos" },
+  { value: "OTHER", label: "Otros" },
+] as const;
+
 const DEFAULT_LINE: PurchaseOrderLine = {
   wbsNodeId: null,
   productId: null,
   costAnalysisLineId: null,
+  costType: "MATERIAL",
   description: "",
   unit: "",
   quantity: "1",
@@ -138,6 +150,8 @@ export function PurchaseOrderLinesEditor({
       const patched: PurchaseOrderLine = { ...l, [field]: value };
       if (field === "wbsNodeId") {
         patched.costAnalysisLineId = null;
+        // Stale LAB/EQP from a previous APU must not stick to another partida.
+        patched.costType = "MATERIAL";
       }
       return patched;
     });
@@ -160,6 +174,9 @@ export function PurchaseOrderLinesEditor({
     const next: PurchaseOrderLine = {
       ...line,
       costAnalysisLineId: apu.id,
+      costType: (COST_TYPE_OPTIONS.some((o) => o.value === apu.category)
+        ? (apu.category as PurchaseOrderLine["costType"])
+        : "MATERIAL"),
       description: apu.description,
       unit: apu.unit,
       productId: apu.productId ?? line.productId,
@@ -323,7 +340,7 @@ export function PurchaseOrderLinesEditor({
               </div>
 
               {/* Row 1: EDT + Insumo APU */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-1">
                   <Label className="text-xs">EDT (obligatorio)</Label>
                   <SearchableCombobox
@@ -353,6 +370,31 @@ export function PurchaseOrderLinesEditor({
                       Esta partida ya está cerca o por encima del saldo disponible (aviso; no bloquea).
                     </p>
                   ) : null}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor={`po-line-${lineKey}-cost-type`} className="text-xs">
+                    Tipo de costo
+                  </Label>
+                  <Select
+                    value={line.costType ?? "MATERIAL"}
+                    onValueChange={(v) =>
+                      update(i, "costType", v as PurchaseOrderLine["costType"])
+                    }
+                  >
+                    <SelectTrigger id={`po-line-${lineKey}-cost-type`} className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COST_TYPE_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground leading-snug">
+                    Si elegís un insumo APU, se sugiere solo. Podés cambiarlo (p. ej. mano de obra).
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Insumo APU</Label>

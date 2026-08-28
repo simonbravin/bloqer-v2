@@ -22,6 +22,7 @@ const sampleLine: PoLineForInvoiceDraft = {
   receivedQuantity: "5",
   lineTotal: "1210",
   wbsNodeId: "wbs-1",
+  costType: "MATERIAL",
 };
 
 test("buildAutoFromPoInternalNotes includes receipt when provided", () => {
@@ -102,6 +103,19 @@ test("buildInvoiceDraftLinesFromPo filters by receipt quantities", () => {
   assert.equal(lines.length, 1);
   assert.equal(lines[0]!.description, "Arena");
   assert.equal(lines[0]!.quantity, "2");
+  assert.equal(lines[0]!.costType, "MATERIAL");
+});
+
+test("buildInvoiceDraftLinesFromPo inherits LAB costType from PO line", () => {
+  const lines = buildInvoiceDraftLinesFromPo(
+    [{ ...sampleLine, costType: "LABOR", receivedQuantity: "5" }],
+    {
+      basis: "received",
+      receivedAmount: new Prisma.Decimal(605),
+      invoicedAmount: new Prisma.Decimal(0),
+    },
+  );
+  assert.equal(lines[0]!.costType, "LABOR");
 });
 
 test("buildInvoiceDraftLinesFromPo returns empty when no received qty", () => {

@@ -46,6 +46,7 @@ export function PurchaseOrderEditForm({
           wbsNodeId:   l.wbsNodeId,
           productId:   l.productId ?? null,
           costAnalysisLineId: l.costAnalysisLineId ?? null,
+          costType: (l.costType as PurchaseOrderLine["costType"]) ?? "MATERIAL",
           description: l.description,
           unit:        l.unit,
           quantity:    l.quantity,
@@ -54,7 +55,7 @@ export function PurchaseOrderEditForm({
           discountPct: l.discountPct ?? "0",
           varianceJustification: l.varianceJustification,
         }))
-      : [{ wbsNodeId: null, productId: null, costAnalysisLineId: null, description: "", unit: "", quantity: "1", unitPrice: "", taxRate: "21", discountPct: "0" }],
+      : [{ wbsNodeId: null, productId: null, costAnalysisLineId: null, costType: "MATERIAL", description: "", unit: "", quantity: "1", unitPrice: "", taxRate: "21", discountPct: "0" }],
   );
 
   const showEmergency =

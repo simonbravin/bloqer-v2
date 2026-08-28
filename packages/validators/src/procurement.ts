@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { idempotencyKeySchema } from "./idempotency";
+import { costCategorySchema } from "./budget";
 import { isPositiveRoundedQty, positiveQtyString, qtyString, unitPriceString, discountPctString } from "./money";
 
 const purchaseOrderLineSchema = z.object({
@@ -7,6 +8,8 @@ const purchaseOrderLineSchema = z.object({
   productId: z.string().uuid().optional().nullable(),
   /** Optional APU hint ([D-068]); does not change EDT imputation. */
   costAnalysisLineId: z.string().uuid().optional().nullable(),
+  /** Job-cost nature ([D-099]). Defaults to APU category or MATERIAL in the service. */
+  costType: costCategorySchema.optional().nullable(),
   description: z.string().min(1, "Descripción requerida"),
   unit: z.string().default(""),
   quantity: positiveQtyString,

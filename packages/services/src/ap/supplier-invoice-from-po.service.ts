@@ -25,6 +25,7 @@ import {
   clampReceiptQuantitiesToPendingInvoice,
   computePendingToInvoiceAmount,
   sumPoLinesReceivedAmount,
+  type CostCategoryCode,
   type InvoiceDraftLineInput,
   type PoLineForInvoiceDraft,
 } from "./supplier-invoice-from-po-pure";
@@ -84,6 +85,7 @@ function toPoLineDraft(
     lineTotal: Prisma.Decimal;
     receivedQuantity: Prisma.Decimal;
     wbsNodeId: string | null;
+    costType?: CostCategoryCode | null;
   },
 ): PoLineForInvoiceDraft {
   return {
@@ -96,6 +98,7 @@ function toPoLineDraft(
     receivedQuantity: serializeQtyDecimal(line.receivedQuantity),
     lineTotal: serializeMoneyDecimal(line.lineTotal),
     wbsNodeId: line.wbsNodeId,
+    costType: line.costType ?? "MATERIAL",
   };
 }
 

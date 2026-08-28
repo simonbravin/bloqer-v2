@@ -1,11 +1,14 @@
 import { z } from "zod";
 import { positiveQtyString, discountPctString, unitPriceString } from "./money";
+import { costCategorySchema } from "./budget";
 
 const purchaseRequestLineSchema = z.object({
   wbsNodeId: z.string().uuid({ message: "Cada línea debe imputar a un ítem EDT" }),
   productId: z.string().uuid().optional().nullable(),
   /** Optional APU hint ([D-068]); does not change EDT imputation. */
   costAnalysisLineId: z.string().uuid().optional().nullable(),
+  /** Job-cost nature ([D-099]). Defaults to APU category or MATERIAL in the service. */
+  costType: costCategorySchema.optional().nullable(),
   lineType: z.enum(["MATERIAL", "SERVICE", "OTHER"]).default("MATERIAL"),
   description: z.string().min(1, "Descripción requerida"),
   unit: z.string().default(""),

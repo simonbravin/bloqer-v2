@@ -1015,22 +1015,25 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 - **Ruta:** `/proyectos/[id]/control-costos` (título de pantalla: **Estructura de Desglose de Trabajo y Costos**).
 - **Detalle de partida:** en el listado, tocá una fila (código o nombre, p. ej. `1.1 Replanteo de Obra`) para abrir el detalle en un **diálogo**, sin salir del tablero. La ruta directa `/control-costos/[wbsNodeId]` sigue disponible (p. ej. Ctrl+clic o desde Materiales / reportes).
 - Es el **tablero de control de costos** del proyecto. Materiales (cantidades) y Compras (documentos) alimentan este tablero; no lo reemplazan.
-- Compara **presupuesto baseline vs. real** por partida EDT, en capas: **comprometido**, **recibido** (informativo), **devengado**, **pagado**, más **certificado acumulado**. Es el tablero de **afectaciones** por partida (§0.2). Incluye **composición APU** (pie) y **vistas de columnas** (Financiero / Compacto / Cantidades / % Avance / Personalizado; preferencia en el navegador).
+- Compara **presupuesto baseline vs. real** por partida EDT, en capas: **comprometido**, **recibido** (informativo), **devengado**, **pagado**, más **certificado acumulado**. Es el tablero de **afectaciones** por partida (§0.2). Incluye **composición APU** (planificado) y **composición real** (devengado tipado por categoría, [D-099]), más **vistas de columnas** (Financiero / Compacto / Cantidades / % Avance / Personalizado; preferencia en el navegador).
+- **Desglose por tipo de costo ([D-099]):** en partidas hoja, el chevron junto al código EDT abre filas de solo lectura por categoría presente (Materiales / Mano de obra / Equipos / Subcontratos / Otros). El presupuesto por tipo viene del APU; el gasto tipado de OC, factura, subcontrato y consumo. Categorías vacías se ocultan. En el diálogo de partida, sección **Por tipo de costo**.
+- **Tipo en OC / factura de obra:** cada línea tiene **Tipo de costo** (default Materiales; si elegís insumo APU, hereda la categoría). Usá LAB / EQP para liquidaciones de jornales o alquileres facturados imputados a la partida. No hay timesheet en v1.
 - Si las líneas de factura de proveedor tienen partida EDT, el devengado/pagado se imputa **por línea**; si hay vínculo a línea de OC (`purchaseOrderLineId`, D-066), se usa esa partida; si no (legacy), se prorratea vía OC (D-055).
-- **Exposición esperada** = **devengado + comprometido abierto** ([BR-COS-002] / [D-065]). Comprometido abierto = comprometido − devengado ligado al mismo compromiso. **No** usar `max(comprometido, recibido, devengado)` ni sumar OC + factura en bruto. Comprometido de OC = **neto** (`lineSubtotal`, [D-095]/[D-098]).
+- **Exposición esperada** = **devengado + comprometido abierto** ([BR-COS-002] / [D-065]). Comprometido abierto = comprometido − devengado ligado al mismo compromiso. **No** usar `max(comprometido, recibido, devengado)` ni sumar OC + factura en bruto. Comprometido de OC = **neto** (`lineSubtotal`, [D-095]/[D-098]). Tipar por categoría **no cambia** las fórmulas: solo parte el mismo total.
 - **% útiles:** % compra (comprometido/presup.), % físico (cant. recibida/presup.), % económico (devengado/presup.), % exposición (exposición/presup.).
-- **Detalle de partida (diálogo):** links a OC, subcontratos, facturas de proveedor y pagos (trazabilidad partida → documento).
+- **Detalle de partida (diálogo):** links a OC, subcontratos, facturas de proveedor y pagos (trazabilidad partida → documento); desglose por tipo.
 - **Matching 3 vías (compras):** en detalle de OC, avisos si facturado supera recibido ± tolerancia de empresa ([D-067]); la recepción respeta tolerancia de sobrecantidad (0–5%).
-- **Insumo APU en OC (opcional):** se puede elegir un material del APU de la partida para prellenar; la imputación de $ sigue en la partida EDT ([D-068] / [D-057]).
+- **Insumo APU en OC (opcional):** se puede elegir un material del APU de la partida para prellenar; la imputación de $ sigue en la partida EDT ([D-068] / [D-057]); el tipo de costo se sugiere desde la categoría APU ([D-099]).
 - La ruta antigua `/reportes/presupuesto-vs-real` redirige acá ([D-098]).
 
 **Smoke manual — trazabilidad partida → pago**
 
 1. Planificación → **EDT y costos** → abrir una partida con saldo (diálogo).
-2. Compras → crear/confirmar **OC** imputada a esa partida (insumo APU opcional).
-3. Registrar **recepción**; crear **factura de proveedor** desde la OC (“Traer líneas”) y **emitir**.
-4. Registrar **pago** de la CxP.
-5. Volvé a abrir la partida en el diálogo: deben aparecer links a OC, factura y pago; la exposición = devengado + comprometido abierto.
+2. Compras → crear/confirmar **OC** imputada a esa partida (insumo APU opcional; **Tipo** Materiales u otro).
+3. Registrar **recepción**; crear **factura de proveedor** desde la OC (“Traer líneas”) y **emitir** (el tipo se hereda de la OC).
+4. Opcional: factura directa tipada **LAB** o **EQP** a la misma partida → debe aparecer en el expand por tipo.
+5. Registrar **pago** de la CxP.
+6. Volvé a abrir la partida en el diálogo: deben aparecer links a OC, factura y pago; la exposición = devengado + comprometido abierto; **Por tipo de costo** separa MAT vs LAB/EQP si tipaste distinto.
 
 <!-- capture:36 edt-y-costos -->
 ![Bloqer — EDT y costos](./guides/assets/screenshots/36-edt-y-costos.png)

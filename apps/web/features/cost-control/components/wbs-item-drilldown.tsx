@@ -132,6 +132,39 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
         </div>
       )}
 
+      {detail.byCostType && detail.byCostType.length > 0 ? (
+        <Section title="Por tipo de costo">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground border-b">
+                  <th className="py-1.5 pr-2 font-medium">Tipo</th>
+                  <th className="py-1.5 pr-2 font-medium text-right">Presup.</th>
+                  <th className="py-1.5 pr-2 font-medium text-right">Comprom.</th>
+                  <th className="py-1.5 pr-2 font-medium text-right">Devengado</th>
+                  <th className="py-1.5 font-medium text-right">Exposición</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.byCostType.map((b) => (
+                  <tr key={b.costType} className="border-b border-border/50">
+                    <td className="py-1.5 pr-2">{b.label}</td>
+                    <td className="py-1.5 pr-2 text-right tabular-nums">{fmt(b.budgetTotalCost)}</td>
+                    <td className="py-1.5 pr-2 text-right tabular-nums">{fmt(b.committedCost)}</td>
+                    <td className="py-1.5 pr-2 text-right tabular-nums">{fmt(b.accruedCost)}</td>
+                    <td className="py-1.5 text-right tabular-nums">{fmt(b.expectedCostExposure)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Desglose por materiales, mano de obra, equipos, subcontratos u otros según el tipo de cada
+            documento. La mano de obra y los equipos se tipan en la orden de compra o en la factura.
+          </p>
+        </Section>
+      ) : null}
+
       <Section
         title="Materiales APU"
         action={

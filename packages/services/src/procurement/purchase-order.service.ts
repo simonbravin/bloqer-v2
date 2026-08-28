@@ -14,6 +14,8 @@ import { PO_RECEIPT_ELIGIBLE_STATUSES } from "./procurement-constants";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { assertCompanyMatchesProject, assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
+import { resolveLineCostType } from "../cost-control/cost-type";
+import type { CostCategory } from "@bloqer/database";
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import { assertDirectPoAllowed } from "./procurement-policy.service";
@@ -57,6 +59,7 @@ export type PurchaseOrderLineView = {
   wbsNodeName: string | null;
   productId: string | null;
   costAnalysisLineId: string | null;
+  costType: string;
   description: string;
   unit: string;
   quantity: string;
@@ -93,6 +96,7 @@ function serializeLine(
   l: {
     id: string; purchaseOrderId: string; wbsNodeId: string | null; productId: string | null;
     costAnalysisLineId: string | null;
+    costType: CostCategory | null;
     description: string; unit: string;
     quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; taxRate: Prisma.Decimal;
     discountPct: Prisma.Decimal;
@@ -114,6 +118,7 @@ function serializeLine(
     wbsNodeName:       l.wbsNode?.name ?? null,
     productId:         l.productId,
     costAnalysisLineId: l.costAnalysisLineId,
+    costType: l.costType ?? "MATERIAL",
     description:       l.description,
     unit:              l.unit,
     quantity:          serializeQtyDecimal(l.quantity),
@@ -230,6 +235,8 @@ export type ProcurementApuOption = {
   unit: string;
   unitCost: string;
   productId: string | null;
+  /** APU CostCategory ([D-099]). */
+  category: string;
   /**
    * Prefill qty = shortfall (need − ordered). Null when non-purchasable / zero need.
    * Falls back to need when nothing ordered yet.
@@ -289,6 +296,7 @@ export async function listProcurementWbsOptions(
               unit: true,
               unitCost: true,
               productId: true,
+              category: true,
             },
           },
         },
@@ -322,6 +330,7 @@ export async function listProcurementWbsOptions(
           unit: l.unit,
           unitCost: serializeUnitPriceDecimal(l.unitCost),
           productId: l.productId,
+          category: l.category,
           // Prefill remaining to buy (0 when fully covered).
           quantity: c?.shortfallQty ?? null,
           needQty: c?.needQty ?? null,
@@ -437,10 +446,15 @@ export async function createPurchaseOrder(
   await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
 
   assertWbsRequiredOnLines(input.lines);
-  for (const line of input.lines) {
+  const apuCategoryByIdx = new Map<number, CostCategory>();
+  for (let i = 0; i < input.lines.length; i++) {
+    const line = input.lines[i]!;
     await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId);
     if (line.costAnalysisLineId) {
-      await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId);
+      apuCategoryByIdx.set(
+        i,
+        await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId),
+      );
     }
   }
 
@@ -490,7 +504,8 @@ export async function createPurchaseOrder(
       },
     });
 
-    for (const line of input.lines) {
+    for (let i = 0; i < input.lines.length; i++) {
+      const line = input.lines[i]!;
       const qty = new Prisma.Decimal(line.quantity);
       const price = new Prisma.Decimal(line.unitPrice);
       const rate = new Prisma.Decimal(line.taxRate ?? "0");
@@ -510,12 +525,17 @@ export async function createPurchaseOrder(
         },
         tx,
       );
+      const costType = resolveLineCostType({
+        costType: line.costType ?? null,
+        apuCategory: apuCategoryByIdx.get(i) ?? null,
+      });
       await tx.purchaseOrderLine.create({
         data: {
           purchaseOrderId: created.id,
           wbsNodeId: line.wbsNodeId,
           productId: line.productId ?? null,
           costAnalysisLineId: line.costAnalysisLineId ?? null,
+          costType,
           description: line.description,
           unit: line.unit ?? "",
           quantity: qty,
@@ -572,12 +592,17 @@ export async function updatePurchaseOrder(
     await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
   }
 
+  let apuCategoryByIdx = new Map<number, CostCategory>();
   if (input.lines) {
     assertWbsRequiredOnLines(input.lines);
-    for (const line of input.lines) {
+    for (let i = 0; i < input.lines.length; i++) {
+      const line = input.lines[i]!;
       await assertWbsLineForProject(line.wbsNodeId, existing.projectId, ctx.tenantId);
       if (line.costAnalysisLineId) {
-        await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId);
+        apuCategoryByIdx.set(
+          i,
+          await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId),
+        );
       }
     }
     await assertPoLinesWithinSelectedQuote(
@@ -621,7 +646,8 @@ export async function updatePurchaseOrder(
     if (input.lines) {
       const previousLines = await tx.purchaseOrderLine.findMany({ where: { purchaseOrderId: id } });
       await tx.purchaseOrderLine.deleteMany({ where: { purchaseOrderId: id } });
-      for (const line of input.lines) {
+      for (let i = 0; i < input.lines.length; i++) {
+        const line = input.lines[i]!;
         const prev = previousLines.find(
           (p) =>
             p.wbsNodeId === line.wbsNodeId &&
@@ -652,12 +678,17 @@ export async function updatePurchaseOrder(
           prev.budgetUnitCostSnapshot
             ? prev.budgetUnitCostSnapshot
             : baseline.unitCost;
+        const costType = resolveLineCostType({
+          costType: line.costType ?? null,
+          apuCategory: apuCategoryByIdx.get(i) ?? prev?.costType ?? null,
+        });
         await tx.purchaseOrderLine.create({
           data: {
             purchaseOrderId: id,
             wbsNodeId:       line.wbsNodeId,
             productId:       line.productId ?? null,
             costAnalysisLineId: line.costAnalysisLineId ?? null,
+            costType,
             description:     line.description,
             unit:            line.unit ?? "",
             quantity:        qty,

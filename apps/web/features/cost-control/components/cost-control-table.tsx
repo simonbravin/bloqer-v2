@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import Link from "next/link";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { CostControlFilters, CostControlRow, CostControlTotals } from "@bloqer/services";
 import {
   Table,
@@ -234,33 +235,63 @@ function EdtRowCard({
   projectId,
   filters,
   onOpen,
+  typeExpanded,
+  onToggleType,
 }: {
   row: CostControlRow;
   columns: EdtColumnId[];
   projectId: string;
   filters?: DrilldownFilters;
   onOpen: (row: CostControlRow) => void;
+  typeExpanded: boolean;
+  onToggleType: (wbsNodeId: string, e: MouseEvent) => void;
 }) {
   const href = itemPageHref(projectId, row.wbsNodeId, filters);
+  const buckets = row.byCostType ?? [];
+  const canExpand = buckets.length > 0;
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onOpen(row)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(row);
+        }
+      }}
       className={cn(
-        "w-full rounded-lg border bg-card p-3 text-left space-y-2",
+        "w-full cursor-pointer rounded-lg border bg-card p-3 text-left space-y-2",
         row.flags.overBudget && "border-red-300 dark:border-red-800",
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <Link
-            href={href}
-            className="font-mono text-xs font-medium text-primary hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {row.wbsCode}
-          </Link>
-          <p className="truncate text-sm font-medium">{row.wbsName}</p>
+        <div className="min-w-0 flex items-start gap-1">
+          {canExpand ? (
+            <button
+              type="button"
+              className="mt-0.5 rounded p-0.5 text-muted-foreground hover:bg-muted"
+              aria-label={typeExpanded ? "Ocultar tipos de costo" : "Ver tipos de costo"}
+              aria-expanded={typeExpanded}
+              onClick={(e) => onToggleType(row.wbsNodeId, e)}
+            >
+              {typeExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+            </button>
+          ) : null}
+          <div className="min-w-0">
+            <Link
+              href={href}
+              className="font-mono text-xs font-medium text-primary hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {row.wbsCode}
+            </Link>
+            <p className="truncate text-sm font-medium">{row.wbsName}</p>
+          </div>
         </div>
         <CostVarianceBadge
           variance={row.costVariance}
@@ -275,7 +306,24 @@ function EdtRowCard({
           </div>
         ))}
       </dl>
-    </button>
+      {canExpand && typeExpanded ? (
+        <div className="border-t pt-2 space-y-1.5">
+          <p className="text-[10px] text-muted-foreground">
+            Presupuesto → exposición por tipo
+          </p>
+          <ul className="space-y-1 text-[10px] text-muted-foreground">
+            {buckets.map((b) => (
+              <li key={b.costType} className="flex justify-between gap-2">
+                <span className="font-medium text-foreground/80">{b.label}</span>
+                <span className="tabular-nums shrink-0">
+                  {formatMoneyAmount(b.budgetTotalCost)} → {formatMoneyAmount(b.expectedCostExposure)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -283,6 +331,7 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
   const [openItem, setOpenItem] = useState<CostControlRow | null>(null);
   const [presetState, setPresetState] = useState<EdtPresetState>(defaultEdtPresetState);
   const [hydrated, setHydrated] = useState(false);
+  const [typeExpanded, setTypeExpanded] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     setPresetState(readEdtPresetState(projectId));
@@ -292,6 +341,17 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
   function updatePreset(next: EdtPresetState) {
     setPresetState(next);
     persistEdtPresetState(projectId, next);
+  }
+
+  function toggleTypeExpand(wbsNodeId: string, e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setTypeExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(wbsNodeId)) next.delete(wbsNodeId);
+      else next.add(wbsNodeId);
+      return next;
+    });
   }
 
   const columns = columnsForPreset(presetState);
@@ -379,6 +439,8 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
               projectId={projectId}
               filters={filters}
               onOpen={setOpenItem}
+              typeExpanded={typeExpanded.has(row.wbsNodeId)}
+              onToggleType={toggleTypeExpand}
             />
           ))}
         </div>
@@ -401,62 +463,124 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
-                  <TableRow
-                    key={row.wbsNodeId}
-                    className={cn(
-                      "cursor-pointer",
-                      row.flags.overBudget && "bg-red-50/50 dark:bg-red-950/10",
-                    )}
-                    onClick={(e) => {
-                      if (isModifiedClick(e)) return;
-                      setOpenItem(row);
-                    }}
-                  >
-                    <TableCell className="font-mono font-medium">
-                      <Link
-                        href={itemPageHref(projectId, row.wbsNodeId, filters)}
-                        className="hover:underline text-primary"
-                        onClick={(e) => openFromList(e, row)}
-                      >
-                        {row.wbsCode}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="max-w-48 truncate">
-                      <Link
-                        href={itemPageHref(projectId, row.wbsNodeId, filters)}
-                        className="hover:underline"
-                        onClick={(e) => openFromList(e, row)}
-                      >
-                        {row.wbsName}
-                      </Link>
-                      {row.flags.missingBudget && (
-                        <span className="ml-1 text-yellow-600 text-xs">(sin análisis)</span>
+                {rows.flatMap((row) => {
+                  const expanded = typeExpanded.has(row.wbsNodeId);
+                  const buckets = row.byCostType ?? [];
+                  const canExpand = buckets.length > 0;
+                  const main = (
+                    <TableRow
+                      key={row.wbsNodeId}
+                      className={cn(
+                        "cursor-pointer",
+                        row.flags.overBudget && "bg-red-50/50 dark:bg-red-950/10",
                       )}
-                    </TableCell>
-                    {columns.map((col) => (
-                      <TableCell
-                        key={col}
-                        className={cn(
-                          "text-right",
-                          col === "exposure" && "font-medium",
-                          [
-                            "committed",
-                            "received",
-                            "accrued",
-                            "paid",
-                            "consumed",
-                            "openCommitted",
-                            "budgetSale",
-                            "physicalProgress",
-                          ].includes(col) && "text-muted-foreground",
-                        )}
-                      >
-                        {cellValue(row, col)}
+                      onClick={(e) => {
+                        if (isModifiedClick(e)) return;
+                        setOpenItem(row);
+                      }}
+                    >
+                      <TableCell className="font-mono font-medium">
+                        <div className="flex items-center gap-0.5">
+                          {canExpand ? (
+                            <button
+                              type="button"
+                              className="rounded p-0.5 text-muted-foreground hover:bg-muted"
+                              aria-label={expanded ? "Ocultar tipos de costo" : "Ver tipos de costo"}
+                              aria-expanded={expanded}
+                              onClick={(e) => toggleTypeExpand(row.wbsNodeId, e)}
+                            >
+                              {expanded ? (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          ) : (
+                            <span className="inline-block w-4" />
+                          )}
+                          <Link
+                            href={itemPageHref(projectId, row.wbsNodeId, filters)}
+                            className="hover:underline text-primary"
+                            onClick={(e) => openFromList(e, row)}
+                          >
+                            {row.wbsCode}
+                          </Link>
+                        </div>
                       </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
+                      <TableCell className="max-w-48 truncate">
+                        <Link
+                          href={itemPageHref(projectId, row.wbsNodeId, filters)}
+                          className="hover:underline"
+                          onClick={(e) => openFromList(e, row)}
+                        >
+                          {row.wbsName}
+                        </Link>
+                        {row.flags.missingBudget && (
+                          <span className="ml-1 text-yellow-600 text-xs">(sin análisis)</span>
+                        )}
+                      </TableCell>
+                      {columns.map((col) => (
+                        <TableCell
+                          key={col}
+                          className={cn(
+                            "text-right",
+                            col === "exposure" && "font-medium",
+                            [
+                              "committed",
+                              "received",
+                              "accrued",
+                              "paid",
+                              "consumed",
+                              "openCommitted",
+                              "budgetSale",
+                              "physicalProgress",
+                            ].includes(col) && "text-muted-foreground",
+                          )}
+                        >
+                          {cellValue(row, col)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                  if (!expanded) return [main];
+                  return [
+                    main,
+                    ...buckets.map((b) => (
+                      <TableRow
+                        key={`${row.wbsNodeId}-${b.costType}`}
+                        className="bg-muted/30 text-muted-foreground"
+                      >
+                        <TableCell className="pl-8 text-[10px] text-muted-foreground/70">
+                          └
+                        </TableCell>
+                        <TableCell className="text-xs pl-2 font-medium text-foreground/80">
+                          {b.label}
+                        </TableCell>
+                        {columns.map((col) => (
+                          <TableCell key={col} className="text-right tabular-nums text-[11px]">
+                            {col === "budgetCost"
+                              ? formatMoneyAmount(b.budgetTotalCost)
+                              : col === "committed"
+                                ? formatMoneyAmount(b.committedCost)
+                                : col === "accrued"
+                                  ? formatMoneyAmount(b.accruedCost)
+                                  : col === "paid"
+                                    ? formatMoneyAmount(b.paidCost)
+                                    : col === "consumed"
+                                      ? formatMoneyAmount(b.inventoryConsumedCost)
+                                      : col === "openCommitted"
+                                        ? formatMoneyAmount(b.openCommittedCost)
+                                        : col === "exposure"
+                                          ? formatMoneyAmount(b.expectedCostExposure)
+                                          : col === "variance"
+                                            ? formatMoneyAmount(b.costVariance)
+                                            : "—"}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    )),
+                  ];
+                })}
               </TableBody>
               <TableFooter>
                 <TableRow className="font-semibold">

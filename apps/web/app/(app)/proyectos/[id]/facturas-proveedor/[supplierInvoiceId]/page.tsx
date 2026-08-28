@@ -17,6 +17,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, formatUnitPriceFromString } from "@/lib/format-money";
+import { costCategoryLabelEs } from "@/lib/cost-category-colors";
 import {
   getPayableBySupplierInvoiceId,
   getPurchaseOrderCodeForApLink,
@@ -176,6 +177,7 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
             <TableHeader>
               <TableRow>
                 <TableHead>Descripción</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead className="text-right">Qty</TableHead>
                 <TableHead className="text-right">Precio</TableHead>
                 <TableHead className="text-right">Desc. %</TableHead>
@@ -187,6 +189,9 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
               {invoice.lines.map((line) => (
                 <TableRow key={line.id}>
                   <TableCell>{line.description}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {costCategoryLabelEs(line.costType)}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">{formatQtyFromString(line.quantity)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatUnitPriceFromString(line.unitPrice)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatRatePctFromString(line.discountPct)}</TableCell>

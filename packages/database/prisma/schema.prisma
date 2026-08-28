@@ -2018,6 +2018,8 @@ model SupplierInvoiceLine {
   wbsNodeId           String?
   /// Optional link to PO line for 3-way / exposure anti-double-count ([D-066]).
   purchaseOrderLineId String?
+  /// Job-cost nature for EDT partida × cost type ([D-099]).
+  costType            CostCategory?
   description         String
   quantity            Decimal  @db.Decimal(18, 4)
   unitPrice           Decimal  @db.Decimal(18, 4)
@@ -2038,6 +2040,7 @@ model SupplierInvoiceLine {
   @@index([invoiceId])
   @@index([wbsNodeId])
   @@index([purchaseOrderLineId])
+  @@index([costType])
   @@map("supplier_invoice_lines")
 }
 
@@ -2214,6 +2217,8 @@ model PurchaseRequestLine {
   productId              String?
   /// Optional APU hint under the ITEM ([D-068]); cost still imputes to wbsNodeId ([D-057]).
   costAnalysisLineId     String?
+  /// Job-cost nature for EDT partida × cost type ([D-099]). Default MATERIAL when unset at write.
+  costType               CostCategory?
   lineType               PurchaseRequestLineType @default(MATERIAL)
   description            String
   unit                   String                  @default("")
@@ -2233,6 +2238,7 @@ model PurchaseRequestLine {
   @@index([purchaseRequestId])
   @@index([wbsNodeId])
   @@index([costAnalysisLineId])
+  @@index([costType])
   @@map("purchase_request_lines")
 }
 
@@ -2353,6 +2359,8 @@ model PurchaseOrderLine {
   productId              String?
   /// Optional APU hint under the ITEM ([D-068]); cost still imputes to wbsNodeId ([D-057]).
   costAnalysisLineId     String?
+  /// Job-cost nature for EDT partida × cost type ([D-099]). Default MATERIAL when unset at write.
+  costType               CostCategory?
   description            String
   unit                   String                    @default("")
   quantity               Decimal                   @db.Decimal(18, 4)
@@ -2384,6 +2392,7 @@ model PurchaseOrderLine {
   @@index([wbsNodeId])
   @@index([productId])
   @@index([costAnalysisLineId])
+  @@index([costType])
   @@map("purchase_order_lines")
 }
 

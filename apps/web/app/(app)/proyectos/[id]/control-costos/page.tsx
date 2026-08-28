@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  buildAccruedCompositionFromRows,
   getBudgetCompositionReport,
   getProjectCostControl,
   getProjectShellInfo,
@@ -13,6 +14,7 @@ import {
   CostControlFilters,
 } from "@/features/cost-control";
 import { BudgetCompositionChart, ReportExportActions } from "@/features/reports";
+import { CostCompositionChart } from "@/features/projects/cost-composition-chart";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
@@ -67,6 +69,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
   }
 
   let compositionResult = null;
+  let accruedCompositionResult = null;
   if (result.type === "REPORT") {
     try {
       compositionResult = await getBudgetCompositionReport(
@@ -77,6 +80,12 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
     } catch {
       compositionResult = null;
     }
+    accruedCompositionResult = buildAccruedCompositionFromRows(
+      projectId,
+      result.budgetId,
+      result.budgetName,
+      result.rows,
+    );
   }
 
   // availableBudgets is present on REPORT and BUDGET_SELECTION_REQUIRED
@@ -88,6 +97,17 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
       : result.type === "BUDGET_SELECTION_REQUIRED"
         ? `${result.availableBudgets.length} presupuestos aprobados`
         : undefined;
+
+  const plannedComposition =
+    compositionResult?.type === "COMPOSITION" ? compositionResult : null;
+  const accruedComposition =
+    accruedCompositionResult?.type === "COMPOSITION" &&
+    accruedCompositionResult.slices.length > 0
+      ? accruedCompositionResult
+      : null;
+  const showPlannedPie = Boolean(plannedComposition && plannedComposition.slices.length > 0);
+  const showPlannedEmpty = Boolean(plannedComposition && plannedComposition.slices.length === 0);
+  const showCompositionGrid = showPlannedPie || Boolean(accruedComposition) || showPlannedEmpty;
 
   const subtitleFull = subtitle
     ? `${subtitle} · Costos directos de obra (OC, facturas, subcontratos, stock). Los GG de empresa van a Rentabilidad → margen neto.`
@@ -188,8 +208,21 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
 
           <CostControlSummaryCards totals={result.totals} />
 
-          {compositionResult?.type === "COMPOSITION" ? (
-            <BudgetCompositionChart composition={compositionResult} />
+          {showCompositionGrid ? (
+            <div
+              className={
+                showPlannedPie && accruedComposition
+                  ? "grid gap-4 lg:grid-cols-2"
+                  : "grid gap-4"
+              }
+            >
+              {plannedComposition ? (
+                <BudgetCompositionChart composition={plannedComposition} />
+              ) : null}
+              {accruedComposition ? (
+                <CostCompositionChart composition={accruedComposition} />
+              ) : null}
+            </div>
           ) : null}
 
           {result.rows.length === 0 ? (

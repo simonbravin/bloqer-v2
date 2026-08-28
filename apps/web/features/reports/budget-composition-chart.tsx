@@ -4,9 +4,8 @@ import { useMemo } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { BudgetCompositionReport } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { costCategoryColor } from "@/lib/cost-category-colors";
 import { formatChartMoney } from "@/lib/format-money";
-
-const COLORS = ["#2563eb", "#16a34a", "#ca8a04", "#9333ea"];
 
 function moneyTooltip(value: number) {
   return formatChartMoney(value);
@@ -21,9 +20,10 @@ export function BudgetCompositionChart({ composition }: Props) {
     () =>
       composition.slices.map((s, i) => ({
         name: s.label,
+        category: s.category,
         value: parseFloat(s.amount),
         percent: parseFloat(s.percent),
-        fill: COLORS[i % COLORS.length],
+        fill: costCategoryColor(s.category, i),
       })),
     [composition.slices],
   );
@@ -33,7 +33,7 @@ export function BudgetCompositionChart({ composition }: Props) {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Composición del presupuesto</CardTitle>
-          <CardDescription>Costo directo por categoría APU</CardDescription>
+          <CardDescription>Costo directo planificado por tipo (APU)</CardDescription>
         </CardHeader>
         <CardContent className="py-8 text-center text-sm text-muted-foreground">
           Sin líneas de análisis de costo en este presupuesto.
@@ -66,7 +66,10 @@ export function BudgetCompositionChart({ composition }: Props) {
                   paddingAngle={2}
                 >
                   {chartData.map((entry, index) => (
-                    <Cell key={entry.name} fill={entry.fill ?? COLORS[index % COLORS.length]} />
+                    <Cell
+                      key={entry.category}
+                      fill={entry.fill ?? costCategoryColor(entry.category, index)}
+                    />
                   ))}
                 </Pie>
                 <Tooltip
@@ -81,7 +84,7 @@ export function BudgetCompositionChart({ composition }: Props) {
               <li key={s.category} className="flex items-center gap-2 min-w-0">
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                  style={{ backgroundColor: costCategoryColor(s.category, i) }}
                 />
                 <span className="truncate text-muted-foreground">{s.label}</span>
                 <span className="ml-auto shrink-0 font-mono tabular-nums">{s.percent}%</span>

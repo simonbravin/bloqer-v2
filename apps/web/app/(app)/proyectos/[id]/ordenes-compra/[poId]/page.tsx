@@ -7,6 +7,7 @@ import {
   formatUnitPriceFromString,
   isZeroRatePct,
 } from "@/lib/format-money";
+import { costCategoryLabelEs } from "@/lib/cost-category-colors";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import Link from "next/link";
@@ -260,6 +261,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
               <TableRow>
                 <TableHead className="w-[30%]">Descripción</TableHead>
                 <TableHead>EDT</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead className="text-right">Unidad</TableHead>
                 <TableHead className="text-right">Cant.</TableHead>
                 {showReceiptQty && (
@@ -281,6 +283,9 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                   <TableCell>{line.description}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {line.wbsNodeCode ? `${line.wbsNodeCode} — ${line.wbsNodeName}` : "—"}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {costCategoryLabelEs(line.costType)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{line.unit || "—"}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatQtyFromString(line.quantity)}</TableCell>

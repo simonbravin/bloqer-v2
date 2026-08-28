@@ -30,6 +30,7 @@ const DEFAULT_LINE: PurchaseOrderLine = {
   wbsNodeId: null,
   productId: null,
   costAnalysisLineId: null,
+  costType: "MATERIAL",
   description: "",
   unit: "",
   quantity: "1",

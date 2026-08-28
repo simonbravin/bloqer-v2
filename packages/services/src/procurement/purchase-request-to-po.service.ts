@@ -1,4 +1,5 @@
 import { effectiveUnitPriceNet } from "@bloqer/utils";
+import { resolveLineCostType } from "../cost-control/cost-type";
 import { parseDiscountPct } from "../finance/invoice-line-money";
 import { Prisma, prisma, PurchaseOrderStatus } from "@bloqer/database";
 import { auditProcurement } from "./procurement-audit";
@@ -119,6 +120,10 @@ export async function selectProcurementQuoteAndCreatePo(
           wbsNodeId: prl.wbsNodeId,
           costAnalysisLineId: prl.costAnalysisLineId,
           productId: prl.productId,
+          costType: resolveLineCostType({
+            costType: prl.costType,
+            apuCategory: null,
+          }),
           description: prl.description,
           unit: prl.unit,
           quantity: prl.quantity,

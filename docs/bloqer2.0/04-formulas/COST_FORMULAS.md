@@ -115,6 +115,19 @@ Componentes imputados al ítem según la **vista activa** del toggle del reporte
 - **Devengado:** obligaciones reconocidas imputadas al ítem.
 - **Pagado:** pagos confirmados imputados al ítem.
 
+### 3.1 Matriz partida × tipo de costo ([D-099])
+
+El total por partida EDT (capas [D-021] / exposición [BR-COS-002]) se puede **partir** por `CostCategory` (MATERIAL | LABOR | EQUIPMENT | SUBCONTRACT | OTHER) sin cambiar las fórmulas:
+
+\[
+\text{layer}_{item} = \sum_{c \in CostCategory} \text{layer}_{item,c}
+\]
+
+- **Presupuesto por tipo:** suma de líneas APU (`CostAnalysisLine`) de esa categoría bajo la partida.
+- **Actuals por tipo:** documentos tipados (`costType` en líneas de SC/OC/factura; subcontrato → SUBCONTRACT; consumo stock → MATERIAL).
+- Tipar **no** introduce un eje APU-línea como cost code ([D-057] / [D-068]).
+- Forecast to Complete / EAC editable: fuera de v1 (ver [OPEN_QUESTIONS](../00-product/OPEN_QUESTIONS.md) Q-059).
+
 ---
 
 ## 4. Presupuesto vs real por ítem

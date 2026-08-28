@@ -25,6 +25,11 @@ const supplierInvoiceLineSchema = z.object({
   wbsNodeId:   z.string().uuid().optional().nullable(),
   /** Optional link to PO line when invoice is tied to an OC ([D-066]). */
   purchaseOrderLineId: z.string().uuid().optional().nullable(),
+  /** Job-cost nature ([D-099]). Required for project invoices without PO line inherit; default MATERIAL. */
+  costType: z
+    .enum(["MATERIAL", "LABOR", "EQUIPMENT", "SUBCONTRACT", "OTHER"])
+    .optional()
+    .nullable(),
 });
 
 /** projectId null/omit = company-level AP (Phase 16B). Project routes must still pass projectId from URL. */

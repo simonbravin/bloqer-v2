@@ -502,6 +502,19 @@
 
 ---
 
+### Q-059 — Forecast to Complete / EAC por partida (y por tipo de costo)
+
+- **Categoría:** Control de costos / proyecciones
+- **Estado:** ABIERTA — diferida ([D-099] v1 usa exposición)
+- **Contexto:** Procore Budget ofrece Forecast to Complete / Estimated Cost at Completion editable por budget code×type. Bloqer hoy usa **exposición esperada** (devengado + comprometido abierto, [D-065]) y, con [D-099], desglose por `CostCategory`. No hay proyección manual “cuánto falta gastar al cierre”.
+- **Impacto si no se resuelve:** el PM alerta con exposición, pero no carga un EAC explícito ni forecast por tipo.
+- **Opciones identificadas:**
+  1. Campo/proyección editable por partida (y opcionalmente por tipo) estilo Procore.
+  2. Seguir solo con exposición + % físico/económico (status quo D-099).
+- **Recomendación inicial:** opción 2 hasta priorizar forecasting; no inventar EAC en código sin D-NNN.
+
+---
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

@@ -67,6 +67,7 @@ const DEFAULT_LINE: InvoiceLine = {
   discountPct: "0",
   wbsNodeId: null,
   purchaseOrderLineId: null,
+  costType: "MATERIAL",
 };
 const INVOICE_CURRENCY = "ARS";
 
@@ -184,6 +185,7 @@ export function SupplierInvoiceForm({
         discountPct: l.discountPct ?? "0",
         wbsNodeId: l.wbsNodeId ?? null,
         purchaseOrderLineId: l.purchaseOrderLineId ?? null,
+        costType: (l.costType as InvoiceLine["costType"]) ?? "MATERIAL",
       })),
     );
     toast.success("Líneas traídas desde la OC (pendiente de facturar). Podés ajustarlas.");

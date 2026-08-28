@@ -9,6 +9,7 @@ import { assertProjectAllowsOperationalMutation } from "../project/project-opera
 import { assertSubcontractCertSuccessionAllowed } from "./subcontract-cert-succession";
 import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import { subcontractCostType } from "../cost-control/cost-type";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -498,6 +499,7 @@ export async function approveSubcontractCertification(
           quantity:    line.currentQty,
           unitPrice:   line.unitPriceSnapshot,
           taxRate:     new Prisma.Decimal(0),
+          costType:    subcontractCostType(),
           lineSubtotal: line.lineTotal,
           lineTax:     new Prisma.Decimal(0),
           lineTotal:   line.lineTotal,

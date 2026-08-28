@@ -29,6 +29,7 @@ import {
   assertSupplierInvoiceLinesPoLink,
   assertSupplierInvoiceLinesWbs,
   resolveCompanyIdForAp,
+  resolveInvoiceLineCostTypes,
 } from "./supplier-invoice.service";
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
@@ -368,6 +369,7 @@ export async function registerApExpense(
     input.lines,
     ctx.tenantId,
   );
+  const lineCostTypes = await resolveInvoiceLineCostTypes(input.lines);
 
   const companyId = await resolveCompanyIdForAp(projectId, ctx);
   const company = await prisma.company.findUnique({
@@ -441,7 +443,8 @@ export async function registerApExpense(
               },
             });
 
-            for (const line of input.lines) {
+            for (let i = 0; i < input.lines.length; i++) {
+              const line = input.lines[i]!;
               const qty = new Prisma.Decimal(line.quantity);
               const price = new Prisma.Decimal(line.unitPrice);
               const rate = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
@@ -457,6 +460,7 @@ export async function registerApExpense(
                   invoiceId: created.id,
                   wbsNodeId: line.wbsNodeId ?? null,
                   purchaseOrderLineId: line.purchaseOrderLineId ?? null,
+                  costType: lineCostTypes[i] ?? "MATERIAL",
                   description: line.description,
                   quantity: qty,
                   unitPrice: unitPriceNet,

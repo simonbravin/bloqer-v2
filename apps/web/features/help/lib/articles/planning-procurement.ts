@@ -324,20 +324,21 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     where: { menu: "Compras → Órdenes de compra" },
     hrefs: [{ kind: "project", suffix: "/ordenes-compra", label: "Órdenes de compra" }],
     steps: [
-      "Nueva OC o desde SC seleccionada. Proveedor: buscá por razón social o nombre fantasía. Cada línea: partida hoja, cantidades/precios y Desc. % (antes de IVA). Descuento general % + Aplicar a todas copia el mismo % (hay que ingresar un número; 0 limpia todas).",
+      "Nueva OC o desde SC seleccionada. Proveedor: buscá por razón social o nombre fantasía. Cada línea: partida hoja, **Tipo de costo** (Materiales / Mano de obra / Equipos / Subcontratos / Otros; default Materiales; si elegís insumo APU hereda la categoría), cantidades/precios y Desc. % (antes de IVA). Descuento general % + Aplicar a todas copia el mismo % (hay que ingresar un número; 0 limpia todas).",
       "En el listado de OC hay un buscador (código, proveedor, aprobador) y botones de estado (Todas / Borrador / Pend. aprobación / Aprobada / Confirmada / Recep. parcial / Recibida / Anulada) con contador por estado. Los deep-links históricos (?status=) siguen funcionando como filtro inicial (por ejemplo desde Pendientes).",
       "Ref. presup. muestra el insumo de materiales del APU, o el costo dir. /u de la partida si esa partida no tiene materiales (p. ej. solo mano de obra).",
       "Enviar a aprobación → Aprobar (o Devolver a borrador con motivo). Si el precio supera el referencial, completá Justificación desvío. Comprar por debajo no pide nota. El % de desvío se ve en rojo si se gasta más y en verde si se gasta menos. Aprobadores la ven en Pendientes + campana.",
-      "Confirmar al proveedor → CONFIRMED = Comprometido en EDT y costos. Quien puede confirmar la ve en Pendientes tras la aprobación; Depósito/Compras reciben campana al confirmar para registrar recepción.",
+      "Confirmar al proveedor → CONFIRMED = Comprometido en EDT y costos (en el bucket del tipo elegido). Quien puede confirmar la ve en Pendientes tras la aprobación; Depósito/Compras reciben campana al confirmar para registrar recepción.",
       "Si la OC queda Confirmada o Recep. parcial y pasa la Entrega prevista, aparece un badge rojo Vencida N d junto a Entrega prevista en el listado y en Pendientes; se envía notificación diaria a quien puede recepcionar (dedup 7 días).",
       "Cuando la OC pasa a Recep. parcial o Recibida, aparece Registrar factura desde OC. Si se dejan pasar 5 días (configurable) sin registrar la factura, aparece un pendiente OC recibida sin factura para Administración con CTA Registrar factura; también se notifica por campana + email a EDIT|APPROVE AP.",
-      "Luego recepción y factura.",
+      "Luego recepción y factura (el tipo se hereda de la línea de OC).",
     ],
     effects: ["APPROVED = control interno; CONFIRMED = Comprometido."],
     pitfalls: [
       "Siempre Enviar → Aprobar → Confirmar; no existe atajo Emitir y confirmar.",
       "Si Ref. presup. sale — la partida no tiene APU ni costo dir. /u: hay que justificar el desvío o completar el presupuesto.",
       "Sin factura de proveedor no hay CxP: la alerta OC recibida sin factura sirve para cerrar ese circuito y poder pagar.",
+      "Para jornales o alquileres puntuales elegí tipo Mano de obra o Equipos en la línea; el desglose fino del APU se arma en Presupuesto.",
     ],
     relatedSlugs: [
       "circuito-comprar-material-hasta-pagarlo",
@@ -377,7 +378,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "recibida sin factura",
       "registrar factura desde oc",
     ],
-    guideRef: "§9.2",
+    guideRef: "§9.2 · [D-099]",
   },
   {
     slug: "recibir-una-oc",
@@ -429,11 +430,14 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Desde la OC: Registrar factura desde OC (Traer líneas).",
-      "Revisá montos y adjunto del comprobante.",
+      "Revisá montos, **Tipo de costo** (se hereda de la OC; ajustalo si hace falta) y adjunto del comprobante.",
       "Crear → borrador → Emitir (o Emitir y pagar ahora).",
     ],
-    effects: ["Emitir → Devengado + CxP + asiento DRAFT."],
-    relatedSlugs: ["pagar-una-cuenta-por-pagar", "emitir-y-pagar-ahora", "descuento-porcentual-en-lineas"],
+    effects: ["Emitir → Devengado + CxP + asiento DRAFT (en el bucket del tipo de cada línea)."],
+    pitfalls: [
+      "Gasto directo sin OC: elegí el Tipo de costo en la línea (default Materiales); usá Mano de obra o Equipos para jornales o alquileres.",
+    ],
+    relatedSlugs: ["pagar-una-cuenta-por-pagar", "emitir-y-pagar-ahora", "descuento-porcentual-en-lineas", "leer-edt-y-costos"],
     keywords: [
       "factura desde oc",
       "traer lineas",
@@ -441,8 +445,9 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "factura de compra",
       "boleta",
       "boleta de compra",
+      "tipo de costo",
     ],
-    guideRef: "§9.2 · §12.2",
+    guideRef: "§9.2 · §12.2 · [D-099]",
   },
   {
     slug: "oc-directa-vs-con-solicitud",

@@ -1,5 +1,12 @@
 import { Prisma } from "@bloqer/database";
 
+export type CostCategoryCode =
+  | "MATERIAL"
+  | "LABOR"
+  | "EQUIPMENT"
+  | "SUBCONTRACT"
+  | "OTHER";
+
 export type PoLineForInvoiceDraft = {
   id: string;
   description: string;
@@ -10,6 +17,7 @@ export type PoLineForInvoiceDraft = {
   receivedQuantity: string;
   lineTotal: string;
   wbsNodeId: string | null;
+  costType: CostCategoryCode | null;
 };
 
 export type InvoiceDraftLineInput = {
@@ -20,6 +28,7 @@ export type InvoiceDraftLineInput = {
   discountPct: string;
   wbsNodeId?: string | null;
   purchaseOrderLineId?: string | null;
+  costType?: CostCategoryCode | null;
 };
 
 const ZERO = new Prisma.Decimal(0);
@@ -135,6 +144,7 @@ export function buildInvoiceDraftLinesFromPo(
       discountPct: line.discountPct,
       wbsNodeId: line.wbsNodeId,
       purchaseOrderLineId: line.id,
+      costType: line.costType ?? "MATERIAL",
     });
   }
 

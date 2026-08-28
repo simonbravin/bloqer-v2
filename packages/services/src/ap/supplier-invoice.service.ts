@@ -1,4 +1,4 @@
-import { Prisma, prisma, SupplierInvoice } from "@bloqer/database";
+import { Prisma, prisma, SupplierInvoice, type CostCategory } from "@bloqer/database";
 import type { CreateSupplierInvoiceInput, UpdateSupplierInvoiceInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
@@ -21,6 +21,7 @@ import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, se
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
 import { assertWbsLineForProject } from "../procurement/procurement-wbs";
+import { resolveLineCostType } from "../cost-control/cost-type";
 import { ensureDraftJournalFromSupplierInvoice } from "../accounting/accounting-auto-draft.service";
 import {
   assertJournalAllowsOperationalCancel,
@@ -29,6 +30,37 @@ import {
 import { assertApInvoicePayee } from "../contact/assert-contact-role";
 
 const PO_AP_LINKABLE_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
+
+export async function resolveInvoiceLineCostTypes(
+  lines: Array<{
+    costType?: CostCategory | null;
+    purchaseOrderLineId?: string | null;
+  }>,
+): Promise<CostCategory[]> {
+  const poIds = [
+    ...new Set(lines.map((l) => l.purchaseOrderLineId).filter((id): id is string => Boolean(id))),
+  ];
+  const poCostById = new Map<string, CostCategory>();
+  if (poIds.length > 0) {
+    const poLines = await prisma.purchaseOrderLine.findMany({
+      where: { id: { in: poIds } },
+      select: { id: true, costType: true },
+    });
+    for (const pl of poLines) {
+      if (pl.costType) poCostById.set(pl.id, pl.costType);
+    }
+  }
+  return lines.map((line) => {
+    const fromPo = line.purchaseOrderLineId
+      ? (poCostById.get(line.purchaseOrderLineId) ?? null)
+      : null;
+    // Explicit line type wins; else inherit from OC line ([D-099]); else MATERIAL.
+    return resolveLineCostType({
+      costType: line.costType ?? null,
+      apuCategory: fromPo,
+    });
+  });
+}
 
 /** Shared with registerApExpense — OC must be confirmed (or later receipt states) before AP link. */
 export function assertPurchaseOrderLinkableForAp(status: string): void {
@@ -50,6 +82,7 @@ export type SupplierInvoiceLineView = {
   invoiceId: string;
   wbsNodeId: string | null;
   purchaseOrderLineId: string | null;
+  costType: string | null;
   description: string;
   quantity: string;
   unitPrice: string;
@@ -522,6 +555,7 @@ export async function createSupplierInvoice(
     input.lines,
     ctx.tenantId,
   );
+  const lineCostTypes = await resolveInvoiceLineCostTypes(input.lines);
 
   const maxNum = await prisma.supplierInvoice.aggregate({
     where: { tenantId: ctx.tenantId, companyId },
@@ -550,7 +584,8 @@ export async function createSupplierInvoice(
       },
     });
 
-    for (const line of input.lines) {
+    for (let i = 0; i < input.lines.length; i++) {
+      const line = input.lines[i]!;
       const qty   = new Prisma.Decimal(line.quantity);
       const price = new Prisma.Decimal(line.unitPrice);
       const rate  = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
@@ -566,6 +601,7 @@ export async function createSupplierInvoice(
           invoiceId:   created.id,
           wbsNodeId:   line.wbsNodeId ?? null,
           purchaseOrderLineId: line.purchaseOrderLineId ?? null,
+          costType: lineCostTypes[i] ?? "MATERIAL",
           description: line.description,
           quantity:    qty,
           unitPrice:   unitPriceNet,
@@ -696,6 +732,10 @@ export async function updateSupplierInvoice(
       }
     }
 
+  const updateLineCostTypes = input.lines
+    ? await resolveInvoiceLineCostTypes(input.lines)
+    : [];
+
   const inv = await prisma.$transaction(async (tx) => {
     const nextPurchaseOrderId =
       input.purchaseOrderId !== undefined ? input.purchaseOrderId : undefined;
@@ -735,7 +775,8 @@ export async function updateSupplierInvoice(
     if (input.lines) {
       await tx.supplierInvoiceLine.deleteMany({ where: { invoiceId: id } });
       const pricesIncludeTax = Boolean(input.pricesIncludeTax);
-      for (const line of input.lines) {
+      for (let i = 0; i < input.lines.length; i++) {
+        const line = input.lines[i]!;
         const qty   = new Prisma.Decimal(line.quantity);
         const price = new Prisma.Decimal(line.unitPrice);
         const rate  = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
@@ -751,6 +792,7 @@ export async function updateSupplierInvoice(
             invoiceId: id,
             wbsNodeId: line.wbsNodeId ?? null,
             purchaseOrderLineId: line.purchaseOrderLineId ?? null,
+            costType: updateLineCostTypes[i] ?? "MATERIAL",
             description: line.description,
             quantity: qty,
             unitPrice: unitPriceNet,
@@ -1120,6 +1162,7 @@ type RawInvoice = SupplierInvoice & {
     invoiceId: string;
     wbsNodeId: string | null;
     purchaseOrderLineId: string | null;
+    costType: CostCategory | null;
     description: string;
     quantity: Prisma.Decimal;
     unitPrice: Prisma.Decimal;
@@ -1170,6 +1213,7 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
       invoiceId:   l.invoiceId,
       wbsNodeId:   l.wbsNodeId,
       purchaseOrderLineId: l.purchaseOrderLineId,
+      costType:    l.costType ?? null,
       description: l.description,
       quantity:    serializeQtyDecimal(l.quantity),
       unitPrice:   serializeUnitPriceDecimal(l.unitPrice),

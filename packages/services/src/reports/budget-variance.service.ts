@@ -53,7 +53,13 @@ export type BudgetVarianceResult =
   | Extract<CostControlResult, { type: "BUDGET_SELECTION_REQUIRED" }>
   | Extract<CostControlResult, { type: "NO_APPROVED_BUDGETS" }>;
 
-const VISIBLE_CATEGORIES: CostCategory[] = ["MATERIAL", "LABOR", "EQUIPMENT", "SUBCONTRACT"];
+const VISIBLE_CATEGORIES: CostCategory[] = [
+  "MATERIAL",
+  "LABOR",
+  "EQUIPMENT",
+  "SUBCONTRACT",
+  "OTHER",
+];
 
 export type BudgetCompositionSlice = {
   category: CostCategory;

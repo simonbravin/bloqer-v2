@@ -1504,6 +1504,23 @@
 
 ---
 
+### D-099 — EDT partida × tipo de costo (`CostCategory`)
+
+- **Fecha:** 2026-08-28
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** EDT y costos imputaba SC/OC/facturas/subcontratos/consumos solo a `wbsNodeId`. El APU desglosa MAT/LAB/EQP/SUB/OTHER en presupuesto, pero el gasto real se aplastaba en un solo número por partida — no se podía responder “¿Replanteo se fue en materiales o en mano de obra?”. Materiales y subcontratos tenían tableros parciales; LAB/EQP solo vivían en el APU. Patrón industria (Procore cost code × cost type; Odoo analytic × categoría) no estaba formalizado.
+- **Decisión:**
+  1. **Matriz partida × `CostCategory`:** el eje de alcance sigue siendo la partida EDT ([D-057]); el eje de naturaleza es `CostCategory` (MATERIAL | LABOR | EQUIPMENT | SUBCONTRACT | OTHER). Las líneas APU **no** son cost codes ([D-068] hint se mantiene).
+  2. **Persistir `costType`** en `PurchaseRequestLine`, `PurchaseOrderLine` y `SupplierInvoiceLine`. Resolución: consumo stock → MATERIAL; subcontrato/cert → SUBCONTRACT; hint APU → categoría del APU; SC/OC sin hint → default MATERIAL (editable); factura desde OC hereda; factura sin OC → `costType` obligatorio (default sugerido MATERIAL).
+  3. **EDT UI:** vista General (totales por partida, sin cambio de default). Expand opcional en hojas → filas hijas de solo lectura por categoría con presupuesto APU vs capas reales; ocultar categorías vacías. Totales/CSV siguen solo filas EDT.
+  4. **LAB / EQP v1:** tipar OC/factura (liquidaciones / alquileres). Sin timesheets ni equipment logs (no-paridad intencional con Procore).
+  5. **Forecast to Complete / EAC:** fuera de alcance v1; se sigue usando exposición esperada ([D-065]) + desglose por tipo. Follow-up en OPEN_QUESTIONS.
+- **Implicancias:** Datos legacy backfill a MATERIAL (o categoría APU si hay hint). Tipar no cambia [BR-COS-002]; solo parte el mismo total. Libro de obra no genera $ por tipo.
+- **Documentos afectados:** [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §13, [`REPORT_CATALOG.md`](../06-reports/REPORT_CATALOG.md), [`OPEN_QUESTIONS.md`](./OPEN_QUESTIONS.md), help `leer-edt-y-costos` / compras.
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1512,7 +1529,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-099`…).
+1. Tomar el siguiente ID disponible (`D-100`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

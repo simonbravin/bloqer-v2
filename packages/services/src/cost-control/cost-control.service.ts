@@ -1,4 +1,4 @@
-import { Prisma, prisma } from "@bloqer/database";
+import { Prisma, prisma, type CostCategory } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { roundToDecimals } from "@bloqer/utils";
 import { ServiceContext, ServiceError } from "../types";
@@ -19,6 +19,21 @@ import {
   type WbsProgressSummary,
 } from "./wbs-progress-summary";
 import { parseFilterDate } from "../reports/report-month";
+import {
+  COST_TYPE_LABELS_ES,
+  COST_TYPE_ORDER,
+  inventoryCostType,
+  resolveLineCostType,
+  subcontractCostType,
+} from "./cost-type";
+
+export {
+  COST_TYPE_LABELS_ES,
+  COST_TYPE_ORDER,
+  inventoryCostType,
+  resolveLineCostType,
+  subcontractCostType,
+} from "./cost-type";
 
 function serializePct2(raw: string | number): string {
   return roundToDecimals(raw, 2);
@@ -84,6 +99,22 @@ export type CostControlRow = {
   pctEconomic: string | null;   // accruedCost / budgetTotalCost × 100
   pctExposure: string | null;   // expectedCostExposure / budgetTotalCost × 100
   flags: CostControlRowFlags;
+  /** Partida × cost type breakdown ([D-099]). Empty categories omitted by the UI. */
+  byCostType: CostTypeBucket[];
+};
+
+/** Budget vs cost layers for one CostCategory under a WBS ITEM ([D-099]). */
+export type CostTypeBucket = {
+  costType: CostCategory;
+  label: string;
+  budgetTotalCost: string;
+  committedCost: string;
+  accruedCost: string;
+  paidCost: string;
+  inventoryConsumedCost: string;
+  openCommittedCost: string;
+  expectedCostExposure: string;
+  costVariance: string;
 };
 
 export type CostControlTotals = {
@@ -156,7 +187,17 @@ type WbsAcc = {
   submittedProgressQty: Prisma.Decimal;
 };
 
+/** Per-category money layers ([D-099]). */
+type TypeAcc = {
+  committedCost: Prisma.Decimal;
+  accruedCost: Prisma.Decimal;
+  accruedLinkedCost: Prisma.Decimal;
+  paidCost: Prisma.Decimal;
+  inventoryConsumedCost: Prisma.Decimal;
+};
+
 const ZERO = new Prisma.Decimal(0);
+
 function newAcc(): WbsAcc {
   return {
     certifiedIssued: ZERO, certifiedApproved: ZERO,
@@ -165,6 +206,45 @@ function newAcc(): WbsAcc {
     qtyCommitted: ZERO, qtyReceived: ZERO, qtyConsumed: ZERO,
     operationalProgressQty: ZERO, submittedProgressQty: ZERO,
   };
+}
+
+function newTypeAcc(): TypeAcc {
+  return {
+    committedCost: ZERO,
+    accruedCost: ZERO,
+    accruedLinkedCost: ZERO,
+    paidCost: ZERO,
+    inventoryConsumedCost: ZERO,
+  };
+}
+
+function ensureTypeAcc(
+  map: Map<string, Map<CostCategory, TypeAcc>>,
+  wbsId: string,
+  costType: CostCategory,
+): TypeAcc {
+  let byType = map.get(wbsId);
+  if (!byType) {
+    byType = new Map();
+    map.set(wbsId, byType);
+  }
+  let acc = byType.get(costType);
+  if (!acc) {
+    acc = newTypeAcc();
+    byType.set(costType, acc);
+  }
+  return acc;
+}
+
+function addTyped(
+  map: Map<string, Map<CostCategory, TypeAcc>>,
+  wbsId: string,
+  costType: CostCategory,
+  field: keyof TypeAcc,
+  amount: Prisma.Decimal,
+) {
+  const acc = ensureTypeAcc(map, wbsId, costType);
+  acc[field] = acc[field].add(amount);
 }
 
 type UnallocAcc = {
@@ -318,7 +398,13 @@ export async function getProjectCostControl(
         ],
       } : {}),
     },
-    include: { costItem: true },
+    include: {
+      costItem: {
+        include: {
+          analysisLines: { select: { category: true, totalCost: true } },
+        },
+      },
+    },
   });
   wbsNodes.sort((a, b) => compareWbsCodes(a.code, b.code));
 
@@ -326,6 +412,8 @@ export async function getProjectCostControl(
 
   // Pre-populate accumulator map for all budget WBS ITEM nodes
   const accMap = new Map<string, WbsAcc>(wbsNodes.map((n) => [n.id, newAcc()]));
+  const typeAccMap = new Map<string, Map<CostCategory, TypeAcc>>();
+  for (const n of wbsNodes) typeAccMap.set(n.id, new Map());
   const unalloc = newUnalloc();
   const dateFrom = filters.dateFrom;
   const dateTo   = filters.dateTo;
@@ -409,15 +497,16 @@ export async function getProjectCostControl(
                 lineSubtotal: true,
                 lineTotal: true,
                 wbsNodeId: true,
+                costType: true,
                 purchaseOrderLineId: true,
-                purchaseOrderLine: { select: { wbsNodeId: true, lineSubtotal: true, lineTotal: true } },
+                purchaseOrderLine: { select: { wbsNodeId: true, lineSubtotal: true, lineTotal: true, costType: true } },
               },
             },
             purchaseOrder: {
               select: {
                 id: true,
                 totalAmount: true,
-                lines: { select: { id: true, wbsNodeId: true, lineSubtotal: true, lineTotal: true } },
+                lines: { select: { id: true, wbsNodeId: true, lineSubtotal: true, lineTotal: true, costType: true } },
               },
             },
           },
@@ -432,7 +521,7 @@ export async function getProjectCostControl(
           },
           select: {
             totalAmount: true,
-            lines: { select: { wbsNodeId: true, lineSubtotal: true, lineTotal: true } },
+            lines: { select: { wbsNodeId: true, lineSubtotal: true, lineTotal: true, costType: true } },
           },
         })
       : Promise.resolve([]),
@@ -453,15 +542,16 @@ export async function getProjectCostControl(
                     purchaseOrder: {
                       select: {
                         totalAmount: true,
-                        lines: { select: { id: true, wbsNodeId: true, lineTotal: true } },
+                        lines: { select: { id: true, wbsNodeId: true, lineTotal: true, costType: true } },
                       },
                     },
                     lines: {
                       select: {
                         wbsNodeId: true,
                         lineTotal: true,
+                        costType: true,
                         purchaseOrderLineId: true,
-                        purchaseOrderLine: { select: { wbsNodeId: true } },
+                        purchaseOrderLine: { select: { wbsNodeId: true, costType: true } },
                       },
                     },
                   },
@@ -542,10 +632,12 @@ export async function getProjectCostControl(
   for (const pol of poLines) {
     const wbsId = pol.wbsNodeId;
     const inBudget = wbsId && wbsNodeIds.has(wbsId);
+    const costType = resolveLineCostType({ costType: pol.costType, apuCategory: null });
     // Committed
     if (inBudget) {
       add(accMap, wbsId!, "committedCost", new Prisma.Decimal(pol.lineSubtotal));
       add(accMap, wbsId!, "qtyCommitted", new Prisma.Decimal(pol.quantity));
+      addTyped(typeAccMap, wbsId!, costType, "committedCost", new Prisma.Decimal(pol.lineSubtotal));
     } else {
       unalloc.committedCost = unalloc.committedCost.add(pol.lineSubtotal);
     }
@@ -568,9 +660,11 @@ export async function getProjectCostControl(
   // C. Committed from ACTIVE subcontract lines
   for (const sl of activeSubLines) {
     const wbsId = sl.wbsNodeId;
+    const subType = subcontractCostType();
     if (wbsId && wbsNodeIds.has(wbsId)) {
       add(accMap, wbsId, "committedCost", new Prisma.Decimal(sl.lineTotal));
       add(accMap, wbsId, "qtyCommitted", new Prisma.Decimal(sl.quantity));
+      addTyped(typeAccMap, wbsId, subType, "committedCost", new Prisma.Decimal(sl.lineTotal));
     } else {
       unalloc.committedCost = unalloc.committedCost.add(sl.lineTotal);
     }
@@ -580,9 +674,12 @@ export async function getProjectCostControl(
   for (const scl of subCertLines) {
     const wbsId = scl.subcontractLine.wbsNodeId;
     const amount = new Prisma.Decimal(scl.lineTotal);
+    const subType = subcontractCostType();
     if (wbsId && wbsNodeIds.has(wbsId)) {
       add(accMap, wbsId, "accruedCost", amount);
       add(accMap, wbsId, "accruedLinkedCost", amount);
+      addTyped(typeAccMap, wbsId, subType, "accruedCost", amount);
+      addTyped(typeAccMap, wbsId, subType, "accruedLinkedCost", amount);
     } else {
       unalloc.accruedCost = unalloc.accruedCost.add(amount);
     }
@@ -597,10 +694,16 @@ export async function getProjectCostControl(
       for (const line of linkedLines) {
         const wbsId = line.purchaseOrderLine?.wbsNodeId ?? line.wbsNodeId;
         const amount = new Prisma.Decimal(line.lineSubtotal);
+        const costType = resolveLineCostType({
+          costType: line.costType ?? line.purchaseOrderLine?.costType ?? null,
+          apuCategory: null,
+        });
         if (wbsId && wbsNodeIds.has(wbsId)) {
           add(accMap, wbsId, "accruedCost", amount);
           // Only FK-mapped lines consume open_committed on that partida ([D-065]).
           add(accMap, wbsId, "accruedLinkedCost", amount);
+          addTyped(typeAccMap, wbsId, costType, "accruedCost", amount);
+          addTyped(typeAccMap, wbsId, costType, "accruedLinkedCost", amount);
         } else {
           unalloc.accruedCost = unalloc.accruedCost.add(amount);
         }
@@ -614,10 +717,13 @@ export async function getProjectCostControl(
       for (const line of orphanLines) {
         const amount = new Prisma.Decimal(line.lineSubtotal);
         const wbsId = line.wbsNodeId;
+        const costType = resolveLineCostType({ costType: line.costType, apuCategory: null });
         if (wbsId && wbsNodeIds.has(wbsId)) {
           add(accMap, wbsId, "accruedCost", amount);
+          addTyped(typeAccMap, wbsId, costType, "accruedCost", amount);
           if (poWbsOnCommitment.has(wbsId)) {
             add(accMap, wbsId, "accruedLinkedCost", amount);
+            addTyped(typeAccMap, wbsId, costType, "accruedLinkedCost", amount);
           }
         } else {
           unalloc.accruedCost = unalloc.accruedCost.add(amount);
@@ -638,9 +744,12 @@ export async function getProjectCostControl(
     for (const pol of poLines2) {
       const share = new Prisma.Decimal(pol.lineSubtotal).div(poTotal).mul(invNet);
       const wbsId = pol.wbsNodeId;
+      const costType = resolveLineCostType({ costType: pol.costType, apuCategory: null });
       if (wbsId && wbsNodeIds.has(wbsId)) {
         add(accMap, wbsId, "accruedCost", share);
         add(accMap, wbsId, "accruedLinkedCost", share);
+        addTyped(typeAccMap, wbsId, costType, "accruedCost", share);
+        addTyped(typeAccMap, wbsId, costType, "accruedLinkedCost", share);
       } else {
         unalloc.accruedCost = unalloc.accruedCost.add(share);
       }
@@ -656,6 +765,13 @@ export async function getProjectCostControl(
         const amount = new Prisma.Decimal(line.lineSubtotal);
         if (wbsNodeIds.has(wbsId)) {
           add(accMap, wbsId, "accruedCost", amount);
+          addTyped(
+            typeAccMap,
+            wbsId,
+            resolveLineCostType({ costType: line.costType, apuCategory: null }),
+            "accruedCost",
+            amount,
+          );
         } else {
           unalloc.accruedCost = unalloc.accruedCost.add(amount);
         }
@@ -687,8 +803,14 @@ export async function getProjectCostControl(
       for (const line of inv.lines) {
         const share = new Prisma.Decimal(line.lineTotal).div(lineTotal).mul(pmt.amount);
         const wbsId = line.purchaseOrderLine?.wbsNodeId ?? line.wbsNodeId;
-        if (wbsId && wbsNodeIds.has(wbsId)) add(accMap, wbsId, "paidCost", share);
-        else unalloc.paidCost = unalloc.paidCost.add(share);
+        const costType = resolveLineCostType({
+          costType: line.costType ?? line.purchaseOrderLine?.costType ?? null,
+          apuCategory: null,
+        });
+        if (wbsId && wbsNodeIds.has(wbsId)) {
+          add(accMap, wbsId, "paidCost", share);
+          addTyped(typeAccMap, wbsId, costType, "paidCost", share);
+        } else unalloc.paidCost = unalloc.paidCost.add(share);
       }
     } else if (inv.purchaseOrderId && inv.purchaseOrder) {
       const poLines2 = inv.purchaseOrder.lines;
@@ -697,24 +819,33 @@ export async function getProjectCostControl(
       for (const pol of poLines2) {
         const share = new Prisma.Decimal(pol.lineTotal).div(poTotal).mul(pmt.amount);
         const wbsId = pol.wbsNodeId;
-        if (wbsId && wbsNodeIds.has(wbsId)) add(accMap, wbsId, "paidCost", share);
-        else unalloc.paidCost = unalloc.paidCost.add(share);
+        const costType = resolveLineCostType({ costType: pol.costType, apuCategory: null });
+        if (wbsId && wbsNodeIds.has(wbsId)) {
+          add(accMap, wbsId, "paidCost", share);
+          addTyped(typeAccMap, wbsId, costType, "paidCost", share);
+        } else unalloc.paidCost = unalloc.paidCost.add(share);
       }
     } else if (inv.subcontractCertificationId) {
       const fracs = subCertWbsMap.get(inv.subcontractCertificationId);
       if (!fracs) { unalloc.paidCost = unalloc.paidCost.add(pmt.amount); continue; }
+      const subType = subcontractCostType();
       for (const f of fracs) {
         const share = f.fraction.mul(pmt.amount);
-        if (f.wbsNodeId && wbsNodeIds.has(f.wbsNodeId)) add(accMap, f.wbsNodeId, "paidCost", share);
-        else unalloc.paidCost = unalloc.paidCost.add(share);
+        if (f.wbsNodeId && wbsNodeIds.has(f.wbsNodeId)) {
+          add(accMap, f.wbsNodeId, "paidCost", share);
+          addTyped(typeAccMap, f.wbsNodeId, subType, "paidCost", share);
+        } else unalloc.paidCost = unalloc.paidCost.add(share);
       }
     } else if (inv.lines?.some((l) => l.wbsNodeId)) {
       const lineTotal = inv.lines.reduce((s, l) => s.add(l.lineTotal), ZERO);
       if (lineTotal.isZero()) { unalloc.paidCost = unalloc.paidCost.add(pmt.amount); continue; }
       for (const line of inv.lines) {
         const share = new Prisma.Decimal(line.lineTotal).div(lineTotal).mul(pmt.amount);
-        if (line.wbsNodeId && wbsNodeIds.has(line.wbsNodeId)) add(accMap, line.wbsNodeId, "paidCost", share);
-        else unalloc.paidCost = unalloc.paidCost.add(share);
+        const costType = resolveLineCostType({ costType: line.costType, apuCategory: null });
+        if (line.wbsNodeId && wbsNodeIds.has(line.wbsNodeId)) {
+          add(accMap, line.wbsNodeId, "paidCost", share);
+          addTyped(typeAccMap, line.wbsNodeId, costType, "paidCost", share);
+        } else unalloc.paidCost = unalloc.paidCost.add(share);
       }
     } else {
       unalloc.paidCost = unalloc.paidCost.add(pmt.amount);
@@ -727,9 +858,11 @@ export async function getProjectCostControl(
       ? new Prisma.Decimal(sm.quantity).mul(decOrZero(sm.unitCost))
       : decOrZero(sm.totalCost);
     const wbsId = sm.wbsNodeId!;
+    const matType = inventoryCostType();
     if (wbsNodeIds.has(wbsId)) {
       add(accMap, wbsId, "inventoryConsumedCost", cost);
       add(accMap, wbsId, "qtyConsumed", new Prisma.Decimal(sm.quantity));
+      addTyped(typeAccMap, wbsId, matType, "inventoryConsumedCost", cost);
     } else unalloc.inventoryConsumedCost = unalloc.inventoryConsumedCost.add(cost);
   }
 
@@ -780,6 +913,45 @@ export async function getProjectCostControl(
       missingBudget: ci === null,
     };
 
+    // Budget by APU category ([D-047]/[D-099]): totalCost is per CostItem unit.
+    const budgetByType = new Map<CostCategory, Prisma.Decimal>();
+    if (ci?.analysisLines) {
+      for (const al of ci.analysisLines) {
+        const contrib = new Prisma.Decimal(al.totalCost).mul(bQty);
+        budgetByType.set(al.category, (budgetByType.get(al.category) ?? ZERO).add(contrib));
+      }
+    }
+    const typeAccs = typeAccMap.get(node.id) ?? new Map();
+    const byCostType: CostTypeBucket[] = [];
+    for (const cat of COST_TYPE_ORDER) {
+      const tAcc = typeAccs.get(cat) ?? newTypeAcc();
+      const tBudget = budgetByType.get(cat) ?? ZERO;
+      const hasSignal =
+        !tBudget.isZero() ||
+        !tAcc.committedCost.isZero() ||
+        !tAcc.accruedCost.isZero() ||
+        !tAcc.paidCost.isZero() ||
+        !tAcc.inventoryConsumedCost.isZero();
+      if (!hasSignal) continue;
+      const { openCommitted: tOpen, expectedCostExposure: tExpected } = computeCostExposureLayers({
+        committed: tAcc.committedCost,
+        accrued: tAcc.accruedCost,
+        accruedLinked: tAcc.accruedLinkedCost,
+      });
+      byCostType.push({
+        costType: cat,
+        label: COST_TYPE_LABELS_ES[cat],
+        budgetTotalCost: serializeMoneyDecimal(tBudget),
+        committedCost: serializeMoneyDecimal(tAcc.committedCost),
+        accruedCost: serializeMoneyDecimal(tAcc.accruedCost),
+        paidCost: serializeMoneyDecimal(tAcc.paidCost),
+        inventoryConsumedCost: serializeMoneyDecimal(tAcc.inventoryConsumedCost),
+        openCommittedCost: serializeMoneyDecimal(tOpen),
+        expectedCostExposure: serializeMoneyDecimal(tExpected),
+        costVariance: serializeMoneyDecimal(tBudget.sub(tExpected)),
+      });
+    }
+
     rows.push({
       wbsNodeId: node.id,
       wbsCode:   node.code,
@@ -812,6 +984,7 @@ export async function getProjectCostControl(
       pctEconomic:  pctOfBudget(accrued, bCost),
       pctExposure:  pctOfBudget(expected, bCost),
       flags,
+      byCostType,
     });
 
     // Accumulate totals
@@ -912,6 +1085,8 @@ export type WbsItemCostDetail = {
   materialCommitments: MaterialApuCommitmentView[];
   /** Derived físico / económico / costo % — not persisted. */
   progressSummary: WbsProgressSummary;
+  /** Partida × CostCategory buckets ([D-099]); empty if no typed spend/budget. */
+  byCostType: CostTypeBucket[];
 };
 
 export async function getWbsItemCostDetail(
@@ -1142,6 +1317,7 @@ export async function getWbsItemCostDetail(
   let committedCost: Prisma.Decimal | null = null;
   let accruedCost: Prisma.Decimal | null = null;
   let expectedCostExposure: Prisma.Decimal | null = null;
+  let byCostType: CostTypeBucket[] = [];
   try {
     const cc = await getProjectCostControl(
       projectId,
@@ -1154,6 +1330,7 @@ export async function getWbsItemCostDetail(
         committedCost = new Prisma.Decimal(row.committedCost);
         accruedCost = new Prisma.Decimal(row.accruedCost);
         expectedCostExposure = new Prisma.Decimal(row.expectedCostExposure);
+        byCostType = row.byCostType ?? [];
       }
     }
   } catch (err) {
@@ -1247,5 +1424,6 @@ export async function getWbsItemCostDetail(
     })),
     materialCommitments,
     progressSummary,
+    byCostType,
   };
 }

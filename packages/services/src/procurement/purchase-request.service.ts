@@ -1,4 +1,4 @@
-import { Prisma, prisma, type PurchaseRequest } from "@bloqer/database";
+import { Prisma, prisma, type PurchaseRequest, type CostCategory } from "@bloqer/database";
 import type { CreatePurchaseRequestInput } from "@bloqer/validators";
 import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
@@ -7,6 +7,7 @@ import { canEditPurchaseRequests, canViewPurchaseRequests } from "./procurement-
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
+import { resolveLineCostType } from "../cost-control/cost-type";
 import {
   assertWbsRequiredOnLines,
   budgetBaselineForPurchaseLine,
@@ -34,6 +35,7 @@ export type PurchaseRequestLineView = {
   wbsNodeName: string | null;
   productId: string | null;
   costAnalysisLineId: string | null;
+  costType: string;
   lineType: string;
   description: string;
   unit: string;
@@ -139,6 +141,7 @@ function mapPrLines(
     wbsNodeId: string | null;
     productId: string | null;
     costAnalysisLineId: string | null;
+    costType: CostCategory | null;
     lineType: string;
     description: string;
     unit: string;
@@ -154,6 +157,7 @@ function mapPrLines(
     wbsNodeName: l.wbsNode?.name ?? null,
     productId: l.productId,
     costAnalysisLineId: l.costAnalysisLineId,
+    costType: l.costType ?? "MATERIAL",
     lineType: l.lineType,
     description: l.description,
     unit: l.unit,
@@ -255,10 +259,15 @@ export async function createPurchaseRequest(
   const companyId = await resolveCompanyId(input.projectId, ctx);
 
   assertWbsRequiredOnLines(input.lines);
-  for (const line of input.lines) {
+  const apuCategoryByIdx = new Map<number, CostCategory>();
+  for (let i = 0; i < input.lines.length; i++) {
+    const line = input.lines[i]!;
     await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId);
     if (line.costAnalysisLineId) {
-      await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId);
+      apuCategoryByIdx.set(
+        i,
+        await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId),
+      );
     }
   }
 
@@ -280,6 +289,10 @@ export async function createPurchaseRequest(
             wbsNodeId: line.wbsNodeId,
             productId: line.productId ?? null,
             costAnalysisLineId: line.costAnalysisLineId ?? null,
+            costType: resolveLineCostType({
+              costType: line.costType ?? null,
+              apuCategory: apuCategoryByIdx.get(i) ?? null,
+            }),
             lineType: line.lineType,
             description: line.description,
             unit: line.unit ?? "",
