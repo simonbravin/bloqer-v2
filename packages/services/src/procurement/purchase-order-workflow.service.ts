@@ -80,7 +80,7 @@ async function applyVarianceSnapshots(
   for (const line of lines) {
     if (!line.wbsNodeId) continue;
     const prev = pendingByWbs.get(line.wbsNodeId) ?? new Prisma.Decimal(0);
-    pendingByWbs.set(line.wbsNodeId, prev.plus(line.lineTotal));
+    pendingByWbs.set(line.wbsNodeId, prev.plus(line.lineSubtotal));
   }
 
   for (const line of lines) {
@@ -135,10 +135,10 @@ async function applyVarianceSnapshots(
     });
   }
 
-  for (const [wbsNodeId, pendingTotal] of pendingByWbs) {
+  for (const [wbsNodeId, pendingSubtotal] of pendingByWbs) {
     const ref = await getWbsBudgetReference(wbsNodeId, tenantId, {
       excludePurchaseOrderId: purchaseOrderId,
-      pendingLineTotal: serializeMoneyDecimal(pendingTotal),
+      pendingLineSubtotal: serializeMoneyDecimal(pendingSubtotal),
       db: tx,
     });
     if (ref.wouldExceedBudget) {

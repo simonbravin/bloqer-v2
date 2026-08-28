@@ -229,14 +229,17 @@ export type WbsBudgetReference = {
   budgetQuantity: string | null;
   /** Budgeted purchasable material total (excludes gl / legacy lump). */
   budgetedMaterialTotal: string | null;
+  /** Net committed on CONFIRMED+ POs (lineSubtotal, sin IVA) — comparable a budgetedMaterialTotal. */
   committedOnConfirmedPos: string;
-  /** budgetedMaterialTotal − committed (null if no baseline). Alert-only in Fase 1. */
+  /** budgetedMaterialTotal − committed neto (null if no baseline). Alert-only in Fase 1. */
   availableSaldo: string | null;
   wouldExceedBudget: boolean;
 };
 
 /**
  * Referential cost + open commitment on CONFIRMED+ POs for a WBS node (BR-PUR-011).
+ * Committed amounts use lineSubtotal (neto, sin IVA) so they compare apples-to-apples
+ * against budgetedMaterialTotal from the APU.
  * Soft alert only — does not block by default.
  */
 export async function getWbsBudgetReference(
@@ -244,6 +247,9 @@ export async function getWbsBudgetReference(
   tenantId: string,
   options?: {
     excludePurchaseOrderId?: string;
+    /** Pending PO line subtotal (neto) for this WBS, not yet confirmed. */
+    pendingLineSubtotal?: string;
+    /** @deprecated Use pendingLineSubtotal (neto). Kept for callers passing lineSubtotal values. */
     pendingLineTotal?: string;
     db?: DbClient;
   },
@@ -271,11 +277,12 @@ export async function getWbsBudgetReference(
           : {}),
       },
     },
-    _sum: { lineTotal: true },
+    _sum: { lineSubtotal: true },
   });
-  const committed = committedAgg._sum.lineTotal ?? new Prisma.Decimal(0);
-  const pending = options?.pendingLineTotal
-    ? new Prisma.Decimal(options.pendingLineTotal)
+  const committed = committedAgg._sum.lineSubtotal ?? new Prisma.Decimal(0);
+  const pendingRaw = options?.pendingLineSubtotal ?? options?.pendingLineTotal;
+  const pending = pendingRaw
+    ? new Prisma.Decimal(pendingRaw)
     : new Prisma.Decimal(0);
   const projected = committed.plus(pending);
 

@@ -756,10 +756,13 @@ flowchart LR
 
 1. **Nueva solicitud** (diálogo / `?create=1`) desde **Solicitudes de compra** o **Tablero de compras** (**Nueva solicitud** / **Todas las solicitudes**), o llegar prellenada desde Materiales → **Pedir**.
 2. Líneas: cantidad, unidad, descripción y **partida EDT obligatoria**.
-3. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por partida EDT).
-4. Cargar **Cotizaciones**: elegí proveedor (buscador: razón social o nombre fantasía), **precio unit.**, **Desc. %** (opcional, antes de IVA) + **plazo de entrega en días** + validez. En el listado de cotizaciones se ve el total y, debajo del proveedor, cada línea con precio de lista y **Desc. %**. Cumplir mínimo de cotizaciones de `/configuracion/politicas`. El umbral que obliga SC+cotizaciones vs OC directa lo setea cada empresa en políticas de compras (no es un monto fijo del producto).
-5. **Seleccionar** proveedor → genera **OC en borrador**.
-6. Revisar columnas de actor (quién solicitó / envió). Notificaciones: envío a compras + recordatorio SLA si demora. Quienes pueden cotizar también ven la SC en **Pendientes** hasta elegir proveedor ([D-094]). El email de nueva solicitud muestra organización, proyecto, solicitante e ítems; el asunto es `[organización] Nueva solicitud · SC-003`.
+3. **Fecha requerida obligatoria** ([BR-PUR-017] · [D-096]): cuándo se necesita el material en obra. El formulario no deja guardar la SC sin ese dato. Sirve para priorizar cotizaciones y entregas, y aparece como **Necesaria para** en el listado y **Pendientes**.
+4. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por partida EDT).
+5. Cargar **Cotizaciones**: elegí proveedor (buscador: razón social o nombre fantasía), **precio unit.**, **Desc. %** (opcional, antes de IVA) + **plazo de entrega en días** + validez. En el listado de cotizaciones se ve el total y, debajo del proveedor, cada línea con precio de lista y **Desc. %**. Cumplir mínimo de cotizaciones de `/configuracion/politicas`. El umbral que obliga SC+cotizaciones vs OC directa lo setea cada empresa en políticas de compras (no es un monto fijo del producto).
+6. **Seleccionar** proveedor → genera **OC en borrador**.
+7. En el **listado desktop** de solicitudes: **Código**, **Estado**, **Descripción** (primera línea + “+N más” si hay varias), **WBS** (partida o “Múltiple”), **Monto est.** (referencial Σ qty × ref. presup. o total de cotización seleccionada, con badge **Presup.** / **Cotización**), **Proveedor** (si ya hay cotización elegida), **Necesaria para**. El **solicitante** y fechas de envío/creación se ven en el **detalle** de la SC.
+8. **Buscador + filtro de estado** ([D-096]): arriba del listado hay un buscador (código, descripción, WBS, proveedor, solicitante) y botones **Todas / Borrador / Enviada / Cotización elegida / Completada / Anulada** con contador por estado. Los deep-links históricos `?status=SUBMITTED` (por ejemplo desde el email de nueva SC) siguen abriendo el filtro pre-seleccionado; después, quitarlo o cambiarlo se hace desde los mismos botones.
+9. Notificaciones: envío a compras + recordatorio SLA si demora. Quienes pueden cotizar también ven la SC en **Pendientes** hasta elegir proveedor ([D-094]). El email de nueva solicitud muestra organización, proyecto, solicitante e ítems; el asunto es `[organización] Nueva solicitud · SC-003`.
 
 ### 9.2 Procedimiento — Orden de compra (OC)
 
@@ -768,15 +771,16 @@ flowchart LR
 **Estados en pantalla:** Borrador → Pend. aprobación → Aprobada → Confirmada → Recepción parcial / Recibida · Anulada.  
 **Enum:** `DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED` (o `CANCELLED`).
 
-1. **Nueva OC** desde listado/tablero (`?create=1`) o desde SC seleccionada. Proveedor: buscador por razón social o nombre fantasía. Cada línea: **partida hoja** + cantidades/precios y **Desc. %** (antes de IVA). **Descuento general %** + **Aplicar a todas** copia el mismo % a cada línea (hay que ingresar un número; 0 limpia todas). Al elegir partida se muestran **Ref. presup.** (insumo MATERIAL del APU, o **costo dir. /u** de la partida si no hay materiales) y **saldo de partida** (alerta, no bloqueo).
-2. **Enviar a aprobación** → `SUBMITTED` (aprobadores: Pendientes + campana).
-3. Aprobador: **Aprobar** → `APPROVED`, o **Devolver a borrador** con **motivo obligatorio**. Quien puede confirmar la ve en **Pendientes**; campana de “OC aprobada” llega a origen + quien confirma.
-4. **Confirmar al proveedor** → `CONFIRMED` = **comprometido** en EDT y costos.  
+1. **Nueva OC** desde listado/tablero (`?create=1`) o desde SC seleccionada. Proveedor: buscador por razón social o nombre fantasía. Cada línea: **partida hoja** + cantidades/precios y **Desc. %** (antes de IVA). **Descuento general %** + **Aplicar a todas** copia el mismo % a cada línea (hay que ingresar un número; 0 limpia todas). Al elegir partida se muestran **Ref. presup.** (insumo MATERIAL del APU, o **costo dir. /u** de la partida si no hay materiales) y **saldo de partida** neto (alerta, no bloqueo; ver [D-095]).
+2. **Listado OC — buscador + filtro de estado** ([D-096]): arriba del listado hay un buscador (código, proveedor, aprobador) y botones **Todas / Borrador / Pend. aprobación / Aprobada / Confirmada / Recep. parcial / Recibida / Anulada** con contador por estado. Los deep-links históricos `?status=` siguen funcionando como estado inicial (por ejemplo desde **Pendientes** o el tablero).
+3. **Enviar a aprobación** → `SUBMITTED` (aprobadores: Pendientes + campana).
+4. Aprobador: **Aprobar** → `APPROVED`, o **Devolver a borrador** con **motivo obligatorio**. Quien puede confirmar la ve en **Pendientes**; campana de “OC aprobada” llega a origen + quien confirma.
+5. **Confirmar al proveedor** → `CONFIRMED` = **comprometido** en EDT y costos.  
    > No existe atajo “Emitir y confirmar (rápido)”: siempre Enviar → Aprobar → Confirmar.
-5. **Registrar recepción** (parcial o total). Quien puede recibir (Compras / Depósito / PM) la ve en **Pendientes** con botón **Recibir** (abre `…/recepciones/nueva`). La campana de confirmación avisa “Ya se puede registrar la recepción” con CTA **Registrar recepción** a ese mismo formulario.
-6. Con cantidades recibidas: **Registrar factura desde OC** (o alta manual en Facturas proveedor).
-7. Desvíos de precio vs referencia: si el PU **supera** el referencial (umbrales de políticas), pide **Justificación desvío**. Comprar por debajo no exige nota. En la ficha, el % se muestra en **rojo** si se gasta más y en **verde** si se gasta menos; la nota de justificación queda debajo (sin códigos internos de estado). Sin referencial de partida (APU y costo dir. /u en cero) sí pide justificación.
-8. **OC directa** (sin SC): solo si la política de compras lo habilita; umbrales altos pueden exigir motivo de emergencia (`OWNER`/`ADMIN`).
+6. **Registrar recepción** (parcial o total). Quien puede recibir (Compras / Depósito / PM) la ve en **Pendientes** con botón **Recibir** (abre `…/recepciones/nueva`). La campana de confirmación avisa “Ya se puede registrar la recepción” con CTA **Registrar recepción** a ese mismo formulario.
+7. Con cantidades recibidas: **Registrar factura desde OC** (o alta manual en Facturas proveedor).
+8. Desvíos de precio vs referencia: si el PU **supera** el referencial (umbrales de políticas), pide **Justificación desvío**. Comprar por debajo no exige nota. En la ficha, el % se muestra en **rojo** si se gasta más y en **verde** si se gasta menos; la nota de justificación queda debajo (sin códigos internos de estado). Sin referencial de partida (APU y costo dir. /u en cero) sí pide justificación.
+9. **OC directa** (sin SC): solo si la política de compras lo habilita; umbrales altos pueden exigir motivo de emergencia (`OWNER`/`ADMIN`).
 
 | Hito | Impacto |
 |------|---------|

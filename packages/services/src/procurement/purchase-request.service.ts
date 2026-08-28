@@ -12,7 +12,16 @@ import {
   budgetBaselineForPurchaseLine,
 } from "./procurement-budget-baseline";
 import { notifyPurchaseRequestSubmitted } from "./procurement-notifications.service";
-import { serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import {
+  serializeMoneyDecimal,
+  serializeQtyDecimal,
+  serializeUnitPriceDecimal,
+} from "../finance/money-decimal";
+import {
+  computeEstimatedAmount,
+  computeLineSummaries,
+  type PurchaseRequestEstimatedAmountSource,
+} from "./purchase-request-list-enrichment";
 import {
   resolveUserDisplayNames,
   userDisplayNameFromMap,
@@ -32,11 +41,22 @@ export type PurchaseRequestLineView = {
   budgetUnitCostSnapshot: string | null;
 };
 
+export type { PurchaseRequestEstimatedAmountSource };
+
 export type PurchaseRequestView = Omit<PurchaseRequest, never> & {
   code: string;
   requestedByName: string | null;
   selectedSupplierName: string | null;
   lines: PurchaseRequestLineView[];
+  /** Σ qty × ref. presup. or selected quote total when available. */
+  estimatedAmount: string | null;
+  estimatedAmountCurrency: string | null;
+  estimatedAmountSource: PurchaseRequestEstimatedAmountSource | null;
+  primaryWbsNodeCode: string | null;
+  primaryWbsNodeName: string | null;
+  hasMultipleWbs: boolean;
+  linesCount: number;
+  firstLineDescription: string | null;
 };
 
 async function resolveCompanyId(projectId: string, ctx: ServiceContext): Promise<string> {
@@ -65,17 +85,36 @@ async function nextDocumentNumber(
   return (max._max.number ?? 0) + 1;
 }
 
+type SelectedQuoteForList = {
+  totalAmount: Prisma.Decimal;
+  currency: string;
+};
+
 function serialize(
   pr: PurchaseRequest & { lines: PurchaseRequestLineView[] },
   requestedByName: string | null = null,
   selectedSupplierName: string | null = null,
+  selectedQuote: SelectedQuoteForList | null = null,
 ): PurchaseRequestView {
+  const summaries = computeLineSummaries(pr.lines);
+  const estimated = computeEstimatedAmount(
+    pr,
+    pr.lines,
+    selectedQuote
+      ? {
+          totalAmount: serializeMoneyDecimal(selectedQuote.totalAmount),
+          currency: selectedQuote.currency,
+        }
+      : null,
+  );
   return {
     ...pr,
     code: `SC-${String(pr.number).padStart(3, "0")}`,
     requestedByName,
     selectedSupplierName,
     lines: pr.lines,
+    ...summaries,
+    ...estimated,
   };
 }
 
@@ -86,7 +125,11 @@ const prLineInclude = {
 
 const selectedQuoteInclude = {
   where: { status: "SELECTED" as const },
-  include: { supplierContact: { select: { legalName: true, fantasyName: true } } },
+  select: {
+    totalAmount: true,
+    currency: true,
+    supplierContact: { select: { legalName: true, fantasyName: true } },
+  },
   take: 1,
 };
 
@@ -119,12 +162,22 @@ function mapPrLines(
   }));
 }
 
-function selectedSupplierFromQuotes(
-  quotes: Array<{ supplierContact: { legalName: string; fantasyName: string | null } }>,
-): string | null {
+function selectedQuoteFromRows(
+  quotes: Array<{
+    totalAmount: Prisma.Decimal;
+    currency: string;
+    supplierContact: { legalName: string; fantasyName: string | null };
+  }>,
+): {
+  quote: SelectedQuoteForList;
+  supplierName: string;
+} | null {
   const q = quotes[0];
   if (!q) return null;
-  return q.supplierContact.fantasyName ?? q.supplierContact.legalName;
+  return {
+    quote: { totalAmount: q.totalAmount, currency: q.currency },
+    supplierName: q.supplierContact.fantasyName ?? q.supplierContact.legalName,
+  };
 }
 
 function assertDraftPr(status: string): void {
@@ -150,16 +203,18 @@ export async function listPurchaseRequestsByProject(
     orderBy: { number: "desc" },
   });
   const nameById = await resolveUserDisplayNames(rows.map((r) => r.requestedByUserId));
-  return rows.map((r) =>
-    serialize(
+  return rows.map((r) => {
+    const selected = selectedQuoteFromRows(r.quotes);
+    return serialize(
       {
         ...r,
         lines: mapPrLines(r.lines),
       },
       userDisplayNameFromMap(nameById, r.requestedByUserId),
-      selectedSupplierFromQuotes(r.quotes),
-    ),
-  );
+      selected?.supplierName ?? null,
+      selected?.quote ?? null,
+    );
+  });
 }
 
 export async function getPurchaseRequestById(id: string, ctx: ServiceContext): Promise<PurchaseRequestView> {
@@ -176,13 +231,15 @@ export async function getPurchaseRequestById(id: string, ctx: ServiceContext): P
   });
   if (!pr || pr.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
   const nameById = await resolveUserDisplayNames([pr.requestedByUserId]);
+  const selected = selectedQuoteFromRows(pr.quotes);
   return serialize(
     {
       ...pr,
       lines: mapPrLines(pr.lines),
     },
     userDisplayNameFromMap(nameById, pr.requestedByUserId),
-    selectedSupplierFromQuotes(pr.quotes),
+    selected?.supplierName ?? null,
+    selected?.quote ?? null,
   );
 }
 
@@ -214,7 +271,7 @@ export async function createPurchaseRequest(
         projectId: input.projectId,
         number,
         requestedByUserId: ctx.actorUserId,
-        neededByDate: input.neededByDate ? new Date(input.neededByDate) : null,
+        neededByDate: new Date(input.neededByDate),
         notes: input.notes ?? null,
         createdBy: ctx.actorUserId,
         updatedBy: ctx.actorUserId,

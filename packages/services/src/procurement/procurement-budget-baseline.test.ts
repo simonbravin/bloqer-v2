@@ -23,3 +23,14 @@ test("fallbackBudgetFromCostItem is null when CostItem has no unit cost", () => 
   assert.equal(r.unitCost, null);
   assert.equal(r.unit, "m2");
 });
+
+test("saldo partida compares budget neto against committed lineSubtotal not lineTotal with IVA", () => {
+  const budgeted = new Prisma.Decimal("1000");
+  const committedNet = new Prisma.Decimal("800");
+  const committedGrossWithIva = new Prisma.Decimal("968");
+  const availFromNet = budgeted.minus(committedNet);
+  const availFromGross = budgeted.minus(committedGrossWithIva);
+  assert.equal(availFromNet.toFixed(2), "200.00");
+  assert.equal(availFromGross.toFixed(2), "32.00");
+  assert.ok(availFromNet.greaterThan(availFromGross));
+});

@@ -57,7 +57,7 @@ export type CostControlRow = {
   certifiedIssued: string;   // Certification.status = ISSUED
   certifiedApproved: string; // Certification.status = APPROVED (primary KPI)
   // ─ Cost layers (shown separately — no double-counting) ─
-  committedCost: string;         // CONFIRMED POs + ACTIVE subcontracts
+  committedCost: string;         // CONFIRMED POs (lineSubtotal neto) + ACTIVE subcontracts
   receivedCost: string;          // CONFIRMED receipts (qty × unit price via POLine)
   accruedCost: string;           // ISSUED SupplierInvoices (PO-linked proportional) + APPROVED SubcontractCertifications
   paidCost: string;              // CONFIRMED Payments traceable to WBS
@@ -523,9 +523,9 @@ export async function getProjectCostControl(
     const inBudget = wbsId && wbsNodeIds.has(wbsId);
     // Committed
     if (inBudget) {
-      add(accMap, wbsId!, "committedCost", new Prisma.Decimal(pol.lineTotal));
+      add(accMap, wbsId!, "committedCost", new Prisma.Decimal(pol.lineSubtotal));
     } else {
-      unalloc.committedCost = unalloc.committedCost.add(pol.lineTotal);
+      unalloc.committedCost = unalloc.committedCost.add(pol.lineSubtotal);
     }
     // Received (via CONFIRMED receipts)
     const unitCostWithTax = pol.quantity.isZero()

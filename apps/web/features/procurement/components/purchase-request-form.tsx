@@ -141,9 +141,14 @@ export function PurchaseRequestForm({
               setError("La cantidad debe ser mayor a cero");
               return;
             }
+            const neededByDate = fd.get("neededByDate")?.toString() ?? "";
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(neededByDate)) {
+              setError("La fecha requerida es obligatoria");
+              return;
+            }
             const result = await createPurchaseRequestAction(projectId, {
               projectId,
-              neededByDate: fd.get("neededByDate")?.toString() || null,
+              neededByDate,
               notes: fd.get("notes")?.toString() || null,
               lines: [
                 {
@@ -288,8 +293,20 @@ export function PurchaseRequestForm({
         <section className="space-y-4">
           <h2 className="text-sm font-semibold">Cuándo</h2>
           <div className="space-y-2">
-            <Label htmlFor="neededByDate">Fecha requerida</Label>
-            <Input id="neededByDate" name="neededByDate" type="date" className="min-h-11 md:min-h-9" />
+            <Label htmlFor="neededByDate">
+              Fecha requerida <span className="text-destructive" aria-hidden>*</span>
+            </Label>
+            <Input
+              id="neededByDate"
+              name="neededByDate"
+              type="date"
+              required
+              aria-required="true"
+              className="min-h-11 md:min-h-9"
+            />
+            <p className="text-xs text-muted-foreground">
+              Cuándo se necesita el material en obra. Es obligatoria para priorizar cotizaciones y entregas.
+            </p>
           </div>
         </section>
 

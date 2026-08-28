@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
-import { PurchaseOrderListSection } from "@/features/procurement/components/purchase-order-list-section";
+import { PurchaseOrderListFilters } from "@/features/procurement/components/purchase-order-list-filters";
 import {
   NewPurchaseOrderDialog,
   type PurchaseOrderListItem,
@@ -38,16 +38,6 @@ const PO_STATUS_FILTERS = [
 ] as const;
 
 type PoStatusFilter = (typeof PO_STATUS_FILTERS)[number];
-
-const STATUS_LABELS: Record<PoStatusFilter, string> = {
-  DRAFT: "borrador (por enviar)",
-  SUBMITTED: "enviadas (por aprobar)",
-  APPROVED: "aprobadas (por confirmar)",
-  CONFIRMED: "confirmadas",
-  PARTIALLY_RECEIVED: "parcialmente recibidas",
-  RECEIVED: "recibidas",
-  CANCELLED: "canceladas",
-};
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -147,12 +137,7 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
     approvedByName: o.approvedByName,
   }));
 
-  const filtered = statusFilter ? items.filter((o) => o.status === statusFilter) : items;
-  const listHref = `/proyectos/${id}/ordenes-compra`;
-
-  const subtitle = statusFilter
-    ? `${filtered.length} ${STATUS_LABELS[statusFilter]}`
-    : `${items.length} ${items.length === 1 ? "orden" : "órdenes"}`;
+  const subtitle = `${items.length} ${items.length === 1 ? "orden" : "órdenes"}`;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -189,17 +174,12 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
         }
       />
 
-      {statusFilter ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
-          <span>Filtro activo: {STATUS_LABELS[statusFilter]}.</span>
-          <Button asChild variant="link" size="sm" className="h-auto p-0">
-            <Link href={listHref}>Ver todas</Link>
-          </Button>
-        </div>
-      ) : null}
-
       <Suspense fallback={<ListSectionSkeleton />}>
-        <PurchaseOrderListSection orders={filtered} projectId={id} />
+        <PurchaseOrderListFilters
+          orders={items}
+          projectId={id}
+          initialStatus={statusFilter}
+        />
       </Suspense>
     </PageShell>
   );

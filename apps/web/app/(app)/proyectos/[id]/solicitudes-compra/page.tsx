@@ -2,23 +2,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { TableScroll } from "@/components/ui/table-scroll";
-import { ListEmptyState } from "@/components/ui/list-empty-state";
-import { PurchaseRequestStatusBadge } from "@/features/procurement/components/purchase-request-status-badge";
 import { NewPurchaseRequestDialog } from "@/features/procurement";
-import { PurchaseRequestMobileCards } from "@/features/procurement/components/purchase-request-mobile-cards";
+import { PurchaseRequestListFilters } from "@/features/procurement/components/purchase-request-list-filters";
 import type { WbsOption } from "@/features/procurement";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { getCurrentUser } from "@/lib/auth";
-import { formatDate } from "@/lib/format";
 import {
   canEditPurchaseRequests,
   getProjectShellInfo,
@@ -27,6 +15,16 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+
+const PR_STATUS_FILTERS = [
+  "DRAFT",
+  "SUBMITTED",
+  "QUOTE_SELECTED",
+  "COMPLETED",
+  "CANCELLED",
+] as const;
+
+type PrStatusFilter = (typeof PR_STATUS_FILTERS)[number];
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -49,10 +47,9 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
 
   const { id } = await params;
   const sp = await searchParams;
-  const statusFilter =
-    sp.status === "SUBMITTED" || sp.status === "DRAFT" || sp.status === "QUOTE_SELECTED"
-      ? sp.status
-      : undefined;
+  const statusFilter = PR_STATUS_FILTERS.includes(sp.status as PrStatusFilter)
+    ? (sp.status as PrStatusFilter)
+    : undefined;
 
   const ctx = {
     actorUserId: current.session.user.id!,
@@ -77,12 +74,7 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
     throw err;
   }
 
-  const filtered = statusFilter
-    ? requests.filter((pr) => pr.status === statusFilter)
-    : requests;
-
   const canCreate = canEditPurchaseRequests(current.tenantCtx.roles);
-  const listHref = `/proyectos/${id}/solicitudes-compra`;
 
   let wbsOptions: WbsOption[] = [];
   if (canCreate) {
@@ -119,12 +111,7 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
     </Suspense>
   ) : null;
 
-  const subtitle =
-    statusFilter === "SUBMITTED"
-      ? `${filtered.length} enviada${filtered.length === 1 ? "" : "s"} pendiente${filtered.length === 1 ? "" : "s"} de cotización`
-      : statusFilter
-        ? `${filtered.length} con estado filtrado`
-        : `${requests.length} ${requests.length === 1 ? "solicitud" : "solicitudes"}`;
+  const subtitle = `${requests.length} ${requests.length === 1 ? "solicitud" : "solicitudes"}`;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -144,115 +131,12 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
         }
       />
 
-      {statusFilter && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
-          <span>
-            {statusFilter === "SUBMITTED"
-              ? "Mostrando solo solicitudes enviadas (pendientes de cotización)."
-              : `Filtro activo: ${statusFilter}.`}
-          </span>
-          <Button asChild variant="link" size="sm" className="h-auto p-0">
-            <Link href={listHref}>Ver todas</Link>
-          </Button>
-        </div>
-      )}
-
-      {filtered.length === 0 ? (
-        <div className="md:hidden">
-          <PurchaseRequestMobileCards
-            requests={[]}
-            projectId={id}
-            emptyAction={
-              !statusFilter && canCreate ? (
-                <Button asChild size="sm">
-                  <Link href={`/proyectos/${id}/solicitudes-compra/nueva`}>Nueva solicitud</Link>
-                </Button>
-              ) : undefined
-            }
-          />
-        </div>
-      ) : (
-        <PurchaseRequestMobileCards requests={filtered} projectId={id} />
-      )}
-
-      <div className="hidden md:block">
-      <TableScroll>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Código</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Solicitante</TableHead>
-              <TableHead>Líneas</TableHead>
-              <TableHead>Necesaria para</TableHead>
-              <TableHead className="text-right">Ver</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="whitespace-normal p-0">
-                  <ListEmptyState
-                    className="rounded-none border-0"
-                    title={
-                      statusFilter === "SUBMITTED"
-                        ? "Sin solicitudes pendientes de cotización"
-                        : statusFilter
-                          ? "Sin resultados para este filtro"
-                          : "Sin solicitudes de compra"
-                    }
-                    description={
-                      statusFilter
-                        ? "Probá quitar el filtro o crear una nueva solicitud."
-                        : "Revisá la cobertura en Materiales o creá una solicitud para generar una OC."
-                    }
-                    action={
-                      !statusFilter ? (
-                        <div className="flex flex-wrap justify-center gap-2">
-                          <Button asChild size="sm" variant="outline">
-                            <Link href={`/proyectos/${id}/materiales`}>Ver materiales</Link>
-                          </Button>
-                          {canCreate ? (
-                            <Button asChild size="sm">
-                              <Link href={`${listHref}?create=1`}>Nueva solicitud</Link>
-                            </Button>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={listHref}>Ver todas</Link>
-                        </Button>
-                      )
-                    }
-                  />
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((pr) => (
-                <TableRow key={pr.id}>
-                  <TableCell className="font-medium">{pr.code}</TableCell>
-                  <TableCell>
-                    <PurchaseRequestStatusBadge status={pr.status} />
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {pr.requestedByName ?? "—"}
-                  </TableCell>
-                  <TableCell>{pr.lines.length}</TableCell>
-                  <TableCell>
-                    {pr.neededByDate ? formatDate(pr.neededByDate) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button asChild variant="link" size="sm">
-                      <Link href={`/proyectos/${id}/solicitudes-compra/${pr.id}`}>Detalle</Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableScroll>
-      </div>
+      <PurchaseRequestListFilters
+        requests={requests}
+        projectId={id}
+        initialStatus={statusFilter}
+        canCreate={canCreate}
+      />
     </PageShell>
   );
 }

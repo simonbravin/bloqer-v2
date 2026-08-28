@@ -15,7 +15,11 @@ const purchaseRequestLineSchema = z.object({
 
 export const createPurchaseRequestSchema = z.object({
   projectId: z.string().uuid(),
-  neededByDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  neededByDate: z
+    .string({ required_error: "La fecha requerida es obligatoria" })
+    .regex(/^\d{4}-\d{2}-\d{2}$/, {
+      message: "La fecha requerida es obligatoria",
+    }),
   notes: z.string().optional().nullable(),
   lines: z.array(purchaseRequestLineSchema).min(1, "Debe tener al menos una línea"),
 });

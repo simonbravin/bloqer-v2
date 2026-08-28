@@ -200,8 +200,8 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Origen:** [D-044](../00-product/DECISION_LOG.md), [D-050](../00-product/DECISION_LOG.md).
 
 ### BR-PUR-011 — Costo referencial y saldo de partida visibles
-- **Regla:** al cargar o enviar SC/OC, la UI y el service exponen el **costo unitario referencial** de la partida (snapshot / APU) y el **saldo disponible** (presupuestado − comprometido abierto − real, ver [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md)). Si al confirmar la OC el compromiso de la línea haría superar el presupuestado de la partida, el sistema **alerta**; el bloqueo duro es configurable por empresa (default: alerta + justificación, sin bloqueo automático en Fase 1).
-- **Origen:** [D-050](../00-product/DECISION_LOG.md).
+- **Regla:** al cargar o enviar SC/OC, la UI y el service exponen el **costo unitario referencial** de la partida (snapshot / APU) y el **saldo disponible** (presupuestado neto − comprometido neto abierto − real, ver [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md)). El **comprometido** de OC confirmada y el saldo usan **`lineSubtotal` (neto, sin IVA)** para comparar contra presupuesto neto ([D-095]). Si al confirmar la OC el compromiso de la línea haría superar el presupuestado de la partida, el sistema **alerta**; el bloqueo duro es configurable por empresa (default: alerta + justificación, sin bloqueo automático en Fase 1).
+- **Origen:** [D-050](../00-product/DECISION_LOG.md), [D-095](../00-product/DECISION_LOG.md).
 
 ### BR-PUR-012 — Matching tres vías y tolerancia en factura
 - **Regla:** la factura de proveedor vinculada a OC se valida contra cantidades/precios de OC y, cuando existe, contra cantidades **recibidas**. Desvíos dentro de la tolerancia de empresa se permiten con registro; fuera de tolerancia requieren justificación y, si supera umbral de varianza, aprobación FINANCE/OWNER/ADMIN según política AP.
@@ -231,6 +231,10 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 ### BR-APR-005 — Factura directa a obra sobre umbral
 - **Regla:** una `SupplierInvoice` de proyecto sin `purchaseOrderId` cuyo total en ARS supere `purchaseRequestRequiredAboveArs` solo puede registrarse por roles con `APPROVE AP` u OWNER/ADMIN, salvo que exista OC confirmada o solicitud completada que respalde el gasto.
 - **Origen:** [D-044](../00-product/DECISION_LOG.md).
+
+### BR-PUR-017 — Fecha requerida obligatoria al crear SC
+- **Regla:** toda `PurchaseRequest` nueva (DRAFT recién creada) debe informar `neededByDate` (fecha ISO `YYYY-MM-DD`). El validador `createPurchaseRequestSchema` rechaza cargas sin ese campo. `updatePurchaseRequestSchema` lo mantiene opcional para permitir edición sin pisar el valor. Solicitudes históricas sin fecha (previas a esta regla) no se retocan.
+- **Origen:** [D-096](../00-product/DECISION_LOG.md).
 
 ---
 

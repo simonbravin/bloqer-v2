@@ -1438,6 +1438,36 @@
 
 ---
 
+### D-095 — Committed y saldo de partida usan neto (sin IVA)
+
+- **Fecha:** 2026-08-27
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** El presupuesto/APU y el desvío unitario de OC ([D-093]) comparan precios **netos**. `committedCost` en control de costos y `availableSaldo` en saldo de partida acumulaban `lineTotal` (bruto con IVA), mezclando bases y sobrestimando el comprometido.
+- **Decisión:**
+  1. **Comprometido de OC** (`committedCost`, saldo de partida, alertas al enviar OC) usa **`lineSubtotal`** (neto, post-descuento, sin IVA).
+  2. **Desvío unitario** sigue neto vs neto ([D-093]); no cambia.
+  3. **IVA** se mantiene en líneas de OC/factura para pagos, asientos GL ([D-085]) y futuro Libro IVA ([Q-040]).
+  4. **Subcontratos:** `SubcontractLine.lineTotal` = qty × PU (sin IVA discriminado); no cambia en este paso.
+- **Implicancias:** Los reportes de comprometido pueden mostrar más saldo disponible que antes (corrección, no cambio de dinero real). UI de saldo de partida sigue siendo alerta soft ([BR-PUR-011]).
+- **Documentos afectados:** [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) [BR-PUR-011], [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md).
+
+---
+
+### D-096 — Fecha requerida obligatoria en SC + buscador/estado en SC y OC
+
+- **Fecha:** 2026-08-28
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Los listados de **Solicitudes de compra** y **Órdenes de compra** por proyecto sólo permitían filtrar por estado vía deep-link (`?status=`), sin buscador ni filtros visibles. En SC, la **fecha requerida** del material era opcional, dejando a cotizadores y compradores sin señal de urgencia para priorizar.
+- **Decisión:**
+  1. En `/proyectos/[id]/ordenes-compra` y `/proyectos/[id]/solicitudes-compra`: **buscador** (código, proveedor/solicitante, descripción, EDT) + **botones/toggle de estado** con contador por estado. El deep-link `?status=` sigue funcionando como estado inicial. Los filtros son locales; no persisten en la URL después de interactuar.
+  2. En la creación de SC (`PurchaseRequestForm` / `NewPurchaseRequestDialog`): `neededByDate` pasa a **obligatorio** en formulario y en `createPurchaseRequestSchema`. Se mantiene opcional en `updatePurchaseRequestSchema` (retro-compat). SC históricas sin fecha no se retocan (no migración).
+- **Implicancias:** el `createPurchaseRequestAction` rechaza payloads sin fecha (`400`). El campo Prisma sigue `DateTime?` para no romper histórico. Notificaciones y `Necesaria para` en listado siempre tienen dato desde ahora.
+- **Documentos afectados:** [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) [BR-PUR-017], [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §9.1 · §9.2, `apps/web/features/help/lib/articles/planning-procurement.ts` (`solicitud-de-compra`, `orden-de-compra-y-afectar-edt`).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

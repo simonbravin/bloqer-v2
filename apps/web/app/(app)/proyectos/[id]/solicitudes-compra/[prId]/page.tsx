@@ -195,6 +195,22 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
       />
 
       <div className="hidden md:block rounded-lg border bg-card p-6 space-y-4 text-sm">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <p>
+            <span className="text-muted-foreground">Solicitante: </span>
+            <span className="font-medium">{pr.requestedByName ?? "—"}</span>
+          </p>
+          {pr.submittedAt ? (
+            <p>
+              <span className="text-muted-foreground">Enviada: </span>
+              {formatDate(pr.submittedAt)}
+            </p>
+          ) : null}
+          <p>
+            <span className="text-muted-foreground">Creada: </span>
+            {formatDate(pr.createdAt)}
+          </p>
+        </div>
         {pr.neededByDate && (
           <p>
             <span className="text-muted-foreground">Necesaria para: </span>
