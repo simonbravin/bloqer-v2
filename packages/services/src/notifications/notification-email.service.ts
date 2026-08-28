@@ -150,13 +150,42 @@ export async function sendNotificationEmail(
 }
 
 /**
- * Internal system fan-out (procurement events). Not for UI/actions — skips self-only AuthZ.
+ * Internal system fan-out (procurement events, cron runners). Not for UI/actions —
+ * skips self-only AuthZ. Optional `emailType` lets operational runners tag the
+ * delivery log so it shows up in the operational-alerts activity card.
  */
 export async function sendNotificationEmailAsSystem(
   notificationId: string,
   ctx: ServiceContext,
+  options?: { emailType?: EmailDeliveryType },
 ): Promise<SendNotificationEmailResult> {
-  return dispatchNotificationEmail(notificationId, ctx, { systemDispatch: true });
+  return dispatchNotificationEmail(notificationId, ctx, {
+    systemDispatch: true,
+    emailType: options?.emailType,
+  });
+}
+
+/**
+ * Same as {@link sendNotificationEmailAsSystem} but tags the delivery log as
+ * `OPERATIONAL_ALERT` and refuses to fire for non-operational notification types.
+ * Preferred entry point for cron runners in `operational-alerts.service` and
+ * `procurement-overdue-alerts.service`.
+ */
+export async function sendOperationalAlertEmailAsSystem(
+  notificationId: string,
+  ctx: ServiceContext,
+): Promise<SendNotificationEmailResult> {
+  const n = await loadNotification(notificationId, ctx.tenantId);
+  if (!n) {
+    throw new ServiceError("NOT_FOUND", "Notificación no encontrada");
+  }
+  if (!OPERATIONAL_NOTIFICATION_TYPE_SET.has(n.type)) {
+    throw new ServiceError("VALIDATION", "Esta notificación no es una alerta operativa");
+  }
+  return dispatchNotificationEmail(notificationId, ctx, {
+    systemDispatch: true,
+    emailType: "OPERATIONAL_ALERT",
+  });
 }
 
 async function dispatchNotificationEmail(
@@ -164,11 +193,15 @@ async function dispatchNotificationEmail(
   ctx: ServiceContext,
   options: { emailType?: EmailDeliveryType; systemDispatch?: boolean },
 ): Promise<SendNotificationEmailResult> {
-  const emailType: EmailDeliveryType = options.emailType ?? "NOTIFICATION";
   const n = await loadNotification(notificationId, ctx.tenantId);
   if (!n) {
     throw new ServiceError("NOT_FOUND", "Notificación no encontrada");
   }
+  // Smart default: if the runner did not tag the email type but the notification is
+  // operational, log it as OPERATIONAL_ALERT so it shows up in the activity card.
+  const emailType: EmailDeliveryType =
+    options.emailType ??
+    (OPERATIONAL_NOTIFICATION_TYPE_SET.has(n.type) ? "OPERATIONAL_ALERT" : "NOTIFICATION");
   if (!n.recipientUserId) {
     throw new ServiceError("VALIDATION", "Notificación sin destinatario");
   }

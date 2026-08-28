@@ -1468,6 +1468,26 @@
 
 ---
 
+### D-097 — Alertas de vencimiento en compras (entrega, fecha requerida, factura)
+
+- **Fecha:** 2026-08-28
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** [D-094] llevó a Pendientes las tres etapas post-aprobación de compras (cotizar / confirmar / recibir). Con `neededByDate` obligatoria ([D-096]) y `expectedDeliveryDate` opcional en OC, seguía faltando señal cuando una entrega no llega, una SC vence sin OC o una OC recibida no tiene factura registrada (sin factura → sin CxP → nadie va a pagar). Referencias: Procore separa señal visual inline + tarjeta en dashboard + notificación diaria dirigida al rol que acciona; Fieldwire y Buildertrend hacen lo mismo con opt-out por empresa.
+- **Decisión:**
+  1. **Tres alertas nuevas** disparadas por el cron `operational-alerts` (mismo runner que ya existe, mismo dedup 7 días por tipo+entidad+recipient):
+     - **`PURCHASE_ORDER_DELIVERY_OVERDUE`** — OC `CONFIRMED` o `PARTIALLY_RECEIVED` con `expectedDeliveryDate` vencida más allá del colchón por empresa. Audiencia: quien puede recepcionar (patrón `PO_RECEIPT_AUDIENCE` = `EDIT PROCUREMENT|PURCHASE_ORDERS|INVENTORY`) + CC OWNER/ADMIN. Deep-link al form de recepción. [BR-PUR-018].
+     - **`PURCHASE_REQUEST_NEEDED_BY_OVERDUE`** — SC `SUBMITTED` o `QUOTE_SELECTED` con `neededByDate` vencida más allá del colchón y sin OC en `CONFIRMED/PARTIALLY_RECEIVED/RECEIVED`. Audiencia: aprobadores SC/OC (`APPROVE PURCHASE_REQUESTS|PURCHASE_ORDERS` + `EDIT PROCUREMENT`) + CC OWNER/ADMIN. [BR-PUR-019].
+     - **`PURCHASE_ORDER_RECEIVED_WITHOUT_INVOICE`** — OC `PARTIALLY_RECEIVED` o `RECEIVED` con primera recepción `CONFIRMED` hace ≥ `receiptToInvoiceSlaDays` (default 5) y sin `SupplierInvoice` en `ISSUED`. Audiencia: `EDIT|APPROVE AP` + CC OWNER/ADMIN. Deep-link al detalle de OC (CTA existente "Registrar factura desde OC"). [BR-PUR-020].
+  2. **Pendientes suma un source nuevo** `PURCHASE_ORDER_INVOICE` (grupo `compras`, CTA "Registrar factura"), gate por permiso `EDIT AP`. Los items de `PURCHASE_ORDER_RECEIPT` y `PURCHASE_REQUEST` traen `overdueDays: number` (0 = a término) para que la card muestre badge "Vencida N d" y los vencidos suban al tope.
+  3. **Listados por proyecto** muestran badge inline `Vencida N d` junto a `Entrega prevista` (OC en `CONFIRMED/PARTIALLY_RECEIVED`) y `Necesaria para` (SC `SUBMITTED/QUOTE_SELECTED`).
+  4. **Config por empresa** (`CompanyProcurementSettings`): `deliveryOverdueGraceDays` (default 0), `neededByOverdueGraceDays` (default 0), `receiptToInvoiceSlaDays` (default 5), y toggles `deliveryAlertsEnabled` / `neededByAlertsEnabled` / `receiptToInvoiceAlertsEnabled` (default `true`). El colchón sólo afecta la **emisión de la alerta**; la señal visual en Pendientes/listados es literal desde el día 1.
+  5. **Canales**: campana in-app + email best-effort (patrón D-050 / BR-PUR-015). Sin nuevas tablas ni cambios en state machines.
+- **Implicancias:** portal.bloqer.app necesita `prisma migrate deploy` en Neon branch `production` — sin la migración 20260828120000_d097 el runner rompe por columnas faltantes. Cron ya está autenticado con `CRON_SECRET`. No entra en `deliveryAlertsEnabled=false` que la señal visual sí se sigue mostrando (deliberado — el silencio es de campana, no del contexto operativo).
+- **Documentos afectados:** [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) [BR-PUR-018] · [BR-PUR-019] · [BR-PUR-020], [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §9.1 · §9.2 · §11 alertas, [`02-modules/NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md), `apps/web/features/help/lib/articles/planning-procurement.ts`.
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

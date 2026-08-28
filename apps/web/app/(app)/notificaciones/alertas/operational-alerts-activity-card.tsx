@@ -15,6 +15,10 @@ const TYPE_LABEL: Record<OperationalNotificationType, string> = {
   NEGATIVE_STOCK: "Stock negativo",
   CERTIFICATION_APPROVED_WITHOUT_INVOICE: "Cert. sin factura",
   STALE_DOCUMENT_UPLOAD: "Uploads pendientes",
+  PROCUREMENT_SLA_REMINDER: "Compras demoradas (SLA)",
+  PURCHASE_ORDER_DELIVERY_OVERDUE: "OC entrega vencida",
+  PURCHASE_REQUEST_NEEDED_BY_OVERDUE: "SC fecha requerida vencida",
+  PURCHASE_ORDER_RECEIVED_WITHOUT_INVOICE: "OC recibida sin factura",
 };
 
 type Props = {

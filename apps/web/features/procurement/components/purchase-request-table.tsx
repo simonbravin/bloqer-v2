@@ -15,6 +15,7 @@ import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 import type { PurchaseRequestView } from "@bloqer/services";
 import { PurchaseRequestStatusBadge } from "./purchase-request-status-badge";
+import { purchaseRequestNeededByOverdueDays } from "../lib/purchase-delivery-overdue";
 
 function descriptionTooltip(pr: PurchaseRequestView): string {
   const lines = pr.lines.map((l) => l.description).filter(Boolean);
@@ -103,7 +104,26 @@ export function PurchaseRequestTable({
                   {pr.selectedSupplierName ?? "—"}
                 </TableCell>
                 <TableCell>
-                  {pr.neededByDate ? formatDate(pr.neededByDate) : "—"}
+                  {pr.neededByDate ? (
+                    (() => {
+                      const overdue = purchaseRequestNeededByOverdueDays(
+                        pr.status,
+                        pr.neededByDate,
+                      );
+                      return (
+                        <span className="inline-flex flex-wrap items-center gap-1.5">
+                          <span>{formatDate(pr.neededByDate)}</span>
+                          {overdue > 0 ? (
+                            <Badge variant="destructive" className="whitespace-nowrap">
+                              Vencida {overdue} d
+                            </Badge>
+                          ) : null}
+                        </span>
+                      );
+                    })()
+                  ) : (
+                    "—"
+                  )}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button asChild variant="link" size="sm">

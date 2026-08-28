@@ -46,13 +46,23 @@ export function CompanyProcurementSettingsForm({
   const [apPaymentNotificationChannel, setApPaymentNotificationChannel] = useState(
     settings.apPaymentNotificationChannel,
   );
+  const [deliveryAlertsEnabled, setDeliveryAlertsEnabled] = useState(
+    settings.deliveryAlertsEnabled,
+  );
+  const [neededByAlertsEnabled, setNeededByAlertsEnabled] = useState(
+    settings.neededByAlertsEnabled,
+  );
+  const [receiptToInvoiceAlertsEnabled, setReceiptToInvoiceAlertsEnabled] = useState(
+    settings.receiptToInvoiceAlertsEnabled,
+  );
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Política de compras — {companyName}</CardTitle>
         <CardDescription>
-          Umbrales de aprobación, cotizaciones, desvíos y canal de avisos de pago a proveedores.
+          Umbrales de aprobación, cotizaciones, desvíos, alertas de vencimiento y canal de avisos
+          de pago a proveedores.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -67,6 +77,9 @@ export function CompanyProcurementSettingsForm({
               const slaRaw = Number(fd.get("approvalSlaHours"));
               const minQuotes = Number(fd.get("minQuotesRequired"));
               const maxQuotes = Number(fd.get("maxQuotesAllowed"));
+              const deliveryGraceRaw = Number(fd.get("deliveryOverdueGraceDays"));
+              const neededByGraceRaw = Number(fd.get("neededByOverdueGraceDays"));
+              const receiptToInvoiceRaw = Number(fd.get("receiptToInvoiceSlaDays"));
               const res = await updateCompanyProcurementSettingsAction(companyId, {
                 poApprovalThresholdArs: fd.get("poApprovalThresholdArs")?.toString() || null,
                 purchaseRequestRequiredAboveArs:
@@ -83,6 +96,21 @@ export function CompanyProcurementSettingsForm({
                 overReceiptTolerancePct: fd.get("overReceiptTolerancePct")?.toString() ?? "0",
                 invoiceMatchTolerancePct: fd.get("invoiceMatchTolerancePct")?.toString() ?? "0",
                 approvalSlaHours: Number.isFinite(slaRaw) && slaRaw > 0 ? slaRaw : 72,
+                deliveryOverdueGraceDays:
+                  Number.isFinite(deliveryGraceRaw) && deliveryGraceRaw >= 0
+                    ? deliveryGraceRaw
+                    : 0,
+                neededByOverdueGraceDays:
+                  Number.isFinite(neededByGraceRaw) && neededByGraceRaw >= 0
+                    ? neededByGraceRaw
+                    : 0,
+                receiptToInvoiceSlaDays:
+                  Number.isFinite(receiptToInvoiceRaw) && receiptToInvoiceRaw >= 0
+                    ? receiptToInvoiceRaw
+                    : 5,
+                deliveryAlertsEnabled,
+                neededByAlertsEnabled,
+                receiptToInvoiceAlertsEnabled,
                 apPaymentNotificationChannel,
               });
               if ("error" in res) {
@@ -229,6 +257,105 @@ export function CompanyProcurementSettingsForm({
               Horas sin avance en OC enviada o SC sin cotizar antes de avisar a OWNER/ADMIN
               ([BR-PUR-015]). Default 72.
             </p>
+          </div>
+
+          <div className="space-y-4 rounded-lg border p-4">
+            <div>
+              <h4 className="text-sm font-medium">Alertas de vencimiento en compras</h4>
+              <p className="text-xs text-muted-foreground">
+                Recordatorios diarios para recepción, fecha requerida y facturación de OC recibidas
+                ([D-097]). Se emiten a quien puede accionar (compras/depósito, aprobadores,
+                administración) con CC a OWNER/ADMIN.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="deliveryOverdueGraceDays">
+                  Días de gracia entrega OC
+                </Label>
+                <Input
+                  id="deliveryOverdueGraceDays"
+                  name="deliveryOverdueGraceDays"
+                  type="number"
+                  min={0}
+                  max={60}
+                  defaultValue={settings.deliveryOverdueGraceDays}
+                  disabled={!canEdit || pending}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Colchón antes de marcar como vencida una OC confirmada sin recibir. Default 0.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="neededByOverdueGraceDays">
+                  Días de gracia fecha requerida SC
+                </Label>
+                <Input
+                  id="neededByOverdueGraceDays"
+                  name="neededByOverdueGraceDays"
+                  type="number"
+                  min={0}
+                  max={60}
+                  defaultValue={settings.neededByOverdueGraceDays}
+                  disabled={!canEdit || pending}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Colchón antes de alertar SC con fecha requerida pasada y sin OC. Default 0.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="receiptToInvoiceSlaDays">
+                  Días recepción → factura
+                </Label>
+                <Input
+                  id="receiptToInvoiceSlaDays"
+                  name="receiptToInvoiceSlaDays"
+                  type="number"
+                  min={0}
+                  max={60}
+                  defaultValue={settings.receiptToInvoiceSlaDays}
+                  disabled={!canEdit || pending}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Días desde primera recepción antes de alertar que falta registrar factura.
+                  Default 5.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={deliveryAlertsEnabled}
+                  onChange={(e) => setDeliveryAlertsEnabled(e.target.checked)}
+                  disabled={!canEdit || pending}
+                  className="rounded border"
+                />
+                Alertar OC con entrega prevista vencida sin recibir
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={neededByAlertsEnabled}
+                  onChange={(e) => setNeededByAlertsEnabled(e.target.checked)}
+                  disabled={!canEdit || pending}
+                  className="rounded border"
+                />
+                Alertar SC con fecha requerida vencida y sin OC confirmada
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={receiptToInvoiceAlertsEnabled}
+                  onChange={(e) => setReceiptToInvoiceAlertsEnabled(e.target.checked)}
+                  disabled={!canEdit || pending}
+                  className="rounded border"
+                />
+                Alertar OC recibida sin factura del proveedor registrada
+              </label>
+            </div>
           </div>
 
           <div className="space-y-2">

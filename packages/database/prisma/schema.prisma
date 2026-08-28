@@ -2155,6 +2155,18 @@ model CompanyProcurementSettings {
   invoiceMatchTolerancePct        Decimal                      @default(0) @db.Decimal(8, 4)
   /// Hours before SLA reminder for SUBMITTED POs / SUBMITTED PRs without quotes (D-050).
   approvalSlaHours                Int                          @default(72)
+  /// Days of grace before flagging a CONFIRMED/PARTIALLY_RECEIVED PO as delivery-overdue ([D-097] / [BR-PUR-018]). 0 = alert same day.
+  deliveryOverdueGraceDays        Int                          @default(0)
+  /// Days of grace before flagging a SUBMITTED/QUOTE_SELECTED PR whose neededByDate passed as overdue ([D-097] / [BR-PUR-019]). 0 = alert same day.
+  neededByOverdueGraceDays        Int                          @default(0)
+  /// Days after first confirmed receipt before flagging a PO as received-without-invoice ([D-097] / [BR-PUR-020]).
+  receiptToInvoiceSlaDays         Int                          @default(5)
+  /// Enable PURCHASE_ORDER_DELIVERY_OVERDUE alert ([D-097]). Opt-out per company.
+  deliveryAlertsEnabled           Boolean                      @default(true)
+  /// Enable PURCHASE_REQUEST_NEEDED_BY_OVERDUE alert ([D-097]). Opt-out per company.
+  neededByAlertsEnabled           Boolean                      @default(true)
+  /// Enable PURCHASE_ORDER_RECEIVED_WITHOUT_INVOICE alert ([D-097]). Opt-out per company.
+  receiptToInvoiceAlertsEnabled   Boolean                      @default(true)
   /// Ready-to-pay / payment-confirmed alerts ([D-069]/[D-070]). Default email+in-app so finance is reached off-app.
   apPaymentNotificationChannel    ApPaymentNotificationChannel @default(IN_APP_AND_EMAIL)
   createdAt                       DateTime                     @default(now())
@@ -2969,6 +2981,12 @@ enum NotificationType {
   PURCHASE_ORDER_RETURNED
   PURCHASE_ORDER_CONFIRMED
   PROCUREMENT_SLA_REMINDER
+  /// OC confirmada/parcialmente recibida con expectedDeliveryDate vencida ([D-097] / [BR-PUR-018]).
+  PURCHASE_ORDER_DELIVERY_OVERDUE
+  /// SC submitted/quote-selected con neededByDate vencida y sin OC confirmada ([D-097] / [BR-PUR-019]).
+  PURCHASE_REQUEST_NEEDED_BY_OVERDUE
+  /// OC parcial/totalmente recibida hace >= N días sin factura de proveedor ([D-097] / [BR-PUR-020]).
+  PURCHASE_ORDER_RECEIVED_WITHOUT_INVOICE
   /// Soft nudge: sourced journal drafts awaiting post [D-063].
   ACCOUNTING_DRAFTS_PENDING
   /// Project payable ready for treasury payment [D-069].

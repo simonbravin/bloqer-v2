@@ -19,6 +19,18 @@ export type CompanyProcurementSettingsView = {
   overReceiptTolerancePct: string;
   invoiceMatchTolerancePct: string;
   approvalSlaHours: number;
+  /** [D-097] Grace days before flagging a CONFIRMED/PARTIALLY_RECEIVED PO as delivery-overdue. */
+  deliveryOverdueGraceDays: number;
+  /** [D-097] Grace days before flagging a PR with passed neededByDate as overdue. */
+  neededByOverdueGraceDays: number;
+  /** [D-097] Days after first confirmed receipt before flagging a PO as received-without-invoice. */
+  receiptToInvoiceSlaDays: number;
+  /** [D-097] Toggle PURCHASE_ORDER_DELIVERY_OVERDUE alert. */
+  deliveryAlertsEnabled: boolean;
+  /** [D-097] Toggle PURCHASE_REQUEST_NEEDED_BY_OVERDUE alert. */
+  neededByAlertsEnabled: boolean;
+  /** [D-097] Toggle PURCHASE_ORDER_RECEIVED_WITHOUT_INVOICE alert. */
+  receiptToInvoiceAlertsEnabled: boolean;
   /** [D-070] Channel for PAYABLE_READY_TO_PAY / PAYMENT_CONFIRMED. */
   apPaymentNotificationChannel: ApPaymentNotificationChannel;
 };
@@ -36,6 +48,12 @@ const DEFAULTS = {
   overReceiptTolerancePct: new Prisma.Decimal(0),
   invoiceMatchTolerancePct: new Prisma.Decimal(0),
   approvalSlaHours: 72,
+  deliveryOverdueGraceDays: 0,
+  neededByOverdueGraceDays: 0,
+  receiptToInvoiceSlaDays: 5,
+  deliveryAlertsEnabled: true,
+  neededByAlertsEnabled: true,
+  receiptToInvoiceAlertsEnabled: true,
   apPaymentNotificationChannel: "IN_APP_AND_EMAIL" as ApPaymentNotificationChannel,
 };
 
@@ -55,6 +73,12 @@ function serialize(row: {
   overReceiptTolerancePct: Prisma.Decimal;
   invoiceMatchTolerancePct: Prisma.Decimal;
   approvalSlaHours: number;
+  deliveryOverdueGraceDays: number;
+  neededByOverdueGraceDays: number;
+  receiptToInvoiceSlaDays: number;
+  deliveryAlertsEnabled: boolean;
+  neededByAlertsEnabled: boolean;
+  receiptToInvoiceAlertsEnabled: boolean;
   apPaymentNotificationChannel: ApPaymentNotificationChannel;
 }): CompanyProcurementSettingsView {
   const cats = row.quoteRequiredCategories;
@@ -76,6 +100,13 @@ function serialize(row: {
     overReceiptTolerancePct: serializeRatePctDecimal(row.overReceiptTolerancePct),
     invoiceMatchTolerancePct: serializeRatePctDecimal(row.invoiceMatchTolerancePct),
     approvalSlaHours: row.approvalSlaHours ?? 72,
+    deliveryOverdueGraceDays: row.deliveryOverdueGraceDays ?? DEFAULTS.deliveryOverdueGraceDays,
+    neededByOverdueGraceDays: row.neededByOverdueGraceDays ?? DEFAULTS.neededByOverdueGraceDays,
+    receiptToInvoiceSlaDays: row.receiptToInvoiceSlaDays ?? DEFAULTS.receiptToInvoiceSlaDays,
+    deliveryAlertsEnabled: row.deliveryAlertsEnabled ?? DEFAULTS.deliveryAlertsEnabled,
+    neededByAlertsEnabled: row.neededByAlertsEnabled ?? DEFAULTS.neededByAlertsEnabled,
+    receiptToInvoiceAlertsEnabled:
+      row.receiptToInvoiceAlertsEnabled ?? DEFAULTS.receiptToInvoiceAlertsEnabled,
     apPaymentNotificationChannel: row.apPaymentNotificationChannel ?? DEFAULTS.apPaymentNotificationChannel,
   };
 }
@@ -120,6 +151,12 @@ export async function getCompanyProcurementSettings(
       overReceiptTolerancePct: serializeRatePctDecimal(DEFAULTS.overReceiptTolerancePct),
       invoiceMatchTolerancePct: serializeRatePctDecimal(DEFAULTS.invoiceMatchTolerancePct),
       approvalSlaHours: DEFAULTS.approvalSlaHours,
+      deliveryOverdueGraceDays: DEFAULTS.deliveryOverdueGraceDays,
+      neededByOverdueGraceDays: DEFAULTS.neededByOverdueGraceDays,
+      receiptToInvoiceSlaDays: DEFAULTS.receiptToInvoiceSlaDays,
+      deliveryAlertsEnabled: DEFAULTS.deliveryAlertsEnabled,
+      neededByAlertsEnabled: DEFAULTS.neededByAlertsEnabled,
+      receiptToInvoiceAlertsEnabled: DEFAULTS.receiptToInvoiceAlertsEnabled,
       apPaymentNotificationChannel: DEFAULTS.apPaymentNotificationChannel,
     };
   }
@@ -157,6 +194,12 @@ export async function upsertCompanyProcurementSettings(
     overReceiptTolerancePct: string;
     invoiceMatchTolerancePct: string;
     approvalSlaHours: number;
+    deliveryOverdueGraceDays: number;
+    neededByOverdueGraceDays: number;
+    receiptToInvoiceSlaDays: number;
+    deliveryAlertsEnabled: boolean;
+    neededByAlertsEnabled: boolean;
+    receiptToInvoiceAlertsEnabled: boolean;
     apPaymentNotificationChannel: ApPaymentNotificationChannel;
   }>,
   ctx: ServiceContext,
@@ -210,6 +253,18 @@ export async function upsertCompanyProcurementSettings(
       DEFAULTS.invoiceMatchTolerancePct,
     ),
     approvalSlaHours: input.approvalSlaHours ?? DEFAULTS.approvalSlaHours,
+    deliveryOverdueGraceDays:
+      input.deliveryOverdueGraceDays ?? DEFAULTS.deliveryOverdueGraceDays,
+    neededByOverdueGraceDays:
+      input.neededByOverdueGraceDays ?? DEFAULTS.neededByOverdueGraceDays,
+    receiptToInvoiceSlaDays:
+      input.receiptToInvoiceSlaDays ?? DEFAULTS.receiptToInvoiceSlaDays,
+    deliveryAlertsEnabled:
+      input.deliveryAlertsEnabled ?? DEFAULTS.deliveryAlertsEnabled,
+    neededByAlertsEnabled:
+      input.neededByAlertsEnabled ?? DEFAULTS.neededByAlertsEnabled,
+    receiptToInvoiceAlertsEnabled:
+      input.receiptToInvoiceAlertsEnabled ?? DEFAULTS.receiptToInvoiceAlertsEnabled,
     apPaymentNotificationChannel:
       input.apPaymentNotificationChannel ?? DEFAULTS.apPaymentNotificationChannel,
   };
@@ -277,6 +332,24 @@ export async function upsertCompanyProcurementSettings(
   }
   if (input.approvalSlaHours !== undefined) {
     updateData.approvalSlaHours = input.approvalSlaHours;
+  }
+  if (input.deliveryOverdueGraceDays !== undefined) {
+    updateData.deliveryOverdueGraceDays = input.deliveryOverdueGraceDays;
+  }
+  if (input.neededByOverdueGraceDays !== undefined) {
+    updateData.neededByOverdueGraceDays = input.neededByOverdueGraceDays;
+  }
+  if (input.receiptToInvoiceSlaDays !== undefined) {
+    updateData.receiptToInvoiceSlaDays = input.receiptToInvoiceSlaDays;
+  }
+  if (input.deliveryAlertsEnabled !== undefined) {
+    updateData.deliveryAlertsEnabled = input.deliveryAlertsEnabled;
+  }
+  if (input.neededByAlertsEnabled !== undefined) {
+    updateData.neededByAlertsEnabled = input.neededByAlertsEnabled;
+  }
+  if (input.receiptToInvoiceAlertsEnabled !== undefined) {
+    updateData.receiptToInvoiceAlertsEnabled = input.receiptToInvoiceAlertsEnabled;
   }
   if (input.apPaymentNotificationChannel !== undefined) {
     updateData.apPaymentNotificationChannel = input.apPaymentNotificationChannel;

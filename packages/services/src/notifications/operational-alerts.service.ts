@@ -8,6 +8,7 @@ import {
   resolveNotificationAudience,
 } from "./notification-audience.service";
 import { createSystemNotification } from "./notification.service";
+import { sendOperationalAlertEmailAsSystem } from "./notification-email.service";
 import { resolveDocumentNotificationEntityLabel, staleDocumentUploadCopy } from "./notification-copy";
 
 /** Re-export recipient helpers for existing call sites. */
@@ -16,13 +17,17 @@ export { findActiveOwnerAdminUserIds, findActiveUsersForPermission } from "./not
 /** Rolling window to avoid duplicate operational alerts for the same entity + recipient. */
 const DEDUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** In-app notification types produced by operational alert jobs (Phase 8B). */
+/** In-app notification types produced by operational alert jobs (Phase 8B + [D-094] + [D-097]). */
 export const OPERATIONAL_NOTIFICATION_TYPES = [
   "RECEIVABLE_OVERDUE",
   "PAYABLE_OVERDUE",
   "NEGATIVE_STOCK",
   "CERTIFICATION_APPROVED_WITHOUT_INVOICE",
   "STALE_DOCUMENT_UPLOAD",
+  "PROCUREMENT_SLA_REMINDER",
+  "PURCHASE_ORDER_DELIVERY_OVERDUE",
+  "PURCHASE_REQUEST_NEEDED_BY_OVERDUE",
+  "PURCHASE_ORDER_RECEIVED_WITHOUT_INVOICE",
 ] as const satisfies readonly NotificationType[];
 
 export type OperationalNotificationType = (typeof OPERATIONAL_NOTIFICATION_TYPES)[number];
@@ -64,6 +69,7 @@ async function hasRecentDuplicate(params: {
 }
 
 async function tryCreateAlert(
+  ctx: ServiceContext,
   input: {
     tenantId: string;
     companyId?: string | null;
@@ -92,7 +98,10 @@ async function tryCreateAlert(
       summary.skippedCount += 1;
       return;
     }
-    await createSystemNotification(input);
+    const { id: notificationId } = await createSystemNotification(input);
+    // Best-effort operational email (never abort the run for delivery issues).
+    // Tagged as OPERATIONAL_ALERT so it shows up in the activity card email metrics.
+    await sendOperationalAlertEmailAsSystem(notificationId, ctx).catch(() => undefined);
     summary.createdCount += 1;
   } catch (e) {
     summary.errors.push(e instanceof Error ? e.message : String(e));
@@ -159,6 +168,7 @@ export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<O
 
     for (const uid of recipients) {
       await tryCreateAlert(
+        ctx,
         {
           tenantId: ctx.tenantId,
           companyId: r.companyId,
@@ -239,6 +249,7 @@ export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<Oper
 
     for (const uid of recipients) {
       await tryCreateAlert(
+        ctx,
         {
           tenantId: ctx.tenantId,
           companyId: p.companyId,
@@ -309,6 +320,7 @@ export async function runNegativeStockAlert(ctx: ServiceContext): Promise<Operat
 
     for (const uid of recipients) {
       await tryCreateAlert(
+        ctx,
         {
           tenantId: ctx.tenantId,
           recipientUserId: uid,
@@ -362,6 +374,7 @@ export async function runApprovedCertificationsWithoutInvoiceAlert(ctx: ServiceC
 
     for (const uid of recipients) {
       await tryCreateAlert(
+        ctx,
         {
           tenantId: ctx.tenantId,
           companyId: c.companyId,
@@ -432,6 +445,7 @@ export async function runStaleUploadingDocumentsAlert(ctx: ServiceContext): Prom
 
     for (const uid of recipientIds) {
       await tryCreateAlert(
+        ctx,
         {
           tenantId: ctx.tenantId,
           companyId: d.companyId,

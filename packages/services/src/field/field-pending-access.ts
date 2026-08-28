@@ -12,14 +12,15 @@ import type { TenantModuleGate } from "../tenant-modules/tenant-module-gate";
 import { ServiceError } from "../types";
 
 /**
- * Pending inbox sources ([D-087] + [D-094]).
- * Procurement follow-through (quote / confirm / receive) lives alongside approvals.
+ * Pending inbox sources ([D-087] + [D-094] + [D-097]).
+ * Procurement follow-through (quote / confirm / receive / invoice) lives alongside approvals.
  */
 export type FieldPendingSource =
   | "PURCHASE_REQUEST"
   | "PURCHASE_ORDER"
   | "PURCHASE_ORDER_CONFIRM"
   | "PURCHASE_ORDER_RECEIPT"
+  | "PURCHASE_ORDER_INVOICE"
   | "JOBSITE_LOG"
   | "CERTIFICATION"
   | "SUBCONTRACT_CERTIFICATION";
@@ -50,6 +51,7 @@ export const FIELD_PENDING_GROUP_BY_SOURCE: Record<FieldPendingSource, FieldPend
   PURCHASE_ORDER: "compras",
   PURCHASE_ORDER_CONFIRM: "compras",
   PURCHASE_ORDER_RECEIPT: "compras",
+  PURCHASE_ORDER_INVOICE: "compras",
   JOBSITE_LOG: "obra",
   CERTIFICATION: "certificaciones",
   SUBCONTRACT_CERTIFICATION: "certificaciones",
@@ -62,6 +64,9 @@ export function fieldPendingSourcesForActor(
 ): FieldPendingSource[] {
   const sources: FieldPendingSource[] = [];
   if (gate.isEnabled("PROCUREMENT")) {
+    // PMs (EDIT PROCUREMENT) ven la SC pendiente en su bandeja pero, por diseño,
+    // no reciben campana en cada submit (evita spam en obras con volumen alto).
+    // La campana la manda `notifyPurchaseRequestSubmitted` a APPROVE PR/PO.
     if (canManageProcurementQuotes(roles)) {
       sources.push("PURCHASE_REQUEST");
     }
@@ -73,6 +78,10 @@ export function fieldPendingSourcesForActor(
     }
     if (canEditPurchaseReceipts(roles)) {
       sources.push("PURCHASE_ORDER_RECEIPT");
+    }
+    // OC recibida sin factura del proveedor ([D-097] / [BR-PUR-020]).
+    if (can(roles, "EDIT", "AP")) {
+      sources.push("PURCHASE_ORDER_INVOICE");
     }
   }
   if (gate.isEnabled("JOBSITE_LOG") && canSuperviseJobsiteLog(roles)) {

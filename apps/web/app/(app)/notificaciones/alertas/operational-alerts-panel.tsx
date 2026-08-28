@@ -14,6 +14,9 @@ const SINGLE_ALERTS: ReadonlyArray<{ type: OperationalAlertType; label: string }
   { type: "approvedCertificationsWithoutInvoice", label: "Certificaciones aprobadas sin factura" },
   { type: "staleUploadingDocuments", label: "Uploads pendientes" },
   { type: "procurementSlaReminders", label: "Compras demoradas (SLA)" },
+  { type: "purchaseOrderDeliveryOverdue", label: "OC con entrega vencida" },
+  { type: "purchaseRequestNeededByOverdue", label: "SC con fecha requerida vencida" },
+  { type: "purchaseOrderReceivedWithoutInvoice", label: "OC recibida sin factura" },
 ];
 
 function ResultPanel({ state }: { state: OperationalAlertsActionState }) {

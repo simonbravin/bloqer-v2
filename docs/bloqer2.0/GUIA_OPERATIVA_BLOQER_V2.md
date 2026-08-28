@@ -188,7 +188,7 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 |------------|------------------------|
 | **Campana** | Dropdown con las **últimas 5** no archivadas; badge solo si hay no leídas; pie **Ver todas** → `/notificaciones`. Polling cada **30 s** (pestaña visible); al abrir el dropdown se refresca. |
 | **Inbox** | `/notificaciones` — filtros Todas / No leídas / Leídas / Archivadas; **Marcar todas como leídas**; marcar como no leída; archivar. |
-| **Alertas operativas** | `/notificaciones/alertas` — solo `OWNER`/`ADMIN`: AR vencida, AP vencida, stock negativo, certificaciones aprobadas sin factura, uploads pendientes, compras demoradas (SLA) + card **Última actividad**. |
+| **Alertas operativas** | `/notificaciones/alertas` — solo `OWNER`/`ADMIN`: AR vencida, AP vencida, stock negativo, certificaciones aprobadas sin factura, uploads pendientes, compras demoradas (SLA), OC entrega vencida, SC fecha requerida vencida, OC recibida sin factura + card **Última actividad**. Cron diario **12:00 UTC**, dedup 7 días por tipo/entidad/recipient. Cada alerta genera **campana + email** (best-effort) al destinatario resuelto por permiso; los emails se loguean como `OPERATIONAL_ALERT` y aparecen en `/notificaciones/emails?emailType=OPERATIONAL_ALERT`. |
 | **Emails enviados** | `/notificaciones/emails` — historial (NOTIFICATION, OPERATIONAL_ALERT, REPORT_*). |
 
 **Quién las recibe**
@@ -762,7 +762,8 @@ flowchart LR
 6. **Seleccionar** proveedor → genera **OC en borrador**.
 7. En el **listado desktop** de solicitudes: **Código**, **Estado**, **Descripción** (primera línea + “+N más” si hay varias), **WBS** (partida o “Múltiple”), **Monto est.** (referencial Σ qty × ref. presup. o total de cotización seleccionada, con badge **Presup.** / **Cotización**), **Proveedor** (si ya hay cotización elegida), **Necesaria para**. El **solicitante** y fechas de envío/creación se ven en el **detalle** de la SC.
 8. **Buscador + filtro de estado** ([D-096]): arriba del listado hay un buscador (código, descripción, WBS, proveedor, solicitante) y botones **Todas / Borrador / Enviada / Cotización elegida / Completada / Anulada** con contador por estado. Los deep-links históricos `?status=SUBMITTED` (por ejemplo desde el email de nueva SC) siguen abriendo el filtro pre-seleccionado; después, quitarlo o cambiarlo se hace desde los mismos botones.
-9. Notificaciones: envío a compras + recordatorio SLA si demora. Quienes pueden cotizar también ven la SC en **Pendientes** hasta elegir proveedor ([D-094]). El email de nueva solicitud muestra organización, proyecto, solicitante e ítems; el asunto es `[organización] Nueva solicitud · SC-003`.
+9. **Fecha requerida vencida** ([BR-PUR-019] · [D-097]): mientras la SC esté `SUBMITTED` o `QUOTE_SELECTED`, si `neededByDate` pasó, en el listado y en **Pendientes** aparece el badge rojo **Vencida N d** junto a **Necesaria para**. Todos los días el sistema notifica a compras / aprobadores con CC OWNER/ADMIN hasta que se elija cotización o se emita OC confirmada (dedup 7 días). El colchón (`neededByOverdueGraceDays`) y el toggle se configuran por empresa en **Configuración → Políticas de compras**.
+10. Notificaciones: envío a compras + recordatorio SLA si demora. Quienes pueden cotizar también ven la SC en **Pendientes** hasta elegir proveedor ([D-094]). El email de nueva solicitud muestra organización, proyecto, solicitante e ítems; el asunto es `[organización] Nueva solicitud · SC-003`.
 
 ### 9.2 Procedimiento — Orden de compra (OC)
 
@@ -778,9 +779,11 @@ flowchart LR
 5. **Confirmar al proveedor** → `CONFIRMED` = **comprometido** en EDT y costos.  
    > No existe atajo “Emitir y confirmar (rápido)”: siempre Enviar → Aprobar → Confirmar.
 6. **Registrar recepción** (parcial o total). Quien puede recibir (Compras / Depósito / PM) la ve en **Pendientes** con botón **Recibir** (abre `…/recepciones/nueva`). La campana de confirmación avisa “Ya se puede registrar la recepción” con CTA **Registrar recepción** a ese mismo formulario.
-7. Con cantidades recibidas: **Registrar factura desde OC** (o alta manual en Facturas proveedor).
-8. Desvíos de precio vs referencia: si el PU **supera** el referencial (umbrales de políticas), pide **Justificación desvío**. Comprar por debajo no exige nota. En la ficha, el % se muestra en **rojo** si se gasta más y en **verde** si se gasta menos; la nota de justificación queda debajo (sin códigos internos de estado). Sin referencial de partida (APU y costo dir. /u en cero) sí pide justificación.
-9. **OC directa** (sin SC): solo si la política de compras lo habilita; umbrales altos pueden exigir motivo de emergencia (`OWNER`/`ADMIN`).
+7. **Entrega prevista vencida sin recepción** ([BR-PUR-018] · [D-097]): mientras la OC esté `CONFIRMED` o `PARTIALLY_RECEIVED` con `expectedDeliveryDate` pasada, en el listado y en **Pendientes** aparece el badge rojo **Vencida N d** junto a **Entrega prevista**. Se envía notificación diaria a quien puede recepcionar con deep-link al form (CTA **Registrar recepción**), CC OWNER/ADMIN, dedup 7 días. Ajustable con `deliveryOverdueGraceDays` y toggle `deliveryAlertsEnabled` por empresa.
+8. Con cantidades recibidas: **Registrar factura desde OC** (o alta manual en Facturas proveedor).
+9. **OC recibida sin factura registrada** ([BR-PUR-020] · [D-097]): si pasan `receiptToInvoiceSlaDays` (default **5**) desde la primera recepción confirmada y la OC no tiene ninguna factura de proveedor `ISSUED`, aparece en **Pendientes** para Administración / Finanzas con CTA **Registrar factura** (grupo `compras`, item "OC recibida sin factura"). Notificación diaria a `EDIT|APPROVE AP` con CC OWNER/ADMIN, dedup 7 días. Toggle `receiptToInvoiceAlertsEnabled` por empresa. Es la señal que evita que la CxP nunca se genere y que el pago quede en el aire.
+10. Desvíos de precio vs referencia: si el PU **supera** el referencial (umbrales de políticas), pide **Justificación desvío**. Comprar por debajo no exige nota. En la ficha, el % se muestra en **rojo** si se gasta más y en **verde** si se gasta menos; la nota de justificación queda debajo (sin códigos internos de estado). Sin referencial de partida (APU y costo dir. /u en cero) sí pide justificación.
+11. **OC directa** (sin SC): solo si la política de compras lo habilita; umbrales altos pueden exigir motivo de emergencia (`OWNER`/`ADMIN`).
 
 | Hito | Impacto |
 |------|---------|

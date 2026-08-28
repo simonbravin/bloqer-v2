@@ -2,10 +2,12 @@ import Link from "next/link";
 import { formatDate } from "@/lib/format";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { PurchaseRequestStatusBadge } from "./purchase-request-status-badge";
 import type { PurchaseRequestView } from "@bloqer/services";
 import type { ReactNode } from "react";
 import { formatQtyFromString } from "@/lib/format-money";
+import { purchaseRequestNeededByOverdueDays } from "../lib/purchase-delivery-overdue";
 
 function primaryLine(pr: PurchaseRequestView) {
   return pr.lines[0] ?? null;
@@ -67,9 +69,19 @@ export function PurchaseRequestMobileCards({
               {pr.requestedByName ?? "—"}
             </p>
             {pr.neededByDate ? (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Necesaria {formatDate(pr.neededByDate)}
-              </p>
+              (() => {
+                const overdue = purchaseRequestNeededByOverdueDays(pr.status, pr.neededByDate);
+                return (
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+                    <span>Necesaria {formatDate(pr.neededByDate)}</span>
+                    {overdue > 0 ? (
+                      <Badge variant="destructive" className="whitespace-nowrap">
+                        Vencida {overdue} d
+                      </Badge>
+                    ) : null}
+                  </p>
+                );
+              })()
             ) : null}
             {pr.selectedSupplierName ? (
               <p className="mt-1 text-sm text-muted-foreground">{pr.selectedSupplierName}</p>

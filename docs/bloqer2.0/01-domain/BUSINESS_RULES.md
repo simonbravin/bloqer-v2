@@ -236,6 +236,18 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Regla:** toda `PurchaseRequest` nueva (DRAFT recién creada) debe informar `neededByDate` (fecha ISO `YYYY-MM-DD`). El validador `createPurchaseRequestSchema` rechaza cargas sin ese campo. `updatePurchaseRequestSchema` lo mantiene opcional para permitir edición sin pisar el valor. Solicitudes históricas sin fecha (previas a esta regla) no se retocan.
 - **Origen:** [D-096](../00-product/DECISION_LOG.md).
 
+### BR-PUR-018 — Alerta OC con entrega prevista vencida
+- **Regla:** una `PurchaseOrder` en `CONFIRMED` o `PARTIALLY_RECEIVED` con `expectedDeliveryDate` anterior a `CURRENT_DATE − deliveryOverdueGraceDays` (por empresa; default 0) genera una notificación diaria `PURCHASE_ORDER_DELIVERY_OVERDUE` (severidad `WARNING`) para quien pueda registrar recepción (`EDIT PROCUREMENT|PURCHASE_ORDERS|INVENTORY`) con CC OWNER/ADMIN. Dedup por 7 días por (tipo, entidad, recipient). El deep-link apunta al form de recepción. La card en `/pendientes` marca la OC como `Vencida N d` y sube al tope. El toggle por empresa `deliveryAlertsEnabled` desactiva la emisión pero no la señal visual.
+- **Origen:** [D-097](../00-product/DECISION_LOG.md).
+
+### BR-PUR-019 — Alerta SC con fecha requerida vencida y sin OC
+- **Regla:** una `PurchaseRequest` en `SUBMITTED` o `QUOTE_SELECTED` con `neededByDate` anterior a `CURRENT_DATE − neededByOverdueGraceDays` (por empresa; default 0) **y sin `PurchaseOrder` vinculada en `CONFIRMED/PARTIALLY_RECEIVED/RECEIVED`** genera una notificación diaria `PURCHASE_REQUEST_NEEDED_BY_OVERDUE` (severidad `WARNING`) para aprobadores SC/OC (`APPROVE PURCHASE_REQUESTS|PURCHASE_ORDERS` + `EDIT PROCUREMENT`) con CC OWNER/ADMIN. Dedup por 7 días. Deep-link al detalle de SC. Toggle por empresa `neededByAlertsEnabled`. La card en `/pendientes` marca la SC como `Vencida N d`.
+- **Origen:** [D-097](../00-product/DECISION_LOG.md).
+
+### BR-PUR-020 — Alerta OC recibida sin factura registrada
+- **Regla:** una `PurchaseOrder` en `PARTIALLY_RECEIVED` o `RECEIVED` con primera `PurchaseReceipt` en `CONFIRMED` cuyo `receiptDate` es de hace ≥ `receiptToInvoiceSlaDays` (por empresa; default 5) **y sin ninguna `SupplierInvoice` en `ISSUED` vinculada** genera una notificación diaria `PURCHASE_ORDER_RECEIVED_WITHOUT_INVOICE` (severidad `WARNING`) para `EDIT|APPROVE AP` con CC OWNER/ADMIN. Dedup por 7 días. Deep-link al detalle de OC (CTA "Registrar factura desde OC"). En `/pendientes` aparece como nuevo item con CTA "Registrar factura" para quien tiene `EDIT AP`. Toggle por empresa `receiptToInvoiceAlertsEnabled`.
+- **Origen:** [D-097](../00-product/DECISION_LOG.md).
+
 ---
 
 ## 8. Reglas de inventario

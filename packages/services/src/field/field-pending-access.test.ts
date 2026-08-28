@@ -19,26 +19,30 @@ test("OWNER can query procurement follow-through plus approvals and other source
     "PURCHASE_ORDER",
     "PURCHASE_ORDER_CONFIRM",
     "PURCHASE_ORDER_RECEIPT",
+    "PURCHASE_ORDER_INVOICE",
     "JOBSITE_LOG",
     "CERTIFICATION",
     "SUBCONTRACT_CERTIFICATION",
   ]);
 });
 
-test("PROCUREMENT sees SC, OC approve/confirm/receive; not jobsite or client cert", () => {
+test("PROCUREMENT sees SC, OC approve/confirm/receive/invoice; not jobsite or client cert", () => {
   const sources = fieldPendingSourcesForActor(["PROCUREMENT"], allOn);
   assert.ok(sources.includes("PURCHASE_REQUEST"));
   assert.ok(sources.includes("PURCHASE_ORDER"));
   assert.ok(sources.includes("PURCHASE_ORDER_CONFIRM"));
   assert.ok(sources.includes("PURCHASE_ORDER_RECEIPT"));
+  assert.ok(sources.includes("PURCHASE_ORDER_INVOICE"));
   assert.equal(sources.includes("JOBSITE_LOG"), false);
   assert.equal(sources.includes("CERTIFICATION"), false);
 });
 
-test("PROJECT_MANAGER cannot query purchase orders awaiting approval but can quote/confirm/receive", () => {
+test("PROJECT_MANAGER cannot query purchase orders awaiting approval or invoice-follow-up", () => {
   const sources = fieldPendingSourcesForActor(["PROJECT_MANAGER"], allOn);
   assert.equal(sources.includes("PURCHASE_ORDER"), false);
   assert.equal(fieldPendingSourceAllowed(["PROJECT_MANAGER"], allOn, "PURCHASE_ORDER"), false);
+  // AP is VIEW-only for PM ([D-097]) — no PURCHASE_ORDER_INVOICE inbox.
+  assert.equal(sources.includes("PURCHASE_ORDER_INVOICE"), false);
   assert.ok(sources.includes("PURCHASE_REQUEST"));
   assert.ok(sources.includes("PURCHASE_ORDER_CONFIRM"));
   assert.ok(sources.includes("PURCHASE_ORDER_RECEIPT"));
@@ -47,11 +51,17 @@ test("PROJECT_MANAGER cannot query purchase orders awaiting approval but can quo
   assert.equal(sources.includes("CERTIFICATION"), false);
 });
 
-test("WAREHOUSE only sees OC awaiting receipt", () => {
+test("WAREHOUSE only sees OC awaiting receipt (no invoice follow-up)", () => {
   const sources = fieldPendingSourcesForActor(["WAREHOUSE"], allOn);
   assert.deepEqual(sources, ["PURCHASE_ORDER_RECEIPT"]);
   assert.equal(fieldPendingSourceAllowed(["WAREHOUSE"], allOn, "PURCHASE_ORDER"), false);
   assert.equal(fieldPendingSourceAllowed(["WAREHOUSE"], allOn, "PURCHASE_REQUEST"), false);
+  assert.equal(fieldPendingSourceAllowed(["WAREHOUSE"], allOn, "PURCHASE_ORDER_INVOICE"), false);
+});
+
+test("FINANCE sees PURCHASE_ORDER_INVOICE via AP even without procurement approve", () => {
+  const sources = fieldPendingSourcesForActor(["FINANCE"], allOn);
+  assert.ok(sources.includes("PURCHASE_ORDER_INVOICE"));
 });
 
 test("VIEWER gets no pending sources", () => {
@@ -65,6 +75,7 @@ test("disabled PROCUREMENT module omits all purchase sources even for OWNER", ()
   assert.equal(fieldPendingSourceAllowed(["OWNER"], gate, "PURCHASE_REQUEST"), false);
   assert.equal(fieldPendingSourceAllowed(["OWNER"], gate, "PURCHASE_ORDER_CONFIRM"), false);
   assert.equal(fieldPendingSourceAllowed(["OWNER"], gate, "PURCHASE_ORDER_RECEIPT"), false);
+  assert.equal(fieldPendingSourceAllowed(["OWNER"], gate, "PURCHASE_ORDER_INVOICE"), false);
   assert.equal(can(["OWNER"], "APPROVE", "PURCHASE_ORDERS"), true);
 });
 

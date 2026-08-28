@@ -28,6 +28,12 @@ const baseSettings: CompanyProcurementSettingsView = {
   overReceiptTolerancePct: "0",
   invoiceMatchTolerancePct: "0",
   approvalSlaHours: 72,
+  deliveryOverdueGraceDays: 0,
+  neededByOverdueGraceDays: 0,
+  receiptToInvoiceSlaDays: 5,
+  deliveryAlertsEnabled: true,
+  neededByAlertsEnabled: true,
+  receiptToInvoiceAlertsEnabled: true,
   apPaymentNotificationChannel: "IN_APP_AND_EMAIL",
 };
 

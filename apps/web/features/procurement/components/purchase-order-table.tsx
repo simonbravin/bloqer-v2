@@ -15,7 +15,9 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
 import { PurchaseOrderReceiptBadge } from "./purchase-order-receipt-badge";
+import { Badge } from "@/components/ui/badge";
 import type { PurchaseOrderListItem } from "./purchase-order-list";
+import { purchaseOrderDeliveryOverdueDays } from "../lib/purchase-delivery-overdue";
 
 export function PurchaseOrderTable({
   orders,
@@ -59,7 +61,26 @@ export function PurchaseOrderTable({
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">{formatDate(order.issueDate)}</TableCell>
               <TableCell className="text-sm text-muted-foreground">
-                {order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : "—"}
+                {order.expectedDeliveryDate ? (
+                  (() => {
+                    const overdue = purchaseOrderDeliveryOverdueDays(
+                      order.status,
+                      order.expectedDeliveryDate,
+                    );
+                    return (
+                      <span className="inline-flex flex-wrap items-center gap-1.5">
+                        <span>{formatDate(order.expectedDeliveryDate)}</span>
+                        {overdue > 0 ? (
+                          <Badge variant="destructive" className="whitespace-nowrap">
+                            Vencida {overdue} d
+                          </Badge>
+                        ) : null}
+                      </span>
+                    );
+                  })()
+                ) : (
+                  "—"
+                )}
               </TableCell>
               <TableCell>
                 <PurchaseOrderReceiptBadge status={order.status} />

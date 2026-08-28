@@ -13,6 +13,23 @@ import {
 
 const INBOX_LIMIT = 80;
 const STALE_MS = 3 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** UTC midnight of today, aligned to Prisma @db.Date semantics. */
+function todayUtcMidnight(): Date {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+/** Whole days between a Date column and today's UTC midnight. Negative → not yet due (returns 0). */
+function daysOverdueFromDate(reference: Date | null | undefined): number {
+  if (!reference) return 0;
+  const today = todayUtcMidnight().getTime();
+  const ref = new Date(
+    Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), reference.getUTCDate()),
+  ).getTime();
+  return Math.max(0, Math.floor((today - ref) / DAY_MS));
+}
 
 export type FieldPendingItem = {
   entityType: FieldPendingSource;
@@ -33,6 +50,8 @@ export type FieldPendingItem = {
   occurredAt: Date;
   href: string;
   priority: "normal" | "stale";
+  /** Days past a date field relevant to the item ([D-097]). 0 = on time. */
+  overdueDays: number;
 };
 
 export type FieldPendingCounts = {
@@ -41,6 +60,8 @@ export type FieldPendingCounts = {
   purchaseOrders: number;
   purchaseOrdersToConfirm: number;
   purchaseOrdersToReceive: number;
+  /** OC parcial/totalmente recibida sin factura del proveedor ([D-097]). */
+  purchaseOrdersToInvoice: number;
   jobsiteLogs: number;
   certifications: number;
   subcontractCertifications: number;
@@ -68,6 +89,7 @@ function emptyCounts(): FieldPendingCounts {
     purchaseOrders: 0,
     purchaseOrdersToConfirm: 0,
     purchaseOrdersToReceive: 0,
+    purchaseOrdersToInvoice: 0,
     jobsiteLogs: 0,
     certifications: 0,
     subcontractCertifications: 0,
@@ -105,6 +127,7 @@ export async function getMyFieldPendingItems(
   const runPo = activeSources.includes("PURCHASE_ORDER");
   const runPoConfirm = activeSources.includes("PURCHASE_ORDER_CONFIRM");
   const runPoReceipt = activeSources.includes("PURCHASE_ORDER_RECEIPT");
+  const runPoInvoice = activeSources.includes("PURCHASE_ORDER_INVOICE");
   const runLog = activeSources.includes("JOBSITE_LOG");
   const runCert = activeSources.includes("CERTIFICATION");
   const runSubCert = activeSources.includes("SUBCONTRACT_CERTIFICATION");
@@ -113,6 +136,7 @@ export async function getMyFieldPendingItems(
   const countPo = sources.includes("PURCHASE_ORDER");
   const countPoConfirm = sources.includes("PURCHASE_ORDER_CONFIRM");
   const countPoReceipt = sources.includes("PURCHASE_ORDER_RECEIPT");
+  const countPoInvoice = sources.includes("PURCHASE_ORDER_INVOICE");
   const countLog = sources.includes("JOBSITE_LOG");
   const countCert = sources.includes("CERTIFICATION");
   const countSubCert = sources.includes("SUBCONTRACT_CERTIFICATION");
@@ -137,6 +161,7 @@ export async function getMyFieldPendingItems(
             number: true,
             createdAt: true,
             submittedAt: true,
+            neededByDate: true,
             requestedByUserId: true,
             createdBy: true,
             projectId: true,
@@ -207,12 +232,47 @@ export async function getMyFieldPendingItems(
             currency: true,
             createdAt: true,
             confirmedAt: true,
+            expectedDeliveryDate: true,
             status: true,
             createdBy: true,
             originRequestedByUserId: true,
             projectId: true,
             project: { select: { code: true, name: true } },
             supplierContact: { select: { fantasyName: true, legalName: true } },
+          },
+        })
+      : Promise.resolve(null);
+
+  const poInvoiceListPromise =
+    runPoInvoice && !countsOnly
+      ? prisma.purchaseOrder.findMany({
+          where: {
+            tenantId: ctx.tenantId,
+            status: { in: ["PARTIALLY_RECEIVED", "RECEIVED"] },
+            supplierInvoices: { none: { status: "ISSUED" } },
+            receipts: { some: { status: "CONFIRMED" } },
+            ...projectWhere,
+          },
+          orderBy: { createdAt: "asc" },
+          take: INBOX_LIMIT,
+          select: {
+            id: true,
+            number: true,
+            totalAmount: true,
+            currency: true,
+            createdAt: true,
+            status: true,
+            createdBy: true,
+            originRequestedByUserId: true,
+            projectId: true,
+            project: { select: { code: true, name: true } },
+            supplierContact: { select: { fantasyName: true, legalName: true } },
+            receipts: {
+              where: { status: "CONFIRMED" },
+              orderBy: { receiptDate: "asc" },
+              take: 1,
+              select: { receiptDate: true },
+            },
           },
         })
       : Promise.resolve(null);
@@ -273,11 +333,20 @@ export async function getMyFieldPendingItems(
         })
       : Promise.resolve(null);
 
+  const poInvoiceWhere = {
+    tenantId: ctx.tenantId,
+    status: { in: ["PARTIALLY_RECEIVED", "RECEIVED"] as Array<"PARTIALLY_RECEIVED" | "RECEIVED"> },
+    supplierInvoices: { none: { status: "ISSUED" as const } },
+    receipts: { some: { status: "CONFIRMED" as const } },
+    ...projectWhere,
+  };
+
   const [
     prs,
     pos,
     posConfirm,
     posReceipt,
+    posInvoice,
     logs,
     certs,
     subCerts,
@@ -285,6 +354,7 @@ export async function getMyFieldPendingItems(
     poCount,
     poConfirmCount,
     poReceiptCount,
+    poInvoiceCount,
     logCount,
     certCount,
     subCertCount,
@@ -293,6 +363,7 @@ export async function getMyFieldPendingItems(
     poListPromise,
     poConfirmListPromise,
     poReceiptListPromise,
+    poInvoiceListPromise,
     logListPromise,
     certListPromise,
     subCertListPromise,
@@ -313,6 +384,9 @@ export async function getMyFieldPendingItems(
       : Promise.resolve(0),
     countPoReceipt
       ? prisma.purchaseOrder.count({ where: poReceiptWhere })
+      : Promise.resolve(0),
+    countPoInvoice
+      ? prisma.purchaseOrder.count({ where: poInvoiceWhere })
       : Promise.resolve(0),
     countLog
       ? prisma.jobsiteLog.count({
@@ -335,6 +409,7 @@ export async function getMyFieldPendingItems(
   counts.purchaseOrders = poCount;
   counts.purchaseOrdersToConfirm = poConfirmCount;
   counts.purchaseOrdersToReceive = poReceiptCount;
+  counts.purchaseOrdersToInvoice = poInvoiceCount;
   counts.jobsiteLogs = logCount;
   counts.certifications = certCount;
   counts.subcontractCertifications = subCertCount;
@@ -343,6 +418,7 @@ export async function getMyFieldPendingItems(
     counts.purchaseOrders +
     counts.purchaseOrdersToConfirm +
     counts.purchaseOrdersToReceive +
+    counts.purchaseOrdersToInvoice +
     counts.jobsiteLogs +
     counts.certifications +
     counts.subcontractCertifications;
@@ -364,6 +440,9 @@ export async function getMyFieldPendingItems(
   if (Array.isArray(posReceipt)) {
     for (const row of posReceipt) actorIds.push(row.originRequestedByUserId, row.createdBy);
   }
+  if (Array.isArray(posInvoice)) {
+    for (const row of posInvoice) actorIds.push(row.originRequestedByUserId, row.createdBy);
+  }
   if (Array.isArray(logs)) {
     for (const row of logs) actorIds.push(row.createdBy);
   }
@@ -379,6 +458,7 @@ export async function getMyFieldPendingItems(
     for (const row of prs) {
       const occurredAt = row.submittedAt ?? row.createdAt;
       const hasQuotes = row.quotes.length > 0;
+      const overdueDays = daysOverdueFromDate(row.neededByDate);
       items.push({
         entityType: "PURCHASE_REQUEST",
         entityId: row.id,
@@ -400,6 +480,7 @@ export async function getMyFieldPendingItems(
         occurredAt,
         href: `/proyectos/${row.projectId}/solicitudes-compra/${row.id}`,
         priority: stalePriority(occurredAt),
+        overdueDays,
       });
     }
   }
@@ -428,6 +509,7 @@ export async function getMyFieldPendingItems(
         occurredAt: row.createdAt,
         href: `/proyectos/${row.projectId}/ordenes-compra/${row.id}`,
         priority: stalePriority(row.createdAt),
+        overdueDays: 0,
       });
     }
   }
@@ -457,6 +539,7 @@ export async function getMyFieldPendingItems(
         occurredAt,
         href: `/proyectos/${row.projectId}/ordenes-compra/${row.id}`,
         priority: stalePriority(occurredAt),
+        overdueDays: 0,
       });
     }
   }
@@ -468,6 +551,7 @@ export async function getMyFieldPendingItems(
         (row.originRequestedByUserId && names.get(row.originRequestedByUserId)) ||
         (row.createdBy && names.get(row.createdBy)) ||
         null;
+      const overdueDays = daysOverdueFromDate(row.expectedDeliveryDate);
       items.push({
         entityType: "PURCHASE_ORDER_RECEIPT",
         entityId: row.id,
@@ -490,6 +574,42 @@ export async function getMyFieldPendingItems(
         // Deep-link to the receive form (CTA says Recibir, not Revisar).
         href: `/proyectos/${row.projectId}/ordenes-compra/${row.id}/recepciones/nueva`,
         priority: stalePriority(occurredAt),
+        overdueDays,
+      });
+    }
+  }
+
+  if (Array.isArray(posInvoice)) {
+    for (const row of posInvoice) {
+      const firstReceiptDate = row.receipts[0]?.receiptDate ?? null;
+      const occurredAt = firstReceiptDate ?? row.createdAt;
+      const requestedBy =
+        (row.originRequestedByUserId && names.get(row.originRequestedByUserId)) ||
+        (row.createdBy && names.get(row.createdBy)) ||
+        null;
+      const overdueDays = daysOverdueFromDate(firstReceiptDate);
+      items.push({
+        entityType: "PURCHASE_ORDER_INVOICE",
+        entityId: row.id,
+        projectId: row.projectId,
+        projectCode: row.project.code,
+        projectName: row.project.name,
+        group: "compras",
+        typeLabel: "Orden de compra",
+        title: `OC-${String(row.number).padStart(3, "0")}`,
+        description: row.supplierContact.fantasyName ?? row.supplierContact.legalName,
+        statusLabel:
+          row.status === "PARTIALLY_RECEIVED"
+            ? "Recibida parcialmente sin factura"
+            : "Recibida sin factura",
+        actionLabel: "Registrar factura",
+        amount: serializeMoneyDecimal(row.totalAmount),
+        currency: row.currency,
+        requestedByName: requestedBy,
+        occurredAt,
+        href: `/proyectos/${row.projectId}/ordenes-compra/${row.id}`,
+        priority: stalePriority(occurredAt),
+        overdueDays,
       });
     }
   }
@@ -514,6 +634,7 @@ export async function getMyFieldPendingItems(
         occurredAt: row.createdAt,
         href: `/proyectos/${row.projectId}/libro-obra/${row.id}`,
         priority: stalePriority(row.createdAt),
+        overdueDays: 0,
       });
     }
   }
@@ -538,6 +659,7 @@ export async function getMyFieldPendingItems(
         occurredAt: row.issueDate ?? row.createdAt,
         href: `/proyectos/${row.projectId}/certificaciones/${row.id}`,
         priority: stalePriority(row.issueDate ?? row.createdAt),
+        overdueDays: 0,
       });
     }
   }
@@ -563,11 +685,16 @@ export async function getMyFieldPendingItems(
         occurredAt: row.createdAt,
         href: `/proyectos/${row.projectId}/subcontratos/${row.subcontractId}/certificaciones/${row.id}`,
         priority: stalePriority(row.createdAt),
+        overdueDays: 0,
       });
     }
   }
 
-  items.sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+  // Overdue-first ([D-097]): items whose date-field is past today rise to the top, then FIFO.
+  items.sort((a, b) => {
+    if (a.overdueDays !== b.overdueDays) return b.overdueDays - a.overdueDays;
+    return a.occurredAt.getTime() - b.occurredAt.getTime();
+  });
 
   return { items, counts, queryMs: Date.now() - started };
 }

@@ -4,7 +4,9 @@ import { formatMoneyAmount } from "@/lib/format-money";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
 import { PurchaseOrderReceiptBadge } from "./purchase-order-receipt-badge";
+import { Badge } from "@/components/ui/badge";
 import type { PurchaseOrderListItem } from "./purchase-order-list";
+import { purchaseOrderDeliveryOverdueDays } from "../lib/purchase-delivery-overdue";
 
 export function PurchaseOrderCards({
   orders,
@@ -44,9 +46,22 @@ export function PurchaseOrderCards({
             <PurchaseOrderReceiptBadge status={order.status} />
           </div>
           {order.expectedDeliveryDate ? (
-            <p className="mt-1 text-sm text-muted-foreground">
-              Entrega prevista {formatDate(order.expectedDeliveryDate)}
-            </p>
+            (() => {
+              const overdue = purchaseOrderDeliveryOverdueDays(
+                order.status,
+                order.expectedDeliveryDate,
+              );
+              return (
+                <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+                  <span>Entrega prevista {formatDate(order.expectedDeliveryDate)}</span>
+                  {overdue > 0 ? (
+                    <Badge variant="destructive" className="whitespace-nowrap">
+                      Vencida {overdue} d
+                    </Badge>
+                  ) : null}
+                </p>
+              );
+            })()
           ) : null}
           <p className="mt-3 text-lg font-semibold tabular-nums">
             {formatMoneyAmount(order.totalAmount, order.currency)}

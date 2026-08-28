@@ -148,10 +148,16 @@ export function actionLabelForNotification(
       return "Registrar pago";
     case "RECEIVABLE_READY_TO_COLLECT":
       return "Registrar cobranza";
+    case "PAYABLE_OVERDUE":
+      return "Ver cuenta por pagar";
+    case "RECEIVABLE_OVERDUE":
+      return "Ver cuenta por cobrar";
     case "ACCOUNTING_DRAFTS_PENDING":
       return "Ver asientos";
     case "NEGATIVE_STOCK":
       return "Ver inventario";
+    case "PROCUREMENT_SLA_REMINDER":
+      return "Revisar compras demoradas";
     case "STALE_DOCUMENT_UPLOAD":
     case "DOCUMENT_UPLOAD_CONFIRMED":
       return documentUploadActionLabel(linked, actionUrl);
@@ -173,6 +179,12 @@ export function actionLabelForNotification(
     case "PURCHASE_ORDER_CONFIRMED":
       // Receivers get …/recepciones/nueva; informees get the OC detail.
       return actionUrl?.includes("/recepciones/nueva") ? "Registrar recepción" : "Ver orden";
+    case "PURCHASE_ORDER_DELIVERY_OVERDUE":
+      return "Registrar recepción";
+    case "PURCHASE_REQUEST_NEEDED_BY_OVERDUE":
+      return "Ver solicitud";
+    case "PURCHASE_ORDER_RECEIVED_WITHOUT_INVOICE":
+      return "Registrar factura";
     default:
       return actionLabelForLinkedEntity(linked);
   }

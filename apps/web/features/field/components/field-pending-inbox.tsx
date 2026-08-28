@@ -15,7 +15,8 @@ function groupCount(counts: FieldPendingCounts, id: "todos" | FieldPendingGroup)
         counts.purchaseRequests +
         counts.purchaseOrders +
         counts.purchaseOrdersToConfirm +
-        counts.purchaseOrdersToReceive
+        counts.purchaseOrdersToReceive +
+        counts.purchaseOrdersToInvoice
       );
     case "obra":
       return counts.jobsiteLogs;

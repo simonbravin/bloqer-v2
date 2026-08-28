@@ -9,6 +9,11 @@ import {
   type OperationalAlertRunSummary,
 } from "./operational-alerts.service";
 import { runProcurementSlaReminders } from "../procurement/procurement-notifications.service";
+import {
+  runPurchaseOrderDeliveryOverdueAlert,
+  runPurchaseOrderReceivedWithoutInvoiceAlert,
+  runPurchaseRequestNeededByOverdueAlert,
+} from "../procurement/procurement-overdue-alerts.service";
 
 export const OPERATIONAL_ALERT_TYPES = [
   "overdueReceivables",
@@ -17,6 +22,9 @@ export const OPERATIONAL_ALERT_TYPES = [
   "approvedCertificationsWithoutInvoice",
   "staleUploadingDocuments",
   "procurementSlaReminders",
+  "purchaseOrderDeliveryOverdue",
+  "purchaseRequestNeededByOverdue",
+  "purchaseOrderReceivedWithoutInvoice",
 ] as const;
 
 export type OperationalAlertType = (typeof OPERATIONAL_ALERT_TYPES)[number];
@@ -79,6 +87,18 @@ async function dispatchOperationalAlert(
       const s = await runProcurementSlaReminders(ctx);
       return { checkedCount: s.checkedCount, createdCount: s.createdCount, skippedCount: s.skippedCount, errors: [] };
     }
+    case "purchaseOrderDeliveryOverdue": {
+      const s = await runPurchaseOrderDeliveryOverdueAlert(ctx);
+      return { checkedCount: s.checkedCount, createdCount: s.createdCount, skippedCount: s.skippedCount, errors: [] };
+    }
+    case "purchaseRequestNeededByOverdue": {
+      const s = await runPurchaseRequestNeededByOverdueAlert(ctx);
+      return { checkedCount: s.checkedCount, createdCount: s.createdCount, skippedCount: s.skippedCount, errors: [] };
+    }
+    case "purchaseOrderReceivedWithoutInvoice": {
+      const s = await runPurchaseOrderReceivedWithoutInvoiceAlert(ctx);
+      return { checkedCount: s.checkedCount, createdCount: s.createdCount, skippedCount: s.skippedCount, errors: [] };
+    }
   }
 }
 
@@ -138,7 +158,7 @@ export async function runAllOperationalAlerts(ctx: ServiceContext): Promise<RunA
 }
 
 /**
- * Runs all five operational alert jobs for one tenant without OWNER/ADMIN checks.
+ * Runs every operational alert job for one tenant without OWNER/ADMIN checks.
  * HTTP/cron layer must enforce auth (e.g. CRON_SECRET). Per-alert failures are isolated.
  */
 export async function runAllOperationalAlertsForSystemContext(ctx: ServiceContext): Promise<RunAllOperationalAlertsResult> {
