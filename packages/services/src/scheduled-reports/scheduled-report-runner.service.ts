@@ -3,10 +3,11 @@ import type { ScheduledReportRunStatus } from "@bloqer/database";
 import type { ScheduledReportKey } from "@bloqer/validators";
 import { randomUUID } from "crypto";
 import { ServiceContext, ServiceError } from "../types";
-import { calculateNextRunAt } from "./scheduling";
+import { calculateNextRunAt, calendarDateInTimezone } from "./scheduling";
 import { assertCanManageScheduledReports } from "./scheduled-report-permissions";
 import { buildScheduledReportsCronServiceContext } from "./scheduled-report-cron-context";
 import type { BuildScheduledReportAttachmentFn } from "./scheduled-report-attachment.service";
+import { isPartialScheduledAttachmentsError } from "./scheduled-report-attachment.service";
 import {
   deliverScheduledReportBundle,
   type ScheduledReportDeliveryKind,
@@ -84,7 +85,18 @@ type RunOneOptions = {
   advanceNextRunAt?: boolean;
   deliveryKind?: ScheduledReportDeliveryKind;
   recipientEmails?: Set<string> | null;
+  /** When set, overrides calendar date for TENANT_JOBSITE_DAILY_LOGS (retry of an older slot). */
+  jobsiteLogDateSource?: Date;
 };
+
+/** Recover the original schedule slot from delivery metadata.runWindow (ISO or manual:/retry: prefix). */
+function instantFromStoredRunWindow(runWindow: unknown): Date | null {
+  if (typeof runWindow !== "string" || !runWindow.trim()) return null;
+  const prefixed = runWindow.match(/^(?:manual|retry):(.+)$/);
+  const iso = prefixed?.[1] ?? runWindow;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 async function loadScheduledReportRow(
   tenantId: string,
@@ -165,7 +177,7 @@ export async function retryScheduledReportFailedDeliveries(
       createdAt: { gte: since },
     },
     orderBy: { createdAt: "desc" },
-    select: { recipientEmail: true },
+    select: { recipientEmail: true, metadata: true },
   });
 
   const failedEmails = new Set(
@@ -175,12 +187,33 @@ export async function retryScheduledReportFailedDeliveries(
     throw new ServiceError("VALIDATION", "No hay envíos fallidos recientes para reintentar");
   }
 
+  // Prefer an original scheduled runWindow (plain ISO). Fallback to manual:/retry: timestamps.
+  let jobsiteLogDateSource: Date | undefined;
+  for (const preferPlain of [true, false]) {
+    for (const log of failedLogs) {
+      const meta = log.metadata;
+      if (!meta || typeof meta !== "object" || Array.isArray(meta)) continue;
+      const rw = (meta as Record<string, unknown>).runWindow;
+      if (typeof rw !== "string") continue;
+      const isPrefixed = /^(?:manual|retry):/.test(rw);
+      if (preferPlain && isPrefixed) continue;
+      if (!preferPlain && !isPrefixed) continue;
+      const slot = instantFromStoredRunWindow(rw);
+      if (slot) {
+        jobsiteLogDateSource = slot;
+        break;
+      }
+    }
+    if (jobsiteLogDateSource) break;
+  }
+
   const now = new Date();
   return runOneScheduledReport(row, now, buildAttachment, {
     runWindowOverride: `retry:${now.toISOString()}`,
     advanceNextRunAt: false,
     deliveryKind: "retry",
     recipientEmails: failedEmails,
+    jobsiteLogDateSource,
   });
 }
 
@@ -224,19 +257,37 @@ async function runOneScheduledReport(
   const ctx = buildScheduledReportsCronServiceContext(row.tenantId, row.companyId);
   const params = paramsFromJson(row.params);
   const attachmentErrors: string[] = [];
-  const attachments = [];
+  const attachments: Awaited<ReturnType<BuildScheduledReportAttachmentFn>> = [];
+
+  // Scheduled slot date (nextRunAt), not wall-clock `now` — a late cron must still attach that day's parts.
+  // Retry may pass jobsiteLogDateSource from the failed delivery's original runWindow.
+  const jobsiteLogDateSource =
+    options.jobsiteLogDateSource ??
+    (deliveryKind === "scheduled" && options.runWindowOverride == null ? row.nextRunAt : now);
 
   for (const item of row.items) {
     try {
-      const att = await buildAttachment(
+      const runParams =
+        item.reportKey === "TENANT_JOBSITE_DAILY_LOGS"
+          ? {
+              ...(params ?? {}),
+              runLogDate: calendarDateInTimezone(jobsiteLogDateSource, row.timezone),
+            }
+          : params;
+      const atts = await buildAttachment(
         item.reportKey as ScheduledReportKey,
         row.format,
         row.projectId,
-        params,
+        runParams,
         ctx,
       );
-      attachments.push(att);
+      attachments.push(...atts);
     } catch (e) {
+      if (isPartialScheduledAttachmentsError(e)) {
+        attachments.push(...e.attachments);
+        attachmentErrors.push(...e.itemErrors);
+        continue;
+      }
       const msg =
         e instanceof ServiceError
           ? e.message
@@ -253,11 +304,13 @@ async function runOneScheduledReport(
   let recipientsDuplicate = 0;
 
   if (attachments.length === 0) {
+    const emptyStatus: ScheduledReportRunStatus =
+      attachmentErrors.length > 0 ? "FAILED" : "SKIPPED";
     await finalizeScheduledReportRun(
       row,
       runWindow,
       now,
-      "FAILED",
+      emptyStatus,
       {
         recipientsSent,
         recipientsSkipped,
@@ -269,8 +322,8 @@ async function runOneScheduledReport(
     );
     return {
       scheduleId: row.id,
-      ok: false,
-      runStatus: "FAILED",
+      ok: emptyStatus !== "FAILED",
+      runStatus: emptyStatus,
       recipientsSent,
       recipientsSkipped,
       recipientsFailed,

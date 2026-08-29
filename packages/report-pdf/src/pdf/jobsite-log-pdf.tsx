@@ -1,4 +1,4 @@
-import { Document, Page, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, Text, View } from "@react-pdf/renderer";
 import type { JobsiteLogPdfPayload } from "@bloqer/services";
 import type { PdfReportBranding } from "../branding/pdf-branding.types";
 import { MAX_JOBSITE_LOG_PDF_HISTORY_ENTRIES, MAX_JOBSITE_LOG_PDF_TABLE_ROWS } from "./pdf-export.types";
@@ -201,6 +201,24 @@ export function JobsiteLogPdfDocument({ payload, branding }: Props) {
           </View>
         ) : null}
 
+        {payload.embeddedImages.length > 0 ? (
+          <View style={{ marginTop: 8 }}>
+            <Text style={reportPdfStyles.sectionTitle}>
+              Evidencias ({payload.embeddedImages.length})
+            </Text>
+            {payload.embeddedImages.map((img, i) => (
+              <View key={`${img.fileName}-${i}`} style={{ marginBottom: 10 }}>
+                <Text style={reportPdfStyles.meta}>{truncateText(img.fileName, 80)}</Text>
+                {/* Fixed height — maxHeight is unreliable in @react-pdf; wrap allowed to avoid blank pages. */}
+                <Image
+                  src={img.dataUrl}
+                  style={{ width: "100%", height: 280, objectFit: "contain", marginTop: 4 }}
+                />
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {payload.attachmentsNote ? (
           <View style={{ marginTop: 8 }}>
             <Text style={[reportPdfStyles.meta, { fontFamily: "Helvetica-Bold" }]}>Adjuntos</Text>
@@ -210,7 +228,11 @@ export function JobsiteLogPdfDocument({ payload, branding }: Props) {
 
         <PdfReportFooter
           branding={branding}
-          extraNote="Documento operativo generado desde Bloqer. Los adjuntos digitales no se incluyen en este PDF."
+          extraNote={
+            payload.embeddedImages.length > 0
+              ? "Documento operativo generado desde Bloqer. Las fotos jpeg/png/webp se embeben cuando están disponibles."
+              : "Documento operativo generado desde Bloqer."
+          }
         />
       </Page>
     </Document>

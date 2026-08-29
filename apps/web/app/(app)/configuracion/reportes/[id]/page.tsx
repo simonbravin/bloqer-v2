@@ -130,6 +130,7 @@ export default async function EditarReporteProgramadoPage({ params, searchParams
             projectCatalog={formData.projectCatalog}
             members={formData.members}
             projects={formData.projects}
+            activeProjects={formData.activeProjects}
             lockScope={detail.scope}
             lockProjectId={detail.projectId ?? undefined}
             initial={{

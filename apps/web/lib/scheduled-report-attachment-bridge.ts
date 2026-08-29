@@ -8,7 +8,7 @@ import {
   type ScheduledReportAttachment,
   type ServiceContext,
 } from "@bloqer/services";
-import { buildScheduledReportPdfAttachment } from "@bloqer/report-pdf";
+import { buildScheduledReportPdfAttachments } from "@bloqer/report-pdf";
 
 export const buildScheduledReportAttachment: BuildScheduledReportAttachmentFn = async (
   reportKey: ScheduledReportKey,
@@ -16,16 +16,19 @@ export const buildScheduledReportAttachment: BuildScheduledReportAttachmentFn = 
   projectId: string | null,
   params: Record<string, string> | null | undefined,
   ctx: ServiceContext,
-): Promise<ScheduledReportAttachment> => {
+): Promise<ScheduledReportAttachment[]> => {
   await assertReportKeyEnabledAtRun(reportKey, ctx);
   if (format === "CSV") {
-    return buildScheduledReportCsvAttachmentForRunner(reportKey, projectId, params, ctx);
+    const att = await buildScheduledReportCsvAttachmentForRunner(reportKey, projectId, params, ctx);
+    return [att];
   }
-  const pdf = await buildScheduledReportPdfAttachment(reportKey, projectId, params, ctx);
-  return {
+  // PartialScheduledAttachmentsError (jobsite multi-PDF) may be thrown already fully formed
+  // (prefixed filenames); do not wrap — runner duck-types and sends what succeeded.
+  const pdfs = await buildScheduledReportPdfAttachments(reportKey, projectId, params, ctx);
+  return pdfs.map((pdf) => ({
     reportKey,
     filename: prefixScheduledReportAttachmentFilename(reportKey, pdf.filename),
     content: pdf.content,
     contentType: pdf.contentType,
-  };
+  }));
 };

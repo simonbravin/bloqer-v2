@@ -113,6 +113,7 @@ export * from "./subcontracts/subcontract-cert-succession";
 export * from "./security/tenant-isolation";
 export * from "./jobsite-log/jobsite-log.service";
 export * from "./jobsite-log/jobsite-log-export.service";
+export * from "./jobsite-log/jobsite-log-scheduled-daily.service";
 export * from "./jobsite-log/jobsite-log-notifications.service";
 export * from "./jobsite-log/jobsite-log-access";
 export * from "./schedule/schedule-access";

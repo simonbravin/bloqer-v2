@@ -51,139 +51,30 @@ export {
   sliceCostControlReportByCostType,
 } from "./cost-type-slice";
 
-// ─── Filter / output types ────────────────────────────────────────────────────
+export type {
+  AvailableBudget,
+  BudgetSelectionRequired,
+  CostControlFilters,
+  CostControlResult,
+  CostControlRow,
+  CostControlRowFlags,
+  CostControlTotals,
+  CostTypeBucket,
+  NoApprovedBudgets,
+  ProjectCostControlReport,
+} from "./cost-control-types";
 
-export type CostControlFilters = {
-  budgetId?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  wbsSearch?: string;
-  /**
-   * CSV / export scope filter ([D-099]). When present, the export slices each
-   * row and totals to the given CostCategory bucket. It does **not** affect
-   * `getProjectCostControl` (which always returns full rows + `byCostType`).
-   */
-  costType?: CostCategory;
-};
+// ─── Filter / output types (re-exported above from cost-control-types) ────────
 
-export type CostControlRowFlags = {
-  overBudget: boolean;
-  overCertified: boolean;
-  missingBudget: boolean;
-};
-
-export type CostControlRow = {
-  wbsNodeId: string;
-  wbsCode: string;
-  wbsName: string;
-  unit: string;
-  // ─ Budget baseline ─
-  budgetQty: string;
-  budgetUnitCost: string;
-  budgetTotalCost: string;
-  budgetUnitSale: string;
-  budgetTotalSale: string;
-  // ─ Revenue ─
-  certifiedIssued: string;   // Certification.status = ISSUED
-  certifiedApproved: string; // Certification.status = APPROVED (primary KPI)
-  // ─ Cost layers (shown separately — no double-counting) ─
-  committedCost: string;         // CONFIRMED POs (lineSubtotal neto) + ACTIVE subcontracts
-  receivedCost: string;          // CONFIRMED receipts (qty × unit price via POLine)
-  accruedCost: string;           // ISSUED SupplierInvoices (lineSubtotal neto) + APPROVED SubcontractCertifications
-  paidCost: string;              // CONFIRMED Payments traceable to WBS
-  inventoryConsumedCost: string; // StockMovement OUT CONSUMPTION with wbsNodeId
-  // ─ Quantities (D-098 EDT presets) ─
-  qtyCommitted: string; // PO + subcontract line qty on this WBS
-  qtyReceived: string;  // CONFIRMED receipt qty
-  qtyConsumed: string;  // Stock OUT CONSUMPTION qty
-  // ─ Progress ─
-  operationalProgressQty: string;   // APPROVED logs only
-  submittedProgressQty: string;     // SUBMITTED logs (informational)
-  // ─ Derived ([BR-COS-002] / [D-065]) ─
-  // openCommittedCost = max(0, committed − accrued_linked) — both net ([D-095]/[D-098])
-  // expectedCostExposure = accrued + openCommitted (received is informational only)
-  openCommittedCost: string;
-  expectedCostExposure: string;
-  remainingBudgetCost: string; // budgetTotalCost - expectedCostExposure
-  costVariance: string;        // same; positive = saving, negative = overrun
-  projectedMargin: string;     // budgetTotalSale - expectedCostExposure
-  // ─ Percentages vs budget (null when budget is zero) ─
-  pctPurchased: string | null;  // committedCost / budgetTotalCost × 100
-  /** qtyReceived / budgetQty × 100 — cobertura física de compra ([D-098]). */
-  pctReceived: string | null;
-  /** operationalProgressQty / budgetQty × 100 — avance real desde libro APPROVED ([D-045]). */
-  pctPhysicalProgress: string | null;
-  pctEconomic: string | null;   // accruedCost / budgetTotalCost × 100
-  pctExposure: string | null;   // expectedCostExposure / budgetTotalCost × 100
-  flags: CostControlRowFlags;
-  /** Partida × cost type breakdown ([D-099]). Empty categories omitted by the UI. */
-  byCostType: CostTypeBucket[];
-};
-
-/** Budget vs cost layers for one CostCategory under a WBS ITEM ([D-099]). */
-export type CostTypeBucket = {
-  costType: CostCategory;
-  label: string;
-  budgetTotalCost: string;
-  committedCost: string;
-  accruedCost: string;
-  paidCost: string;
-  inventoryConsumedCost: string;
-  openCommittedCost: string;
-  expectedCostExposure: string;
-  costVariance: string;
-};
-
-export type CostControlTotals = {
-  budgetTotalCost: string;
-  budgetTotalSale: string;
-  certifiedIssued: string;
-  certifiedApproved: string;
-  committedCost: string;
-  receivedCost: string;
-  accruedCost: string;
-  paidCost: string;
-  inventoryConsumedCost: string;
-  operationalProgressQty: string;
-  openCommittedCost: string;
-  expectedCostExposure: string;
-  remainingBudgetCost: string;
-  costVariance: string;
-  projectedMargin: string;
-};
-
-export type AvailableBudget = { id: string; name: string; status: string };
-
-export type ProjectCostControlReport = {
-  type: "REPORT";
-  projectId: string;
-  budgetId: string;
-  budgetName: string;
-  budgetStatus: string;
-  availableBudgets: AvailableBudget[];
-  rows: CostControlRow[];
-  totals: CostControlTotals;
-  unallocatedCommittedCost: string;
-  unallocatedReceivedCost: string;
-  unallocatedAccruedCost: string;
-  unallocatedPaidCost: string;
-  unallocatedInventoryConsumedCost: string;
-  warnings: string[];
-  /** Phase 12D: layers omitted when the corresponding tenant module is disabled. */
-  sectionsExcluded: TenantModuleSectionExcludedWarning[];
-};
-
-export type BudgetSelectionRequired = {
-  type: "BUDGET_SELECTION_REQUIRED";
-  availableBudgets: AvailableBudget[];
-};
-
-/** No approved/closed budgets — avoid throwing so the UI can explain instead of a 500. */
-export type NoApprovedBudgets = {
-  type: "NO_APPROVED_BUDGETS";
-};
-
-export type CostControlResult = ProjectCostControlReport | BudgetSelectionRequired | NoApprovedBudgets;
+import type {
+  CostControlFilters,
+  CostControlResult,
+  CostControlRow,
+  CostControlRowFlags,
+  CostControlTotals,
+  CostTypeBucket,
+  ProjectCostControlReport,
+} from "./cost-control-types";
 
 // ─── Internal accumulators ────────────────────────────────────────────────────
 

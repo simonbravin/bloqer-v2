@@ -1,6 +1,10 @@
 import type { JobsiteLogIssueSeverity, JobsiteLogIssueStatus, JobsiteLogIssueType, JobsiteLogStatus } from "@bloqer/database";
 import { formatDateLong, formatDateTime } from "@bloqer/utils";
-import { listEntityDocuments } from "../documents/document.service";
+import {
+  getDocumentFileBytes,
+  listEntityDocuments,
+  type DocumentAttachmentView,
+} from "../documents/document.service";
 import { getProjectShellInfo } from "../project/project.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
@@ -9,6 +13,17 @@ import {
   getJobsiteLogById,
   type JobsiteLogLifecycleLogEntry,
 } from "./jobsite-log.service";
+
+const EMBEDDABLE_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_EMBEDDED_IMAGES = 12;
+const MAX_EMBEDDED_IMAGE_BYTES = Math.floor(2.5 * 1024 * 1024);
+
+/** Normalize common aliases so jpeg uploads declared as `image/jpg` still embed. */
+function normalizeEmbeddableMime(mime: string): string {
+  const m = mime.trim().toLowerCase();
+  if (m === "image/jpg") return "image/jpeg";
+  return m;
+}
 
 const STATUS_LABELS: Record<JobsiteLogStatus, string> = {
   DRAFT: "Borrador",
@@ -132,9 +147,78 @@ export type JobsiteLogPdfPayload = {
     comment: string | null;
     detail: string | null;
   }>;
+  embeddedImages: Array<{
+    fileName: string;
+    mimeType: string;
+    dataUrl: string;
+  }>;
   attachmentsNote: string | null;
   historyTruncated: boolean;
 };
+
+async function resolveJobsiteLogPdfImages(
+  activeAttachments: DocumentAttachmentView[],
+  ctx: ServiceContext,
+): Promise<{
+  embeddedImages: JobsiteLogPdfPayload["embeddedImages"];
+  attachmentsNote: string | null;
+}> {
+  const candidates = activeAttachments.filter((a) =>
+    EMBEDDABLE_IMAGE_MIME.has(normalizeEmbeddableMime(a.mimeType)),
+  );
+  const nonEmbeddable = activeAttachments.filter(
+    (a) => !EMBEDDABLE_IMAGE_MIME.has(normalizeEmbeddableMime(a.mimeType)),
+  );
+
+  const embeddedImages: JobsiteLogPdfPayload["embeddedImages"] = [];
+  const skippedNames: string[] = [];
+
+  for (const att of candidates) {
+    if (embeddedImages.length >= MAX_EMBEDDED_IMAGES) {
+      skippedNames.push(att.originalFileName);
+      continue;
+    }
+    if (att.sizeBytes > MAX_EMBEDDED_IMAGE_BYTES) {
+      skippedNames.push(att.originalFileName);
+      continue;
+    }
+    if (att.storageProvider !== "R2") {
+      skippedNames.push(att.originalFileName);
+      continue;
+    }
+    try {
+      const file = await getDocumentFileBytes(att.id, ctx);
+      const mime = normalizeEmbeddableMime(file.mimeType || att.mimeType);
+      if (!EMBEDDABLE_IMAGE_MIME.has(mime)) {
+        skippedNames.push(att.originalFileName);
+        continue;
+      }
+      embeddedImages.push({
+        fileName: att.originalFileName,
+        mimeType: mime,
+        dataUrl: `data:${mime};base64,${file.body.toString("base64")}`,
+      });
+    } catch {
+      skippedNames.push(att.originalFileName);
+    }
+  }
+
+  for (const att of nonEmbeddable) {
+    skippedNames.push(att.originalFileName);
+  }
+
+  let attachmentsNote: string | null = null;
+  if (skippedNames.length > 0) {
+    const shown = skippedNames.slice(0, 8).join(", ");
+    const extra = skippedNames.length > 8 ? ` y ${skippedNames.length - 8} más` : "";
+    attachmentsNote =
+      `Adjuntos no embebidos (HEIC, PDF u otros / tamaño o error de lectura): ${shown}${extra}.`;
+  } else if (activeAttachments.length === 0) {
+    attachmentsNote = null;
+  }
+
+  return { embeddedImages, attachmentsNote };
+}
 
 export async function buildJobsiteLogPdfPayload(
   logId: string,
@@ -159,18 +243,10 @@ export async function buildJobsiteLogPdfPayload(
     activity.updatedByName !== activity.createdByName;
 
   const activeAttachments = attachments.filter((a) => a.status === "ACTIVE");
-  let attachmentsNote: string | null = null;
-  if (activeAttachments.length > 0) {
-    const names = activeAttachments
-      .slice(0, 12)
-      .map((a) => a.originalFileName)
-      .join(", ");
-    const extra =
-      activeAttachments.length > 12 ? ` y ${activeAttachments.length - 12} más` : "";
-    attachmentsNote =
-      `Este parte registra ${activeAttachments.length} archivo(s) adjunto(s) en la plataforma ` +
-      `(no incluidos en este PDF): ${names}${extra}. Consultá el detalle en Bloqer para descargarlos.`;
-  }
+  const { embeddedImages, attachmentsNote } = await resolveJobsiteLogPdfImages(
+    activeAttachments,
+    ctx,
+  );
 
   const narrativeFields = [
     { label: "Notas generales", value: log.generalNotes },
@@ -238,6 +314,7 @@ export async function buildJobsiteLogPdfPayload(
         comment: entry.comment,
         detail: entry.detail,
       })),
+    embeddedImages,
     attachmentsNote,
     historyTruncated: activity.entries.length > MAX_LIFECYCLE_HISTORY_ENTRIES,
   };

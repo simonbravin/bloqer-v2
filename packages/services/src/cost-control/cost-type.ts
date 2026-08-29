@@ -1,21 +1,7 @@
 import { Prisma, prisma, type CostCategory } from "@bloqer/database";
+import { COST_TYPE_ORDER } from "./cost-type-constants";
 
-/** Canonical job-cost natures for EDT partida × cost type ([D-099]). */
-export const COST_TYPE_ORDER: CostCategory[] = [
-  "MATERIAL",
-  "LABOR",
-  "EQUIPMENT",
-  "SUBCONTRACT",
-  "OTHER",
-];
-
-export const COST_TYPE_LABELS_ES: Record<CostCategory, string> = {
-  MATERIAL: "Materiales",
-  LABOR: "Mano de obra",
-  EQUIPMENT: "Equipos",
-  SUBCONTRACT: "Subcontratos",
-  OTHER: "Otros",
-};
+export { COST_TYPE_LABELS_ES, COST_TYPE_ORDER } from "./cost-type-constants";
 
 /**
  * Resolve persisted costType for a procurement / AP line ([D-099]).

@@ -2,6 +2,7 @@ import type { ServiceContext } from "@bloqer/services";
 import {
   getScheduledReportCatalog,
   getScheduledReportFormTenantTimezone,
+  listActiveProjectsForJobsiteSchedulePicker,
   listProjectsForScheduledReportPicker,
   listTenantMembersForScheduledReports,
 } from "@bloqer/services";
@@ -17,18 +18,21 @@ export type ScheduledReportFormData = {
   projectCatalog: ScheduledReportCatalogOption[];
   members: ScheduledReportFormMember[];
   projects: ScheduledReportFormProject[];
+  activeProjects: ScheduledReportFormProject[];
 };
 
 export async function loadScheduledReportFormData(
   ctx: ServiceContext,
 ): Promise<ScheduledReportFormData> {
-  const [defaultTimezone, tenantCatalog, projectCatalog, members, projects] = await Promise.all([
-    getScheduledReportFormTenantTimezone(ctx),
-    getScheduledReportCatalog(ctx, "TENANT"),
-    getScheduledReportCatalog(ctx, "PROJECT"),
-    listTenantMembersForScheduledReports(ctx),
-    listProjectsForScheduledReportPicker(ctx),
-  ]);
+  const [defaultTimezone, tenantCatalog, projectCatalog, members, projects, activeProjects] =
+    await Promise.all([
+      getScheduledReportFormTenantTimezone(ctx),
+      getScheduledReportCatalog(ctx, "TENANT"),
+      getScheduledReportCatalog(ctx, "PROJECT"),
+      listTenantMembersForScheduledReports(ctx),
+      listProjectsForScheduledReportPicker(ctx),
+      listActiveProjectsForJobsiteSchedulePicker(ctx),
+    ]);
 
   return {
     defaultTimezone,
@@ -42,5 +46,6 @@ export async function loadScheduledReportFormData(
         name: m.name,
       })),
     projects,
+    activeProjects,
   };
 }

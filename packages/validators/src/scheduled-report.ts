@@ -16,6 +16,7 @@ export const tenantScheduledReportKeySchema = z.enum([
   "TENANT_MULTI_PROJECT_RENTABILITY",
   "TENANT_OVERHEAD_BY_PROJECT",
   "TENANT_MULTI_PROJECT_PROCUREMENT",
+  "TENANT_JOBSITE_DAILY_LOGS",
 ]);
 
 export const projectScheduledReportKeySchema = z.enum([
@@ -59,14 +60,27 @@ const timezoneSchema = z
   .max(64)
   .refine(isValidIanaTimeZone, "Zona horaria inválida (usá una zona IANA, ej. America/Argentina/Buenos_Aires)");
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const paramsRecordSchema = z
-  .record(z.string().max(64), z.string().max(512))
+  .record(z.string().max(64), z.string().max(1024))
   .refine((o) => Object.keys(o).length <= 48, "Demasiados parámetros")
   .refine(
     (o) => !Object.keys(o).some((k) => /^(tenantId|companyId|projectId)$/i.test(k)),
     "Parámetros reservados no permitidos",
   )
   .optional();
+
+/** Parse `jobsiteProjectIds` param (comma-separated UUIDs, max 20). */
+export function parseJobsiteProjectIdsParam(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  const ids = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return [...new Set(ids)];
+}
 
 const reportItemsSchema = z
   .array(
@@ -180,6 +194,37 @@ function refineScheduledReportBody(
     });
   }
   scopeKeyRefine(data.scope, data.items, ctx);
+
+  const hasJobsiteDaily = data.items.some((i) => i.reportKey === "TENANT_JOBSITE_DAILY_LOGS");
+  if (hasJobsiteDaily) {
+    if (data.format !== "PDF") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Libro de obra — parte del día solo admite formato PDF",
+        path: ["format"],
+      });
+    }
+    const ids = parseJobsiteProjectIdsParam(data.params?.jobsiteProjectIds);
+    if (ids.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Seleccioná al menos una obra ACTIVE para el parte diario",
+        path: ["params", "jobsiteProjectIds"],
+      });
+    } else if (ids.length > 20) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Máximo 20 obras por envío de partes diarios",
+        path: ["params", "jobsiteProjectIds"],
+      });
+    } else if (ids.some((id) => !UUID_RE.test(id))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "IDs de obra inválidos",
+        path: ["params", "jobsiteProjectIds"],
+      });
+    }
+  }
 }
 
 export const createScheduledReportSchema = scheduledReportBodySchema.superRefine(

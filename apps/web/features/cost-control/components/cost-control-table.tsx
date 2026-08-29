@@ -11,7 +11,7 @@ import {
   type CostControlRow,
   type CostControlTotals,
   type CostTypeBucket,
-} from "@bloqer/services";
+} from "@bloqer/services/cost-type-slice";
 import type { CostCategory } from "@bloqer/database";
 import { COST_CATEGORY_OPTIONS } from "@/lib/cost-category-colors";
 import {

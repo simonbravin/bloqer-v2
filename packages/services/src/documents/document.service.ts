@@ -3,6 +3,7 @@ import type { LinkedEntityType } from "@bloqer/database";
 import {
   buildStorageKey,
   putObject,
+  getObjectBytes,
   getPresignedGetUrl,
   deleteObject,
   assertTenantScopedStorageKey,
@@ -653,6 +654,47 @@ export async function getDocumentDownloadUrl(
     responseContentDisposition: buildContentDispositionHeader(disposition, doc.originalFileName),
     responseContentType: doc.mimeType || undefined,
   });
+}
+
+export type DocumentFileBytes = {
+  body: Buffer;
+  mimeType: string;
+  originalFileName: string;
+  sizeBytes: number;
+};
+
+/** Server-side R2 read for PDF embedding (same auth as download). */
+export async function getDocumentFileBytes(
+  id: string,
+  ctx: ServiceContext,
+): Promise<DocumentFileBytes> {
+  const doc = await prisma.documentAttachment.findUnique({ where: { id } });
+  if (!doc || doc.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Documento no encontrado");
+  if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para descargar documentos");
+  }
+  if (doc.status === "DELETED") throw new ServiceError("FORBIDDEN", "El documento ha sido eliminado");
+  if (doc.status === "UPLOADING") throw new ServiceError("CONFLICT", "El documento todavía se está subiendo");
+  if (doc.storageProvider !== "R2") {
+    throw new ServiceError(
+      "CONFLICT",
+      "No hay archivo almacenado para descargar. Solo se guardó la metadata del documento (el almacenamiento de archivos no estaba configurado).",
+    );
+  }
+
+  try {
+    assertTenantScopedStorageKey(ctx.tenantId, doc.storageKey);
+  } catch {
+    throw new ServiceError("NOT_FOUND", "Documento no encontrado");
+  }
+
+  const { body, contentType } = await getObjectBytes(doc.storageKey);
+  return {
+    body,
+    mimeType: contentType || doc.mimeType,
+    originalFileName: doc.originalFileName,
+    sizeBytes: doc.sizeBytes,
+  };
 }
 
 export async function archiveDocument(id: string, ctx: ServiceContext): Promise<void> {

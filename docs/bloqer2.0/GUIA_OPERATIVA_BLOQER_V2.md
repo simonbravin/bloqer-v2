@@ -670,6 +670,8 @@ En el Gantt: relleno oscuro de la barra = **Real**; franja/borde ámbar = **Cert
 3. Adjuntar fotos y observaciones.
 4. **Enviar a revisión** → `SUBMITTED` → **campana + email** a OWNER/ADMIN y al PM (u otros supervisores) del **Equipo de obra**.
 5. El PM abre el parte (campana, Pendientes o listado) y pulsa **Aprobar parte** → `APPROVED` (queda inmutable salvo anulación con motivo). Si hace falta, **devolver** → el autor recibe campana + email con el motivo.
+6. **Exportar PDF** del parte: incluye tablas + **fotos jpeg/png/webp embebidas** (si hay adjuntos en R2). HEIC u otros tipos quedan listados sin embeber.
+7. **Envío programado (empresa):** Configuración → Reportes programados → card **Libro de obra — parte del día**. Elegís obras ACTIVE; cada corrida manda el parte SUBMITTED/APPROVED de ese día (zona del envío). Si no hay parte, esa obra se saltea.
 
 ```mermaid
 flowchart LR
@@ -1051,7 +1053,7 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 - **Rentabilidad:** `/proyectos/[id]/reportes/rentabilidad` (margen bruto; neto según overhead imputado, visible a `OWNER`/`ADMIN`).
 - **Hub de empresa:** General → **Reportes** → `/reportes` — mismas secciones **Financieros** (rentabilidad multi-obra, aging CxC/CxP, flujo de caja, GG por proyecto) y **Operativos** (portafolio, compras multi-obra, inventario) ([D-098]).
 - **Exportar:** en cada pantalla de reporte, menú **Exportar** → **CSV** / **PDF** (o botón **Exportar PDF** si solo hay PDF). Contabilidad/tesorería/finanzas/inventario/registro siguen el mismo patrón; algunos libros ofrecen también XLSX.
-- **Envíos programados por email:** `/proyectos/[id]/reportes/programados` (obra) y Configuración → **Reportes programados** → `/configuracion/reportes`. El listado muestra el catálogo por alcance (**Empresa general** / **Proyecto**) y por sección (**Financieros** / **Operativos**). En el alta, las cards se eligen con los mismos títulos. Formato **PDF** o **CSV (Excel)** para todos los reportes listados (portafolio, rentabilidad multi-obra, GG y compras multi-obra ya no son solo CSV). *Presupuesto vs real* quedó absorbido por **EDT y costos** y no se ofrece en envíos nuevos.
+- **Envíos programados por email:** `/proyectos/[id]/reportes/programados` (obra) y Configuración → **Reportes programados** → `/configuracion/reportes`. El listado muestra el catálogo por alcance (**Empresa general** / **Proyecto**) y por sección (**Financieros** / **Operativos**). En el alta, las cards se eligen con los mismos títulos. Formato **PDF** o **CSV (Excel)** para todos los reportes listados (portafolio, rentabilidad multi-obra, GG y compras multi-obra ya no son solo CSV). *Presupuesto vs real* quedó absorbido por **EDT y costos** y no se ofrece en envíos nuevos. **Libro de obra — parte del día** ([D-100]): solo PDF, multi-obra ACTIVE, un adjunto por parte del día de la corrida.
 
 ---
 

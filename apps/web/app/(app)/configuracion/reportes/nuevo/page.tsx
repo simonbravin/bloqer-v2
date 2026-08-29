@@ -39,6 +39,7 @@ export default async function NuevoReporteProgramadoPage({ searchParams }: Props
         projectCatalog={formData.projectCatalog}
         members={formData.members}
         projects={formData.projects}
+        activeProjects={formData.activeProjects}
         lockScope={lockScope}
         lockProjectId={lockProjectId}
       />

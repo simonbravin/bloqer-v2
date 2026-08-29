@@ -9,6 +9,7 @@ import type {
 } from "@bloqer/database";
 import {
   createScheduledReportSchema,
+  parseJobsiteProjectIdsParam,
   updateScheduledReportSchema,
   type CreateScheduledReportInput,
   type ScheduledReportKey,
@@ -144,6 +145,28 @@ async function assertRecipientUsers(
   });
   if (memberships.length !== unique.length) {
     throw new ServiceError("VALIDATION", "Uno o más destinatarios no pertenecen al equipo activo");
+  }
+}
+
+async function assertActiveJobsiteProjectsForSchedule(
+  items: { reportKey: ScheduledReportKey }[],
+  params: Record<string, string> | undefined,
+  ctx: ServiceContext,
+): Promise<void> {
+  if (!items.some((i) => i.reportKey === "TENANT_JOBSITE_DAILY_LOGS")) return;
+  const ids = parseJobsiteProjectIdsParam(params?.jobsiteProjectIds);
+  if (ids.length === 0) {
+    throw new ServiceError("VALIDATION", "Seleccioná al menos una obra ACTIVE para el parte diario");
+  }
+  const found = await prisma.project.findMany({
+    where: { tenantId: ctx.tenantId, id: { in: ids }, status: "ACTIVE" },
+    select: { id: true },
+  });
+  if (found.length !== ids.length) {
+    throw new ServiceError(
+      "VALIDATION",
+      "Una o más obras del parte diario no existen o no están ACTIVE",
+    );
   }
 }
 
@@ -323,6 +346,7 @@ export async function createScheduledReport(
     await assertProjectInTenant(input.projectId, ctx);
   }
   await assertRecipientUsers(input.recipientUserIds, ctx);
+  await assertActiveJobsiteProjectsForSchedule(input.items, input.params, ctx);
 
   const timezone = input.timezone?.trim() || (await resolveTenantTimezone(ctx.tenantId));
   const { nextRunAt, dayOfWeek, dayOfMonth } = buildTimingFromInput(input, timezone);
@@ -400,6 +424,7 @@ export async function updateScheduledReport(
     await assertProjectInTenant(input.projectId, ctx);
   }
   await assertRecipientUsers(input.recipientUserIds, ctx);
+  await assertActiveJobsiteProjectsForSchedule(input.items, input.params, ctx);
 
   const timezone = input.timezone?.trim() || (await resolveTenantTimezone(ctx.tenantId));
   const { nextRunAt, dayOfWeek, dayOfMonth } = buildTimingFromInput(input, timezone);
@@ -541,4 +566,17 @@ export async function listProjectsForScheduledReportPicker(
   });
 }
 
-export { calculateNextRunAt } from "./scheduling";
+/** ACTIVE projects only — for TENANT_JOBSITE_DAILY_LOGS multi-select ([D-100]). */
+export async function listActiveProjectsForJobsiteSchedulePicker(
+  ctx: ServiceContext,
+): Promise<ProjectPickerRow[]> {
+  assertCanManageScheduledReports(ctx);
+  return prisma.project.findMany({
+    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+    select: { id: true, code: true, name: true },
+    orderBy: { code: "asc" },
+    take: 500,
+  });
+}
+
+export { calculateNextRunAt, calendarDateInTimezone } from "./scheduling";

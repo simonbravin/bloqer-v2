@@ -97,6 +97,12 @@ export const SCHEDULED_REPORT_KEY_META: Record<ScheduledReportKey, ScheduledRepo
     group: "operational",
     requiredModules: ["PROCUREMENT"],
   },
+  TENANT_JOBSITE_DAILY_LOGS: {
+    scope: "TENANT",
+    labelEs: "Libro de obra — parte del día",
+    group: "operational",
+    requiredModules: ["PROJECTS", "JOBSITE_LOG"],
+  },
   PROJECT_COST_CONTROL: {
     scope: "PROJECT",
     labelEs: "EDT y costos",

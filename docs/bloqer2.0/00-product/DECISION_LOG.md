@@ -1523,6 +1523,22 @@
 
 ---
 
+### D-100 — Parte diario de libro de obra programado (multi-obra) + fotos en PDF
+
+- **Fecha:** 2026-08-29
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** El export PDF del parte solo listaba nombres de adjuntos. No había envío programado del libro de obra. Un schedule tiene un solo `projectId`; hace falta multi-obra sin inventar tablas.
+- **Decisión:**
+  1. Key empresa `TENANT_JOBSITE_DAILY_LOGS` (**Libro de obra — parte del día**), formato **solo PDF**, módulos `PROJECTS` + `JOBSITE_LOG`.
+  2. Multi-selección de hasta **20 obras ACTIVE** en `params.jobsiteProjectIds` (CSV de UUIDs).
+  3. Día = fecha calendario de la corrida en timezone del envío. Partes `SUBMITTED` \| `APPROVED` (no DRAFT/CANCELLED). Un PDF por parte; sin partes → corrida `SKIPPED` (sin mail).
+  4. Embeber jpeg/png/webp (máx. 12, ≤ 2.5 MB, R2) en el PDF del parte — mismo pipeline que Exportar en el detalle. HEIC/PDF quedan listados, no embebidos.
+- **Implicancias:** El cron puede generar N adjuntos por key. Destinatarios externos / ZIP / HEIC conversion fuera de alcance.
+- **Documentos afectados:** [`REPORT_CATALOG.md`](../06-reports/REPORT_CATALOG.md) R-015, [`SCHEDULED_REPORTS_ARCHITECTURE.md`](../08-architecture/SCHEDULED_REPORTS_ARCHITECTURE.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §8.1 · §13.2, help export / programar envíos / parte.
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

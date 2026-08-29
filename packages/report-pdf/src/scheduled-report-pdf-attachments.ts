@@ -1,4 +1,5 @@
 import type { ScheduledReportKey } from "@bloqer/validators";
+import { parseJobsiteProjectIdsParam } from "@bloqer/validators";
 import type { ServiceContext } from "@bloqer/services";
 import {
   parseAgingFilters,
@@ -18,6 +19,9 @@ import {
   parseStockBalanceFilters,
   parseStockMovementFilters,
   parseSubcontractReportFilters,
+  listDailyJobsiteLogsForSchedule,
+  PartialScheduledAttachmentsError,
+  prefixScheduledReportAttachmentFilename,
   ServiceError,
 } from "@bloqer/services";
 import {
@@ -43,6 +47,7 @@ import {
   exportPortfolioProfitabilityPdf,
   exportOverheadByProjectPdf,
   exportMultiProjectProcurementPdf,
+  exportJobsiteLogPdf,
 } from "./report-pdf-export.service";
 
 export type ScheduledReportPdfAttachment = {
@@ -68,6 +73,89 @@ function assertValidPdfBuffer(buffer: Buffer): void {
 function toPdfAttachment(filename: string, buffer: Buffer): ScheduledReportPdfAttachment {
   assertValidPdfBuffer(buffer);
   return { filename, content: buffer, contentType: "application/pdf" };
+}
+
+function slugPart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 40);
+}
+
+/**
+ * Builds one or more PDF attachments for a scheduled report key.
+ * TENANT_JOBSITE_DAILY_LOGS may return zero (no parts that day) or many.
+ */
+export async function buildScheduledReportPdfAttachments(
+  reportKey: ScheduledReportKey,
+  projectId: string | null,
+  params: Record<string, string> | null | undefined,
+  ctx: ServiceContext,
+): Promise<ScheduledReportPdfAttachment[]> {
+  if (reportKey === "TENANT_JOBSITE_DAILY_LOGS") {
+    return buildJobsiteDailyLogPdfAttachments(params, ctx);
+  }
+  const single = await buildScheduledReportPdfAttachment(reportKey, projectId, params, ctx);
+  return [single];
+}
+
+async function buildJobsiteDailyLogPdfAttachments(
+  params: Record<string, string> | null | undefined,
+  ctx: ServiceContext,
+): Promise<ScheduledReportPdfAttachment[]> {
+  const sp = asFilterRecord(params);
+  // Hard cap even if legacy params exceed validator max (defensive at run time).
+  const projectIds = parseJobsiteProjectIdsParam(sp.jobsiteProjectIds).slice(0, 20);
+  const logDateIso = sp.runLogDate?.trim();
+  if (!logDateIso || !/^\d{4}-\d{2}-\d{2}$/.test(logDateIso)) {
+    throw new ServiceError("VALIDATION", "Fecha de corrida requerida para partes diarios");
+  }
+  if (projectIds.length === 0) {
+    return [];
+  }
+
+  const { logs, truncated, takeLimit } = await listDailyJobsiteLogsForSchedule(
+    projectIds,
+    logDateIso,
+    ctx,
+  );
+  const out: ScheduledReportPdfAttachment[] = [];
+  const errors: string[] = [];
+
+  if (truncated) {
+    errors.push(
+      `Se alcanzó el límite de ${takeLimit} partes para la fecha; algunos no se adjuntaron`,
+    );
+  }
+
+  for (const log of logs) {
+    try {
+      const { buffer, filename } = await exportJobsiteLogPdf(log.id, log.projectId, ctx);
+      const code = slugPart(log.projectCode || log.projectId.slice(0, 8));
+      const uniqueName =
+        filename.replace(/\.pdf$/i, "") +
+        `_${code}` +
+        (log.shift ? `_${slugPart(log.shift)}` : "") +
+        `_${log.id.slice(0, 8)}.pdf`;
+      out.push(toPdfAttachment(uniqueName, buffer));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al generar PDF del parte";
+      errors.push(`${log.projectCode}: ${msg}`);
+    }
+  }
+
+  if (out.length === 0 && errors.length > 0) {
+    throw new ServiceError("CONFLICT", `No se pudo generar ningún parte: ${errors.join("; ")}`);
+  }
+  if (out.length > 0 && errors.length > 0) {
+    throw new PartialScheduledAttachmentsError(
+      out.map((pdf) => ({
+        reportKey: "TENANT_JOBSITE_DAILY_LOGS" as const,
+        filename: prefixScheduledReportAttachmentFilename("TENANT_JOBSITE_DAILY_LOGS", pdf.filename),
+        content: pdf.content,
+        contentType: pdf.contentType,
+      })),
+      errors.map((e) => `TENANT_JOBSITE_DAILY_LOGS: ${e}`),
+    );
+  }
+  return out;
 }
 
 export async function buildScheduledReportPdfAttachment(
@@ -212,6 +300,12 @@ export async function buildScheduledReportPdfAttachment(
     case "TENANT_MULTI_PROJECT_PROCUREMENT": {
       const { buffer, filename } = await exportMultiProjectProcurementPdf(ctx, sp);
       return toPdfAttachment(filename, buffer);
+    }
+    case "TENANT_JOBSITE_DAILY_LOGS": {
+      throw new ServiceError(
+        "VALIDATION",
+        "Usá buildScheduledReportPdfAttachments para partes diarios",
+      );
     }
     default: {
       const _exhaustive: never = reportKey;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { sliceCostControlReportByCostType, costTypeBucketHasActivity } from "./cost-type-slice";
-import type { CostControlRow, CostTypeBucket, ProjectCostControlReport } from "./cost-control.service";
+import type { CostControlRow, CostTypeBucket, ProjectCostControlReport } from "./cost-control-types";
 
 function bucket(partial: Partial<CostTypeBucket> & Pick<CostTypeBucket, "costType">): CostTypeBucket {
   return {

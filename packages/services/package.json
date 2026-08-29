@@ -14,7 +14,8 @@
     "./schedule-field": "./src/schedule/schedule-field.ts",
     "./materials-field": "./src/materials/materials-field.ts",
     "./payables-field": "./src/ap/payables-field.ts",
-    "./receivables-field": "./src/ar/receivables-field.ts"
+    "./receivables-field": "./src/ar/receivables-field.ts",
+    "./cost-type-slice": "./src/cost-control/cost-type-slice.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

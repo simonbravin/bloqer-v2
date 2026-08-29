@@ -1,11 +1,28 @@
-import { Prisma, type CostCategory } from "@bloqer/database";
-import { COST_TYPE_ORDER } from "./cost-type";
+import type { CostCategory } from "@bloqer/database";
+import {
+  addDecimal,
+  compareDecimal,
+  divideDecimal,
+  multiplyDecimal,
+  roundMoney,
+  roundToDecimals,
+} from "@bloqer/utils";
+import { COST_TYPE_ORDER } from "./cost-type-constants";
 import type {
   CostControlRow,
   CostControlTotals,
   CostTypeBucket,
   ProjectCostControlReport,
-} from "./cost-control.service";
+} from "./cost-control-types";
+
+export type {
+  CostControlFilters,
+  CostControlRow,
+  CostControlTotals,
+  CostTypeBucket,
+  ProjectCostControlReport,
+} from "./cost-control-types";
+export { COST_TYPE_ORDER } from "./cost-type-constants";
 
 export function parseCostCategoryFilter(raw: string | undefined | null): CostCategory | undefined {
   if (!raw) return undefined;
@@ -24,26 +41,22 @@ export function costTypeBucketHasActivity(b: CostTypeBucket): boolean {
 }
 
 function pctOf(num: string, den: string): string | null {
-  const d = Number(den);
-  if (!Number.isFinite(d) || d === 0) return null;
-  const n = Number(num);
-  if (!Number.isFinite(n)) return null;
-  return ((n / d) * 100).toFixed(2);
+  if (compareDecimal(den, "0") === 0) return null;
+  // Decimal-safe % (avoid Number float drift on money strings).
+  return roundToDecimals(multiplyDecimal(divideDecimal(num, den, 8), "100"), 2);
 }
 
 function moneyMinus(a: string, b: string): string {
-  return new Prisma.Decimal(a).minus(b).toFixed(2);
+  return roundMoney(addDecimal(a, multiplyDecimal(b, "-1")));
 }
 
 function moneyPlus(a: string, b: string): string {
-  return new Prisma.Decimal(a).plus(b).toFixed(2);
+  return roundMoney(addDecimal(a, b));
 }
 
 function rowFromBucket(row: CostControlRow, bucket: CostTypeBucket): CostControlRow {
   const budget = bucket.budgetTotalCost;
   const remaining = moneyMinus(budget, bucket.expectedCostExposure);
-  const budgetDec = new Prisma.Decimal(bucket.budgetTotalCost);
-  const exposureDec = new Prisma.Decimal(bucket.expectedCostExposure);
   return {
     ...row,
     budgetTotalCost: budget,
@@ -69,7 +82,9 @@ function rowFromBucket(row: CostControlRow, bucket: CostTypeBucket): CostControl
     pctEconomic: pctOf(bucket.accruedCost, budget),
     pctExposure: pctOf(bucket.expectedCostExposure, budget),
     flags: {
-      overBudget: exposureDec.gt(budgetDec) && !budgetDec.isZero(),
+      overBudget:
+        compareDecimal(bucket.expectedCostExposure, bucket.budgetTotalCost) > 0 &&
+        compareDecimal(bucket.budgetTotalCost, "0") !== 0,
       overCertified: false,
       missingBudget: row.flags.missingBudget,
     },

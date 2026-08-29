@@ -52,6 +52,33 @@ export type ScheduledReportAttachment = {
   reportKey: ScheduledReportKey;
 };
 
+/** Some attachments built; others failed — runner should send what succeeded and mark PARTIAL. */
+export class PartialScheduledAttachmentsError extends Error {
+  readonly attachments: ScheduledReportAttachment[];
+  readonly itemErrors: string[];
+
+  constructor(attachments: ScheduledReportAttachment[], itemErrors: string[]) {
+    super(itemErrors.join("; "));
+    this.name = "PartialScheduledAttachmentsError";
+    this.attachments = attachments;
+    this.itemErrors = itemErrors;
+  }
+}
+
+/** Duck-type safe across package boundaries (instanceof can fail with duplicate module instances). */
+export function isPartialScheduledAttachmentsError(
+  e: unknown,
+): e is PartialScheduledAttachmentsError {
+  if (e instanceof PartialScheduledAttachmentsError) return true;
+  if (!e || typeof e !== "object") return false;
+  const o = e as { name?: unknown; attachments?: unknown; itemErrors?: unknown };
+  return (
+    o.name === "PartialScheduledAttachmentsError" &&
+    Array.isArray(o.attachments) &&
+    Array.isArray(o.itemErrors)
+  );
+}
+
 /** Avoid duplicate attachment names when a schedule bundles several reports. */
 export function prefixScheduledReportAttachmentFilename(
   reportKey: ScheduledReportKey,
@@ -306,6 +333,12 @@ async function buildScheduledReportCsvAttachment(
         contentType: "text/csv; charset=utf-8",
       };
     }
+    case "TENANT_JOBSITE_DAILY_LOGS": {
+      throw new ServiceError(
+        "CONFLICT",
+        "Libro de obra — parte del día solo se envía en PDF",
+      );
+    }
     default: {
       const _exhaustive: never = reportKey;
       throw new ServiceError("VALIDATION", `CSV no soportado: ${_exhaustive}`);
@@ -324,13 +357,14 @@ export async function assertReportKeyEnabledAtRun(
   }
 }
 
+/** Returns zero or more attachments per report key (jobsite daily may emit N PDFs). */
 export type BuildScheduledReportAttachmentFn = (
   reportKey: ScheduledReportKey,
   format: ScheduledReportFormat,
   projectId: string | null,
   params: Record<string, string> | null | undefined,
   ctx: ServiceContext,
-) => Promise<ScheduledReportAttachment>;
+) => Promise<ScheduledReportAttachment[]>;
 
 export async function buildScheduledReportCsvAttachmentForRunner(
   reportKey: ScheduledReportKey,

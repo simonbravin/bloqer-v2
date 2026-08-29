@@ -31,10 +31,13 @@ const WEEKDAY_LABELS: Record<number, string> = {
   7: "Domingo",
 };
 
+const MAX_JOBSITE_PROJECTS = 20;
+
 function buildReportParams(
   dateFrom: string,
   dateTo: string,
   currency: string,
+  jobsiteProjectIds: string[],
 ): Record<string, string> | undefined {
   const params: Record<string, string> = {};
   const from = dateFrom.trim();
@@ -43,6 +46,9 @@ function buildReportParams(
   if (from) params.dateFrom = from;
   if (to) params.dateTo = to;
   if (cur) params.currency = cur;
+  if (jobsiteProjectIds.length > 0) {
+    params.jobsiteProjectIds = jobsiteProjectIds.join(",");
+  }
   return Object.keys(params).length > 0 ? params : undefined;
 }
 
@@ -91,6 +97,8 @@ export type ScheduledReportFormProps = {
   projectCatalog: ScheduledReportCatalogOption[];
   members: ScheduledReportFormMember[];
   projects: ScheduledReportFormProject[];
+  /** ACTIVE projects for libro de obra daily schedule ([D-100]). */
+  activeProjects: ScheduledReportFormProject[];
   initial?: ScheduledReportFormInitial;
   lockScope?: "TENANT" | "PROJECT";
   lockProjectId?: string;
@@ -125,6 +133,15 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
   const [selectedKeys, setSelectedKeys] = React.useState<Set<ScheduledReportKey>>(
     () => new Set(props.initial?.reportKeys ?? []),
   );
+  const [selectedJobsiteProjects, setSelectedJobsiteProjects] = React.useState<Set<string>>(() => {
+    const raw = props.initial?.params?.jobsiteProjectIds ?? "";
+    return new Set(
+      raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  });
   const [selectedRecipients, setSelectedRecipients] = React.useState<Set<string>>(
     () => new Set(props.initial?.recipientUserIds ?? []),
   );
@@ -136,6 +153,17 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
 
   const catalog = scope === "TENANT" ? props.tenantCatalog : props.projectCatalog;
   const scopeLocked = Boolean(props.lockScope);
+  const includesJobsiteDaily = selectedKeys.has("TENANT_JOBSITE_DAILY_LOGS");
+  const activeProjectIdSet = React.useMemo(
+    () => new Set(props.activeProjects.map((p) => p.id)),
+    [props.activeProjects],
+  );
+  /** IDs still in selection but no longer ACTIVE (edit UX — must drop before save). */
+  const orphanJobsiteProjectIds = React.useMemo(
+    () => [...selectedJobsiteProjects].filter((id) => !activeProjectIdSet.has(id)),
+    [selectedJobsiteProjects, activeProjectIdSet],
+  );
+  const activeJobsiteSelectionCount = selectedJobsiteProjects.size - orphanJobsiteProjectIds.length;
 
   React.useEffect(() => {
     if (scopeLocked) return;
@@ -147,11 +175,38 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
     });
   }, [scope, scopeLocked, catalog]);
 
+  React.useEffect(() => {
+    if (includesJobsiteDaily && format !== "PDF") {
+      setFormat("PDF");
+    }
+  }, [includesJobsiteDaily, format]);
+
   function toggleKey(key: ScheduledReportKey, checked: boolean) {
     setSelectedKeys((prev) => {
       const next = new Set(prev);
       if (checked) next.add(key);
       else next.delete(key);
+      return next;
+    });
+  }
+
+  function toggleJobsiteProject(id: string, checked: boolean) {
+    setSelectedJobsiteProjects((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        const activeCount = [...next].filter((x) => activeProjectIdSet.has(x)).length;
+        if (activeCount >= MAX_JOBSITE_PROJECTS) return prev;
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  function clearOrphanJobsiteProjects() {
+    setSelectedJobsiteProjects((prev) => {
+      const next = new Set([...prev].filter((id) => activeProjectIdSet.has(id)));
       return next;
     });
   }
@@ -168,22 +223,38 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    // Never persist inactive/orphan obra IDs — server assertActiveJobsiteProjects would reject.
+    const jobsiteIdsForSave = includesJobsiteDaily
+      ? [...selectedJobsiteProjects].filter((id) => activeProjectIdSet.has(id))
+      : [];
+    if (includesJobsiteDaily && jobsiteIdsForSave.length === 0) {
+      setError("Seleccioná al menos una obra ACTIVE para el parte diario.");
+      return;
+    }
+    if (includesJobsiteDaily && jobsiteIdsForSave.length > MAX_JOBSITE_PROJECTS) {
+      setError(`Máximo ${MAX_JOBSITE_PROJECTS} obras por envío de partes diarios.`);
+      return;
+    }
+    if (includesJobsiteDaily && orphanJobsiteProjectIds.length > 0) {
+      clearOrphanJobsiteProjects();
+    }
     setPending(true);
     const items = [...selectedKeys].map((reportKey, index) => ({ reportKey, sortOrder: index }));
     const effectiveScope = props.lockScope ?? scope;
+    const effectiveFormat = includesJobsiteDaily ? "PDF" : format;
     const payload = {
       ...(props.initial?.id ? { id: props.initial.id } : {}),
       name: name.trim(),
       scope: effectiveScope,
       projectId:
         effectiveScope === "PROJECT" ? (props.lockProjectId ?? projectId) || undefined : undefined,
-      format,
+      format: effectiveFormat,
       frequency,
       dayOfWeek: frequency === "WEEKLY" ? Number(dayOfWeek) : undefined,
       dayOfMonth: frequency === "MONTHLY" ? Number(dayOfMonth) : undefined,
       timeOfDay: timeOfDay.slice(0, 5),
       timezone,
-      params: buildReportParams(dateFrom, dateTo, currency),
+      params: buildReportParams(dateFrom, dateTo, currency, jobsiteIdsForSave),
       items,
       recipientUserIds: [...selectedRecipients],
     };
@@ -277,7 +348,7 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
           <CardTitle className="text-base">Reportes incluidos</CardTitle>
           <p className="text-xs text-muted-foreground">
             Agrupados como en el hub: financieros (caja, cobros, margen) y operativos (obras, compras,
-            inventario). PDF y CSV (Excel) para todos.
+            inventario). PDF o CSV (Excel) según el envío; el parte diario de libro de obra es solo PDF.
           </p>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -318,9 +389,78 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
         </CardContent>
       </Card>
 
+      {includesJobsiteDaily ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Obras del parte diario</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Solo obras ACTIVE (máx. {MAX_JOBSITE_PROJECTS}). Se envía el parte SUBMITTED o APPROVED
+              de la fecha de la corrida (zona horaria del envío). Sin parte ese día, esa obra no
+              adjunta nada. Los filtros Desde/Hasta no aplican a este reporte.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {orphanJobsiteProjectIds.length > 0 ? (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm space-y-2">
+                <p>
+                  Hay {orphanJobsiteProjectIds.length} obra(s) guardada(s) que ya no están ACTIVE.
+                  Se quitarán al guardar.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearOrphanJobsiteProjects}
+                >
+                  Quitar obras inactivas ahora
+                </Button>
+              </div>
+            ) : null}
+            {props.activeProjects.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No hay obras ACTIVE en la empresa.</p>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Seleccionadas: {activeJobsiteSelectionCount} / {MAX_JOBSITE_PROJECTS}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {props.activeProjects.map((p) => (
+                    <label
+                      key={p.id}
+                      htmlFor={`sr-jobsite-project-${p.id}`}
+                      className="flex items-start gap-2 text-sm cursor-pointer"
+                    >
+                      <Checkbox
+                        id={`sr-jobsite-project-${p.id}`}
+                        className="mt-0.5"
+                        checked={selectedJobsiteProjects.has(p.id)}
+                        disabled={
+                          !selectedJobsiteProjects.has(p.id) &&
+                          activeJobsiteSelectionCount >= MAX_JOBSITE_PROJECTS
+                        }
+                        onCheckedChange={(v) => toggleJobsiteProject(p.id, v === true)}
+                      />
+                      <span>
+                        {p.code} · {p.name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Filtros del reporte</CardTitle>
+          {includesJobsiteDaily ? (
+            <p className="text-xs text-muted-foreground">
+              Desde/Hasta y moneda aplican a los demás reportes del envío. El parte diario usa la
+              fecha de la corrida, no este rango.
+            </p>
+          ) : null}
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -428,7 +568,11 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
           </div>
           <div className="space-y-2">
             <Label>Formato</Label>
-            <Select value={format} onValueChange={(v) => setFormat(v as "CSV" | "PDF")}>
+            <Select
+              value={includesJobsiteDaily ? "PDF" : format}
+              onValueChange={(v) => setFormat(v as "CSV" | "PDF")}
+              disabled={includesJobsiteDaily}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -438,8 +582,9 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
               </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground">
-              El CSV usa punto y coma y se abre en Excel. El PDF es el mismo que el botón Exportar de cada
-              reporte.
+              {includesJobsiteDaily
+                ? "El parte diario se envía solo en PDF (con fotos embebidas si hay)."
+                : "El CSV usa punto y coma y se abre en Excel. El PDF es el mismo que el botón Exportar de cada reporte."}
             </p>
           </div>
         </CardContent>

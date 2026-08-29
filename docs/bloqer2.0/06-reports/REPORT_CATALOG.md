@@ -20,7 +20,7 @@
 | R-012 | Evolución certificaciones | PRJ | Serie mensual certificado / facturado / cobrado: **facturado** = existe `SalesInvoice`/`Receivable` vinculada ([BR-CERT-007]); cobrado vía AR+tesorería; `payment_status` derivado; columnas no usan `INVOICED` como estado de certificación | 1 |
 | R-013 | Materiales por proyecto | INV / OP | Consumo/stock imputado | 1 |
 | R-014 | Inventario valorizado | INV | Por depósito y consolidado. Qty-only en piloto; **valorizado pleno diferido** (depende [D-007]/[D-083](../00-product/DECISION_LOG.md)) | 1 |
-| R-015 | Libro de obra export | PRJ | PDF parte diarios | 1 |
+| R-015 | Libro de obra export | PRJ | PDF del parte (detalle) con fotos jpeg/png/webp embebidas; key programada empresa `TENANT_JOBSITE_DAILY_LOGS` ([D-100]) | 1 |
 | R-016 | Directorio de contactos | OP | Export maestro | 1 |
 | R-017 | Auditoría de movimientos | FIN | Log filtrable | 1 |
 | R-018 | Query builder ad-hoc | ALL | Filtros + columnas ([Q-010]) | 1 |

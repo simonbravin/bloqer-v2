@@ -155,6 +155,12 @@ function candidateLocalDate(
   return { year: y, month: m, day: d, hour, minute };
 }
 
+/** Calendar YYYY-MM-DD in the given IANA timezone for `instant`. */
+export function calendarDateInTimezone(instant: Date, timeZone: string): string {
+  const p = partsInTimezone(instant, timeZone);
+  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+}
+
 /** Next scheduled run instant (UTC). */
 export function calculateNextRunAt(input: CalculateNextRunAtInput): Date {
   const after = input.after ?? new Date();

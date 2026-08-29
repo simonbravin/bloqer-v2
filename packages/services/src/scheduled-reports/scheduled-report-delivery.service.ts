@@ -65,15 +65,35 @@ export type DeliverScheduledReportBundleResult =
   | { outcome: "failed"; error: string }
   | { outcome: "duplicate" };
 
+/** Prefer the schedule slot instant encoded in runWindow over wall-clock `now` (late cron / retries). */
+function asOfFromRunWindow(
+  runWindow: string,
+  deliveryKind: ScheduledReportDeliveryKind,
+): Date {
+  if (deliveryKind === "scheduled") {
+    const d = new Date(runWindow);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  const prefixed = runWindow.match(/^(?:manual|retry):(.+)$/);
+  if (prefixed?.[1]) {
+    const d = new Date(prefixed[1]);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  const fallback = new Date(runWindow);
+  if (!Number.isNaN(fallback.getTime())) return fallback;
+  return new Date();
+}
+
 export async function deliverScheduledReportBundle(
   input: DeliverScheduledReportBundleInput,
   ctx: ServiceContext,
 ): Promise<DeliverScheduledReportBundleResult> {
+  const deliveryKind = input.deliveryKind ?? "scheduled";
   const idempotencyKey = buildScheduledReportIdempotencyKey(
     input.scheduleId,
     input.runWindow,
     input.recipientEmail,
-    input.deliveryKind ?? "scheduled",
+    deliveryKind,
   );
 
   if (await hasScheduledReportBundleBeenSent(ctx.tenantId, idempotencyKey)) {
@@ -81,7 +101,7 @@ export async function deliverScheduledReportBundle(
   }
 
   const dateLabel = toIsoDateInTimeZone(
-    new Date(),
+    asOfFromRunWindow(input.runWindow, deliveryKind),
     input.timezone?.trim() || PRODUCT_TIMEZONE,
   );
   const facts = await loadNotificationIdentityFacts({
@@ -111,7 +131,7 @@ export async function deliverScheduledReportBundle(
       metadata: {
         runId: input.runId,
         runWindow: input.runWindow,
-        deliveryKind: input.deliveryKind ?? "scheduled",
+        deliveryKind: deliveryKind,
         attachmentCount: input.attachments.length,
         reportKeys: input.attachments.map((a) => a.reportKey).join(","),
       },
