@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useHasMounted, useIsMdUp } from "@/lib/media-query";
 import {
+  LIST_VIEW_CHANGE_EVENT,
   persistListView,
   readStoredListView,
   resolveListViewMode,
@@ -17,9 +18,13 @@ export type { ListViewMode };
 
 /**
  * Shared by `ListViewToggle` and list sections so mobile defaults to cards
- * without duplicating `if (mobile)` on every page.
+ * without duplicating `if (mobile)` on every page. Pass `defaultView` to
+ * change the desktop fallback (e.g. proyectos → cards).
  */
-export function useListViewMode(param = "view"): ListViewMode {
+export function useListViewMode(
+  param = "view",
+  defaultView: ListViewMode = "table",
+): ListViewMode {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const hasMounted = useHasMounted();
@@ -27,14 +32,17 @@ export function useListViewMode(param = "view"): ListViewMode {
   const [stored, setStored] = useState<ListViewMode | null>(null);
 
   useEffect(() => {
-    setStored(readStoredListView(pathname, isMdUp));
+    const sync = () => setStored(readStoredListView(pathname, isMdUp));
+    sync();
+    window.addEventListener(LIST_VIEW_CHANGE_EVENT, sync);
+    return () => window.removeEventListener(LIST_VIEW_CHANGE_EVENT, sync);
   }, [pathname, isMdUp]);
 
   const urlView = searchParams.get(param);
   if (!hasMounted) {
-    return resolveListViewMode({ urlView, stored: null, isMdUp: true });
+    return resolveListViewMode({ urlView, stored: null, isMdUp: true, defaultView });
   }
-  return resolveListViewMode({ urlView, stored, isMdUp });
+  return resolveListViewMode({ urlView, stored, isMdUp, defaultView });
 }
 
 export function ListViewToggle({
@@ -55,28 +63,26 @@ export function ListViewToggle({
   const searchParams = useSearchParams();
   const isMdUp = useIsMdUp();
   const hasMounted = useHasMounted();
-  const view = useListViewMode(param);
+  const view = useListViewMode(param, defaultView);
   void _storageKey;
-  void defaultView;
 
   const setView = useCallback(
     (next: ListViewMode) => {
       const params = new URLSearchParams(searchParams.toString());
-      const desktopDefault: ListViewMode = "table";
-      const implicitDefault: ListViewMode = isMdUp ? desktopDefault : "cards";
+      const implicitDefault: ListViewMode = isMdUp ? defaultView : "cards";
       if (next === implicitDefault) params.delete(param);
       else params.set(param, next);
       persistListView(pathname, isMdUp, next);
       const q = params.toString();
       router.replace(q ? `${pathname}?${q}` : pathname);
     },
-    [router, pathname, searchParams, param, isMdUp],
+    [router, pathname, searchParams, param, isMdUp, defaultView],
   );
 
   return (
     <div
       className={cn(
-        "inline-flex rounded-lg border border-border/80 bg-muted/30 p-0.5",
+        "inline-flex w-fit rounded-lg border border-border/80 bg-muted/30 p-0.5",
         className,
       )}
       role="group"

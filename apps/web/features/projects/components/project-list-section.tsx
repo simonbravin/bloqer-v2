@@ -6,7 +6,7 @@ import { ProjectCards } from "./project-cards";
 import { ProjectTable } from "./project-table";
 
 export function ProjectListSection({ projects }: { projects: ProjectListItem[] }) {
-  const view = useListViewMode();
+  const view = useListViewMode("view", "cards");
 
   if (view === "cards") return <ProjectCards projects={projects} />;
   return <ProjectTable projects={projects} />;

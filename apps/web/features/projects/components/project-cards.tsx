@@ -30,29 +30,29 @@ export function ProjectCards({ projects }: ProjectCardsProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
       {projects.map((p) => (
         <Link
           key={p.id}
           href={`/proyectos/${p.id}`}
-          className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+          className="flex min-h-[8.5rem] min-w-0 flex-col rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md md:min-h-40 md:p-5"
         >
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-3">
             <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{p.code}</span>
             <span className="shrink-0">
               <ProjectStatusBadge status={p.status} />
             </span>
           </div>
-          <h3 className="mt-2 truncate font-semibold leading-snug" title={p.name}>
+          <h3 className="mt-3 line-clamp-2 text-base font-semibold leading-snug md:text-lg" title={p.name}>
             {p.name}
           </h3>
           <p
-            className="mt-1 truncate text-sm text-muted-foreground"
+            className="mt-2 truncate text-sm text-muted-foreground"
             title={p.client.fantasyName ?? p.client.legalName}
           >
             {p.client.fantasyName ?? p.client.legalName}
           </p>
-          <p className="mt-3 text-xs text-muted-foreground">{TYPE_LABELS[p.type]}</p>
+          <p className="mt-auto pt-4 text-xs text-muted-foreground">{TYPE_LABELS[p.type]}</p>
         </Link>
       ))}
     </div>

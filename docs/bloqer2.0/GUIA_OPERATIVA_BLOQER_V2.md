@@ -444,7 +444,7 @@ Para diferencias de caja/banco que no vienen de un cobro/pago (cargos bancarios,
 
 ## 5. Crear y operar un proyecto (nivel proyecto)
 
-En el listado **Proyectos** (`/proyectos`), para entrar a una obra: **Ver**, o clic en el **código** o el **nombre**. En vista tarjetas, toda la tarjeta abre el proyecto.
+En el listado **Proyectos** (`/proyectos`) la vista por defecto es **Tarjetas** (dos por fila en desktop). Toda la tarjeta abre el proyecto. El toggle **Tabla / Tarjetas** cambia la vista; en tabla, **Ver**, o clic en el **código** o el **nombre**.
 
 ### 5.1 Procedimiento — Alta de proyecto
 

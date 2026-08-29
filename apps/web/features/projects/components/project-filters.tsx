@@ -38,18 +38,18 @@ export function ProjectFilters() {
   );
 
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap">
       <Input
         placeholder="Buscar por nombre o código..."
         defaultValue={searchDefault}
         onChange={(e) => setSearchDebounced(e.target.value)}
-        className="h-9 w-64"
+        className="h-11 w-full min-w-0 sm:h-9 sm:w-64"
       />
       <Select
         value={searchParams.get("status") ?? ""}
         onValueChange={(v) => update("status", v === "all" ? "" : v)}
       >
-        <SelectTrigger className="h-9 w-40">
+        <SelectTrigger className="h-11 w-full sm:h-9 sm:w-40">
           <SelectValue placeholder="Estado" />
         </SelectTrigger>
         <SelectContent>

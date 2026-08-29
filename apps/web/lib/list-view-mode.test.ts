@@ -35,6 +35,27 @@ test("viewport default is cards below md and table from md up", () => {
   );
 });
 
+test("desktop defaultView cards is used when URL and storage are empty", () => {
+  assert.equal(
+    resolveListViewMode({
+      urlView: null,
+      stored: null,
+      isMdUp: true,
+      defaultView: "cards",
+    }),
+    "cards",
+  );
+  assert.equal(
+    resolveListViewMode({
+      urlView: null,
+      stored: null,
+      isMdUp: false,
+      defaultView: "table",
+    }),
+    "cards",
+  );
+});
+
 test("parseListViewParam ignores unknown values", () => {
   assert.equal(parseListViewParam("kanban"), null);
   assert.equal(parseListViewParam("cards"), "cards");

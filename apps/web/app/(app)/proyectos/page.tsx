@@ -59,11 +59,11 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <ProjectFilters />
         <Suspense fallback={null}>
-          <ListViewToggle storageKey="proyectos" />
+          <ListViewToggle storageKey="proyectos" defaultView="cards" className="self-start" />
         </Suspense>
       </div>
 
-      <Suspense fallback={<ListSectionSkeleton />}>
+      <Suspense fallback={<ListSectionSkeleton variant="cards" className="md:grid-cols-2 xl:grid-cols-2" />}>
         <ProjectListSection projects={result.data} />
       </Suspense>
 
