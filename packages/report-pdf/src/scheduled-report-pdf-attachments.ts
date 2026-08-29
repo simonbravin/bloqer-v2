@@ -39,6 +39,10 @@ import {
   exportTreasuryCashFlowPdf,
   exportTreasuryCashPositionPdf,
   exportTreasuryMovementsPdf,
+  exportProjectPortfolioPdf,
+  exportPortfolioProfitabilityPdf,
+  exportOverheadByProjectPdf,
+  exportMultiProjectProcurementPdf,
 } from "./report-pdf-export.service";
 
 export type ScheduledReportPdfAttachment = {
@@ -190,14 +194,25 @@ export async function buildScheduledReportPdfAttachment(
       );
       return toPdfAttachment(filename, buffer);
     }
-    case "TENANT_PROJECT_PORTFOLIO":
-    case "TENANT_MULTI_PROJECT_RENTABILITY":
-    case "TENANT_OVERHEAD_BY_PROJECT":
-    case "TENANT_MULTI_PROJECT_PROCUREMENT":
-      throw new ServiceError(
-        "VALIDATION",
-        `PDF no disponible aún para ${reportKey}; usá formato CSV`,
-      );
+    case "TENANT_PROJECT_PORTFOLIO": {
+      const { buffer, filename } = await exportProjectPortfolioPdf(ctx, sp);
+      return toPdfAttachment(filename, buffer);
+    }
+    case "TENANT_MULTI_PROJECT_RENTABILITY": {
+      const { buffer, filename } = await exportPortfolioProfitabilityPdf(ctx, sp);
+      return toPdfAttachment(filename, buffer);
+    }
+    case "TENANT_OVERHEAD_BY_PROJECT": {
+      const { buffer, filename } = await exportOverheadByProjectPdf(ctx, {
+        periodFrom: sp.dateFrom ?? sp.periodFrom,
+        periodTo: sp.dateTo ?? sp.periodTo,
+      });
+      return toPdfAttachment(filename, buffer);
+    }
+    case "TENANT_MULTI_PROJECT_PROCUREMENT": {
+      const { buffer, filename } = await exportMultiProjectProcurementPdf(ctx, sp);
+      return toPdfAttachment(filename, buffer);
+    }
     default: {
       const _exhaustive: never = reportKey;
       throw new ServiceError("VALIDATION", `PDF no soportado: ${_exhaustive}`);

@@ -37,7 +37,7 @@ export default async function TenantReportesPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Reportes</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Reportes consolidados a nivel empresa.
+          Reportes consolidados a nivel empresa, agrupados en financieros y operativos.
         </p>
       </div>
 

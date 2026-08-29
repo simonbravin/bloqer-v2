@@ -48,7 +48,7 @@ export default async function RentabilidadMultiObraPage() {
             Ingreso certificado vs costo devengado por obra. Consolidado al pie.
           </p>
         </div>
-        <ReportExportActions exportPath="/api/reports/rentabilidad-multi-obra.csv" params={{}} />
+        <ReportExportActions exportPath="/api/reports/rentabilidad-multi-obra.csv" params={{}} pdf xlsx />
       </div>
 
       <ReportSubnav>

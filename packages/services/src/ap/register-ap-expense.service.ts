@@ -369,7 +369,7 @@ export async function registerApExpense(
     input.lines,
     ctx.tenantId,
   );
-  const lineCostTypes = await resolveInvoiceLineCostTypes(input.lines);
+  const lineCostTypes = await resolveInvoiceLineCostTypes(input.lines, ctx.tenantId);
 
   const companyId = await resolveCompanyIdForAp(projectId, ctx);
   const company = await prisma.company.findUnique({

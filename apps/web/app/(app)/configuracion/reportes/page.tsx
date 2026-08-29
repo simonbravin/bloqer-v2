@@ -3,7 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import { formatDateTime } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import { canManageScheduledReports, listScheduledReports } from "@bloqer/services";
+import {
+  canManageScheduledReports,
+  getScheduledReportCatalog,
+  listScheduledReports,
+} from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageShell } from "@/components/layout/page-shell";
@@ -25,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { ScheduledReportCatalogPanel } from "@/features/scheduled-reports/scheduled-report-catalog-panel";
 
 type Props = {
   searchParams: Promise<{ ok?: string }>;
@@ -38,7 +43,11 @@ export default async function ConfiguracionReportesPage({ searchParams }: Props)
   if (!ctx) redirect("/login");
   if (!canManageScheduledReports(ctx)) notFound();
 
-  const rows = await listScheduledReports(ctx);
+  const [rows, tenantCatalog, projectCatalog] = await Promise.all([
+    listScheduledReports(ctx),
+    getScheduledReportCatalog(ctx, "TENANT"),
+    getScheduledReportCatalog(ctx, "PROJECT"),
+  ]);
 
   const okMessages: Record<string, string> = {
     deleted: "Envío programado eliminado.",
@@ -58,6 +67,19 @@ export default async function ConfiguracionReportesPage({ searchParams }: Props)
       {sp.ok && okMessages[sp.ok] ? (
         <p className="text-sm text-green-600 dark:text-green-500">{okMessages[sp.ok]}</p>
       ) : null}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ScheduledReportCatalogPanel
+          title="Empresa general"
+          hint="Alcance tenant. PDF y CSV (Excel) en todos."
+          catalog={tenantCatalog}
+        />
+        <ScheduledReportCatalogPanel
+          title="Proyecto"
+          hint="Alcance obra. PDF y CSV (Excel) en todos."
+          catalog={projectCatalog}
+        />
+      </div>
 
       {rows.length === 0 ? (
         <ListEmptyState

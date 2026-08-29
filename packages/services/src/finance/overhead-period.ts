@@ -37,6 +37,18 @@ export function assertValidOverheadPeriod(period: string): void {
   }
 }
 
+/**
+ * Accepts YYYY-MM or a calendar date YYYY-MM-DD (from scheduled-report date pickers)
+ * and returns the stored period key YYYY-MM.
+ */
+export function normalizeOverheadPeriodBound(raw?: string): string | undefined {
+  if (!raw?.trim()) return undefined;
+  const trimmed = raw.trim();
+  const period = /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed.slice(0, 7) : trimmed;
+  assertValidOverheadPeriod(period);
+  return period;
+}
+
 export type OverheadPeriodFilter = {
   periodFrom?: string;
   periodTo?: string;

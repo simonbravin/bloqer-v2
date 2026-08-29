@@ -2,13 +2,18 @@
 
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import type {
-  CostControlFilters,
-  CostControlRow,
-  CostControlTotals,
-  CostTypeBucket,
+import {
+  parseCostCategoryFilter,
+  sliceCostControlByCostType,
+  type CostControlFilters,
+  type CostControlRow,
+  type CostControlTotals,
+  type CostTypeBucket,
 } from "@bloqer/services";
+import type { CostCategory } from "@bloqer/database";
+import { COST_CATEGORY_OPTIONS } from "@/lib/cost-category-colors";
 import {
   Table,
   TableBody,
@@ -198,6 +203,30 @@ const BUCKET_COLUMNS: EdtColumnId[] = [
   "variance",
 ];
 
+/** Columns that do not make sense when filtering by cost type — hidden when a
+ * concrete CostCategory is selected ([D-099]).
+ * Rationale: qtyReceived / operationalProgressQty / budgetSale live at the
+ * partida level, they can't be sliced by MAT/LAB/EQP/SUB/OTHER. */
+const COST_TYPE_FILTER_HIDDEN: EdtColumnId[] = [
+  "budgetSale",
+  "received",
+  "physicalProgress",
+  "qtyBudgeted",
+  "qtyCommitted",
+  "qtyReceived",
+  "qtyConsumed",
+  "pctReceived",
+  "pctPhysicalProgress",
+  "certified",
+];
+
+type CostTypeFilter = "ALL" | CostCategory;
+
+const COST_TYPE_FILTER_OPTIONS: { value: CostTypeFilter; label: string }[] = [
+  { value: "ALL", label: "Todos los tipos" },
+  ...COST_CATEGORY_OPTIONS,
+];
+
 function bucketCellValue(bucket: CostTypeBucket, col: EdtColumnId): ReactNode {
   switch (col) {
     case "budgetCost":
@@ -281,6 +310,7 @@ function EdtRowCard({
   onOpen,
   typeExpanded,
   onToggleType,
+  typeExpandAvailable,
 }: {
   row: CostControlRow;
   columns: EdtColumnId[];
@@ -289,10 +319,11 @@ function EdtRowCard({
   onOpen: (row: CostControlRow) => void;
   typeExpanded: boolean;
   onToggleType: (wbsNodeId: string, e: MouseEvent) => void;
+  typeExpandAvailable: boolean;
 }) {
   const href = itemPageHref(projectId, row.wbsNodeId, filters);
   const buckets = row.byCostType ?? [];
-  const canExpand = buckets.length > 0;
+  const canExpand = typeExpandAvailable && buckets.length > 0;
   return (
     <div
       role="button"
@@ -376,6 +407,29 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
   const [presetState, setPresetState] = useState<EdtPresetState>(defaultEdtPresetState);
   const [hydrated, setHydrated] = useState(false);
   const [typeExpanded, setTypeExpanded] = useState<Set<string>>(() => new Set());
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlCostType = parseCostCategoryFilter(searchParams.get("costType")) ?? "ALL";
+  const [costTypeFilter, setCostTypeFilterState] = useState<CostTypeFilter>(urlCostType);
+
+  // URL is the source of truth (Limpiar / cambiar presupuesto / back). Local
+  // state is only an optimistic write so the select does not flicker.
+  useEffect(() => {
+    setCostTypeFilterState(urlCostType);
+  }, [urlCostType]);
+
+  function setCostTypeFilter(next: CostTypeFilter) {
+    setCostTypeFilterState(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "ALL") {
+      params.delete("costType");
+    } else {
+      params.set("costType", next);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
 
   useEffect(() => {
     setPresetState(readEdtPresetState(projectId));
@@ -398,9 +452,19 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
     });
   }
 
-  const columns = columnsForPreset(presetState);
+  const columnsRaw = columnsForPreset(presetState);
+  const filterActive = costTypeFilter !== "ALL";
+  const columns = filterActive
+    ? columnsRaw.filter((col) => !COST_TYPE_FILTER_HIDDEN.includes(col))
+    : columnsRaw;
   // Quantity / % presets have no money column, so a bucket row would be all dashes.
-  const typeExpandAvailable = columns.some((col) => BUCKET_COLUMNS.includes(col));
+  const typeExpandAvailable = !filterActive && columns.some((col) => BUCKET_COLUMNS.includes(col));
+
+  const sliced =
+    costTypeFilter === "ALL" ? null : sliceCostControlByCostType(rows, costTypeFilter);
+  const derivedRows = sliced?.rows ?? rows;
+  const derivedTotals = sliced?.totals ?? totals;
+  const filterLabel = COST_TYPE_FILTER_OPTIONS.find((o) => o.value === costTypeFilter)?.label ?? "";
 
   function openFromList(e: MouseEvent, row: CostControlRow) {
     if (isModifiedClick(e)) return;
@@ -462,33 +526,68 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
               })}
             </div>
           ) : null}
+          <div className="space-y-1">
+            <Label className="text-xs">Tipo de costo</Label>
+            <Select
+              value={costTypeFilter}
+              onValueChange={(v) => setCostTypeFilter(v as CostTypeFilter)}
+            >
+              <SelectTrigger className="h-8 w-44 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {COST_TYPE_FILTER_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           {!hydrated ? null : (
             <Button
               type="button"
               variant="ghost"
               size="sm"
               className="h-8 text-xs text-muted-foreground"
-              onClick={() => updatePreset(defaultEdtPresetState())}
+              onClick={() => {
+                updatePreset(defaultEdtPresetState());
+                if (costTypeFilter !== "ALL") setCostTypeFilter("ALL");
+              }}
             >
               Restablecer
             </Button>
           )}
         </div>
+        {filterActive ? (
+          <div className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            Filtrando por <span className="font-medium text-foreground">{filterLabel}</span>. Los importes
+            corresponden a ese tipo de costo. Las columnas de cantidad, % recepción y avance de obra se ocultan
+            porque son atributos de la partida, no del bucket.
+          </div>
+        ) : null}
 
         {/* Mobile cards */}
         <div className="grid gap-2 md:hidden">
-          {rows.map((row) => (
-            <EdtRowCard
-              key={row.wbsNodeId}
-              row={row}
-              columns={columns}
-              projectId={projectId}
-              filters={filters}
-              onOpen={setOpenItem}
-              typeExpanded={typeExpanded.has(row.wbsNodeId)}
-              onToggleType={toggleTypeExpand}
-            />
-          ))}
+          {derivedRows.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              Ninguna partida tiene actividad en {filterLabel.toLowerCase()}.
+            </p>
+          ) : (
+            derivedRows.map((row) => (
+              <EdtRowCard
+                key={row.wbsNodeId}
+                row={row}
+                columns={columns}
+                projectId={projectId}
+                filters={filters}
+                onOpen={setOpenItem}
+                typeExpanded={typeExpanded.has(row.wbsNodeId)}
+                onToggleType={toggleTypeExpand}
+                typeExpandAvailable={typeExpandAvailable}
+              />
+            ))
+          )}
         </div>
 
         {/* Desktop table */}
@@ -509,7 +608,17 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.flatMap((row) => {
+                {derivedRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={2 + columns.length}
+                      className="text-center text-xs text-muted-foreground py-6"
+                    >
+                      Ninguna partida tiene actividad en {filterLabel.toLowerCase()}.
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+                {derivedRows.flatMap((row) => {
                   const buckets = row.byCostType ?? [];
                   const canExpand = typeExpandAvailable && buckets.length > 0;
                   const expanded = canExpand && typeExpanded.has(row.wbsNodeId);
@@ -614,10 +723,12 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
               </TableBody>
               <TableFooter>
                 <TableRow className="font-semibold">
-                  <TableCell colSpan={2}>Total</TableCell>
+                  <TableCell colSpan={2}>
+                    Total{filterActive ? ` · ${filterLabel}` : ""}
+                  </TableCell>
                   {columns.map((col) => (
                     <TableCell key={col} className="text-right">
-                      {totalValue(totals, col, rows)}
+                      {totalValue(derivedTotals, col, derivedRows)}
                     </TableCell>
                   ))}
                 </TableRow>

@@ -2,10 +2,13 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  buildAccruedCompositionFromRows,
+  buildCostTypeComparisonFromRows,
+  COST_TYPE_LABELS_ES,
   getBudgetCompositionReport,
   getProjectCostControl,
   getProjectShellInfo,
+  parseCostCategoryFilter,
+  sliceCostControlReportByCostType,
   ServiceError,
 } from "@bloqer/services";
 import {
@@ -14,7 +17,7 @@ import {
   CostControlFilters,
 } from "@/features/cost-control";
 import { BudgetCompositionChart, ReportExportActions } from "@/features/reports";
-import { CostCompositionChart } from "@/features/projects/cost-composition-chart";
+import { CostTypeComparisonChart } from "@/features/projects/cost-type-comparison-chart";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
@@ -28,6 +31,8 @@ interface PageProps {
     dateFrom?: string;
     dateTo?: string;
     wbsSearch?: string;
+    /** Cost-type filter (MATERIAL / LABOR / EQUIPMENT / SUBCONTRACT / OTHER) — [D-099]. */
+    costType?: string;
   }>;
 }
 
@@ -69,7 +74,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
   }
 
   let compositionResult = null;
-  let accruedCompositionResult = null;
+  let costTypeComparison = null;
   if (result.type === "REPORT") {
     try {
       compositionResult = await getBudgetCompositionReport(
@@ -80,7 +85,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
     } catch {
       compositionResult = null;
     }
-    accruedCompositionResult = buildAccruedCompositionFromRows(
+    costTypeComparison = buildCostTypeComparisonFromRows(
       projectId,
       result.budgetId,
       result.budgetName,
@@ -90,6 +95,11 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
 
   // availableBudgets is present on REPORT and BUDGET_SELECTION_REQUIRED
   const availableBudgets = result.type === "NO_APPROVED_BUDGETS" ? [] : result.availableBudgets;
+  const costTypeFilter = parseCostCategoryFilter(sp.costType);
+  const filteredKpis =
+    result.type === "REPORT" && costTypeFilter
+      ? sliceCostControlReportByCostType(result, costTypeFilter)
+      : null;
 
   const subtitle =
     result.type === "REPORT"
@@ -100,14 +110,12 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
 
   const plannedComposition =
     compositionResult?.type === "COMPOSITION" ? compositionResult : null;
-  const accruedComposition =
-    accruedCompositionResult?.type === "COMPOSITION" &&
-    accruedCompositionResult.slices.length > 0
-      ? accruedCompositionResult
-      : null;
+  const hasComparison = Boolean(
+    costTypeComparison && costTypeComparison.rows.length > 0,
+  );
   const showPlannedPie = Boolean(plannedComposition && plannedComposition.slices.length > 0);
-  const showPlannedEmpty = Boolean(plannedComposition && plannedComposition.slices.length === 0);
-  const showCompositionGrid = showPlannedPie || Boolean(accruedComposition) || showPlannedEmpty;
+  const showCompositionGrid =
+    !costTypeFilter && (showPlannedPie || hasComparison);
 
   const subtitleFull = subtitle
     ? `${subtitle} · Costos directos de obra (OC, facturas, subcontratos, stock). Los GG de empresa van a Rentabilidad → margen neto.`
@@ -206,12 +214,15 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
             </div>
           )}
 
-          <CostControlSummaryCards totals={result.totals} />
+          <CostControlSummaryCards
+            totals={filteredKpis?.totals ?? result.totals}
+            costTypeLabel={costTypeFilter ? COST_TYPE_LABELS_ES[costTypeFilter] : undefined}
+          />
 
           {showCompositionGrid ? (
             <div
               className={
-                showPlannedPie && accruedComposition
+                showPlannedPie && hasComparison
                   ? "grid gap-4 lg:grid-cols-2"
                   : "grid gap-4"
               }
@@ -219,8 +230,8 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
               {plannedComposition ? (
                 <BudgetCompositionChart composition={plannedComposition} />
               ) : null}
-              {accruedComposition ? (
-                <CostCompositionChart composition={accruedComposition} />
+              {hasComparison && costTypeComparison ? (
+                <CostTypeComparisonChart comparison={costTypeComparison} />
               ) : null}
             </div>
           ) : null}
@@ -239,7 +250,8 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
             />
           )}
 
-          {(Number(result.unallocatedCommittedCost) > 0 ||
+          {!costTypeFilter &&
+          (Number(result.unallocatedCommittedCost) > 0 ||
             Number(result.unallocatedReceivedCost) > 0 ||
             Number(result.unallocatedAccruedCost) > 0 ||
             Number(result.unallocatedPaidCost) > 0 ||

@@ -44,6 +44,12 @@ function serializePct2(raw: string | number): string {
 export { canViewProjectCostControlReport };
 export { computeCostExposureLayers } from "./cost-exposure";
 export { buildWbsProgressSummary, type WbsProgressSummary } from "./wbs-progress-summary";
+export {
+  costTypeBucketHasActivity,
+  parseCostCategoryFilter,
+  sliceCostControlByCostType,
+  sliceCostControlReportByCostType,
+} from "./cost-type-slice";
 
 // ─── Filter / output types ────────────────────────────────────────────────────
 
@@ -52,6 +58,12 @@ export type CostControlFilters = {
   dateFrom?: string;
   dateTo?: string;
   wbsSearch?: string;
+  /**
+   * CSV / export scope filter ([D-099]). When present, the export slices each
+   * row and totals to the given CostCategory bucket. It does **not** affect
+   * `getProjectCostControl` (which always returns full rows + `byCostType`).
+   */
+  costType?: CostCategory;
 };
 
 export type CostControlRowFlags = {
@@ -936,18 +948,19 @@ export async function getProjectCostControl(
     for (const cat of COST_TYPE_ORDER) {
       const tAcc = typeAccs.get(cat) ?? newTypeAcc();
       const tBudget = budgetByType.get(cat) ?? ZERO;
-      const hasSignal =
-        !tBudget.isZero() ||
-        !tAcc.committedCost.isZero() ||
-        !tAcc.accruedCost.isZero() ||
-        !tAcc.paidCost.isZero() ||
-        !tAcc.inventoryConsumedCost.isZero();
-      if (!hasSignal) continue;
       const { openCommitted: tOpen, expectedCostExposure: tExpected } = computeCostExposureLayers({
         committed: tAcc.committedCost,
         accrued: tAcc.accruedCost,
         accruedLinked: tAcc.accruedLinkedCost,
       });
+      const hasSignal =
+        !tBudget.isZero() ||
+        !tAcc.committedCost.isZero() ||
+        !tAcc.accruedCost.isZero() ||
+        !tAcc.paidCost.isZero() ||
+        !tAcc.inventoryConsumedCost.isZero() ||
+        !tOpen.isZero();
+      if (!hasSignal) continue;
       byCostType.push({
         costType: cat,
         label: COST_TYPE_LABELS_ES[cat],

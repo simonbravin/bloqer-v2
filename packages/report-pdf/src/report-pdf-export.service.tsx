@@ -16,6 +16,7 @@ import {
   getProcurementDeviationReport,
   getProjectCashFlowReport,
   getProjectCostControl,
+  sliceCostControlReportByCostType,
   getProjectIncomeExpenseReport,
   getProjectProfitabilityReport,
   getReceivableAgingReport,
@@ -58,6 +59,10 @@ import {
   type SubcontractReportFilters,
   type TenantAuditLogExportUrlFilters,
   getTenantDisplayTimezone,
+  getProjectPortfolioReport,
+  getPortfolioProfitabilityReport,
+  getOverheadByProjectReport,
+  getMultiProjectProcurementReport,
 } from "@bloqer/services";
 import { formatDateTime, formatTimezoneOptionLabel } from "@bloqer/utils";
 import { resolvePdfReportBranding } from "./branding/pdf-branding.service";
@@ -110,14 +115,18 @@ export async function exportProjectCostControlPdf(
   filters: CostControlFilters,
   ctx: ServiceContext,
 ): Promise<ReportPdfPayload> {
-  const result = await getProjectCostControl(projectId, filters, ctx);
-  if (result.type === "NO_APPROVED_BUDGETS") {
+  const raw = await getProjectCostControl(projectId, filters, ctx);
+  if (raw.type === "NO_APPROVED_BUDGETS") {
     throw new ServiceError("CONFLICT", "No hay presupuesto aprobado o cerrado para exportar el control de costos");
   }
-  if (result.type === "BUDGET_SELECTION_REQUIRED") {
+  if (raw.type === "BUDGET_SELECTION_REQUIRED") {
     throw new ServiceError("CONFLICT", "Seleccioná un presupuesto para exportar el control de costos");
   }
-  const slug = `${result.budgetName}_${filters.dateFrom ?? "all"}_${filters.dateTo ?? "all"}`
+  const result = filters.costType
+    ? sliceCostControlReportByCostType(raw, filters.costType)
+    : raw;
+  const typeSuffix = filters.costType ? `_${filters.costType.toLowerCase()}` : "";
+  const slug = `${result.budgetName}_${filters.dateFrom ?? "all"}_${filters.dateTo ?? "all"}${typeSuffix}`
     .replace(/[^a-zA-Z0-9._-]+/g, "_")
     .slice(0, 80);
   return exportPdfDocument(ctx, { projectId }, `control_costos_${slug}`, (branding) => (
@@ -1045,4 +1054,174 @@ export async function exportIncomeStatementPdf(
       />
     ),
   );
+}
+
+export async function exportProjectPortfolioPdf(
+  ctx: ServiceContext,
+  filters?: { status?: string },
+): Promise<ReportPdfPayload> {
+  type PS = import("@bloqer/database").ProjectStatus;
+  const allowed: PS[] = ["DRAFT", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"];
+  const status =
+    filters?.status && (allowed as string[]).includes(filters.status)
+      ? (filters.status as PS)
+      : undefined;
+  const report = await getProjectPortfolioReport(ctx, { status });
+  return exportPdfDocument(ctx, {}, "portafolio_proyectos", (branding) => (
+    <ProjectSimpleTablePdfDocument
+      branding={branding}
+      title="Portafolio de proyectos"
+      subtitle="Presupuesto, comprometido, devengado y exposición por obra"
+      warnings={report.warnings}
+      columns={[
+        { key: "code", label: "Código", flex: 0.7 },
+        { key: "name", label: "Proyecto", flex: 1.4 },
+        { key: "status", label: "Estado", flex: 0.7 },
+        { key: "budget", label: "Presup.", flex: 0.8 },
+        { key: "committed", label: "Comprom.", flex: 0.8 },
+        { key: "accrued", label: "Deveng.", flex: 0.8 },
+        { key: "exposure", label: "Exposición", flex: 0.85 },
+        { key: "variance", label: "Var.", flex: 0.7 },
+      ]}
+      rows={report.rows.map((r) => ({
+        code: r.code,
+        name: r.name,
+        status: r.status,
+        budget: r.budgetTotalCost,
+        committed: r.committedCost,
+        accrued: r.accruedCost,
+        exposure: r.expectedCostExposure,
+        variance: r.costVariance,
+      }))}
+    />
+  ));
+}
+
+export async function exportPortfolioProfitabilityPdf(
+  ctx: ServiceContext,
+  filters?: { costLayer?: string; revenueBasis?: string; status?: string },
+): Promise<ReportPdfPayload> {
+  type PS = import("@bloqer/database").ProjectStatus;
+  const allowed: PS[] = ["DRAFT", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"];
+  const report = await getPortfolioProfitabilityReport(ctx, {
+    costLayer: filters?.costLayer as "exposure" | "committed" | "accrued" | "paid" | undefined,
+    revenueBasis: filters?.revenueBasis as "certified" | "invoiced" | undefined,
+    status:
+      filters?.status && (allowed as string[]).includes(filters.status)
+        ? (filters.status as PS)
+        : undefined,
+  });
+  const rows = [
+    ...report.rows.map((r) => ({
+      code: r.code,
+      name: r.name,
+      revenue: r.revenue,
+      cost: r.directCost,
+      margin: r.grossMargin,
+      pct: r.grossMarginPct ?? "",
+    })),
+    {
+      code: "",
+      name: "CONSOLIDADO",
+      revenue: report.consolidatedRevenue,
+      cost: report.consolidatedDirectCost,
+      margin: report.consolidatedGrossMargin,
+      pct: report.consolidatedGrossMarginPct ?? "",
+    },
+  ];
+  return exportPdfDocument(ctx, {}, "rentabilidad_multi_obra", (branding) => (
+    <ProjectSimpleTablePdfDocument
+      branding={branding}
+      title="Rentabilidad multi-obra"
+      subtitle="Ingresos vs costos directos por obra"
+      warnings={report.warnings}
+      columns={[
+        { key: "code", label: "Código", flex: 0.7 },
+        { key: "name", label: "Proyecto", flex: 1.6 },
+        { key: "revenue", label: "Ingresos", flex: 0.9 },
+        { key: "cost", label: "Costos", flex: 0.9 },
+        { key: "margin", label: "Margen", flex: 0.9 },
+        { key: "pct", label: "MB %", flex: 0.6 },
+      ]}
+      rows={rows}
+    />
+  ));
+}
+
+export async function exportOverheadByProjectPdf(
+  ctx: ServiceContext,
+  filters?: { periodFrom?: string; periodTo?: string; dateFrom?: string; dateTo?: string },
+): Promise<ReportPdfPayload> {
+  const periodFrom = filters?.periodFrom ?? filters?.dateFrom;
+  const periodTo = filters?.periodTo ?? filters?.dateTo;
+  const report = await getOverheadByProjectReport(ctx, { periodFrom, periodTo });
+  return exportPdfDocument(ctx, {}, "gastos_generales_por_proyecto", (branding) => (
+    <ProjectSimpleTablePdfDocument
+      branding={branding}
+      title="Gastos generales por proyecto"
+      filterLine={buildPdfFilterLine({ periodFrom, periodTo })}
+      warnings={report.warnings}
+      columns={[
+        { key: "code", label: "Código", flex: 0.7 },
+        { key: "name", label: "Proyecto", flex: 1.5 },
+        { key: "period", label: "Período", flex: 0.7 },
+        { key: "currency", label: "Mon.", flex: 0.45 },
+        { key: "amount", label: "Monto", flex: 0.85 },
+        { key: "notes", label: "Notas", flex: 1.2 },
+      ]}
+      rows={report.rows.map((r) => ({
+        code: r.projectCode,
+        name: r.projectName,
+        period: r.period,
+        currency: r.currency,
+        amount: r.amount,
+        notes: r.notes ?? "",
+      }))}
+    />
+  ));
+}
+
+export async function exportMultiProjectProcurementPdf(
+  ctx: ServiceContext,
+  filters?: { dateFrom?: string; dateTo?: string },
+): Promise<ReportPdfPayload> {
+  const report = await getMultiProjectProcurementReport(ctx, filters);
+  const rows = [
+    ...report.topSuppliers.map((s) => ({
+      section: "Proveedores",
+      supplier: s.supplierName,
+      project: "",
+      po: "",
+      committed: s.committedCost,
+      accrued: s.accruedCost,
+      paid: s.paidCost,
+    })),
+    ...report.openPurchaseOrders.map((po) => ({
+      section: "OC abiertas",
+      supplier: po.supplierName,
+      project: `${po.projectCode} — ${po.projectName}`,
+      po: po.poNumber,
+      committed: po.totalAmount,
+      accrued: "",
+      paid: "",
+    })),
+  ];
+  return exportPdfDocument(ctx, {}, "compras_multi_obra", (branding) => (
+    <ProjectSimpleTablePdfDocument
+      branding={branding}
+      title="Compras multi-obra"
+      filterLine={buildPdfFilterLine({ dateFrom: filters?.dateFrom, dateTo: filters?.dateTo })}
+      warnings={report.warnings}
+      columns={[
+        { key: "section", label: "Sección", flex: 0.8 },
+        { key: "supplier", label: "Proveedor", flex: 1.3 },
+        { key: "project", label: "Obra", flex: 1.2 },
+        { key: "po", label: "OC", flex: 0.6 },
+        { key: "committed", label: "Comprom.", flex: 0.8 },
+        { key: "accrued", label: "Deveng.", flex: 0.8 },
+        { key: "paid", label: "Pagado", flex: 0.7 },
+      ]}
+      rows={rows}
+    />
+  ));
 }

@@ -7,7 +7,7 @@ import { canEditPurchaseRequests, canViewPurchaseRequests } from "./procurement-
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
-import { resolveLineCostType } from "../cost-control/cost-type";
+import { loadWbsDominantCostTypes, resolveLineCostType } from "../cost-control/cost-type";
 import {
   assertWbsRequiredOnLines,
   budgetBaselineForPurchaseLine,
@@ -270,6 +270,10 @@ export async function createPurchaseRequest(
       );
     }
   }
+  // APU-derived dominant CostCategory used when the line only references the WBS
+  // (no insumo APU, no manual costType) ([D-099]).
+  const wbsIds = Array.from(new Set(input.lines.map((l) => l.wbsNodeId).filter((v): v is string => Boolean(v))));
+  const wbsDominant = await loadWbsDominantCostTypes(wbsIds, ctx.tenantId);
 
   const pr = await prisma.$transaction(async (tx) => {
     const number = await nextDocumentNumber(tx, ctx.tenantId, companyId);
@@ -292,6 +296,7 @@ export async function createPurchaseRequest(
             costType: resolveLineCostType({
               costType: line.costType ?? null,
               apuCategory: apuCategoryByIdx.get(i) ?? null,
+              wbsDominantCostType: line.wbsNodeId ? wbsDominant.get(line.wbsNodeId) ?? null : null,
             }),
             lineType: line.lineType,
             description: line.description,

@@ -1,10 +1,13 @@
-import { NextRequest } from "next/server";
-import { exportMultiProjectProcurementCsv } from "@bloqer/services";
+import { NextRequest, NextResponse } from "next/server";
+import { exportMultiProjectProcurementCsv, exportMultiProjectProcurementXlsx } from "@bloqer/services";
+import { exportMultiProjectProcurementPdf } from "@bloqer/report-pdf";
 import {
   csvResponse,
+  pdfResponse,
   reportExportErrorResponse,
   requireReportExportContext,
   searchParamsRecord,
+  xlsxResponse,
 } from "@/lib/report-export-http";
 
 export const runtime = "nodejs";
@@ -12,12 +15,23 @@ export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   const auth = await requireReportExportContext();
   if (!auth.ok) return auth.response;
+  const sp = searchParamsRecord(req);
   try {
-    const { content, filename } = await exportMultiProjectProcurementCsv(
-      auth.ctx,
-      searchParamsRecord(req),
-    );
-    return csvResponse(content, filename);
+    const fmt = (sp.format ?? "csv").toLowerCase();
+    const filters = { dateFrom: sp.dateFrom, dateTo: sp.dateTo };
+    if (fmt === "pdf") {
+      const { buffer, filename } = await exportMultiProjectProcurementPdf(auth.ctx, filters);
+      return pdfResponse(buffer, filename);
+    }
+    if (fmt === "xlsx") {
+      const { buffer, filename } = await exportMultiProjectProcurementXlsx(auth.ctx, filters);
+      return xlsxResponse(buffer, filename);
+    }
+    if (fmt === "csv") {
+      const { content, filename } = await exportMultiProjectProcurementCsv(auth.ctx, filters);
+      return csvResponse(content, filename);
+    }
+    return NextResponse.json({ error: "Formato no soportado" }, { status: 400 });
   } catch (e) {
     return reportExportErrorResponse(e);
   }

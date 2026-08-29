@@ -61,6 +61,8 @@ export type WbsOption = {
   availableSaldo?: string | null;
   wouldExceedBudget?: boolean;
   apuLines?: WbsApuOption[];
+  /** APU-derived dominant CostCategory used to pre-select `costType` ([D-099]). */
+  dominantCostType?: CostCategoryOptionValue | null;
 };
 export type ProductOption = { id: string; sku: string; name: string; unit: string };
 
@@ -122,6 +124,11 @@ export function PurchaseOrderLinesEditor({
   const [lineKeys, setLineKeys] = useState<string[]>(() =>
     Array.from({ length: Math.max(lines.length, 1) }, createLineKey),
   );
+  // Lines whose `costType` the user set manually. We must not overwrite that
+  // when the WBS changes (auto-typing from the APU dominant only kicks in for
+  // untouched lines). Persisted lines already carry the user's choice, so the
+  // set only tracks changes within this editing session.
+  const [manualCostTypeKeys, setManualCostTypeKeys] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     setLineKeys((prev) => {
@@ -138,23 +145,59 @@ export function PurchaseOrderLinesEditor({
   }, [lines.length]);
 
   function update(i: number, field: keyof PurchaseOrderLine, value: string | null) {
+    const lineKey = lineKeys[i] ?? String(i);
     const next = lines.map((l, idx) => {
       if (idx !== i) return l;
       const patched: PurchaseOrderLine = { ...l, [field]: value };
       if (field === "wbsNodeId") {
-        // Stale LAB/EQP inherited from the old APU must not stick to another partida,
-        // but a type the user picked by hand survives the partida change.
-        if (l.costAnalysisLineId) patched.costType = "MATERIAL";
+        // Stale APU insumo hint no longer applies to the new partida.
         patched.costAnalysisLineId = null;
+        const overriddenManually = manualCostTypeKeys.has(lineKey);
+        if (!overriddenManually) {
+          // Auto-type from the APU dominant category ([D-099]).
+          // - baño químico with 100% EQP → EQP.
+          // - excavación with EQP 70% → EQP.
+          // - genuinely mixed or empty APU → MATERIAL (safe default; hint asks user to pick).
+          const wbs = wbsOptions.find((w) => w.id === value);
+          const dominant = wbs?.dominantCostType ?? null;
+          patched.costType = dominant && COST_CATEGORY_OPTIONS.some((o) => o.value === dominant)
+            ? dominant
+            : "MATERIAL";
+        }
       }
       return patched;
     });
     onChange(next);
   }
 
+  function updateCostType(i: number, value: CostCategoryOptionValue) {
+    const lineKey = lineKeys[i] ?? String(i);
+    // Remember that this line's cost type was set by the user; changing the
+    // partida later should not stomp on it.
+    setManualCostTypeKeys((prev) => {
+      if (prev.has(lineKey)) return prev;
+      const next = new Set(prev);
+      next.add(lineKey);
+      return next;
+    });
+    onChange(lines.map((l, idx) => (idx === i ? { ...l, costType: value } : l)));
+  }
+
   function applyApuHint(i: number, line: PurchaseOrderLine, apuId: string | null, wbs?: WbsOption) {
     if (!apuId) {
-      update(i, "costAnalysisLineId", null);
+      const lineKey = lineKeys[i] ?? String(i);
+      const dominant = wbs?.dominantCostType ?? null;
+      const restoredType =
+        !manualCostTypeKeys.has(lineKey) &&
+        dominant &&
+        COST_CATEGORY_OPTIONS.some((o) => o.value === dominant)
+          ? dominant
+          : line.costType;
+      onChange(
+        lines.map((l, idx) =>
+          idx === i ? { ...l, costAnalysisLineId: null, costType: restoredType } : l,
+        ),
+      );
       return;
     }
     const apu = wbs?.apuLines?.find((a) => a.id === apuId);
@@ -371,9 +414,7 @@ export function PurchaseOrderLinesEditor({
                   </Label>
                   <Select
                     value={line.costType ?? "MATERIAL"}
-                    onValueChange={(v) =>
-                      update(i, "costType", v as PurchaseOrderLine["costType"])
-                    }
+                    onValueChange={(v) => updateCostType(i, v as CostCategoryOptionValue)}
                   >
                     <SelectTrigger id={`po-line-${lineKey}-cost-type`} className="h-8 text-xs">
                       <SelectValue />
@@ -386,9 +427,15 @@ export function PurchaseOrderLinesEditor({
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-[10px] text-muted-foreground leading-snug">
-                    Si elegís un insumo APU, se sugiere solo. Podés cambiarlo (p. ej. mano de obra).
-                  </p>
+                  {wbs && wbs.dominantCostType == null && line.wbsNodeId ? (
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      Esta partida tiene varios tipos en su APU; elegí el correcto (o dejalo en Materiales).
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      Se sugiere solo desde el APU de la partida o el insumo. Podés cambiarlo.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Insumo APU</Label>

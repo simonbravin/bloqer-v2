@@ -1,5 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { normalizeOverheadPeriodBound } from "../finance/overhead-period";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 
@@ -40,10 +41,12 @@ export async function getOverheadByProjectReport(
     tenantId: ctx.tenantId,
   };
 
-  if (filters?.periodFrom || filters?.periodTo) {
+  const periodFrom = normalizeOverheadPeriodBound(filters?.periodFrom);
+  const periodTo = normalizeOverheadPeriodBound(filters?.periodTo);
+  if (periodFrom || periodTo) {
     where.period = {};
-    if (filters.periodFrom) where.period.gte = filters.periodFrom;
-    if (filters.periodTo) where.period.lte = filters.periodTo;
+    if (periodFrom) where.period.gte = periodFrom;
+    if (periodTo) where.period.lte = periodTo;
   }
 
   const allocations = await prisma.projectOverheadAllocation.findMany({

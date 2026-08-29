@@ -42,6 +42,8 @@ export type InvoiceWbsOption = {
   id: string;
   code: string;
   name: string;
+  /** APU-derived dominant CostCategory used to pre-select `costType` ([D-099]). */
+  dominantCostType?: CostCategoryOptionValue | null;
 };
 
 function createLineKey(): string {
@@ -103,6 +105,9 @@ export function InvoiceLinesEditor({
   const [lineKeys, setLineKeys] = useState<string[]>(() =>
     Array.from({ length: Math.max(lines.length, 1) }, createLineKey),
   );
+  // Track which lines had their `costType` set by the user in this session so
+  // partida changes don't stomp on it ([D-099]).
+  const [manualCostTypeKeys, setManualCostTypeKeys] = useState<Set<string>>(() => new Set());
 
   // Keep React keys aligned when the parent replaces lines (PO import, form reset, etc.).
   useEffect(() => {
@@ -120,16 +125,36 @@ export function InvoiceLinesEditor({
   }, [lines.length]);
 
   function update(i: number, field: keyof InvoiceLine, value: string | null) {
+    const lineKey = lineKeys[i] ?? String(i);
     const next = lines.map((l, idx) => {
       if (idx !== i) return l;
       const patched: InvoiceLine = { ...l, [field]: value };
       // Changing EDT breaks the OC-line link only when the partida actually changes ([D-066]).
       if (field === "wbsNodeId" && value !== l.wbsNodeId) {
         patched.purchaseOrderLineId = null;
+        // Auto-type from APU dominant when the user has not overridden `costType`.
+        if (!manualCostTypeKeys.has(lineKey)) {
+          const wbs = wbsOptions.find((w) => w.id === value);
+          const dominant = wbs?.dominantCostType ?? null;
+          patched.costType = dominant && COST_CATEGORY_OPTIONS.some((o) => o.value === dominant)
+            ? dominant
+            : "MATERIAL";
+        }
       }
       return patched;
     });
     onChange(next);
+  }
+
+  function updateCostType(i: number, value: CostCategoryOptionValue) {
+    const lineKey = lineKeys[i] ?? String(i);
+    setManualCostTypeKeys((prev) => {
+      if (prev.has(lineKey)) return prev;
+      const next = new Set(prev);
+      next.add(lineKey);
+      return next;
+    });
+    onChange(lines.map((l, idx) => (idx === i ? { ...l, costType: value } : l)));
   }
 
   function addLine() {
@@ -212,6 +237,10 @@ export function InvoiceLinesEditor({
           const unitPriceId = `invoice-line-${lineKey}-unit-price`;
           const taxRateId = `invoice-line-${lineKey}-tax-rate`;
           const wbsId = `invoice-line-${lineKey}-wbs`;
+          const selectedWbs = wbsOptions.find((w) => w.id === line.wbsNodeId);
+          const showMixedCostTypeHint = Boolean(
+            selectedWbs && selectedWbs.dominantCostType == null && line.wbsNodeId,
+          );
 
           return (
             <section
@@ -259,9 +288,7 @@ export function InvoiceLinesEditor({
                     </Label>
                     <Select
                       value={line.costType ?? "MATERIAL"}
-                      onValueChange={(v) =>
-                        update(i, "costType", v as NonNullable<InvoiceLine["costType"]>)
-                      }
+                      onValueChange={(v) => updateCostType(i, v as CostCategoryOptionValue)}
                     >
                       <SelectTrigger
                         id={`invoice-line-${lineKey}-cost-type`}
@@ -278,7 +305,9 @@ export function InvoiceLinesEditor({
                       </SelectContent>
                     </Select>
                     <p className="text-[10px] text-muted-foreground leading-snug">
-                      Usá Mano de obra o Equipos para liquidaciones / alquileres imputados a la partida.
+                      {showMixedCostTypeHint
+                        ? "Esta partida tiene varios tipos en su APU; elegí el correcto."
+                        : "Se sugiere solo desde el APU de la partida. Cambialo para jornales, empleados o alquileres."}
                     </p>
                   </div>
                 </div>

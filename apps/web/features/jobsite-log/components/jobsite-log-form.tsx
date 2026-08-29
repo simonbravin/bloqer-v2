@@ -29,6 +29,8 @@ import {
   isKnownJobsiteWeather,
 } from "../lib/jobsite-log-options";
 import {
+  applyProgressPctChange,
+  applyProgressQtyChange,
   applyProgressWbsSelection,
   JOBSITE_PROGRESS_NONE,
   JOBSITE_QTY_RE,
@@ -302,12 +304,22 @@ export function JobsiteLogForm({
     setProgress((prev) =>
       prev.map((r, idx) => {
         if (idx !== i) return r;
-        if (field !== "wbsNodeId") return { ...r, [field]: val };
-        // Prefill remaining % only when the partida actually changes (editable afterwards).
-        if (val === r.wbsNodeId) return r;
-        const rem = remainingPctForWbs(val, wbsProgressSnapshot, prev, i);
-        const wbs = wbsOptions.find((w) => w.id === val);
-        return { ...applyProgressWbsSelection(r, wbs, rem), rowKey: r.rowKey };
+        if (field === "wbsNodeId") {
+          // Prefill remaining % only when the partida actually changes (editable afterwards).
+          if (val === r.wbsNodeId) return r;
+          const rem = remainingPctForWbs(val, wbsProgressSnapshot, prev, i);
+          const wbs = wbsOptions.find((w) => w.id === val);
+          return { ...applyProgressWbsSelection(r, wbs, rem), rowKey: r.rowKey };
+        }
+        const next = { ...r, [field]: val };
+        const wbs = wbsOptions.find((w) => w.id === r.wbsNodeId);
+        if (field === "physicalPct") {
+          return { ...applyProgressPctChange(next, wbs?.budgetQty), rowKey: r.rowKey };
+        }
+        if (field === "quantityCompleted") {
+          return { ...applyProgressQtyChange(next, wbs?.budgetQty), rowKey: r.rowKey };
+        }
+        return next;
       }),
     );
   }
@@ -620,6 +632,9 @@ export function JobsiteLogForm({
                       : ""}
                     {" · "}
                     Restante sugerido {formatRatePctFromString(remPct)}% (editable)
+                    {wbs?.budgetQty
+                      ? " · Cambiar % o cantidad mantiene el otro campo alineado al presupuesto"
+                      : ""}
                   </p>
                 ) : null}
                 <div className="flex justify-end">

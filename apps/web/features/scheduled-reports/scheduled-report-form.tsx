@@ -65,6 +65,7 @@ export type ScheduledReportFormProject = {
 export type ScheduledReportCatalogOption = {
   reportKey: ScheduledReportKey;
   labelEs: string;
+  group: "financial" | "operational";
 };
 
 export type ScheduledReportFormInitial = {
@@ -274,28 +275,45 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Reportes incluidos</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Agrupados como en el hub: financieros (caja, cobros, margen) y operativos (obras, compras,
+            inventario). PDF y CSV (Excel) para todos.
+          </p>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
+        <CardContent className="space-y-5">
           {catalog.length === 0 ? (
-            <p className="text-sm text-muted-foreground sm:col-span-2">
+            <p className="text-sm text-muted-foreground">
               No hay reportes disponibles para este alcance con los módulos actuales.
             </p>
           ) : (
-            catalog.map((opt) => (
-              <label
-                key={opt.reportKey}
-                htmlFor={`sr-key-${opt.reportKey}`}
-                className="flex items-start gap-2 text-sm cursor-pointer"
-              >
-                <Checkbox
-                  id={`sr-key-${opt.reportKey}`}
-                  className="mt-0.5"
-                  checked={selectedKeys.has(opt.reportKey)}
-                  onCheckedChange={(v) => toggleKey(opt.reportKey, v === true)}
-                />
-                <span>{opt.labelEs}</span>
-              </label>
-            ))
+            (["financial", "operational"] as const).map((group) => {
+              const items = catalog.filter((o) => o.group === group);
+              if (items.length === 0) return null;
+              return (
+                <div key={group} className="space-y-2">
+                  <p className="text-xs font-semibold tracking-tight">
+                    {group === "financial" ? "Financieros" : "Operativos"}
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {items.map((opt) => (
+                      <label
+                        key={opt.reportKey}
+                        htmlFor={`sr-key-${opt.reportKey}`}
+                        className="flex items-start gap-2 text-sm cursor-pointer"
+                      >
+                        <Checkbox
+                          id={`sr-key-${opt.reportKey}`}
+                          className="mt-0.5"
+                          checked={selectedKeys.has(opt.reportKey)}
+                          onCheckedChange={(v) => toggleKey(opt.reportKey, v === true)}
+                        />
+                        <span>{opt.labelEs}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
           )}
         </CardContent>
       </Card>
@@ -416,9 +434,13 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="PDF">PDF</SelectItem>
-                <SelectItem value="CSV">CSV</SelectItem>
+                <SelectItem value="CSV">CSV (Excel)</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-[11px] text-muted-foreground">
+              El CSV usa punto y coma y se abre en Excel. El PDF es el mismo que el botón Exportar de cada
+              reporte.
+            </p>
           </div>
         </CardContent>
       </Card>

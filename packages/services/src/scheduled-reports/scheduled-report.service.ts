@@ -505,7 +505,11 @@ export async function deleteScheduledReport(ctx: ServiceContext, id: string): Pr
   }
 }
 
-export type ScheduledReportCatalogEntry = { reportKey: ScheduledReportKey; labelEs: string };
+export type ScheduledReportCatalogEntry = {
+  reportKey: ScheduledReportKey;
+  labelEs: string;
+  group: "financial" | "operational";
+};
 
 export async function getScheduledReportCatalog(
   ctx: ServiceContext,
@@ -517,7 +521,10 @@ export async function getScheduledReportCatalog(
     .filter((key) =>
       SCHEDULED_REPORT_KEY_META[key].requiredModules.every((m) => gate.isEnabled(m)),
     )
-    .map((key) => ({ reportKey: key, labelEs: SCHEDULED_REPORT_KEY_META[key].labelEs }));
+    .map((key) => {
+      const meta = SCHEDULED_REPORT_KEY_META[key];
+      return { reportKey: key, labelEs: meta.labelEs, group: meta.group };
+    });
 }
 
 export type ProjectPickerRow = { id: string; code: string; name: string };

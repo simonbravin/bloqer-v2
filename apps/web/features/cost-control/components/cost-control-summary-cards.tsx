@@ -3,23 +3,28 @@ import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 
-type Props = { totals: CostControlTotals };
+type Props = {
+  totals: CostControlTotals;
+  /** When set, KPIs are scoped to one CostCategory ([D-099]). Sale / certified / margin are not sliced. */
+  costTypeLabel?: string;
+};
 
-export function CostControlSummaryCards({ totals }: Props) {
+export function CostControlSummaryCards({ totals, costTypeLabel }: Props) {
   const varianceTone = isZeroMoneyAmount(totals.costVariance)
     ? "muted"
     : isPositiveMoneyAmount(totals.costVariance)
       ? "success"
       : "danger";
+  const scoped = Boolean(costTypeLabel);
 
   return (
     <KpiStatGrid title={null} columns={5}>
       <KpiStatCard
         compact
         iconKey="cost_budget"
-        label="Presupuesto costo"
+        label={scoped ? `Presupuesto · ${costTypeLabel}` : "Presupuesto costo"}
         value={formatMoneyAmount(totals.budgetTotalCost)}
-        subtitle={`Venta: ${formatMoneyAmount(totals.budgetTotalSale)}`}
+        subtitle={scoped ? "Solo este tipo de costo" : `Venta: ${formatMoneyAmount(totals.budgetTotalSale)}`}
       />
       <KpiStatCard
         compact
@@ -32,15 +37,15 @@ export function CostControlSummaryCards({ totals }: Props) {
         compact
         iconKey="cost_certified"
         label="Certificado aprobado"
-        value={formatMoneyAmount(totals.certifiedApproved)}
-        subtitle={`Emitido: ${formatMoneyAmount(totals.certifiedIssued)}`}
+        value={scoped ? "—" : formatMoneyAmount(totals.certifiedApproved)}
+        subtitle={scoped ? "No se parte por tipo" : `Emitido: ${formatMoneyAmount(totals.certifiedIssued)}`}
       />
       <KpiStatCard
         compact
         iconKey="cost_variance"
         label="Variación de costo"
         value={formatMoneyAmount(totals.costVariance)}
-        subtitle={`Margen: ${formatMoneyAmount(totals.projectedMargin)}`}
+        subtitle={scoped ? `Restante: ${formatMoneyAmount(totals.remainingBudgetCost)}` : `Margen: ${formatMoneyAmount(totals.projectedMargin)}`}
         tone={varianceTone}
       />
       <KpiStatCard

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  applyProgressPctChange,
+  applyProgressQtyChange,
   applyProgressWbsSelection,
   fillProgressQuantity,
   isBlankProgressLine,
@@ -8,6 +10,7 @@ import {
   prepareMaterialLinesForSubmit,
   prepareProgressLinesForSubmit,
   progressLinesSubmitError,
+  suggestedPctFromQty,
   suggestedQuantityFromPct,
   type JobsiteLogProgressDraft,
 } from "./jobsite-log-form-lines";
@@ -99,6 +102,40 @@ test("prepareProgressLinesForSubmit: partida without qty or budget is an error, 
     [],
   );
   assert.equal("error" in prepared, true);
+});
+
+test("suggestedPctFromQty is the inverse of qty = budget × %", () => {
+  assert.equal(suggestedPctFromQty("50", "5.0000"), "10.00");
+  assert.equal(suggestedPctFromQty("1.0000", "1.0000"), "100.00");
+  assert.equal(suggestedPctFromQty(undefined, "5"), "");
+});
+
+test("editing % del día rewrites the suggested qty (keeps libro and EDT aligned)", () => {
+  const next = applyProgressPctChange(
+    {
+      ...blank,
+      wbsNodeId: "11111111-1111-4111-8111-111111111111",
+      quantityCompleted: "50.0000",
+      physicalPct: "10.00",
+    },
+    "50",
+  );
+  assert.equal(next.quantityCompleted, "5.0000");
+  assert.equal(next.physicalPct, "10.00");
+});
+
+test("editing qty rewrites % del día from budget", () => {
+  const next = applyProgressQtyChange(
+    {
+      ...blank,
+      wbsNodeId: "11111111-1111-4111-8111-111111111111",
+      quantityCompleted: "5",
+      physicalPct: "100.00",
+    },
+    "50",
+  );
+  assert.equal(next.physicalPct, "10.00");
+  assert.equal(next.quantityCompleted, "5");
 });
 
 test("applyProgressWbsSelection replaces qty when the partida changes", () => {

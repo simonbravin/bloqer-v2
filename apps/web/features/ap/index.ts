@@ -1,5 +1,5 @@
 export { InvoiceLinesEditor } from "./components/invoice-lines-editor";
-export type { InvoiceLine } from "./components/invoice-lines-editor";
+export type { InvoiceLine, InvoiceWbsOption } from "./components/invoice-lines-editor";
 export { SupplierInvoiceStatusBadge } from "./components/supplier-invoice-status-badge";
 export { PayableStatusBadge } from "./components/payable-status-badge";
 export { SupplierInvoiceTable } from "./components/supplier-invoice-table";

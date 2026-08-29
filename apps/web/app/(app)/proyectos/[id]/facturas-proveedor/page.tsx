@@ -11,6 +11,7 @@ import {
   SupplierInvoiceListSection,
   LIST_AP_DIRECT_PAYEES,
   toApPayeeOption,
+  type InvoiceWbsOption,
   type POOption,
   type SupplierInvoiceListItem,
   type SupplierOption,
@@ -105,7 +106,7 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
   const canCreateInvoice = can(ctx.roles, "EDIT", "AP");
   let suppliers: SupplierOption[] = [];
   let poOptions: POOption[] = [];
-  let wbsOptions: { id: string; code: string; name: string }[] = [];
+  let wbsOptions: InvoiceWbsOption[] = [];
   let treasuryAccounts: TreasuryAccountOption[] = [];
   let canPayNow = false;
   let companyCountry: string | null = null;
@@ -132,6 +133,7 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
         id: n.id,
         code: n.code,
         name: n.name,
+        dominantCostType: n.dominantCostType,
       }));
       try {
         const fiscal = await getCompanyFiscalContext(ctx, shell.companyId);

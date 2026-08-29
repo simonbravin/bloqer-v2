@@ -89,6 +89,7 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
       availableSaldo: n.availableSaldo,
       wouldExceedBudget: n.wouldExceedBudget,
       apuLines: n.apuLines,
+      dominantCostType: n.dominantCostType,
     }));
   }
 

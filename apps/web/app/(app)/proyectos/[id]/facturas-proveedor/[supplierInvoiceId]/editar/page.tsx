@@ -65,6 +65,7 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
     id: n.id,
     code: n.code,
     name: n.name,
+    dominantCostType: n.dominantCostType,
   }));
 
   let companyCountry: string | null = null;

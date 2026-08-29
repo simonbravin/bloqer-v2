@@ -51,6 +51,13 @@
 | Preferencias por usuario | P-EMAIL-02 |
 | Reintento automático en fallo Resend | Evita spam; usar “Reintentar fallidos” |
 
+## Catálogo UI (actualizado)
+
+Agrupado en **Financieros** / **Operativos** (mismo criterio que los hubs). `PROJECT_BUDGET_VARIANCE` queda oculto del picker (legado [D-098]; EDT y costos lo reemplaza). CSV (Excel, `;` + BOM) y PDF para todas las keys listadas, incluidas las de empresa D-098 (portafolio, rentabilidad multi-obra, GG, compras multi-obra).
+
+- **Empresa:** Aging CxC/CxP, tesorería (posición, movimientos, flujo consolidado), CxP corporativo, facturas proveedor corporativas, rentabilidad multi-obra, GG por proyecto, portafolio, compras multi-obra, inventario (stock / movimientos).
+- **Proyecto:** Caja y proyección, ingresos vs gastos, rentabilidad, EDT y costos, certificaciones, análisis de compras, subcontratos, materiales.
+
 ## Checklist de prueba manual (pre-producción)
 
 1. `pnpm --filter @bloqer/database db:migrate:deploy` aplicado en el entorno.

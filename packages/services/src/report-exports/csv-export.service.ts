@@ -33,3 +33,40 @@ export function buildCsv(headers: string[], rows: string[][]): string {
   ];
   return BOM + lines.join("\r\n");
 }
+
+/** Inverse of `buildCsv` (semicolon + optional BOM). Used to reuse a CSV table as XLSX. */
+export function parseBuiltCsv(content: string): { headers: string[]; rows: string[][] } {
+  const text = content.replace(/^\uFEFF/, "");
+  const lines = text.split(/\r\n|\n/).filter((l) => l.length > 0);
+  const parseLine = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]!;
+      if (inQuotes) {
+        if (ch === '"' && line[i + 1] === '"') {
+          cur += '"';
+          i += 1;
+        } else if (ch === '"') {
+          inQuotes = false;
+        } else {
+          cur += ch;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === SEP) {
+        out.push(cur);
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur);
+    return out;
+  };
+  return {
+    headers: parseLine(lines[0] ?? ""),
+    rows: lines.slice(1).map(parseLine),
+  };
+}

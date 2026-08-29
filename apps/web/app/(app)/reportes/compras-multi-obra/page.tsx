@@ -54,7 +54,7 @@ export default async function ComprasMultiObraPage({ searchParams }: PageProps) 
             Top proveedores (comprometido neto) y OC abiertas en todas las obras.
           </p>
         </div>
-        <ReportExportActions exportPath="/api/reports/compras-multi-obra.csv" params={sp} />
+        <ReportExportActions exportPath="/api/reports/compras-multi-obra.csv" params={sp} pdf xlsx />
       </div>
 
       <ReportSubnav>

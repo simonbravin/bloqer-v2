@@ -4,6 +4,13 @@
 
 Centralizar la reportería **multi-obra** a nivel tenant, separado del hub de obra (`/proyectos/[id]/reportes`). Evita “28 mil reportes”: 8 cards canónicos, 4 de ellos con servicio dedicado y 4 deep-links a pantallas operativas existentes.
 
+## Secciones (UI)
+
+- **Financieros:** rentabilidad multi-obra, aging CxC/CxP, flujo de caja, GG por proyecto.
+- **Operativos:** portafolio de proyectos, compras multi-obra, inventario.
+
+El hub de obra (`/proyectos/[id]/reportes`) usa las mismas secciones: financieros (caja, cobros, pagos, margen) y operativos (EDT, compras, materiales, subcontratos, certificaciones).
+
 ## Cards
 
 | Card | Ruta | Fuente |
@@ -23,8 +30,8 @@ Centralizar la reportería **multi-obra** a nivel tenant, separado del hub de ob
 
 ## Exports / programados
 
-- CSV: `/api/reports/portafolio.csv`, `rentabilidad-multi-obra.csv`, `gastos-generales-por-proyecto.csv`, `compras-multi-obra.csv`.
-- Keys programadas: `TENANT_PROJECT_PORTFOLIO`, `TENANT_MULTI_PROJECT_RENTABILITY`, `TENANT_OVERHEAD_BY_PROJECT`, `TENANT_MULTI_PROJECT_PROCUREMENT`.
+- CSV / Excel / PDF: `/api/reports/portafolio.csv`, `rentabilidad-multi-obra.csv`, `gastos-generales-por-proyecto.csv`, `compras-multi-obra.csv` (`?format=csv|xlsx|pdf`).
+- Keys programadas: `TENANT_PROJECT_PORTFOLIO`, `TENANT_MULTI_PROJECT_RENTABILITY`, `TENANT_OVERHEAD_BY_PROJECT`, `TENANT_MULTI_PROJECT_PROCUREMENT` (PDF y CSV).
 
 ## Relación con obra
 

@@ -4,6 +4,7 @@ import { ServiceError } from "../types";
 import {
   assertValidOverheadPeriod,
   computeWeightShare,
+  normalizeOverheadPeriodBound,
   periodToIssueDateBounds,
   resolvePeriodKeysForFilter,
 } from "./overhead-period";
@@ -32,6 +33,16 @@ test("computeWeightShare returns percent of total", () => {
 test("resolvePeriodKeysForFilter expands inclusive range", () => {
   const keys = resolvePeriodKeysForFilter({ periodFrom: "2026-01", periodTo: "2026-03" });
   assert.deepEqual(keys, ["2026-01", "2026-02", "2026-03"]);
+});
+
+test("normalizeOverheadPeriodBound accepts YYYY-MM and YYYY-MM-DD", () => {
+  assert.equal(normalizeOverheadPeriodBound("2026-01"), "2026-01");
+  assert.equal(normalizeOverheadPeriodBound("2026-01-15"), "2026-01");
+  assert.equal(normalizeOverheadPeriodBound(undefined), undefined);
+  assert.throws(
+    () => normalizeOverheadPeriodBound("enero-2026"),
+    (e: unknown) => e instanceof ServiceError && e.code === "VALIDATION",
+  );
 });
 
 test("periodToIssueDateBounds includes last day of month end-to-end UTC", () => {

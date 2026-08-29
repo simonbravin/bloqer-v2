@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-import Link from "next/link";
 import {
   BarChart3,
   FileCheck2,
@@ -9,16 +7,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-type ReportCard = {
-  title: string;
-  description: string;
-  href: string;
-  icon: ReactNode;
-  available: boolean;
-  badge?: string;
-};
+import { ReportsHubSections, type ReportHubCard } from "./reports-hub-sections";
 
 type Props = {
   projectId: string;
@@ -47,7 +36,7 @@ export function ReportsHub({
 }: Props) {
   const base = `/proyectos/${projectId}/reportes`;
 
-  const cards: ReportCard[] = [
+  const financial: ReportHubCard[] = [
     {
       title: "Aging Cuentas por cobrar",
       description: "Deuda abierta por cliente con buckets de vencimiento y foco en riesgo de cobro.",
@@ -65,51 +54,19 @@ export function ReportsHub({
       badge: "AP Aging",
     },
     {
-      title: "Certificaciones",
-      description: "Evolución certificado / facturado / cobrado, curvas de avance y estado por partida.",
-      href: `${base}/certificaciones`,
-      icon: <FileCheck2 className="h-5 w-5" />,
-      available: canCertReports,
-    },
-    {
-      title: "Análisis de compras",
-      description:
-        "Desvío proveedor vs presupuesto/OC/facturas. El control de $ por partida está en EDT y costos.",
-      href: `${base}/compras-proveedores`,
-      icon: <Package className="h-5 w-5" />,
-      available: canProcurementReports,
-    },
-    {
-      title: "Materiales",
-      description:
-        "Cantidades APU vs pedido/recibido/consumido. El control de $ por partida está en EDT y costos.",
-      href: `/proyectos/${projectId}/materiales`,
-      icon: <Package className="h-5 w-5" />,
-      // Same gate as /materiales (cost-control / budgets) — inventory optional for cobertura.
-      available: canCostReports,
-    },
-    {
-      title: "Subcontratos",
-      description: "Varianza SUB por partida, contratos activos y evolución certificado vs pagado.",
-      href: `${base}/subcontratos`,
-      icon: <Users className="h-5 w-5" />,
-      available: canSubcontractReports,
-    },
-    {
-      title: "EDT y costos",
-      description:
-        "Tablero de $ por partida: comprometido, recibido, devengado, pagado, exposición, composición APU planificada y real (por tipo) y vistas por columnas.",
-      href: `/proyectos/${projectId}/control-costos`,
-      icon: <BarChart3 className="h-5 w-5" />,
-      available: canCostReports,
-      badge: "Incluye presupuesto vs real + composición",
-    },
-    {
       title: "Caja y proyección",
       description: "Flujo de caja real (R-005) y cobros/pagos esperados por vencimiento (R-006).",
       href: `${base}/caja`,
       icon: <Wallet className="h-5 w-5" />,
       available: canCashFlow,
+    },
+    {
+      title: "Flujo de caja (detalle)",
+      description: "Cobranzas y pagos confirmados con tablas de detalle.",
+      href: `/proyectos/${projectId}/flujo-caja`,
+      icon: <Wallet className="h-5 w-5" />,
+      available: canCashFlow,
+      badge: "Detalle",
     },
     {
       title: "Ingresos vs gastos",
@@ -126,44 +83,64 @@ export function ReportsHub({
       available: canProfitability,
       badge: "R-003",
     },
+  ];
+
+  const operational: ReportHubCard[] = [
     {
-      title: "Flujo de caja (detalle)",
-      description: "Cobranzas y pagos confirmados con tablas de detalle.",
-      href: `/proyectos/${projectId}/flujo-caja`,
-      icon: <Wallet className="h-5 w-5" />,
-      available: canCashFlow,
-      badge: "Detalle",
+      title: "EDT y costos",
+      description:
+        "Tablero de $ por partida: capas, filtro por tipo, composición APU y barras Presup/Devengado/Exposición.",
+      href: `/proyectos/${projectId}/control-costos`,
+      icon: <BarChart3 className="h-5 w-5" />,
+      available: canCostReports,
+      badge: "Incluye presupuesto vs real + gasto por tipo",
+    },
+    {
+      title: "Certificaciones",
+      description: "Evolución certificado / facturado / cobrado, curvas de avance y estado por partida.",
+      href: `${base}/certificaciones`,
+      icon: <FileCheck2 className="h-5 w-5" />,
+      available: canCertReports,
+    },
+    {
+      title: "Análisis de compras",
+      description:
+        "Eje proveedor y varianza de OC vs APU. El control de $ por partida está en EDT y costos.",
+      href: `${base}/compras-proveedores`,
+      icon: <Package className="h-5 w-5" />,
+      available: canProcurementReports,
+    },
+    {
+      title: "Materiales",
+      description:
+        "Cantidades APU vs pedido/recibido/consumido. El control de $ por partida está en EDT y costos.",
+      href: `/proyectos/${projectId}/materiales`,
+      icon: <Package className="h-5 w-5" />,
+      available: canCostReports,
+    },
+    {
+      title: "Subcontratos",
+      description: "Varianza SUB por partida, contratos activos y evolución certificado vs pagado.",
+      href: `${base}/subcontratos`,
+      icon: <Users className="h-5 w-5" />,
+      available: canSubcontractReports,
     },
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {cards.map((card) => (
-        <Card
-          key={card.title}
-          className={card.available ? "transition-shadow hover:shadow-md" : "opacity-50"}
-        >
-          {card.available ? (
-            <Link href={card.href} className="block h-full">
-              <CardHeader className="space-y-2">
-                <div className="flex items-center gap-2 text-primary">{card.icon}</div>
-                <CardTitle className="text-base">{card.title}</CardTitle>
-                <CardDescription className="text-sm">{card.description}</CardDescription>
-                {card.badge ? (
-                  <span className="inline-block text-xs text-muted-foreground">{card.badge}</span>
-                ) : null}
-              </CardHeader>
-            </Link>
-          ) : (
-            <CardHeader className="space-y-2">
-              <div className="flex items-center gap-2 text-muted-foreground">{card.icon}</div>
-              <CardTitle className="text-base">{card.title}</CardTitle>
-              <CardDescription className="text-sm">{card.description}</CardDescription>
-              <span className="text-xs text-muted-foreground">Sin permisos o módulo deshabilitado</span>
-            </CardHeader>
-          )}
-        </Card>
-      ))}
-    </div>
+    <ReportsHubSections
+      sections={[
+        {
+          title: "Financieros",
+          description: "Caja, cobros, pagos y margen de la obra.",
+          cards: financial,
+        },
+        {
+          title: "Operativos",
+          description: "Costos por partida, compras, materiales y avance certificado.",
+          cards: operational,
+        },
+      ]}
+    />
   );
 }

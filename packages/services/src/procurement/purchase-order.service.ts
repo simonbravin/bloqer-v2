@@ -15,7 +15,11 @@ import { PO_RECEIPT_ELIGIBLE_STATUSES } from "./procurement-constants";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { assertCompanyMatchesProject, assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
-import { resolveLineCostType } from "../cost-control/cost-type";
+import {
+  computeDominantCostTypeFromApuLines,
+  loadWbsDominantCostTypes,
+  resolveLineCostType,
+} from "../cost-control/cost-type";
 import type { CostCategory } from "@bloqer/database";
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
@@ -262,6 +266,19 @@ export type ProcurementWbsOption = {
   wouldExceedBudget: boolean;
   /** MATERIAL APU hints under this ITEM ([D-068]). */
   apuLines: ProcurementApuOption[];
+  /**
+   * APU-derived dominant CostCategory for this ITEM ([D-099]).
+   *
+   * Computed from the sum of `totalCost` per category across all analysisLines:
+   * - a category with ≥ 60% of the total → dominant.
+   * - if a single category exists (e.g. baño químico = 100% EQP) → that one.
+   * - mixed (no category reaches 60% and >1 categories present) → null.
+   * - lump-sum or empty APU → null.
+   *
+   * Used by the OC/factura line editor to pre-select `costType` when the user
+   * picks the partida but does not pick a specific insumo APU.
+   */
+  dominantCostType: CostCategory | null;
 };
 
 export async function listProcurementWbsOptions(
@@ -288,8 +305,11 @@ export async function listProcurementWbsOptions(
       budget: { select: { name: true, versionNumber: true } },
       costItem: {
         select: {
+          // We fetch all analysisLines (all categories) so we can compute the
+          // dominant CostCategory for the ITEM ([D-099]). The MATERIAL, non
+          // lump-sum ones are the only ones exposed as `apuLines` (existing
+          // insumo picker behaviour, [D-068]).
           analysisLines: {
-            where: { category: "MATERIAL", isLumpSum: false },
             orderBy: { sortOrder: "asc" },
             select: {
               id: true,
@@ -298,6 +318,8 @@ export async function listProcurementWbsOptions(
               unitCost: true,
               productId: true,
               category: true,
+              totalCost: true,
+              isLumpSum: true,
             },
           },
         },
@@ -314,6 +336,8 @@ export async function listProcurementWbsOptions(
   for (let i = 0; i < ordered.length; i++) {
     const n = ordered[i]!;
     const ref = refs[i]!;
+    const allLines = n.costItem?.analysisLines ?? [];
+    const materialLines = allLines.filter((l) => l.category === "MATERIAL" && !l.isLumpSum);
     result.push({
       id: n.id,
       code: n.code,
@@ -323,7 +347,8 @@ export async function listProcurementWbsOptions(
       budgetUnit: ref.budgetUnit,
       availableSaldo: ref.availableSaldo,
       wouldExceedBudget: ref.wouldExceedBudget,
-      apuLines: (n.costItem?.analysisLines ?? []).map((l) => {
+      dominantCostType: computeDominantCostTypeFromApuLines(allLines),
+      apuLines: materialLines.map((l) => {
         const c = commitments.get(l.id);
         return {
           id: l.id,
@@ -458,6 +483,10 @@ export async function createPurchaseOrder(
       );
     }
   }
+  const wbsIdsForDominant = Array.from(
+    new Set(input.lines.map((l) => l.wbsNodeId).filter((v): v is string => Boolean(v))),
+  );
+  const wbsDominantByCreate = await loadWbsDominantCostTypes(wbsIdsForDominant, ctx.tenantId);
 
   const companyId = await resolveCompanyId(input.projectId, ctx);
   await assertCompanyMatchesProject(companyId, input.projectId, ctx.tenantId);
@@ -529,6 +558,7 @@ export async function createPurchaseOrder(
       const costType = resolveLineCostType({
         costType: line.costType ?? null,
         apuCategory: apuCategoryByIdx.get(i) ?? null,
+        wbsDominantCostType: line.wbsNodeId ? wbsDominantByCreate.get(line.wbsNodeId) ?? null : null,
       });
       await tx.purchaseOrderLine.create({
         data: {
@@ -594,6 +624,7 @@ export async function updatePurchaseOrder(
   }
 
   let apuCategoryByIdx = new Map<number, CostCategory>();
+  let wbsDominantByUpdate = new Map<string, CostCategory | null>();
   if (input.lines) {
     assertWbsRequiredOnLines(input.lines);
     for (let i = 0; i < input.lines.length; i++) {
@@ -606,6 +637,10 @@ export async function updatePurchaseOrder(
         );
       }
     }
+    const wbsIdsForDominant = Array.from(
+      new Set(input.lines.map((l) => l.wbsNodeId).filter((v): v is string => Boolean(v))),
+    );
+    wbsDominantByUpdate = await loadWbsDominantCostTypes(wbsIdsForDominant, ctx.tenantId);
     await assertPoLinesWithinSelectedQuote(
       id,
       input.lines.map((l, i) => ({
@@ -681,7 +716,8 @@ export async function updatePurchaseOrder(
             : baseline.unitCost;
         const costType = resolveLineCostType({
           costType: line.costType ?? null,
-          apuCategory: apuCategoryByIdx.get(i) ?? prev?.costType ?? null,
+          apuCategory: apuCategoryByIdx.get(i) ?? null,
+          wbsDominantCostType: line.wbsNodeId ? wbsDominantByUpdate.get(line.wbsNodeId) ?? null : null,
         });
         await tx.purchaseOrderLine.create({
           data: {

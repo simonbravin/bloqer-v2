@@ -6,7 +6,7 @@
 
 | ID | Nombre | Área | Descripción breve | Fase |
 |---|---|---|---|---|
-| R-001 | Presupuesto vs real (ítem) | OP | Integrado en **EDT y costos** ([D-098]): capas + composición APU + vistas de columnas. Ruta legacy `/reportes/presupuesto-vs-real` → redirect | 1 |
+| R-001 | Presupuesto vs real (ítem) | OP | Integrado en **EDT y costos** ([D-098] · [D-099]): capas + composición APU + gasto por tipo (barras) + filtro por CostCategory + vistas de columnas. Ruta legacy `/reportes/presupuesto-vs-real` → redirect | 1 |
 | R-002 | Avance físico/económico/financiero | PRJ | Tres curvas por proyecto | 1 |
 | R-003 | Rentabilidad bruta por proyecto | FIN | MB y MB% (costo según vista etiquetada: devengado / pagado / exposición esperada, [BR-COS-001]) | 1 |
 | R-004 | Rentabilidad neta por proyecto | FIN | MN y MN% (misma convención de capa de costo que R-003) | 1 |
@@ -14,7 +14,7 @@
 | R-006 | Proyección de caja | FIN | Saldo + cobros/pagos esperados por AR/AP (**liquidez**; no suma OC abiertas salvo política) | 1 |
 | R-007 | Aging cuentas por cobrar | FIN | Buckets por cliente/proyecto | 1 |
 | R-008 | Aging cuentas por pagar | FIN | Buckets por proveedor | 1 |
-| R-009 | Análisis de compras (ex Compras por proveedor) | OP | Monto y documentos; comprometido = `lineSubtotal` neto ([D-095]/[D-098]) | 1 |
+| R-009 | Análisis de compras (ex Compras por proveedor) | OP | Eje **proveedor** + **varianza OC vs baseline APU** ([D-044]) + sin imputación EDT. Ya **no** incluye "Material presupuestado vs ejecución" (ese eje vive en EDT y costos, [D-099]) | 1 |
 | R-010 | Compras multi-proyecto | OP | Hub empresa `/reportes/compras-multi-obra` ([D-098]; supersede diferimiento [D-083] para este card) | 1 |
 | R-011 | Materiales más caros | OP | Ranking por variación precio o monto. **Diferido cierre Phase 4** ([D-083](../00-product/DECISION_LOG.md)) | 1 |
 | R-012 | Evolución certificaciones | PRJ | Serie mensual certificado / facturado / cobrado: **facturado** = existe `SalesInvoice`/`Receivable` vinculada ([BR-CERT-007]); cobrado vía AR+tesorería; `payment_status` derivado; columnas no usan `INVOICED` como estado de certificación | 1 |
@@ -30,7 +30,7 @@
 ### Extensiones hub proyecto (baseline vs ejecución)
 
 > Read-layer y checklist ERD: [`REPORTING_ERD_GUARDRAILS.md`](../08-architecture/REPORTING_ERD_GUARDRAILS.md) · ADR-010.  
-> Hub UI: `/proyectos/[id]/reportes`. **Impl.** = disponible en código actual.
+> Hub UI: `/proyectos/[id]/reportes`, agrupado en **Financieros** (caja, cobros, pagos, margen) y **Operativos** (EDT, compras, materiales, subcontratos, certificaciones). **Impl.** = disponible en código actual.
 
 | ID | Nombre | Área | Descripción breve | Fase | Impl. |
 |---|---|---|---|---|---|
@@ -57,19 +57,21 @@
 | R-004 | Rentabilidad neta | Completo (GG manual + % empresa [D-040]) | `/reportes/rentabilidad` |
 | — | Ingresos vs gastos | Sí | `/reportes/ingresos-gastos` |
 
-**R-001 / EDT ([D-098] · [D-099]):** tablero único `/proyectos/[id]/control-costos` — capas de costo, composición APU, presets de columnas (incl. % y cantidades), expand por `CostCategory` en partidas hoja, CSV `control-costos.csv` (filas EDT; CSV por tipo opcional post-v1). La ruta `presupuesto-vs-real` redirige acá.
+**R-001 / EDT ([D-098] · [D-099]):** tablero único `/proyectos/[id]/control-costos` — capas de costo, composición APU (torta) + **gasto por tipo** (barras Presup/Devengado/Exposición), presets de columnas (incl. % y cantidades), expand por `CostCategory` en partidas hoja, **filtro por tipo de costo** (query `?costType=MATERIAL|LABOR|EQUIPMENT|SUBCONTRACT|OTHER`) que reemplaza importes y totales por el bucket y se propaga al CSV/PDF. La ruta `presupuesto-vs-real` redirige acá.
 
 ### Hub reportes empresa ([D-098])
 
+UI `/reportes` agrupada en **Financieros** (rentabilidad multi-obra, aging, flujo de caja, GG) y **Operativos** (portafolio, compras multi-obra, inventario).
+
 | ID | Nombre | Impl. | Ruta UI |
 |----|--------|-------|---------|
-| R-PORT | Portafolio de proyectos | Sí | `/reportes/portafolio` |
-| R-RENT-M | Rentabilidad multi-obra | Sí | `/reportes/rentabilidad-multi-obra` |
+| R-PORT | Portafolio de proyectos | Sí | `/reportes/portafolio` (CSV / Excel / PDF) |
+| R-RENT-M | Rentabilidad multi-obra | Sí | `/reportes/rentabilidad-multi-obra` (CSV / Excel / PDF) |
 | R-007/8 | Aging CxC / CxP | Sí (link) | `/finanzas/cuentas-por-cobrar` · `/finanzas/cuentas-por-pagar` |
 | R-005/6 | Flujo caja consolidado | Sí (link) | `/tesoreria/flujo-caja` |
 | R-014 | Inventario | Sí (link) | `/inventario` |
-| R-GG | Gastos generales por proyecto | Sí | `/reportes/gastos-generales-por-proyecto` |
-| R-010 | Compras multi-obra | Sí | `/reportes/compras-multi-obra` |
+| R-GG | Gastos generales por proyecto | Sí | `/reportes/gastos-generales-por-proyecto` (CSV / Excel / PDF) |
+| R-010 | Compras multi-obra | Sí | `/reportes/compras-multi-obra` (CSV / Excel / PDF) |
 
 Ver [`TENANT_REPORTS_HUB.md`](../08-architecture/TENANT_REPORTS_HUB.md).
 

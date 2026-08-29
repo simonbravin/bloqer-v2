@@ -6,6 +6,7 @@ import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import {
   canManageScheduledReports,
   getProjectShellInfo,
+  getScheduledReportCatalog,
   listScheduledReports,
   ServiceError,
 } from "@bloqer/services";
@@ -27,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { ScheduledReportCatalogPanel } from "@/features/scheduled-reports/scheduled-report-catalog-panel";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -47,7 +49,10 @@ export default async function ProjectReportesProgramadosPage({ params }: Props) 
     throw e;
   }
 
-  const rows = await listScheduledReports(ctx, { projectId });
+  const [rows, projectCatalog] = await Promise.all([
+    listScheduledReports(ctx, { projectId }),
+    getScheduledReportCatalog(ctx, "PROJECT"),
+  ]);
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -60,6 +65,12 @@ export default async function ProjectReportesProgramadosPage({ params }: Props) 
             </Link>
           </Button>
         }
+      />
+
+      <ScheduledReportCatalogPanel
+        title="Reportes de esta obra"
+        hint="PDF y CSV (Excel) en todos. Presupuesto vs real quedó dentro de EDT y costos."
+        catalog={projectCatalog}
       />
 
       {rows.length === 0 ? (

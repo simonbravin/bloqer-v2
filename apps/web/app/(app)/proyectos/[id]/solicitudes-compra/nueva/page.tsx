@@ -57,6 +57,7 @@ export default async function NuevaSolicitudCompraPage({ params, searchParams }:
     availableSaldo: n.availableSaldo,
     wouldExceedBudget: n.wouldExceedBudget,
     apuLines: n.apuLines,
+    dominantCostType: n.dominantCostType,
   }));
 
   return (

@@ -44,7 +44,7 @@ export default async function PortafolioReportPage() {
             Costos y exposición de todas las obras (sin canceladas). Drill a EDT de cada obra.
           </p>
         </div>
-        <ReportExportActions exportPath="/api/reports/portafolio.csv" params={{}} />
+        <ReportExportActions exportPath="/api/reports/portafolio.csv" params={{}} pdf xlsx />
       </div>
 
       <ReportSubnav>

@@ -86,7 +86,10 @@ export default async function ProjectReportesPage({ params }: PageProps) {
 
   return (
     <PageShell variant="default" className="space-y-6">
-      <ProjectPageHeader title="Reportes del proyecto" />
+      <ProjectPageHeader
+        title="Reportes del proyecto"
+        subtitle="Agrupados en financieros (caja, cobros, margen) y operativos (costos, compras y avance)."
+      />
 
       {!hasAnyReport ? (
         <div className="rounded-lg border bg-card p-8 text-center space-y-3">

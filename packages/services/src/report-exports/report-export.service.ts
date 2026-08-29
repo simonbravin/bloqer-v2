@@ -16,7 +16,11 @@ import {
 import type { StockBalanceFilters, StockMovementReportFilters } from "../inventory-reports/inventory-reports.service";
 import { getStockBalanceReport, getStockMovementReport } from "../inventory-reports/inventory-reports.service";
 import type { CostControlFilters } from "../cost-control/cost-control.service";
-import { getProjectCostControl } from "../cost-control/cost-control.service";
+import {
+  getProjectCostControl,
+  parseCostCategoryFilter,
+  sliceCostControlReportByCostType,
+} from "../cost-control/cost-control.service";
 import type { BudgetVarianceFilters } from "../reports/budget-variance.service";
 import {
   getBudgetVarianceReport,
@@ -44,13 +48,32 @@ import {
   type CompanySupplierInvoiceListFilters,
 } from "../ap/supplier-invoice.service";
 import { ServiceContext, ServiceError } from "../types";
-import { buildCsv } from "./csv-export.service";
+import { buildCsv, parseBuiltCsv } from "./csv-export.service";
 import { safeReportFilename } from "./filename.service";
+import { buildXlsxSheet } from "./xlsx-export.service";
 import {
   TREASURY_MOVEMENTS_EXPORT_LABELS,
   type MovementExportLabels,
   type ReportCsvPayload,
+  type ReportXlsxPayload,
 } from "./report-export.types";
+
+function tableToXlsx(
+  headers: string[],
+  rows: string[][],
+  filenameBase: string,
+  sheetName: string,
+): ReportXlsxPayload {
+  return {
+    buffer: buildXlsxSheet(headers, rows, { sheetName }),
+    filename: safeReportFilename(filenameBase, "xlsx"),
+  };
+}
+
+function csvTextToXlsx(content: string, filenameBase: string, sheetName: string): ReportXlsxPayload {
+  const { headers, rows } = parseBuiltCsv(content);
+  return tableToXlsx(headers, rows, filenameBase, sheetName);
+}
 
 function padCsvRow(cells: string[], columnCount: number): string[] {
   const r = [...cells];
@@ -179,6 +202,7 @@ export function parseCostControlFilters(sp: Record<string, string | undefined>):
     dateFrom: sp.dateFrom,
     dateTo: sp.dateTo,
     wbsSearch: sp.wbsSearch,
+    costType: parseCostCategoryFilter(sp.costType),
   };
 }
 
@@ -635,7 +659,7 @@ export async function exportProjectCostControlCsv(
   if (result.type === "BUDGET_SELECTION_REQUIRED") {
     throw new ServiceError("CONFLICT", "Seleccioná un presupuesto para exportar el control de costos");
   }
-  const r = result;
+  const r = filters.costType ? sliceCostControlReportByCostType(result, filters.costType) : result;
   const headers = [
     "CodigoWBS",
     "NombreWBS",
@@ -869,7 +893,8 @@ export async function exportProjectCostControlCsv(
     }
   }
 
-  const fname = `control_costos_${r.projectId}_${r.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
+  const typeSuffix = filters.costType ? `_${filters.costType.toLowerCase()}` : "";
+  const fname = `control_costos_${r.projectId}_${r.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}${typeSuffix}`;
   return {
     content: buildCsv(headers, rows),
     filename: safeReportFilename(fname, "csv"),
@@ -1449,6 +1474,14 @@ export async function exportProjectPortfolioCsv(
   };
 }
 
+export async function exportProjectPortfolioXlsx(
+  ctx: ServiceContext,
+  filters?: { status?: string },
+): Promise<ReportXlsxPayload> {
+  const { content, filename } = await exportProjectPortfolioCsv(ctx, filters);
+  return csvTextToXlsx(content, filename.replace(/\.csv$/i, ""), "Portafolio");
+}
+
 export async function exportPortfolioProfitabilityCsv(
   ctx: ServiceContext,
   filters?: { costLayer?: string; revenueBasis?: string; status?: string },
@@ -1505,12 +1538,23 @@ export async function exportPortfolioProfitabilityCsv(
   };
 }
 
+export async function exportPortfolioProfitabilityXlsx(
+  ctx: ServiceContext,
+  filters?: { costLayer?: string; revenueBasis?: string; status?: string },
+): Promise<ReportXlsxPayload> {
+  const { content, filename } = await exportPortfolioProfitabilityCsv(ctx, filters);
+  return csvTextToXlsx(content, filename.replace(/\.csv$/i, ""), "Rentabilidad");
+}
+
 export async function exportOverheadByProjectCsv(
   ctx: ServiceContext,
-  filters?: { periodFrom?: string; periodTo?: string },
+  filters?: { periodFrom?: string; periodTo?: string; dateFrom?: string; dateTo?: string },
 ): Promise<ReportCsvPayload> {
   const { getOverheadByProjectReport } = await import("../reports/overhead-by-project.service");
-  const report = await getOverheadByProjectReport(ctx, filters);
+  const report = await getOverheadByProjectReport(ctx, {
+    periodFrom: filters?.periodFrom ?? filters?.dateFrom,
+    periodTo: filters?.periodTo ?? filters?.dateTo,
+  });
   const headers = [
     "Codigo proyecto",
     "Proyecto",
@@ -1531,6 +1575,14 @@ export async function exportOverheadByProjectCsv(
     content: buildCsv(headers, rows),
     filename: safeReportFilename("gastos_generales_por_proyecto", "csv"),
   };
+}
+
+export async function exportOverheadByProjectXlsx(
+  ctx: ServiceContext,
+  filters?: { periodFrom?: string; periodTo?: string; dateFrom?: string; dateTo?: string },
+): Promise<ReportXlsxPayload> {
+  const { content, filename } = await exportOverheadByProjectCsv(ctx, filters);
+  return csvTextToXlsx(content, filename.replace(/\.csv$/i, ""), "GG por proyecto");
 }
 
 export async function exportMultiProjectProcurementCsv(
@@ -1581,4 +1633,12 @@ export async function exportMultiProjectProcurementCsv(
     content: buildCsv(headers, rows),
     filename: safeReportFilename("compras_multi_obra", "csv"),
   };
+}
+
+export async function exportMultiProjectProcurementXlsx(
+  ctx: ServiceContext,
+  filters?: { dateFrom?: string; dateTo?: string },
+): Promise<ReportXlsxPayload> {
+  const { content, filename } = await exportMultiProjectProcurementCsv(ctx, filters);
+  return csvTextToXlsx(content, filename.replace(/\.csv$/i, ""), "Compras");
 }

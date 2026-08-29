@@ -26,6 +26,8 @@ const FILTER_LABEL_ES: Record<string, string> = {
   issueDateFrom: "Emisión desde",
   issueDateTo: "Emisión hasta",
   period: "Período",
+  periodFrom: "Período desde",
+  periodTo: "Período hasta",
   productId: "Producto",
   projectId: "Proyecto",
   status: "Estado",

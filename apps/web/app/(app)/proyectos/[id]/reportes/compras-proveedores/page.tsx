@@ -11,7 +11,6 @@ import {
 import {
   ProcurementSupplierTable,
   ProcurementUnallocatedTable,
-  ProcurementWbsDeviationTable,
   PurchaseOrderVarianceTable,
   ReportDateFilters,
   ReportSubnav,
@@ -74,8 +73,8 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
         title="Compras y proveedores"
         subtitle={
           report.type === "REPORT"
-            ? `${report.budgetName} · desvío proveedor vs OC/facturas. El control de $ está en EDT y costos.`
-            : "Desvío proveedor vs OC/facturas. El control de $ está en EDT y costos."
+            ? `${report.budgetName} · eje proveedor + varianza OC vs APU. El control $ por partida está en EDT y costos.`
+            : "Eje proveedor + varianza OC vs APU. El control $ por partida está en EDT y costos."
         }
         actions={
           report.type === "REPORT" ? (
@@ -129,16 +128,10 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Material presupuestado vs ejecución</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ProcurementWbsDeviationTable rows={report.byWbs} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
               <CardTitle className="text-base">Sin imputación EDT</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Compras que no vinieron con partida asignada. Corregilas para que aparezcan en EDT y costos.
+              </p>
             </CardHeader>
             <CardContent>
               <ProcurementUnallocatedTable rows={report.unallocated} />
@@ -148,6 +141,9 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Por proveedor</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Qué le comprás a cada proveedor (OC confirmadas + facturas). Para ver $ por partida, mirá EDT y costos.
+              </p>
             </CardHeader>
             <CardContent>
               <ProcurementSupplierTable rows={report.bySupplier} />
@@ -157,6 +153,9 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Desvíos en líneas de OC</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Precio unitario de OC vs baseline APU ([D-044]). No aparece en EDT y costos.
+              </p>
             </CardHeader>
             <CardContent>
               <PurchaseOrderVarianceTable rows={poVariance.rows} projectId={projectId} />

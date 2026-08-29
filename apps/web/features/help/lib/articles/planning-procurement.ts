@@ -93,7 +93,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "project", suffix: "/libro-obra", label: "Libro de obra" }],
     steps: [
       "Operación → Libro de obra → nuevo parte.",
-      "Clima, cuadrilla, fotos. En avance: agregá una fila, elegí la partida EDT y la cantidad (% del día se precarga). En mano de obra, buscá el contacto por razón social o nombre fantasía.",
+      "Clima, cuadrilla, fotos. En avance: agregá una fila, elegí la partida EDT (% del día restante y cantidad se precargan). Si cambiás el % o la cantidad, el otro campo se alinea al presupuesto de la partida. En mano de obra, buscá el contacto por razón social o nombre fantasía.",
       "Enviar (SUBMITTED): el PM del Equipo de obra (y OWNER/ADMIN) reciben campana + email.",
       "Si te lo devuelven, corregí desde el enlace de la notificación.",
     ],
@@ -103,6 +103,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     ],
     pitfalls: [
       "Cada fila de avance necesita partida EDT y cantidad. Si falta alguno, el parte no se guarda.",
+      "El % avance libro de EDT y costos solo suma partes APPROVED. Mientras el parte esté enviado (SUBMITTED) no mueve esa columna. La vista Financiero no muestra %: cambiá a Cantidades o % Avance.",
       "En materiales, descripción y cantidad son obligatorios: una fila a medias no se graba.",
     ],
     relatedSlugs: ["registrar-consumo-materiales", "asignar-equipo-de-obra", "usar-notificaciones", "revisar-pendientes"],
@@ -324,7 +325,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     where: { menu: "Compras → Órdenes de compra" },
     hrefs: [{ kind: "project", suffix: "/ordenes-compra", label: "Órdenes de compra" }],
     steps: [
-      "Nueva OC o desde SC seleccionada. Proveedor: buscá por razón social o nombre fantasía. Cada línea: partida hoja, **Tipo de costo** (Materiales / Mano de obra / Equipos / Subcontratos / Otros; default Materiales; si elegís insumo APU hereda la categoría), cantidades/precios y Desc. % (antes de IVA). Descuento general % + Aplicar a todas copia el mismo % (hay que ingresar un número; 0 limpia todas).",
+      "Nueva OC o desde SC seleccionada. Proveedor: buscá por razón social o nombre fantasía. Cada línea: partida hoja, **Tipo de costo** (Materiales / Mano de obra / Equipos / Subcontratos / Otros; se sugiere solo desde el APU dominante de la partida o desde el insumo APU si elegís uno; podés cambiarlo a mano y no lo pisamos al mover la partida), cantidades/precios y Desc. % (antes de IVA). Descuento general % + Aplicar a todas copia el mismo % (hay que ingresar un número; 0 limpia todas).",
       "En el listado de OC hay un buscador (código, proveedor, aprobador) y botones de estado (Todas / Borrador / Pend. aprobación / Aprobada / Confirmada / Recep. parcial / Recibida / Anulada) con contador por estado. Los deep-links históricos (?status=) siguen funcionando como filtro inicial (por ejemplo desde Pendientes).",
       "Ref. presup. muestra el insumo de materiales del APU, o el costo dir. /u de la partida si esa partida no tiene materiales (p. ej. solo mano de obra).",
       "Enviar a aprobación → Aprobar (o Devolver a borrador con motivo). Si el precio supera el referencial, completá Justificación desvío. Comprar por debajo no pide nota. El % de desvío se ve en rojo si se gasta más y en verde si se gasta menos. Aprobadores la ven en Pendientes + campana.",
@@ -338,7 +339,8 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Siempre Enviar → Aprobar → Confirmar; no existe atajo Emitir y confirmar.",
       "Si Ref. presup. sale — la partida no tiene APU ni costo dir. /u: hay que justificar el desvío o completar el presupuesto.",
       "Sin factura de proveedor no hay CxP: la alerta OC recibida sin factura sirve para cerrar ese circuito y poder pagar.",
-      "Para jornales o alquileres puntuales elegí tipo Mano de obra o Equipos en la línea; el desglose fino del APU se arma en Presupuesto.",
+      "**Mano de obra externa** (cuadrilla contratada, empresa de albañilería, jornal facturado como AP): tipá la línea como **Mano de obra**. No hace falta contrato de subcontrato — SUB se usa solo con el módulo Subcontratos + certificación.",
+      "**Alquiler de equipos** (baño químico, retro): al elegir la partida se pre-tipa como Equipos si el APU lo indica; verificalo antes de confirmar.",
     ],
     relatedSlugs: [
       "circuito-comprar-material-hasta-pagarlo",
@@ -432,10 +434,13 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Desde la OC: Registrar factura desde OC (Traer líneas).",
       "Revisá montos, **Tipo de costo** (se hereda de la OC; ajustalo si hace falta) y adjunto del comprobante.",
       "Crear → borrador → Emitir (o Emitir y pagar ahora).",
+      "**Sin OC**: al elegir la partida, el sistema pre-tipa la línea con la categoría dominante del APU (baño químico → EQP; excavación con retro → EQP). Si es mixto, queda Materiales con hint.",
     ],
     effects: ["Emitir → Devengado + CxP + asiento DRAFT (en el bucket del tipo de cada línea)."],
     pitfalls: [
-      "Gasto directo sin OC: elegí el Tipo de costo en la línea (default Materiales); usá Mano de obra o Equipos para jornales o alquileres.",
+      "Gasto directo sin OC: revisá el Tipo de costo sugerido. Cambialo si no aplica.",
+      "**Mano de obra externa** (cuadrilla, empresa de albañilería, jornal facturado): tipá la línea como **Mano de obra**. No hace falta subcontrato; SUB es solo con módulo Subcontratos + certificación.",
+      "**Alquiler de equipos** facturado por proveedor: tipá como **Equipos**.",
     ],
     relatedSlugs: ["pagar-una-cuenta-por-pagar", "emitir-y-pagar-ahora", "descuento-porcentual-en-lineas", "leer-edt-y-costos"],
     keywords: [

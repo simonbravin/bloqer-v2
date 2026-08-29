@@ -103,6 +103,7 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
         availableSaldo: n.availableSaldo,
         wouldExceedBudget: n.wouldExceedBudget,
         apuLines: n.apuLines,
+        dominantCostType: n.dominantCostType,
       }));
       productOptions = productsResult.data.map((p) => ({
         id: p.id,

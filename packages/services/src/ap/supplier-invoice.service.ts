@@ -21,7 +21,7 @@ import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, se
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
 import { assertWbsLineForProject } from "../procurement/procurement-wbs";
-import { resolveLineCostType } from "../cost-control/cost-type";
+import { loadWbsDominantCostTypes, resolveLineCostType } from "../cost-control/cost-type";
 import { ensureDraftJournalFromSupplierInvoice } from "../accounting/accounting-auto-draft.service";
 import {
   assertJournalAllowsOperationalCancel,
@@ -35,7 +35,9 @@ export async function resolveInvoiceLineCostTypes(
   lines: Array<{
     costType?: CostCategory | null;
     purchaseOrderLineId?: string | null;
+    wbsNodeId?: string | null;
   }>,
+  tenantId?: string,
 ): Promise<CostCategory[]> {
   const poIds = [
     ...new Set(lines.map((l) => l.purchaseOrderLineId).filter((id): id is string => Boolean(id))),
@@ -50,14 +52,36 @@ export async function resolveInvoiceLineCostTypes(
       if (pl.costType) poCostById.set(pl.id, pl.costType);
     }
   }
+  // APU-derived dominant CostCategory used when neither the caller nor the OC
+  // line provide a costType. Requires tenantId because we cross project boundaries
+  // for the WBS lookup.
+  const wbsIdsNeedingDominant = tenantId
+    ? Array.from(
+        new Set(
+          lines
+            .filter(
+              (l) =>
+                !l.costType &&
+                !(l.purchaseOrderLineId && poCostById.has(l.purchaseOrderLineId)) &&
+                l.wbsNodeId,
+            )
+            .map((l) => l.wbsNodeId!),
+        ),
+      )
+    : [];
+  const wbsDominant =
+    wbsIdsNeedingDominant.length > 0 && tenantId
+      ? await loadWbsDominantCostTypes(wbsIdsNeedingDominant, tenantId)
+      : new Map<string, CostCategory | null>();
+
   return lines.map((line) => {
     const fromPo = line.purchaseOrderLineId
       ? (poCostById.get(line.purchaseOrderLineId) ?? null)
       : null;
-    // Explicit line type wins; else inherit from OC line ([D-099]); else MATERIAL.
     return resolveLineCostType({
       costType: line.costType ?? null,
       apuCategory: fromPo,
+      wbsDominantCostType: line.wbsNodeId ? wbsDominant.get(line.wbsNodeId) ?? null : null,
     });
   });
 }
@@ -555,7 +579,7 @@ export async function createSupplierInvoice(
     input.lines,
     ctx.tenantId,
   );
-  const lineCostTypes = await resolveInvoiceLineCostTypes(input.lines);
+  const lineCostTypes = await resolveInvoiceLineCostTypes(input.lines, ctx.tenantId);
 
   const maxNum = await prisma.supplierInvoice.aggregate({
     where: { tenantId: ctx.tenantId, companyId },
@@ -733,7 +757,7 @@ export async function updateSupplierInvoice(
     }
 
   const updateLineCostTypes = input.lines
-    ? await resolveInvoiceLineCostTypes(input.lines)
+    ? await resolveInvoiceLineCostTypes(input.lines, ctx.tenantId)
     : [];
 
   const inv = await prisma.$transaction(async (tx) => {

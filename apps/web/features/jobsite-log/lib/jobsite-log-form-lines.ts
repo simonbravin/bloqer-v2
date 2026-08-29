@@ -1,4 +1,4 @@
-import { divideDecimal, multiplyDecimal, roundQty } from "@bloqer/utils";
+import { DISPLAY_DECIMALS, divideDecimal, multiplyDecimal, roundQty } from "@bloqer/utils";
 
 export type JobsiteLogProgressDraft = {
   wbsNodeId: string;
@@ -56,6 +56,43 @@ export function fillProgressQuantity(
   const suggested = suggestedQuantityFromPct(budgetQty, line.physicalPct);
   if (!suggested) return line;
   return { ...line, quantityCompleted: suggested };
+}
+
+/** % del día implied by qty / budgetQty × 100 (2 dp, same as the form display). */
+export function suggestedPctFromQty(
+  budgetQty: string | undefined,
+  quantityCompleted: string,
+): string {
+  const qty = quantityCompleted.trim();
+  const base = budgetQty?.trim() ?? "";
+  if (!JOBSITE_QTY_RE.test(qty) || !JOBSITE_QTY_RE.test(base)) return "";
+  try {
+    return divideDecimal(multiplyDecimal(qty, "100"), base, DISPLAY_DECIMALS);
+  } catch {
+    return "";
+  }
+}
+
+/** Keep qty aligned when the user edits % del día ([D-045] / EDT % avance libro). */
+export function applyProgressPctChange(
+  line: JobsiteLogProgressDraft,
+  budgetQty: string | undefined,
+): JobsiteLogProgressDraft {
+  if (!line.physicalPct.trim()) return line;
+  const suggested = suggestedQuantityFromPct(budgetQty, line.physicalPct);
+  if (!suggested) return line;
+  return { ...line, quantityCompleted: suggested };
+}
+
+/** Keep % aligned when the user edits cantidad. */
+export function applyProgressQtyChange(
+  line: JobsiteLogProgressDraft,
+  budgetQty: string | undefined,
+): JobsiteLogProgressDraft {
+  if (!line.quantityCompleted.trim()) return line;
+  const suggested = suggestedPctFromQty(budgetQty, line.quantityCompleted);
+  if (!suggested) return line;
+  return { ...line, physicalPct: suggested };
 }
 
 /** On partida change: refresh % and qty so the previous row cannot keep the old cantidad. */

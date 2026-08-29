@@ -1,5 +1,5 @@
 import { effectiveUnitPriceNet } from "@bloqer/utils";
-import { resolveLineCostType } from "../cost-control/cost-type";
+import { loadWbsDominantCostTypes, resolveLineCostType } from "../cost-control/cost-type";
 import { parseDiscountPct } from "../finance/invoice-line-money";
 import { Prisma, prisma, PurchaseOrderStatus } from "@bloqer/database";
 import { auditProcurement } from "./procurement-audit";
@@ -51,6 +51,15 @@ export async function selectProcurementQuoteAndCreatePo(
   if (quote.validUntil && quote.validUntil < new Date()) {
     throw new ServiceError("CONFLICT", "La cotización está vencida");
   }
+
+  const wbsIdsForDominant = Array.from(
+    new Set(
+      quote.lines
+        .map((ql) => ql.purchaseRequestLine.wbsNodeId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  const wbsDominant = await loadWbsDominantCostTypes(wbsIdsForDominant, ctx.tenantId);
 
   const poId = await prisma.$transaction(async (tx) => {
     // Serialize selection on the SC row so concurrent selects cannot create two OCs.
@@ -123,6 +132,7 @@ export async function selectProcurementQuoteAndCreatePo(
           costType: resolveLineCostType({
             costType: prl.costType,
             apuCategory: null,
+            wbsDominantCostType: prl.wbsNodeId ? wbsDominant.get(prl.wbsNodeId) ?? null : null,
           }),
           description: prl.description,
           unit: prl.unit,

@@ -55,6 +55,8 @@ export default async function GastosGeneralesPorProyectoPage({ searchParams }: P
         <ReportExportActions
           exportPath="/api/reports/gastos-generales-por-proyecto.csv"
           params={sp}
+          pdf
+          xlsx
         />
       </div>
 
