@@ -5,7 +5,6 @@ import {
   FileCheck2,
   LineChart,
   Package,
-  PieChart,
   Percent,
   Users,
   Wallet,
@@ -99,19 +98,11 @@ export function ReportsHub({
     {
       title: "EDT y costos",
       description:
-        "Tablero de $ por partida: comprometido, recibido, devengado, pagado, exposición, composición APU y vistas por columnas.",
+        "Tablero de $ por partida: comprometido, recibido, devengado, pagado, exposición, composición APU planificada y real (por tipo) y vistas por columnas.",
       href: `/proyectos/${projectId}/control-costos`,
       icon: <BarChart3 className="h-5 w-5" />,
       available: canCostReports,
-      badge: "Incluye presupuesto vs real",
-    },
-    {
-      title: "Composición presupuesto",
-      description: "Gráfico APU integrado en EDT y costos; acceso directo al tablero.",
-      href: `/proyectos/${projectId}/control-costos`,
-      icon: <PieChart className="h-5 w-5" />,
-      available: canCostReports,
-      badge: "En EDT y costos",
+      badge: "Incluye presupuesto vs real + composición",
     },
     {
       title: "Caja y proyección",

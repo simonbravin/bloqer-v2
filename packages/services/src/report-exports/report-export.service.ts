@@ -656,7 +656,8 @@ export async function exportProjectCostControlCsv(
     "CantRecibida",
     "CantConsumida",
     "PctCompra",
-    "PctFisico",
+    "PctRecepcion",
+    "PctAvanceLibro",
     "PctEconomico",
     "PctExposicion",
     "AvanceOperativoQty",
@@ -690,7 +691,8 @@ export async function exportProjectCostControlCsv(
     x.qtyReceived,
     x.qtyConsumed,
     x.pctPurchased ?? "",
-    x.pctPhysical ?? "",
+    x.pctReceived ?? "",
+    x.pctPhysicalProgress ?? "",
     x.pctEconomic ?? "",
     x.pctExposure ?? "",
     x.operationalProgressQty,
@@ -724,7 +726,8 @@ export async function exportProjectCostControlCsv(
     "", // qtyReceived
     "", // qtyConsumed
     "", // pctPurchased
-    "", // pctPhysical
+    "", // pctReceived
+    "", // pctPhysicalProgress
     "", // pctEconomic
     "", // pctExposure
     r.totals.operationalProgressQty,
@@ -738,40 +741,28 @@ export async function exportProjectCostControlCsv(
     "",
     "",
   ]);
-  rows.push([
-    "__NO_ASIGNADO__",
-    "Costos no asignados a EDT",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    r.unallocatedCommittedCost,
-    r.unallocatedReceivedCost,
-    r.unallocatedAccruedCost,
-    r.unallocatedPaidCost,
-    r.unallocatedInventoryConsumedCost,
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-  ]);
+  rows.push(
+    padCsvRow(
+      [
+        "__NO_ASIGNADO__",
+        "Costos no asignados a EDT",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        r.unallocatedCommittedCost,
+        r.unallocatedReceivedCost,
+        r.unallocatedAccruedCost,
+        r.unallocatedPaidCost,
+        r.unallocatedInventoryConsumedCost,
+      ],
+      headers.length,
+    ),
+  );
 
   if (r.sectionsExcluded.length > 0) {
     const n = headers.length;

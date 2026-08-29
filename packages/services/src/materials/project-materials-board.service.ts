@@ -8,6 +8,7 @@ import {
   toIsoDateInTimeZone,
 } from "@bloqer/utils";
 import { uniqueRelatedId } from "./materials-field";
+import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
@@ -568,7 +569,12 @@ export async function getProjectMaterialsBoard(
     });
   }
 
-  rows = rows.sort((a, b) => a.wbsCode.localeCompare(b.wbsCode) || a.description.localeCompare(b.description));
+  // Natural sort: 1.9 antes de 4.1 antes de 10, no orden lexicográfico ([D-098]).
+  rows = rows.sort(
+    (a, b) =>
+      compareWbsCodes(a.wbsCode, b.wbsCode) ||
+      a.description.localeCompare(b.description, "es"),
+  );
 
   const productIds = [...new Set(rows.map((r) => r.productId).filter((id): id is string => Boolean(id)))];
   if (productIds.length > 0) {

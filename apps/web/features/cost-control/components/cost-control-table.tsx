@@ -67,7 +67,9 @@ const COLUMN_HINTS: Partial<Record<EdtColumnId, string>> = {
   exposure:
     "Exposición esperada = Devengado + Comprometido abierto (anti doble conteo). No suma OC + factura en bruto.",
   pctPurchased: "Comprometido ÷ presupuesto de costo × 100.",
-  pctPhysical: "Cantidad recibida ÷ cantidad presupuestada × 100.",
+  pctReceived: "Cantidad recibida en compras ÷ cantidad presupuestada × 100. Cobertura física de la compra, no del avance de obra.",
+  pctPhysicalProgress: "Cantidad ejecutada según libro de obra aprobado ÷ cantidad presupuestada × 100. Es el avance real de obra.",
+  physicalProgress: "Cantidad ejecutada acumulada según partes de libro APPROVED.",
   pctEconomic: "Devengado ÷ presupuesto de costo × 100.",
   pctExposure: "Exposición esperada ÷ presupuesto de costo × 100.",
 };
@@ -171,8 +173,10 @@ function cellValue(row: CostControlRow, col: EdtColumnId): ReactNode {
       return row.qtyConsumed;
     case "pctPurchased":
       return <PctPill value={row.pctPurchased} />;
-    case "pctPhysical":
-      return <PctPill value={row.pctPhysical} />;
+    case "pctReceived":
+      return <PctPill value={row.pctReceived} />;
+    case "pctPhysicalProgress":
+      return <PctPill value={row.pctPhysicalProgress} />;
     case "pctEconomic":
       return <PctPill value={row.pctEconomic} />;
     case "pctExposure":

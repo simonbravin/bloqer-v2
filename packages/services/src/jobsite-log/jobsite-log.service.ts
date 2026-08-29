@@ -29,6 +29,7 @@ import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { resolveActiveCompanyId } from "../company/company.service";
 import { assertCompanyMatchesProject } from "../procurement/procurement-wbs";
 import { sortTreeOrder, toIsoDateInTimeZone } from "@bloqer/utils";
+import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { serializeQtyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
 import {
   canMutateJobsiteLogAsContributor,
@@ -1299,5 +1300,5 @@ export async function listProjectWbsItemsForLog(projectId: string, ctx: ServiceC
       costItem: { select: { unit: true, quantity: true } },
     },
   });
-  return sortTreeOrder(nodes, (a, b) => a.code.localeCompare(b.code, "es"));
+  return sortTreeOrder(nodes, (a, b) => compareWbsCodes(a.code, b.code));
 }

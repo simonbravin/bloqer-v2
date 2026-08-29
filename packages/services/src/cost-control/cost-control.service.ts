@@ -97,7 +97,10 @@ export type CostControlRow = {
   projectedMargin: string;     // budgetTotalSale - expectedCostExposure
   // ─ Percentages vs budget (null when budget is zero) ─
   pctPurchased: string | null;  // committedCost / budgetTotalCost × 100
-  pctPhysical: string | null;   // qtyReceived / budgetQty × 100
+  /** qtyReceived / budgetQty × 100 — cobertura física de compra ([D-098]). */
+  pctReceived: string | null;
+  /** operationalProgressQty / budgetQty × 100 — avance real desde libro APPROVED ([D-045]). */
+  pctPhysicalProgress: string | null;
   pctEconomic: string | null;   // accruedCost / budgetTotalCost × 100
   pctExposure: string | null;   // expectedCostExposure / budgetTotalCost × 100
   flags: CostControlRowFlags;
@@ -986,10 +989,11 @@ export async function getProjectCostControl(
       remainingBudgetCost:  serializeMoneyDecimal(remaining),
       costVariance:         serializeMoneyDecimal(variance),
       projectedMargin:      serializeMoneyDecimal(margin),
-      pctPurchased: pctOfBudget(committed, bCost),
-      pctPhysical:  pctOfBudget(acc.qtyReceived, bQty),
-      pctEconomic:  pctOfBudget(accrued, bCost),
-      pctExposure:  pctOfBudget(expected, bCost),
+      pctPurchased:        pctOfBudget(committed, bCost),
+      pctReceived:         pctOfBudget(acc.qtyReceived, bQty),
+      pctPhysicalProgress: pctOfBudget(acc.operationalProgressQty, bQty),
+      pctEconomic:         pctOfBudget(accrued, bCost),
+      pctExposure:         pctOfBudget(expected, bCost),
       flags,
       byCostType,
     });

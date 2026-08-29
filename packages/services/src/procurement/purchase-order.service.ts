@@ -1,6 +1,7 @@
 import { Prisma, prisma, PurchaseOrder } from "@bloqer/database";
 import type { CreatePurchaseOrderInput, UpdatePurchaseOrderInput } from "@bloqer/validators";
 import { sortTreeOrder } from "@bloqer/utils";
+import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { auditProcurement } from "./procurement-audit";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
@@ -304,7 +305,7 @@ export async function listProcurementWbsOptions(
     },
   });
 
-  const ordered = sortTreeOrder(nodes, (a, b) => a.code.localeCompare(b.code));
+  const ordered = sortTreeOrder(nodes, (a, b) => compareWbsCodes(a.code, b.code));
   const commitments = await loadMaterialApuCommitmentByLineId(projectId, ctx.tenantId);
 
   const refs = await Promise.all(ordered.map((n) => getWbsBudgetReference(n.id, ctx.tenantId)));
