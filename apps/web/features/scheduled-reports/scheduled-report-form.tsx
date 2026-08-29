@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import type { ScheduledReportKey } from "@bloqer/validators";
+import { listTenantTimezoneSelectOptions, resolveDisplayTimeZone } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,9 @@ import {
   createScheduledReportAction,
   updateScheduledReportAction,
 } from "@/app/(app)/configuracion/scheduled-report-actions";
-import { listTenantTimezoneSelectOptions, resolveDisplayTimeZone } from "@bloqer/utils";
+import { isNextRedirectError } from "@/lib/next-errors";
+import { cn } from "@/lib/utils";
+import { JobsiteDailyScheduleHint } from "./scheduled-report-catalog-panel";
 
 const WEEKDAY_LABELS: Record<number, string> = {
   1: "Lunes",
@@ -50,10 +53,6 @@ function buildReportParams(
     params.jobsiteProjectIds = jobsiteProjectIds.join(",");
   }
   return Object.keys(params).length > 0 ? params : undefined;
-}
-
-function isNextRedirectError(err: unknown): boolean {
-  return err instanceof Error && err.message.includes("NEXT_REDIRECT");
 }
 
 export type ScheduledReportFormMember = {
@@ -299,21 +298,56 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
 
           {!scopeLocked ? (
             <div className="space-y-2">
-              <Label>Alcance</Label>
-              <Select value={scope} onValueChange={(v) => setScope(v as "TENANT" | "PROJECT")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TENANT">Empresa general</SelectItem>
-                  <SelectItem value="PROJECT">Proyecto</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Alcance del envío</Label>
+              <div
+                className="grid gap-2 sm:grid-cols-2"
+                role="radiogroup"
+                aria-label="Alcance del envío"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={scope === "TENANT"}
+                  onClick={() => setScope("TENANT")}
+                  className={cn(
+                    "rounded-lg border px-3 py-3 text-left transition-colors",
+                    scope === "TENANT"
+                      ? "border-foreground bg-muted/50"
+                      : "border-border hover:bg-muted/30",
+                  )}
+                >
+                  <span className="block text-sm font-medium">Empresa general</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Aging, tesorería, portafolio, parte diario multi-obra, etc.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={scope === "PROJECT"}
+                  onClick={() => setScope("PROJECT")}
+                  className={cn(
+                    "rounded-lg border px-3 py-3 text-left transition-colors",
+                    scope === "PROJECT"
+                      ? "border-foreground bg-muted/50"
+                      : "border-border hover:bg-muted/30",
+                  )}
+                >
+                  <span className="block text-sm font-medium">Un proyecto</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    EDT, certificaciones, compras y reportes de una sola obra.
+                  </span>
+                </button>
+              </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Alcance: {scope === "PROJECT" ? "Proyecto" : "Empresa general"}
-            </p>
+            <div className="rounded-lg border bg-muted/30 px-3 py-3 space-y-2">
+              <p className="text-sm">
+                <span className="font-medium">Alcance:</span>{" "}
+                {scope === "PROJECT" ? "Un proyecto" : "Empresa general"}
+              </p>
+              {scope === "PROJECT" ? <JobsiteDailyScheduleHint /> : null}
+            </div>
           )}
 
           {(props.lockScope ?? scope) === "PROJECT" ? (
@@ -347,8 +381,9 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
         <CardHeader>
           <CardTitle className="text-base">Reportes incluidos</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Agrupados como en el hub: financieros (caja, cobros, margen) y operativos (obras, compras,
-            inventario). PDF o CSV (Excel) según el envío; el parte diario de libro de obra es solo PDF.
+            {scope === "TENANT"
+              ? "Catálogo empresa: financieros y operativos (incluye Libro de obra — parte del día, solo PDF)."
+              : "Catálogo de obra: EDT, certificaciones, compras, etc. El parte diario multi-obra está en alcance empresa."}
           </p>
         </CardHeader>
         <CardContent className="space-y-5">

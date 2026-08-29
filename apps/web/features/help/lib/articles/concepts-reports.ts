@@ -637,11 +637,10 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       { kind: "project", suffix: "/reportes/programados", label: "Envíos de la obra" },
     ],
     steps: [
-      "Configuración → Reportes programados. Arriba ves el catálogo vigente: Empresa general y Proyecto, cada uno en Financieros / Operativos.",
-      "Nuevo envío → elegí alcance (empresa o un proyecto), los reportes (máx. 5), destinatarios del directorio de usuarios, frecuencia y formato.",
-      "Formato: PDF (igual que Exportar en pantalla) o CSV (Excel: punto y coma + BOM).",
-      "Libro de obra — parte del día (empresa): elegí obras ACTIVE; solo PDF. Se manda el parte SUBMITTED/APPROVED de la fecha de la corrida. Sin parte, esa obra se saltea.",
-      "En obra: Planificación → Reportes → Envíos programados lista el mismo catálogo de proyecto y los envíos de esa obra.",
+      "Configuración → Reportes programados. Arriba ves el catálogo: Empresa general vs Un proyecto.",
+      "Nuevo envío → elegí alcance con las dos tarjetas (Empresa general / Un proyecto), reportes (máx. 5), destinatarios, frecuencia y formato.",
+      "Libro de obra — parte del día solo aparece en alcance empresa: marcá obras ACTIVE; solo PDF; el día es el de la corrida.",
+      "Desde una obra (Planificación → Reportes → Envíos programados) el catálogo es solo de proyecto; el parte diario se crea desde Configuración → Reportes programados (empresa).",
       "Presupuesto vs real ya no se programa: usá EDT y costos.",
     ],
     effects: [
@@ -652,6 +651,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Los reportes que no ves faltan por módulo deshabilitado (inventario, tesorería, libro de obra, etc.).",
       "No hay destinatarios externos: solo usuarios ACTIVE del tenant.",
       "El parte diario no usa el filtro Desde/Hasta: el día lo define la hora de la corrida.",
+      "Si al guardar viste un error pero el envío aparece en la lista, era un falso negativo de redirect (ya corregido): el envío quedó creado.",
     ],
     relatedSlugs: [
       "hub-reportes-de-obra",

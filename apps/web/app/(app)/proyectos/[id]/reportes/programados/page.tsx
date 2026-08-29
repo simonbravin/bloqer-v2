@@ -28,7 +28,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { ScheduledReportCatalogPanel } from "@/features/scheduled-reports/scheduled-report-catalog-panel";
+import {
+  ScheduledReportCatalogPanel,
+  JobsiteDailyScheduleHint,
+} from "@/features/scheduled-reports/scheduled-report-catalog-panel";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -69,8 +72,9 @@ export default async function ProjectReportesProgramadosPage({ params }: Props) 
 
       <ScheduledReportCatalogPanel
         title="Reportes de esta obra"
-        hint="PDF y CSV (Excel) en todos. Presupuesto vs real quedó dentro de EDT y costos."
+        hint="PDF o CSV según el envío. Estos reportes miran una sola obra."
         catalog={projectCatalog}
+        footer={<JobsiteDailyScheduleHint />}
       />
 
       {rows.length === 0 ? (

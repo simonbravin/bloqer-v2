@@ -16,6 +16,7 @@ import {
   executeScheduledReportNow,
   executeScheduledReportRetryFailed,
 } from "@/lib/scheduled-report-run";
+import { rethrowNextNavigationError } from "@/lib/next-errors";
 
 function runResultMessage(summary: {
   runStatus: string;
@@ -51,6 +52,8 @@ export async function createScheduledReportAction(input: unknown) {
     revalidateScheduledReportPaths(created.projectId);
     redirect(`/configuracion/reportes/${created.id}?ok=created`);
   } catch (e) {
+    // redirect() throws NEXT_REDIRECT — must rethrow or success looks like failure (row saved, UI errors).
+    rethrowNextNavigationError(e);
     if (e instanceof ServiceError) {
       redirect(`/configuracion/reportes/nuevo?err=${encodeURIComponent(e.message)}`);
     }
@@ -66,6 +69,7 @@ export async function updateScheduledReportAction(input: unknown) {
     revalidateScheduledReportPaths(updated.projectId);
     redirect(`/configuracion/reportes/${updated.id}?ok=updated`);
   } catch (e) {
+    rethrowNextNavigationError(e);
     if (e instanceof ServiceError && e.code === "VALIDATION") {
       const id =
         typeof input === "object" && input && "id" in input
@@ -87,6 +91,7 @@ export async function deactivateScheduledReportAction(id: string) {
     revalidatePath("/configuracion/reportes");
     redirect(`/configuracion/reportes/${id}?ok=paused`);
   } catch (e) {
+    rethrowNextNavigationError(e);
     const msg = e instanceof ServiceError ? e.message : "No se pudo pausar";
     redirect(`/configuracion/reportes/${id}?err=${encodeURIComponent(msg)}`);
   }
@@ -100,6 +105,7 @@ export async function reactivateScheduledReportAction(id: string) {
     revalidatePath("/configuracion/reportes");
     redirect(`/configuracion/reportes/${id}?ok=reactivated`);
   } catch (e) {
+    rethrowNextNavigationError(e);
     const msg = e instanceof ServiceError ? e.message : "No se pudo reactivar";
     redirect(`/configuracion/reportes/${id}?err=${encodeURIComponent(msg)}`);
   }
@@ -116,6 +122,7 @@ export async function runScheduledReportNowAction(id: string) {
       `/configuracion/reportes/${id}?ok=ran_now&detail=${encodeURIComponent(runResultMessage(summary))}`,
     );
   } catch (e) {
+    rethrowNextNavigationError(e);
     const msg = e instanceof ServiceError ? e.message : "No se pudo ejecutar el envío";
     redirect(`/configuracion/reportes/${id}?err=${encodeURIComponent(msg)}`);
   }
@@ -132,6 +139,7 @@ export async function retryScheduledReportFailedAction(id: string) {
       `/configuracion/reportes/${id}?ok=retried&detail=${encodeURIComponent(runResultMessage(summary))}`,
     );
   } catch (e) {
+    rethrowNextNavigationError(e);
     const msg = e instanceof ServiceError ? e.message : "No se pudo reintentar";
     redirect(`/configuracion/reportes/${id}?err=${encodeURIComponent(msg)}`);
   }
@@ -145,6 +153,7 @@ export async function deleteScheduledReportAction(id: string) {
     revalidatePath("/configuracion/reportes");
     redirect("/configuracion/reportes?ok=deleted");
   } catch (e) {
+    rethrowNextNavigationError(e);
     const msg = e instanceof ServiceError ? e.message : "No se pudo eliminar";
     redirect(`/configuracion/reportes/${id}?err=${encodeURIComponent(msg)}`);
   }

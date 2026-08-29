@@ -71,12 +71,12 @@ export default async function ConfiguracionReportesPage({ searchParams }: Props)
       <div className="grid gap-4 lg:grid-cols-2">
         <ScheduledReportCatalogPanel
           title="Empresa general"
-          hint="Alcance tenant. PDF y CSV (Excel) en todos."
+          hint="Multi-obra / tenant. Incluye Libro de obra — parte del día (PDF)."
           catalog={tenantCatalog}
         />
         <ScheduledReportCatalogPanel
-          title="Proyecto"
-          hint="Alcance obra. PDF y CSV (Excel) en todos."
+          title="Un proyecto"
+          hint="Reportes de una sola obra (EDT, certificaciones, compras…)."
           catalog={projectCatalog}
         />
       </div>
