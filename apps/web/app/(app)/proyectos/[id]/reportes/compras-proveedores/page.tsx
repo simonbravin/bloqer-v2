@@ -98,6 +98,9 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
           <Link href={`/proyectos/${projectId}/materiales`}>Materiales</Link>
         </Button>
         <Button variant="ghost" size="sm" asChild>
+          <Link href={`/proyectos/${projectId}/reportes/proveedores`}>Proveedores</Link>
+        </Button>
+        <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/ordenes-compra`}>Órdenes de compra</Link>
         </Button>
         <Button variant="ghost" size="sm" asChild>
@@ -142,7 +145,12 @@ export default async function ReporteComprasProveedoresPage({ params, searchPara
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Por proveedor</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Qué le comprás a cada proveedor (OC confirmadas + facturas). Para ver $ por partida, mirá EDT y costos.
+                Qué le comprás a cada proveedor (OC confirmadas + facturas). El ranking, % de obra y saldo CxP están
+                en el{" "}
+                <Link href={`/proyectos/${projectId}/reportes/proveedores`} className="underline underline-offset-2">
+                  reporte de proveedores
+                </Link>
+                .
               </p>
             </CardHeader>
             <CardContent>

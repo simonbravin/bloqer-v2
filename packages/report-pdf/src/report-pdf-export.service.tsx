@@ -14,6 +14,7 @@ import {
   getMaterialVarianceReport,
   getPayableAgingReport,
   getProcurementDeviationReport,
+  getProjectSupplierReport,
   getProjectCashFlowReport,
   getProjectCostControl,
   sliceCostControlReportByCostType,
@@ -50,6 +51,7 @@ import {
   type MovementExportLabels,
   type MovementReportFilters,
   type ProcurementReportFilters,
+  type ProjectSupplierReportFilters,
   TREASURY_MOVEMENTS_EXPORT_LABELS,
   type ProfitabilityFilters,
   type ProjectCashFlowFilters,
@@ -441,6 +443,47 @@ export async function exportProcurementDeviationPdf(
         committed: r.committedCost,
         accrued: r.accruedCost,
         variance: r.varianceAmount,
+      }))}
+      warnings={result.warnings}
+    />
+  ));
+}
+
+export async function exportProjectSupplierReportPdf(
+  projectId: string,
+  filters: ProjectSupplierReportFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const result = await getProjectSupplierReport(projectId, filters, ctx);
+  const slug = projectId.replace(/[^a-zA-Z0-9._-]+/g, "_");
+  return exportPdfDocument(ctx, { projectId }, `proveedores_${slug}`, (branding) => (
+    <ProjectSimpleTablePdfDocument
+      branding={branding}
+      title="Proveedores de la obra"
+      subtitle="Pedidos, capas de costo y saldo CxP (R-AP-03)"
+      filterLine={buildPdfFilterLine({ dateFrom: filters.dateFrom, dateTo: filters.dateTo })}
+      totalsLine={`Proveedores: ${result.totals.supplierCount} · OC: ${result.totals.poCount} · Comprometido: ${result.totals.committedCost} · Exposición: ${result.totals.expectedExposure} · Saldo CxP: ${result.totals.payableBalance}`}
+      columns={[
+        { key: "name", label: "Proveedor", flex: 1.4 },
+        { key: "pos", label: "OC", flex: 0.45 },
+        { key: "invoices", label: "Fact.", flex: 0.45 },
+        { key: "committed", label: "Comprom.", flex: 0.85 },
+        { key: "accrued", label: "Deveng.", flex: 0.85 },
+        { key: "paid", label: "Pagado", flex: 0.8 },
+        { key: "exposure", label: "Exposición", flex: 0.9 },
+        { key: "share", label: "%", flex: 0.45 },
+        { key: "payable", label: "Saldo CxP", flex: 0.85 },
+      ]}
+      rows={result.rows.map((r) => ({
+        name: r.supplierName,
+        pos: String(r.poCount),
+        invoices: String(r.invoiceCount),
+        committed: r.committedCost,
+        accrued: r.accruedCost,
+        paid: r.paidCost,
+        exposure: r.expectedExposure,
+        share: r.shareOfExposurePct ? `${r.shareOfExposurePct}%` : "—",
+        payable: r.payableBalance,
       }))}
       warnings={result.warnings}
     />

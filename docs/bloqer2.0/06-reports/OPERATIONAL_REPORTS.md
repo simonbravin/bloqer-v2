@@ -6,7 +6,7 @@ Soportar decisiones de **obra y compras**: productividad, consumo, proveedores, 
 ## Reportes clave
 - Presupuesto vs real ([`R-001`](./REPORT_CATALOG.md)) — hub `/proyectos/[id]/reportes/presupuesto-vs-real`.
 - Avance triple dimensión ([`R-002`](./REPORT_CATALOG.md)) — integrado en certificaciones del hub.
-- Compras por proveedor / multi-proyecto ([`R-009`](./REPORT_CATALOG.md), [`R-010`](./REPORT_CATALOG.md)); desvíos por partida ([`R-AP-01`](./REPORT_CATALOG.md)…) en *Compras y proveedores*.
+- Compras por proveedor / multi-proyecto ([`R-009`](./REPORT_CATALOG.md), [`R-010`](./REPORT_CATALOG.md)); **Proveedores de la obra** ([`R-AP-03`](./REPORT_CATALOG.md)) en `/proyectos/[id]/reportes/proveedores`; desvíos OC vs APU y sin imputación ([`R-AP-01`](./REPORT_CATALOG.md)…) en *Análisis de compras*.
 - Subcontratos: varianza SUB y evolución certificado/pagado ([`R-SCC-*`](./REPORT_CATALOG.md), [`R-SUB-*`](./REPORT_CATALOG.md)).
 - Materiales más caros / por proyecto ([`R-011`](./REPORT_CATALOG.md), [`R-013`](./REPORT_CATALOG.md)).
 - Evolución certificaciones ([`R-012`](./REPORT_CATALOG.md)) + estado cartera ([`R-CERT-*`](./REPORT_CATALOG.md)).

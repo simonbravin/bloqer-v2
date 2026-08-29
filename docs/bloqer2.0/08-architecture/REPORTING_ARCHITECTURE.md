@@ -127,7 +127,8 @@ Filtros: **mismos query params** que las páginas de reporte (p. ej. `currency`,
 - `/api/reports/proyectos/[projectId]/control-costos.csv`
 - `/api/reports/proyectos/[projectId]/presupuesto-vs-real.csv` (R-001)
 - `/api/reports/proyectos/[projectId]/certificaciones.csv` (R-012, R-CERT-*)
-- `/api/reports/proyectos/[projectId]/compras-proveedores.csv` (R-AP-01…03)
+- `/api/reports/proyectos/[projectId]/compras-proveedores.csv` (R-AP-01…02)
+- `/api/reports/proyectos/[projectId]/proveedores.csv` (R-AP-03)
 - `/api/reports/proyectos/[projectId]/subcontratos.csv` (R-SCC-*, R-SUB-*)
 - `/api/reports/proyectos/[projectId]/flujo-caja.csv`
 - `/api/reports/proyectos/[projectId]/materiales.csv` (R-MAT-01)

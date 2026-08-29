@@ -36,6 +36,7 @@ export const DIRECTORY_ARTICLES: HelpArticle[] = [
       "proveedor-empleado-o-subcontratista",
       "un-contacto-varios-roles",
       "cargar-un-empleado",
+      "reporte-proveedores-de-obra",
     ],
     keywords: [
       "proveedor",

@@ -29,6 +29,7 @@ _No aplica._
 
 ## 9. Pantallas y vistas necesarias
 - Biblioteca de reportes por categoría.
+- **Proveedores de la obra** (`/proyectos/[id]/reportes/proveedores`, R-AP-03): líderes y tabla.
 - Query builder ([`QUERY_BUILDER.md`](../06-reports/QUERY_BUILDER.md)).
 
 ## 10. Reglas de negocio

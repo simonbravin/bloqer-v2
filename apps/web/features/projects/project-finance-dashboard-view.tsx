@@ -359,8 +359,8 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
               </Table>
             </TableScroll>
             <Button asChild variant="link" size="sm" className="mt-3 px-0">
-              <Link href={`/proyectos/${projectId}/reportes/compras-proveedores`}>
-                Ver reporte de compras
+              <Link href={`/proyectos/${projectId}/reportes/proveedores`}>
+                Ver reporte de proveedores
               </Link>
             </Button>
           </CardContent>

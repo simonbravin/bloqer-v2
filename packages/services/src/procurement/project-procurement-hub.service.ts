@@ -27,6 +27,7 @@ export type ProjectProcurementHub = {
     ordenes: string;
     recepciones: string;
     reporteCompras: string;
+    reporteProveedores: string;
   };
 };
 
@@ -130,6 +131,7 @@ export async function getProjectProcurementHub(
       ordenes: `${base}/ordenes-compra`,
       recepciones: `${base}/recepciones`,
       reporteCompras: `${base}/reportes/compras-proveedores`,
+      reporteProveedores: `${base}/reportes/proveedores`,
     },
   };
 }

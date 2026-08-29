@@ -132,7 +132,7 @@ export default async function ComprasMultiObraPage({ searchParams }: PageProps) 
                     <TableCell>
                       {row.projectId ? (
                         <Link
-                          href={`/proyectos/${row.projectId}/reportes/compras-proveedores`}
+                          href={`/proyectos/${row.projectId}/reportes/proveedores`}
                           className="hover:underline"
                         >
                           <span className="font-mono text-[10px]">{row.projectCode}</span>{" "}

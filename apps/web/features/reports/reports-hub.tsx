@@ -4,6 +4,7 @@ import {
   LineChart,
   Package,
   Percent,
+  Truck,
   Users,
   Wallet,
 } from "lucide-react";
@@ -103,9 +104,18 @@ export function ReportsHub({
       available: canCertReports,
     },
     {
+      title: "Proveedores",
+      description:
+        "Tabla, líderes por pedidos y por monto, concentración y saldo CxP (R-AP-03).",
+      href: `${base}/proveedores`,
+      icon: <Truck className="h-5 w-5" />,
+      available: canProcurementReports,
+      badge: "R-AP-03",
+    },
+    {
       title: "Análisis de compras",
       description:
-        "Eje proveedor y varianza de OC vs APU. El control de $ por partida está en EDT y costos.",
+        "Varianza de OC vs APU y líneas sin imputación EDT. El control de $ por partida está en EDT y costos.",
       href: `${base}/compras-proveedores`,
       icon: <Package className="h-5 w-5" />,
       available: canProcurementReports,
@@ -137,7 +147,7 @@ export function ReportsHub({
         },
         {
           title: "Operativos",
-          description: "Costos por partida, compras, materiales y avance certificado.",
+          description: "Costos por partida, proveedores, compras, materiales y avance certificado.",
           cards: operational,
         },
       ]}

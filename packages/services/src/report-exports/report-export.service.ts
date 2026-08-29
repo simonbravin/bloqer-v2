@@ -30,6 +30,8 @@ import type { CertificationReportFilters } from "../reports/certification-evolut
 import { getCertificationEvolutionReport } from "../reports/certification-evolution.service";
 import type { ProcurementReportFilters } from "../reports/procurement-deviation.service";
 import { getProcurementDeviationReport } from "../reports/procurement-deviation.service";
+import type { ProjectSupplierReportFilters } from "../reports/project-supplier-report.service";
+import { getProjectSupplierReport } from "../reports/project-supplier-report.service";
 import type { SubcontractReportFilters } from "../reports/subcontract-variance.service";
 import { getSubcontractVarianceReport } from "../reports/subcontract-variance.service";
 import type { MaterialReportFilters } from "../reports/material-variance.service";
@@ -255,6 +257,15 @@ export function parseProcurementReportFilters(
   sp: Record<string, string | undefined>,
 ): ProcurementReportFilters {
   return parseProjectReportDateFilters(sp);
+}
+
+export function parseProjectSupplierReportFilters(
+  sp: Record<string, string | undefined>,
+): ProjectSupplierReportFilters {
+  return {
+    dateFrom: sp.dateFrom,
+    dateTo: sp.dateTo,
+  };
 }
 
 export function parseSubcontractReportFilters(
@@ -1129,6 +1140,66 @@ export async function exportProcurementDeviationCsv(
   }
   const fname = `compras_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
   return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
+}
+
+export async function exportProjectSupplierReportCsv(
+  projectId: string,
+  filters: ProjectSupplierReportFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
+  const result = await getProjectSupplierReport(projectId, filters, ctx);
+  const headers = [
+    "Proveedor",
+    "PedidosOC",
+    "OCAbiertas",
+    "Facturas",
+    "Recepciones",
+    "Comprometido",
+    "Devengado",
+    "Pagado",
+    "OCAbiertaMonto",
+    "Exposicion",
+    "ParticipacionPct",
+    "SaldoCxp",
+    "CxpVencido",
+    "UltimaActividad",
+  ];
+  const rows: string[][] = result.rows.map((s) => [
+    s.supplierName,
+    String(s.poCount),
+    String(s.openPoCount),
+    String(s.invoiceCount),
+    String(s.receiptCount),
+    s.committedCost,
+    s.accruedCost,
+    s.paidCost,
+    s.openCommitted,
+    s.expectedExposure,
+    s.shareOfExposurePct ?? "",
+    s.payableBalance,
+    s.overduePayable,
+    s.lastActivityDate ?? "",
+  ]);
+  rows.push([
+    "TOTAL",
+    String(result.totals.poCount),
+    "",
+    String(result.totals.invoiceCount),
+    String(result.totals.receiptCount),
+    result.totals.committedCost,
+    result.totals.accruedCost,
+    result.totals.paidCost,
+    result.totals.openCommitted,
+    result.totals.expectedExposure,
+    result.totals.top3SharePct ? "100.00" : "",
+    result.totals.payableBalance,
+    result.totals.overduePayable,
+    "",
+  ]);
+  return {
+    content: buildCsv(headers, rows),
+    filename: safeReportFilename(`proveedores_${projectId}`, "csv"),
+  };
 }
 
 export async function exportSubcontractVarianceCsv(

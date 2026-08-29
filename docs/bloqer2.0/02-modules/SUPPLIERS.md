@@ -31,6 +31,7 @@ Hereda `ACTIVE` / `ARCHIVED` del Contact.
 ## 9. Pantallas y vistas necesarias
 - Lista proveedores con filtros por rubro, provincia.
 - Ficha: datos fiscales, contactos operativos, histórico de compras.
+- **Reporte de obra** `/proyectos/[id]/reportes/proveedores` (R-AP-03): tabla, líderes por pedidos / monto / saldo CxP.
 
 ## 10. Reglas de negocio
 - **BR-SUP-001**: OC solo puede seleccionar Contact con rol SUPPLIER (o aviso si se fuerza alta rápida).
@@ -48,7 +49,7 @@ Hereda `ACTIVE` / `ARCHIVED` del Contact.
 - Mismo contacto cliente y proveedor: mostrar ambos perfiles en ficha unificada.
 
 ## 14. Reportes relacionados
-- Compras por proveedor, materiales más caros (filtra por proveedor).
+- Proveedores de la obra ([`R-AP-03`](../06-reports/REPORT_CATALOG.md)), análisis de compras (R-009), materiales más caros (filtra por proveedor).
 
 ## 15. Relación con otros módulos
 - **PROCUREMENT**, **OC**, **Facturas compra**, **Pagos**, **Directorio**.

@@ -154,7 +154,10 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href={hub.links.reporteCompras}>Reporte compras vs presupuesto</Link>
+            <Link href={hub.links.reporteProveedores}>Reporte de proveedores</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={hub.links.reporteCompras}>Análisis de compras</Link>
           </Button>
           {showMateriales ? (
             <Button asChild variant="outline" size="sm">
