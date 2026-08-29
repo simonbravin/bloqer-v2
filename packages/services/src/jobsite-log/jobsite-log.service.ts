@@ -28,7 +28,7 @@ import { assertProjectAllowsOperationalMutation } from "../project/project-opera
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { resolveActiveCompanyId } from "../company/company.service";
 import { assertCompanyMatchesProject } from "../procurement/procurement-wbs";
-import { sortTreeOrder, toIsoDateInTimeZone } from "@bloqer/utils";
+import { isRichNoteEmpty, normalizeRichNote, sortTreeOrder, toIsoDateInTimeZone } from "@bloqer/utils";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { serializeQtyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
 import {
@@ -844,7 +844,8 @@ export async function createJobsiteLog(
   await assertCompanyMatchesProject(companyId, input.projectId, ctx.tenantId);
 
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
-  const replayInput = { ...input, companyId };
+  const generalNotes = normalizeRichNote(input.generalNotes);
+  const replayInput = { ...input, companyId, generalNotes };
   const existingByKey = await prisma.jobsiteLog.findFirst({
     where: { tenantId: ctx.tenantId, idempotencyKey },
     include: logInclude,
@@ -864,7 +865,7 @@ export async function createJobsiteLog(
   }
 
   const hasContent =
-    input.generalNotes || input.blockers || input.incidents || input.safetyNotes ||
+    !isRichNoteEmpty(generalNotes) || input.blockers || input.incidents || input.safetyNotes ||
     input.title || input.workFront || input.weather || input.shift ||
     (input.progress?.length ?? 0) > 0 ||
     (input.labor?.length ?? 0) > 0 ||
@@ -895,7 +896,7 @@ export async function createJobsiteLog(
             workFront:    input.workFront ?? null,
             shift:        input.shift ?? null,
             weather:      input.weather ?? null,
-            generalNotes: input.generalNotes ?? null,
+            generalNotes,
             blockers:     input.blockers ?? null,
             incidents:    input.incidents ?? null,
             safetyNotes:  input.safetyNotes ?? null,
@@ -969,7 +970,7 @@ export async function updateJobsiteLog(
         workFront:    input.workFront    !== undefined ? input.workFront    : existing.workFront,
         shift:        input.shift        !== undefined ? input.shift        : existing.shift,
         weather:      input.weather      !== undefined ? input.weather      : existing.weather,
-        generalNotes: input.generalNotes !== undefined ? input.generalNotes : existing.generalNotes,
+        generalNotes: input.generalNotes !== undefined ? normalizeRichNote(input.generalNotes) : existing.generalNotes,
         blockers:     input.blockers     !== undefined ? input.blockers     : existing.blockers,
         incidents:    input.incidents    !== undefined ? input.incidents    : existing.incidents,
         safetyNotes:  input.safetyNotes  !== undefined ? input.safetyNotes  : existing.safetyNotes,
@@ -1027,7 +1028,7 @@ export async function submitJobsiteLog(id: string, ctx: ServiceContext): Promise
   }
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
   const hasContent =
-    existing.generalNotes || existing.blockers || existing.incidents || existing.safetyNotes ||
+    !isRichNoteEmpty(existing.generalNotes) || existing.blockers || existing.incidents || existing.safetyNotes ||
     existing.title || existing.workFront || existing.weather || existing.shift ||
     existing.progress.length > 0 ||
     existing.labor.length > 0 ||

@@ -1,5 +1,7 @@
 # Libro de obra (Jobsite Log)
 
+> Ver [D-101](../00-product/DECISION_LOG.md) para el formato de **Notas generales**.
+
 ## 1. Objetivo
 Registrar **diariamente** lo ocurrido en obra: clima, cuadrillas, tareas, materiales recibidos, incidencias y fotos — como evidencia operativa y soporte a certificaciones y reclamos.
 
@@ -25,7 +27,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § JobsiteLogEntry.
 ## 8. Acciones disponibles
 - Crear parte del día (borrador).
 - Enviar y aprobar.
-- Anexar fotos y observaciones.
+- Anexar fotos y observaciones. **Notas generales** admiten negrita, viñetas y numeración ([D-101]); el resto de notas del parte es texto plano.
 
 ## 9. Pantallas y vistas necesarias
 - Calendario de partes por proyecto.
@@ -41,6 +43,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § JobsiteLogEntry.
 ## 11. Validaciones
 - Fecha no futura para parte “ejecutado”.
 - Al menos un campo descriptivo no vacío.
+- `generalNotes`: HTML restringido o texto plano legado; vacío (`<p></p>`, solo `<br>`) no cuenta como contenido ([D-101]).
 
 ## 12. Fórmulas relacionadas
 _No directas_; cruza con avance físico en [`../04-formulas/PROGRESS_FORMULAS.md`](../04-formulas/PROGRESS_FORMULAS.md).

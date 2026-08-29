@@ -25,6 +25,16 @@ test("updateJobsiteLogSchema accepts a form progress line (edit → save)", () =
   assert.equal(parsed.data.progress.length, 1);
   assert.equal(parsed.data.progress[0]?.quantityCompleted, "1.0000");
   assert.equal(parsed.data.progress[0]?.physicalPct, "100.00");
+  assert.equal(parsed.data.generalNotes, "<p>Daniel vidal y su gente…</p>");
+});
+
+test("updateJobsiteLogSchema omits generalNotes when the field is absent", () => {
+  const parsed = updateJobsiteLogSchema.safeParse({
+    title: "Solo título",
+  });
+  assert.equal(parsed.success, true);
+  if (!parsed.success) return;
+  assert.equal(parsed.data.generalNotes, undefined);
 });
 
 test("updateJobsiteLogSchema rejects a progress line without quantity", () => {

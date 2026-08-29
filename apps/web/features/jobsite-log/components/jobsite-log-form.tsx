@@ -7,7 +7,7 @@ import { Button }   from "@/components/ui/button";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { RichNoteEditor } from "@/components/ui/rich-note-editor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import {
@@ -535,7 +535,17 @@ export function JobsiteLogForm({
         </div>
         <div className="space-y-1">
           <Label htmlFor="generalNotes">Notas generales</Label>
-          <Textarea id="generalNotes" name="generalNotes" rows={3} defaultValue={defaultValues?.generalNotes} />
+          <RichNoteEditor
+            id="generalNotes"
+            name="generalNotes"
+            defaultValue={defaultValues?.generalNotes}
+            disabled={pending}
+            aria-label="Notas generales"
+            placeholder="Tareas del día, pendientes, problemas…"
+          />
+          <p className="text-xs text-muted-foreground">
+            Viñetas, numeración y negrita. El resto del parte sigue en las tablas de abajo.
+          </p>
         </div>
       </section>
 

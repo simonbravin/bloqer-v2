@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@bloqer/database";
-import { isUuid } from "@bloqer/utils";
+import { isUuid, normalizeRichNote } from "@bloqer/utils";
 import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import {
   serializeMoneyDecimal,
@@ -641,7 +641,7 @@ export function jobsiteLogReplayMatches(
   if (nullableStr(existing.workFront) !== nullableStr(input.workFront)) return false;
   if (nullableStr(existing.shift) !== nullableStr(input.shift)) return false;
   if (nullableStr(existing.weather) !== nullableStr(input.weather)) return false;
-  if (nullableStr(existing.generalNotes) !== nullableStr(input.generalNotes)) return false;
+  if ((normalizeRichNote(existing.generalNotes) ?? "") !== (normalizeRichNote(input.generalNotes) ?? "")) return false;
   if (nullableStr(existing.blockers) !== nullableStr(input.blockers)) return false;
   if (nullableStr(existing.incidents) !== nullableStr(input.incidents)) return false;
   if (nullableStr(existing.safetyNotes) !== nullableStr(input.safetyNotes)) return false;

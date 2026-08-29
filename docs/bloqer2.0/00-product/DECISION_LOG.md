@@ -1539,6 +1539,21 @@
 
 ---
 
+### D-101 — Notas generales del parte: viñetas, numeración y negrita
+
+- **Fecha:** 2026-08-29
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** El relato del día (tareas hechas, pendientes, problemas) era un textarea plano. Hacía falta listar sin meter un editor tipo documento.
+- **Decisión:**
+  1. Solo en **Notas generales** del libro de obra (`JobsiteLog.generalNotes`).
+  2. Barra mínima: **negrita**, **viñetas**, **numeración**. Sin fuentes, color, alineación ni adjuntos en el editor.
+  3. Persistencia: HTML restringido (`p`, `br`, `strong`, `ul`, `ol`, `li`). Texto plano legado sigue válido. El detalle y el PDF renderizan listas; no se inyecta HTML sin parsear.
+- **Implicancias:** Notas de filas (avance, cuadrilla, materiales, incidencias) y otros módulos siguen en texto plano. Reutilizar el editor en otro campo requiere decisión aparte.
+- **Documentos afectados:** [`JOBSITE_LOG.md`](../02-modules/JOBSITE_LOG.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §8.1, help `cargar-libro-de-obra`.
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1547,7 +1562,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-100`…).
+1. Tomar el siguiente ID disponible (`D-101`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

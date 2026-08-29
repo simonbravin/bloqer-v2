@@ -17,7 +17,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import { getJobsiteLogById, getJobsiteLogActivityLog, getProjectOperationalMutationBlockReason, getProjectShellInfo, getWbsIncrementalProgressSnapshot, listEntityDocuments, listStockMovements, ServiceError } from "@bloqer/services";
-import { addDecimal } from "@bloqer/utils";
+import { addDecimal, isRichNoteEmpty } from "@bloqer/utils";
 import { formatQtyFromString, formatRatePctDisplay } from "@/lib/format-money";
 import {
   JobsiteLogStatusBadge,
@@ -36,6 +36,7 @@ import {
 } from "../actions";
 import { formatDateLong, formatDateTime } from "@/lib/format";
 import { PageShell } from "@/components/layout/page-shell";
+import { RichNoteView } from "@/components/ui/rich-note-view";
 
 interface PageProps {
   params: Promise<{ id: string; logId: string }>;
@@ -233,16 +234,20 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
       </Card>
 
       {[
-        { label: "Notas generales", value: log.generalNotes },
-        { label: "Impedimentos", value: log.blockers },
-        { label: "Incidentes", value: log.incidents },
-        { label: "Observaciones de seguridad", value: log.safetyNotes },
+        { label: "Notas generales", value: log.generalNotes, rich: true },
+        { label: "Impedimentos", value: log.blockers, rich: false },
+        { label: "Incidentes", value: log.incidents, rich: false },
+        { label: "Observaciones de seguridad", value: log.safetyNotes, rich: false },
       ]
-        .filter((f) => f.value)
+        .filter((f) => (f.rich ? !isRichNoteEmpty(f.value) : Boolean(f.value)))
         .map((f) => (
           <div key={f.label} className="rounded-lg border bg-card p-4">
             <p className="mb-1 text-xs uppercase text-muted-foreground">{f.label}</p>
-            <p className="whitespace-pre-wrap text-sm">{f.value}</p>
+            {f.rich ? (
+              <RichNoteView value={f.value} />
+            ) : (
+              <p className="whitespace-pre-wrap text-sm">{f.value}</p>
+            )}
           </div>
         ))}
 

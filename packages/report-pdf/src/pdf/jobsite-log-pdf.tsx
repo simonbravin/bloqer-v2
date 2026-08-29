@@ -1,5 +1,6 @@
 import { Document, Image, Page, Text, View } from "@react-pdf/renderer";
 import type { JobsiteLogPdfPayload } from "@bloqer/services";
+import { parseRichNote, richNoteToPlainText, type RichNoteInline } from "@bloqer/utils";
 import type { PdfReportBranding } from "../branding/pdf-branding.types";
 import { MAX_JOBSITE_LOG_PDF_HISTORY_ENTRIES, MAX_JOBSITE_LOG_PDF_TABLE_ROWS } from "./pdf-export.types";
 import { PdfReportFooter, PdfReportHeader, reportPdfStyles, truncateText } from "./report-pdf-shared";
@@ -63,6 +64,49 @@ function SimpleTableSection({
   );
 }
 
+function pdfInlines(nodes: RichNoteInline[]) {
+  return nodes.map((node, i) => {
+    if (node.type === "text") return <Text key={i}>{node.text}</Text>;
+    if (node.type === "br") return <Text key={i}>{"\n"}</Text>;
+    return (
+      <Text key={i} style={{ fontFamily: "Helvetica-Bold" }}>
+        {pdfInlines(node.children)}
+      </Text>
+    );
+  });
+}
+
+function RichNotePdf({ value }: { value: string }) {
+  const plain = richNoteToPlainText(value);
+  if (plain.length > 900) {
+    return <Text style={reportPdfStyles.meta}>{truncateText(plain, 900)}</Text>;
+  }
+  const blocks = parseRichNote(value);
+  return (
+    <View>
+      {blocks.map((block, i) => {
+        if (block.type === "p") {
+          return (
+            <Text key={i} style={reportPdfStyles.meta}>
+              {pdfInlines(block.children)}
+            </Text>
+          );
+        }
+        return (
+          <View key={i}>
+            {block.items.map((item, j) => (
+              <Text key={j} style={reportPdfStyles.meta}>
+                {block.type === "ul" ? "• " : `${j + 1}. `}
+                {pdfInlines(item)}
+              </Text>
+            ))}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function NarrativeSection({ fields }: { fields: Array<{ label: string; value: string }> }) {
   if (fields.length === 0) return null;
   return (
@@ -71,7 +115,7 @@ function NarrativeSection({ fields }: { fields: Array<{ label: string; value: st
       {fields.map((f) => (
         <View key={f.label} style={{ marginBottom: 6 }}>
           <Text style={[reportPdfStyles.meta, { fontFamily: "Helvetica-Bold" }]}>{f.label}</Text>
-          <Text style={reportPdfStyles.meta}>{truncateText(f.value, 900)}</Text>
+          <RichNotePdf value={f.value} />
         </View>
       ))}
     </View>

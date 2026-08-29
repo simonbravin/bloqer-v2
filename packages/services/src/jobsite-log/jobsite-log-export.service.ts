@@ -1,5 +1,5 @@
 import type { JobsiteLogIssueSeverity, JobsiteLogIssueStatus, JobsiteLogIssueType, JobsiteLogStatus } from "@bloqer/database";
-import { formatDateLong, formatDateTime } from "@bloqer/utils";
+import { formatDateLong, formatDateTime, isRichNoteEmpty } from "@bloqer/utils";
 import {
   getDocumentFileBytes,
   listEntityDocuments,
@@ -253,7 +253,7 @@ export async function buildJobsiteLogPdfPayload(
     { label: "Impedimentos", value: log.blockers },
     { label: "Incidentes", value: log.incidents },
     { label: "Observaciones de seguridad", value: log.safetyNotes },
-  ].filter((f): f is { label: string; value: string } => Boolean(f.value?.trim()));
+  ].filter((f): f is { label: string; value: string } => f.value != null && !isRichNoteEmpty(f.value));
 
   return {
     meta: {

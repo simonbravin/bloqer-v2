@@ -80,3 +80,14 @@ export {
 } from "./line-amounts";
 export { isUuid } from "./uuid";
 export { sortTreeOrder } from "./sort-tree-order";
+export {
+  RICH_NOTE_MAX_CHARS,
+  RICH_NOTE_RAW_MAX,
+  isRichNoteEmpty,
+  normalizeRichNote,
+  parseRichNote,
+  richNoteToPlainText,
+  serializeRichNote,
+  type RichNoteBlock,
+  type RichNoteInline,
+} from "./rich-note";

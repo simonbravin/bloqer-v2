@@ -2722,6 +2722,7 @@ model JobsiteLog {
   shift        String?
   status       JobsiteLogStatus @default(DRAFT)
   weather      String?
+  /// Restricted HTML (p, br, strong, ul, ol, li). Legacy plain text still valid. [D-101]
   generalNotes String?
   blockers     String?
   incidents    String?

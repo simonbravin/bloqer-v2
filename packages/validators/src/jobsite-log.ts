@@ -1,5 +1,21 @@
 import { z } from "zod";
+import { RICH_NOTE_MAX_CHARS, RICH_NOTE_RAW_MAX, normalizeRichNote } from "@bloqer/utils";
 import { idempotencyKeySchema } from "./idempotency";
+
+const generalNotesSchema = z.preprocess(
+  (v) => {
+    if (v === undefined) return undefined;
+    if (v == null || v === "") return null;
+    if (typeof v !== "string") return v;
+    if (v.length > RICH_NOTE_RAW_MAX) return v;
+    return normalizeRichNote(v);
+  },
+  z
+    .string()
+    .max(RICH_NOTE_MAX_CHARS, "Las notas generales son demasiado largas")
+    .nullable()
+    .optional(),
+);
 
 const decimalString = z.string().regex(/^\d+(\.\d+)?$/, "Debe ser un número positivo");
 const pctString     = z.string().regex(/^\d+(\.\d+)?$/).optional().nullable();
@@ -55,7 +71,7 @@ export const createJobsiteLogSchema = z.object({
   workFront:    z.string().optional().nullable(),
   shift:        z.string().optional().nullable(),
   weather:      z.string().optional().nullable(),
-  generalNotes: z.string().optional().nullable(),
+  generalNotes: generalNotesSchema,
   blockers:     z.string().optional().nullable(),
   incidents:    z.string().optional().nullable(),
   safetyNotes:  z.string().optional().nullable(),
