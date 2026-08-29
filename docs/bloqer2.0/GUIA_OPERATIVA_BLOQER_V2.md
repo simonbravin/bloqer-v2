@@ -1047,6 +1047,7 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 
 ### 13.2 Rentabilidad y reportes
 
+- **Tablero de finanzas de obra** (`/proyectos/[id]/finanzas`): después de la visión rápida del mes (mes calendario actual), **Tendencia mensual** a todo el ancho (ingresos vs gastos; rangos Este mes / 3 / 6 / 12 meses).
 - **Hub de obra:** Planificación → **Reportes** → `/proyectos/[id]/reportes` (título: **Reportes del proyecto**). Las cards se agrupan en **Financieros** y **Operativos**.
 - **Financieros:** aging CxC/CxP, **Caja y proyección**, **Flujo de caja (detalle)**, **Ingresos vs gastos**, **Rentabilidad**.
 - **Operativos:** **EDT y costos** (control $ por partida + composición APU + gasto por tipo + filtro por tipo de costo, [D-099]), **Certificaciones**, **Análisis de compras** (eje **proveedor** + varianza OC vs APU, [D-044]; **no** solapa con EDT), **Materiales**, **Subcontratos**.
@@ -1059,7 +1060,7 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 
 ## 14. Finanzas corporativas, gastos generales e inventario (nivel empresa)
 
-- **Finanzas corporativas** (`/finanzas`): tablero con KPIs, proyección y actividad consolidada.
+- **Finanzas corporativas** (`/finanzas`): tablero con KPIs, **Tendencia mensual** (ingresos vs gastos; rangos Este mes / 3 / 6 / 12 meses; pestaña Caja para tesorería), proyección y actividad consolidada. Contabilidad se abre desde el menú **Contabilidad**, no desde una card del tablero.
 - **Transacciones** (`/finanzas/transacciones`): alta rápida de **gasto corporativo (AP)** a proveedor o **empleado** ([D-089], §12.2), **factura/CxC corporativa (AR, D-051)** y **ingreso solo caja** (`TREASURY_INFLOW`, sin obligación).
 - **Cuentas por cobrar empresa** (`/finanzas/cuentas-por-cobrar`): consolida obra + filas **Empresa**; detalle y cobranza corporativa en `/finanzas/cuentas-por-cobrar/[id]`.
 - **Gastos generales / overhead** (`/finanzas/gastos-generales`): se **imputan a las obras** de forma **manual** o por **prorrateo automático** según el peso del costo directo, con **cierre de período**. *(Es un módulo complejo; conviene validar los cálculos en producción.)*

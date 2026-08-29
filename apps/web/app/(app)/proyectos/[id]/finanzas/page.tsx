@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { ProjectFinanceDashboardView } from "@/features/projects";
-import { getProjectFinanceDashboard, ServiceError } from "@bloqer/services";
+import { getProjectFinanceDashboard, parseTrendMonths, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
@@ -26,7 +26,7 @@ export default async function ProyectoFinanzasPage({ params, searchParams }: Pag
   let dashboard;
   try {
     dashboard = await getProjectFinanceDashboard(ctx, id, {
-      months: sp.months === "6" ? 6 : 12,
+      months: parseTrendMonths(sp.months),
       budgetId: sp.budgetId,
     });
   } catch (err) {

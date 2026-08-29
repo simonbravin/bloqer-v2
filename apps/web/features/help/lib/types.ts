@@ -88,7 +88,8 @@ export type HelpIntent =
   | "registro-actividad"
   | "checklist-roles"
   | "limitaciones"
-  | "puesta-marcha-contable";
+  | "puesta-marcha-contable"
+  | "tablero-finanzas";
 
 export type HelpHref =
   | { kind: "company"; path: string; label?: string }

@@ -351,6 +351,43 @@ export const AP_ARTICLES: HelpArticle[] = [
     guideRef: "§12.2",
   },
   {
+    slug: "tablero-finanzas-tendencia",
+    title: "Leer la tendencia de ingresos vs gastos",
+    summary:
+      "En el tablero de Finanzas (empresa u obra) el gráfico Tendencia mensual muestra ingresos vs gastos. Elegí Este mes, 3, 6 o 12 meses.",
+    intents: ["tablero-finanzas"],
+    modules: ["finanzas"],
+    level: "both",
+    typicalRoles: ["OWNER / ADMIN", "Finanzas", "PM"],
+    permissionHint: "Company finance para /finanzas; en obra, permiso de finanzas del proyecto.",
+    where: { menu: "Finanzas → Tablero · o Finanzas del proyecto → Tablero de finanzas" },
+    hrefs: [
+      { kind: "company", path: "/finanzas", label: "Tablero de finanzas (empresa)" },
+      { kind: "project", suffix: "/finanzas", label: "Tablero de finanzas (obra)" },
+    ],
+    steps: [
+      "Empresa: Finanzas → Tablero. Después de Indicadores está Tendencia mensual (todo el ancho).",
+      "Obra: Finanzas del proyecto → Tablero de finanzas. El mismo gráfico va después de la visión rápida del mes.",
+      "Rango: Este mes · 3 meses · 6 meses · 12 meses (queda en la URL como ?months=).",
+      "En empresa, Económico es ingresos vs gastos; Caja es tesorería. Contabilidad se abre desde el menú Contabilidad, no desde el tablero.",
+    ],
+    effects: [
+      "El rango filtra el gráfico. En la obra, la visión rápida del mes es el mes calendario actual (no el último punto del rango).",
+    ],
+    relatedSlugs: ["cobrar-una-cxc-de-obra", "montos-y-decimales"],
+    keywords: [
+      "tendencia mensual",
+      "ingresos vs gastos",
+      "tablero finanzas",
+      "grafico finanzas",
+      "este mes",
+      "3 meses",
+      "6 meses",
+      "12 meses",
+    ],
+    guideRef: "§14",
+  },
+  {
     slug: "descuento-porcentual-en-lineas",
     title: "Descuento % en líneas (OC, cotización, factura)",
     summary:

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import type { CompanyFinanceOperationsSummary, FinanceHubOverview } from "@bloqer/services";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,7 +80,13 @@ function CompanyOperationsSection({ summary }: { summary: CompanyFinanceOperatio
   );
 }
 
-export function FinanceHubView({ overview }: { overview: FinanceHubOverview }) {
+export function FinanceHubView({
+  overview,
+  afterKpis,
+}: {
+  overview: FinanceHubOverview;
+  afterKpis?: ReactNode;
+}) {
   if (!overview.hasFinanceModules) {
     return (
       <EmptyState title="Finanzas no habilitadas" body="Activá los módulos financieros para este tenant." />
@@ -119,6 +126,8 @@ export function FinanceHubView({ overview }: { overview: FinanceHubOverview }) {
           ))}
         </KpiStatGrid>
       ) : null}
+
+      {afterKpis}
 
       {overview.projection ? <FinanceProjectionPanel projection={overview.projection} /> : null}
 

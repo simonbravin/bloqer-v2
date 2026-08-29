@@ -23,6 +23,8 @@ type Props = {
   variant?: "composed" | "trend";
   title?: string;
   description?: string;
+  /** Skip the outer card when the chart already sits in a panel. */
+  embedded?: boolean;
 };
 
 export function IncomeExpenseChart({
@@ -30,6 +32,7 @@ export function IncomeExpenseChart({
   variant = "composed",
   title,
   description,
+  embedded = false,
 }: Props) {
   const data = useMemo(
     () =>
@@ -45,108 +48,100 @@ export function IncomeExpenseChart({
     [series],
   );
 
-  if (data.length === 0) {
-    return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">{title ?? "Ingresos vs gastos"}</CardTitle>
-          <CardDescription>{description ?? "Evolución mensual por capa"}</CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground py-8 text-center">
-          Sin datos en el rango seleccionado.
-        </CardContent>
-      </Card>
-    );
-  }
+  const fewPoints = data.length <= 3;
+  const frameClass = embedded
+    ? "h-[260px] w-full min-w-0 overflow-x-auto sm:h-[320px]"
+    : `${REPORT_CHART_FRAME_CLASS} overflow-x-auto`;
 
-  if (variant === "trend") {
-    return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">{title ?? "Tendencia mensual"}</CardTitle>
-          <CardDescription>
-            {description ?? "Certificado, costo devengado y margen bruto por mes"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className={REPORT_CHART_FRAME_CLASS}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 10 }}
-                  interval="preserveStartEnd"
-                  angle={-20}
-                  textAnchor="end"
-                  height={48}
-                />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
-                <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Line
-                  type="monotone"
-                  dataKey="Certificado"
-                  stroke="hsl(var(--chart-1))"
-                  strokeWidth={2.5}
-                  dot={{ r: 3 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="Costo devengado"
-                  stroke="hsl(var(--chart-4))"
-                  strokeWidth={2}
-                  dot={{ r: 2 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="MB devengado"
-                  stroke="hsl(var(--chart-2))"
-                  strokeWidth={2}
-                  strokeDasharray="4 4"
-                  dot={false}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+  const empty = (
+    <p className="py-8 text-center text-sm text-muted-foreground">Sin datos en el rango seleccionado.</p>
+  );
+
+  const plot =
+    data.length === 0 ? (
+      empty
+    ) : variant === "trend" ? (
+      <div className={frameClass}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 10 }}
+              interval={fewPoints ? 0 : "preserveStartEnd"}
+              angle={fewPoints ? 0 : -20}
+              textAnchor={fewPoints ? "middle" : "end"}
+              height={fewPoints ? 28 : 48}
+            />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
+            <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Line
+              type="monotone"
+              dataKey="Certificado"
+              stroke="hsl(var(--chart-1))"
+              strokeWidth={2.5}
+              dot={{ r: 3 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="Costo devengado"
+              stroke="hsl(var(--chart-4))"
+              strokeWidth={2}
+              dot={{ r: 2 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="MB devengado"
+              stroke="hsl(var(--chart-2))"
+              strokeWidth={2}
+              strokeDasharray="4 4"
+              dot={false}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    ) : (
+      <div className={frameClass}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 10 }}
+              interval={fewPoints ? 0 : "preserveStartEnd"}
+              angle={fewPoints ? 0 : -20}
+              textAnchor={fewPoints ? "middle" : "end"}
+              height={fewPoints ? 28 : 48}
+            />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
+            <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="Certificado" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Costo devengado" fill="hsl(var(--chart-4))" radius={[2, 2, 0, 0]} />
+            <Line type="monotone" dataKey="Cobrado" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="Costo pagado" stroke="hsl(var(--chart-5))" strokeWidth={2} dot={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
     );
-  }
+
+  if (embedded) return plot;
+
+  const heading = variant === "trend" ? (title ?? "Tendencia mensual") : (title ?? "Ingresos vs gastos");
+  const sub =
+    description ??
+    (variant === "trend"
+      ? "Certificado, costo devengado y margen bruto por mes"
+      : "Barras: certificado vs costo devengado · Línea: cobrado vs pagado · MB = margen del período");
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">{title ?? "Ingresos vs gastos"}</CardTitle>
-        <CardDescription>
-          {description ??
-            "Barras: certificado vs costo devengado · Línea: cobrado vs pagado · MB = margen del período"}
-        </CardDescription>
+        <CardTitle className="text-base">{heading}</CardTitle>
+        <CardDescription>{sub}</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className={REPORT_CHART_FRAME_CLASS}>
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 10 }}
-                interval="preserveStartEnd"
-                angle={-20}
-                textAnchor="end"
-                height={48}
-              />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
-              <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="Certificado" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="Costo devengado" fill="hsl(var(--chart-4))" radius={[2, 2, 0, 0]} />
-              <Line type="monotone" dataKey="Cobrado" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="Costo pagado" stroke="hsl(var(--chart-5))" strokeWidth={2} dot={false} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
+      <CardContent>{plot}</CardContent>
     </Card>
   );
 }

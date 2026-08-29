@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ProjectFinanceDashboard } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -18,6 +18,10 @@ import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { DashboardKpiCard } from "@/features/dashboard/dashboard-kpi-card";
 import { IncomeExpenseChart } from "@/features/reports/income-expense-chart";
+import {
+  MonthlyTrendRangeToggle,
+  readTrendMonthsParam,
+} from "@/features/finance/components/monthly-trend-range-toggle";
 import { CostCompositionChart } from "@/features/projects/cost-composition-chart";
 import { ProjectFinanceSnapshotPanel } from "@/features/project-cash-flow/project-finance-snapshot-panel";
 import { ProjectCashFlowChart } from "@/features/project-cash-flow/components/project-cash-flow-chart";
@@ -53,6 +57,7 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
   const searchParams = useSearchParams();
   const projectId = project.id;
   const moneyCurrency = dashboard.incomeExpense?.displayCurrency ?? "ARS";
+  const selectedMonths = readTrendMonthsParam(searchParams.get("months"), dashboard.months);
 
   function setMonths(months: number) {
     const p = new URLSearchParams(searchParams.toString());
@@ -104,24 +109,6 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
               Visión rápida del mes
             </h2>
             <FinanceLayerBadge layer="accrued" />
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={dashboard.months === 6 ? "secondary" : "outline"}
-                onClick={() => setMonths(6)}
-              >
-                6 meses
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={dashboard.months === 12 ? "secondary" : "outline"}
-                onClick={() => setMonths(12)}
-              >
-                12 meses
-              </Button>
-            </div>
           </div>
           <KpiStatGrid title={null} columns={4}>
             {dashboard.monthBalance ? (
@@ -132,7 +119,7 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
                     dashboard.monthBalance.grossMarginAccrued,
                     dashboard.monthBalance.currency,
                   )}
-                  helper="MB devengado del último mes"
+                  helper="MB devengado de este mes"
                   tone={
                     isZeroMoneyAmount(dashboard.monthBalance.grossMarginAccrued)
                       ? "muted"
@@ -178,17 +165,21 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
         </section>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {dashboard.incomeExpense && dashboard.incomeExpense.series.length > 0 ? (
-          <IncomeExpenseChart
-            series={dashboard.incomeExpense.series}
-            variant="trend"
-            title="Tendencia mensual"
-            description={`Últimos ${dashboard.months} meses · capa devengada`}
-          />
-        ) : (
-          <Card>
-            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+      <Card className="rounded-xl border bg-card shadow-sm">
+        <CardHeader className="border-b border-border/60 pb-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 space-y-1">
+              <CardTitle className="text-base">Tendencia mensual</CardTitle>
+              <CardDescription>Ingresos vs gastos por mes · capa devengada</CardDescription>
+            </div>
+            <MonthlyTrendRangeToggle months={selectedMonths} onChange={setMonths} />
+          </div>
+        </CardHeader>
+        <CardContent className="min-w-0 pt-4">
+          {dashboard.incomeExpense && dashboard.incomeExpense.series.length > 0 ? (
+            <IncomeExpenseChart series={dashboard.incomeExpense.series} embedded />
+          ) : (
+            <p className="py-8 text-center text-sm text-muted-foreground">
               Sin tendencia de ingresos vs gastos.{" "}
               <Link
                 href={`/proyectos/${projectId}/reportes/ingresos-gastos`}
@@ -196,28 +187,29 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
               >
                 Ver reporte
               </Link>
-            </CardContent>
-          </Card>
-        )}
-        {composition ? (
-          <CostCompositionChart composition={composition} />
-        ) : (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Composición de gastos</CardTitle>
-            </CardHeader>
-            <CardContent className="py-8 text-center text-sm text-muted-foreground">
-              Sin datos de composición.{" "}
-              <Link
-                href={`/proyectos/${projectId}/control-costos`}
-                className="underline underline-offset-2"
-              >
-                Control de costos
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {composition ? (
+        <CostCompositionChart composition={composition} />
+      ) : (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Composición de gastos</CardTitle>
+          </CardHeader>
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            Sin datos de composición.{" "}
+            <Link
+              href={`/proyectos/${projectId}/control-costos`}
+              className="underline underline-offset-2"
+            >
+              Control de costos
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {cashCur && cashCur.periods.length > 0 ? (
         <Card>
@@ -334,14 +326,6 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
             </TableScroll>
           </CardContent>
         </Card>
-      ) : null}
-
-      {dashboard.incomeExpense && dashboard.incomeExpense.series.length > 0 ? (
-        <IncomeExpenseChart
-          series={dashboard.incomeExpense.series}
-          title="Ingresos vs gastos (detalle)"
-          description="Certificado vs costo devengado con capa de caja"
-        />
       ) : null}
 
       {dashboard.topSuppliers.length > 0 ? (

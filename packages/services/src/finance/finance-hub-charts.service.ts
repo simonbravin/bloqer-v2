@@ -1,5 +1,4 @@
-import { fmtDecimalEs } from "../dashboard/kpi-helpers";
-import { defaultReportDateRange } from "../reports/report-month";
+import { parseTrendMonths, trendDateRange, type TrendMonths } from "../reports/report-month";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import {
   getCashFlowReport,
@@ -10,42 +9,31 @@ import {
   getCompanyIncomeExpenseReport,
   type CompanyIncomeExpenseReport,
 } from "../reports/company-income-expense.service";
-import { monthKey } from "../reports/report-month";
 import { canViewCompanyFinanceHub, canViewCompanyTreasury } from "./finance-access";
 import { canViewCompanyAp } from "../ap/ap-access";
 import { canViewCompanyAr } from "../ar/ar-access";
 
-export type FinanceHubMonthlyNetCash = {
-  currency: string;
-  amount: string;
-  periodKey: string;
-  label: string;
-};
+export { parseTrendMonths };
+export type { TrendMonths };
 
 export type FinanceHubCharts = {
-  months: number;
+  months: TrendMonths;
   cash: CashFlowCurrency | null;
   /** True when treasury report returned more than one currency (chart shows one). */
   cashMulticurrency: boolean;
-  currentMonthNetCash: FinanceHubMonthlyNetCash | null;
   economic: CompanyIncomeExpenseReport | null;
 };
-
-function parseMonths(value?: number): 6 | 12 {
-  return value === 6 ? 6 : 12;
-}
 
 export async function getFinanceHubCharts(
   ctx: ServiceContext,
   opts?: { months?: number },
 ): Promise<FinanceHubCharts> {
-  const months = parseMonths(opts?.months);
+  const months = parseTrendMonths(opts?.months);
   const gate = await getTenantModuleGate(ctx);
-  const range = defaultReportDateRange(months);
+  const range = trendDateRange(months);
 
   let cash: CashFlowCurrency | null = null;
   let cashMulticurrency = false;
-  let currentMonthNetCash: FinanceHubMonthlyNetCash | null = null;
 
   if (gate.isEnabled("TREASURY") && canViewCompanyTreasury(ctx.roles)) {
     try {
@@ -56,16 +44,6 @@ export async function getFinanceHubCharts(
       if (report.length > 0) {
         cashMulticurrency = report.length > 1;
         cash = report.find((c) => c.currency === "ARS") ?? report[0]!;
-        const currentKey = monthKey(new Date());
-        const bucket = cash.buckets.find((b) => b.period === currentKey);
-        if (bucket) {
-          currentMonthNetCash = {
-            currency: cash.currency,
-            amount: bucket.netOperatingCashFlow,
-            periodKey: currentKey,
-            label: fmtDecimalEs(bucket.netOperatingCashFlow, cash.currency),
-          };
-        }
       }
     } catch {
       cash = null;
@@ -93,5 +71,5 @@ export async function getFinanceHubCharts(
     }
   }
 
-  return { months, cash, cashMulticurrency, currentMonthNetCash, economic };
+  return { months, cash, cashMulticurrency, economic };
 }

@@ -490,15 +490,6 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
 
   const hubKpis: DashboardKpi[] = [...corporateResult.kpis];
 
-  if (accountingSection?.visible) {
-    hubKpis.push({
-      key:   "accounting",
-      label: "Contabilidad",
-      value: "Abrir",
-      href:  accountingSection.href,
-    });
-  }
-
   const projection = await buildFinanceProjection(
     ctx,
     corporateAccess,

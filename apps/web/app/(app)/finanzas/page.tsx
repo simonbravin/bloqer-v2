@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { getFinanceHubCharts, getFinanceHubOverview } from "@bloqer/services";
+import { getFinanceHubCharts, getFinanceHubOverview, parseTrendMonths } from "@bloqer/services";
 import { FinanceHubView } from "@/features/finance";
 import { FinanceHubChartsPanel } from "@/features/finance/components/finance-hub-charts-panel";
 import { getCurrentUser } from "@/lib/auth";
@@ -19,7 +19,7 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
   if (!ctx) redirect("/login");
 
   const sp = await searchParams;
-  const months = sp.months === "6" ? 6 : 12;
+  const months = parseTrendMonths(sp.months);
 
   const [overview, charts] = await Promise.all([
     getFinanceHubOverview(ctx),
@@ -33,25 +33,28 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
   const hasCash = charts.cash != null && charts.cash.buckets.length > 0;
   const hasEconomic = charts.economic != null && charts.economic.series.length > 0;
   const defaultTab =
-    sp.trend === "economico"
-      ? "economico"
-      : sp.trend === "caja"
-        ? "caja"
-        : hasCash
-          ? "caja"
-          : hasEconomic
-            ? "economico"
-            : "caja";
+    sp.trend === "caja"
+      ? "caja"
+      : sp.trend === "economico"
+        ? "economico"
+        : hasEconomic
+          ? "economico"
+          : hasCash
+            ? "caja"
+            : "economico";
 
   return (
     <PageShell variant="default" className="space-y-8">
       <h1 className="text-2xl font-bold tracking-tight">Finanzas</h1>
 
-      <FinanceHubView overview={overview} />
-
-      <Suspense fallback={null}>
-        <FinanceHubChartsPanel charts={charts} defaultTab={defaultTab} />
-      </Suspense>
+      <FinanceHubView
+        overview={overview}
+        afterKpis={
+          <Suspense fallback={null}>
+            <FinanceHubChartsPanel charts={charts} defaultTab={defaultTab} />
+          </Suspense>
+        }
+      />
     </PageShell>
   );
 }

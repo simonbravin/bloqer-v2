@@ -12,10 +12,38 @@ export function monthLabel(key: string): string {
   });
 }
 
+export const TREND_MONTH_OPTIONS = [1, 3, 6, 12] as const;
+export type TrendMonths = (typeof TREND_MONTH_OPTIONS)[number];
+
+export function parseTrendMonths(raw?: string | number): TrendMonths {
+  const n = typeof raw === "string" ? Number(raw) : raw;
+  if (n === 1 || n === 3 || n === 6 || n === 12) return n;
+  return 12;
+}
+
 export function defaultReportDateRange(monthsBack = 12): { dateFrom: string; dateTo: string } {
   const to = new Date();
   const from = new Date(to);
   from.setUTCMonth(from.getUTCMonth() - monthsBack);
+  return {
+    dateFrom: from.toISOString().slice(0, 10),
+    dateTo: to.toISOString().slice(0, 10),
+  };
+}
+
+export function pickCurrentMonthItem<T extends { periodKey: string }>(
+  items: T[],
+  now = new Date(),
+): T | undefined {
+  const key = monthKey(now);
+  return items.find((i) => i.periodKey === key);
+}
+
+/** Calendar month for “este mes”; otherwise last N months via `defaultReportDateRange`. */
+export function trendDateRange(months: TrendMonths): { dateFrom: string; dateTo: string } {
+  if (months !== 1) return defaultReportDateRange(months);
+  const to = new Date();
+  const from = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), 1));
   return {
     dateFrom: from.toISOString().slice(0, 10),
     dateTo: to.toISOString().slice(0, 10),

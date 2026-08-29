@@ -16,13 +16,23 @@ import {
 import type { CashFlowCurrency } from "@bloqer/services";
 import { formatChartMoney } from "@/lib/format-money";
 
+function formatPeriodTick(period: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(period);
+  if (!m) return period;
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1)).toLocaleDateString("es-AR", {
+    month: "short",
+    year: "numeric",
+  });
+}
+
 interface Props {
   data: CashFlowCurrency;
   /** Trend line for evolution over time (dashboard). Bars for detailed comparison (reports). */
   variant?: "trend" | "bars";
+  className?: string;
 }
 
-export function CashFlowChart({ data, variant = "bars" }: Props) {
+export function CashFlowChart({ data, variant = "bars", className }: Props) {
   if (data.buckets.length === 0) return null;
 
   const chartData = data.buckets.map((b) => ({
@@ -42,15 +52,18 @@ export function CashFlowChart({ data, variant = "bars" }: Props) {
     return formatChartMoney(v, data.currency);
   }
 
+  const frameClass = className ?? "h-64 w-full";
+
   if (variant === "trend") {
     return (
-      <div className="h-64 w-full">
+      <div className={frameClass}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
             <XAxis
               dataKey="period"
               tick={{ fontSize: 11 }}
+              tickFormatter={formatPeriodTick}
               tickLine={false}
               axisLine={false}
               className="text-muted-foreground"
@@ -105,13 +118,18 @@ export function CashFlowChart({ data, variant = "bars" }: Props) {
   }
 
   return (
-    <div className="h-64 w-full">
+    <div className={frameClass}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
           <XAxis
             dataKey="period"
             tick={{ fontSize: 11 }}
+            tickFormatter={formatPeriodTick}
+            interval="preserveStartEnd"
+            angle={-20}
+            textAnchor="end"
+            height={48}
             className="text-muted-foreground"
           />
           <YAxis

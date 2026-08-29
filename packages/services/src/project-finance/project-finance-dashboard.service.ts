@@ -31,7 +31,14 @@ import {
   getProjectCashFlowReport,
   type ProjectCashFlowReport,
 } from "../project-cash-flow/project-cash-flow.service";
-import { defaultReportDateRange } from "../reports/report-month";
+import {
+  monthKey,
+  monthLabel,
+  parseTrendMonths,
+  pickCurrentMonthItem,
+  trendDateRange,
+  type TrendMonths,
+} from "../reports/report-month";
 import type { ServiceContext } from "../types";
 
 export type ProjectFinanceMonthBalance = {
@@ -73,7 +80,7 @@ export type ProjectFinanceDashboard = {
   topSuppliers: ProjectFinanceTopSupplier[];
   costComposition: ProjectCostCompositionResult | null;
   wbsAlerts: ProjectWbsProgressResult | null;
-  months: number;
+  months: TrendMonths;
 };
 
 export async function getProjectFinanceDashboard(
@@ -81,8 +88,8 @@ export async function getProjectFinanceDashboard(
   projectId: string,
   opts?: { months?: number; budgetId?: string },
 ): Promise<ProjectFinanceDashboard> {
-  const months = opts?.months === 6 ? 6 : 12;
-  const range = defaultReportDateRange(months);
+  const months = parseTrendMonths(opts?.months);
+  const range = trendDateRange(months);
   const budgetFilter = { budgetId: opts?.budgetId };
 
   const gate = await getTenantModuleGate(ctx);
@@ -218,16 +225,29 @@ function buildSnapshotPreloadFromOverview(
 }
 
 function deriveMonthBalance(report: IncomeExpenseReport | null): ProjectFinanceMonthBalance | null {
-  if (!report || report.series.length === 0) return null;
-  const last = report.series[report.series.length - 1]!;
+  if (!report) return null;
+  const currentKey = monthKey(new Date());
+  const point = pickCurrentMonthItem(report.series);
+  if (!point) {
+    return {
+      periodLabel: monthLabel(currentKey),
+      certifiedAmount: "0",
+      costAccrued: "0",
+      grossMarginAccrued: "0",
+      collectedAmount: "0",
+      costPaid: "0",
+      grossMarginCash: "0",
+      currency: report.displayCurrency,
+    };
+  }
   return {
-    periodLabel: last.periodLabel,
-    certifiedAmount: last.certifiedAmount,
-    costAccrued: last.costAccrued,
-    grossMarginAccrued: last.grossMarginAccrued,
-    collectedAmount: last.collectedAmount,
-    costPaid: last.costPaid,
-    grossMarginCash: last.grossMarginCash,
+    periodLabel: point.periodLabel,
+    certifiedAmount: point.certifiedAmount,
+    costAccrued: point.costAccrued,
+    grossMarginAccrued: point.grossMarginAccrued,
+    collectedAmount: point.collectedAmount,
+    costPaid: point.costPaid,
+    grossMarginCash: point.grossMarginCash,
     currency: report.displayCurrency,
   };
 }
@@ -235,13 +255,23 @@ function deriveMonthBalance(report: IncomeExpenseReport | null): ProjectFinanceM
 function deriveMonthCashFlow(report: ProjectCashFlowReport | null): ProjectFinanceMonthCashFlow | null {
   if (!report) return null;
   const cur = report.currencies.find((c) => c.currency === "ARS") ?? report.currencies[0];
-  if (!cur || cur.periods.length === 0) return null;
-  const last = cur.periods[cur.periods.length - 1]!;
+  if (!cur) return null;
+  const currentKey = monthKey(new Date());
+  const point = pickCurrentMonthItem(cur.periods);
+  if (!point) {
+    return {
+      periodLabel: monthLabel(currentKey),
+      inflows: "0",
+      outflows: "0",
+      netCashFlow: "0",
+      currency: cur.currency,
+    };
+  }
   return {
-    periodLabel: last.periodLabel,
-    inflows: last.inflows,
-    outflows: last.outflows,
-    netCashFlow: last.netCashFlow,
+    periodLabel: point.periodLabel,
+    inflows: point.inflows,
+    outflows: point.outflows,
+    netCashFlow: point.netCashFlow,
     currency: cur.currency,
   };
 }

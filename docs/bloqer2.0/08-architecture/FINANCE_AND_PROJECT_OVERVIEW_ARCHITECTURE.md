@@ -163,7 +163,7 @@ Permitir **facturas proveedor / C×P / pagos** con **`projectId` null** (gastos 
 
 ### 16D.1 Alcance
 
-- **Servicio:** `packages/services/src/finance/finance-hub-overview.service.ts` — DTO con `FinanceHubCurrencySnapshot` por moneda (totales abiertos, vencido vs al día, ratios), `apWithProjectInsight` vs `apCorporateInsight` (filtro por `projectId` en ítems del **mismo** `getPayableAgingReport` global), `quickActions`, `alerts` (incl. nota multimoneda), `accountingSection` (enlace a `/contabilidad` si módulo + `VIEW ACCOUNTING`). Sin schema nuevo, sin entidad `Expense`, sin contabilización automática.
+- **Servicio:** `packages/services/src/finance/finance-hub-overview.service.ts` — DTO con `FinanceHubCurrencySnapshot` por moneda (totales abiertos, vencido vs al día, ratios), `apWithProjectInsight` vs `apCorporateInsight` (filtro por `projectId` en ítems del **mismo** `getPayableAgingReport` global), `quickActions`, `alerts` (incl. nota multimoneda), `accountingSection` (dato de módulo; el tablero **no** muestra card-KPI a Contabilidad — se entra por el menú). Gráfico **Tendencia mensual** vía `getFinanceHubCharts` (ingresos vs gastos; rangos 1/3/6/12 meses). Sin schema nuevo, sin entidad `Expense`, sin contabilización automática.
 - **UI:** `apps/web/features/finance/finance-hub-view.tsx` + copy en `apps/web/app/(app)/finanzas/page.tsx`.
 - **Nav:** `apps/web/lib/nav-config.ts` — ítem **Finanzas** si `VIEW AR` **o** `VIEW AP` **o** `VIEW TREASURY` **o** `VIEW ACCOUNTING`, con módulo tenant habilitado en la rama correspondiente.
 - **Permisos:** `canSeeAnything` no usa `VIEW PROJECTS` como atajo global; AP corporativo en UI/servicios `*Company*` sigue **`VIEW AP`** (sin cambio 16C).
