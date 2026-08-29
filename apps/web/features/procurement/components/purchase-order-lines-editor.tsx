@@ -88,7 +88,7 @@ interface Props {
   showVarianceJustification?: boolean;
 }
 
-const DEFAULT_LINE: PurchaseOrderLine = {
+export const DEFAULT_PURCHASE_ORDER_LINE: PurchaseOrderLine = {
   wbsNodeId: null,
   productId: null,
   costAnalysisLineId: null,
@@ -100,6 +100,8 @@ const DEFAULT_LINE: PurchaseOrderLine = {
   taxRate: "21",
   discountPct: "0",
 };
+
+const LINE_FIELD_CLASS = "min-h-11 text-sm md:min-h-9 md:h-9";
 
 function createLineKey(): string {
   return crypto.randomUUID();
@@ -280,7 +282,7 @@ export function PurchaseOrderLinesEditor({
 
   function addLine() {
     setLineKeys((keys) => [...keys, createLineKey()]);
-    onChange([...lines, { ...DEFAULT_LINE }]);
+    onChange([...lines, { ...DEFAULT_PURCHASE_ORDER_LINE }]);
   }
 
   function removeLine(i: number) {
@@ -305,46 +307,43 @@ export function PurchaseOrderLinesEditor({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Líneas</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Label htmlFor="po-header-discount" className="text-xs text-muted-foreground whitespace-nowrap">
-            Descuento general %
-          </Label>
-                  <DecimalInput
-                    id="po-header-discount"
-                    value={headerDiscount}
-                    onValueChange={setHeaderDiscount}
-                    placeholder="0"
-                    className="h-8 w-20 text-sm"
-                  />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (headerDiscount.trim() === "") {
-                toast.error("Ingresá un descuento entre 0 y 100");
-                return;
-              }
-              try {
-                const pct = normalizeDiscountPct(headerDiscount);
-                onChange(lines.map((l) => ({ ...l, discountPct: pct })));
-                toast.success("Descuento copiado a todas las líneas");
-              } catch {
-                toast.error("El descuento debe estar entre 0 y 100");
-              }
-            }}
-          >
-            Aplicar a todas
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={addLine}>
-            + Agregar línea
-          </Button>
-        </div>
+        <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={addLine}>
+          + Agregar línea
+        </Button>
       </div>
-      <p className="text-xs text-muted-foreground">
-        El descuento % se aplica al subtotal de la línea, antes de IVA. El precio unitario de lista no cambia.
-        «Descuento general %» copia el mismo porcentaje a todas las líneas.
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Label htmlFor="po-header-discount" className="text-xs text-muted-foreground whitespace-nowrap">
+          Descuento general %
+        </Label>
+        <DecimalInput
+          id="po-header-discount"
+          value={headerDiscount}
+          onValueChange={setHeaderDiscount}
+          placeholder="0"
+          className="h-11 w-20 text-sm md:h-8"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="min-h-11 md:min-h-8"
+          onClick={() => {
+            if (headerDiscount.trim() === "") {
+              toast.error("Ingresá un descuento entre 0 y 100");
+              return;
+            }
+            try {
+              const pct = normalizeDiscountPct(headerDiscount);
+              onChange(lines.map((l) => ({ ...l, discountPct: pct })));
+              toast.success("Descuento copiado a todas las líneas");
+            } catch {
+              toast.error("El descuento debe estar entre 0 y 100");
+            }
+          }}
+        >
+          Aplicar a todas
+        </Button>
+      </div>
       <p className="text-xs text-muted-foreground">
         Cada línea debe imputar a un ítem EDT. Para gastos generales usá la partida de
         indirectos del presupuesto.
@@ -382,7 +381,7 @@ export function PurchaseOrderLinesEditor({
                   <Label className="text-xs">EDT (obligatorio)</Label>
                   <SearchableCombobox
                     popoverWidth="wide"
-                    className="h-8 text-xs"
+                    className={LINE_FIELD_CLASS}
                     options={wbsComboboxOptions}
                     value={line.wbsNodeId ?? ""}
                     onValueChange={(v) => update(i, "wbsNodeId", v || null)}
@@ -416,7 +415,7 @@ export function PurchaseOrderLinesEditor({
                     value={line.costType ?? "MATERIAL"}
                     onValueChange={(v) => updateCostType(i, v as CostCategoryOptionValue)}
                   >
-                    <SelectTrigger id={`po-line-${lineKey}-cost-type`} className="h-8 text-xs">
+                    <SelectTrigger id={`po-line-${lineKey}-cost-type`} className={LINE_FIELD_CLASS}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -427,21 +426,17 @@ export function PurchaseOrderLinesEditor({
                       ))}
                     </SelectContent>
                   </Select>
-                  {wbs && wbs.dominantCostType == null && line.wbsNodeId ? (
-                    <p className="text-[10px] text-muted-foreground leading-snug">
-                      Esta partida tiene varios tipos en su APU; elegí el correcto (o dejalo en Materiales).
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-muted-foreground leading-snug">
-                      Se sugiere solo desde el APU de la partida o el insumo. Podés cambiarlo.
-                    </p>
-                  )}
+                  <p className="text-[10px] text-muted-foreground leading-snug">
+                    {wbs && wbs.dominantCostType == null && line.wbsNodeId
+                      ? "Esta partida tiene varios tipos en su APU; elegí el correcto."
+                      : "Sugerido desde APU."}
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Insumo APU</Label>
                   <SearchableCombobox
                     popoverWidth="wide"
-                    className="h-8 text-xs"
+                    className={LINE_FIELD_CLASS}
                     options={withNoneOption(
                       toSearchableOptions(
                         (wbs?.apuLines ?? []).map((a) => ({
@@ -480,7 +475,7 @@ export function PurchaseOrderLinesEditor({
                   <Label className="text-xs">Producto</Label>
                   <SearchableCombobox
                     popoverWidth="wide"
-                    className="h-8 text-xs"
+                    className={LINE_FIELD_CLASS}
                     options={productComboboxOptions}
                     value={line.productId ?? SEARCHABLE_NONE}
                     onValueChange={(v) => {
@@ -506,19 +501,18 @@ export function PurchaseOrderLinesEditor({
                   value={line.description}
                   onChange={(e) => update(i, "description", e.target.value)}
                   placeholder="Descripción del ítem"
-                  className="h-9 text-sm"
+                  className={LINE_FIELD_CLASS}
                 />
               </div>
 
-              {/* Montos: una fila con columnas legibles. */}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Unidad</Label>
                   <UnitSelect
                     value={line.unit}
                     onChange={(v) => update(i, "unit", v)}
                     placeholder="un"
-                    className="h-9 text-sm w-full"
+                    className={`${LINE_FIELD_CLASS} w-full`}
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
@@ -528,37 +522,28 @@ export function PurchaseOrderLinesEditor({
                     value={line.quantity}
                     onValueChange={(v) => update(i, "quantity", v)}
                     placeholder="1,00"
-                    className="h-9 text-sm"
+                    className={LINE_FIELD_CLASS}
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
-                  <Label className="text-xs">Precio unit.</Label>
+                  <Label className="text-xs">Precio unitario</Label>
                   <DecimalInput
                     required
                     value={line.unitPrice}
                     onValueChange={(v) => update(i, "unitPrice", v)}
                     placeholder="0,00"
-                    className="h-9 text-sm"
+                    className={LINE_FIELD_CLASS}
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
-                  <Label className="text-xs">Desc. %</Label>
-                  <DecimalInput
-                    value={line.discountPct ?? "0"}
-                    onValueChange={(v) => update(i, "discountPct", v)}
-                    placeholder="0"
-                    className="h-9 text-sm"
-                  />
-                </div>
-                <div className="space-y-1 min-w-0">
-                  <Label className="text-xs">Ref. presup.</Label>
-                  <div className="flex h-9 items-center text-sm tabular-nums text-muted-foreground">
+                  <Label className="text-xs">Ref. presupuesto</Label>
+                  <div className="flex min-h-11 items-center text-sm tabular-nums text-muted-foreground md:min-h-9">
                     {wbs?.budgetUnitCost != null ? (
                       <button
                         type="button"
                         onClick={() => fillBudgetUnitPrice(i, wbs)}
                         title="Usar este costo como precio unitario"
-                        className="text-left underline decoration-dotted underline-offset-2 hover:text-foreground truncate max-w-full"
+                        className="max-w-full truncate text-left underline decoration-dotted underline-offset-2 hover:text-foreground"
                       >
                         {formatDecimalArFromString(wbs.budgetUnitCost)}
                         {wbs.budgetUnit ? ` / ${budgetUnitLabel(wbs.budgetUnit) || wbs.budgetUnit}` : ""}
@@ -568,13 +553,25 @@ export function PurchaseOrderLinesEditor({
                     )}
                   </div>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1 min-w-0">
+                  <Label className="text-xs">Desc. %</Label>
+                  <DecimalInput
+                    value={line.discountPct ?? "0"}
+                    onValueChange={(v) => update(i, "discountPct", v)}
+                    placeholder="0"
+                    className={LINE_FIELD_CLASS}
+                  />
+                </div>
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">IVA %</Label>
                   <Select
                     value={normalizeIvaRatePreset(line.taxRate) ?? undefined}
                     onValueChange={(v) => update(i, "taxRate", v)}
                   >
-                    <SelectTrigger className="h-9 text-sm">
+                    <SelectTrigger className={LINE_FIELD_CLASS}>
                       <SelectValue placeholder={line.taxRate || "21"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -588,7 +585,7 @@ export function PurchaseOrderLinesEditor({
                 </div>
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Total</Label>
-                  <p className="flex h-9 items-center text-sm tabular-nums font-semibold">
+                  <p className="flex min-h-11 items-center text-sm tabular-nums font-semibold md:min-h-9">
                     {formatDecimalArFromString(p.total)}
                   </p>
                 </div>
@@ -602,7 +599,7 @@ export function PurchaseOrderLinesEditor({
                     value={line.varianceJustification ?? ""}
                     onChange={(e) => update(i, "varianceJustification", e.target.value)}
                     placeholder="Si supera presupuesto…"
-                    className="h-8 text-sm"
+                    className={LINE_FIELD_CLASS}
                   />
                 </div>
               )}

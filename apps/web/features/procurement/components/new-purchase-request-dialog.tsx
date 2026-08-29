@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { PROCUREMENT_FORM_DIALOG_CLASS } from "@/features/procurement/lib/procurement-form-layout";
 import { useHasMounted, useIsMdUp } from "@/lib/media-query";
 import { PurchaseRequestCreateComposer } from "./purchase-request-create-composer";
 import type { WbsOption } from "./purchase-order-lines-editor";
@@ -105,7 +106,15 @@ export function NewPurchaseRequestDialog({
     setOpen(false);
   }
 
-  if (hasMounted && !isMdUp) {
+  if (!hasMounted) {
+    return (
+      <Button variant={triggerVariant} className="min-h-11" disabled>
+        {triggerLabel}
+      </Button>
+    );
+  }
+
+  if (!isMdUp) {
     return (
       <Button asChild variant={triggerVariant} className="min-h-11">
         <Link href={nuevoHref}>{triggerLabel}</Link>
@@ -124,7 +133,7 @@ export function NewPurchaseRequestDialog({
       <DialogTrigger asChild>
         <Button variant={triggerVariant}>{triggerLabel}</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className={PROCUREMENT_FORM_DIALOG_CLASS}>
         <DialogHeader>
           <DialogTitle>Nueva solicitud de compra</DialogTitle>
           <DialogDescription className="sr-only">

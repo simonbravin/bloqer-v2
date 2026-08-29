@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -316,7 +316,7 @@ export function PurchaseRequestForm({
           <h2 className="text-sm font-semibold">Observaciones</h2>
           <div className="space-y-2">
             <Label htmlFor="notes">Notas</Label>
-            <Textarea id="notes" name="notes" rows={3} className="min-h-24" />
+            <AutoGrowTextarea id="notes" name="notes" />
           </div>
         </section>
 

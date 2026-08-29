@@ -9,6 +9,7 @@ import {
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { PurchaseRequestCreateComposer } from "@/features/procurement/components/purchase-request-create-composer";
+import { PROCUREMENT_FORM_PAGE_CLASS } from "@/features/procurement/lib/procurement-form-layout";
 import type { WbsOption } from "@/features/procurement";
 
 interface PageProps {
@@ -41,24 +42,31 @@ export default async function NuevaSolicitudCompraPage({ params, searchParams }:
   try {
     await getProjectShellInfo(id, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
-  const wbsNodes = await listProcurementWbsOptions(id, ctx);
-  const wbsOptions: WbsOption[] = wbsNodes.map((n) => ({
-    id: n.id,
-    code: n.code,
-    name: n.name,
-    budgetName: n.budgetName,
-    budgetUnitCost: n.budgetUnitCost,
-    budgetUnit: n.budgetUnit,
-    availableSaldo: n.availableSaldo,
-    wouldExceedBudget: n.wouldExceedBudget,
-    apuLines: n.apuLines,
-    dominantCostType: n.dominantCostType,
-  }));
+  let wbsOptions: WbsOption[] = [];
+  try {
+    const wbsNodes = await listProcurementWbsOptions(id, ctx);
+    wbsOptions = wbsNodes.map((n) => ({
+      id: n.id,
+      code: n.code,
+      name: n.name,
+      budgetName: n.budgetName,
+      budgetUnitCost: n.budgetUnitCost,
+      budgetUnit: n.budgetUnit,
+      availableSaldo: n.availableSaldo,
+      wouldExceedBudget: n.wouldExceedBudget,
+      apuLines: n.apuLines,
+      dominantCostType: n.dominantCostType,
+    }));
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+    throw err;
+  }
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel="Nueva solicitud">
@@ -66,19 +74,21 @@ export default async function NuevaSolicitudCompraPage({ params, searchParams }:
         title="Nueva solicitud de compra"
         subtitle="Pedido simple de una línea, con evidencia fotográfica."
       />
-      <PurchaseRequestCreateComposer
-        projectId={id}
-        wbsOptions={wbsOptions}
-        initialLine={{
-          wbsNodeId: sp.wbsNodeId,
-          description: sp.description,
-          quantity: sp.quantity,
-          productId: sp.productId,
-          costAnalysisLineId: sp.costAnalysisLineId,
-          unit: sp.unit,
-        }}
-        prefilledFromMaterials={sp.from === "materiales"}
-      />
+      <div className={PROCUREMENT_FORM_PAGE_CLASS}>
+        <PurchaseRequestCreateComposer
+          projectId={id}
+          wbsOptions={wbsOptions}
+          initialLine={{
+            wbsNodeId: sp.wbsNodeId,
+            description: sp.description,
+            quantity: sp.quantity,
+            productId: sp.productId,
+            costAnalysisLineId: sp.costAnalysisLineId,
+            unit: sp.unit,
+          }}
+          prefilledFromMaterials={sp.from === "materiales"}
+        />
+      </div>
     </PageShell>
   );
 }

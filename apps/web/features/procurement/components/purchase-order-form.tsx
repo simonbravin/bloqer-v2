@@ -1,15 +1,20 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
-import { PurchaseOrderLinesEditor } from "./purchase-order-lines-editor";
-import type { PurchaseOrderLine, WbsOption, ProductOption } from "./purchase-order-lines-editor";
+import {
+  DEFAULT_PURCHASE_ORDER_LINE,
+  PurchaseOrderLinesEditor,
+  type PurchaseOrderLine,
+  type ProductOption,
+  type WbsOption,
+} from "./purchase-order-lines-editor";
 import { createPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 
 export type SupplierOption = { id: string; label: string; searchValue?: string };
@@ -26,19 +31,6 @@ interface Props {
   onSuccess?: () => void;
 }
 
-const DEFAULT_LINE: PurchaseOrderLine = {
-  wbsNodeId: null,
-  productId: null,
-  costAnalysisLineId: null,
-  costType: "MATERIAL",
-  description: "",
-  unit: "",
-  quantity: "1",
-  unitPrice: "",
-  taxRate: "21",
-  discountPct: "0",
-};
-
 export function PurchaseOrderForm({
   projectId,
   suppliers,
@@ -52,11 +44,17 @@ export function PurchaseOrderForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
   const [supplierContactId, setSupplierContactId] = useState("");
-  const [lines, setLines] = useState<PurchaseOrderLine[]>([{ ...DEFAULT_LINE }]);
+  const [lines, setLines] = useState<PurchaseOrderLine[]>([{ ...DEFAULT_PURCHASE_ORDER_LINE }]);
+
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [error]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError(null);
     if (!supplierContactId) {
       setError("Debe seleccionar un proveedor");
       return;
@@ -110,14 +108,20 @@ export function PurchaseOrderForm({
   }
 
   return (
-    <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
+    <div className={variant === "card" ? "rounded-lg border bg-card p-4 sm:p-6" : undefined}>
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p
+            ref={errorRef}
+            className="rounded bg-destructive/10 p-3 text-sm text-destructive"
+            role="alert"
+          >
+            {error}
+          </p>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 space-y-1">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2 space-y-1">
             <Label htmlFor="po-supplier">Proveedor</Label>
             {suppliers.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -139,11 +143,11 @@ export function PurchaseOrderForm({
 
           <div className="space-y-1">
             <Label htmlFor="issueDate">Fecha de emisión</Label>
-            <Input id="issueDate" name="issueDate" type="date" required />
+            <Input id="issueDate" name="issueDate" type="date" required className="min-h-11 md:min-h-9" />
           </div>
           <div className="space-y-1">
             <Label htmlFor="expectedDeliveryDate">Fecha de entrega esperada</Label>
-            <Input id="expectedDeliveryDate" name="expectedDeliveryDate" type="date" />
+            <Input id="expectedDeliveryDate" name="expectedDeliveryDate" type="date" className="min-h-11 md:min-h-9" />
           </div>
         </div>
 
@@ -162,7 +166,7 @@ export function PurchaseOrderForm({
         {allowEmergencyDirectPo && (
           <div className="space-y-1">
             <Label htmlFor="emergencyReason">Motivo de emergencia (si supera umbral sin SC)</Label>
-            <Textarea id="emergencyReason" name="emergencyReason" rows={2} />
+            <AutoGrowTextarea id="emergencyReason" name="emergencyReason" />
             <p className="text-xs text-muted-foreground">
               Obligatorio para OC directa sobre el umbral de solicitud. Solo OWNER/ADMIN.
             </p>
@@ -170,19 +174,24 @@ export function PurchaseOrderForm({
         )}
 
         <div className="space-y-1">
-          <Label htmlFor="notes">Notas (opcional)</Label>
-          <Textarea id="notes" name="notes" rows={2} />
+          <Label htmlFor="notes">Notas</Label>
+          <AutoGrowTextarea id="notes" name="notes" />
         </div>
 
-        <div className="flex justify-end gap-2">
+        <div className="sticky bottom-0 z-20 -mx-1 flex flex-col-reverse gap-2 border-t bg-background/95 p-3 backdrop-blur sm:flex-row sm:justify-end md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
           <Button
             type="button"
             variant="outline"
+            className="min-h-11 md:min-h-9"
             onClick={onCancel ?? (() => router.back())}
           >
             Cancelar
           </Button>
-          <Button type="submit" disabled={isPending || suppliers.length === 0}>
+          <Button
+            type="submit"
+            className="min-h-11 md:min-h-9"
+            disabled={isPending || suppliers.length === 0}
+          >
             {isPending ? "Guardando…" : "Crear orden de compra"}
           </Button>
         </div>

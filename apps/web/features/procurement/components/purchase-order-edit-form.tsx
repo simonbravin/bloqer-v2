@@ -1,22 +1,25 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
+import { PROCUREMENT_FORM_PAGE_CLASS } from "@/features/procurement/lib/procurement-form-layout";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
-import { PurchaseOrderLinesEditor } from "./purchase-order-lines-editor";
-import type { PurchaseOrderLine, WbsOption, ProductOption } from "./purchase-order-lines-editor";
+import {
+  DEFAULT_PURCHASE_ORDER_LINE,
+  PurchaseOrderLinesEditor,
+  type PurchaseOrderLine,
+  type ProductOption,
+  type WbsOption,
+} from "./purchase-order-lines-editor";
 import { updatePurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 import type { PurchaseOrderView } from "@bloqer/services";
 import type { SupplierOption } from "./purchase-order-form";
-
-function toDateStr(d: Date | string): string {
-  return d instanceof Date ? d.toISOString().split("T")[0] : String(d).split("T")[0];
-}
+import { toDateInput } from "@/lib/date-input";
 
 interface Props {
   projectId: string;
@@ -39,6 +42,7 @@ export function PurchaseOrderEditForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
   const [supplierContactId, setSupplierContactId] = useState(order.supplierContactId);
   const [lines, setLines] = useState<PurchaseOrderLine[]>(
     order.lines.length > 0
@@ -55,14 +59,19 @@ export function PurchaseOrderEditForm({
           discountPct: l.discountPct ?? "0",
           varianceJustification: l.varianceJustification,
         }))
-      : [{ wbsNodeId: null, productId: null, costAnalysisLineId: null, costType: "MATERIAL", description: "", unit: "", quantity: "1", unitPrice: "", taxRate: "21", discountPct: "0" }],
+      : [{ ...DEFAULT_PURCHASE_ORDER_LINE }],
   );
 
   const showEmergency =
     allowEmergencyDirectPo && !order.purchaseRequestId;
 
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [error]);
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError(null);
     if (lines.some((l) => !l.wbsNodeId)) {
       setError("Cada línea debe tener un ítem EDT");
       return;
@@ -110,16 +119,23 @@ export function PurchaseOrderEditForm({
   }
 
   return (
-    <div className="rounded-lg border bg-card p-6">
+    <div className={`${PROCUREMENT_FORM_PAGE_CLASS} rounded-lg border bg-card p-4 sm:p-6`}>
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p
+            ref={errorRef}
+            className="rounded bg-destructive/10 p-3 text-sm text-destructive"
+            role="alert"
+          >
+            {error}
+          </p>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 space-y-1">
-            <Label>Proveedor</Label>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2 space-y-1">
+            <Label htmlFor="po-supplier">Proveedor</Label>
             <SearchableCombobox
+              id="po-supplier"
               popoverWidth="wide"
               options={toSearchableOptions(suppliers)}
               value={supplierContactId}
@@ -134,14 +150,16 @@ export function PurchaseOrderEditForm({
             <Label htmlFor="issueDate">Fecha de emisión</Label>
             <Input
               id="issueDate" name="issueDate" type="date" required
-              defaultValue={toDateStr(order.issueDate)}
+              defaultValue={toDateInput(order.issueDate)}
+              className="min-h-11 md:min-h-9"
             />
           </div>
           <div className="space-y-1">
             <Label htmlFor="expectedDeliveryDate">Fecha de entrega esperada</Label>
             <Input
               id="expectedDeliveryDate" name="expectedDeliveryDate" type="date"
-              defaultValue={order.expectedDeliveryDate ? toDateStr(order.expectedDeliveryDate) : ""}
+              defaultValue={toDateInput(order.expectedDeliveryDate)}
+              className="min-h-11 md:min-h-9"
             />
           </div>
         </div>
@@ -161,10 +179,9 @@ export function PurchaseOrderEditForm({
         {showEmergency && (
           <div className="space-y-1">
             <Label htmlFor="emergencyReason">Motivo de emergencia (si supera umbral sin SC)</Label>
-            <Textarea
+            <AutoGrowTextarea
               id="emergencyReason"
               name="emergencyReason"
-              rows={2}
               defaultValue={order.emergencyReason ?? ""}
             />
             <p className="text-xs text-muted-foreground">
@@ -174,13 +191,15 @@ export function PurchaseOrderEditForm({
         )}
 
         <div className="space-y-1">
-          <Label htmlFor="notes">Notas (opcional)</Label>
-          <Textarea id="notes" name="notes" rows={2} defaultValue={order.notes ?? ""} />
+          <Label htmlFor="notes">Notas</Label>
+          <AutoGrowTextarea id="notes" name="notes" defaultValue={order.notes ?? ""} />
         </div>
 
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>
-          <Button type="submit" disabled={isPending}>
+        <div className="sticky bottom-0 z-20 -mx-1 flex flex-col-reverse gap-2 border-t bg-background/95 p-3 backdrop-blur sm:flex-row sm:justify-end md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+          <Button type="button" variant="outline" className="min-h-11 md:min-h-9" onClick={() => router.back()}>
+            Cancelar
+          </Button>
+          <Button type="submit" className="min-h-11 md:min-h-9" disabled={isPending}>
             {isPending ? "Guardando…" : "Guardar cambios"}
           </Button>
         </div>

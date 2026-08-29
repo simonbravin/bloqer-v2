@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { PurchaseOrderForm, type SupplierOption } from "./purchase-order-form";
 import type { ProductOption, WbsOption } from "./purchase-order-lines-editor";
+import { PROCUREMENT_FORM_DIALOG_CLASS } from "@/features/procurement/lib/procurement-form-layout";
+import { useHasMounted, useIsMdUp } from "@/lib/media-query";
 
 interface Props {
   projectId: string;
@@ -39,10 +42,18 @@ export function NewPurchaseOrderDialog({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(defaultOpen);
+  const hasMounted = useHasMounted();
+  const isMdUp = useIsMdUp();
+  const nuevoHref = `/proyectos/${projectId}/ordenes-compra/nueva`;
 
   useEffect(() => {
     if (defaultOpen) setOpen(true);
   }, [defaultOpen]);
+
+  useEffect(() => {
+    if (!hasMounted || isMdUp || !defaultOpen) return;
+    router.replace(nuevoHref);
+  }, [hasMounted, isMdUp, defaultOpen, router, nuevoHref]);
 
   function clearCreateQueryParam() {
     if (searchParams.get("create") !== "1") return;
@@ -62,6 +73,22 @@ export function NewPurchaseOrderDialog({
     setOpen(false);
   }
 
+  if (!hasMounted) {
+    return (
+      <Button variant={triggerVariant} className="min-h-11" disabled>
+        {triggerLabel}
+      </Button>
+    );
+  }
+
+  if (!isMdUp) {
+    return (
+      <Button asChild variant={triggerVariant} className="min-h-11">
+        <Link href={nuevoHref}>{triggerLabel}</Link>
+      </Button>
+    );
+  }
+
   return (
     <Dialog
       open={open}
@@ -73,7 +100,7 @@ export function NewPurchaseOrderDialog({
       <DialogTrigger asChild>
         <Button variant={triggerVariant}>{triggerLabel}</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className={PROCUREMENT_FORM_DIALOG_CLASS}>
         <DialogHeader>
           <DialogTitle>Nueva orden de compra</DialogTitle>
           <DialogDescription className="sr-only">
