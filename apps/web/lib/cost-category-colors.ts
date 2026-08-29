@@ -15,6 +15,17 @@ export const COST_CATEGORY_LABELS_ES: Record<string, string> = {
   OTHER: "Otros",
 };
 
+/** Selector options for typed OC / invoice lines ([D-099]), in canonical order. */
+export const COST_CATEGORY_OPTIONS = [
+  { value: "MATERIAL", label: "Materiales" },
+  { value: "LABOR", label: "Mano de obra" },
+  { value: "EQUIPMENT", label: "Equipos" },
+  { value: "SUBCONTRACT", label: "Subcontratos" },
+  { value: "OTHER", label: "Otros" },
+] as const;
+
+export type CostCategoryOptionValue = (typeof COST_CATEGORY_OPTIONS)[number]["value"];
+
 export function costCategoryColor(category: string, fallbackIndex = 0): string {
   return (
     COST_CATEGORY_COLORS[category] ??

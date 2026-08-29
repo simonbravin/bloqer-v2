@@ -125,6 +125,7 @@ El total por partida EDT (capas [D-021] / exposición [BR-COS-002]) se puede **p
 
 - **Presupuesto por tipo:** suma de líneas APU (`CostAnalysisLine`) de esa categoría bajo la partida.
 - **Actuals por tipo:** documentos tipados (`costType` en líneas de SC/OC/factura; subcontrato → SUBCONTRACT; consumo stock → MATERIAL).
+- **`open_committed` por tipo:** el devengado ligado (`accrued_linked`) descuenta el bucket **de la OC**, no el de la factura. Si una factura se retipa (OC en MAT, factura en LAB), el gasto va a LAB y el compromiso liberado sale de MAT; así los buckets siguen sumando el total de la partida en vez de duplicar exposición.
 - Tipar **no** introduce un eje APU-línea como cost code ([D-057] / [D-068]).
 - Forecast to Complete / EAC editable: fuera de v1 (ver [OPEN_QUESTIONS](../00-product/OPEN_QUESTIONS.md) Q-059).
 

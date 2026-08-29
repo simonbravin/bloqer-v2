@@ -22,6 +22,7 @@ import { parseFilterDate } from "../reports/report-month";
 import {
   COST_TYPE_LABELS_ES,
   COST_TYPE_ORDER,
+  dominantCostTypeByWbs,
   inventoryCostType,
   resolveLineCostType,
   subcontractCostType,
@@ -30,6 +31,7 @@ import {
 export {
   COST_TYPE_LABELS_ES,
   COST_TYPE_ORDER,
+  dominantCostTypeByWbs,
   inventoryCostType,
   resolveLineCostType,
   subcontractCostType,
@@ -691,19 +693,26 @@ export async function getProjectCostControl(
     if (!inv.purchaseOrder) continue;
     const linkedLines = inv.lines.filter((l) => l.purchaseOrderLineId);
     if (linkedLines.length > 0) {
+      const commitmentTypeByWbs = dominantCostTypeByWbs(inv.purchaseOrder.lines);
       for (const line of linkedLines) {
         const wbsId = line.purchaseOrderLine?.wbsNodeId ?? line.wbsNodeId;
         const amount = new Prisma.Decimal(line.lineSubtotal);
-        const costType = resolveLineCostType({
+        const spentType = resolveLineCostType({
           costType: line.costType ?? line.purchaseOrderLine?.costType ?? null,
+          apuCategory: null,
+        });
+        // The consumed commitment keeps the OC line nature ([D-099]): re-typing the invoice
+        // must not leave phantom open_committed in the bucket the OC actually committed.
+        const commitmentType = resolveLineCostType({
+          costType: line.purchaseOrderLine?.costType ?? line.costType ?? null,
           apuCategory: null,
         });
         if (wbsId && wbsNodeIds.has(wbsId)) {
           add(accMap, wbsId, "accruedCost", amount);
           // Only FK-mapped lines consume open_committed on that partida ([D-065]).
           add(accMap, wbsId, "accruedLinkedCost", amount);
-          addTyped(typeAccMap, wbsId, costType, "accruedCost", amount);
-          addTyped(typeAccMap, wbsId, costType, "accruedLinkedCost", amount);
+          addTyped(typeAccMap, wbsId, spentType, "accruedCost", amount);
+          addTyped(typeAccMap, wbsId, commitmentType, "accruedLinkedCost", amount);
         } else {
           unalloc.accruedCost = unalloc.accruedCost.add(amount);
         }
@@ -711,19 +720,17 @@ export async function getProjectCostControl(
       // Orphan lines on a PO invoice: accrue by line WBS. If that WBS is on the
       // same OC commitment, also count as linked so open_committed shrinks ([D-065]).
       const orphanLines = inv.lines.filter((l) => !l.purchaseOrderLineId);
-      const poWbsOnCommitment = new Set(
-        inv.purchaseOrder.lines.map((l) => l.wbsNodeId).filter((id): id is string => Boolean(id)),
-      );
       for (const line of orphanLines) {
         const amount = new Prisma.Decimal(line.lineSubtotal);
         const wbsId = line.wbsNodeId;
-        const costType = resolveLineCostType({ costType: line.costType, apuCategory: null });
+        const spentType = resolveLineCostType({ costType: line.costType, apuCategory: null });
         if (wbsId && wbsNodeIds.has(wbsId)) {
           add(accMap, wbsId, "accruedCost", amount);
-          addTyped(typeAccMap, wbsId, costType, "accruedCost", amount);
-          if (poWbsOnCommitment.has(wbsId)) {
+          addTyped(typeAccMap, wbsId, spentType, "accruedCost", amount);
+          const commitmentType = commitmentTypeByWbs.get(wbsId);
+          if (commitmentType) {
             add(accMap, wbsId, "accruedLinkedCost", amount);
-            addTyped(typeAccMap, wbsId, costType, "accruedLinkedCost", amount);
+            addTyped(typeAccMap, wbsId, commitmentType, "accruedLinkedCost", amount);
           }
         } else {
           unalloc.accruedCost = unalloc.accruedCost.add(amount);

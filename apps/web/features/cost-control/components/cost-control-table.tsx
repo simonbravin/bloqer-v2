@@ -3,7 +3,12 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import type { CostControlFilters, CostControlRow, CostControlTotals } from "@bloqer/services";
+import type {
+  CostControlFilters,
+  CostControlRow,
+  CostControlTotals,
+  CostTypeBucket,
+} from "@bloqer/services";
 import {
   Table,
   TableBody,
@@ -174,6 +179,41 @@ function cellValue(row: CostControlRow, col: EdtColumnId): ReactNode {
       return <PctPill value={row.pctExposure} />;
     default:
       return null;
+  }
+}
+
+/** Money columns a cost-type bucket can fill ([D-099]); the rest render as "—". */
+const BUCKET_COLUMNS: EdtColumnId[] = [
+  "budgetCost",
+  "committed",
+  "accrued",
+  "paid",
+  "consumed",
+  "openCommitted",
+  "exposure",
+  "variance",
+];
+
+function bucketCellValue(bucket: CostTypeBucket, col: EdtColumnId): ReactNode {
+  switch (col) {
+    case "budgetCost":
+      return formatMoneyAmount(bucket.budgetTotalCost);
+    case "committed":
+      return formatMoneyAmount(bucket.committedCost);
+    case "accrued":
+      return formatMoneyAmount(bucket.accruedCost);
+    case "paid":
+      return formatMoneyAmount(bucket.paidCost);
+    case "consumed":
+      return formatMoneyAmount(bucket.inventoryConsumedCost);
+    case "openCommitted":
+      return formatMoneyAmount(bucket.openCommittedCost);
+    case "exposure":
+      return formatMoneyAmount(bucket.expectedCostExposure);
+    case "variance":
+      return formatMoneyAmount(bucket.costVariance);
+    default:
+      return "—";
   }
 }
 
@@ -355,6 +395,8 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
   }
 
   const columns = columnsForPreset(presetState);
+  // Quantity / % presets have no money column, so a bucket row would be all dashes.
+  const typeExpandAvailable = columns.some((col) => BUCKET_COLUMNS.includes(col));
 
   function openFromList(e: MouseEvent, row: CostControlRow) {
     if (isModifiedClick(e)) return;
@@ -464,9 +506,9 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
               </TableHeader>
               <TableBody>
                 {rows.flatMap((row) => {
-                  const expanded = typeExpanded.has(row.wbsNodeId);
                   const buckets = row.byCostType ?? [];
-                  const canExpand = buckets.length > 0;
+                  const canExpand = typeExpandAvailable && buckets.length > 0;
+                  const expanded = canExpand && typeExpanded.has(row.wbsNodeId);
                   const main = (
                     <TableRow
                       key={row.wbsNodeId}
@@ -558,23 +600,7 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
                         </TableCell>
                         {columns.map((col) => (
                           <TableCell key={col} className="text-right tabular-nums text-[11px]">
-                            {col === "budgetCost"
-                              ? formatMoneyAmount(b.budgetTotalCost)
-                              : col === "committed"
-                                ? formatMoneyAmount(b.committedCost)
-                                : col === "accrued"
-                                  ? formatMoneyAmount(b.accruedCost)
-                                  : col === "paid"
-                                    ? formatMoneyAmount(b.paidCost)
-                                    : col === "consumed"
-                                      ? formatMoneyAmount(b.inventoryConsumedCost)
-                                      : col === "openCommitted"
-                                        ? formatMoneyAmount(b.openCommittedCost)
-                                        : col === "exposure"
-                                          ? formatMoneyAmount(b.expectedCostExposure)
-                                          : col === "variance"
-                                            ? formatMoneyAmount(b.costVariance)
-                                            : "—"}
+                            {bucketCellValue(b, col)}
                           </TableCell>
                         ))}
                       </TableRow>

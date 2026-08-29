@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { IVA_RATE_PRESETS, IVA_RATE_LABEL_ES, normalizeIvaRatePreset } from "@bloqer/domain";
+import { COST_CATEGORY_OPTIONS, type CostCategoryOptionValue } from "@/lib/cost-category-colors";
 
 export type InvoiceLine = {
   description: string;
@@ -34,7 +35,7 @@ export type InvoiceLine = {
   /** Set when line comes from OC draft ([D-066]); kept for submit. */
   purchaseOrderLineId?: string | null;
   /** Job-cost nature ([D-099]). */
-  costType?: "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER" | null;
+  costType?: CostCategoryOptionValue | null;
 };
 
 export type InvoiceWbsOption = {
@@ -42,14 +43,6 @@ export type InvoiceWbsOption = {
   code: string;
   name: string;
 };
-
-const COST_TYPE_OPTIONS = [
-  { value: "MATERIAL", label: "Materiales" },
-  { value: "LABOR", label: "Mano de obra" },
-  { value: "EQUIPMENT", label: "Equipos" },
-  { value: "SUBCONTRACT", label: "Subcontratos" },
-  { value: "OTHER", label: "Otros" },
-] as const;
 
 function createLineKey(): string {
   return crypto.randomUUID();
@@ -277,7 +270,7 @@ export function InvoiceLinesEditor({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {COST_TYPE_OPTIONS.map((o) => (
+                        {COST_CATEGORY_OPTIONS.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
                             {o.label}
                           </SelectItem>

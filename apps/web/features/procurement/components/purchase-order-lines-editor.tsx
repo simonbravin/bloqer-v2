@@ -20,13 +20,14 @@ import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { formatDecimalArFromString, formatQtyDisplay, isPositiveMoneyAmount, isPositiveQty } from "@/lib/format-money";
 import { IVA_RATE_PRESETS, IVA_RATE_LABEL_ES, normalizeIvaRatePreset } from "@bloqer/domain";
+import { COST_CATEGORY_OPTIONS, type CostCategoryOptionValue } from "@/lib/cost-category-colors";
 
 export type PurchaseOrderLine = {
   wbsNodeId: string | null;
   productId: string | null;
   costAnalysisLineId: string | null;
   /** Job-cost nature ([D-099]). */
-  costType: "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER";
+  costType: CostCategoryOptionValue;
   description: string;
   unit: string;
   quantity: string;
@@ -85,14 +86,6 @@ interface Props {
   showVarianceJustification?: boolean;
 }
 
-const COST_TYPE_OPTIONS = [
-  { value: "MATERIAL", label: "Materiales" },
-  { value: "LABOR", label: "Mano de obra" },
-  { value: "EQUIPMENT", label: "Equipos" },
-  { value: "SUBCONTRACT", label: "Subcontratos" },
-  { value: "OTHER", label: "Otros" },
-] as const;
-
 const DEFAULT_LINE: PurchaseOrderLine = {
   wbsNodeId: null,
   productId: null,
@@ -149,9 +142,10 @@ export function PurchaseOrderLinesEditor({
       if (idx !== i) return l;
       const patched: PurchaseOrderLine = { ...l, [field]: value };
       if (field === "wbsNodeId") {
+        // Stale LAB/EQP inherited from the old APU must not stick to another partida,
+        // but a type the user picked by hand survives the partida change.
+        if (l.costAnalysisLineId) patched.costType = "MATERIAL";
         patched.costAnalysisLineId = null;
-        // Stale LAB/EQP from a previous APU must not stick to another partida.
-        patched.costType = "MATERIAL";
       }
       return patched;
     });
@@ -174,7 +168,7 @@ export function PurchaseOrderLinesEditor({
     const next: PurchaseOrderLine = {
       ...line,
       costAnalysisLineId: apu.id,
-      costType: (COST_TYPE_OPTIONS.some((o) => o.value === apu.category)
+      costType: (COST_CATEGORY_OPTIONS.some((o) => o.value === apu.category)
         ? (apu.category as PurchaseOrderLine["costType"])
         : "MATERIAL"),
       description: apu.description,
@@ -385,7 +379,7 @@ export function PurchaseOrderLinesEditor({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {COST_TYPE_OPTIONS.map((o) => (
+                      {COST_CATEGORY_OPTIONS.map((o) => (
                         <SelectItem key={o.value} value={o.value}>
                           {o.label}
                         </SelectItem>
