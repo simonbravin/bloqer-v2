@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { formatDateTime } from "@/lib/format";
+import { formatScheduledInstant } from "./format-scheduled-instant";
 import {
   EMAIL_DELIVERY_STATUS_HINT,
   EMAIL_DELIVERY_STATUS_LABEL,
@@ -40,9 +40,11 @@ function runSummary(run: ScheduledReportExecutionRun): string {
 type Props = {
   runs: ScheduledReportExecutionRun[];
   deliveries: ScheduledReportEmailDeliveryRow[];
+  /** Schedule IANA timezone — same as next/last run (avoid SSR UTC). */
+  timezone: string;
 };
 
-export function ScheduledReportExecutionHistory({ runs, deliveries }: Props) {
+export function ScheduledReportExecutionHistory({ runs, deliveries, timezone }: Props) {
   const hasHistory = deliveries.length > 0;
 
   return (
@@ -67,7 +69,9 @@ export function ScheduledReportExecutionHistory({ runs, deliveries }: Props) {
                   >
                     <summary className="cursor-pointer list-none text-sm [&::-webkit-details-marker]:hidden">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-medium">{formatDateTime(run.at)}</span>
+                        <span className="font-medium">
+                          {formatScheduledInstant(run.at, timezone)}
+                        </span>
                         <span className="text-muted-foreground text-xs">{runSummary(run)}</span>
                       </div>
                       {run.runWindow ? (
@@ -131,7 +135,7 @@ export function ScheduledReportExecutionHistory({ runs, deliveries }: Props) {
                     {deliveries.map((d) => (
                       <TableRow key={d.id}>
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                          {formatDateTime(d.createdAt)}
+                          {formatScheduledInstant(d.createdAt, timezone)}
                         </TableCell>
                         <TableCell className="text-sm max-w-[180px] truncate">
                           {d.recipientEmail}

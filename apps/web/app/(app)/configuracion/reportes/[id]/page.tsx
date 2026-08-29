@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { formatDateTime } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { loadScheduledReportFormData } from "@/lib/scheduled-report-form-data";
@@ -15,9 +14,11 @@ import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/page-shell";
 import { ScheduledReportForm } from "@/features/scheduled-reports/scheduled-report-form";
 import { ScheduledReportDeleteButton } from "@/features/scheduled-reports/scheduled-report-delete-button";
+import { ScheduledReportSendNowButton } from "@/features/scheduled-reports/scheduled-report-send-now-button";
 import { ScheduledReportStatusPanel } from "@/features/scheduled-reports/scheduled-report-status-panel";
 import { ScheduledReportExecutionHistory } from "@/features/scheduled-reports/scheduled-report-execution-history";
 import { ScheduledReportRunActions } from "@/features/scheduled-reports/scheduled-report-run-actions";
+import { formatScheduledInstant } from "@/features/scheduled-reports/format-scheduled-instant";
 import {
   deactivateScheduledReportAction,
   reactivateScheduledReportAction,
@@ -57,7 +58,7 @@ export default async function EditarReporteProgramadoPage({ params, searchParams
     updated: "Cambios guardados.",
     paused: "Envío pausado.",
     reactivated: "Envío reactivado.",
-    ran_now: "Ejecución manual completada.",
+    ran_now: "Corrida manual finalizada.",
     retried: "Reintento de fallidos completado.",
   };
 
@@ -69,7 +70,8 @@ export default async function EditarReporteProgramadoPage({ params, searchParams
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{detail.name}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Configuración de envío programado · Próxima ejecución: {formatDateTime(detail.nextRunAt)}
+            Configuración de envío programado · Próxima ejecución:{" "}
+            {formatScheduledInstant(detail.nextRunAt, detail.timezone)}
           </p>
           {sp.ok && okMessages[sp.ok] ? (
             <p className="mt-2 text-sm text-green-600 dark:text-green-500">
@@ -89,6 +91,13 @@ export default async function EditarReporteProgramadoPage({ params, searchParams
           <Button variant="outline" asChild>
             <Link href="/configuracion/reportes">Volver al listado</Link>
           </Button>
+          {detail.status === "ACTIVE" ? (
+            <ScheduledReportSendNowButton
+              id={id}
+              scheduleName={detail.name}
+              recipientCount={detail.recipientCount}
+            />
+          ) : null}
           {detail.status === "ACTIVE" ? (
             <form action={deactivateScheduledReportAction.bind(null, id)}>
               <Button type="submit" variant="secondary">
@@ -116,7 +125,11 @@ export default async function EditarReporteProgramadoPage({ params, searchParams
         />
       ) : null}
 
-      <ScheduledReportExecutionHistory runs={runs} deliveries={deliveries} />
+      <ScheduledReportExecutionHistory
+        runs={runs}
+        deliveries={deliveries}
+        timezone={detail.timezone}
+      />
 
       {detail.status === "DELETED" ? (
         <p className="text-sm text-muted-foreground">Este envío fue eliminado y no se puede editar.</p>

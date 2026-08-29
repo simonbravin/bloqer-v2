@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { formatDateTime } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import {
@@ -19,6 +18,7 @@ import {
   SCHEDULED_REPORT_STATUS_LABEL,
   runStatusBadgeVariant,
 } from "@/features/scheduled-reports/scheduled-report-labels";
+import { formatScheduledInstant } from "@/features/scheduled-reports/format-scheduled-instant";
 import {
   Table,
   TableBody,
@@ -95,11 +95,13 @@ export default async function ProjectReportesProgramadosPage({ params }: Props) 
               {rows.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.name}</TableCell>
-                  <TableCell className="text-sm">{formatDateTime(r.nextRunAt)}</TableCell>
+                  <TableCell className="text-sm">
+                    {formatScheduledInstant(r.nextRunAt, r.timezone)}
+                  </TableCell>
                   <TableCell className="text-sm">
                     {r.lastRunAt ? (
                       <>
-                        {formatDateTime(r.lastRunAt)}
+                        {formatScheduledInstant(r.lastRunAt, r.timezone)}
                         {r.lastRunStatus ? (
                           <Badge variant={runStatusBadgeVariant(r.lastRunStatus)} className="mt-1">
                             {SCHEDULED_REPORT_RUN_STATUS_LABEL[r.lastRunStatus]}

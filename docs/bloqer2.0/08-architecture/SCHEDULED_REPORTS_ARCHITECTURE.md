@@ -30,8 +30,8 @@
 
 ## Phase 17D (implementado)
 
-- **HTTP:** `GET` / `POST` `/api/cron/scheduled-reports` — mismo `CRON_SECRET` que alertas operativas (≥16 chars); opcional `?tenantId=`.
-- **Vercel Cron:** `5 * * * *` (cada hora, minuto 5) en `apps/web/vercel.json`.
+- **HTTP:** `GET` / `POST` `/api/cron/scheduled-reports` — mismo `CRON_SECRET` que alertas operativas (≥16 chars); opcional `?tenantId=`. Vercel: **cada hora** (`0 * * * *`) para respetar `timeOfDay` en cualquier zona; no solo 23:00 UTC.
+- **Vercel Cron:** `0 * * * *` (cada hora, minuto 0) en `apps/web/vercel.json`.
 - **Runner:** `scheduled-report-runner.service.ts` — due `ACTIVE` + `nextRunAt <= now`, lock `runLockUntil` 10 min, bundle **un email / destinatario** con N adjuntos (CSV/PDF según config).
 - **Exportes:** reutiliza `export*Csv` (`@bloqer/services`) y `buildScheduledReportPdfAttachment` (`@bloqer/report-pdf`); gates de módulo en corrida.
 - **Logs:** `EmailDeliveryLog` `REPORT_SCHEDULED`, `relatedEntityType` `SCHEDULED_REPORT`, idempotencia `scheduled:{scheduleId}:{runWindow}:{email}` (índice único parcial 17B).
@@ -39,7 +39,7 @@
 
 ## Phase 17E — Cierre operativo (implementado)
 
-- **Ejecutar ahora** (OWNER/ADMIN): envío manual inmediato; idempotencia `scheduled-manual:…`; **no** mueve `nextRunAt`.
+- **Enviar ahora** (OWNER/ADMIN): envío manual inmediato desde el detalle (confirmación); idempotencia `scheduled-manual:…`; **no** mueve `nextRunAt`. Solo si el envío está `ACTIVE`.
 - **Reintentar fallidos**: reenvío a destinatarios con `EmailDeliveryLog` `FAILED` (últimos 7 días); clave `scheduled-retry:…`; disponible con envío ACTIVE o PAUSED.
 - **Fuera de alcance deliberado** (no implementar sin ADR + producto):
 
@@ -65,7 +65,7 @@ Agrupado en **Financieros** / **Operativos** (mismo criterio que los hubs). `PRO
 1. `pnpm --filter @bloqer/database db:migrate:deploy` aplicado en el entorno.
 2. `CRON_SECRET` ≥ 16 chars en Vercel + local.
 3. Crear envío ACTIVE con 1 reporte + 1 destinatario (OWNER).
-4. **Ejecutar ahora** en detalle → historial con `deliveryKind: manual` y correo (o `SKIPPED` si Resend off).
+4. **Enviar ahora** en detalle → confirmá → historial con `deliveryKind: manual` y correo (o `SKIPPED` si Resend off).
 5. `GET /api/cron/scheduled-reports` con Bearer → JSON `schedulesProcessed` ≥ 0 cuando `nextRunAt` vencido.
 6. `/notificaciones/emails?emailType=REPORT_SCHEDULED&scheduledReportId=` filtra el envío.
 

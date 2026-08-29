@@ -2,7 +2,10 @@ import Link from "next/link";
 import type { ScheduledReportDetail } from "@bloqer/services";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDateTime } from "@/lib/format";
+import {
+  formatScheduledInstant,
+  scheduledTimezoneCaption,
+} from "./format-scheduled-instant";
 import {
   SCHEDULED_REPORT_FREQUENCY_LABEL,
   SCHEDULED_REPORT_RUN_STATUS_HINT,
@@ -31,13 +34,19 @@ export function ScheduledReportStatusPanel({ detail, emailsFilterHref }: Props) 
         </div>
         <div>
           <p className="text-muted-foreground">Próxima ejecución</p>
-          <p className="mt-1 font-medium">{formatDateTime(detail.nextRunAt)}</p>
-          <p className="text-xs text-muted-foreground">{detail.timezone}</p>
+          <p className="mt-1 font-medium">
+            {formatScheduledInstant(detail.nextRunAt, detail.timezone)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {scheduledTimezoneCaption(detail.timezone, detail.nextRunAt)}
+          </p>
         </div>
         <div>
           <p className="text-muted-foreground">Última corrida</p>
           <p className="mt-1 font-medium">
-            {detail.lastRunAt ? formatDateTime(detail.lastRunAt) : "Sin ejecuciones aún"}
+            {detail.lastRunAt
+              ? formatScheduledInstant(detail.lastRunAt, detail.timezone)
+              : "Sin ejecuciones aún"}
           </p>
           {detail.lastRunStatus ? (
             <>
@@ -57,7 +66,11 @@ export function ScheduledReportStatusPanel({ detail, emailsFilterHref }: Props) 
         <div>
           <p className="text-muted-foreground">Programación</p>
           <p className="mt-1">
-            {SCHEDULED_REPORT_FREQUENCY_LABEL[detail.frequency] ?? detail.frequency} · {detail.timeOfDay}
+            {SCHEDULED_REPORT_FREQUENCY_LABEL[detail.frequency] ?? detail.frequency} ·{" "}
+            {detail.timeOfDay}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Hora local de {scheduledTimezoneCaption(detail.timezone)}
           </p>
         </div>
         <div>

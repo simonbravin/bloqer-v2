@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { formatDateTime } from "@/lib/format";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import {
@@ -19,6 +18,7 @@ import {
   SCHEDULED_REPORT_STATUS_LABEL,
   runStatusBadgeVariant,
 } from "@/features/scheduled-reports/scheduled-report-labels";
+import { formatScheduledInstant } from "@/features/scheduled-reports/format-scheduled-instant";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import {
   Table,
@@ -115,11 +115,13 @@ export default async function ConfiguracionReportesPage({ searchParams }: Props)
                   <TableCell>
                     {SCHEDULED_REPORT_FREQUENCY_LABEL[r.frequency] ?? r.frequency} · {r.timeOfDay}
                   </TableCell>
-                  <TableCell className="text-sm">{formatDateTime(r.nextRunAt)}</TableCell>
+                  <TableCell className="text-sm">
+                    {formatScheduledInstant(r.nextRunAt, r.timezone)}
+                  </TableCell>
                   <TableCell className="text-sm">
                     {r.lastRunAt ? (
                       <span className="block">
-                        {formatDateTime(r.lastRunAt)}
+                        {formatScheduledInstant(r.lastRunAt, r.timezone)}
                         {r.lastRunStatus ? (
                           <Badge
                             variant={runStatusBadgeVariant(r.lastRunStatus)}

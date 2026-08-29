@@ -144,12 +144,22 @@ export async function runScheduledReportNow(
   if (row.status !== "ACTIVE") {
     throw new ServiceError("CONFLICT", "Solo se puede ejecutar un envío activo");
   }
+  if (row.recipients.length === 0) {
+    throw new ServiceError("VALIDATION", "El envío no tiene destinatarios");
+  }
   const now = new Date();
-  return runOneScheduledReport(row, now, buildAttachment, {
+  const summary = await runOneScheduledReport(row, now, buildAttachment, {
     runWindowOverride: `manual:${now.toISOString()}`,
     advanceNextRunAt: false,
     deliveryKind: "manual",
   });
+  if (summary.runStatus === "LOCKED") {
+    throw new ServiceError(
+      "CONFLICT",
+      "Hay otra ejecución en curso. Reintentá en unos minutos.",
+    );
+  }
+  return summary;
 }
 
 const RETRY_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -208,13 +218,20 @@ export async function retryScheduledReportFailedDeliveries(
   }
 
   const now = new Date();
-  return runOneScheduledReport(row, now, buildAttachment, {
+  const summary = await runOneScheduledReport(row, now, buildAttachment, {
     runWindowOverride: `retry:${now.toISOString()}`,
     advanceNextRunAt: false,
     deliveryKind: "retry",
     recipientEmails: failedEmails,
     jobsiteLogDateSource,
   });
+  if (summary.runStatus === "LOCKED") {
+    throw new ServiceError(
+      "CONFLICT",
+      "Hay otra ejecución en curso. Reintentá en unos minutos.",
+    );
+  }
+  return summary;
 }
 
 async function runOneScheduledReport(
@@ -252,65 +269,148 @@ async function runOneScheduledReport(
     };
   }
 
-  const runWindow = options.runWindowOverride ?? row.nextRunAt.toISOString();
-  const runId = randomUUID();
-  const ctx = buildScheduledReportsCronServiceContext(row.tenantId, row.companyId);
-  const params = paramsFromJson(row.params);
-  const attachmentErrors: string[] = [];
-  const attachments: Awaited<ReturnType<BuildScheduledReportAttachmentFn>> = [];
+  let finalized = false;
+  try {
+    const runWindow = options.runWindowOverride ?? row.nextRunAt.toISOString();
+    const runId = randomUUID();
+    const ctx = buildScheduledReportsCronServiceContext(row.tenantId, row.companyId);
+    const params = paramsFromJson(row.params);
+    const attachmentErrors: string[] = [];
+    const attachments: Awaited<ReturnType<BuildScheduledReportAttachmentFn>> = [];
 
-  // Scheduled slot date (nextRunAt), not wall-clock `now` — a late cron must still attach that day's parts.
-  // Retry may pass jobsiteLogDateSource from the failed delivery's original runWindow.
-  const jobsiteLogDateSource =
-    options.jobsiteLogDateSource ??
-    (deliveryKind === "scheduled" && options.runWindowOverride == null ? row.nextRunAt : now);
+    // Scheduled slot date (nextRunAt), not wall-clock `now` — a late cron must still attach that day's parts.
+    // Retry may pass jobsiteLogDateSource from the failed delivery's original runWindow.
+    const jobsiteLogDateSource =
+      options.jobsiteLogDateSource ??
+      (deliveryKind === "scheduled" && options.runWindowOverride == null ? row.nextRunAt : now);
 
-  for (const item of row.items) {
-    try {
-      const runParams =
-        item.reportKey === "TENANT_JOBSITE_DAILY_LOGS"
-          ? {
-              ...(params ?? {}),
-              runLogDate: calendarDateInTimezone(jobsiteLogDateSource, row.timezone),
-            }
-          : params;
-      const atts = await buildAttachment(
-        item.reportKey as ScheduledReportKey,
-        row.format,
-        row.projectId,
-        runParams,
+    for (const item of row.items) {
+      try {
+        const runParams =
+          item.reportKey === "TENANT_JOBSITE_DAILY_LOGS"
+            ? {
+                ...(params ?? {}),
+                runLogDate: calendarDateInTimezone(jobsiteLogDateSource, row.timezone),
+              }
+            : params;
+        const atts = await buildAttachment(
+          item.reportKey as ScheduledReportKey,
+          row.format,
+          row.projectId,
+          runParams,
+          ctx,
+        );
+        attachments.push(...atts);
+      } catch (e) {
+        if (isPartialScheduledAttachmentsError(e)) {
+          attachments.push(...e.attachments);
+          attachmentErrors.push(...e.itemErrors);
+          continue;
+        }
+        const msg =
+          e instanceof ServiceError
+            ? e.message
+            : e instanceof Error
+              ? e.message
+              : "Error al generar adjunto";
+        attachmentErrors.push(`${item.reportKey}: ${msg}`);
+      }
+    }
+
+    let recipientsSent = 0;
+    let recipientsSkipped = 0;
+    let recipientsFailed = 0;
+    let recipientsDuplicate = 0;
+
+    if (attachments.length === 0) {
+      const emptyStatus: ScheduledReportRunStatus =
+        attachmentErrors.length > 0 ? "FAILED" : "SKIPPED";
+      await finalizeScheduledReportRun(
+        row,
+        runWindow,
+        now,
+        emptyStatus,
+        {
+          recipientsSent,
+          recipientsSkipped,
+          recipientsFailed,
+          recipientsDuplicate,
+          attachmentErrors,
+        },
+        options.advanceNextRunAt !== false,
+      );
+      finalized = true;
+      return {
+        scheduleId: row.id,
+        ok: emptyStatus !== "FAILED",
+        runStatus: emptyStatus,
+        recipientsSent,
+        recipientsSkipped,
+        recipientsFailed,
+        recipientsDuplicate,
+        attachmentErrors,
+      };
+    }
+
+    for (const rec of row.recipients) {
+      const emailNorm = rec.recipient.email.trim().toLowerCase();
+      if (recipientFilter && !recipientFilter.has(emailNorm)) continue;
+
+      const result = await deliverScheduledReportBundle(
+        {
+          scheduleId: row.id,
+          scheduleName: row.name,
+          runWindow,
+          runId,
+          recipientUserId: rec.recipientUserId,
+          recipientEmail: rec.recipient.email,
+          attachments,
+          deliveryKind,
+          projectId: row.projectId,
+          timezone: row.timezone,
+        },
         ctx,
       );
-      attachments.push(...atts);
-    } catch (e) {
-      if (isPartialScheduledAttachmentsError(e)) {
-        attachments.push(...e.attachments);
-        attachmentErrors.push(...e.itemErrors);
-        continue;
+
+      switch (result.outcome) {
+        case "sent":
+          recipientsSent += 1;
+          break;
+        case "skipped":
+          recipientsSkipped += 1;
+          break;
+        case "failed":
+          recipientsFailed += 1;
+          break;
+        case "duplicate":
+          recipientsDuplicate += 1;
+          break;
       }
-      const msg =
-        e instanceof ServiceError
-          ? e.message
-          : e instanceof Error
-            ? e.message
-            : "Error al generar adjunto";
-      attachmentErrors.push(`${item.reportKey}: ${msg}`);
     }
-  }
 
-  let recipientsSent = 0;
-  let recipientsSkipped = 0;
-  let recipientsFailed = 0;
-  let recipientsDuplicate = 0;
+    if (recipientFilter) {
+      const attempted = recipientsSent + recipientsSkipped + recipientsFailed + recipientsDuplicate;
+      if (attempted === 0) {
+        throw new ServiceError(
+          "VALIDATION",
+          "Ningún destinatario fallido coincide con la configuración actual",
+        );
+      }
+    }
 
-  if (attachments.length === 0) {
-    const emptyStatus: ScheduledReportRunStatus =
-      attachmentErrors.length > 0 ? "FAILED" : "SKIPPED";
+    const runStatus = deriveScheduledReportRunStatus({
+      recipientsSent,
+      recipientsSkipped,
+      recipientsFailed,
+      recipientsDuplicate,
+      attachmentErrorCount: attachmentErrors.length,
+    });
+
     await finalizeScheduledReportRun(
       row,
       runWindow,
       now,
-      emptyStatus,
+      runStatus,
       {
         recipientsSent,
         recipientsSkipped,
@@ -320,101 +420,28 @@ async function runOneScheduledReport(
       },
       options.advanceNextRunAt !== false,
     );
+    finalized = true;
+
     return {
       scheduleId: row.id,
-      ok: emptyStatus !== "FAILED",
-      runStatus: emptyStatus,
+      ok: runStatus !== "FAILED",
+      runStatus,
       recipientsSent,
       recipientsSkipped,
       recipientsFailed,
       recipientsDuplicate,
       attachmentErrors,
     };
-  }
-
-  for (const rec of row.recipients) {
-    const emailNorm = rec.recipient.email.trim().toLowerCase();
-    if (recipientFilter && !recipientFilter.has(emailNorm)) continue;
-
-    const result = await deliverScheduledReportBundle(
-      {
-        scheduleId: row.id,
-        scheduleName: row.name,
-        runWindow,
-        runId,
-        recipientUserId: rec.recipientUserId,
-        recipientEmail: rec.recipient.email,
-        attachments,
-        deliveryKind,
-        projectId: row.projectId,
-        timezone: row.timezone,
-      },
-      ctx,
-    );
-
-    switch (result.outcome) {
-      case "sent":
-        recipientsSent += 1;
-        break;
-      case "skipped":
-        recipientsSkipped += 1;
-        break;
-      case "failed":
-        recipientsFailed += 1;
-        break;
-      case "duplicate":
-        recipientsDuplicate += 1;
-        break;
+  } finally {
+    if (!finalized) {
+      await prisma.scheduledReport
+        .update({
+          where: { id: row.id, tenantId: row.tenantId },
+          data: { runLockUntil: null },
+        })
+        .catch(() => undefined);
     }
   }
-
-  if (recipientFilter) {
-    const attempted = recipientsSent + recipientsSkipped + recipientsFailed + recipientsDuplicate;
-    if (attempted === 0) {
-      await prisma.scheduledReport.update({
-        where: { id: row.id, tenantId: row.tenantId },
-        data: { runLockUntil: null },
-      });
-      throw new ServiceError(
-        "VALIDATION",
-        "Ningún destinatario fallido coincide con la configuración actual",
-      );
-    }
-  }
-
-  const runStatus = deriveScheduledReportRunStatus({
-    recipientsSent,
-    recipientsSkipped,
-    recipientsFailed,
-    recipientsDuplicate,
-    attachmentErrorCount: attachmentErrors.length,
-  });
-
-  await finalizeScheduledReportRun(
-    row,
-    runWindow,
-    now,
-    runStatus,
-    {
-      recipientsSent,
-      recipientsSkipped,
-      recipientsFailed,
-      recipientsDuplicate,
-      attachmentErrors,
-    },
-    options.advanceNextRunAt !== false,
-  );
-
-  return {
-    scheduleId: row.id,
-    ok: runStatus !== "FAILED",
-    runStatus,
-    recipientsSent,
-    recipientsSkipped,
-    recipientsFailed,
-    recipientsDuplicate,
-    attachmentErrors,
-  };
 }
 
 async function finalizeScheduledReportRun(

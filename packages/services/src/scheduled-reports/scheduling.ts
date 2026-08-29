@@ -50,7 +50,11 @@ function partsInTimezone(date: Date, timeZone: string): LocalParts {
     year: Number(map.year),
     month: Number(map.month),
     day: Number(map.day),
-    hour: Number(map.hour),
+    // Some engines report midnight as 24:00; normalize to 0.
+    hour: (() => {
+      const h = Number(map.hour);
+      return h === 24 ? 0 : h;
+    })(),
     minute: Number(map.minute),
     weekday: weekdayMap[weekdayShort] ?? 1,
   };

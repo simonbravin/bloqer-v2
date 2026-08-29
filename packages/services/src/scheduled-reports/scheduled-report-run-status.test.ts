@@ -28,6 +28,19 @@ test("a successful delivery remains successful with duplicate recipients", () =>
   );
 });
 
+test("zero recipients attempted is skipped, not success", () => {
+  assert.equal(
+    deriveScheduledReportRunStatus({
+      recipientsSent: 0,
+      recipientsSkipped: 0,
+      recipientsFailed: 0,
+      recipientsDuplicate: 0,
+      attachmentErrorCount: 0,
+    }),
+    "SKIPPED",
+  );
+});
+
 test("mixed sent and failed recipients produce a partial run", () => {
   assert.equal(
     deriveScheduledReportRunStatus({
