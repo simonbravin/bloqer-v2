@@ -30,8 +30,8 @@
 
 ## Phase 17D (implementado)
 
-- **HTTP:** `GET` / `POST` `/api/cron/scheduled-reports` — mismo `CRON_SECRET` que alertas operativas (≥16 chars); opcional `?tenantId=`. Vercel: **cada hora** (`0 * * * *`) para respetar `timeOfDay` en cualquier zona; no solo 23:00 UTC.
-- **Vercel Cron:** `0 * * * *` (cada hora, minuto 0) en `apps/web/vercel.json`.
+- **HTTP:** `GET` / `POST` `/api/cron/scheduled-reports` — mismo `CRON_SECRET` que alertas operativas (≥16 chars); opcional `?tenantId=`.
+- **Vercel Cron (Hobby):** una vez al día — `5 5 * * *` (05:05 UTC) en `apps/web/vercel.json`. Hobby **no** permite crons más frecuentes que diarios; un `0 * * * *` bloquea el deploy. El runner toma todo `nextRunAt <= now`, así que un slot de la noche (p. ej. 23:50 Bogotá = 04:50 UTC) se dispara en esa pasada matutina UTC. Para latencia ~horaria: Pro en Vercel **o** ping externo horario al mismo endpoint con el secret.
 - **Runner:** `scheduled-report-runner.service.ts` — due `ACTIVE` + `nextRunAt <= now`, lock `runLockUntil` 10 min, bundle **un email / destinatario** con N adjuntos (CSV/PDF según config).
 - **Exportes:** reutiliza `export*Csv` (`@bloqer/services`) y `buildScheduledReportPdfAttachment` (`@bloqer/report-pdf`); gates de módulo en corrida.
 - **Logs:** `EmailDeliveryLog` `REPORT_SCHEDULED`, `relatedEntityType` `SCHEDULED_REPORT`, idempotencia `scheduled:{scheduleId}:{runWindow}:{email}` (índice único parcial 17B).
@@ -46,7 +46,7 @@
 | Ítem | Motivo |
 |------|--------|
 | Destinatarios externos (`externalEmail`) | Decisión 17B: solo membresía ACTIVE |
-| Cola / worker de reintentos | P-EMAIL-04; cron horario + reintento manual alcanza MVP |
+| Cola / worker de reintentos | P-EMAIL-04; cron diario (Hobby) / externo + reintento manual alcanza MVP |
 | ZIP / multi-paquete | Phase 9D+ / digest |
 | Preferencias por usuario | P-EMAIL-02 |
 | Reintento automático en fallo Resend | Evita spam; usar “Reintentar fallidos” |

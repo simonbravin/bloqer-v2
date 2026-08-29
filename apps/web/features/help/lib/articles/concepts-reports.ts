@@ -653,7 +653,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "No hay destinatarios externos: solo usuarios ACTIVE del tenant.",
       "El parte diario no usa el filtro Desde/Hasta: el día lo define la hora de la corrida.",
       "Próxima ejecución se muestra en la zona del envío (ej. 23:00 Buenos Aires), no en UTC del servidor.",
-      "El cron corre cada hora: un envío vencido se dispara a más tardar en la siguiente hora UTC.",
+      "En Vercel Hobby el cron de programados corre una vez al día (05:05 UTC): un envío vencido puede demorar hasta esa pasada. Usá Enviar ahora para no esperar.",
       "Enviar ahora solo está disponible si el envío está Activo (no pausado ni eliminado).",
     ],
     relatedSlugs: [
