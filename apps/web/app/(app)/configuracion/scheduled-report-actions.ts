@@ -118,8 +118,14 @@ export async function runScheduledReportNowAction(id: string) {
     const summary = await executeScheduledReportNow(ctx, id);
     const detail = await getScheduledReportById(ctx, id);
     revalidateScheduledReportPaths(detail.projectId);
+    const detailMsg = runResultMessage(summary);
+    if (!summary.ok) {
+      redirect(
+        `/configuracion/reportes/${id}?err=${encodeURIComponent(`Corrida con fallos. ${detailMsg}`)}`,
+      );
+    }
     redirect(
-      `/configuracion/reportes/${id}?ok=ran_now&detail=${encodeURIComponent(runResultMessage(summary))}`,
+      `/configuracion/reportes/${id}?ok=ran_now&detail=${encodeURIComponent(detailMsg)}`,
     );
   } catch (e) {
     rethrowNextNavigationError(e);
@@ -135,8 +141,14 @@ export async function retryScheduledReportFailedAction(id: string) {
     const summary = await executeScheduledReportRetryFailed(ctx, id);
     const detail = await getScheduledReportById(ctx, id);
     revalidateScheduledReportPaths(detail.projectId);
+    const detailMsg = runResultMessage(summary);
+    if (!summary.ok) {
+      redirect(
+        `/configuracion/reportes/${id}?err=${encodeURIComponent(`Reintento con fallos. ${detailMsg}`)}`,
+      );
+    }
     redirect(
-      `/configuracion/reportes/${id}?ok=retried&detail=${encodeURIComponent(runResultMessage(summary))}`,
+      `/configuracion/reportes/${id}?ok=retried&detail=${encodeURIComponent(detailMsg)}`,
     );
   } catch (e) {
     rethrowNextNavigationError(e);

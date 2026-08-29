@@ -20,8 +20,21 @@ type LocalParts = {
 };
 
 function parseTimeOfDay(timeOfDay: string): { hour: number; minute: number } {
-  const [h, m] = timeOfDay.split(":").map((x) => Number(x));
-  return { hour: h!, minute: m! };
+  const match = /^(\d{1,2}):(\d{2})$/.exec(timeOfDay.trim());
+  if (!match) return { hour: 0, minute: 0 };
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (
+    !Number.isFinite(hour) ||
+    !Number.isFinite(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return { hour: 0, minute: 0 };
+  }
+  return { hour, minute };
 }
 
 function partsInTimezone(date: Date, timeZone: string): LocalParts {

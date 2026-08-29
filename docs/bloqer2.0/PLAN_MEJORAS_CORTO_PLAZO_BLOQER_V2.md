@@ -124,21 +124,13 @@ flowchart LR
 | Campo | Valor |
 |-------|-------|
 | **Módulo** | Reportes programados |
-| **Problema actual** | La UI dice que el “cron horario” genera adjuntos; el cron real es diario (`vercel.json` ~23:00 UTC). |
-| **Evidencia** | `apps/web/app/(app)/configuracion/reportes/page.tsx` (subtitle); `apps/web/vercel.json`; RELEVAMIENTO F-59 / D-5 |
-| **Impacto** | Operadores esperan envíos cada hora y no entienden el historial. |
-| **Solución** | Cambiar copy a “cron diario” / “una vez al día” y, si hay tooltip, mostrar hora UTC documentada. |
-| **Áreas** | `configuracion/reportes/page.tsx`, posiblemente `scheduled-report-form.tsx` |
-| **Riesgo** | Bajo |
-| **Complejidad** | Baja |
-| **Prioridad** | P1 |
-| **Dependencias** | Ninguna |
-| **Criterios de aceptación** | Ninguna pantalla de reportes programados menciona “horario” como frecuencia del job. |
-| **Tests** | No unitario; smoke visual |
+| **Problema actual** | ~~La UI decía “cron horario”~~. En Hobby el job es **diario** (`5 5 * * *` = 05:05 UTC). Guía + ayuda ya lo documentan; **Enviar ahora** cubre latencia. |
+| **Estado** | Mitigado (2026-08-29): copy guía/ayuda + botón Enviar ahora. No volver a poner `0 * * * *` en Hobby (bloquea deploy). |
+| **Evidencia** | `apps/web/vercel.json`; `GUIA_OPERATIVA` §13.2; help `programar-envios-de-reportes` |
+| **Impacto** | Operadores pueden esperar envío inmediato a la hora local; el automatico espera la pasada diaria UTC. |
+| **Solución residual** | Pro en Vercel o ping externo horario al endpoint de cron. |
 | **Migración Prisma** | No |
-| **Cambia UI** | Mínimo |
-| **Guía operativa** | Sí (frecuencia real) |
-| **Lote** | 1 |
+| **Lote** | 1 (cerrado / documentado) |
 
 ### A-02 — Un solo presupuesto `APPROVED` por proyecto solo en service layer
 

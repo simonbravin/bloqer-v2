@@ -13,7 +13,19 @@ export function formatScheduledInstant(
   return formatDateTime(value, { timeZone, fallback });
 }
 
+function asDate(value: Date | string | number | undefined): Date {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? new Date() : value;
+  }
+  if (value == null) return new Date();
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? new Date() : d;
+}
+
 /** e.g. "Buenos Aires (GMT-3)" for captions under next/last run. */
-export function scheduledTimezoneCaption(timeZone: string, at: Date = new Date()): string {
-  return formatTimezoneOptionLabel(timeZone, at);
+export function scheduledTimezoneCaption(
+  timeZone: string,
+  at: Date | string | number = new Date(),
+): string {
+  return formatTimezoneOptionLabel(timeZone, asDate(at));
 }

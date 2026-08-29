@@ -259,7 +259,7 @@ async function runOneScheduledReport(
   if (locked.count === 0) {
     return {
       scheduleId: row.id,
-      ok: true,
+      ok: false,
       runStatus: "LOCKED",
       recipientsSent: 0,
       recipientsSkipped: 0,

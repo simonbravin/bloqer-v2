@@ -1,6 +1,6 @@
 "use client";
 
-import { cloneElement, isValidElement, useEffect, useState, type ReactNode } from "react";
+import { cloneElement, isValidElement, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { BreadcrumbOverrideProvider } from "@/lib/breadcrumb-override-context";
 import { ProjectShellProvider } from "@/lib/project-shell-context";
@@ -82,7 +82,7 @@ export function ShellLayout({
   }, []);
 
   // App shell scrolls inside <main>; lock document so we don't get a second scrollbar.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
     const prevHtmlOverflow = html.style.overflow;
