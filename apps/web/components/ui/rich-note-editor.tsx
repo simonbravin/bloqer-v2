@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useId, useRef, useState, type ClipboardEvent, type ReactNode } from "react";
 import { Bold, List, ListOrdered } from "lucide-react";
 import { isRichNoteEmpty, normalizeRichNote } from "@bloqer/utils";
+import { Button } from "@/components/ui/button";
+import { textareaClassName } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -105,13 +107,8 @@ export function RichNoteEditor({
   );
 
   return (
-    <div className={cn("rounded-md border border-input bg-background", disabled && "opacity-50")}>
-      <input type="hidden" name={name} ref={hiddenRef} defaultValue={initialHtml} />
-      <div
-        role="toolbar"
-        aria-label="Formato de notas"
-        className="flex flex-wrap gap-0.5 border-b border-input bg-muted/40 px-1 py-1"
-      >
+    <div className={cn("space-y-1", disabled && "pointer-events-none opacity-50")}>
+      <div role="toolbar" aria-label="Formato de notas" className="flex flex-wrap gap-0.5">
         <ToolbarButton
           label="Negrita"
           pressed={boldOn}
@@ -137,39 +134,46 @@ export function RichNoteEditor({
           <ListOrdered />
         </ToolbarButton>
       </div>
-      <div className="relative">
-        {empty ? (
-          <p className="pointer-events-none absolute left-3 top-2 text-base text-muted-foreground md:text-sm">
-            {placeholder}
-          </p>
-        ) : null}
-        <div
-          id={editorId}
-          ref={editorRef}
-          role="textbox"
-          aria-multiline="true"
-          aria-label={ariaLabel ?? placeholder}
-          aria-disabled={disabled || undefined}
-          tabIndex={disabled ? -1 : 0}
-          contentEditable={!disabled}
-          suppressContentEditableWarning
-          className={cn(
-            "min-h-[120px] px-3 py-2 text-base outline-none md:text-sm",
-            "[&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5",
-            "[&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5",
-            "[&_p]:my-0 [&_p+p]:mt-2 [&_strong]:font-semibold [&_b]:font-semibold",
-            "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          )}
-          onInput={() => {
-            syncFromEditor();
-            refreshToolbar();
-          }}
-          onKeyUp={refreshToolbar}
-          onMouseUp={refreshToolbar}
-          onFocus={refreshToolbar}
-          onBlur={syncFromEditor}
-          onPaste={onPaste}
-        />
+      <div
+        className={cn(
+          textareaClassName,
+          "flex-col p-0 [outline:none] focus-visible:ring-0 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+        )}
+      >
+        <input type="hidden" name={name} ref={hiddenRef} defaultValue={initialHtml} />
+        <div className="relative min-h-[80px]">
+          {empty ? (
+            <p className="pointer-events-none absolute left-3 top-2 text-base text-muted-foreground md:text-sm">
+              {placeholder}
+            </p>
+          ) : null}
+          <div
+            id={editorId}
+            ref={editorRef}
+            role="textbox"
+            aria-multiline="true"
+            aria-label={ariaLabel ?? placeholder}
+            aria-disabled={disabled || undefined}
+            tabIndex={disabled ? -1 : 0}
+            contentEditable={!disabled}
+            suppressContentEditableWarning
+            className={cn(
+              "min-h-[80px] px-3 py-2 [outline:none]",
+              "[&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5",
+              "[&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5",
+              "[&_p]:my-0 [&_p+p]:mt-2 [&_strong]:font-semibold [&_b]:font-semibold",
+            )}
+            onInput={() => {
+              syncFromEditor();
+              refreshToolbar();
+            }}
+            onKeyUp={refreshToolbar}
+            onMouseUp={refreshToolbar}
+            onFocus={refreshToolbar}
+            onBlur={syncFromEditor}
+            onPaste={onPaste}
+          />
+        </div>
       </div>
     </div>
   );
@@ -189,8 +193,10 @@ function ToolbarButton({
   children: ReactNode;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon"
       aria-label={label}
       aria-pressed={pressed}
       title={label}
@@ -198,15 +204,11 @@ function ToolbarButton({
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       className={cn(
-        "inline-flex size-9 items-center justify-center rounded-md text-muted-foreground md:size-8",
-        "hover:bg-background hover:text-foreground",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        "disabled:pointer-events-none disabled:opacity-50",
-        "[&_svg]:size-4",
-        pressed && "bg-background text-foreground shadow-sm",
+        "size-9 text-muted-foreground md:size-8",
+        pressed && "bg-accent text-foreground",
       )}
     >
       {children}
-    </button>
+    </Button>
   );
 }
