@@ -30,7 +30,7 @@ type BudgetEditabilityClient = {
 };
 
 /**
- * Economic edits: DRAFT / RETURNED_FOR_CHANGES always;
+ * Economic + WBS edits: DRAFT / RETURNED_FOR_CHANGES always;
  * APPROVED only when tenant kill-switch AND project flag are ON ([D-088]);
  * CLOSED never.
  */
@@ -157,12 +157,20 @@ export function approvedEditOverrideAuditMeta(
   return status === "APPROVED" ? { approvedEditOverride: true } : {};
 }
 
-/** WBS: estado editable y no bloqueado por cronograma. */
+/**
+ * WBS structure (add/remove/reorder/import items).
+ * DRAFT / RETURNED_FOR_CHANGES: blocked if this budget is the schedule baseline.
+ * APPROVED: D-088 override already required by assertBudgetEditable — full
+ * structure edits allowed even when the budget is the schedule baseline.
+ */
 export async function assertBudgetWbsStructureMutable(
   budget: Budget,
   ctx: ServiceContext,
 ): Promise<void> {
   await assertBudgetEditable(budget);
+  if (budget.status === "APPROVED") {
+    return;
+  }
   if (await isBudgetScheduleBaseline(budget.id, ctx.tenantId)) {
     throw new ServiceError(
       "CONFLICT",

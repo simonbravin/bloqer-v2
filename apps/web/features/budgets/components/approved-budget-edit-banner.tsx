@@ -55,7 +55,7 @@ export function ApprovedBudgetEditBanner({
       <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">
         {readOnlyEdit
           ? "La obra tiene habilitada la excepción, pero tu usuario no puede editar presupuestos. Pedile a alguien con permiso de edición o congelá la excepción si sos OWNER/ADMIN."
-          : "Podés modificar WBS, costos y venta. Cada cambio queda en el registro de auditoría. Cuando la obra esté definida, congelá esta excepción."}
+          : "Podés agregar, quitar y editar partidas, APU, costos y venta. Cada cambio queda en el registro de auditoría. Cuando la obra esté definida, congelá esta excepción."}
       </p>
       {error && <p className="mt-2 text-destructive">{error}</p>}
       {canManagePolicy && projectAllow ? (

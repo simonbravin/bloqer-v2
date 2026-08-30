@@ -124,9 +124,9 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Presupuestos</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Política excepcional para editar presupuestos ya aprobados (deshabilitada por defecto).
-            Se listan todas las obras: si no hay presupuesto aprobado, se indica; si hay, podés
-            habilitar la edición.
+            Política excepcional para editar presupuestos ya aprobados: partidas, APU, costos y
+            venta (deshabilitada por defecto). Se listan todas las obras: si no hay presupuesto
+            aprobado, se indica; si hay, podés habilitar la edición.
           </p>
         </div>
 

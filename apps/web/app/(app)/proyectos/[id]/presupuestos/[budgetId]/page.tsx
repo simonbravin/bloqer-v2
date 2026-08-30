@@ -108,7 +108,8 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
 
   const canEditBudgets = can(current.tenantCtx.roles, "EDIT", "BUDGETS");
   const editable = editability.editable && canEditBudgets;
-  const wbsStructureEditable = editable && !scheduleBaseline;
+  const wbsStructureEditable =
+    editable && (!scheduleBaseline || editability.approvedOverrideActive);
   const canCreateAddendum = budget.status === "APPROVED" || budget.status === "CLOSED";
   const hasLeafItems = (() => {
     function walk(nodes: WbsViewNode[]): boolean {
@@ -238,7 +239,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
           editable={editable}
           structureEditable={wbsStructureEditable}
           structureLockedReason={
-            editable && scheduleBaseline
+            editable && scheduleBaseline && !editability.approvedOverrideActive
               ? "Este presupuesto es la base del cronograma. La estructura EDT está bloqueada; podés seguir editando APU y costos en los ítems."
               : undefined
           }

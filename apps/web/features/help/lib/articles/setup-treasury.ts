@@ -145,7 +145,11 @@ export const SETUP_ARTICLES: HelpArticle[] = [
       "Revisá umbral de aprobación, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia y % de desvíos.",
       "Guardá. Las OC nuevas respetan esas reglas.",
     ],
-    relatedSlugs: ["orden-de-compra-y-afectar-edt", "oc-directa-vs-con-solicitud"],
+    relatedSlugs: [
+      "orden-de-compra-y-afectar-edt",
+      "oc-directa-vs-con-solicitud",
+      "editar-presupuesto-aprobado",
+    ],
     keywords: ["politicas", "compras", "umbral", "cotizaciones", "oc directa"],
     guideRef: "§1.3 · §9",
   },

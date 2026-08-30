@@ -166,7 +166,7 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 - **Zona horaria:** desplegable con ciudades + offset **GMT** (ej. `Buenos Aires (GMT-3)`). No hay que escribir el id IANA a mano. Argentina (Buenos Aires) es **GMT-3 todo el año** (sin horario de verano).
 - Esa zona se usa en el **Registro de actividad** (tabla, detalle y exports CSV/PDF). En **reportes programados**, cada envío tiene su propia zona: la **próxima / última ejecución** se muestra en la zona del envío (no en UTC del servidor).
 - Razón social / CUIT son de solo lectura acá (datos fiscales de la empresa principal).
-- **Políticas:** `/configuracion/politicas` (Configuración → **Políticas** en sidebar y subnavegación): umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos; y política excepcional de presupuestos aprobados.
+- **Políticas:** `/configuracion/politicas` (Configuración → **Políticas** en sidebar y subnavegación): umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos; y política excepcional de presupuestos aprobados (partidas + economía; apagada por defecto; solo OWNER/ADMIN).
 
 <!-- capture:02 configuracion-zona-horaria -->
 ![Bloqer — Configuración + zona horaria](./guides/assets/screenshots/02-configuracion-zona-horaria.png)
@@ -595,12 +595,14 @@ stateDiagram-v2
 | `DRAFT` | Editar estructura EDT, APU y precios |
 | `IN_REVIEW` | Solo revisión; economía bloqueada |
 | `RETURNED_FOR_CHANGES` | Correcciones y reenvío |
-| `APPROVED` | Congelado; habilita certificaciones, Materiales y baseline de EDT y costos |
+| `APPROVED` | Congelado por defecto; habilita certificaciones, Materiales y baseline de EDT y costos |
 | `CLOSED` | Base contractual |
 | `CANCELLED` | Anulado |
 
 > **Hito:** con `APPROVED` o `CLOSED` se habilitan certificaciones al cliente, tablero Materiales (líneas MAT) y baseline de control de costos.  
 > **Solo un** presupuesto `APPROVED` por proyecto a la vez.
+
+**Excepción (OWNER/ADMIN):** si hace falta corregir un `APPROVED` (agregar partidas, APU, costos o venta), Configuración → **Políticas** → Presupuestos: habilitar el interruptor de la organización **y** el de la obra. Quien tenga permiso de editar presupuestos puede cambiar todo el presupuesto. Al terminar: **Congelar** en la obra (o deshabilitar el interruptor de la organización). Un `CLOSED` no entra: ahí se usa adenda.
 
 <!-- capture:21 presupuesto-aprobado-edt -->
 ![Bloqer — Presupuesto aprobado / EDT](./guides/assets/screenshots/21-presupuesto-aprobado-edt.png)

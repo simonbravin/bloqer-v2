@@ -60,7 +60,7 @@ export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
     if (!canEdit) return;
     if (next && !tenantAllow) return;
     const msg = next
-      ? `¿Permitir editar presupuestos aprobados en la obra ${code}? Quien tenga permiso de edición de presupuestos podrá cambiar WBS, costos y venta. Cada cambio queda auditado.`
+      ? `¿Permitir editar presupuestos aprobados en la obra ${code}? Quien tenga permiso de edición de presupuestos podrá agregar o cambiar partidas, APU, costos y venta. Cada cambio queda auditado.`
       : `¿Congelar de nuevo los presupuestos aprobados de la obra ${code}?`;
     if (!window.confirm(msg)) return;
 
@@ -83,8 +83,9 @@ export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
         <CardHeader>
           <CardTitle className="text-base">Organización (kill-switch)</CardTitle>
           <CardDescription>
-            Por defecto está apagado. Si está off, ningún presupuesto aprobado se puede editar aunque
-            una obra tenga el permiso. Solo OWNER o ADMIN pueden cambiarlo.
+            Por defecto está apagado. Si está off, ningún presupuesto aprobado se puede editar
+            (ni economía ni partidas), aunque una obra tenga el permiso. Solo OWNER o ADMIN
+            pueden cambiarlo.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

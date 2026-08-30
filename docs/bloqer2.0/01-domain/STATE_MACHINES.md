@@ -83,7 +83,7 @@ stateDiagram-v2
 | `DRAFT` | No | **Sí**, completa | Sí |
 | `IN_REVIEW` | **No** | **No** cambios estructurales (WBS, cantidades, PU, fórmulas, márgenes, impuestos, moneda, alcance vendido, condiciones contractuales, plazos de pago frente a cliente). Solo **comentarios de revisión**, **adjuntos de revisión** y metadata no económica si el workflow lo permite ([BR-BUD-007]) | Notas/comentarios revisión |
 | `RETURNED_FOR_CHANGES` | No | **Sí** (el responsable corrige; luego debe **`IN_REVIEW`** de nuevo) | Sí |
-| `APPROVED` | Sí (interno) | **No** por defecto ([BR-BUD-006]). **Excepción [D-088]:** editable en lo económico solo si kill-switch de tenant **y** flag de obra están ON; `CLOSED` no aplica | **Sí** según whitelist metadata ([BR-BUD-006]) |
+| `APPROVED` | Sí (interno) | **No** por defecto ([BR-BUD-006]). **Excepción [D-088]:** editable por completo (partidas + economía) solo si kill-switch de tenant **y** flag de obra están ON; `CLOSED` no aplica | **Sí** según whitelist metadata ([BR-BUD-006]) |
 | `CLOSED` | Sí (base contractual/comercial) | **No**; cambios vendidos solo **Adenda** + budget hijo ([BR-BUD-002], [D-005]) | **Solo** whitelist [BR-BUD-008]: `internal_notes`, `attachments`, `tags`, `display_order`, `non_contractual_reference_code`, `assigned_internal_responsible`. **Prohibido** todo lo usado por certificaciones, contratos, adendas, reportes o rentabilidad (WBS, cantidades, PU, costo, márgenes, impuestos, precio venta, moneda, alcance cliente, términos contractuales, plazos de pago, etc.) |
 
 `SUPERSEDED` y `CANCELLED`: solo lectura salvo procesos excepcionales auditados.
