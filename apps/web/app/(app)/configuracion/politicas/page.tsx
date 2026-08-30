@@ -76,24 +76,28 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
   }
 
   return (
-    <PageShell variant="default" className="space-y-10">
+    <PageShell variant="default" className="space-y-12">
       <PageListHeader
         title="Políticas"
-        subtitle="Políticas de compras y de presupuesto de la organización."
+        subtitle="Reglas de compras y excepciones de presupuesto de la organización."
       />
 
-      <section id="compras" className="space-y-6 scroll-mt-6">
-        <div>
+      <section id="compras" className="space-y-5 scroll-mt-6">
+        <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-tight">Compras</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Umbrales de solicitudes, cotizaciones, aprobación de OC y avisos cuando hay CxP lista
-            para pagar o se confirma un pago.
+          <p className="text-sm text-muted-foreground max-w-3xl">
+            Umbrales de solicitudes, cotizaciones, aprobación de OC, alertas de vencimiento y
+            avisos cuando hay CxP lista para pagar o se confirma un pago.
           </p>
         </div>
 
-        {companies.length > 1 && (
-          <form method="get" action="/configuracion/politicas" className="flex flex-wrap items-end gap-3">
-            <div className="space-y-2">
+        {companies.length > 1 ? (
+          <form
+            method="get"
+            action="/configuracion/politicas"
+            className="flex flex-wrap items-end gap-3 rounded-lg border bg-muted/20 px-4 py-3"
+          >
+            <div className="space-y-1.5">
               <Label htmlFor="companyId">Empresa</Label>
               <select
                 id="companyId"
@@ -108,9 +112,11 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
                 ))}
               </select>
             </div>
-            <Button type="submit">Ver empresa</Button>
+            <Button type="submit" variant="secondary">
+              Ver empresa
+            </Button>
           </form>
-        )}
+        ) : null}
 
         <CompanyProcurementSettingsForm
           companyId={company.id}
@@ -120,10 +126,10 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
         />
       </section>
 
-      <section id="presupuestos" className="space-y-6 scroll-mt-6">
-        <div>
+      <section id="presupuestos" className="space-y-5 scroll-mt-6">
+        <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-tight">Presupuestos</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground max-w-3xl">
             Política excepcional para editar presupuestos ya aprobados: partidas, APU, costos y
             venta (deshabilitada por defecto). Se listan todas las obras: si no hay presupuesto
             aprobado, se indica; si hay, podés habilitar la edición.

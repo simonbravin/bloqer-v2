@@ -3,9 +3,9 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ApprovedBudgetEditsPolicyView } from "@bloqer/services";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { SwitchField } from "@/components/ui/switch-field";
 import {
   updateTenantApprovedBudgetEditsPolicyAction,
   updateProjectApprovedBudgetEditsPolicyAction,
@@ -79,8 +79,8 @@ export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
+      <Card className="overflow-hidden border-border/80 shadow-sm">
+        <CardHeader className="border-b bg-muted/30">
           <CardTitle className="text-base">Organización (kill-switch)</CardTitle>
           <CardDescription>
             Por defecto está apagado. Si está off, ningún presupuesto aprobado se puede editar
@@ -93,34 +93,33 @@ export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
           {success && (
             <p className="text-sm text-green-600 dark:text-green-500">{success}</p>
           )}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
-            <div className="space-y-1">
-              <Label>Permitir edición excepcional de presupuestos aprobados</Label>
-              <p className="text-xs text-muted-foreground">
-                Estado actual:{" "}
-                <span className="font-medium text-foreground">
-                  {tenantAllow ? "Habilitado" : "Deshabilitado"}
-                </span>
-              </p>
-            </div>
-            {canEdit ? (
-              <Button
-                type="button"
-                variant={tenantAllow ? "destructive" : "default"}
-                disabled={pending}
-                onClick={() => runTenantToggle(!tenantAllow)}
-              >
-                {tenantAllow ? "Deshabilitar" : "Habilitar"}
-              </Button>
-            ) : (
-              <p className="text-sm text-muted-foreground">Solo lectura</p>
-            )}
+          <div className="rounded-lg border bg-muted/20 p-4">
+            <SwitchField
+              id="tenant-approved-budget-edits"
+              className="border-0 bg-transparent px-0 py-0"
+              label="Permitir edición excepcional de presupuestos aprobados"
+              description={
+                <>
+                  Estado actual:{" "}
+                  <span className="font-medium text-foreground">
+                    {tenantAllow ? "Habilitado" : "Deshabilitado"}
+                  </span>
+                  . El cambio pide confirmación porque afecta a toda la organización.
+                </>
+              }
+              checked={tenantAllow}
+              onCheckedChange={(next) => runTenantToggle(next)}
+              disabled={!canEdit || pending}
+            />
+            {!canEdit ? (
+              <p className="mt-2 text-sm text-muted-foreground">Solo lectura</p>
+            ) : null}
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
+      <Card className="overflow-hidden border-border/80 shadow-sm">
+        <CardHeader className="border-b bg-muted/30">
           <CardTitle className="text-base">Por obra</CardTitle>
           <CardDescription>
             La excepción solo aplica a presupuestos en estado Aprobado. Si la obra aún no tiene uno,
@@ -145,7 +144,6 @@ export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
                     <th className="px-3 py-2 font-medium">Estado</th>
                     <th className="px-3 py-2 font-medium">Presupuesto</th>
                     <th className="px-3 py-2 font-medium">Edición excepcional</th>
-                    <th className="px-3 py-2 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
@@ -159,53 +157,48 @@ export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
                       !p.allow;
                     // Congelar even if the org kill-switch is off (cleanup project flags).
                     const canFreeze = canEdit && p.allow;
+                    const interactive = canEnable || canFreeze;
+                    const statusLabel = p.allow
+                      ? "Habilitada"
+                      : p.hasApprovedBudget
+                        ? "Bloqueada"
+                        : "No aplica aún";
+
                     return (
-                      <tr key={p.id} className="border-t align-top">
-                        <td className="px-3 py-2 font-mono text-xs">{p.code}</td>
-                        <td className="px-3 py-2">{p.name}</td>
-                        <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                      <tr key={p.id} className="border-t align-middle">
+                        <td className="px-3 py-2.5 font-mono text-xs">{p.code}</td>
+                        <td className="px-3 py-2.5">{p.name}</td>
+                        <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">
                           {PROJECT_STATUS_LABEL[p.status] ?? p.status}
                         </td>
-                        <td className="px-3 py-2 max-w-[280px]">
+                        <td className="px-3 py-2.5 max-w-[280px]">
                           {p.hasApprovedBudget ? (
                             <span className="font-medium">{p.budgetStatusLabel}</span>
                           ) : (
                             <span className="text-muted-foreground">{p.budgetStatusLabel}</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          {p.allow ? (
-                            <span className="font-medium text-amber-700 dark:text-amber-400">
-                              Habilitada
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-3 min-w-[11rem]">
+                            <span
+                              className={
+                                p.allow
+                                  ? "text-xs font-medium text-amber-700 dark:text-amber-400"
+                                  : "text-xs text-muted-foreground"
+                              }
+                            >
+                              {statusLabel}
                             </span>
-                          ) : p.hasApprovedBudget ? (
-                            <span className="text-muted-foreground">Bloqueada</span>
-                          ) : (
-                            <span className="text-muted-foreground">No aplica aún</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap">
-                          {canFreeze ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={pending}
-                              onClick={() => runProjectToggle(p.id, p.code, false)}
-                            >
-                              Congelar
-                            </Button>
-                          ) : canEnable ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="default"
-                              disabled={pending}
-                              onClick={() => runProjectToggle(p.id, p.code, true)}
-                            >
-                              Habilitar
-                            </Button>
-                          ) : null}
+                            <Switch
+                              checked={p.allow}
+                              disabled={pending || !interactive}
+                              onCheckedChange={(next) => {
+                                if (next === p.allow) return;
+                                runProjectToggle(p.id, p.code, next);
+                              }}
+                              aria-label={`Edición excepcional — ${p.code}`}
+                            />
+                          </div>
                         </td>
                       </tr>
                     );

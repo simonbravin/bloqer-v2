@@ -114,4 +114,33 @@
   .form-section {
     @apply rounded-lg border border-border/70 bg-form-section;
   }
+
+  /**
+   * Policy / settings on-off control (slide switch).
+   * Use via `<Switch>` / `<SwitchField>` — do not reinvent with checkboxes.
+   */
+  .switch-root {
+    @apply peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+    @apply data-[state=checked]:bg-primary data-[state=unchecked]:bg-input;
+  }
+
+  .switch-thumb {
+    @apply pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform;
+    @apply data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0;
+  }
+
+  /** Labeled row wrapping a switch — settings / políticas lists. */
+  .switch-field {
+    @apply flex items-start justify-between gap-4 rounded-lg border border-border/70 bg-muted/20 px-4 py-3;
+  }
+
+  .switch-field-label {
+    @apply cursor-pointer text-sm font-medium leading-snug;
+  }
+
+  .switch-field-description {
+    @apply text-xs leading-relaxed text-muted-foreground;
+  }
 }

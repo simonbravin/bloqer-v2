@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { CompanyProcurementSettingsView } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { SwitchField } from "@/components/ui/switch-field";
 import { updateCompanyProcurementSettingsAction } from "@/app/(app)/configuracion/politicas/actions";
 
 interface Props {
@@ -22,6 +24,26 @@ interface Props {
   companyName: string;
   settings: CompanyProcurementSettingsView;
   canEdit: boolean;
+}
+
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
+        {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+      </div>
+      {children}
+    </div>
+  );
 }
 
 export function CompanyProcurementSettingsForm({
@@ -65,18 +87,20 @@ export function CompanyProcurementSettingsForm({
     settings.receiptToInvoiceAlertsEnabled,
   );
 
+  const togglesDisabled = !canEdit || pending;
+
   return (
-    <Card>
-      <CardHeader>
+    <Card className="overflow-hidden border-border/80 shadow-sm">
+      <CardHeader className="border-b bg-muted/30">
         <CardTitle className="text-base">Política de compras — {companyName}</CardTitle>
         <CardDescription>
           Umbrales de aprobación, cotizaciones, desvíos, alertas de vencimiento y canal de avisos
           de pago a proveedores.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         <form
-          className="space-y-6"
+          className="space-y-8"
           action={(fd) => {
             if (!canEdit) return;
             startTransition(async () => {
@@ -134,158 +158,172 @@ export function CompanyProcurementSettingsForm({
             });
           }}
         >
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          {success && (
-            <p className="text-sm text-green-600 dark:text-green-500">Configuración guardada.</p>
-          )}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="poApprovalThresholdArs">Umbral aprobación OC (ARS)</Label>
-              <DecimalInput
-                id="poApprovalThresholdArs"
-                name="poApprovalThresholdArs"
-                value={poThreshold}
-                onValueChange={setPoThreshold}
-                placeholder="3.000.000,00"
-                disabled={!canEdit || pending}
-              />
-              <p className="text-xs text-muted-foreground">
-                Montos iguales o superiores requieren aprobación de administración.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="purchaseRequestRequiredAboveArs">Umbral solicitud obligatoria (ARS)</Label>
-              <DecimalInput
-                id="purchaseRequestRequiredAboveArs"
-                name="purchaseRequestRequiredAboveArs"
-                value={prThreshold}
-                onValueChange={setPrThreshold}
-                placeholder="Opcional"
-                disabled={!canEdit || pending}
-              />
-              <p className="text-xs text-muted-foreground">
-                Sobre este monto la OC directa exige solicitud con cotizaciones, salvo emergencia
-                documentada por OWNER/ADMIN ([BR-PUR-008]).
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="minQuotesRequired">Cotizaciones mínimas</Label>
-              <Input
-                id="minQuotesRequired"
-                name="minQuotesRequired"
-                type="number"
-                min={1}
-                max={10}
-                defaultValue={settings.minQuotesRequired}
-                disabled={!canEdit || pending}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="maxQuotesAllowed">Cotizaciones máximas</Label>
-              <Input
-                id="maxQuotesAllowed"
-                name="maxQuotesAllowed"
-                type="number"
-                min={1}
-                max={20}
-                defaultValue={settings.maxQuotesAllowed}
-                disabled={!canEdit || pending}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="varianceSoftAlertPct">Nota / alerta por desvío desde (%)</Label>
-              <DecimalInput
-                id="varianceSoftAlertPct"
-                name="varianceSoftAlertPct"
-                value={softPct}
-                onValueChange={setSoftPct}
-                disabled={!canEdit || pending}
-              />
-              <p className="text-xs text-muted-foreground">
-                Desde este % hasta el de aprobación extra se exige justificación en la línea
-                ([BR-PUR-009]).
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="varianceExtraApprovalPct">Aprobación administración desde (%)</Label>
-              <DecimalInput
-                id="varianceExtraApprovalPct"
-                name="varianceExtraApprovalPct"
-                value={extraPct}
-                onValueChange={setExtraPct}
-                disabled={!canEdit || pending}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="overReceiptTolerancePct">Tolerancia sobrecantidad recepción (%)</Label>
-              <DecimalInput
-                id="overReceiptTolerancePct"
-                name="overReceiptTolerancePct"
-                value={overReceiptPct}
-                onValueChange={setOverReceiptPct}
-                disabled={!canEdit || pending}
-              />
-              <p className="text-xs text-muted-foreground">
-                0–5%. Default 0 = no permitir recibir más que la OC ([BR-PUR-006]).
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="invoiceMatchTolerancePct">Tolerancia matching factura (%)</Label>
-              <DecimalInput
-                id="invoiceMatchTolerancePct"
-                name="invoiceMatchTolerancePct"
-                value={invoiceMatchPct}
-                onValueChange={setInvoiceMatchPct}
-                disabled={!canEdit || pending}
-              />
-              <p className="text-xs text-muted-foreground">
-                Aviso (no bloqueo) si factura supera recibido + tolerancia ([BR-PUR-012]).
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="approvalSlaHours">SLA recordatorio compras (horas)</Label>
-            <Input
-              id="approvalSlaHours"
-              name="approvalSlaHours"
-              type="number"
-              min={1}
-              max={720}
-              defaultValue={settings.approvalSlaHours}
-              disabled={!canEdit || pending}
-            />
-            <p className="text-xs text-muted-foreground">
-              Horas sin avance en OC enviada o SC sin cotizar antes de avisar a OWNER/ADMIN
-              ([BR-PUR-015]). Default 72.
+          {error ? (
+            <p
+              className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              role="alert"
+            >
+              {error}
             </p>
-          </div>
+          ) : null}
+          {success ? (
+            <p
+              className="rounded-lg border border-emerald-500/30 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
+              role="status"
+            >
+              Configuración guardada.
+            </p>
+          ) : null}
 
-          <div className="space-y-4 rounded-lg border p-4">
-            <div>
-              <h4 className="text-sm font-medium">Alertas de vencimiento en compras</h4>
-              <p className="text-xs text-muted-foreground">
-                Recordatorios diarios para recepción, fecha requerida y facturación de OC recibidas
-                ([D-097]). Se emiten a quien puede accionar (compras/depósito, aprobadores,
-                administración) con CC a OWNER/ADMIN.
-              </p>
+          <Section
+            title="Umbrales y cotizaciones"
+            description="Montos en ARS y cantidad de cotizaciones exigidas antes de emitir OC."
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="poApprovalThresholdArs">Umbral aprobación OC (ARS)</Label>
+                <DecimalInput
+                  id="poApprovalThresholdArs"
+                  name="poApprovalThresholdArs"
+                  value={poThreshold}
+                  onValueChange={setPoThreshold}
+                  placeholder="3.000.000,00"
+                  disabled={togglesDisabled}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Montos iguales o superiores requieren aprobación de administración.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="purchaseRequestRequiredAboveArs">
+                  Umbral solicitud obligatoria (ARS)
+                </Label>
+                <DecimalInput
+                  id="purchaseRequestRequiredAboveArs"
+                  name="purchaseRequestRequiredAboveArs"
+                  value={prThreshold}
+                  onValueChange={setPrThreshold}
+                  placeholder="Opcional"
+                  disabled={togglesDisabled}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sobre este monto la OC directa exige solicitud con cotizaciones, salvo emergencia
+                  documentada por OWNER/ADMIN ([BR-PUR-008]).
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="minQuotesRequired">Cotizaciones mínimas</Label>
+                <Input
+                  id="minQuotesRequired"
+                  name="minQuotesRequired"
+                  type="number"
+                  min={1}
+                  max={10}
+                  defaultValue={settings.minQuotesRequired}
+                  disabled={togglesDisabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maxQuotesAllowed">Cotizaciones máximas</Label>
+                <Input
+                  id="maxQuotesAllowed"
+                  name="maxQuotesAllowed"
+                  type="number"
+                  min={1}
+                  max={20}
+                  defaultValue={settings.maxQuotesAllowed}
+                  disabled={togglesDisabled}
+                />
+              </div>
             </div>
+          </Section>
 
+          <Separator />
+
+          <Section
+            title="Desvíos y tolerancias"
+            description="Porcentajes que disparan justificación, aprobación extra o avisos de matching."
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="varianceSoftAlertPct">Nota / alerta por desvío desde (%)</Label>
+                <DecimalInput
+                  id="varianceSoftAlertPct"
+                  name="varianceSoftAlertPct"
+                  value={softPct}
+                  onValueChange={setSoftPct}
+                  disabled={togglesDisabled}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Desde este % hasta el de aprobación extra se exige justificación en la línea
+                  ([BR-PUR-009]).
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="varianceExtraApprovalPct">Aprobación administración desde (%)</Label>
+                <DecimalInput
+                  id="varianceExtraApprovalPct"
+                  name="varianceExtraApprovalPct"
+                  value={extraPct}
+                  onValueChange={setExtraPct}
+                  disabled={togglesDisabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="overReceiptTolerancePct">Tolerancia sobre-recepción (%)</Label>
+                <DecimalInput
+                  id="overReceiptTolerancePct"
+                  name="overReceiptTolerancePct"
+                  value={overReceiptPct}
+                  onValueChange={setOverReceiptPct}
+                  disabled={togglesDisabled}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Máximo % por encima de la cantidad pedida al confirmar recepción.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invoiceMatchTolerancePct">Tolerancia matching factura (%)</Label>
+                <DecimalInput
+                  id="invoiceMatchTolerancePct"
+                  name="invoiceMatchTolerancePct"
+                  value={invoiceMatchPct}
+                  onValueChange={setInvoiceMatchPct}
+                  disabled={togglesDisabled}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Aviso (no bloqueo) si factura supera recibido + tolerancia ([BR-PUR-012]).
+                </p>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="approvalSlaHours">SLA recordatorio compras (horas)</Label>
+                <Input
+                  id="approvalSlaHours"
+                  name="approvalSlaHours"
+                  type="number"
+                  min={1}
+                  max={720}
+                  defaultValue={settings.approvalSlaHours}
+                  disabled={togglesDisabled}
+                  className="max-w-xs"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Horas sin avance en OC enviada o SC sin cotizar antes de avisar a OWNER/ADMIN
+                  ([BR-PUR-015]). Default 72.
+                </p>
+              </div>
+            </div>
+          </Section>
+
+          <Separator />
+
+          <Section
+            title="Alertas de vencimiento"
+            description="Recordatorios diarios para recepción, fecha requerida y facturación ([D-097])."
+          >
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="deliveryOverdueGraceDays">
-                  Días de gracia entrega OC
-                </Label>
+                <Label htmlFor="deliveryOverdueGraceDays">Días de gracia entrega OC</Label>
                 <Input
                   id="deliveryOverdueGraceDays"
                   name="deliveryOverdueGraceDays"
@@ -293,16 +331,14 @@ export function CompanyProcurementSettingsForm({
                   min={0}
                   max={60}
                   defaultValue={settings.deliveryOverdueGraceDays}
-                  disabled={!canEdit || pending}
+                  disabled={togglesDisabled}
                 />
                 <p className="text-xs text-muted-foreground">
                   Colchón antes de marcar como vencida una OC confirmada sin recibir. Default 0.
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="neededByOverdueGraceDays">
-                  Días de gracia fecha requerida SC
-                </Label>
+                <Label htmlFor="neededByOverdueGraceDays">Días de gracia fecha requerida SC</Label>
                 <Input
                   id="neededByOverdueGraceDays"
                   name="neededByOverdueGraceDays"
@@ -310,16 +346,14 @@ export function CompanyProcurementSettingsForm({
                   min={0}
                   max={60}
                   defaultValue={settings.neededByOverdueGraceDays}
-                  disabled={!canEdit || pending}
+                  disabled={togglesDisabled}
                 />
                 <p className="text-xs text-muted-foreground">
                   Colchón antes de alertar SC con fecha requerida pasada y sin OC. Default 0.
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="receiptToInvoiceSlaDays">
-                  Días recepción → factura
-                </Label>
+                <Label htmlFor="receiptToInvoiceSlaDays">Días recepción → factura</Label>
                 <Input
                   id="receiptToInvoiceSlaDays"
                   name="receiptToInvoiceSlaDays"
@@ -327,7 +361,7 @@ export function CompanyProcurementSettingsForm({
                   min={0}
                   max={60}
                   defaultValue={settings.receiptToInvoiceSlaDays}
-                  disabled={!canEdit || pending}
+                  disabled={togglesDisabled}
                 />
                 <p className="text-xs text-muted-foreground">
                   Días desde primera recepción antes de alertar que falta registrar factura.
@@ -335,162 +369,135 @@ export function CompanyProcurementSettingsForm({
                 </p>
               </div>
             </div>
-
-            <div className="flex flex-col gap-3 text-sm">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={deliveryAlertsEnabled}
-                  onChange={(e) => setDeliveryAlertsEnabled(e.target.checked)}
-                  disabled={!canEdit || pending}
-                  className="rounded border"
-                />
-                Alertar OC con entrega prevista vencida sin recibir
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={neededByAlertsEnabled}
-                  onChange={(e) => setNeededByAlertsEnabled(e.target.checked)}
-                  disabled={!canEdit || pending}
-                  className="rounded border"
-                />
-                Alertar SC con fecha requerida vencida y sin OC confirmada
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={receiptToInvoiceAlertsEnabled}
-                  onChange={(e) => setReceiptToInvoiceAlertsEnabled(e.target.checked)}
-                  disabled={!canEdit || pending}
-                  className="rounded border"
-                />
-                Alertar OC recibida sin factura del proveedor registrada
-              </label>
+            <div className="space-y-2">
+              <SwitchField
+                id="deliveryAlertsEnabled"
+                label="Alertar OC con entrega prevista vencida sin recibir"
+                checked={deliveryAlertsEnabled}
+                onCheckedChange={setDeliveryAlertsEnabled}
+                disabled={togglesDisabled}
+              />
+              <SwitchField
+                id="neededByAlertsEnabled"
+                label="Alertar SC con fecha requerida vencida y sin OC confirmada"
+                checked={neededByAlertsEnabled}
+                onCheckedChange={setNeededByAlertsEnabled}
+                disabled={togglesDisabled}
+              />
+              <SwitchField
+                id="receiptToInvoiceAlertsEnabled"
+                label="Alertar OC recibida sin factura del proveedor registrada"
+                checked={receiptToInvoiceAlertsEnabled}
+                onCheckedChange={setReceiptToInvoiceAlertsEnabled}
+                disabled={togglesDisabled}
+              />
             </div>
-          </div>
+          </Section>
 
-          <div className="space-y-2">
-            <Label htmlFor="apPaymentNotificationChannel">Avisos de pago a proveedores</Label>
-            <Select
-              value={apPaymentNotificationChannel}
-              onValueChange={(v) =>
-                setApPaymentNotificationChannel(v as "IN_APP" | "IN_APP_AND_EMAIL")
-              }
-              disabled={!canEdit || pending}
-            >
-              <SelectTrigger id="apPaymentNotificationChannel">
-                <SelectValue placeholder="Canal de avisos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="IN_APP_AND_EMAIL">In-app + email</SelectItem>
-                <SelectItem value="IN_APP">Solo in-app</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Cuando hay una CxP lista para pagar o se confirma un pago. El email requiere Resend
-              configurado; si no, queda solo la notificación en la plataforma.
-            </p>
-          </div>
+          <Separator />
 
-          <div className="flex flex-col gap-3 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+          <Section
+            title="Avisos de pago"
+            description="Canal cuando hay CxP lista para pagar o se confirma un pago."
+          >
+            <div className="space-y-2 max-w-md">
+              <Label htmlFor="apPaymentNotificationChannel">Avisos de pago a proveedores</Label>
+              <Select
+                value={apPaymentNotificationChannel}
+                onValueChange={(v) =>
+                  setApPaymentNotificationChannel(v as "IN_APP" | "IN_APP_AND_EMAIL")
+                }
+                disabled={togglesDisabled}
+              >
+                <SelectTrigger id="apPaymentNotificationChannel">
+                  <SelectValue placeholder="Canal de avisos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="IN_APP_AND_EMAIL">In-app + email</SelectItem>
+                  <SelectItem value="IN_APP">Solo in-app</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                El email requiere Resend configurado; si no, queda solo la notificación en la
+                plataforma.
+              </p>
+            </div>
+          </Section>
+
+          <Separator />
+
+          <Section
+            title="Reglas de emisión de OC"
+            description="Quién puede saltear solicitud o auto-aprobar bajo umbral."
+          >
+            <div className="space-y-2">
+              <SwitchField
+                id="allowDirectPo"
+                label="Permitir OC directa (sin solicitud previa bajo umbral)"
                 checked={allowDirectPo}
-                onChange={(e) => setAllowDirectPo(e.target.checked)}
-                disabled={!canEdit || pending}
-                className="rounded border"
+                onCheckedChange={setAllowDirectPo}
+                disabled={togglesDisabled}
               />
-              Permitir OC directa (sin solicitud previa bajo umbral)
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <SwitchField
+                id="allowSelfApproval"
+                label="Permitir auto-aprobación solo bajo umbral y sin desvío extra"
+                description="Si la OC supera el umbral de administración o requiere aprobación extra por desvío, quien originó la compra no puede aprobarla aunque esta opción esté activa."
                 checked={allowSelfApproval}
-                onChange={(e) => setAllowSelfApproval(e.target.checked)}
-                disabled={!canEdit || pending}
-                className="rounded border"
+                onCheckedChange={setAllowSelfApproval}
+                disabled={togglesDisabled}
               />
-              Permitir auto-aprobación solo bajo umbral y sin desvío extra
-            </label>
-            <p className="-mt-2 text-xs text-muted-foreground">
-              Si la OC supera el umbral de administración o requiere aprobación extra por desvío,
-              quien originó la compra no puede aprobarla aunque esta opción esté activa.
-            </p>
-
-            <div className="rounded-lg border p-4 space-y-3">
-              <p className="text-sm font-medium">Atajos operativos</p>
-              <p className="text-xs text-muted-foreground -mt-1">
-                Acortan pasos del circuito OC sin cambiar estados ni reglas de dinero. Por defecto
-                apagados.
-              </p>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={allowAuthorizeAndCommit}
-                  onChange={(e) => setAllowAuthorizeAndCommit(e.target.checked)}
-                  disabled={!canEdit || pending}
-                  className="rounded border"
-                />
-                Un paso: autorizar y comprometer
-              </label>
-              <p className="-mt-2 text-xs text-muted-foreground">
-                Si está encendido, PM/Compras pueden autorizar y comprometer OC bajo umbral (sin
-                desvío extra). OWNER/ADMIN también pueden usarlo en OC de alto nivel.
-              </p>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={autoConfirmOnApprove}
-                  onChange={(e) => setAutoConfirmOnApprove(e.target.checked)}
-                  disabled={!canEdit || pending}
-                  className="rounded border"
-                />
-                Al aprobar, confirmar al proveedor (bajo umbral)
-              </label>
-              <p className="-mt-2 text-xs text-muted-foreground">
-                Si está encendido, aprobar una OC que no es de alto nivel la deja Confirmada =
-                Comprometido. Alto nivel sigue Aprobar → Confirmar (o Autorizar y comprometer si
-                sos Admin).
-              </p>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={autoDraftApInvoiceOnReceipt}
-                  onChange={(e) => setAutoDraftApInvoiceOnReceipt(e.target.checked)}
-                  disabled={!canEdit || pending}
-                  className="rounded border"
-                />
-                Al recibir, crear borrador de factura
-              </label>
-              <p className="-mt-2 text-xs text-muted-foreground">
-                Si está encendido, al confirmar la recepción se crea un borrador de factura del
-                proveedor (no abre deuda). Finanzas completa y emite para crear la CxP.
-              </p>
-            </div>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <SwitchField
+                id="allowEmergencyDirectPo"
+                label="Compra de emergencia sin solicitud (solo OWNER/ADMIN, sobre el umbral)"
+                description="Permite OC directa por encima del umbral de solicitud con motivo obligatorio, aunque la OC directa general esté deshabilitada."
                 checked={allowEmergencyDirectPo}
-                onChange={(e) => setAllowEmergencyDirectPo(e.target.checked)}
-                disabled={!canEdit || pending}
-                className="rounded border"
+                onCheckedChange={setAllowEmergencyDirectPo}
+                disabled={togglesDisabled}
               />
-              Compra de emergencia sin solicitud (solo OWNER/ADMIN, sobre el umbral)
-            </label>
-            <p className="-mt-2 text-xs text-muted-foreground">
-              Permite OC directa por encima del umbral de solicitud con motivo obligatorio, aunque
-              la OC directa general esté deshabilitada.
-            </p>
-          </div>
+            </div>
+          </Section>
 
-          {canEdit && (
-            <Button type="submit" disabled={pending}>
-              {pending ? "Guardando…" : "Guardar política"}
-            </Button>
-          )}
+          <Separator />
+
+          <Section
+            title="Atajos operativos"
+            description="Acortan pasos del circuito OC sin cambiar estados ni reglas de dinero. Por defecto apagados."
+          >
+            <div className="space-y-2">
+              <SwitchField
+                id="allowAuthorizeAndCommit"
+                label="Un paso: autorizar y comprometer"
+                description="PM/Compras pueden autorizar y comprometer OC bajo umbral (sin desvío extra). OWNER/ADMIN también en OC de alto nivel."
+                checked={allowAuthorizeAndCommit}
+                onCheckedChange={setAllowAuthorizeAndCommit}
+                disabled={togglesDisabled}
+              />
+              <SwitchField
+                id="autoConfirmOnApprove"
+                label="Al aprobar, confirmar al proveedor (bajo umbral)"
+                description="Aprobar una OC que no es de alto nivel la deja Confirmada = Comprometido. Alto nivel sigue Aprobar → Confirmar (o Autorizar y comprometer si sos Admin)."
+                checked={autoConfirmOnApprove}
+                onCheckedChange={setAutoConfirmOnApprove}
+                disabled={togglesDisabled}
+              />
+              <SwitchField
+                id="autoDraftApInvoiceOnReceipt"
+                label="Al recibir, crear borrador de factura"
+                description="Al confirmar la recepción se crea un borrador de factura del proveedor (no abre deuda). Finanzas completa y emite para crear la CxP."
+                checked={autoDraftApInvoiceOnReceipt}
+                onCheckedChange={setAutoDraftApInvoiceOnReceipt}
+                disabled={togglesDisabled}
+              />
+            </div>
+          </Section>
+
+          {canEdit ? (
+            <div className="flex justify-end border-t pt-6">
+              <Button type="submit" disabled={pending} className="min-w-40">
+                {pending ? "Guardando…" : "Guardar política"}
+              </Button>
+            </div>
+          ) : null}
         </form>
       </CardContent>
     </Card>
