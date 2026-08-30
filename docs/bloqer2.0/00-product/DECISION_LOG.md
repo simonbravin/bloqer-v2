@@ -585,8 +585,9 @@
   4. Si el acumulado supera 100 %, no se sincroniza ese WBS (datos legacy / Q-005b).
   5. Al llegar a 100 % con estado `IN_PROGRESS`, la tarea pasa a `COMPLETED` (transición documentada en §27).
   6. El **avance certificado** y el **avance por cantidad operativa** siguen siendo dimensiones de lectura separadas ([BR-SCH-002]); el PM puede editar fechas y dependencias; el avance real manual queda como excepción operativa.
+  7. **Excepción ([D-103]):** ítems `type = MILESTONE` **no** reciben sync de `progressPct` ni transición de estado desde el libro; el PM completa el hito a mano (o vía recepción de OC en P1).
 - **Implicancias:** `syncScheduleProgressFromJobsiteLog` en `packages/services`; auditoría `SCHEDULE_PROGRESS_SYNCED_FROM_JOBSITE_LOG`.
-- **Documentos afectados:** [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) ([BR-SCH-004]), [`05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md), [`02-modules/PROJECT_SCHEDULING.md`](../02-modules/PROJECT_SCHEDULING.md), [`02-modules/JOBSITE_LOG.md`](../02-modules/JOBSITE_LOG.md).
+- **Documentos afectados:** [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) ([BR-SCH-004]), [`05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md), [`02-modules/PROJECT_SCHEDULING.md`](../02-modules/PROJECT_SCHEDULING.md), [`02-modules/JOBSITE_LOG.md`](../02-modules/JOBSITE_LOG.md), [D-103](#d-103--cronograma-árbol-de-filas-hitos-visuales-y-sync-solo-en-tareas).
 
 ---
 
@@ -1571,6 +1572,41 @@
 
 ---
 
+### D-103 — Cronograma: árbol de filas, hitos visuales y sync solo en tareas
+
+- **Fecha:** 2026-08-30
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (relevamiento Indari / P0 cronograma)
+- **Contexto:** Vincular un hito a una partida EDT no lo ubicaba a la misma altura que la tarea de montaje; el color seguía el estado; el libro podía empujar el % Real del hito de «llegada».
+- **Decisión:**
+  1. **Árbol ≠ EDT.** La altura en Gantt/tabla/calendario es `ScheduleItem.parentId` + `sortOrder`. El vínculo `ScheduleItemWbsLink` solo alimenta métricas económicas y (en `TASK`) el % Real. Sin migración: esos campos ya existen.
+  2. **Alta junto a una partida.** Si el usuario elige una EDT que ya tiene un ítem hoja en el cronograma, el default es **hermano, inmediatamente debajo** — nunca hijo de esa hoja (la convertiría en contenedor y perdería fechas editables, [D-046]).
+  3. **Hitos no sincronizan desde libro.** `syncScheduleProgressFromJobsiteLog` ignora `type = MILESTONE`. El PM completa el hito a mano o por **recepción de OC** ([D-104]).
+  4. **Hito se ve distinto:** color fijo (diamante), no el del estado; atrasado → tono peligro; hecho → check / success. Filtro `?type=TASK|MILESTONE` en las cuatro vistas desktop.
+  5. **Reordenar:** subir/bajar + indent/outdent (o insertar después de) vía service `moveScheduleItem`; UI en Gantt sidebar, tabla y detalle. Indent bajo una hoja permitido con confirmación (pasa a contenedor → rollup).
+- **Implicancias:** `createScheduleItem` con `afterItemId` y append por `max(sortOrder)+1`; filtro workspace `itemType`; docs ERD + guía §7 + help.
+- **Documentos afectados:** [`PROJECT_SCHEDULING.md`](../02-modules/PROJECT_SCHEDULING.md), [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) ([BR-SCH-004]), [D-045](#d-045--avance-real-del-cronograma-sincronizado-desde-libro-de-obra), [`CORE_ENTITIES.md`](../01-domain/CORE_ENTITIES.md), [`ENTITY_RELATIONSHIPS.md`](../01-domain/ENTITY_RELATIONSHIPS.md), [`PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §7, help `agregar-hito-al-cronograma`, [D-104](#d-104--hito-de-cronograma-completado-por-recepción-de-oc--fechas-de-compra-en-workspace).
+
+---
+
+### D-104 — Hito de cronograma completado por recepción de OC + fechas de compra en workspace
+
+- **Fecha:** 2026-08-30
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (P1 cronograma / Indari)
+- **Contexto:** El hito «Llegada de paneles» no debía heredar % Real del libro ([D-103]); la llegada real ocurre al recepcionar la OC de esa EDT.
+- **Decisión:**
+  1. Al **confirmar** un `PurchaseReceipt`, completar `ScheduleItem` `type = MILESTONE` del mismo proyecto con vínculo a cualquier `wbsNodeId` de las líneas recibidas, si el estado es `PLANNED` o `IN_PROGRESS`. Idempotente si ya `COMPLETED`. `BLOCKED` / `CANCELLED` no se tocan.
+  2. Cualquier cantidad confirmada en esa EDT alcanza (no hace falta el 100 % de la OC).
+  3. Transición `PLANNED → COMPLETED` **solo** para `MILESTONE` (recepción o complete manual). Las `TASK` siguen sin salto directo.
+  4. Anular recepción **no** reabre el hito.
+  5. Workspace (solo lectura): por ítem con EDT, `expectedDeliveryDate` = min de OC `CONFIRMED`/`PARTIALLY_RECEIVED` con líneas en esos WBS; `latestReceiptDate` = max recepción `CONFIRMED`. Riesgo si la prometida es posterior al `startDate` más temprano de una tarea hoja hermana que comparte WBS.
+  6. UI: barras de tarea atrasadas en color peligro; contenedores colapsables en Gantt (estado local, sin DB).
+- **Implicancias:** `completeMilestonesFromPurchaseReceipt` en services; DTO `procurement` en workspace; [BR-SCH-005]; sin migración Prisma.
+- **Documentos afectados:** [`PROJECT_SCHEDULING.md`](../02-modules/PROJECT_SCHEDULING.md), [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md), [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §27, [`PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §7 · §9, help `agregar-hito-al-cronograma` + recepción/OC, [D-103](#d-103--cronograma-árbol-de-filas-hitos-visuales-y-sync-solo-en-tareas).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1579,7 +1615,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-103`…).
+1. Tomar el siguiente ID disponible (`D-105`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

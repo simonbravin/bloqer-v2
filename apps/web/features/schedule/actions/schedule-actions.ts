@@ -13,6 +13,7 @@ import {
   linkWbsNodesToScheduleItem,
   listScheduleItemAuditHistory,
   listScheduleLinkableWbsOptions,
+  moveScheduleItem,
   moveScheduleItemToStatus,
   removeScheduleDependency,
   ServiceError,
@@ -29,6 +30,7 @@ import {
   createScheduleItemSchema,
   importScheduleFromBudgetSchema,
   linkWbsNodesSchema,
+  moveScheduleItemSchema,
   removeScheduleDependencySchema,
   unlinkWbsNodeSchema,
   updateScheduleItemDatesSchema,
@@ -77,6 +79,21 @@ export async function createScheduleItemAction(projectId: string, raw: unknown) 
     await createScheduleItem(projectId, input, ctx);
     revalidateCronograma(projectId);
     return { ok: true as const };
+  } catch (e) {
+    return handle(e);
+  }
+}
+
+export async function moveScheduleItemAction(projectId: string, raw: unknown) {
+  const ctx = await getCtx();
+  const input = moveScheduleItemSchema.parse(raw);
+  try {
+    const result = await moveScheduleItem(projectId, input, ctx);
+    revalidateCronograma(projectId);
+    return {
+      ok: true as const,
+      promotesLeafToContainer: result.promotesLeafToContainer,
+    };
   } catch (e) {
     return handle(e);
   }

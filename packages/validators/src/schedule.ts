@@ -15,6 +15,8 @@ export const scheduleWorkspaceFiltersSchema = z.object({
   budgetId: z.string().uuid().optional(),
   status: scheduleItemStatusSchema.optional(),
   delayedOnly: z.coerce.boolean().optional(),
+  /** D-103 — filter by TASK | MILESTONE */
+  itemType: scheduleItemTypeSchema.optional(),
 });
 
 export const importScheduleFromBudgetSchema = z.object({
@@ -25,6 +27,7 @@ export const importScheduleFromBudgetSchema = z.object({
 
 export const createScheduleItemSchema = z.object({
   parentId: z.string().uuid().nullable().optional(),
+  afterItemId: z.string().uuid().nullable().optional(),
   name: z.string().min(1).max(500),
   type: scheduleItemTypeSchema.optional().default("TASK"),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
@@ -32,6 +35,21 @@ export const createScheduleItemSchema = z.object({
   sortOrder: z.number().int().min(0).optional(),
   /** Optional leaf WBS (EDT) to link as primary after create. */
   wbsNodeId: z.string().uuid().optional(),
+});
+
+export const moveScheduleItemSchema = z.object({
+  itemId: z.string().uuid(),
+  action: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("up") }),
+    z.object({ kind: z.literal("down") }),
+    z.object({ kind: z.literal("indent") }),
+    z.object({ kind: z.literal("outdent") }),
+    z.object({
+      kind: z.literal("place"),
+      parentId: z.string().uuid().nullable(),
+      afterItemId: z.string().uuid().nullable(),
+    }),
+  ]),
 });
 
 export const updateScheduleItemDatesSchema = z.object({

@@ -53,7 +53,7 @@ export function ScheduleFieldItemSheet({
   const isMilestone = item?.type === "MILESTONE";
   const predecessors = useMemo(() => item?.predecessorNames ?? [], [item]);
 
-  const actions = item ? scheduleFieldStatusActions(item.status) : [];
+  const actions = item ? scheduleFieldStatusActions(item.status, item.type) : [];
   const primaryActions = actions.filter((action) => action !== "BLOCKED");
   const canBlock = actions.includes("BLOCKED");
 

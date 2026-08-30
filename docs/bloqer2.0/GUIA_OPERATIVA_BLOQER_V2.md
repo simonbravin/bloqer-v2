@@ -627,15 +627,18 @@ stateDiagram-v2
 1. Abrir Cronograma. Vista por defecto: **Gantt** (`?view=gantt`). También: Calendario, Kanban, Tabla.
 2. (Recomendado) **Importar desde presupuesto** → diálogo **Importar EDT al cronograma** → elegir presupuesto aprobado → **Importar**. Así las tareas nacen alineadas a la EDT.
 3. Completar fechas en ítems **hoja** (no en contenedores: sus fechas se derivan; usar **Recalcular contenedores** en el Gantt si hace falta). En Gantt: arrastrar/redimensionar barras y **hitos**.
-4. Crear ítems adicionales con **+ Tarea / hito** (`TASK` o `MILESTONE`). Opcional: vincular partida EDT al crear.
-5. Dependencias: solo **Finish‑to‑Start (FS)** en la pestaña **Dependencias** del detalle (o botón **FS** en el Gantt). Violaciones = advertencias al guardar fechas, no bloqueos. Las flechas del Gantt son de solo lectura.
-6. En cada tarea crítica: vincular nodos EDT (uno **primario**) desde el detalle — sin vínculo aparece el chip **Sin EDT** (no hay sync Real ni métricas de costo/cert).
-7. Revisar si aparece aviso de **baselineBudgetMismatch** (presupuesto base del cronograma ≠ el aprobado actual).
-8. Las tareas **canceladas** están ocultas por defecto en las cuatro vistas; filtrá estado **Cancelado** para verlas.
+4. Crear ítems adicionales con **+ Tarea / hito** (`TASK` o `MILESTONE`). En **Ubicación**: *Colocar bajo* (capítulo o raíz) e *Insertar después de* (hermano). Si vinculás una partida EDT que ya tiene una tarea hoja, el sistema propone poner el ítem **justo debajo** (hermano, no hijo). El vínculo EDT **no** mueve la fila.
+5. Reordenar: en Gantt (sidebar), Tabla o detalle usá **↑ ↓**, **sangrar** / **disminuir sangría**. Si sangrás bajo una hoja con fechas, esa hoja pasa a contenedor (fechas derivadas); el sistema pide confirmación.
+6. Dependencias: solo **Finish‑to‑Start (FS)** en la pestaña **Dependencias** del detalle (o botón **FS** en el Gantt). Violaciones = advertencias al guardar fechas, no bloqueos. Las flechas del Gantt son de solo lectura.
+7. En cada tarea crítica: vincular nodos EDT (uno **primario**) desde el detalle — sin vínculo aparece el chip **Sin EDT** (no hay sync Real ni métricas de costo/cert). Los **hitos** no reciben % Real del libro aunque tengan EDT ([D-103]); se completan a mano o al **confirmar una recepción** de la misma EDT ([D-104]).
+8. Filtrá por **Tipo** (Todos / Tareas / Hitos) y estado. Los hitos se ven con color fijo (diamante) en el Gantt; las barras de tarea **atrasadas** también se pintan en rojo. En el sidebar del Gantt, **▾** colapsa capítulos (estado local del navegador).
+9. Con EDT vinculada: chips **Entrega OC** (fecha prometida de OC confirmada) y **Recibido**; chip ámbar si la prometida es posterior al inicio de una tarea hermana con la misma EDT.
+10. Revisar si aparece aviso de **baselineBudgetMismatch** (presupuesto base del cronograma ≠ el aprobado actual).
+11. Las tareas **canceladas** están ocultas por defecto en las cuatro vistas; filtrá estado **Cancelado** para verlas.
 
 **Estados de ítem:** `PLANNED` · `IN_PROGRESS` · `BLOCKED` · `COMPLETED` · `CANCELLED`.
 
-**Kanban:** solo transiciones permitidas (ej. Planificado → En curso / Bloqueado; En curso → Hecho / Bloqueado). Soltar en Planificado o Cancelado, o un salto inválido, muestra un mensaje y no cambia el estado. Para cancelar, usar el detalle de la tarea.
+**Kanban:** solo transiciones permitidas (ej. Planificado → En curso / Bloqueado; En curso → Hecho / Bloqueado; hitos también Planificado → Hecho — [D-104]). Soltar en Planificado o Cancelado, o un salto inválido, muestra un mensaje y no cambia el estado. Para cancelar, usar el detalle de la tarea.
 
 **Montos** en sidebar/tabla/detalle (comprometido, presupuesto, certificado): moneda del presupuesto base del cronograma.
 
@@ -650,7 +653,7 @@ En detalle de tarea / tabla / Gantt aparecen como **Real / plan t. / cant. / cer
 
 | Dimensión | Fuente | Quién la mueve |
 |-----------|--------|----------------|
-| **Real** | `ScheduleItem.progressPct` | Libro de obra **aprobado** (o ajuste manual **Avance real %** del PM) |
+| **Real** | `ScheduleItem.progressPct` | Libro de obra **aprobado** en **tareas** con EDT primaria; en **hitos** ajuste manual del PM o **confirmación de recepción** de la misma EDT ([D-103]/[D-104]) |
 | **Plan (tiempo)** | Fechas vs. hoy | Automático |
 | **Cantidades** | Cantidades físicas vs. presupuesto | Libro de obra |
 | **Certificado** | Certificaciones emitidas | Módulo Certificaciones (solo lectura en cronograma) |
@@ -816,6 +819,7 @@ flowchart LR
 1. Desde **Pendientes** (botón **Recibir**), desde la **campana** (CTA **Registrar recepción**), Compras → **Recepciones**, o desde la OC → **Nueva recepción** (`/ordenes-compra/[poId]/recepciones/nueva`).
 2. Indicar cantidades recibidas por línea; depósito opcional si el módulo Inventario está activo.
 3. Confirmar. Si hay producto/depósito → **entrada de stock** (el movimiento IN puede copiar `wbsNodeId`).
+4. Al confirmar: si hay un **hito** del mismo proyecto vinculado a la EDT de alguna línea recibida (`PLANNED`/`IN_PROGRESS`), el sistema lo marca **Completado** ([D-104] / [BR-SCH-005]). Anular la recepción **no** reabre el hito.
 
 <!-- capture:27 listado-recepciones -->
 ![Bloqer — Listado Recepciones](./guides/assets/screenshots/27-listado-recepciones.png)

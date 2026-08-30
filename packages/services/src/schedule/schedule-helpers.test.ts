@@ -39,6 +39,10 @@ describe("assertScheduleStatusTransition", () => {
     assert.doesNotThrow(() => assertScheduleStatusTransition("PLANNED", "IN_PROGRESS"));
   });
 
+  it("allows PLANNED → COMPLETED in the matrix (MILESTONE guard is separate)", () => {
+    assert.doesNotThrow(() => assertScheduleStatusTransition("PLANNED", "COMPLETED"));
+  });
+
   it("rejects COMPLETED → IN_PROGRESS", () => {
     assert.throws(
       () => assertScheduleStatusTransition("COMPLETED", "IN_PROGRESS"),

@@ -2,6 +2,7 @@
 
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
 import { cn } from "@/lib/utils";
+import { MILESTONE_COLOR } from "../adapters/schedule-view-types";
 import { formatProgressPctDisplay } from "../adapters/schedule-field-labels";
 
 export function scheduleProgressValues(item: ScheduleWorkspaceItemDto) {
@@ -80,7 +81,7 @@ export function ScheduleProgressLegend({ className }: { className?: string }) {
     <div className={cn("space-y-1 text-xs text-muted-foreground", className)}>
       <p>
         <strong className="font-medium text-foreground">Real</strong> = cronograma
-        (sincronizado desde libro) ·{" "}
+        (sincronizado desde libro en <em>tareas</em>; hitos a mano o por recepción) ·{" "}
         <strong className="font-medium text-foreground">Plan (t)</strong> = tiempo
         transcurrido ·{" "}
         <strong className="font-medium text-foreground">Cant.</strong> = cantidades en
@@ -88,8 +89,19 @@ export function ScheduleProgressLegend({ className }: { className?: string }) {
         certificada (solo lectura).
       </p>
       <p>
-        En el Gantt: relleno oscuro = Real; franja/borde ámbar = Cert. Comprometido (compras)
-        se muestra en sidebar, tabla y detalle cuando hay EDT vinculado.
+        En el Gantt: relleno oscuro = Real; franja/borde ámbar = Cert.{" "}
+        <strong className="font-medium text-foreground">Barra roja</strong> = atrasado vs
+        plan (tarea o hito).{" "}
+        <span className="inline-flex items-center gap-1">
+          Hito = diamante{" "}
+          <span
+            className="inline-block h-2 w-2 rotate-45 rounded-[1px]"
+            style={{ backgroundColor: MILESTONE_COLOR }}
+            aria-hidden
+          />{" "}
+          (violeta; rojo si atrasado; verde si hecho).
+        </span>{" "}
+        Comprometido (compras) se muestra en sidebar, tabla y detalle cuando hay EDT vinculado.
       </p>
     </div>
   );

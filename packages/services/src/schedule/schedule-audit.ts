@@ -15,6 +15,7 @@ export const SCHEDULE_AUDIT_ACTIONS = [
   "schedule_item.name_updated",
   "schedule_item.dates_updated",
   "schedule_item.progress_updated",
+  "schedule_item.moved",
   "schedule_item.status_changed",
   "schedule_item.started",
   "schedule_item.completed",
@@ -94,6 +95,7 @@ export type ScheduleItemAuditEntryDto = {
 const ACTION_LABELS: Record<string, string> = {
   "schedule_item.dates_updated": "Fechas actualizadas",
   "schedule_item.progress_updated": "Avance planificado actualizado",
+  "schedule_item.moved": "Ítem reordenado",
   "schedule_item.status_changed": "Estado cambiado",
   "schedule_item.started": "Tarea iniciada",
   "schedule_item.completed": "Tarea completada",

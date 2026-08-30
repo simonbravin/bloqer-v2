@@ -33,12 +33,14 @@ export function ScheduleSummaryCards({ workspace }: { workspace: ScheduleWorkspa
         iconKey="schedule_completed"
         label="Completados"
         value={String(summary.completedItems)}
+        helper="Del proyecto (sin filtros)"
         tone={summary.completedItems > 0 ? "success" : "muted"}
       />
       <KpiStatCard
         iconKey="schedule_delayed"
         label="Atrasados"
         value={String(summary.delayedItems)}
+        helper="Hojas del proyecto (sin filtros)"
         tone={summary.delayedItems > 0 ? "danger" : "muted"}
       />
     </div>

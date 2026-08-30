@@ -2,20 +2,20 @@
 
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
 import { cn } from "@/lib/utils";
-import { scheduleItemHasActiveChildren, hasPrimaryWbsLink } from "../adapters/schedule-view-types";
+import { hasPrimaryWbsLink } from "../adapters/schedule-view-types";
 
 /** Badge when a leaf task/milestone has no primary EDT link (blocks Real sync + cost metrics). */
 export function ScheduleMissingEdtBadge({
   item,
-  allItems,
   className,
 }: {
   item: ScheduleWorkspaceItemDto;
-  allItems: ScheduleWorkspaceItemDto[];
+  /** @deprecated unused — leaf comes from server isLeaf (full tree). */
+  allItems?: ScheduleWorkspaceItemDto[];
   className?: string;
 }) {
   if (item.status === "CANCELLED") return null;
-  if (scheduleItemHasActiveChildren(allItems, item.id)) return null;
+  if (!item.isLeaf) return null;
   if (hasPrimaryWbsLink(item)) return null;
   return (
     <span

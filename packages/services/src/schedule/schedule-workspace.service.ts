@@ -9,15 +9,22 @@ import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { canEditScheduleArea, canViewScheduleArea } from "./schedule-access";
-import { computeDaysLate, formatDateOnly, computeTimePlanProgressPct, isScheduleLeafItem, mergeDerivedContainerDatesIntoDtos } from "./schedule-helpers";
+import { computeDaysLate, formatDateOnly, computeTimePlanProgressPct, isFormerScheduleContainer, isScheduleLeafItem, mergeDerivedContainerDatesIntoDtos } from "./schedule-helpers";
 import { ensureScheduleForProject, findScheduleForProject } from "./schedule.service";
 import { addDecimal, divideDecimal, multiplyDecimal, serializeMoney, sortTreeOrder } from "@bloqer/utils";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
+import {
+  computeDeliveryAfterSiblingStart,
+  mergeProcurementDatesByWbs,
+  type ProcurementDateByWbs,
+} from "./schedule-milestone-from-receipt";
 
 export type ScheduleWorkspaceFilters = {
   budgetId?: string;
   status?: ScheduleItemStatus;
   delayedOnly?: boolean;
+  /** D-103 — TASK | MILESTONE */
+  itemType?: "TASK" | "MILESTONE";
 };
 
 export type ScheduleWbsLinkDto = {
@@ -62,12 +69,37 @@ export type ScheduleWorkspaceItemDto = {
   /** Calendar-elapsed plan % (on-read, D-045). */
   timePlanPct: string | null;
   daysLate: number | null;
+  /** Leaf vs container from the **full** schedule tree (ignores URL filters). */
+  isLeaf: boolean;
+  /** Depth from root using the full tree parent chain. */
+  treeDepth: number;
   wbsLinks: ScheduleWbsLinkDto[];
   metrics: ScheduleItemMetricsDto | null;
   predecessorIds: string[];
   successorIds: string[];
   /** FS edges where this item is the successor */
   predecessorDependencies: Array<{ dependencyId: string; predecessorId: string }>;
+  /**
+   * Purchase dates for linked WBS ([D-104]).
+   * Null when there is nothing to show (no EDT, or no dates/risk).
+   */
+  procurement: {
+    expectedDeliveryDate: string | null;
+    latestReceiptDate: string | null;
+    deliveryAfterSiblingStart: boolean;
+  } | null;
+};
+
+/** Full active tree for placement / reorder UI (ignores URL filters). */
+export type ScheduleTreeItemDto = {
+  id: string;
+  parentId: string | null;
+  sortOrder: number;
+  status: ScheduleItemStatus;
+  name: string;
+  type: string;
+  isLeaf: boolean;
+  wbsNodeIds: string[];
 };
 
 export type ScheduleWorkspaceDto = {
@@ -85,6 +117,8 @@ export type ScheduleWorkspaceDto = {
   availableBudgets: AvailableBudget[];
   canEdit: boolean;
   items: ScheduleWorkspaceItemDto[];
+  /** Unfiltered active items for create/reorder placement (D-103). */
+  treeItems: ScheduleTreeItemDto[];
   summary: {
     totalItems: number;
     /** Active items (non-CANCELLED) before status/delayedOnly URL filters */
@@ -219,6 +253,75 @@ function mergeCategoryTotals(
   }
 }
 
+/** Batch PO expectedDelivery + confirmed receipt dates per WBS ([D-104]). */
+async function loadProcurementDatesByWbs(
+  projectId: string,
+  tenantId: string,
+  wbsNodeIds: string[],
+): Promise<Map<string, ProcurementDateByWbs>> {
+  const map = new Map<string, ProcurementDateByWbs>();
+  for (const id of wbsNodeIds) {
+    map.set(id, { expectedDeliveryDate: null, latestReceiptDate: null });
+  }
+  if (wbsNodeIds.length === 0) return map;
+
+  const poLines = await prisma.purchaseOrderLine.findMany({
+    where: {
+      wbsNodeId: { in: wbsNodeIds },
+      purchaseOrder: {
+        tenantId,
+        projectId,
+        status: { in: ["CONFIRMED", "PARTIALLY_RECEIVED"] },
+        expectedDeliveryDate: { not: null },
+      },
+    },
+    select: {
+      wbsNodeId: true,
+      purchaseOrder: { select: { expectedDeliveryDate: true } },
+    },
+  });
+
+  for (const line of poLines) {
+    if (!line.wbsNodeId || !line.purchaseOrder.expectedDeliveryDate) continue;
+    const iso = formatDateOnly(line.purchaseOrder.expectedDeliveryDate);
+    if (!iso) continue;
+    const row = map.get(line.wbsNodeId);
+    if (!row) continue;
+    if (!row.expectedDeliveryDate || iso < row.expectedDeliveryDate) {
+      row.expectedDeliveryDate = iso;
+    }
+  }
+
+  const receiptLines = await prisma.purchaseReceiptLine.findMany({
+    where: {
+      purchaseOrderLine: { wbsNodeId: { in: wbsNodeIds } },
+      purchaseReceipt: {
+        tenantId,
+        projectId,
+        status: "CONFIRMED",
+      },
+    },
+    select: {
+      purchaseOrderLine: { select: { wbsNodeId: true } },
+      purchaseReceipt: { select: { receiptDate: true } },
+    },
+  });
+
+  for (const line of receiptLines) {
+    const wbsId = line.purchaseOrderLine.wbsNodeId;
+    if (!wbsId) continue;
+    const iso = formatDateOnly(line.purchaseReceipt.receiptDate);
+    if (!iso) continue;
+    const row = map.get(wbsId);
+    if (!row) continue;
+    if (!row.latestReceiptDate || iso > row.latestReceiptDate) {
+      row.latestReceiptDate = iso;
+    }
+  }
+
+  return map;
+}
+
 export type ScheduleWorkspaceQueryTimings = {
   moduleGateMs: number;
   costControlMs: number;
@@ -297,6 +400,7 @@ export async function getProjectScheduleWorkspace(
         availableBudgets: cc.availableBudgets,
         canEdit: false,
         items: [],
+        treeItems: [],
         summary: {
           totalItems: 0,
           unfilteredActiveCount: 0,
@@ -361,6 +465,7 @@ export async function getProjectScheduleWorkspace(
     where: {
       scheduleId: schedule.id,
       ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.itemType ? { type: filters.itemType } : {}),
     },
     orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
     include: {
@@ -379,6 +484,9 @@ export async function getProjectScheduleWorkspace(
       id: true,
       parentId: true,
       status: true,
+      type: true,
+      name: true,
+      sortOrder: true,
       startDate: true,
       endDate: true,
       progressPct: true,
@@ -387,12 +495,65 @@ export async function getProjectScheduleWorkspace(
   });
   const rollupSourceMs = mark(t);
 
+  const parentById = new Map(rollupSourceItems.map((i) => [i.id, i.parentId]));
+  const treeDepthOf = (id: string): number => {
+    let depth = 0;
+    let current = parentById.get(id) ?? null;
+    const seen = new Set<string>();
+    while (current) {
+      if (seen.has(current)) break;
+      seen.add(current);
+      depth += 1;
+      current = parentById.get(current) ?? null;
+    }
+    return depth;
+  };
+
   const allWbsIds = [
     ...new Set(items.flatMap((i) => i.wbsLinks.map((l) => l.wbsNodeId))),
   ];
   t = Date.now();
   const categoryByWbs = await loadCostByCategoryForWbs(allWbsIds);
   const costByCategoryMs = mark(t);
+
+  // Full-tree WBS for procurement risk siblings (before URL filters shrink the list).
+  const rollupWbsByItemId = new Map(
+    rollupSourceItems.map((i) => [i.id, [] as string[]]),
+  );
+  const filteredItemIds = new Set(items.map((i) => i.id));
+  for (const item of items) {
+    rollupWbsByItemId.set(
+      item.id,
+      item.wbsLinks.map((l) => l.wbsNodeId),
+    );
+  }
+  const missingWbsItemIds = rollupSourceItems
+    .filter((i) => !filteredItemIds.has(i.id))
+    .map((i) => i.id);
+  if (missingWbsItemIds.length > 0) {
+    const extraLinks = await prisma.scheduleItemWbsLink.findMany({
+      where: {
+        scheduleItemId: { in: missingWbsItemIds },
+        tenantId: ctx.tenantId,
+      },
+      select: { scheduleItemId: true, wbsNodeId: true },
+    });
+    for (const link of extraLinks) {
+      const list = rollupWbsByItemId.get(link.scheduleItemId) ?? [];
+      list.push(link.wbsNodeId);
+      rollupWbsByItemId.set(link.scheduleItemId, list);
+    }
+  }
+
+  const procurementWbsIds = [
+    ...new Set([...rollupWbsByItemId.values()].flat()),
+  ];
+  const procurementByWbs = await loadProcurementDatesByWbs(
+    projectId,
+    ctx.tenantId,
+    procurementWbsIds,
+  );
+
   const mapStarted = Date.now();
 
   const dtoItems: ScheduleWorkspaceItemDto[] = [];
@@ -452,6 +613,17 @@ export async function getProjectScheduleWorkspace(
       // linked but no cost rows (orphan WBS ids) → metrics stay null; never fabricate zeros
     }
 
+    const wbsIds = wbsLinks.map((l) => l.wbsNodeId);
+    let procurement: ScheduleWorkspaceItemDto["procurement"] = null;
+    if (wbsIds.length > 0) {
+      const dates = mergeProcurementDatesByWbs(wbsIds, procurementByWbs);
+      procurement = {
+        expectedDeliveryDate: dates.expectedDeliveryDate,
+        latestReceiptDate: dates.latestReceiptDate,
+        deliveryAfterSiblingStart: false, // filled after all DTOs + full-tree risk inputs
+      };
+    }
+
     dtoItems.push({
       id: item.id,
       parentId: item.parentId,
@@ -469,6 +641,8 @@ export async function getProjectScheduleWorkspace(
         formatDateOnly(item.endDate),
       ),
       daysLate,
+      isLeaf,
+      treeDepth: treeDepthOf(item.id),
       wbsLinks,
       metrics,
       predecessorIds: item.predecessors.map((p) => p.predecessorId),
@@ -477,13 +651,77 @@ export async function getProjectScheduleWorkspace(
         dependencyId: p.id,
         predecessorId: p.predecessorId,
       })),
+      procurement,
     });
+  }
+
+  // Risk against full schedule tree, per shared WBS ([D-104]).
+  const riskPeers = rollupSourceItems.map((i) => ({
+    id: i.id,
+    parentId: i.parentId,
+    type: i.type,
+    status: i.status,
+    startDate: formatDateOnly(i.startDate),
+    wbsNodeIds: rollupWbsByItemId.get(i.id) ?? [],
+  }));
+  const expectedByWbs = new Map(
+    [...procurementByWbs.entries()].map(([id, row]) => [id, row.expectedDeliveryDate]),
+  );
+
+  const isLeafFn = (id: string) => isScheduleLeafItem(rollupSourceItems, id);
+  for (const dto of dtoItems) {
+    if (!dto.procurement) continue;
+    dto.procurement.deliveryAfterSiblingStart = computeDeliveryAfterSiblingStart(
+      {
+        id: dto.id,
+        parentId: dto.parentId,
+        wbsNodeIds: dto.wbsLinks.map((l) => l.wbsNodeId),
+      },
+      riskPeers,
+      isLeafFn,
+      expectedByWbs,
+    );
+    // Collapse to null when there is nothing to show (no dates, no risk).
+    if (
+      !dto.procurement.expectedDeliveryDate &&
+      !dto.procurement.latestReceiptDate &&
+      !dto.procurement.deliveryAfterSiblingStart
+    ) {
+      dto.procurement = null;
+    }
   }
 
   mergeDerivedContainerDatesIntoDtos(
     dtoItems,
     rollupSourceItems,
   );
+
+  // Former containers clear stale DB dates in merge — drop daysLate that used those dates.
+  for (const dto of dtoItems) {
+    if (!dto.isLeaf || !dto.endDate) {
+      dto.daysLate = null;
+    }
+  }
+
+  // delayedOnly may have included former-container rows before merge; drop them now.
+  if (filters.delayedOnly) {
+    for (let i = dtoItems.length - 1; i >= 0; i--) {
+      if (dtoItems[i]!.daysLate == null) dtoItems.splice(i, 1);
+    }
+  }
+
+  const treeItems: ScheduleTreeItemDto[] = rollupSourceItems
+    .filter((i) => i.status !== "CANCELLED")
+    .map((i) => ({
+      id: i.id,
+      parentId: i.parentId,
+      sortOrder: i.sortOrder,
+      status: i.status,
+      name: i.name,
+      type: i.type,
+      isLeaf: isScheduleLeafItem(rollupSourceItems, i.id),
+      wbsNodeIds: rollupWbsByItemId.get(i.id) ?? [],
+    }));
 
   const activeItems = dtoItems.filter((i) => i.status !== "CANCELLED");
   // Leaf KPIs from full tree (D-046) — not the status-filtered list.
@@ -495,6 +733,8 @@ export async function getProjectScheduleWorkspace(
   let delayedItems = 0;
   for (const i of fullActive) {
     if (!fullLeafIds.has(i.id)) continue;
+    // Align with DTO post-merge: former containers have no reliable endDate.
+    if (isFormerScheduleContainer(fullActive, i.id)) continue;
     if (computeDaysLate(i.endDate, i.status) !== null) delayedItems += 1;
   }
 
@@ -502,8 +742,9 @@ export async function getProjectScheduleWorkspace(
   let weightSum = "0";
   for (const i of fullActive) {
     if (!fullLeafIds.has(i.id)) continue;
+    const former = isFormerScheduleContainer(fullActive, i.id);
     const dur =
-      i.durationDays && i.durationDays > 0 ? String(i.durationDays) : "1";
+      !former && i.durationDays && i.durationDays > 0 ? String(i.durationDays) : "1";
     weighted = addDecimal(
       weighted,
       multiplyDecimal(i.progressPct.toString(), dur),
@@ -545,6 +786,7 @@ export async function getProjectScheduleWorkspace(
     availableBudgets: cc.availableBudgets,
     canEdit: canEditScheduleArea(ctx.roles),
     items: sortTreeOrder(dtoItems, (a, b) => a.name.localeCompare(b.name, "es")),
+    treeItems,
     summary: {
       totalItems: activeItems.length,
       unfilteredActiveCount,

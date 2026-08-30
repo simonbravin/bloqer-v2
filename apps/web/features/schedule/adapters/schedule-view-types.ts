@@ -1,4 +1,8 @@
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
+import {
+  resolveScheduleItemBarColor,
+  SCHEDULE_BAR_COLORS,
+} from "@bloqer/services/schedule-bar-color";
 import type { GanttFeature as KiboGanttFeature } from "@/components/kibo-ui/gantt";
 import type { Feature as KiboCalendarFeature } from "@/components/kibo-ui/calendar";
 import { formatDateAr } from "@/lib/gantt-date-format";
@@ -16,15 +20,13 @@ export type KanbanCard = {
   badges: string[];
 };
 
-export const CONTAINER_COLOR = "#475569";
-
-const STATUS_COLORS: Record<string, string> = {
-  PLANNED: "#94a3b8",
-  IN_PROGRESS: "#3b82f6",
-  BLOCKED: "#ef4444",
-  COMPLETED: "#22c55e",
-  CANCELLED: "#64748b",
-};
+export const CONTAINER_COLOR = SCHEDULE_BAR_COLORS.container;
+/** D-103 — fixed milestone color (not status-driven). */
+export const MILESTONE_COLOR = SCHEDULE_BAR_COLORS.milestone;
+export const MILESTONE_LATE_COLOR = SCHEDULE_BAR_COLORS.milestoneLate;
+export const MILESTONE_DONE_COLOR = SCHEDULE_BAR_COLORS.milestoneDone;
+/** D-104 — late TASK bars use the same danger color as late milestones. */
+export const TASK_LATE_COLOR = SCHEDULE_BAR_COLORS.taskLate;
 
 const STATUS_LABELS: Record<string, string> = {
   PLANNED: "Planificado",
@@ -39,27 +41,6 @@ function parseItemDate(iso: string | null, fallback: Date): Date {
   return new Date(`${iso}T12:00:00.000Z`);
 }
 
-export function scheduleItemHasActiveChildren(
-  items: ScheduleWorkspaceItemDto[],
-  itemId: string,
-): boolean {
-  return items.some((i) => i.parentId === itemId && i.status !== "CANCELLED");
-}
-
-export function scheduleItemTreeDepth(
-  items: ScheduleWorkspaceItemDto[],
-  itemId: string,
-): number {
-  const byId = new Map(items.map((i) => [i.id, i]));
-  let depth = 0;
-  let current = byId.get(itemId);
-  while (current?.parentId) {
-    depth += 1;
-    current = byId.get(current.parentId);
-  }
-  return depth;
-}
-
 export function countScheduleItemsWithoutDates(items: ScheduleWorkspaceItemDto[]): {
   containersWithoutDates: number;
   leavesWithoutDates: number;
@@ -72,7 +53,7 @@ export function countScheduleItemsWithoutDates(items: ScheduleWorkspaceItemDto[]
     const hasDates = Boolean(item.startDate && item.endDate);
     if (hasDates) continue;
 
-    if (scheduleItemHasActiveChildren(items, item.id)) {
+    if (!item.isLeaf) {
       containersWithoutDates += 1;
     } else {
       leavesWithoutDates += 1;
@@ -80,6 +61,13 @@ export function countScheduleItemsWithoutDates(items: ScheduleWorkspaceItemDto[]
   }
 
   return { containersWithoutDates, leavesWithoutDates };
+}
+
+export function scheduleItemBarColor(
+  item: Pick<ScheduleWorkspaceItemDto, "type" | "status" | "daysLate">,
+  isSummary = false,
+): string {
+  return resolveScheduleItemBarColor(item, isSummary);
 }
 
 export function mapItemToGanttFeature(
@@ -102,7 +90,7 @@ export function mapItemToGanttFeature(
       status: {
         id: item.status,
         name: STATUS_LABELS[item.status] ?? item.status,
-        color: STATUS_COLORS[item.status] ?? "#64748b",
+        color: scheduleItemBarColor(item, false),
       },
       lane: item.parentId ?? undefined,
     };
@@ -119,7 +107,7 @@ export function mapItemToGanttFeature(
     status: {
       id: isSummary ? "SUMMARY" : item.status,
       name: isSummary ? "Contenedor" : (STATUS_LABELS[item.status] ?? item.status),
-      color: isSummary ? CONTAINER_COLOR : (STATUS_COLORS[item.status] ?? "#64748b"),
+      color: scheduleItemBarColor(item, isSummary),
     },
     lane: item.parentId ?? undefined,
   };
@@ -141,7 +129,7 @@ export function mapItemToCalendarFeature(
     status: {
       id: item.status,
       name: STATUS_LABELS[item.status] ?? item.status,
-      color: STATUS_COLORS[item.status] ?? "#64748b",
+      color: scheduleItemBarColor(item),
     },
   };
 }
@@ -158,7 +146,7 @@ export function mapScheduleItemsToGanttEntries(
 ): ScheduleGanttEntry[] {
   const entries: ScheduleGanttEntry[] = [];
   for (const item of items) {
-    const isSummary = scheduleItemHasActiveChildren(items, item.id);
+    const isSummary = !item.isLeaf;
     const feature = mapItemToGanttFeature(item, fallbackStart, fallbackEnd, isSummary);
     if (feature) entries.push({ item, feature });
   }
@@ -170,6 +158,7 @@ export function mapScheduleItemsToCalendarFeatures(
   fallback: Date,
 ): CalendarFeature[] {
   return items
+    .filter((item) => item.isLeaf)
     .map((item) => mapItemToCalendarFeature(item, fallback))
     .filter((f): f is CalendarFeature => f != null);
 }
@@ -220,4 +209,5 @@ export function mapItemToKanbanCard(item: ScheduleWorkspaceItemDto): KanbanCard 
   };
 }
 
-export { STATUS_LABELS, STATUS_COLORS };
+export { STATUS_LABELS };
+export const STATUS_COLORS = SCHEDULE_BAR_COLORS.status;

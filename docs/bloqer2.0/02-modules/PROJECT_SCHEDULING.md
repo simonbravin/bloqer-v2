@@ -27,21 +27,25 @@ Sin cronograma, el costo puede estar “al día” pero la obra retrasada — o 
 
 ## 8. Acciones disponibles
 - Crear/editar cronograma (Gantt y/o lista de hitos según [Q-003]).
+- Ubicar ítem en el árbol (`parent_id` + `sort_order`): al crear (después de / bajo) y reordenar (↑↓, indent/outdent) — [D-103].
 - Vincular tarea a `CostItem` / `WbsNode`.
-- Registrar avance % de tarea (manual excepcional; **automático desde libro de obra al aprobar** — [D-045] / [BR-SCH-004]).
+- Registrar avance % de tarea (manual excepcional; **automático desde libro de obra al aprobar** en `TASK` — [D-045] / [D-103] / [BR-SCH-004]; hitos no sincronizan desde libro; hitos se completan a mano o por recepción — [D-104] / [BR-SCH-005]).
 - Editar fechas y dependencias FS (advertencias no bloqueantes si hay conflicto).
 - Importar WBS: estructura sin fechas por defecto; fechas de borrador opt-in; rollup de contenedores ([D-046]).
 
 ## 9. Pantallas y vistas necesarias
 - Vista Gantt (si Fase 1 incluye).
-- Lista de hitos con fechas y alertas de desvío.
+- Lista de hitos con fechas y alertas de desvío (filtro Tipo = Hitos).
 - Comparativa plan vs físico ([`../06-reports/OPERATIONAL_REPORTS.md`](../06-reports/OPERATIONAL_REPORTS.md)).
 
 ## 10. Reglas de negocio
 - **BR-SCH-001**: un proyecto tiene un único Schedule activo ([BR-SCH-001]).
 - **BR-SCH-002**: avance cronograma ≠ avance certificado; reportes los muestran lado a lado ([BR-SCH-002]).
 - **BR-SCH-003**: ítem `BLOCKED` con causa obligatoria ([BR-SCH-003]).
-- **BR-SCH-004**: sync de avance real al aprobar libro ([BR-SCH-004], [D-045]).
+- **BR-SCH-004**: sync de avance real al aprobar libro **solo en `TASK`** ([BR-SCH-004], [D-045], [D-103]).
+- **BR-SCH-005**: al confirmar recepción, completar hitos vinculados a la EDT recibida ([BR-SCH-005], [D-104]).
+- Altura visual = árbol de `ScheduleItem`, no el vínculo EDT ([D-103]).
+- Workspace: fecha prometida de OC y última recepción por EDT; chip de riesgo si la prometida es posterior al inicio de una tarea hermana ([D-104]).
 
 ## 11. Validaciones
 - Fechas de tarea coherentes con dependencias (sin ciclos).

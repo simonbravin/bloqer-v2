@@ -233,7 +233,8 @@ export function wouldCreateDependencyCycle(
 }
 
 const ALLOWED: Record<ScheduleItemStatus, ScheduleItemStatus[]> = {
-  PLANNED: ["IN_PROGRESS", "BLOCKED", "CANCELLED"],
+  // COMPLETED from PLANNED is allowed in the matrix but only for MILESTONE ([D-104]).
+  PLANNED: ["IN_PROGRESS", "BLOCKED", "CANCELLED", "COMPLETED"],
   IN_PROGRESS: ["COMPLETED", "BLOCKED", "CANCELLED"],
   BLOCKED: ["IN_PROGRESS", "CANCELLED"],
   COMPLETED: [],

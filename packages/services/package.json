@@ -12,6 +12,8 @@
     "./tenant-module-gate": "./src/tenant-modules/tenant-module-gate.ts",
     "./project-workspace-nav": "./src/project/project-workspace-nav.ts",
     "./schedule-field": "./src/schedule/schedule-field.ts",
+    "./schedule-placement": "./src/schedule/schedule-placement.ts",
+    "./schedule-bar-color": "./src/schedule/schedule-bar-color.ts",
     "./materials-field": "./src/materials/materials-field.ts",
     "./payables-field": "./src/ap/payables-field.ts",
     "./receivables-field": "./src/ar/receivables-field.ts",

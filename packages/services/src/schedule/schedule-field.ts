@@ -249,8 +249,13 @@ export type ScheduleFieldStatusAction = "IN_PROGRESS" | "COMPLETED" | "BLOCKED";
 
 export function scheduleFieldStatusActions(
   status: ScheduleItemStatus | string,
+  type?: string,
 ): ScheduleFieldStatusAction[] {
-  if (status === "PLANNED") return ["IN_PROGRESS", "BLOCKED"];
+  if (status === "PLANNED") {
+    // D-104 — milestones may jump PLANNED → COMPLETED
+    if (type === "MILESTONE") return ["IN_PROGRESS", "COMPLETED", "BLOCKED"];
+    return ["IN_PROGRESS", "BLOCKED"];
+  }
   if (status === "IN_PROGRESS") return ["COMPLETED", "BLOCKED"];
   if (status === "BLOCKED") return ["IN_PROGRESS"];
   return [];

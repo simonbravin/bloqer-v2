@@ -2,11 +2,12 @@ import { Prisma, prisma } from "@bloqer/database";
 import { log } from "../audit/audit.service";
 import { ServiceContext } from "../types";
 import { SCHEDULE_ITEM_ENTITY, scheduleItemSnapshot } from "./schedule-audit";
-import { assertScheduleStatusTransition } from "./schedule-helpers";
+import { assertScheduleStatusTransition, isScheduleLeafItem } from "./schedule-helpers";
 import {
   capSyncProgressPct,
   resolveScheduleStatusAfterProgressSync,
 } from "./schedule-progress-sync-pure";
+import { shouldSyncProgressFromJobsite } from "./schedule-placement";
 
 type TxClient = Omit<
   typeof prisma,
@@ -141,6 +142,11 @@ export async function syncScheduleProgressFromJobsiteLog(
   });
   if (!schedule || schedule.tenantId !== ctx.tenantId) return 0;
 
+  const scheduleTree = await tx.scheduleItem.findMany({
+    where: { scheduleId: schedule.id, tenantId: ctx.tenantId },
+    select: { id: true, parentId: true, status: true },
+  });
+
   let updated = 0;
 
   for (const wbsNodeId of wbsIds) {
@@ -165,6 +171,9 @@ export async function syncScheduleProgressFromJobsiteLog(
 
     for (const link of links) {
       const item = link.scheduleItem;
+      if (!shouldSyncProgressFromJobsite(item.type)) continue;
+      // Containers must not receive libro sync (same leaf rule as manual progress/status).
+      if (!isScheduleLeafItem(scheduleTree, item.id)) continue;
       const before = scheduleItemSnapshot(item);
       const nextStatus = resolveScheduleStatusAfterProgressSync(item.status, pct);
 

@@ -1,18 +1,19 @@
 "use client";
 
-import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
+import type { ScheduleTreeItemDto, ScheduleWorkspaceItemDto } from "@bloqer/services";
 import { Badge } from "@/components/ui/badge";
 import { formatDateAr } from "@/lib/gantt-date-format";
 import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
 import {
   STATUS_LABELS,
   primaryWbsLink,
-  scheduleItemHasActiveChildren,
-  scheduleItemTreeDepth,
+  MILESTONE_COLOR,
 } from "../adapters/schedule-view-types";
 import { ScheduleProgressDimensions } from "./schedule-progress-dimensions";
 import { ScheduleViewEmptyMessage } from "./schedule-empty-state";
 import { ScheduleMissingEdtBadge } from "./schedule-missing-edt-badge";
+import { ScheduleProcurementChips } from "./schedule-procurement-chips";
+import { ScheduleReorderControls } from "./schedule-reorder-controls";
 
 export function ScheduleTableView({
   items,
@@ -20,12 +21,18 @@ export function ScheduleTableView({
   budgetCurrency = "ARS",
   filtersExcludeAll = false,
   unfilteredActiveCount = 0,
+  projectId,
+  canEdit = false,
+  treeItems,
 }: {
   items: ScheduleWorkspaceItemDto[];
   onSelect: (item: ScheduleWorkspaceItemDto) => void;
   budgetCurrency?: string;
   filtersExcludeAll?: boolean;
   unfilteredActiveCount?: number;
+  projectId?: string;
+  canEdit?: boolean;
+  treeItems?: ScheduleTreeItemDto[];
 }) {
   if (items.length === 0) {
     return (
@@ -45,6 +52,7 @@ export function ScheduleTableView({
         <thead>
           <tr className="border-b bg-muted/50 text-left">
             <th className="p-3 font-medium">Tarea</th>
+            {canEdit && projectId ? <th className="p-3 font-medium w-[120px]">Orden</th> : null}
             <th className="p-3 font-medium">Estado</th>
             <th className="p-3 font-medium">Inicio</th>
             <th className="p-3 font-medium">Fin</th>
@@ -57,8 +65,8 @@ export function ScheduleTableView({
         <tbody>
           {items.map((item) => {
             const primary = primaryWbsLink(item);
-            const depth = scheduleItemTreeDepth(items, item.id);
-            const isLeaf = !scheduleItemHasActiveChildren(items, item.id);
+            const depth = item.treeDepth;
+            const isLeaf = item.isLeaf;
             return (
               <tr
                 key={item.id}
@@ -74,16 +82,32 @@ export function ScheduleTableView({
                   </span>
                   <div className="flex flex-wrap items-center gap-1 mt-0.5">
                     {item.type === "MILESTONE" && (
-                      <Badge variant="outline" className="text-[10px] px-1 py-0">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1 py-0 border-violet-500/40 text-violet-700 dark:text-violet-300"
+                        style={{ borderColor: `${MILESTONE_COLOR}66` }}
+                      >
                         Hito
                       </Badge>
                     )}
                     {primary && (
                       <span className="text-xs text-muted-foreground">{primary.wbsCode}</span>
                     )}
-                    <ScheduleMissingEdtBadge item={item} allItems={items} />
+                    <ScheduleMissingEdtBadge item={item} />
+                    <ScheduleProcurementChips item={item} />
                   </div>
                 </td>
+                {canEdit && projectId ? (
+                  <td className="p-2">
+                    <ScheduleReorderControls
+                      projectId={projectId}
+                      itemId={item.id}
+                      items={items}
+                      treeItems={treeItems}
+                      size="xs"
+                    />
+                  </td>
+                ) : null}
                 <td className="p-3">{STATUS_LABELS[item.status] ?? item.status}</td>
                 <td className="p-3 tabular-nums whitespace-nowrap">{formatDateAr(item.startDate)}</td>
                 <td className="p-3 tabular-nums whitespace-nowrap">{formatDateAr(item.endDate)}</td>

@@ -6,6 +6,7 @@ import {
   computeDaysLate,
   computeTimePlanProgressPct,
   formatDateOnly,
+  isFormerScheduleContainer,
   isScheduleLeafItem,
 } from "./schedule-helpers";
 import { ensureScheduleForProject, findScheduleForProject } from "./schedule.service";
@@ -137,8 +138,10 @@ export async function getProjectScheduleFieldWorkspace(
     if (row.status === "CANCELLED") continue;
     if (!isScheduleLeafItem(tree, row.id)) continue;
 
-    const startDate = formatDateOnly(row.startDate);
-    const endDate = formatDateOnly(row.endDate);
+    // Former containers keep stale DB rollup dates — hide them (same as desktop merge).
+    const former = isFormerScheduleContainer(tree, row.id);
+    const startDate = former ? null : formatDateOnly(row.startDate);
+    const endDate = former ? null : formatDateOnly(row.endDate);
     const predecessorIds = row.predecessors.map((p) => p.predecessorId);
     items.push({
       id: row.id,
@@ -151,7 +154,7 @@ export async function getProjectScheduleFieldWorkspace(
       endDate,
       progressPct: serializeProgressPct(row.progressPct.toString()),
       timePlanPct: computeTimePlanProgressPct(startDate, endDate),
-      daysLate: computeDaysLate(row.endDate, row.status),
+      daysLate: former ? null : computeDaysLate(row.endDate, row.status),
       wbsLinks: row.wbsLinks.map((link) => ({
         wbsNodeId: link.wbsNodeId,
         wbsCode: link.wbsNode.code,

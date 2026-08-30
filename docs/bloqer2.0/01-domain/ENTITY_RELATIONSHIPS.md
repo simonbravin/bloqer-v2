@@ -125,7 +125,8 @@ erDiagram
   COST_ITEM ||--o{ COST_ANALYSIS_LINE : "se descompone en"
 
   SCHEDULE ||--o{ SCHEDULE_ITEM : "contiene"
-  SCHEDULE_ITEM }o--o| WBS_NODE : "vinculado opcional"
+  SCHEDULE_ITEM ||--o{ SCHEDULE_ITEM : "hijo (parent_id)"
+  SCHEDULE_ITEM }o--o{ WBS_NODE : "ScheduleItemWbsLink N:M"
 
   CERTIFICATION ||--o{ CERTIFICATION_LINE : "tiene"
   CERTIFICATION_LINE }o--|| COST_ITEM : "certifica"

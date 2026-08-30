@@ -52,6 +52,13 @@ export function ScheduleFilters({ budgets, currentBudgetId, delayedOnly }: Props
     push(sp);
   }
 
+  function setItemType(type: string) {
+    const sp = new URLSearchParams(params.toString());
+    if (type === "ALL") sp.delete("type");
+    else sp.set("type", type);
+    push(sp);
+  }
+
   function toggleDelayed() {
     const sp = new URLSearchParams(params.toString());
     if (delayedOnly) sp.delete("delayedOnly");
@@ -60,6 +67,7 @@ export function ScheduleFilters({ budgets, currentBudgetId, delayedOnly }: Props
   }
 
   const currentStatus = params.get("status") ?? "ALL";
+  const currentType = params.get("type") ?? "ALL";
 
   return (
     <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
@@ -80,6 +88,19 @@ export function ScheduleFilters({ budgets, currentBudgetId, delayedOnly }: Props
           </Select>
         </div>
       )}
+      <div className="space-y-1">
+        <Label className="text-xs">Tipo</Label>
+        <Select value={currentType} onValueChange={setItemType}>
+          <SelectTrigger className="h-8 w-36 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Todos</SelectItem>
+            <SelectItem value="TASK">Tareas</SelectItem>
+            <SelectItem value="MILESTONE">Hitos</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <div className="space-y-1">
         <Label className="text-xs">Estado</Label>
         <Select value={currentStatus} onValueChange={setStatus}>

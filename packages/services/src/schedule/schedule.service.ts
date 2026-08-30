@@ -1,5 +1,4 @@
-import type { Prisma } from "@bloqer/database";
-import { prisma } from "@bloqer/database";
+import { Prisma, prisma } from "@bloqer/database";
 import type { ScheduleItemStatus, ScheduleItemType } from "@bloqer/database";
 import { sortTreeOrder } from "@bloqer/utils";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
@@ -29,6 +28,14 @@ import {
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
+import {
+  applyMoveSibling,
+  resolveInsertSortOrder,
+  suggestPlacementForWbs,
+  type MoveAction,
+  type ScheduleTreeNode,
+} from "./schedule-placement";
+import { assertCanCompleteScheduleItem } from "./schedule-milestone-from-receipt";
 
 const MS_PER_DAY = 86_400_000;
 
@@ -435,6 +442,8 @@ export async function createScheduleItem(
   projectId: string,
   input: {
     parentId?: string | null;
+    /** Insert immediately after this sibling (same parent). Takes precedence over sortOrder. */
+    afterItemId?: string | null;
     name: string;
     type?: ScheduleItemType;
     startDate?: string | null;
@@ -452,11 +461,57 @@ export async function createScheduleItem(
   await assertProjectAccess(projectId, ctx);
   const schedule = await ensureScheduleForProject(projectId, ctx);
 
-  if (input.parentId) {
-    const parent = await prisma.scheduleItem.findFirst({
-      where: { id: input.parentId, scheduleId: schedule.id },
-    });
-    if (!parent) throw new ServiceError("NOT_FOUND", "Ítem padre no encontrado");
+  const existingRows = await prisma.scheduleItem.findMany({
+    where: { scheduleId: schedule.id, tenantId: ctx.tenantId },
+    select: {
+      id: true,
+      parentId: true,
+      sortOrder: true,
+      status: true,
+      wbsLinks: { select: { wbsNodeId: true } },
+    },
+  });
+  const treeNodes: ScheduleTreeNode[] = existingRows.map((r) => ({
+    id: r.id,
+    parentId: r.parentId,
+    sortOrder: r.sortOrder,
+    status: r.status,
+    wbsNodeIds: r.wbsLinks.map((l) => l.wbsNodeId),
+  }));
+
+  let parentId = input.parentId ?? null;
+  let afterItemId = input.afterItemId ?? null;
+
+  // D-103: if WBS chosen and no explicit placement, suggest sibling under existing leaf.
+  if (input.wbsNodeId && input.parentId === undefined && input.afterItemId === undefined) {
+    const suggested = suggestPlacementForWbs(treeNodes, input.wbsNodeId);
+    if (suggested) {
+      parentId = suggested.parentId;
+      afterItemId = suggested.afterItemId;
+    }
+  }
+
+  if (afterItemId) {
+    const after = existingRows.find((r) => r.id === afterItemId);
+    if (!after || after.status === "CANCELLED") {
+      throw new ServiceError("NOT_FOUND", "Ítem de referencia no encontrado");
+    }
+    // afterItem defines parent when parent not explicitly set
+    if (input.parentId === undefined) {
+      parentId = after.parentId ?? null;
+    } else if ((after.parentId ?? null) !== parentId) {
+      throw new ServiceError(
+        "VALIDATION",
+        "El ítem de referencia debe ser hermano (mismo padre)",
+      );
+    }
+  }
+
+  if (parentId) {
+    const parent = existingRows.find((r) => r.id === parentId);
+    if (!parent || parent.status === "CANCELLED") {
+      throw new ServiceError("NOT_FOUND", "Ítem padre no encontrado");
+    }
   }
 
   if (input.wbsNodeId) {
@@ -479,18 +534,48 @@ export async function createScheduleItem(
     }
   }
 
-  const startDate = input.startDate ? parseDateOnly(input.startDate) : null;
-  const endDate = input.endDate ? parseDateOnly(input.endDate) : null;
+  let startDate = input.startDate ? parseDateOnly(input.startDate) : null;
+  let endDate = input.endDate ? parseDateOnly(input.endDate) : null;
+  const itemType = input.type ?? "TASK";
+  if (itemType === "MILESTONE") {
+    const day = startDate ?? endDate;
+    startDate = day;
+    endDate = day;
+  }
+  if (startDate && endDate && endDate < startDate) {
+    throw new ServiceError("VALIDATION", "La fecha de fin no puede ser anterior al inicio");
+  }
   const durationDays =
     startDate && endDate ? daysBetween(startDate, endDate) : null;
 
+  const siblings = existingRows
+    .filter((r) => (r.parentId ?? null) === parentId && r.status !== "CANCELLED")
+    .map((r) => ({ id: r.id, sortOrder: r.sortOrder }));
+
+  const sortOrder =
+    input.sortOrder !== undefined && !afterItemId
+      ? input.sortOrder
+      : resolveInsertSortOrder(siblings, afterItemId);
+
   const created = await prisma.$transaction(async (tx) => {
+    // Shift siblings at or after insertion point
+    await tx.scheduleItem.updateMany({
+      where: {
+        scheduleId: schedule.id,
+        tenantId: ctx.tenantId,
+        parentId,
+        status: { not: "CANCELLED" },
+        sortOrder: { gte: sortOrder },
+      },
+      data: { sortOrder: { increment: 1 } },
+    });
+
     const row = await tx.scheduleItem.create({
       data: {
         tenantId: ctx.tenantId,
         scheduleId: schedule.id,
-        parentId: input.parentId ?? null,
-        sortOrder: input.sortOrder ?? 0,
+        parentId,
+        sortOrder,
         name: input.name,
         type: input.type ?? "TASK",
         startDate,
@@ -510,6 +595,17 @@ export async function createScheduleItem(
         },
       });
     }
+    // Leaf→container: drop parent's EDT so libro sync does not target a non-leaf.
+    if (
+      parentId &&
+      !existingRows.some(
+        (r) => r.parentId === parentId && r.status !== "CANCELLED",
+      )
+    ) {
+      await tx.scheduleItemWbsLink.deleteMany({
+        where: { scheduleItemId: parentId, tenantId: ctx.tenantId },
+      });
+    }
     await rollupScheduleContainerDatesInTx(schedule.id, ctx, tx);
     return row;
   });
@@ -522,10 +618,105 @@ export async function createScheduleItem(
     {
       ...scheduleItemSnapshot(created),
       ...(input.wbsNodeId ? { wbsNodeId: input.wbsNodeId } : {}),
+      afterItemId: afterItemId ?? undefined,
     },
   );
 
   return created;
+}
+
+export async function moveScheduleItem(
+  projectId: string,
+  input: {
+    itemId: string;
+    action: MoveAction;
+  },
+  ctx: ServiceContext,
+): Promise<{
+  item: Awaited<ReturnType<typeof prisma.scheduleItem.update>>;
+  promotesLeafToContainer: boolean;
+}> {
+  if (!canEditScheduleArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
+  }
+  await assertProjectScheduleMutation(projectId, ctx);
+  await assertProjectAccess(projectId, ctx);
+
+  const schedule = await prisma.schedule.findUnique({ where: { projectId } });
+  if (!schedule || schedule.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Cronograma no encontrado");
+  }
+
+  const rows = await prisma.scheduleItem.findMany({
+    where: { scheduleId: schedule.id, tenantId: ctx.tenantId },
+    select: { id: true, parentId: true, sortOrder: true, status: true, name: true },
+  });
+  const item = rows.find((r) => r.id === input.itemId);
+  if (!item) throw new ServiceError("NOT_FOUND", "Ítem no encontrado");
+  if (item.status === "CANCELLED") {
+    throw new ServiceError("VALIDATION", "No se puede reordenar un ítem cancelado");
+  }
+
+  const treeNodes: ScheduleTreeNode[] = rows.map((r) => ({
+    id: r.id,
+    parentId: r.parentId,
+    sortOrder: r.sortOrder,
+    status: r.status,
+  }));
+
+  const result = applyMoveSibling(treeNodes, input.itemId, input.action);
+  if (!result) {
+    throw new ServiceError("VALIDATION", "No se puede aplicar ese movimiento");
+  }
+
+  const before = {
+    parentId: item.parentId,
+    sortOrder: item.sortOrder,
+  };
+
+  const updated = await prisma.$transaction(async (tx) => {
+    // Assign temporary sortOrders to avoid unique collisions within the same parent
+    for (let i = 0; i < result.orderedSiblingIds.length; i++) {
+      await tx.scheduleItem.update({
+        where: { id: result.orderedSiblingIds[i]! },
+        data: {
+          parentId: result.parentId,
+          sortOrder: 10_000 + i,
+          updatedBy: ctx.actorUserId,
+        },
+      });
+    }
+    for (let i = 0; i < result.orderedSiblingIds.length; i++) {
+      await tx.scheduleItem.update({
+        where: { id: result.orderedSiblingIds[i]! },
+        data: { sortOrder: i },
+      });
+    }
+    // Leaf→container: drop new parent's EDT so libro sync targets leaves only.
+    if (result.promotesLeafToContainer && result.parentId) {
+      await tx.scheduleItemWbsLink.deleteMany({
+        where: { scheduleItemId: result.parentId, tenantId: ctx.tenantId },
+      });
+    }
+    await rollupScheduleContainerDatesInTx(schedule.id, ctx, tx);
+    return tx.scheduleItem.findUniqueOrThrow({ where: { id: input.itemId } });
+  });
+
+  await auditSchedule(
+    ctx,
+    "schedule_item.moved",
+    SCHEDULE_ITEM_ENTITY,
+    input.itemId,
+    before,
+    {
+      parentId: updated.parentId,
+      sortOrder: updated.sortOrder,
+      action: input.action.kind,
+      promotesLeafToContainer: result.promotesLeafToContainer,
+    },
+  );
+
+  return { item: updated, promotesLeafToContainer: result.promotesLeafToContainer };
 }
 
 export async function updateScheduleItemName(
@@ -578,8 +769,13 @@ export async function updateScheduleItemDates(
     );
   }
 
-  const startDate = input.startDate ? parseDateOnly(input.startDate) : null;
-  const endDate = input.endDate ? parseDateOnly(input.endDate) : null;
+  let startDate = input.startDate ? parseDateOnly(input.startDate) : null;
+  let endDate = input.endDate ? parseDateOnly(input.endDate) : null;
+  if (item.type === "MILESTONE") {
+    const day = startDate ?? endDate;
+    startDate = day;
+    endDate = day;
+  }
   if (startDate && endDate && endDate < startDate) {
     throw new ServiceError("VALIDATION", "La fecha de fin no puede ser anterior al inicio");
   }
@@ -686,7 +882,27 @@ async function transitionScheduleItem(
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
   }
   const item = await getScheduleItemForMutation(scheduleItemId, ctx);
-  assertScheduleStatusTransition(item.status, to);
+
+  const siblingsForLeaf = await prisma.scheduleItem.findMany({
+    where: {
+      scheduleId: item.scheduleId,
+      tenantId: ctx.tenantId,
+      status: { not: "CANCELLED" },
+    },
+    select: { id: true, parentId: true, status: true },
+  });
+  if (scheduleItemHasActiveChildren(siblingsForLeaf, item.id)) {
+    throw new ServiceError(
+      "VALIDATION",
+      "Los contenedores no cambian de estado; editá las subtareas hoja.",
+    );
+  }
+
+  if (to === "COMPLETED") {
+    assertCanCompleteScheduleItem(item.type, item.status, to);
+  } else {
+    assertScheduleStatusTransition(item.status, to);
+  }
 
   if (to === "BLOCKED" && !extra?.blockReason?.trim()) {
     throw new ServiceError("VALIDATION", "La causa de bloqueo es obligatoria");
@@ -698,7 +914,13 @@ async function transitionScheduleItem(
       where: { id: item.id, tenantId: ctx.tenantId, status: item.status },
       data: {
         status: to,
-        blockReason: to === "BLOCKED" ? extra!.blockReason!.trim() : to === "IN_PROGRESS" ? null : item.blockReason,
+        ...(to === "COMPLETED" ? { progressPct: new Prisma.Decimal(100) } : {}),
+        blockReason:
+          to === "BLOCKED"
+            ? extra!.blockReason!.trim()
+            : to === "IN_PROGRESS" || to === "COMPLETED" || to === "CANCELLED"
+              ? null
+              : item.blockReason,
         updatedBy: ctx.actorUserId,
       },
     });
@@ -775,6 +997,22 @@ export async function linkWbsNodesToScheduleItem(
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar cronograma");
   }
   const item = await getScheduleItemForMutation(scheduleItemId, ctx);
+
+  const siblingsForLeaf = await prisma.scheduleItem.findMany({
+    where: {
+      scheduleId: item.scheduleId,
+      tenantId: ctx.tenantId,
+      status: { not: "CANCELLED" },
+    },
+    select: { id: true, parentId: true, status: true },
+  });
+  if (scheduleItemHasActiveChildren(siblingsForLeaf, item.id)) {
+    throw new ServiceError(
+      "VALIDATION",
+      "Solo se vincula EDT a tareas u hitos hoja (no a contenedores).",
+    );
+  }
+
   const schedule = await prisma.schedule.findUniqueOrThrow({
     where: { id: item.scheduleId },
   });

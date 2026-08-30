@@ -33,9 +33,10 @@ const NEXT_STATUS: Partial<Record<ScheduleItemStatus, ScheduleItemStatus>> = {
   BLOCKED: "IN_PROGRESS",
 };
 
-/** Mirrors server ALLOWED transitions (schedule-helpers) for Kanban drops. */
+/** Mirrors server ALLOWED transitions (schedule-helpers) for Kanban drops.
+ * PLANNED→COMPLETED is server-allowed only for MILESTONE ([D-104]) — enforced in handler. */
 const KANBAN_ALLOWED: Record<ScheduleItemStatus, ScheduleItemStatus[]> = {
-  PLANNED: ["IN_PROGRESS", "BLOCKED", "CANCELLED"],
+  PLANNED: ["IN_PROGRESS", "BLOCKED", "CANCELLED", "COMPLETED"],
   IN_PROGRESS: ["COMPLETED", "BLOCKED", "CANCELLED"],
   BLOCKED: ["IN_PROGRESS", "CANCELLED"],
   COMPLETED: [],
@@ -68,7 +69,10 @@ export function ScheduleKanbanView({
   const [pending, startTransition] = useTransition();
   const [blockTarget, setBlockTarget] = useState<ScheduleWorkspaceItemDto | null>(null);
 
-  const boardItems = items;
+  const boardItems = useMemo(
+    () => items.filter((i) => i.isLeaf),
+    [items],
+  );
 
   const columns = useMemo(() => {
     const ids: ScheduleItemStatus[] = [...COLUMNS];
@@ -166,6 +170,16 @@ export function ScheduleKanbanView({
       return;
     }
 
+    if (
+      item.status === "PLANNED" &&
+      target === "COMPLETED" &&
+      item.type !== "MILESTONE"
+    ) {
+      queueMicrotask(syncDataFromServer);
+      toast.error("Las tareas deben pasar por En curso antes de Completado.");
+      return;
+    }
+
     move(item.id, target);
   }
 
@@ -233,6 +247,20 @@ export function ScheduleKanbanView({
                               }}
                             >
                               → {STATUS_LABELS[NEXT_STATUS[col]!]}
+                            </Button>
+                          )}
+                          {col === "PLANNED" && item.type === "MILESTONE" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs"
+                              disabled={pending}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                move(item.id, "COMPLETED");
+                              }}
+                            >
+                              → Completado
                             </Button>
                           )}
                           {col !== "BLOCKED" && col !== "COMPLETED" && (

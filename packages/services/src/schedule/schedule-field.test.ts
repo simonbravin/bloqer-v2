@@ -279,6 +279,10 @@ describe("200-item display cap", () => {
 describe("field status actions", () => {
   it("exposes existing transitions only", () => {
     assert.deepEqual(scheduleFieldStatusActions("PLANNED"), ["IN_PROGRESS", "BLOCKED"]);
+    assert.deepEqual(
+      scheduleFieldStatusActions("PLANNED", "MILESTONE"),
+      ["IN_PROGRESS", "COMPLETED", "BLOCKED"],
+    );
     assert.deepEqual(scheduleFieldStatusActions("IN_PROGRESS"), ["COMPLETED", "BLOCKED"]);
     assert.deepEqual(scheduleFieldStatusActions("BLOCKED"), ["IN_PROGRESS"]);
     assert.deepEqual(scheduleFieldStatusActions("COMPLETED"), []);

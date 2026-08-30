@@ -112,7 +112,9 @@ export function ScheduleWorkspace({
     workspace.summary.unfilteredActiveCount > 0 && items.length === 0;
 
   const hasActiveFilters =
-    searchParams.get("status") != null || searchParams.get("delayedOnly") === "1";
+    searchParams.get("status") != null ||
+    searchParams.get("delayedOnly") === "1" ||
+    searchParams.get("type") != null;
 
   const cancelledHidden =
     !statusFilter && workspace.items.some((i) => i.status === "CANCELLED");
@@ -137,6 +139,7 @@ export function ScheduleWorkspace({
     replaceParams((params) => {
       params.delete("status");
       params.delete("delayedOnly");
+      params.delete("type");
     });
   }
 
@@ -154,6 +157,7 @@ export function ScheduleWorkspace({
       params.delete("view");
       params.delete("status");
       params.delete("delayedOnly");
+      params.delete("type");
     });
   }
 
@@ -198,22 +202,35 @@ export function ScheduleWorkspace({
 
   useEffect(() => {
     if (!hasMounted || isLgUp) return;
-    if (parseScheduleFieldFilter(fieldParam)) return;
-    setFieldFilterState("today");
-    replaceParamsShallow((params) => {
-      params.set("field", "today");
+    const fieldOk = parseScheduleFieldFilter(fieldParam);
+    const hasDesktopFilters =
+      searchParams.get("status") != null ||
+      searchParams.get("delayedOnly") === "1" ||
+      searchParams.get("type") != null;
+    // Entering field: clear desktop filters and refetch (shallow history would keep filtered payload).
+    if (fieldOk && !hasDesktopFilters) {
+      setFieldFilterState(fieldOk);
+      return;
+    }
+    const nextField = fieldOk ?? "today";
+    setFieldFilterState(nextField);
+    replaceParams((params) => {
+      params.set("field", nextField);
       params.delete("view");
+      params.delete("status");
+      params.delete("delayedOnly");
+      params.delete("type");
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMounted, isLgUp, fieldParam]);
 
-  const fieldWorkspace = useMemo(
-    () => ({
+  const fieldWorkspace = useMemo(() => {
+    const leaves = workspace.items.filter((item) => item.isLeaf);
+    return {
       projectId: workspace.projectId,
-      items: workspace.items.map((item) => toFieldItem(item, workspace.items)),
-    }),
-    [workspace.items, workspace.projectId],
-  );
+      items: leaves.map((item) => toFieldItem(item, workspace.items)),
+    };
+  }, [workspace.items, workspace.projectId]);
   const selectedFieldItem = selectedId
     ? fieldWorkspace.items.find((i) => i.id === selectedId) ?? null
     : null;
@@ -291,7 +308,10 @@ export function ScheduleWorkspace({
                   budgets={workspace.availableBudgets}
                   defaultBudgetId={workspace.budgetId}
                 />
-                <ScheduleCreateDialog projectId={projectId} />
+                <ScheduleCreateDialog
+                  projectId={projectId}
+                  treeItems={workspace.treeItems}
+                />
               </>
             )}
             <div className="ml-auto flex flex-wrap gap-1 rounded-lg border p-1">
@@ -324,6 +344,9 @@ export function ScheduleWorkspace({
               budgetCurrency={workspace.budgetCurrency}
               filtersExcludeAll={filtersExcludeAll}
               unfilteredActiveCount={workspace.summary.unfilteredActiveCount}
+              projectId={projectId}
+              canEdit={workspace.canEdit}
+              treeItems={workspace.treeItems}
             />
           )}
           {view === "gantt" && (

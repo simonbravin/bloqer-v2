@@ -34,6 +34,7 @@ import {
   ScheduleProgressDimensions,
   ScheduleProgressLegend,
 } from "./schedule-progress-dimensions";
+import { ScheduleProcurementChips } from "./schedule-procurement-chips";
 import {
   addScheduleDependencyAction,
   copyProgressFromPhysicalAction,
@@ -47,12 +48,18 @@ import {
   updateScheduleItemProgressAction,
   cancelScheduleItemAction,
 } from "../actions/schedule-actions";
-import { STATUS_LABELS, primaryWbsLink, scheduleItemHasActiveChildren } from "../adapters/schedule-view-types";
+import {
+  STATUS_LABELS,
+  primaryWbsLink,
+  MILESTONE_COLOR,
+} from "../adapters/schedule-view-types";
 import { formatDateAr } from "@/lib/gantt-date-format";
 import { formatMoneyAmount, formatRatePctDisplay, formatRatePctFromString } from "@/lib/format-money";
 import { ScheduleCancelDialog } from "./schedule-cancel-dialog";
 import { ScheduleWbsPicker } from "./schedule-wbs-picker";
 import { ScheduleMissingEdtBadge } from "./schedule-missing-edt-badge";
+import { ScheduleReorderControls } from "./schedule-reorder-controls";
+import { Badge } from "@/components/ui/badge";
 
 const CATEGORY_LABELS: Record<string, string> = {
   MATERIAL: "Materiales",
@@ -83,7 +90,7 @@ export function ScheduleItemDialog({
 }) {
   const router = useRouter();
   const item = itemId ? allItems.find((i) => i.id === itemId) ?? null : null;
-  const isContainer = item ? scheduleItemHasActiveChildren(allItems, item.id) : false;
+  const isContainer = item ? !item.isLeaf : false;
   const [pending, startTransition] = useTransition();
   const [audit, setAudit] = useState<ScheduleItemAuditEntryView[]>([]);
   const [context, setContext] = useState<ScheduleItemContextDto | null>(null);
@@ -94,18 +101,6 @@ export function ScheduleItemDialog({
   const [endDateInput, setEndDateInput] = useState("");
   const [tab, setTab] = useState<ScheduleItemDialogTab>(initialTab);
   const [cancelOpen, setCancelOpen] = useState(false);
-
-  const depCandidates = useMemo(() => {
-    if (!item) return [];
-    return allItems.filter(
-      (i) => i.id !== item.id && !item.predecessorIds.includes(i.id),
-    );
-  }, [allItems, item]);
-
-  const predecessorOptions = useMemo(
-    () => toSearchableOptions(depCandidates.map((c) => ({ id: c.id, label: c.name }))),
-    [depCandidates],
-  );
 
   useEffect(() => {
     if (!open) return;
@@ -141,18 +136,41 @@ export function ScheduleItemDialog({
     projectId,
   ]);
 
+  const depNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of workspace.treeItems) map.set(row.id, row.name);
+    for (const row of allItems) map.set(row.id, row.name);
+    return map;
+  }, [workspace.treeItems, allItems]);
+
   const m = item?.metrics;
   const primaryWbs = item ? primaryWbsLink(item) : null;
   const linkedIds = item?.wbsLinks.map((l) => l.wbsNodeId) ?? [];
-  const predItems = (item?.predecessorDependencies ?? [])
-    .map((d) => {
-      const task = allItems.find((i) => i.id === d.predecessorId);
-      return task ? { ...task, dependencyId: d.dependencyId } : null;
-    })
-    .filter(Boolean) as (ScheduleWorkspaceItemDto & { dependencyId: string })[];
-  const succItems = (item?.successorIds ?? [])
-    .map((id) => allItems.find((i) => i.id === id))
-    .filter(Boolean) as ScheduleWorkspaceItemDto[];
+  const predItems = (item?.predecessorDependencies ?? []).map((d) => ({
+    dependencyId: d.dependencyId,
+    predecessorId: d.predecessorId,
+    name: depNameById.get(d.predecessorId) ?? "Ítem",
+  }));
+  const succItems = (item?.successorIds ?? []).map((id) => ({
+    id,
+    name: depNameById.get(id) ?? "Ítem",
+  }));
+
+  const depCandidates = useMemo(() => {
+    if (!item) return [];
+    const source =
+      workspace.treeItems.length > 0
+        ? workspace.treeItems
+        : allItems.map((i) => ({ id: i.id, name: i.name }));
+    return source.filter(
+      (i) => i.id !== item.id && !item.predecessorIds.includes(i.id),
+    );
+  }, [allItems, item, workspace.treeItems]);
+
+  const predecessorOptions = useMemo(
+    () => toSearchableOptions(depCandidates.map((c) => ({ id: c.id, label: c.name }))),
+    [depCandidates],
+  );
 
   function copyPhysical() {
     const pct = m?.operationalProgressPct;
@@ -295,10 +313,12 @@ export function ScheduleItemDialog({
 
   function saveDates() {
     if (!item) return;
+    const isMilestone = item.type === "MILESTONE";
+    const day = startDateInput || endDateInput || null;
     startTransition(async () => {
       const res = await updateScheduleItemDatesAction(projectId, item.id, {
-        startDate: startDateInput || null,
-        endDate: endDateInput || null,
+        startDate: isMilestone ? day : startDateInput || null,
+        endDate: isMilestone ? day : endDateInput || null,
       });
       if ("error" in res) toast.error(res.error);
       else {
@@ -324,7 +344,16 @@ export function ScheduleItemDialog({
         <DialogHeader>
           <DialogTitle className="flex flex-wrap items-center gap-2">
             <span>{item?.name ?? "Tarea"}</span>
-            {item ? <ScheduleMissingEdtBadge item={item} allItems={allItems} /> : null}
+            {item?.type === "MILESTONE" ? (
+              <Badge
+                variant="outline"
+                className="text-[10px]"
+                style={{ borderColor: `${MILESTONE_COLOR}88`, color: MILESTONE_COLOR }}
+              >
+                Hito
+              </Badge>
+            ) : null}
+            {item ? <ScheduleMissingEdtBadge item={item} /> : null}
           </DialogTitle>
           <DialogDescription>
             {item ? (
@@ -364,46 +393,85 @@ export function ScheduleItemDialog({
 
         {item && tab === "detail" && (
           <div className="space-y-6 text-sm mt-4">
+            {workspace.canEdit && (
+              <section className="space-y-2">
+                <h3 className="font-medium">Orden en el árbol</h3>
+                <ScheduleReorderControls
+                  projectId={projectId}
+                  itemId={item.id}
+                  items={allItems}
+                  treeItems={workspace.treeItems}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Subí/bajá o sangrá. El vínculo EDT no cambia la altura.
+                </p>
+              </section>
+            )}
             <section className="space-y-2">
               <h3 className="font-medium">Cuatro dimensiones de avance (BR-SCH-002 / D-045)</h3>
               <ScheduleProgressDimensions item={item} />
+              <ScheduleProcurementChips item={item} />
               <ScheduleProgressLegend />
               <p className="text-xs text-muted-foreground">
                 Solo <strong className="font-medium text-foreground">Real</strong> se edita o
-                sincroniza desde el libro. Plan (t), Cant. y Cert. son de solo lectura.
+                sincroniza desde el libro en <em>tareas</em>. Los <strong>hitos</strong> no
+                reciben sync del libro ([D-103]); se completan a mano o al confirmar una
+                recepción de la misma EDT ([D-104]). Plan (t), Cant. y Cert. son de solo lectura.
               </p>
             </section>
 
             <section className="space-y-2">
               <h3 className="font-medium">Planificación</h3>
               {workspace.canEdit && !isContainer ? (
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Inicio</Label>
-                    <Input
-                      type="date"
-                      className="h-8 text-xs"
-                      value={startDateInput}
-                      onChange={(e) => setStartDateInput(e.target.value)}
-                    />
+                item.type === "MILESTONE" ? (
+                  <div className="grid gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Fecha del hito</Label>
+                      <Input
+                        type="date"
+                        className="h-8 text-xs"
+                        value={startDateInput || endDateInput}
+                        onChange={(e) => {
+                          setStartDateInput(e.target.value);
+                          setEndDateInput(e.target.value);
+                        }}
+                      />
+                    </div>
+                    <Button size="sm" disabled={pending} onClick={saveDates}>
+                      Guardar fecha
+                    </Button>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Fin</Label>
-                    <Input
-                      type="date"
-                      className="h-8 text-xs"
-                      value={endDateInput}
-                      onChange={(e) => setEndDateInput(e.target.value)}
-                    />
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Inicio</Label>
+                      <Input
+                        type="date"
+                        className="h-8 text-xs"
+                        value={startDateInput}
+                        onChange={(e) => setStartDateInput(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Fin</Label>
+                      <Input
+                        type="date"
+                        className="h-8 text-xs"
+                        value={endDateInput}
+                        onChange={(e) => setEndDateInput(e.target.value)}
+                      />
+                    </div>
+                    <Button size="sm" className="col-span-2" disabled={pending} onClick={saveDates}>
+                      Guardar fechas
+                    </Button>
                   </div>
-                  <Button size="sm" className="col-span-2" disabled={pending} onClick={saveDates}>
-                    Guardar fechas
-                  </Button>
-                </div>
+                )
               ) : (
                 <div>
                   <p>
-                    {formatDateAr(item.startDate)} → {formatDateAr(item.endDate)}
+                    {item.type === "MILESTONE"
+                      ? formatDateAr(item.endDate ?? item.startDate)
+                      : `${formatDateAr(item.startDate)} → ${formatDateAr(item.endDate)}`}
                   </p>
                   {isContainer && (
                     <p className="text-xs text-muted-foreground mt-1">
@@ -418,7 +486,9 @@ export function ScheduleItemDialog({
               {workspace.canEdit && !isContainer && (
                 <div className="flex gap-2 items-end pt-2">
                   <div className="space-y-1 flex-1">
-                    <Label className="text-xs">Avance real %</Label>
+                    <Label className="text-xs">
+                      {item.type === "MILESTONE" ? "Avance % (manual)" : "Avance real %"}
+                    </Label>
                     <DecimalInput
                       value={progressInput}
                       onValueChange={setProgressInput}
@@ -429,6 +499,12 @@ export function ScheduleItemDialog({
                     Guardar
                   </Button>
                 </div>
+              )}
+              {workspace.canEdit && !isContainer && item.type === "MILESTONE" && (
+                <p className="text-xs text-muted-foreground">
+                  En hitos el % no viene del libro; también se completa al confirmar una recepción
+                  de la misma EDT.
+                </p>
               )}
               {isContainer && (
                 <p className="text-xs text-muted-foreground pt-1">
@@ -459,11 +535,21 @@ export function ScheduleItemDialog({
             <section className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="font-medium">EDT enlazado</h3>
-                <ScheduleMissingEdtBadge item={item} allItems={allItems} />
+                <ScheduleMissingEdtBadge item={item} />
               </div>
               <p className="text-xs text-muted-foreground">
-                La partida <strong className="font-medium text-foreground">primaria</strong>{" "}
-                sincroniza el avance Real al aprobar el libro y alimenta costos/certificados.
+                {item.type === "MILESTONE" ? (
+                  <>
+                    El vínculo EDT alimenta costos/certificados y permite completar el hito al
+                    confirmar una recepción ([D-104]). Los hitos <strong className="font-medium text-foreground">no</strong>{" "}
+                    sincronizan % Real desde el libro ([D-103]).
+                  </>
+                ) : (
+                  <>
+                    La partida <strong className="font-medium text-foreground">primaria</strong>{" "}
+                    sincroniza el avance Real al aprobar el libro y alimenta costos/certificados.
+                  </>
+                )}
               </p>
               {item.wbsLinks.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Sin partidas vinculadas.</p>
@@ -496,7 +582,7 @@ export function ScheduleItemDialog({
                           </Button>
                         </div>
                       </div>
-                      {workspace.canEdit && (
+                      {workspace.canEdit && !isContainer && (
                         <div className="flex shrink-0 gap-1">
                           {!link.isPrimary && (
                             <Button
@@ -521,6 +607,11 @@ export function ScheduleItemDialog({
                             Quitar
                           </Button>
                         </div>
+                      )}
+                      {workspace.canEdit && isContainer && (
+                        <p className="text-[10px] text-muted-foreground shrink-0 max-w-[9rem] text-right">
+                          EDT solo en hojas (sync Real)
+                        </p>
                       )}
                     </li>
                   ))}
@@ -577,13 +668,13 @@ export function ScheduleItemDialog({
               </section>
             )}
 
-            {workspace.canEdit && !isContainer && m?.operationalProgressPct && (
+            {workspace.canEdit && !isContainer && item.type !== "MILESTONE" && m?.operationalProgressPct && (
               <Button size="sm" variant="secondary" disabled={pending} onClick={copyPhysical}>
                 Copiar avance por cantidad (operativo)
               </Button>
             )}
 
-            {workspace.canEdit && !isContainer && context?.jobsitePhysicalPctCumulative && (
+            {workspace.canEdit && !isContainer && item.type !== "MILESTONE" && context?.jobsitePhysicalPctCumulative && (
               <Button size="sm" variant="secondary" disabled={pending} onClick={copyJobsitePhysicalPct}>
                 Copiar % físico acumulado ({context.jobsitePhysicalPctCumulative}%)
               </Button>

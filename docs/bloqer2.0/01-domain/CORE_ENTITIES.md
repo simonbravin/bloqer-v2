@@ -150,7 +150,8 @@
 
 ### ScheduleItem
 - **Propósito:** tarea o hito dentro del cronograma.
-- **Atributos clave:** schedule_id, name, type (`TASK` / `MILESTONE`), start_date, end_date, duration, dependencies[], wbs_item_id (opcional, ver [Q-004]), progress_pct, `status` (`PLANNED` \| `IN_PROGRESS` \| `BLOCKED` \| `COMPLETED` \| `CANCELLED`), block_reason (si `BLOCKED`).
+- **Atributos clave:** schedule_id, **parent_id** (árbol de filas; null = raíz), **sort_order** (orden entre hermanos), name, type (`TASK` / `MILESTONE`), start_date, end_date, duration, dependencies[], vínculos N:M a WBS vía `ScheduleItemWbsLink` ([D-039]), progress_pct, `status` (`PLANNED` \| `IN_PROGRESS` \| `BLOCKED` \| `COMPLETED` \| `CANCELLED`), block_reason (si `BLOCKED`).
+- **Notas:** la altura en Gantt/tabla es `parent_id` + `sort_order`, no el vínculo EDT ([D-103]). Hitos no reciben sync de % Real desde libro ([D-103] / [BR-SCH-004]).
 - **Estados:** ver [`STATE_MACHINES.md`](./STATE_MACHINES.md) §27.1 ScheduleItem.
 
 ### Contract

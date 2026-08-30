@@ -22,6 +22,7 @@ import {
   requireIdempotencyKey,
   withIdempotentCreate,
 } from "../idempotency/idempotency";
+import { completeMilestonesFromPurchaseReceipt } from "../schedule/schedule-milestone-from-receipt";
 
 /** Confirmer is stored on confirm as `updatedBy`; after cancel that field is the canceller. */
 function receiptActorUserId(r: {
@@ -424,6 +425,21 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
       await tx.purchaseOrderLine.update({
         where: { id: line.purchaseOrderLineId },
         data: { receivedQuantity: { increment: line.quantityReceived } },
+      });
+    }
+
+    // D-104 / BR-SCH-005 — complete linked milestones after quantities land
+    const receiptWbsIds = existing.lines
+      .map((l) => l.purchaseOrderLine.wbsNodeId)
+      .filter((id): id is string => Boolean(id));
+    if (receiptWbsIds.length > 0) {
+      await completeMilestonesFromPurchaseReceipt({
+        projectId: existing.projectId,
+        wbsNodeIds: receiptWbsIds,
+        receiptId: existing.id,
+        receiptDate: existing.receiptDate,
+        ctx,
+        tx,
       });
     }
 

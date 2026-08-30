@@ -4,7 +4,7 @@ import type { ScheduleFieldItemDto } from "@bloqer/services";
 import { Badge } from "@/components/ui/badge";
 import { formatDateRangeShortAr, formatDateShortAr } from "@/lib/gantt-date-format";
 import { cn } from "@/lib/utils";
-import { primaryWbsLink } from "../adapters/schedule-view-types";
+import { primaryWbsLink, MILESTONE_COLOR, MILESTONE_DONE_COLOR, MILESTONE_LATE_COLOR } from "../adapters/schedule-view-types";
 import { FIELD_STATUS_LABELS, formatProgressPctLabel } from "../adapters/schedule-field-labels";
 
 function statusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
@@ -12,6 +12,16 @@ function statusBadgeVariant(status: string): "default" | "secondary" | "destruct
   if (status === "IN_PROGRESS") return "default";
   if (status === "COMPLETED") return "secondary";
   return "outline";
+}
+
+function milestoneBadgeStyle(item: ScheduleFieldItemDto): { borderColor: string; color: string } {
+  if (item.status === "COMPLETED") {
+    return { borderColor: `${MILESTONE_DONE_COLOR}88`, color: MILESTONE_DONE_COLOR };
+  }
+  if (item.daysLate != null) {
+    return { borderColor: `${MILESTONE_LATE_COLOR}88`, color: MILESTONE_LATE_COLOR };
+  }
+  return { borderColor: `${MILESTONE_COLOR}88`, color: MILESTONE_COLOR };
 }
 
 export function ScheduleFieldTaskCard({
@@ -30,6 +40,7 @@ export function ScheduleFieldTaskCard({
   const dates = isMilestone
     ? formatDateShortAr(item.endDate ?? item.startDate)
     : formatDateRangeShortAr(item.startDate, item.endDate);
+  const milestoneStyle = isMilestone ? milestoneBadgeStyle(item) : null;
 
   return (
     <button
@@ -46,7 +57,11 @@ export function ScheduleFieldTaskCard({
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-base font-semibold leading-snug">{item.name}</h3>
-        <Badge variant={statusBadgeVariant(item.status)}>
+        <Badge
+          variant={statusBadgeVariant(item.status)}
+          className={isMilestone ? "border-violet-500/50" : undefined}
+          style={milestoneStyle ?? undefined}
+        >
           {isMilestone ? "Hito" : (FIELD_STATUS_LABELS[item.status] ?? item.status)}
         </Badge>
       </div>

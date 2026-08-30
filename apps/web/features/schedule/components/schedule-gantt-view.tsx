@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ScheduleWorkspaceDto, ScheduleWorkspaceItemDto } from "@bloqer/services";
@@ -28,9 +28,7 @@ import {
   countScheduleItemsWithoutDates,
   mapScheduleItemsToGanttEntries,
   primaryWbsLink,
-  scheduleItemHasActiveChildren,
-  scheduleItemTreeDepth,
-  STATUS_COLORS,
+  scheduleItemBarColor,
 } from "../adapters/schedule-view-types";
 import { scheduleProgressValues } from "./schedule-progress-dimensions";
 import {
@@ -41,34 +39,103 @@ import { ScheduleGanttDependencyLayer } from "./schedule-gantt-dependency-layer"
 import { ScheduleGanttToolbar } from "./schedule-gantt-toolbar";
 import { ScheduleViewEmptyMessage } from "./schedule-empty-state";
 import { ScheduleMissingEdtBadge } from "./schedule-missing-edt-badge";
+import { ScheduleReorderControls } from "./schedule-reorder-controls";
 import type { ScheduleItemDialogTab } from "./schedule-item-dialog";
+
+function collapsedStorageKey(projectId: string) {
+  return `bloqer.schedule.collapsed.${projectId}`;
+}
+
+function readCollapsedIds(projectId: string): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(collapsedStorageKey(projectId));
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((id): id is string => typeof id === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeCollapsedIds(projectId: string, ids: Set<string>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      collapsedStorageKey(projectId),
+      JSON.stringify([...ids]),
+    );
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+/** True if any ancestor present in the current item list is collapsed. */
+function isHiddenByCollapsedAncestor(
+  itemId: string,
+  items: ScheduleWorkspaceItemDto[],
+  collapsed: Set<string>,
+): boolean {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  let current = byId.get(itemId);
+  while (current?.parentId) {
+    // Parent outside the filtered view → stop (don't hide from stale localStorage ids).
+    if (!byId.has(current.parentId)) break;
+    if (collapsed.has(current.parentId)) return true;
+    current = byId.get(current.parentId);
+  }
+  return false;
+}
 
 function ScheduleGanttSidebarRow({
   item,
   items,
+  treeItems,
   entriesByItemId,
   onSelect,
   onOpenDeps,
   budgetCurrency,
+  projectId,
+  canEdit,
+  isContainer,
+  collapsed,
+  onToggleCollapse,
 }: {
   item: ScheduleWorkspaceItemDto;
   items: ScheduleWorkspaceItemDto[];
+  treeItems?: ScheduleWorkspaceDto["treeItems"];
   entriesByItemId: Map<string, ScheduleGanttEntry>;
   onSelect: (id: string) => void;
   onOpenDeps: (id: string) => void;
   budgetCurrency: string;
+  projectId: string;
+  canEdit: boolean;
+  isContainer: boolean;
+  collapsed: boolean;
+  onToggleCollapse: (id: string) => void;
 }) {
-  const depth = scheduleItemTreeDepth(items, item.id);
+  const depth = item.treeDepth;
   const entry = entriesByItemId.get(item.id);
-  const isSummary = scheduleItemHasActiveChildren(items, item.id);
+  const isSummary = isContainer;
   const primary = primaryWbsLink(item);
   const committed = item.metrics?.committedCost;
   const hasDeps =
     item.predecessorDependencies.length > 0 || item.successorIds.length > 0;
 
   const extras = (
-    <div className="flex max-w-[40%] shrink-0 items-center justify-end gap-0.5 overflow-hidden">
-      <ScheduleMissingEdtBadge item={item} allItems={items} />
+    <div className="flex max-w-[48%] shrink-0 items-center justify-end gap-0.5 overflow-hidden">
+      {canEdit && (
+        <ScheduleReorderControls
+          projectId={projectId}
+          itemId={item.id}
+          items={items}
+          treeItems={treeItems}
+          size="xs"
+          className="opacity-70 hover:opacity-100"
+        />
+      )}
+      <ScheduleMissingEdtBadge item={item} />
       {item.metrics?.overBudget && (
         <span className="rounded bg-amber-500/15 px-1 text-[9px] text-amber-700 dark:text-amber-400">
           PPTO
@@ -105,6 +172,25 @@ function ScheduleGanttSidebarRow({
     </div>
   );
 
+  const collapseBtn = isContainer ? (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      className="h-5 w-5 shrink-0 p-0 text-[10px] text-muted-foreground"
+      title={collapsed ? "Expandir" : "Colapsar"}
+      aria-label={collapsed ? "Expandir capítulo" : "Colapsar capítulo"}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggleCollapse(item.id);
+      }}
+    >
+      {collapsed ? "▸" : "▾"}
+    </Button>
+  ) : (
+    <span className="inline-block w-5 shrink-0" aria-hidden />
+  );
+
   if (entry) {
     return (
       <div
@@ -112,6 +198,7 @@ function ScheduleGanttSidebarRow({
         style={{ paddingLeft: depth > 0 ? depth * 12 + 10 : 10 }}
       >
         <div className="flex items-center gap-1 pr-1">
+          {collapseBtn}
           <div className="min-w-0 flex-1">
             <GanttSidebarItem
               feature={entry.feature}
@@ -142,6 +229,7 @@ function ScheduleGanttSidebarRow({
         if (e.key === "Enter") onSelect(item.id);
       }}
     >
+      {collapseBtn}
       <div
         className="h-2 w-2 shrink-0 rounded-full border border-dashed border-muted-foreground/50"
         style={isSummary ? { backgroundColor: CONTAINER_COLOR } : undefined}
@@ -176,8 +264,50 @@ export function ScheduleGanttView({
   const [range, setRange] = useState<Range>("monthly");
   const [zoom, setZoom] = useState(100);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
 
-  const visibleItems = items;
+  useEffect(() => {
+    setCollapsedIds(readCollapsedIds(projectId));
+  }, [projectId]);
+
+  // Drop collapsed ids that are in view but no longer containers (full-tree isLeaf).
+  // Keep ids outside the filtered view so filters don't wipe localStorage.
+  useEffect(() => {
+    setCollapsedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const byId = new Map(items.map((i) => [i.id, i]));
+      const valid = new Set(
+        [...prev].filter((id) => {
+          const row = byId.get(id);
+          if (!row) return true; // filtered out — keep
+          return !row.isLeaf;
+        }),
+      );
+      if (valid.size === prev.size && [...valid].every((id) => prev.has(id))) {
+        return prev;
+      }
+      writeCollapsedIds(projectId, valid);
+      return valid;
+    });
+  }, [projectId, items]);
+
+  const toggleCollapse = useCallback(
+    (id: string) => {
+      setCollapsedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        writeCollapsedIds(projectId, next);
+        return next;
+      });
+    },
+    [projectId],
+  );
+
+  const visibleItems = useMemo(
+    () => items.filter((item) => !isHiddenByCollapsedAncestor(item.id, items, collapsedIds)),
+    [items, collapsedIds],
+  );
 
   const fallback = useMemo(() => new Date(), []);
   const entries = useMemo(
@@ -200,21 +330,23 @@ export function ScheduleGanttView({
   const handleMove = useCallback(
     (id: string, startAt: Date, endAt: Date | null) => {
       if (!workspace.canEdit) return;
-      if (scheduleItemHasActiveChildren(visibleItems, id)) return;
       const item = itemById.get(id);
-      const end = endAt ?? (item?.type === "MILESTONE" ? startAt : null);
+      if (!item || !item.isLeaf) return;
+      const end = endAt ?? (item.type === "MILESTONE" ? startAt : null);
       if (!end) return;
       // Gantt mouse math is local-calendar; persist that day (not UTC getUTC*).
       const startIso = toLocalDateOnlyString(startAt);
       const endIso =
-        item?.type === "MILESTONE" ? startIso : toLocalDateOnlyString(end);
+        item.type === "MILESTONE" ? startIso : toLocalDateOnlyString(end);
       startTransition(async () => {
         const res = await updateScheduleItemDatesAction(projectId, id, {
           startDate: startIso,
           endDate: endIso,
         });
-        if ("error" in res) toast.error(res.error);
-        else {
+        if ("error" in res) {
+          toast.error(res.error);
+          router.refresh();
+        } else {
           if ("fsWarnings" in res && res.fsWarnings?.length) {
             toast.warning(res.fsWarnings.join(" "));
           } else {
@@ -224,7 +356,7 @@ export function ScheduleGanttView({
         }
       });
     },
-    [projectId, router, workspace.canEdit, visibleItems, itemById],
+    [projectId, router, workspace.canEdit, itemById],
   );
 
   const handleSelect = useCallback(
@@ -256,7 +388,7 @@ export function ScheduleGanttView({
     });
   }, [projectId, router]);
 
-  if (visibleItems.length === 0) {
+  if (items.length === 0) {
     return (
       <ScheduleViewEmptyMessage
         filtersExcludeAll={filtersExcludeAll}
@@ -286,7 +418,8 @@ export function ScheduleGanttView({
         </div>
       )}
       <p className="text-[10px] text-muted-foreground">
-        Barra: relleno oscuro = Real · borde ámbar = Cert. · Botón FS = dependencias.
+        Barra: relleno oscuro = Real · borde ámbar = Cert. · rojo = atrasado · Botón FS =
+        dependencias. ▾ colapsa capítulos.
       </p>
       <div className="overflow-hidden rounded-md border">
         <ScheduleGanttToolbar
@@ -314,11 +447,17 @@ export function ScheduleGanttView({
                 <ScheduleGanttSidebarRow
                   key={item.id}
                   item={item}
-                  items={visibleItems}
+                  items={items}
+                  treeItems={workspace.treeItems}
                   entriesByItemId={entriesByItemId}
                   onSelect={handleSelect}
                   onOpenDeps={handleOpenDeps}
                   budgetCurrency={workspace.budgetCurrency}
+                  projectId={projectId}
+                  canEdit={workspace.canEdit}
+                  isContainer={!item.isLeaf}
+                  collapsed={collapsedIds.has(item.id)}
+                  onToggleCollapse={toggleCollapse}
                 />
               ))}
             </GanttSidebar>
@@ -348,11 +487,9 @@ export function ScheduleGanttView({
                     certified != null && certified !== "" ? Number(certified) : null;
                   const title = `Real: ${real}% · Plan (t): ${timePlan ?? "—"}% · Cant.: ${quantity ?? "—"}% · Cert.: ${certified ?? "—"}%`;
                   const isMilestone = item.type === "MILESTONE";
-                  const isSummary = scheduleItemHasActiveChildren(visibleItems, item.id);
-                  const barColor = isSummary
-                    ? CONTAINER_COLOR
-                    : (STATUS_COLORS[item.status] ?? "#64748b");
-                  const canDrag = workspace.canEdit && !isSummary;
+                  const isSummary = !item.isLeaf;
+                  const barColor = scheduleItemBarColor(item, isSummary);
+                  const canDrag = workspace.canEdit && item.isLeaf;
                   return (
                     <GanttFeatureItem
                       key={feature.id}
@@ -363,7 +500,7 @@ export function ScheduleGanttView({
                         title={title}
                         className={cn(
                           "relative flex h-full w-full items-center overflow-hidden rounded px-1 text-[10px] text-white",
-                          isMilestone && "h-2 min-h-2 self-center rounded-sm",
+                          isMilestone && "h-2.5 min-h-2.5 self-center rounded-sm ring-1 ring-white/30",
                           isSummary && "opacity-90",
                           certPct != null &&
                             certPct > 0 &&
@@ -388,7 +525,13 @@ export function ScheduleGanttView({
                           </>
                         )}
                         <span className="relative z-10 truncate">
-                          {isMilestone ? "◆" : isSummary ? "▬" : `${pct}%`}
+                          {isMilestone
+                            ? item.status === "COMPLETED"
+                              ? "◆✓"
+                              : "◆"
+                            : isSummary
+                              ? "▬"
+                              : `${pct}%`}
                         </span>
                         {!isMilestone &&
                           !isSummary &&

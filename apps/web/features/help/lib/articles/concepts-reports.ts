@@ -65,10 +65,11 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Abrí Planificación → Cronograma. En detalle/tabla/Gantt ves Real / plan t. / cant. / cert.",
-      "Real: lo mueve el libro de obra aprobado (o el PM con «Avance real %»).",
+      "Real: lo mueve el libro de obra aprobado en **tareas** (o el PM con «Avance real %»). Los **hitos** no sincronizan desde el libro ([D-103]); se completan a mano o al confirmar una recepción de la misma EDT ([D-104]).",
       "Plan (tiempo): automático según fechas vs hoy.",
       "Cantidades: libro de obra vs presupuesto.",
       "Certificado: solo el módulo Certificaciones (lectura en cronograma).",
+      "La altura del ítem en el Gantt es el árbol (padre + orden), no el vínculo EDT.",
       "En el Gantt: relleno oscuro = Real; franja ámbar = Cert.",
     ],
     pitfalls: [
@@ -77,6 +78,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     ],
     relatedSlugs: [
       "importar-cronograma",
+      "agregar-hito-al-cronograma",
       "cargar-libro-de-obra",
       "emitir-y-aprobar-certificacion",
       "leer-edt-y-costos",

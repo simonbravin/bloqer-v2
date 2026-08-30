@@ -422,10 +422,16 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Origen:** [`STATE_MACHINES.md`](./STATE_MACHINES.md) §27.
 
 ### BR-SCH-004 — Sincronización de avance real desde libro de obra
-- **Regla:** al **aprobar** un parte de obra (`JobsiteLog` → `APPROVED`), el sistema recalcula y persiste `ScheduleItem.progressPct` para cada ítem de cronograma cuyo WBS primario aparece en las líneas de avance del parte, según [D-045].
+- **Regla:** al **aprobar** un parte de obra (`JobsiteLog` → `APPROVED`), el sistema recalcula y persiste `ScheduleItem.progressPct` para cada ítem de cronograma **`type = TASK`** cuyo WBS primario aparece en las líneas de avance del parte, según [D-045] y [D-103].
+- **Regla:** ítems `type = MILESTONE` **no** reciben sync de avance ni transición de estado desde el libro ([D-103]).
 - **Regla:** no se sincroniza en `DRAFT`, `SUBMITTED` ni `RETURNED`; tampoco si el acumulado físico del WBS supera 100 %.
 - **Regla:** el avance **plan temporal** (curva tiempo vs fechas), el avance **por cantidad** y el **certificado** no se sobrescriben con esta operación.
-- **Origen:** [D-045]; procedimiento en [`../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md).
+- **Origen:** [D-045], [D-103]; procedimiento en [`../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md).
+
+### BR-SCH-005 — Hito completado por recepción de compra
+- **Regla:** al **confirmar** un `PurchaseReceipt`, el sistema completa (`COMPLETED`, `progressPct = 100`) cada `ScheduleItem` `type = MILESTONE` del mismo proyecto vinculado (cualquier `ScheduleItemWbsLink`) a un `wbsNodeId` de las líneas recibidas, si el estado es `PLANNED` o `IN_PROGRESS`. Idempotente si ya está `COMPLETED`. No aplica a `TASK`, ni a `BLOCKED` / `CANCELLED`.
+- **Regla:** anular la recepción **no** revierte el hito.
+- **Origen:** [D-104].
 
 ---
 

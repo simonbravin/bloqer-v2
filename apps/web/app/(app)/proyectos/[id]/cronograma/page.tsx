@@ -24,6 +24,7 @@ interface PageProps {
     budgetId?: string;
     delayedOnly?: string;
     status?: string;
+    type?: string;
     field?: string;
   }>;
 }
@@ -83,6 +84,8 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
     const status = statusValues.includes(sp.status as ScheduleItemStatus)
       ? (sp.status as ScheduleItemStatus)
       : undefined;
+    const itemType =
+      sp.type === "TASK" || sp.type === "MILESTONE" ? sp.type : undefined;
     const fieldFilter = parseScheduleFieldFilter(sp.field);
 
     result = await getProjectScheduleWorkspace(
@@ -91,6 +94,7 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
         budgetId: sp.budgetId,
         delayedOnly: fieldFilter ? false : sp.delayedOnly === "1",
         status: fieldFilter ? undefined : status,
+        itemType: fieldFilter ? undefined : itemType,
       },
       ctx,
     );
