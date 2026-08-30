@@ -1,5 +1,6 @@
 "use client";
 
+import { Download, Eye, FileX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -8,14 +9,14 @@ import {
   documentDownloadHref,
 } from "../lib/document-file-utils";
 
+const iconButtonClass = "size-11 shrink-0 md:size-8";
+
 export type DocumentFileActionsProps = {
   documentId: string;
   mimeType: string;
   originalFileName: string;
   storageProvider: string;
   status: string;
-  /** Compact buttons for mobile cards. */
-  size?: "sm" | "default";
   className?: string;
 };
 
@@ -25,7 +26,6 @@ export function DocumentFileActions({
   originalFileName,
   storageProvider,
   status,
-  size = "sm",
   className,
 }: DocumentFileActionsProps) {
   const canAccess = canAccessDocumentFile({ storageProvider, status });
@@ -35,14 +35,16 @@ export function DocumentFileActions({
       (status === "ACTIVE" || status === "ARCHIVED")
     ) {
       return (
-        <div className={cn("flex flex-wrap items-center gap-1", className)}>
+        <div className={cn("flex flex-nowrap items-center justify-end gap-0.5", className)}>
           <Button
             variant="ghost"
-            size={size}
+            size="icon"
+            className={iconButtonClass}
             disabled
             title="No hay archivo binario almacenado"
+            aria-label="Sin archivo"
           >
-            Sin archivo
+            <FileX />
           </Button>
         </div>
       );
@@ -53,20 +55,28 @@ export function DocumentFileActions({
   const showView = canPreviewInBrowser(mimeType, originalFileName);
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-1", className)}>
+    <div className={cn("flex flex-nowrap items-center justify-end gap-0.5", className)}>
       {showView ? (
-        <Button variant="outline" size={size} asChild>
+        <Button variant="outline" size="icon" className={iconButtonClass} asChild>
           <a
             href={documentDownloadHref(documentId, "inline")}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label="Ver"
+            title="Ver"
           >
-            Ver
+            <Eye />
           </a>
         </Button>
       ) : null}
-      <Button variant="outline" size={size} asChild>
-        <a href={documentDownloadHref(documentId, "attachment")}>Descargar</a>
+      <Button variant="outline" size="icon" className={iconButtonClass} asChild>
+        <a
+          href={documentDownloadHref(documentId, "attachment")}
+          aria-label="Descargar"
+          title="Descargar"
+        >
+          <Download />
+        </a>
       </Button>
     </div>
   );

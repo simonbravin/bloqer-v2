@@ -98,6 +98,7 @@ function EntityDocumentMobileList({
               originalFileName={doc.originalFileName}
               storageProvider={doc.storageProvider}
               status={doc.status}
+              className="justify-start"
             />
           </li>
         );
@@ -346,7 +347,7 @@ export function EntityDocumentsPanel({
                 <TableHead>Estado</TableHead>
                 <TableHead>Tamaño</TableHead>
                 <TableHead>Fecha</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="w-px text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -385,7 +386,7 @@ export function EntityDocumentsPanel({
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                       {fmtDate(doc.createdAt)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="w-px text-right">
                       <div className="flex flex-wrap justify-end gap-1">
                         <DocumentFileActions
                           documentId={doc.id}

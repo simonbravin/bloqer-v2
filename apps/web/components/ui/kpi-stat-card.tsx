@@ -6,6 +6,10 @@ import { cn } from "@/lib/utils";
 
 export type { KpiStatTone };
 
+/** Same chrome for every KPI tile — hover lives on the card, not only on linked ones. */
+export const kpiStatCardClassName =
+  "flex h-full flex-col rounded-xl border border-border bg-card shadow-sm transition-shadow duration-200 hover:shadow-md";
+
 const toneValueClass: Record<KpiStatTone, string> = {
   default: "text-card-foreground",
   success: "text-emerald-600 dark:text-emerald-400",
@@ -49,7 +53,7 @@ export function KpiStatCard({
   const inner = (
     <Card
       className={cn(
-        "flex h-full flex-col rounded-xl border border-border bg-card shadow-sm transition-shadow duration-200",
+        kpiStatCardClassName,
         compact ? "min-h-[4.75rem]" : "min-h-[8.5rem]",
         variant === "highlight" && "border-primary/30 bg-primary/5",
         className,
@@ -105,7 +109,7 @@ export function KpiStatCard({
     return (
       <Link
         href={href}
-        className="block h-full rounded-xl outline-none ring-offset-background transition-shadow duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring"
+        className="block h-full rounded-xl outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
       >
         {inner}
       </Link>

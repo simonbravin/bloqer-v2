@@ -61,7 +61,7 @@ export function documentDownloadHref(
   documentId: string,
   disposition: "inline" | "attachment",
 ): string {
-  return `/api/documents/${documentId}/download?disposition=${disposition}`;
+  return `/api/documents/${encodeURIComponent(documentId)}/download?disposition=${disposition}`;
 }
 
 export function canAccessDocumentFile(opts: {

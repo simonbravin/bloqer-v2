@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { getWarehouseStockDetail, ServiceError } from "@bloqer/services";
 import { StockBalanceTable, StockMovementReportTable } from "@/features/inventory-reports";
 import { PageShell } from "@/components/layout/page-shell";
+import { KpiStatCard } from "@/components/ui/kpi-stat-card";
+import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 
 interface PageProps {
   params: Promise<{ warehouseId: string }>;
@@ -50,17 +52,10 @@ export default async function DepositoStockPage({ params, searchParams }: PagePr
         </div>
       )}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Productos en stock</p>
-          <p className="text-2xl font-bold mt-1">{productCount}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Movimientos totales</p>
-          <p className="text-2xl font-bold mt-1">{movements.length}</p>
-        </div>
-      </div>
+      <KpiStatGrid title={null} columns={2}>
+        <KpiStatCard label="Productos en stock" value={String(productCount)} />
+        <KpiStatCard label="Movimientos totales" value={String(movements.length)} />
+      </KpiStatGrid>
 
       {/* Balance by product */}
       <div className="space-y-2">

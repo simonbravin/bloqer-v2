@@ -697,6 +697,14 @@ flowchart LR
 3. **Registrar consumo**.
 4. Atajos: desde Inventario del proyecto o desde Materiales → enlace **Consumos**.
 
+### 8.4 Procedimiento — Documentos de obra
+
+**Ruta:** Operación → **Documentos** → `/proyectos/[id]/documentos`
+
+1. **Agregar documento** sube el archivo a la biblioteca de la obra.
+2. En la tabla, la columna **Acciones** no muestra texto: el icono de ojo **abre** el archivo en una pestaña nueva (PDF e imágenes) y el icono de descarga **baja** el archivo. El nombre abre el detalle.
+3. El mismo par de iconos aparece en las tarjetas, en los adjuntos de una ficha (parte, OC, factura, etc.) y en el detalle del documento.
+
 <!-- capture:23 parte-de-obra-detalle -->
 ![Bloqer — Parte de obra (detalle)](./guides/assets/screenshots/23-parte-de-obra-detalle.png)
 

@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { getProductStockDetail, ServiceError } from "@bloqer/services";
 import { StockBalanceTable, StockMovementReportTable } from "@/features/inventory-reports";
 import { PageShell } from "@/components/layout/page-shell";
+import { KpiStatCard } from "@/components/ui/kpi-stat-card";
+import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { formatQtyFromString } from "@/lib/format-money";
 import { addDecimal } from "@bloqer/utils";
 
@@ -46,28 +48,19 @@ export default async function ProductoStockPage({ params, searchParams }: PagePr
         <h1 className="text-2xl font-bold tracking-tight">Stock — {product.name}</h1>
       </div>
 
-      {/* Summary card */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Total en stock</p>
-          <p
-            className={`text-2xl font-bold font-mono mt-1 tabular-nums ${hasNegative ? "text-red-600 dark:text-red-400" : ""}`}
-          >
-            {formatQtyFromString(totalOnHand)}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">{product.unit}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Depósitos con stock</p>
-          <p className="text-2xl font-bold mt-1">
-            {balancesByWarehouse.filter((r) => !r.flags.zeroStock).length}
-          </p>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Movimientos totales</p>
-          <p className="text-2xl font-bold mt-1">{movements.length}</p>
-        </div>
-      </div>
+      <KpiStatGrid title={null} columns={3}>
+        <KpiStatCard
+          label="Total en stock"
+          value={formatQtyFromString(totalOnHand)}
+          subtitle={product.unit}
+          tone={hasNegative ? "danger" : "default"}
+        />
+        <KpiStatCard
+          label="Depósitos con stock"
+          value={String(balancesByWarehouse.filter((r) => !r.flags.zeroStock).length)}
+        />
+        <KpiStatCard label="Movimientos totales" value={String(movements.length)} />
+      </KpiStatGrid>
 
       {/* Balance by warehouse */}
       <div className="space-y-2">

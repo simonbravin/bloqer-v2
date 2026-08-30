@@ -26,12 +26,12 @@ Pérdida de respaldo contractual y fiscal disperso en carpetas locales.
 ## 8. Acciones disponibles
 - Subir, renombrar, archivar.
 - Reemplazar creando nueva versión ([Q-008]).
-- **Ver** (PDF e imágenes): abre en **pestaña nueva** con URL firmada `Content-Disposition: inline` (no reemplaza la sesión de Bloqer).
-- **Descargar**: URL firmada con `Content-Disposition: attachment` (desktop y celular). HEIC/HEIF no tiene preview garantizado en todos los browsers; siempre se puede descargar.
+- **Ver** (icono de ojo; PDF e imágenes): abre en **pestaña nueva** con URL firmada `Content-Disposition: inline` (no reemplaza la sesión de Bloqer).
+- **Descargar** (icono de descarga): URL firmada con `Content-Disposition: attachment` (desktop y celular). HEIC/HEIF no tiene preview garantizado en todos los browsers; siempre se puede descargar.
 
 ## 9. Pantallas y vistas necesarias
 - Pestaña “Documentos” en cada ficha entidad.
-- Acciones Ver / Descargar en lista, cards, panel de adjuntos de entidad y ficha del documento; preview in-page solo jpeg/png/webp en la ficha (nunca PDF embebido).
+- Acciones Ver / Descargar como **iconos** (ojo / descarga) en lista, cards, panel de adjuntos de entidad y ficha del documento; preview in-page solo jpeg/png/webp en la ficha (nunca PDF embebido).
 - Buscador global por nombre/tags (Fase 2).
 
 ## 10. Reglas de negocio

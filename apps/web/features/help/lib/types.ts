@@ -40,6 +40,7 @@ export type HelpIntent =
   | "aprobar-presupuesto"
   | "cronograma"
   | "libro-obra"
+  | "documentos-obra"
   | "consumo-materiales"
   | "comprar-material"
   | "pedir-material"

@@ -18,8 +18,8 @@ export function DocumentInlineImagePreview({ documentId, originalFileName }: Pro
         role="note"
         className="rounded-lg border bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground"
       >
-        No se puede previsualizar esta imagen. Usá <strong>Ver</strong> o{" "}
-        <strong>Descargar</strong>.
+        No se puede previsualizar esta imagen. Usá el icono de <strong>ver</strong> o el de{" "}
+        <strong>descargar</strong>.
       </div>
     );
   }

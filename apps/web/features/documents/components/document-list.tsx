@@ -47,7 +47,7 @@ export function DocumentList({ docs, projectId }: Props) {
             <TableHead>Estado</TableHead>
             <TableHead>Tamaño</TableHead>
             <TableHead>Fecha</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className="w-px text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -78,7 +78,7 @@ export function DocumentList({ docs, projectId }: Props) {
               </TableCell>
               <TableCell className="text-xs tabular-nums text-muted-foreground">{fmtSize(doc.sizeBytes)}</TableCell>
               <TableCell className="text-xs text-muted-foreground">{fmtDate(doc.createdAt)}</TableCell>
-              <TableCell className="text-right">
+              <TableCell className="w-px whitespace-nowrap text-right">
                 <div className="flex justify-end">
                   <DocumentFileActions
                     documentId={doc.id}

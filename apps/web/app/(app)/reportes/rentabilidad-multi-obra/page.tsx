@@ -16,6 +16,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { KpiStatCard } from "@/components/ui/kpi-stat-card";
+import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 
 export default async function RentabilidadMultiObraPage() {
   const current = await getCurrentUser();
@@ -67,33 +69,32 @@ export default async function RentabilidadMultiObraPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {[
-          {
-            label: report.consolidatedCurrency
+      <KpiStatGrid title={null} columns={3}>
+        <KpiStatCard
+          label={
+            report.consolidatedCurrency
               ? `Ingresos consolidados (${report.consolidatedCurrency})`
-              : "Ingresos consolidados",
-            v: report.consolidatedRevenue,
-          },
-          {
-            label: report.consolidatedCurrency
+              : "Ingresos consolidados"
+          }
+          value={formatMoneyAmount(report.consolidatedRevenue)}
+        />
+        <KpiStatCard
+          label={
+            report.consolidatedCurrency
               ? `Costo directo (${report.consolidatedCurrency})`
-              : "Costo directo",
-            v: report.consolidatedDirectCost,
-          },
-          {
-            label: report.consolidatedCurrency
+              : "Costo directo"
+          }
+          value={formatMoneyAmount(report.consolidatedDirectCost)}
+        />
+        <KpiStatCard
+          label={
+            report.consolidatedCurrency
               ? `Margen bruto (${report.consolidatedCurrency})`
-              : "Margen bruto",
-            v: report.consolidatedGrossMargin,
-          },
-        ].map((k) => (
-          <div key={k.label} className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground">{k.label}</p>
-            <p className="text-lg font-semibold tabular-nums">{formatMoneyAmount(k.v)}</p>
-          </div>
-        ))}
-      </div>
+              : "Margen bruto"
+          }
+          value={formatMoneyAmount(report.consolidatedGrossMargin)}
+        />
+      </KpiStatGrid>
       {report.consolidatedGrossMarginPct != null ? (
         <p className="text-sm text-muted-foreground">
           Margen bruto consolidado

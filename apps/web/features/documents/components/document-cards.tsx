@@ -58,6 +58,7 @@ export function DocumentCards({
               originalFileName={doc.originalFileName}
               storageProvider={doc.storageProvider}
               status={doc.status}
+              className="justify-start"
             />
           </div>
         </div>
