@@ -8,6 +8,7 @@ import {
   serializeQtyDecimal,
   serializeRatePctDecimal,
   serializeUnitPriceDecimal,
+  serializeFxRateDecimal,
 } from "../finance/money-decimal";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { canViewApProjectArea } from "./ap-access";
@@ -42,8 +43,12 @@ const LINKABLE_PO_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as 
 
 export type PurchaseOrderBillingSummary = {
   receivedAmount: string;
+  /** Amount on ISSUED invoices only (CxP / job-cost issued). */
   invoicedAmount: string;
+  /** Amount reserved by open DRAFT invoices (blocks duplicate auto-drafts). */
+  draftReservedAmount: string;
   paidAmount: string;
+  /** Received − (ISSUED + DRAFT reserved). */
   pendingToInvoice: string;
   hasReceivedQuantity: boolean;
   draftInvoiceCount: number;
@@ -133,6 +138,7 @@ export async function getPurchaseOrderBillingSummary(
   });
 
   let invoicedAmount = new Prisma.Decimal(0);
+  let draftReservedAmount = new Prisma.Decimal(0);
   let paidAmount = new Prisma.Decimal(0);
   let draftInvoiceCount = 0;
   const invoicedQtyByPoLine = new Map<string, Prisma.Decimal>();
@@ -140,6 +146,13 @@ export async function getPurchaseOrderBillingSummary(
   for (const inv of invoices) {
     if (inv.status === "DRAFT") {
       draftInvoiceCount += 1;
+      draftReservedAmount = draftReservedAmount.add(inv.totalAmount);
+      // Reserve draft qty so clamp / pending cannot double-create ([D-108] vs panel).
+      for (const line of inv.lines) {
+        if (!line.purchaseOrderLineId) continue;
+        const prev = invoicedQtyByPoLine.get(line.purchaseOrderLineId) ?? new Prisma.Decimal(0);
+        invoicedQtyByPoLine.set(line.purchaseOrderLineId, prev.add(line.quantity));
+      }
       continue;
     }
     invoicedAmount = invoicedAmount.add(inv.totalAmount);
@@ -169,11 +182,13 @@ export async function getPurchaseOrderBillingSummary(
   );
   const matchWarningCount = lineMatches.filter((l) => l.status === "WARN").length;
 
-  const pendingToInvoice = computePendingToInvoiceAmount(receivedAmount, invoicedAmount);
+  const coveredAmount = invoicedAmount.add(draftReservedAmount);
+  const pendingToInvoice = computePendingToInvoiceAmount(receivedAmount, coveredAmount);
 
   return {
     receivedAmount: serializeMoneyDecimal(receivedAmount),
     invoicedAmount: serializeMoneyDecimal(invoicedAmount),
+    draftReservedAmount: serializeMoneyDecimal(draftReservedAmount),
     paidAmount: serializeMoneyDecimal(paidAmount),
     pendingToInvoice: serializeMoneyDecimal(pendingToInvoice),
     hasReceivedQuantity,
@@ -213,9 +228,15 @@ export async function getPurchaseOrderInvoiceDraftPreview(
   const summary = await getPurchaseOrderBillingSummary(purchaseOrderId, ctx);
   const poLines = po.lines.map(toPoLineDraft);
   const receivedAmount = sumPoLinesReceivedAmount(poLines);
-  const invoicedAmount = new Prisma.Decimal(summary.invoicedAmount);
-  const basis = invoicedAmount.greaterThan(0) ? "remaining" : "received";
-  const lines = buildInvoiceDraftLinesFromPo(poLines, { basis, receivedAmount, invoicedAmount });
+  const coveredAmount = new Prisma.Decimal(summary.invoicedAmount).add(
+    new Prisma.Decimal(summary.draftReservedAmount),
+  );
+  const basis = coveredAmount.greaterThan(0) ? "remaining" : "received";
+  const lines = buildInvoiceDraftLinesFromPo(poLines, {
+    basis,
+    receivedAmount,
+    invoicedAmount: coveredAmount,
+  });
 
   return {
     summary,
@@ -414,12 +435,17 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
   }
 
   const internalNotes = buildAutoFromPoInternalNotes(input.purchaseOrderId, input.purchaseReceiptId);
+  const autoFromPoPrefix = `bloqer:auto-from-po:${input.purchaseOrderId}`;
+  // Idempotent across PO-panel key vs receipt-scoped key ([D-108] duplicate draft).
   const existingDraft = await prisma.supplierInvoice.findFirst({
     where: {
       tenantId: ctx.tenantId,
       purchaseOrderId: input.purchaseOrderId,
       status: "DRAFT",
-      internalNotes,
+      OR: [
+        { internalNotes },
+        { internalNotes: { startsWith: autoFromPoPrefix } },
+      ],
     },
     include: {
       lines: { orderBy: { sortOrder: "asc" } },
@@ -459,6 +485,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
   const poLines = po.lines.map(toPoLineDraft);
   const summary = await getPurchaseOrderBillingSummary(input.purchaseOrderId, ctx);
   const invoicedAmount = new Prisma.Decimal(summary.invoicedAmount);
+  const coveredAmount = invoicedAmount.add(new Prisma.Decimal(summary.draftReservedAmount));
 
   if (receiptQuantities) {
     const invoicedQtyByPoLine = new Map(
@@ -494,14 +521,14 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
   // Receipt path: quantities already clamped to pending; OC path scales by remaining when needed.
   const basis = input.purchaseReceiptId
     ? "received"
-    : invoicedAmount.greaterThan(0)
+    : coveredAmount.greaterThan(0)
       ? "remaining"
       : (input.basis ?? "received");
   const draftLines = buildInvoiceDraftLinesFromPo(poLines, {
     basis,
     receiptQuantities,
     receivedAmount,
-    invoicedAmount,
+    invoicedAmount: coveredAmount,
   });
 
   if (draftLines.length === 0) {
@@ -522,6 +549,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
       issueDate: toIsoDateInTimeZone(),
       dueDate: defaultDueDate(),
       currency: po.currency,
+      fxRate: po.fxRate != null ? serializeFxRateDecimal(po.fxRate) : undefined,
       invoiceLetter: suggestedLetter,
       purchaseOrderId: input.purchaseOrderId,
       internalNotes,
@@ -537,6 +565,8 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
       })),
     },
     ctx,
-    options?.asSystemFromReceiptPolicy ? { bypassApMutateGate: true } : undefined,
+    options?.asSystemFromReceiptPolicy
+      ? { bypassApMutateGate: true, trustedSystemPath: "receipt-auto-draft" }
+      : undefined,
   );
 }

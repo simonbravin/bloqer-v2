@@ -75,7 +75,7 @@ export function computePendingToInvoiceAmount(
 
 /**
  * Clamp receipt qtys so a draft from a receipt cannot re-invoice qty already
- * covered by ISSUED invoices on the same PO line ([D-066]).
+ * covered by ISSUED or open DRAFT invoices on the same PO line ([D-066]/[D-108]).
  */
 export function clampReceiptQuantitiesToPendingInvoice(
   receiptQuantities: ReadonlyMap<string, string>,

@@ -572,13 +572,13 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     modules: ["compras", "inventario"],
     level: "project",
     typicalRoles: ["Compras", "Depósito"],
-    where: { menu: "Compras → Recepciones" },
+    where: { menu: "Compras → Recepciones (OC en Compromisos → Órdenes de compra)" },
     hrefs: [
       { kind: "project", suffix: "/recepciones", label: "Recepciones" },
       { kind: "project", suffix: "/ordenes-compra", label: "Órdenes de compra" },
     ],
     steps: [
-      "Desde Pendientes (botón Recibir → abre …/recepciones/nueva), desde la campana al confirmar (CTA Registrar recepción), desde la OC o Compras → Recepciones.",
+      "Desde Pendientes (botón Recibir → abre …/recepciones/nueva), desde la campana al confirmar (CTA Registrar recepción), desde la OC (Compromisos → Órdenes de compra) o Compras → Recepciones.",
       "Registrá recepción parcial o total. El depósito es opcional si Inventario está activo.",
       "Al confirmar la recepción, el panel Facturación queda arriba. Si la política «Al recibir, crear borrador» está ON, ya hay borrador para Completar y emitir (no crea CxP sola la recepción).",
     ],

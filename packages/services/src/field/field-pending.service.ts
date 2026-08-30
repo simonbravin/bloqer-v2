@@ -11,6 +11,8 @@ import {
   type FieldPendingGroup,
   type FieldPendingSource,
 } from "./field-pending-access";
+import { getCompanyProcurementSettings } from "../procurement/company-procurement-settings.service";
+import { willApproveAutoConfirmPo } from "../procurement/purchase-order-workflow.service";
 
 const INBOX_LIMIT = 80;
 const STALE_MS = 3 * 24 * 60 * 60 * 1000;
@@ -187,12 +189,16 @@ export async function getMyFieldPendingItems(
             number: true,
             totalAmount: true,
             currency: true,
+            fxRate: true,
+            totalAmountArs: true,
             createdAt: true,
             createdBy: true,
             originRequestedByUserId: true,
+            companyId: true,
             projectId: true,
             project: { select: { code: true, name: true } },
             supplierContact: { select: { fantasyName: true, legalName: true } },
+            lines: { select: { varianceTier: true } },
           },
         })
       : Promise.resolve(null);
@@ -273,6 +279,11 @@ export async function getMyFieldPendingItems(
               orderBy: { receiptDate: "asc" },
               take: 1,
               select: { receiptDate: true },
+            },
+            supplierInvoices: {
+              where: { status: "DRAFT" },
+              take: 1,
+              select: { id: true },
             },
           },
         })
@@ -487,7 +498,25 @@ export async function getMyFieldPendingItems(
   }
 
   if (Array.isArray(pos)) {
+    const settingsByCompany = new Map<
+      string,
+      Awaited<ReturnType<typeof getCompanyProcurementSettings>>
+    >();
     for (const row of pos) {
+      if (!settingsByCompany.has(row.companyId)) {
+        settingsByCompany.set(
+          row.companyId,
+          await getCompanyProcurementSettings(row.companyId, ctx),
+        );
+      }
+      const settings = settingsByCompany.get(row.companyId)!;
+      const willAutoConfirm = willApproveAutoConfirmPo(settings, {
+        totalAmount: row.totalAmount,
+        currency: row.currency,
+        fxRate: row.fxRate,
+        totalAmountArs: row.totalAmountArs,
+        lines: row.lines,
+      });
       const requestedBy =
         (row.originRequestedByUserId && names.get(row.originRequestedByUserId)) ||
         (row.createdBy && names.get(row.createdBy)) ||
@@ -502,8 +531,10 @@ export async function getMyFieldPendingItems(
         typeLabel: "Orden de compra",
         title: `OC-${String(row.number).padStart(3, "0")}`,
         description: row.supplierContact.fantasyName ?? row.supplierContact.legalName,
-        statusLabel: "Pendiente de aprobación",
-        actionLabel: "Aprobar",
+        statusLabel: willAutoConfirm
+          ? "Pendiente de aprobación (compromete al aprobar)"
+          : "Pendiente de aprobación",
+        actionLabel: willAutoConfirm ? "Aprobar y comprometer" : "Aprobar",
         amount: serializeMoneyDecimal(row.totalAmount),
         currency: row.currency,
         requestedByName: requestedBy,
@@ -589,6 +620,7 @@ export async function getMyFieldPendingItems(
         (row.createdBy && names.get(row.createdBy)) ||
         null;
       const overdueDays = daysOverdueFromDate(firstReceiptDate);
+      const draftId = row.supplierInvoices[0]?.id ?? null;
       items.push({
         entityType: "PURCHASE_ORDER_INVOICE",
         entityId: row.id,
@@ -599,16 +631,19 @@ export async function getMyFieldPendingItems(
         typeLabel: "Orden de compra",
         title: `OC-${String(row.number).padStart(3, "0")}`,
         description: row.supplierContact.fantasyName ?? row.supplierContact.legalName,
-        statusLabel:
-          row.status === "PARTIALLY_RECEIVED"
+        statusLabel: draftId
+          ? "Borrador de factura pendiente de emitir"
+          : row.status === "PARTIALLY_RECEIVED"
             ? "Recibida parcialmente sin factura"
             : "Recibida sin factura",
-        actionLabel: "Registrar factura",
+        actionLabel: draftId ? "Completar factura" : "Registrar factura",
         amount: serializeMoneyDecimal(row.totalAmount),
         currency: row.currency,
         requestedByName: requestedBy,
         occurredAt,
-        href: `/proyectos/${row.projectId}/ordenes-compra/${row.id}?siguiente=facturar#facturar`,
+        href: draftId
+          ? `/proyectos/${row.projectId}/facturas-proveedor/${draftId}`
+          : `/proyectos/${row.projectId}/ordenes-compra/${row.id}?siguiente=facturar#facturar`,
         priority: stalePriority(occurredAt),
         overdueDays,
       });

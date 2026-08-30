@@ -59,12 +59,31 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
       getPurchaseReceiptById(receiptId, ctx),
       listStockMovements({ purchaseReceiptId: receiptId }, ctx),
     ]);
-    billing = await getPurchaseOrderBillingSummary(receipt.purchaseOrderId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) {
       notFound();
     }
     throw err;
+  }
+
+  billing = {
+    receivedAmount: "0",
+    invoicedAmount: "0",
+    draftReservedAmount: "0",
+    paidAmount: "0",
+    pendingToInvoice: "0",
+    hasReceivedQuantity: false,
+    draftInvoiceCount: 0,
+    lineMatches: [],
+    matchWarningCount: 0,
+  };
+  try {
+    billing = await getPurchaseOrderBillingSummary(receipt.purchaseOrderId, ctx);
+  } catch (err) {
+    if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) {
+      if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
+      throw err;
+    }
   }
 
   if (receipt.projectId !== id) notFound();
@@ -202,6 +221,10 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
                 receipt.purchaseOrderId,
               );
               if ("error" in result) redirectWithActionError(detailPath, result.error);
+              if (result.autoDraftApWarning) {
+                const q = new URLSearchParams({ invoiceError: result.autoDraftApWarning });
+                redirect(`${detailPath}?${q.toString()}`);
+              }
               redirect(detailPath);
             }}
           >

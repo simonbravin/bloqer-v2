@@ -45,7 +45,7 @@ export function PoBillingNextStepPanel({
             Recibido: {formatMoneyAmount(billing.receivedAmount)} · Facturado (emitido):{" "}
             {formatMoneyAmount(billing.invoicedAmount)} · Pagado: {formatMoneyAmount(billing.paidAmount)}
             {billing.draftInvoiceCount > 0
-              ? ` · ${billing.draftInvoiceCount} borrador(es)`
+              ? ` · ${billing.draftInvoiceCount} borrador(es) (${formatMoneyAmount(billing.draftReservedAmount)})`
               : null}
             {pending
               ? ` · Pendiente de facturar: ${formatMoneyAmount(billing.pendingToInvoice)}`

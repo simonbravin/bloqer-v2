@@ -52,6 +52,11 @@ export type PurchaseReceiptView = Omit<PurchaseReceipt, never> & {
   purchaseOrderCode: string;
   receivedByName: string | null;
   lines: PurchaseReceiptLineView[];
+  /**
+   * [D-108] Non-blocking warning when auto-draft AP failed after confirm.
+   * Only set on the confirm mutation response (not on subsequent reads).
+   */
+  autoDraftApWarning?: string | null;
 };
 
 // ─── Serializer ───────────────────────────────────────────────────────────────
@@ -489,38 +494,46 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
   });
 
   // [D-108] Best-effort AP draft after confirm — never rolls back the receipt.
+  let autoDraftApWarning: string | null = null;
   if (settings.autoDraftApInvoiceOnReceipt) {
     try {
-      const { createSupplierInvoiceDraftFromPurchaseOrder, getPurchaseOrderBillingSummary } =
-        await import("../ap/supplier-invoice-from-po.service");
-      const billing = await getPurchaseOrderBillingSummary(existing.purchaseOrderId, ctx);
-      const pending = new Prisma.Decimal(billing.pendingToInvoice);
-      if (billing.hasReceivedQuantity && pending.greaterThan(0)) {
-        await createSupplierInvoiceDraftFromPurchaseOrder(
-          {
-            projectId: existing.projectId,
-            purchaseOrderId: existing.purchaseOrderId,
-            purchaseReceiptId: id,
-            basis: "received",
-          },
-          ctx,
-          { asSystemFromReceiptPolicy: true },
-        );
+      const { isTenantModuleEnabled } = await import("../tenant-modules/tenant-module.service");
+      const apEnabled = await isTenantModuleEnabled(ctx, "AP");
+      if (!apEnabled) {
+        autoDraftApWarning =
+          "La recepción quedó confirmada, pero el módulo CxP está deshabilitado: no se creó el borrador de factura.";
+      } else {
+        const { createSupplierInvoiceDraftFromPurchaseOrder, getPurchaseOrderBillingSummary } =
+          await import("../ap/supplier-invoice-from-po.service");
+        const billing = await getPurchaseOrderBillingSummary(existing.purchaseOrderId, ctx);
+        const pending = new Prisma.Decimal(billing.pendingToInvoice);
+        if (billing.hasReceivedQuantity && pending.greaterThan(0)) {
+          await createSupplierInvoiceDraftFromPurchaseOrder(
+            {
+              projectId: existing.projectId,
+              purchaseOrderId: existing.purchaseOrderId,
+              purchaseReceiptId: id,
+              basis: "received",
+            },
+            ctx,
+            { asSystemFromReceiptPolicy: true },
+          );
+        }
       }
     } catch (err) {
       // Receipt already confirmed; Finance can still use Pendientes / panel billing.
-      console.warn(
-        "[D-108] auto-draft AP after receipt failed",
-        {
-          receiptId: id,
-          purchaseOrderId: existing.purchaseOrderId,
-          message: err instanceof Error ? err.message : String(err),
-        },
-      );
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn("[D-108] auto-draft AP after receipt failed", {
+        receiptId: id,
+        purchaseOrderId: existing.purchaseOrderId,
+        message,
+      });
+      autoDraftApWarning = `La recepción quedó confirmada, pero no se pudo crear el borrador de factura: ${message}`;
     }
   }
 
-  return toPurchaseReceiptView(receipt);
+  const view = await toPurchaseReceiptView(receipt);
+  return autoDraftApWarning ? { ...view, autoDraftApWarning } : view;
 }
 
 export async function cancelPurchaseReceipt(id: string, ctx: ServiceContext): Promise<PurchaseReceiptView> {

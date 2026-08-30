@@ -266,9 +266,10 @@ stateDiagram-v2
 
 | Desde | Hacia | Acción | Quién |
 |---|---|---|---|
-| `DRAFT` | `SUBMITTED` | Enviar (o auto-`APPROVED` si no requiere alto nivel) | PROCUREMENT / PM / ADMIN con EDIT |
-| `DRAFT` / `SUBMITTED` | `CONFIRMED` | **Autorizar y comprometer** ([D-105]): política ON, no alto nivel; escribe APPROVED+CONFIRMED | EDIT OC (PM / PROCUREMENT / ADMIN / OWNER) + segregación |
-| `SUBMITTED` | `APPROVED` | Aprobar | Estándar: PROCUREMENT/ADMIN/OWNER; alto monto o `EXTRA_APPROVAL`: solo OWNER/ADMIN |
+| `DRAFT` | `SUBMITTED` / `APPROVED` / `CONFIRMED` | Enviar; auto-`APPROVED` si aprobador estándar; auto-`CONFIRMED` si además `autoConfirmOnApprove` ([D-107]) | PROCUREMENT / PM / ADMIN con EDIT |
+| `DRAFT` / `SUBMITTED` | `CONFIRMED` | **Autorizar y comprometer** ([D-105]/[D-106]): política ON; bajo umbral EDIT OC; alto nivel OWNER/ADMIN. Un write a `CONFIRMED` con sellos de aprobación | EDIT OC o OWNER/ADMIN + segregación |
+| `SUBMITTED` | `APPROVED` | Aprobar (sin auto-confirm) | Estándar: PROCUREMENT/ADMIN/OWNER; alto monto o `EXTRA_APPROVAL`: solo OWNER/ADMIN |
+| `SUBMITTED` | `CONFIRMED` | Aprobar con `autoConfirmOnApprove` ([D-107], no alto nivel) o atajo D-105 | Según política / roles |
 | `SUBMITTED` | `DRAFT` | Rechazar / devolver con motivo ([BR-PUR-016]) | Mismos roles que pueden aprobar |
 | `APPROVED` | `CONFIRMED` | Confirmar al proveedor → compromiso ([BR-PUR-001]) | PROCUREMENT / ADMIN / OWNER |
 | `CONFIRMED`+ | `PARTIALLY_RECEIVED` / `RECEIVED` | Por recepciones | WAREHOUSE / PROCUREMENT |
@@ -280,8 +281,9 @@ stateDiagram-v2
 - Toda línea tiene `wbs_node_id` obligatorio en compras de proyecto ([BR-PUR-007], [D-050]).
 - `APPROVED` **no** compromete costo; solo habilita confirmar al proveedor.
 - `CONFIRMED` impacta costo comprometido en proyecto ([BR-PUR-001], [D-006]).
-- Atajo [D-105]: alto nivel (umbral o `EXTRA_APPROVAL`) **no** tiene un paso; sigue Aprobar → Confirmar. Auto-approve al Enviar **no** auto-confirma.
-- Recepciones avanzan el estado; factura y pago son documentos separados ([D-020]).
+- Atajo [D-105]/[D-106]: bajo umbral = EDIT OC; alto nivel (umbral o `EXTRA_APPROVAL`) = OWNER/ADMIN. Persistencia: un write a `CONFIRMED` (con `approvedAt`/`confirmedAt`), no queda en `APPROVED`. Auto-approve al Enviar respeta `autoConfirmOnApprove` ([D-107]).
+- [D-107] `autoConfirmOnApprove`: aprobar (o auto-aprobar al Enviar) OC no alto nivel → `CONFIRMED` + notificación de confirmado (nunca “pendiente confirmar”).
+- Recepciones avanzan el estado; factura y pago son documentos separados ([D-020]). [D-108] puede crear borrador CxP post-recepción (no emite / no crea deuda hasta ISSUED).
 - Cancelación con recepción confirmada o factura activa: bloqueada; usar cierre parcial ([BR-PUR-013]).
 - Periodo cerrado bloquea confirmar OC / recepción / factura con impacto ([BR-PUR-014]).
 

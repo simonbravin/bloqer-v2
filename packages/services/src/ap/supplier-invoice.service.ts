@@ -517,14 +517,18 @@ export async function createSupplierInvoice(
     /**
      * [D-108] Trusted system path after receipt confirm under company policy.
      * Skips AP mutate gate so warehouse can confirm receipt while Finance emits later.
+     * Requires `trustedSystemPath: "receipt-auto-draft"` — not a free public bypass.
      */
     bypassApMutateGate?: boolean;
+    trustedSystemPath?: "receipt-auto-draft";
   },
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
 
   const projectId = input.projectId ?? null;
-  if (!options?.bypassApMutateGate && !canMutateApForScope(ctx.roles, projectId)) {
+  const systemBypass =
+    options?.bypassApMutateGate === true && options.trustedSystemPath === "receipt-auto-draft";
+  if (!systemBypass && !canMutateApForScope(ctx.roles, projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas de proveedor");
   }
 
@@ -629,7 +633,7 @@ export async function createSupplierInvoice(
         issueDate:         new Date(input.issueDate),
         dueDate:           new Date(input.dueDate),
         currency:          input.currency ?? "ARS",
-        fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : new Prisma.Decimal(1),
+        fxRate: estimatedFx.fxRate,
         invoiceLetter:     suggestedLetter,
         notes:             input.notes ?? null,
         internalNotes:     input.internalNotes ?? null,

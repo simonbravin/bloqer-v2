@@ -83,11 +83,9 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
 
   let order, receipts, billing, linkedInvoices, project, procurementSettings;
   try {
-    [order, receipts, billing, linkedInvoices, project, procurementSettings] = await Promise.all([
+    [order, receipts, project, procurementSettings] = await Promise.all([
       getPurchaseOrderById(poId, ctx),
       listReceiptsByPurchaseOrder(poId, ctx),
-      getPurchaseOrderBillingSummary(poId, ctx),
-      listSupplierInvoicesByPurchaseOrder(poId, ctx),
       getProjectShellInfo(id, ctx),
       getCompanyProcurementSettingsForProject(id, ctx),
     ]);
@@ -95,6 +93,28 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
+  }
+
+  // Billing/AP panel is optional when CxP module is off or actor lacks AP+procurement view.
+  billing = {
+    receivedAmount: "0",
+    invoicedAmount: "0",
+    draftReservedAmount: "0",
+    paidAmount: "0",
+    pendingToInvoice: "0",
+    hasReceivedQuantity: false,
+    draftInvoiceCount: 0,
+    lineMatches: [],
+    matchWarningCount: 0,
+  };
+  linkedInvoices = [] as Awaited<ReturnType<typeof listSupplierInvoicesByPurchaseOrder>>;
+  try {
+    [billing, linkedInvoices] = await Promise.all([
+      getPurchaseOrderBillingSummary(poId, ctx),
+      listSupplierInvoicesByPurchaseOrder(poId, ctx),
+    ]);
+  } catch (err) {
+    if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
   }
 
   if (order.projectId !== id) notFound();
@@ -111,19 +131,6 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   const canApprovePo = canApprovePurchaseOrders(current.tenantCtx.roles);
   const canEditPo = canEditPurchaseOrders(current.tenantCtx.roles);
   const canReceive = canEditPurchaseReceipts(current.tenantCtx.roles);
-  const showAuthorizeAndCommit = canAuthorizeAndCommitPo(
-    procurementSettings,
-    {
-      status: order.status,
-      totalAmount: order.totalAmount,
-      currency: order.currency,
-      fxRate: order.fxRate,
-      totalAmountArs: order.totalAmountArs,
-      originRequestedByUserId: order.originRequestedByUserId,
-      lines: order.lines,
-    },
-    ctx,
-  );
   const willAutoConfirmOnApprove = willApproveAutoConfirmPo(procurementSettings, {
     totalAmount: order.totalAmount,
     currency: order.currency,
@@ -131,6 +138,22 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     totalAmountArs: order.totalAmountArs,
     lines: order.lines,
   });
+  const showAuthorizeAndCommit =
+    canAuthorizeAndCommitPo(
+      procurementSettings,
+      {
+        status: order.status,
+        totalAmount: order.totalAmount,
+        currency: order.currency,
+        fxRate: order.fxRate,
+        totalAmountArs: order.totalAmountArs,
+        originRequestedByUserId: order.originRequestedByUserId,
+        lines: order.lines,
+      },
+      ctx,
+    ) &&
+    // Avoid dual CTAs on SUBMITTED when D-107 already turns Aprobar into commit.
+    !(isSubmitted && willAutoConfirmOnApprove);
   const canEditAp = canRegisterApInvoice(current.tenantCtx.roles);
   const showBilling = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status);
   const canInvoiceNow =

@@ -185,6 +185,24 @@ test("canAuthorizeAndCommitPo is false when foreign FX is missing", () => {
   );
 });
 
+test("canAuthorizeAndCommitPo uses purchaseRequestRequestedByUserId for self-approval", () => {
+  assert.equal(
+    canAuthorizeAndCommitPo(
+      { ...baseSettings, allowSelfApproval: false },
+      {
+        status: "DRAFT",
+        totalAmount: "50000",
+        currency: "ARS",
+        originRequestedByUserId: null,
+        purchaseRequestRequestedByUserId: "u1",
+        lines: [],
+      },
+      ctx(["PROCUREMENT"], "u1"),
+    ),
+    false,
+  );
+});
+
 test("willApproveAutoConfirmPo is false when policy off", () => {
   assert.equal(
     willApproveAutoConfirmPo(

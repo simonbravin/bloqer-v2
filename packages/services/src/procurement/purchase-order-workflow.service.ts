@@ -184,6 +184,8 @@ export function canAuthorizeAndCommitPo(
     /** Fallback when live totals are unavailable (e.g. unit tests). */
     totalAmountArs?: Prisma.Decimal | string | null;
     originRequestedByUserId?: string | null;
+    /** Fallback when originRequestedByUserId is null (same as service resolveOriginUserId). */
+    purchaseRequestRequestedByUserId?: string | null;
     lines?: Array<{ varianceTier?: string | null }>;
   },
   ctx: Pick<ServiceContext, "roles" | "actorUserId">,
@@ -205,9 +207,10 @@ export function canAuthorizeAndCommitPo(
     return false;
   }
 
+  const originId = po.originRequestedByUserId ?? po.purchaseRequestRequestedByUserId ?? null;
   return isSelfApprovalAllowed(
     settings,
-    po.originRequestedByUserId ?? null,
+    originId,
     ctx.actorUserId,
     requiresExtraApproval,
     requiresHighLevelAmount,
@@ -505,16 +508,26 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
     let nextStatus: PurchaseOrderStatus = "SUBMITTED";
     let approvedBy: string | null = null;
     let approvedAt: Date | null = null;
+    let confirmedBy: string | null = null;
+    let confirmedAt: Date | null = null;
 
     // Auto-approve only when actor may approve; otherwise leave SUBMITTED (do not throw).
+    // [D-107] When autoConfirmOnApprove is ON, Enviar can land on CONFIRMED (same as approve).
     if (!highLevel && isStandardApprover(ctx.roles)) {
       const originId = resolveOriginUserId(existing);
       if (
         isSelfApprovalAllowed(settings, originId, ctx.actorUserId, false, false)
       ) {
-        nextStatus = "APPROVED";
+        const now = new Date();
         approvedBy = ctx.actorUserId ?? null;
-        approvedAt = new Date();
+        approvedAt = now;
+        if (settings.autoConfirmOnApprove) {
+          nextStatus = "CONFIRMED";
+          confirmedBy = ctx.actorUserId ?? null;
+          confirmedAt = now;
+        } else {
+          nextStatus = "APPROVED";
+        }
       }
     }
 
@@ -526,6 +539,8 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
         totalAmountArs: totalArs,
         approvedByUserId: approvedBy,
         approvedAt,
+        confirmedByUserId: confirmedBy,
+        confirmedAt,
         returnReason: null,
         returnedAt: null,
         returnedByUserId: null,
@@ -551,14 +566,37 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
         tx,
       },
     );
-    if (nextStatus === "APPROVED") {
+    if (nextStatus === "APPROVED" || nextStatus === "CONFIRMED") {
       await auditProcurement(
         ctx,
         "purchase_order.approved",
         "PurchaseOrder",
         id,
         { projectId: po.projectId, companyId: po.companyId },
-        { after: { autoApproved: true }, tx },
+        {
+          after: {
+            autoApproved: true,
+            ...(nextStatus === "CONFIRMED" ? { autoConfirmOnApprove: true } : {}),
+          },
+          tx,
+        },
+      );
+    }
+    if (nextStatus === "CONFIRMED") {
+      await onPurchaseOrderConfirmed(id, ctx, tx);
+      await auditProcurement(
+        ctx,
+        "purchase_order.confirmed",
+        "PurchaseOrder",
+        id,
+        { projectId: po.projectId, companyId: po.companyId },
+        {
+          after: {
+            autoConfirmOnApprove: true,
+            totalAmountArs: serializeMoneyDecimal(totalArs),
+          },
+          tx,
+        },
       );
     }
 
@@ -586,6 +624,18 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
       code: `OC-${String(submitResult.number).padStart(3, "0")}`,
       requiresHighLevel: highLevel,
       requiresVarianceExtra: submitResult.requiresExtraApproval,
+    });
+  } else if (submitResult.nextStatus === "CONFIRMED") {
+    await notifyPurchaseOrderConfirmed({
+      ctx,
+      purchaseOrderId: id,
+      projectId: submitResult.projectId,
+      companyId: submitResult.companyId,
+      code: `OC-${String(submitResult.number).padStart(3, "0")}`,
+      recipientUserIds: [
+        submitResult.originRequestedByUserId,
+        submitResult.createdBy,
+      ].filter(Boolean) as string[],
     });
   } else if (submitResult.nextStatus === "APPROVED") {
     await notifyPurchaseOrderApproved({
@@ -620,6 +670,7 @@ export async function approvePurchaseOrder(id: string, ctx: ServiceContext): Pro
   if (existing.status !== "SUBMITTED") {
     throw new ServiceError("CONFLICT", "La orden no está pendiente de aprobación");
   }
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
 
   const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
 

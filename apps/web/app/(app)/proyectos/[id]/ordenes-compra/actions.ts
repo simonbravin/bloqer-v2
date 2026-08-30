@@ -50,6 +50,7 @@ function revalidatePO(projectId: string, poId?: string) {
   revalidatePath(`/proyectos/${projectId}/ordenes-compra`);
   if (poId) revalidatePath(`/proyectos/${projectId}/ordenes-compra/${poId}`);
   revalidatePath("/pendientes");
+  revalidatePath(`/proyectos/${projectId}/pendientes`);
   revalidateProjectCostAndFinancePaths(projectId);
 }
 
@@ -230,21 +231,27 @@ export async function confirmPurchaseReceiptAction(
   receiptId: string,
   projectId: string,
   purchaseOrderId: string,
-): Promise<{ ok: true } | { error: string }> {
+): Promise<{ ok: true; autoDraftApWarning?: string } | { error: string }> {
   const ctx = await getCtx();
   try {
     const receipt = await getPurchaseReceiptById(receiptId, ctx);
     if (receipt.projectId !== projectId || receipt.purchaseOrderId !== purchaseOrderId) {
       return { error: "La recepción no pertenece a este proyecto u orden" };
     }
-    await confirmPurchaseReceipt(receiptId, ctx);
+    const confirmed = await confirmPurchaseReceipt(receiptId, ctx);
     revalidatePath(`/proyectos/${projectId}/recepciones`);
     revalidatePath(`/proyectos/${projectId}/recepciones/${receiptId}`);
     revalidatePath(`/proyectos/${projectId}/ordenes-compra/${purchaseOrderId}`);
+    revalidatePath(`/proyectos/${projectId}/facturas-proveedor`);
     revalidatePath("/pendientes");
     revalidatePath(`/proyectos/${projectId}/pendientes`);
     revalidateProjectCostAndFinancePaths(projectId);
-    return { ok: true };
+    return {
+      ok: true as const,
+      ...(confirmed.autoDraftApWarning
+        ? { autoDraftApWarning: confirmed.autoDraftApWarning }
+        : {}),
+    };
   } catch (err) {
     return handle(err);
   }
