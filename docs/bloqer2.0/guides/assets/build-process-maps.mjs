@@ -303,13 +303,13 @@ const maps = [
     title: "Subcontrato hasta el pago",
     subtitle: "Paquete de ejecución: certificar → factura → CxP → pagar",
     guideRef: "§10 · §12.2",
-    footerRight: "Finanzas del proyecto → Subcontratos · Facturas proveedor · CxP",
+    footerRight: "Compras → Subcontratos · Facturas proveedor · CxP",
     lede: "Un subcontrato <strong>no es una OC</strong>. El albañil o el electricista van por este circuito. No se paga eligiendo al subcontratista en un gasto genérico ni creando una orden de compra.",
     html: wrap => wrap(`
       <p class="section-label">1 · Contratar</p>
       <div class="row cols-3">
         ${card(1, "Alta en Directorio", "Admin", "Contacto con rol <strong>Subcontratista</strong> (activo).", ["No uses rol Proveedor si es paquete de ejecución", "Se busca por razón social o fantasía", "Puede tener otro rol además"], "Contacto listo")}
-        ${card(2, "Crear subcontrato", "PM / Compras", "Finanzas del proyecto → Subcontratos → Nuevo.", ["Alcance e imputación a partidas", "Categoría SUB en el APU cuando corresponda", "No genera comprometido de OC"], "Subcontrato activo")}
+        ${card(2, "Crear subcontrato", "PM / Compras", "Compras → Subcontratos → Nuevo.", ["Alcance e imputación a partidas", "Categoría SUB en el APU cuando corresponda", "No genera comprometido de OC"], "Subcontrato activo")}
         ${card(3, "Certificación del período", "PM", "Nueva certificación de subcontrato (mes / avance).", ["Borrador editable", "Montos / partidas del período", "Luego Emitir"], "Cert. borrador")}
       </div>
       <p class="section-label">2 · Autorizar, facturar y pagar</p>

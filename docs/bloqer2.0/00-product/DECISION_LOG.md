@@ -1622,7 +1622,7 @@
   6. Comprometido sigue [D-006]: solo en `CONFIRMED+`. Auto-approve al Enviar (DRAFT → APPROVED) **no** auto-confirma.
 - **Implicancias:** service `authorizeAndCommitPurchaseOrder`; UI en detalle OC + interruptor de políticas; caminito/guía/help actualizados ([D-090]).
 - **Documentos afectados:** [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7, [`APPROVAL_WORKFLOWS.md`](../01-domain/APPROVAL_WORKFLOWS.md), [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md), [`EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md), [`NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md), [`PURCHASE_ORDERS_AND_RECEIPTS.md`](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [`REGISTER_PURCHASE.md`](../05-workflows/REGISTER_PURCHASE.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §9.2, help OC / políticas / circuito.
-- **Seguimiento UX (Oleada A, 2026-08-30):** Pendientes como portero (etapas + CTAs), menú **Compromisos** (OC + Sub sin fusionar), copy Aprobar ≠ Comprometer, CTA factura post-recepción.
+- **Seguimiento UX (Oleada A, 2026-08-30):** Pendientes como portero (etapas + CTAs), copy Aprobar ≠ Comprometer, CTA factura post-recepción. Menú **Compromisos** (OC+Sub) se revirtió: OC y Subcontratos vuelven bajo **Compras** (menos taxonomía; Comprometido sigue siendo concepto de dinero).
 - **Oleada B (2026-08-30):** ver [D-106](#d-106--autorizar-y-comprometer-en-alto-nivel-owneradmin), [D-107](#d-107--auto-confirmar-al-aprobar-política), [D-108](#d-108--borrador-ap-automático-al-confirmar-recepción). Commitment unificado / Workflows → backlog Oleada C ([Q-060](./OPEN_QUESTIONS.md#q-060--oleada-b-compras-post-pendientes-portero--ux)).
 
 ---

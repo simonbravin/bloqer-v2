@@ -89,19 +89,13 @@ export function buildProjectWorkspaceNavSections(
     compras.push({ label: "Solicitudes de compra", href: `${base}/solicitudes-compra` });
   }
   if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) {
+    compras.push({ label: "Órdenes de compra", href: `${base}/ordenes-compra` });
     compras.push({ label: "Recepciones", href: `${base}/recepciones` });
   }
-  if (compras.length) sections.push({ title: "Compras", items: compras });
-
-  // Visual "Compromisos" family: firm commitments (OC + Sub) without merging models.
-  const compromisos: ProjectWorkspaceNavLink[] = [];
-  if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) {
-    compromisos.push({ label: "Órdenes de compra", href: `${base}/ordenes-compra` });
-  }
   if (gate.isEnabled("SUBCONTRACTS") && (can(roles, "VIEW", "SUBCONTRACTS") || can(roles, "VIEW", "PROJECTS"))) {
-    compromisos.push({ label: "Subcontratos", href: `${base}/subcontratos` });
+    compras.push({ label: "Subcontratos", href: `${base}/subcontratos` });
   }
-  if (compromisos.length) sections.push({ title: "Compromisos", items: compromisos });
+  if (compras.length) sections.push({ title: "Compras", items: compras });
 
   const finanzasProyecto: ProjectWorkspaceNavLink[] = [];
   if (canShowProjectFinanzasNavLink(gate, roles)) {

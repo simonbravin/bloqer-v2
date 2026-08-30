@@ -328,7 +328,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     modules: ["compras", "materiales", "finanzas"],
     level: "project",
     typicalRoles: ["Compras", "PM", "Finanzas"],
-    where: { menu: "Compras → Tablero / Compromisos → OC / Pendientes" },
+    where: { menu: "Compras → Tablero / OC / Recepciones · Pendientes" },
     hrefs: [
       { kind: "project", suffix: "/compras", label: "Tablero de compras" },
       { kind: "project", suffix: "/ordenes-compra", label: "Órdenes de compra" },
@@ -495,7 +495,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     modules: ["compras", "presupuesto"],
     level: "project",
     typicalRoles: ["Compras", "PM", "OWNER / ADMIN"],
-    where: { menu: "Compromisos → Órdenes de compra" },
+    where: { menu: "Compras → Órdenes de compra" },
     hrefs: [{ kind: "project", suffix: "/ordenes-compra", label: "Órdenes de compra" }],
     steps: [
       "Nueva OC (dialog en escritorio; en celular `/ordenes-compra/nueva`) o desde SC seleccionada. Proveedor: buscá por razón social o nombre fantasía. Cada línea: partida hoja, **Tipo de costo** (Materiales / Mano de obra / Equipos / Subcontratos / Otros; **Sugerido desde APU**), unidad / cantidad / precio unitario / ref. presupuesto, y debajo Desc. % · IVA · total. Descuento general % + Aplicar a todas copia el mismo % (hay que ingresar un número; 0 limpia todas).",
@@ -573,13 +573,13 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     modules: ["compras", "inventario"],
     level: "project",
     typicalRoles: ["Compras", "Depósito"],
-    where: { menu: "Compras → Recepciones (OC en Compromisos → Órdenes de compra)" },
+    where: { menu: "Compras → Recepciones (OC en Compras → Órdenes de compra)" },
     hrefs: [
       { kind: "project", suffix: "/recepciones", label: "Recepciones" },
       { kind: "project", suffix: "/ordenes-compra", label: "Órdenes de compra" },
     ],
     steps: [
-      "Desde Pendientes (botón Recibir → abre …/recepciones/nueva), desde la campana al confirmar (CTA Registrar recepción), desde la OC (Compromisos → Órdenes de compra) o Compras → Recepciones.",
+      "Desde Pendientes (botón Recibir → abre …/recepciones/nueva), desde la campana al confirmar (CTA Registrar recepción), desde la OC (Compras → Órdenes de compra) o Compras → Recepciones.",
       "Registrá recepción parcial o total. El depósito es opcional si Inventario está activo.",
       "Al confirmar la recepción, el panel Facturación queda arriba. Si la política «Al recibir, crear borrador» está ON, ya hay borrador para Completar y emitir (no crea CxP sola la recepción).",
     ],
@@ -666,7 +666,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     modules: ["compras", "configuracion"],
     level: "project",
     typicalRoles: ["Compras", "OWNER / ADMIN"],
-    where: { menu: "Compromisos → Órdenes de compra / Configuración → Políticas" },
+    where: { menu: "Compras → Órdenes de compra / Configuración → Políticas" },
     hrefs: [
       { kind: "project", suffix: "/ordenes-compra", label: "Órdenes de compra" },
       { kind: "company", path: "/configuracion/politicas", label: "Políticas" },

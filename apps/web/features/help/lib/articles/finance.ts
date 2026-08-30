@@ -9,11 +9,11 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     modules: ["subcontratos"],
     level: "project",
     typicalRoles: ["PM", "Compras", "Administración"],
-    where: { menu: "Compromisos → Subcontratos" },
+    where: { menu: "Compras → Subcontratos" },
     hrefs: [{ kind: "project", suffix: "/subcontratos", label: "Subcontratos" }],
     steps: [
       "Prerrequisito: contacto con rol Subcontratista.",
-      "Compromisos → Subcontratos → Nuevo (buscá al subcontratista por razón social o nombre fantasía).",
+      "Compras → Subcontratos → Nuevo (buscá al subcontratista por razón social o nombre fantasía).",
       "Alcance e imputación a partidas (categoría SUB en APU cuando corresponda).",
     ],
     relatedSlugs: ["cargar-un-subcontratista", "certificar-y-pagar-subcontrato"],
@@ -28,7 +28,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     modules: ["subcontratos", "finanzas"],
     level: "project",
     typicalRoles: ["PM", "Finanzas"],
-    where: { menu: "Compromisos → Subcontratos" },
+    where: { menu: "Compras → Subcontratos" },
     hrefs: [
       { kind: "project", suffix: "/subcontratos", label: "Subcontratos" },
       { kind: "project", suffix: "/facturas-proveedor", label: "Facturas proveedor" },

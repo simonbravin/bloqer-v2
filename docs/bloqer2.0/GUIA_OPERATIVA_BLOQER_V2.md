@@ -551,13 +551,12 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
 | Resumen | Resumen → `/proyectos/[id]` |
 | Planificación | Presupuesto → `/presupuestos` · Cronograma → `/cronograma` · **EDT y costos** → `/control-costos` · Reportes → `/reportes` |
 | Operación | Libro de obra → `/libro-obra` · Certificaciones → `/certificaciones` · **Materiales** → `/materiales` · Inventario → `/inventario` · Consumos → `/consumos` · Documentos → `/documentos` |
-| Compras | **Tablero de compras** → `/compras` · **Solicitudes de compra** → `/solicitudes-compra` · **Recepciones** → `/recepciones` |
-| Compromisos | **Órdenes de compra** → `/ordenes-compra` · **Subcontratos** → `/subcontratos` (hermanos visuales; modelos separados) |
+| Compras | **Tablero de compras** → `/compras` · **Solicitudes de compra** → `/solicitudes-compra` · **Órdenes de compra** → `/ordenes-compra` · **Recepciones** → `/recepciones` · **Subcontratos** → `/subcontratos` |
 | Finanzas del proyecto | **Tablero de finanzas** → `/finanzas` · Flujo de caja → `/flujo-caja` · CxP → `/cuentas-por-pagar` · CxC → `/cuentas-por-cobrar` · Facturas proveedor → `/facturas-proveedor` · Facturas emitidas → `/facturas` |
 | Administración | Configuración → `/editar` (datos de la obra + **Equipo de obra** al final) |
 
 > En UI, **EDT** = Estructura de Desglose de Trabajo (WBS técnico = `WbsNode`).  
-> **Recepciones** viven bajo **Compras**, no bajo Operación. **Órdenes de compra** y **Subcontratos** viven bajo **Compromisos** (familia visual: ambos reservan $ en EDT al confirmar / activar; la sección Compromisos abre por defecto en el menú, igual que Compras). **Consumos** viven bajo **Operación**.
+> **Recepciones**, **Órdenes de compra** y **Subcontratos** viven bajo **Compras** (un solo caminito operativo). Comprometido sigue siendo el concepto de dinero (OC confirmada / subcontrato activo), no una sección del menú. **Consumos** viven bajo **Operación**.
 
 <!-- capture:19 menu-del-proyecto-compras-operacion -->
 ![Bloqer — Menú del proyecto (Compras + Operación)](./guides/assets/screenshots/19-menu-del-proyecto-compras-operacion.png)
@@ -879,7 +878,7 @@ flowchart TD
 
 ### 9.2 Procedimiento — Orden de compra (OC)
 
-**Ruta:** Compromisos → **Órdenes de compra**
+**Ruta:** Compras → **Órdenes de compra**
 
 **Estados en pantalla:** Borrador → Pend. aprobación → Aprobada → Confirmada → Recepción parcial / Recibida · Anulada.  
 **Enum:** `DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED` (o `CANCELLED`).
@@ -928,7 +927,7 @@ flowchart TD
 
 ## 10. Subcontratos (nivel proyecto)
 
-**Ruta:** Compromisos → **Subcontratos** → `/proyectos/[id]/subcontratos`
+**Ruta:** Compras → **Subcontratos** → `/proyectos/[id]/subcontratos`
 
 ### 10.1 Procedimiento
 

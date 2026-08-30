@@ -517,13 +517,13 @@
 
 - **Categoría:** Compras / OC
 - **Estado:** PARCIAL — #1 → [D-106](./DECISION_LOG.md#d-106--autorizar-y-comprometer-en-alto-nivel-owneradmin); #2 → [D-107](./DECISION_LOG.md#d-107--auto-confirmar-al-aprobar-política); #3 → [D-108](./DECISION_LOG.md#d-108--borrador-ap-automático-al-confirmar-recepción) (auto-draft, **no** remito→CxP).
-- **Contexto:** Oleada A shipped (portero + Compromisos visuales). Oleada B (2026-08-30) acorta clics sin romper Comprometido=`CONFIRMED+` ni CxP=factura ISSUED.
+- **Contexto:** Oleada A shipped (portero). Menú visual «Compromisos» se revirtió: OC y Subcontratos vuelven bajo **Compras**. Oleada B (2026-08-30) acorta clics sin romper Comprometido=`CONFIRMED+` ni CxP=factura ISSUED.
 - **Resuelto en B:**
   1. Atajo alto nivel con OWNER/ADMIN — [D-106].
   2. Auto-confirmar al aprobar (política `autoConfirmOnApprove`, default OFF; solo no-alto-nivel) — [D-107]. Comprometido sigue en `CONFIRMED`.
   3. Auto-borrador AP al confirmar recepción (política; no Payable desde remito) — [D-108].
 - **Backlog Oleada C (visión, no rechazado para siempre):**
-  4. Entidad/listado Commitment unificado OC+Sub (hoy menú Compromisos visual).
+  4. Entidad/listado Commitment unificado OC+Sub (no confundir con sección de menú; menú operativo = Compras).
   5. Motor tipo Workflows multi-paso (cuando el cuello sea gobernanza, no clicks).
 - **Fuera de alcance permanente (salvo decisión nueva):** CxP «Listo para pagar» dentro de Pendientes ([D-094]); Payable sin factura AP.
 - **Documentos:** [D-105](./DECISION_LOG.md#d-105--autorizar-y-comprometer-atajo-de-oc-con-política)–[D-108](./DECISION_LOG.md#d-108--borrador-ap-automático-al-confirmar-recepción), guía §9.2–9.3.
