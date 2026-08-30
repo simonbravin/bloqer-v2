@@ -81,7 +81,7 @@ export const FIELD_PENDING_COMPRAS_STAGE_LABEL: Record<
   string
 > = {
   PURCHASE_REQUEST: "Cotizar",
-  PURCHASE_ORDER: "Aprobar",
+  PURCHASE_ORDER: "Aprobación",
   PURCHASE_ORDER_CONFIRM: "Confirmar",
   PURCHASE_ORDER_RECEIPT: "Recibir",
   PURCHASE_ORDER_INVOICE: "Facturar",

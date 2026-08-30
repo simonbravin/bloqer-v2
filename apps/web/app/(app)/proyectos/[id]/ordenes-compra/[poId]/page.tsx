@@ -57,6 +57,8 @@ import {
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { ScrollToElement } from "@/components/navigation/scroll-to-element";
+import { ProcurementAmberCallout } from "@/features/procurement/components/procurement-amber-callout";
+import { procurementActionBtnClass } from "@/features/procurement/lib/procurement-ui";
 import {
   submitPurchaseOrderAction,
   confirmPurchaseOrderAction,
@@ -192,7 +194,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     (isApproved && canEditPo) ||
     (isReceivable && canReceive) ||
     canCancel;
-  const actionBtn = "min-h-11 w-full sm:w-auto md:min-h-9";
+  const actionBtn = procurementActionBtnClass;
 
   const poPath = `/proyectos/${id}/ordenes-compra/${poId}`;
 
@@ -268,6 +270,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                 poId={poId}
                 projectId={id}
                 willAutoConfirm={willAutoConfirmOnApprove}
+                approveVariant={showAuthorizeAndCommit ? "outline" : "default"}
               />
             )}
             {isSubmitted && showAuthorizeAndCommit ? (
@@ -302,21 +305,13 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
         ) : null}
       </div>
       {isApproved ? (
-        <p
-          className="hidden rounded-md border border-amber-300/60 bg-amber-50/80 px-3 py-2 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100 md:block"
-          role="status"
-        >
+        <ProcurementAmberCallout className="hidden md:block">
           Aprobada — falta Confirmar al proveedor para comprometer $ en EDT.
-        </p>
+        </ProcurementAmberCallout>
       ) : null}
 
       <ActionErrorBanner message={sp.actionError} />
-
-      {sp.invoiceError && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {sp.invoiceError}
-        </div>
-      )}
+      <ActionErrorBanner message={sp.invoiceError} />
 
       {billingPanel}
       {highlightBilling ? <ScrollToElement id="facturar" /> : null}

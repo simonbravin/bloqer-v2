@@ -4,6 +4,8 @@ import { can } from "@bloqer/domain";
 import { createSupplierInvoiceFromPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
 import type { PurchaseOrderBillingSummary } from "@bloqer/services";
 import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
+import { ProcurementAmberCallout } from "./procurement-amber-callout";
+import { procurementActionBtnClass } from "../lib/procurement-ui";
 
 type Props = {
   projectId: string;
@@ -32,10 +34,11 @@ export function PoBillingNextStepPanel({
   return (
     <div
       id="facturar"
+      tabIndex={-1}
       className={
         highlighted
-          ? "scroll-mt-24 rounded-lg border-2 border-primary bg-muted/30 p-4 space-y-3 ring-2 ring-primary/20"
-          : "scroll-mt-24 rounded-lg border bg-muted/30 p-4 space-y-3"
+          ? "scroll-mt-24 rounded-lg border bg-muted/30 p-4 space-y-3 ring-2 ring-primary transition-shadow outline-none"
+          : "scroll-mt-24 rounded-lg border bg-muted/30 p-4 space-y-3 outline-none"
       }
     >
       <div className="text-sm space-y-1">
@@ -58,11 +61,11 @@ export function PoBillingNextStepPanel({
           </p>
         )}
         {billing.matchWarningCount > 0 ? (
-          <div className="rounded border border-amber-300/60 bg-amber-50/80 dark:bg-amber-950/20 p-2 space-y-1">
+          <ProcurementAmberCallout inset>
             <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
               Matching 3 vías: {billing.matchWarningCount} aviso(s) (no bloquea emitir)
             </p>
-            <ul className="text-[11px] text-amber-900/90 dark:text-amber-100/90 list-disc pl-4 space-y-0.5">
+            <ul className="text-xs text-amber-900/90 dark:text-amber-100/90 list-disc pl-4 space-y-0.5">
               {billing.lineMatches
                 .filter((l) => l.message)
                 .slice(0, 5)
@@ -70,10 +73,10 @@ export function PoBillingNextStepPanel({
                   <li key={l.poLineId}>{l.message}</li>
                 ))}
             </ul>
-          </div>
+          </ProcurementAmberCallout>
         ) : null}
         {showAction ? (
-          <p className="text-xs text-amber-800 dark:text-amber-200">
+          <p className="text-xs text-muted-foreground">
             La recepción no genera deuda automáticamente. Registrá la factura del proveedor y
             emitila para crear la cuenta por pagar.
           </p>
@@ -106,7 +109,9 @@ export function PoBillingNextStepPanel({
               redirect(`/proyectos/${projectId}/facturas-proveedor/${res.id}`);
             }}
           >
-            <Button type="submit">Registrar factura desde OC</Button>
+            <Button type="submit" className={procurementActionBtnClass}>
+              Registrar factura
+            </Button>
           </form>
         ) : null
       ) : showAction ? (

@@ -7,7 +7,14 @@ export function ScrollToElement({ id }: { id: string }) {
   useEffect(() => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    if (el instanceof HTMLElement) {
+      if (!el.hasAttribute("tabindex")) el.tabIndex = -1;
+      el.focus({ preventScroll: true });
+    }
   }, [id]);
   return null;
 }

@@ -13,7 +13,8 @@ const MAP = {
   },
   APPROVED: {
     label: "Aprobada",
-    variant: "default",
+    // Outline so Aprobada ≠ Confirmada (Comprometido) visually.
+    variant: "outline",
     title: "Aprobada: control interno. Todavía no reserva $ — falta Confirmar al proveedor",
   },
   CONFIRMED: {
@@ -48,8 +49,8 @@ export function PurchaseOrderStatusBadge({ status }: { status: string }) {
     <Badge
       variant={cfg.variant as "secondary" | "default" | "destructive" | "outline"}
       title={cfg.title}
-      aria-label={cfg.title}
     >
+      <span className="sr-only">{cfg.title}. </span>
       {cfg.label}
     </Badge>
   );

@@ -37,7 +37,7 @@ export function FieldPendingCard({ item }: { item: FieldPendingItem }) {
             </Badge>
           )}
         </div>
-        <Button asChild size="sm" className="shrink-0">
+        <Button asChild size="sm" className="min-h-11 shrink-0">
           <Link href={item.href}>{item.actionLabel}</Link>
         </Button>
       </div>

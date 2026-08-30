@@ -14,15 +14,27 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { authorizeAndCommitPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
+import {
+  procurementActionBtnClass,
+  procurementDialogBtnClass,
+} from "../lib/procurement-ui";
 
 type Props = {
   poId: string;
   projectId: string;
   className?: string;
+  /** When another primary CTA shares the row, demote to outline. */
+  variant?: "default" | "outline";
 };
 
 /** [D-105] One-step Autorizar y comprometer (policy-gated). */
-export function AuthorizeAndCommitPoButton({ poId, projectId, className }: Props) {
+export function AuthorizeAndCommitPoButton({
+  poId,
+  projectId,
+  className,
+  variant = "default",
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -45,17 +57,11 @@ export function AuthorizeAndCommitPoButton({ poId, projectId, className }: Props
   return (
     <>
       <div className="flex w-full flex-col gap-2 sm:w-auto">
-        {error ? (
-          <p
-            className="w-full rounded-md bg-destructive/10 p-3 text-sm text-destructive"
-            role="alert"
-          >
-            {error}
-          </p>
-        ) : null}
+        <ActionErrorBanner message={error ?? undefined} className="w-full" />
         <Button
           type="button"
-          className={className ?? "min-h-11 w-full sm:w-auto md:min-h-9"}
+          variant={variant}
+          className={className ?? procurementActionBtnClass}
           data-testid="po-authorize-and-commit-button"
           disabled={pending}
           onClick={() => setOpen(true)}
@@ -74,8 +80,11 @@ export function AuthorizeAndCommitPoButton({ poId, projectId, className }: Props
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className={procurementDialogBtnClass} disabled={pending}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
+              className={procurementDialogBtnClass}
               disabled={pending}
               onClick={(e) => {
                 e.preventDefault();

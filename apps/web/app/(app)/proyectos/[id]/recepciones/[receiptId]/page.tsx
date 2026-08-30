@@ -33,10 +33,12 @@ import {
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { Button } from "@/components/ui/button";
+import { ScrollToElement } from "@/components/navigation/scroll-to-element";
+import { procurementActionBtnClass } from "@/features/procurement/lib/procurement-ui";
 
 interface PageProps {
   params: Promise<{ id: string; receiptId: string }>;
-  searchParams: Promise<{ invoiceError?: string; actionError?: string }>;
+  searchParams: Promise<{ invoiceError?: string; actionError?: string; siguiente?: string }>;
 }
 
 export default async function RecepcionDetailPage({ params, searchParams }: PageProps) {
@@ -99,14 +101,16 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
 
   const canEditAp = canRegisterApInvoice(current.tenantCtx.roles);
   const isConfirmed = receipt.status === "CONFIRMED";
-  const highlightBilling =
+  const canInvoiceNow =
     isConfirmed &&
     billing.hasReceivedQuantity &&
     isPositiveMoneyAmount(billing.pendingToInvoice);
+  const highlightBilling = canInvoiceNow && sp.siguiente === "facturar";
+  const actionBtn = procurementActionBtnClass;
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={receipt.purchaseOrderCode}>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
         <h1 className="text-2xl font-bold tracking-tight">
           Recepción — {receipt.purchaseOrderCode}
         </h1>
@@ -114,12 +118,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
       </div>
 
       <ActionErrorBanner message={sp.actionError} />
-
-      {sp.invoiceError && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {sp.invoiceError}
-        </div>
-      )}
+      <ActionErrorBanner message={sp.invoiceError} />
 
       {isConfirmed && (
         <PoBillingNextStepPanel
@@ -132,6 +131,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
           highlighted={highlightBilling}
         />
       )}
+      {highlightBilling ? <ScrollToElement id="facturar" /> : null}
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -210,9 +210,10 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
         </DataTableSection>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
         {isDraft && (
           <form
+            className="w-full sm:w-auto"
             action={async () => {
               "use server";
               const result = await confirmPurchaseReceiptAction(
@@ -228,11 +229,14 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
               redirect(detailPath);
             }}
           >
-            <Button type="submit">Confirmar recepción</Button>
+            <Button type="submit" className={actionBtn}>
+              Confirmar recepción
+            </Button>
           </form>
         )}
         {!isCancelled && (
           <form
+            className="w-full sm:w-auto"
             action={async () => {
               "use server";
               const result = await cancelPurchaseReceiptAction(
@@ -244,12 +248,12 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
               redirect(detailPath);
             }}
           >
-            <Button type="submit" variant="destructive">
+            <Button type="submit" variant="destructive" className={actionBtn}>
               Anular recepción
             </Button>
           </form>
         )}
-        <Button asChild variant="outline" className="min-h-11 md:min-h-9">
+        <Button asChild variant="outline" className={actionBtn}>
           <Link
             href={`/proyectos/${id}/ordenes-compra/${receipt.purchaseOrderId}`}
             data-testid="receipt-view-po"

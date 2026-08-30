@@ -1,6 +1,13 @@
 import { formatDate } from "@/lib/format";
-import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, formatUnitPriceFromString, isZeroRatePct } from "@/lib/format-money";
+import {
+  formatMoneyAmount,
+  formatQtyFromString,
+  formatRatePctFromString,
+  formatUnitPriceFromString,
+  isZeroRatePct,
+} from "@/lib/format-money";
 import { PurchaseOrderVarianceReadout } from "./purchase-order-variance-readout";
+import { ProcurementAmberCallout } from "./procurement-amber-callout";
 import type { PurchaseOrderView } from "@bloqer/services";
 import type { ReactNode } from "react";
 
@@ -33,16 +40,14 @@ export function PurchaseOrderMobileFiche({
 }) {
   const wbs = uniqueWbs(order);
   const requester = order.originRequestedByName ?? order.createdByName;
+  const showReceiptQty = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status);
 
   return (
     <div className="space-y-4 md:hidden">
       {order.status === "APPROVED" ? (
-        <p
-          className="rounded-md border border-amber-300/60 bg-amber-50/80 px-3 py-2 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100"
-          role="status"
-        >
+        <ProcurementAmberCallout>
           Aprobada — falta Confirmar al proveedor para comprometer $ en EDT.
-        </p>
+        </ProcurementAmberCallout>
       ) : null}
       <section className="rounded-lg border bg-card p-4 space-y-3" data-testid="po-mobile-fiche">
         <dl className="grid grid-cols-2 gap-3 text-sm">
@@ -76,6 +81,12 @@ export function PurchaseOrderMobileFiche({
             <dt className="text-xs text-muted-foreground">Fecha</dt>
             <dd>{formatDate(order.issueDate)}</dd>
           </div>
+          {order.expectedDeliveryDate ? (
+            <div>
+              <dt className="text-xs text-muted-foreground">Entrega esperada</dt>
+              <dd>{formatDate(order.expectedDeliveryDate)}</dd>
+            </div>
+          ) : null}
         </dl>
       </section>
 
@@ -111,7 +122,11 @@ export function PurchaseOrderMobileFiche({
       <section className="space-y-3">
         <h2 className="font-semibold">Líneas</h2>
         {order.lines.map((line) => (
-          <article key={line.id} className="rounded-lg border bg-card p-4 space-y-2" data-testid="po-line-card">
+          <article
+            key={line.id}
+            className="rounded-lg border bg-card p-4 space-y-2"
+            data-testid="po-line-card"
+          >
             <p className="font-medium leading-snug">{line.description}</p>
             <p className="text-sm tabular-nums text-muted-foreground">
               {formatQtyFromString(line.quantity)} × {formatUnitPriceFromString(line.unitPrice)}
@@ -119,6 +134,11 @@ export function PurchaseOrderMobileFiche({
                 ? ` · desc. ${formatRatePctFromString(line.discountPct)}%`
                 : ""}
             </p>
+            {showReceiptQty ? (
+              <p className="text-xs tabular-nums text-muted-foreground">
+                Recibido {formatQtyFromString(line.receivedQuantity)}
+              </p>
+            ) : null}
             <p className="text-sm font-semibold tabular-nums">{formatMoneyAmount(line.lineTotal)}</p>
             {line.wbsNodeCode ? (
               <p className="text-sm text-muted-foreground">

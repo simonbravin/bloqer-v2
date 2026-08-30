@@ -26,18 +26,29 @@ import {
   approvePurchaseOrderAction,
   returnPurchaseOrderAction,
 } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
+import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
+import {
+  procurementActionBtnClass,
+  procurementDialogBtnClass,
+} from "../lib/procurement-ui";
 
 type Props = {
   poId: string;
   projectId: string;
   /** [D-107] When true, approving also confirms (Comprometido) under company policy. */
   willAutoConfirm?: boolean;
+  /**
+   * When Autorizar y comprometer is also shown on SUBMITTED, demote Aprobar to outline
+   * so there is a single primary CTA.
+   */
+  approveVariant?: "default" | "outline";
 };
 
 export function PurchaseOrderApprovalActions({
   poId,
   projectId,
   willAutoConfirm = false,
+  approveVariant = "default",
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -80,15 +91,12 @@ export function PurchaseOrderApprovalActions({
   }
 
   return (
-    <>
-      {error ? (
-        <p className="w-full rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert">
-          {error}
-        </p>
-      ) : null}
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+      <ActionErrorBanner message={error ?? undefined} className="w-full basis-full" />
       <Button
         type="button"
-        className="min-h-11 w-full sm:w-auto md:min-h-9"
+        variant={approveVariant}
+        className={procurementActionBtnClass}
         data-testid="po-approve-button"
         disabled={pending}
         onClick={() => setApproveOpen(true)}
@@ -98,7 +106,7 @@ export function PurchaseOrderApprovalActions({
       <Button
         type="button"
         variant="outline"
-        className="min-h-11 w-full sm:w-auto md:min-h-9"
+        className={procurementActionBtnClass}
         data-testid="po-return-button"
         disabled={pending}
         onClick={() => setReturnOpen(true)}
@@ -119,11 +127,11 @@ export function PurchaseOrderApprovalActions({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="min-h-11 md:min-h-9" disabled={pending}>
+            <AlertDialogCancel className={procurementDialogBtnClass} disabled={pending}>
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              className="min-h-11 md:min-h-9"
+              className={procurementDialogBtnClass}
               disabled={pending}
               onClick={(e) => {
                 e.preventDefault();
@@ -167,7 +175,7 @@ export function PurchaseOrderApprovalActions({
               <Button
                 type="button"
                 variant="outline"
-                className="min-h-11 md:min-h-9"
+                className={procurementDialogBtnClass}
                 disabled={pending}
                 onClick={() => setReturnOpen(false)}
               >
@@ -175,7 +183,7 @@ export function PurchaseOrderApprovalActions({
               </Button>
               <Button
                 type="button"
-                className="min-h-11 md:min-h-9"
+                className={procurementDialogBtnClass}
                 data-testid="po-return-confirm"
                 disabled={pending}
                 onClick={returnPo}
@@ -186,6 +194,6 @@ export function PurchaseOrderApprovalActions({
           </div>
         </SheetContent>
       </Sheet>
-    </>
+    </div>
   );
 }

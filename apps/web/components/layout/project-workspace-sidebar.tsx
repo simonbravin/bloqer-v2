@@ -53,9 +53,12 @@ export function ProjectWorkspaceSidebar({
             activeWhenPathPrefix: item.activeWhenPathPrefix,
           }),
         );
-        // Keep active section open; default-open Operación/Compras for process discoverability.
+        // Keep active section open; default-open process hubs for discoverability.
         const defaultOpen =
-          s.title === "Resumen" || s.title === "Operación" || s.title === "Compras";
+          s.title === "Resumen" ||
+          s.title === "Operación" ||
+          s.title === "Compras" ||
+          s.title === "Compromisos";
         next[s.title] = hasActive ? true : (prev[s.title] ?? defaultOpen);
       }
       return next;

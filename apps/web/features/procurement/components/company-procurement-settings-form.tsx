@@ -418,51 +418,58 @@ export function CompanyProcurementSettingsForm({
               Si la OC supera el umbral de administración o requiere aprobación extra por desvío,
               quien originó la compra no puede aprobarla aunque esta opción esté activa.
             </p>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={allowAuthorizeAndCommit}
-                onChange={(e) => setAllowAuthorizeAndCommit(e.target.checked)}
-                disabled={!canEdit || pending}
-                className="rounded border"
-              />
-              Un paso: autorizar y comprometer
-            </label>
-            <p className="-mt-2 text-xs text-muted-foreground">
-              Si está encendido, PM/Compras pueden autorizar y comprometer OC bajo umbral (sin
-              desvío extra). OWNER/ADMIN también pueden usarlo en OC de alto nivel. Por defecto
-              apagado.
-            </p>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={autoConfirmOnApprove}
-                onChange={(e) => setAutoConfirmOnApprove(e.target.checked)}
-                disabled={!canEdit || pending}
-                className="rounded border"
-              />
-              Al aprobar, confirmar al proveedor (bajo umbral)
-            </label>
-            <p className="-mt-2 text-xs text-muted-foreground">
-              Si está encendido, aprobar una OC que no es de alto nivel la deja Confirmada =
-              Comprometido. Alto nivel sigue Aprobar → Confirmar (o Autorizar y comprometer si
-              sos Admin). Por defecto apagado.
-            </p>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={autoDraftApInvoiceOnReceipt}
-                onChange={(e) => setAutoDraftApInvoiceOnReceipt(e.target.checked)}
-                disabled={!canEdit || pending}
-                className="rounded border"
-              />
-              Al recibir, crear borrador de factura
-            </label>
-            <p className="-mt-2 text-xs text-muted-foreground">
-              Si está encendido, al confirmar la recepción se crea un borrador de factura del
-              proveedor (no abre deuda). Finanzas completa y emite para crear la CxP. Por defecto
-              apagado.
-            </p>
+
+            <div className="rounded-lg border p-4 space-y-3">
+              <p className="text-sm font-medium">Atajos operativos</p>
+              <p className="text-xs text-muted-foreground -mt-1">
+                Acortan pasos del circuito OC sin cambiar estados ni reglas de dinero. Por defecto
+                apagados.
+              </p>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={allowAuthorizeAndCommit}
+                  onChange={(e) => setAllowAuthorizeAndCommit(e.target.checked)}
+                  disabled={!canEdit || pending}
+                  className="rounded border"
+                />
+                Un paso: autorizar y comprometer
+              </label>
+              <p className="-mt-2 text-xs text-muted-foreground">
+                Si está encendido, PM/Compras pueden autorizar y comprometer OC bajo umbral (sin
+                desvío extra). OWNER/ADMIN también pueden usarlo en OC de alto nivel.
+              </p>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={autoConfirmOnApprove}
+                  onChange={(e) => setAutoConfirmOnApprove(e.target.checked)}
+                  disabled={!canEdit || pending}
+                  className="rounded border"
+                />
+                Al aprobar, confirmar al proveedor (bajo umbral)
+              </label>
+              <p className="-mt-2 text-xs text-muted-foreground">
+                Si está encendido, aprobar una OC que no es de alto nivel la deja Confirmada =
+                Comprometido. Alto nivel sigue Aprobar → Confirmar (o Autorizar y comprometer si
+                sos Admin).
+              </p>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={autoDraftApInvoiceOnReceipt}
+                  onChange={(e) => setAutoDraftApInvoiceOnReceipt(e.target.checked)}
+                  disabled={!canEdit || pending}
+                  className="rounded border"
+                />
+                Al recibir, crear borrador de factura
+              </label>
+              <p className="-mt-2 text-xs text-muted-foreground">
+                Si está encendido, al confirmar la recepción se crea un borrador de factura del
+                proveedor (no abre deuda). Finanzas completa y emite para crear la CxP.
+              </p>
+            </div>
+
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
