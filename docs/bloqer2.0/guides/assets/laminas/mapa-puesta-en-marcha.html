@@ -1,0 +1,129 @@
+﻿<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Puesta en marcha</title>
+  <link rel="stylesheet" href="../mapa-poster.css" />
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Nivel empresa · guía para usuarios</p>
+        <h1>Puesta en marcha</h1>
+        <span>Dejar la empresa lista y abrir la primera obra</span>
+      </div>
+    </header>
+    <div class="body">
+      <div class="lede">
+        <p>Antes de operar una obra hay que cargar <strong>maestros de empresa</strong>. Sin cliente no se crea el proyecto. Sin cuentas de tesorería no se cobra ni se paga. Sin plantilla contable los asientos no tienen plan.</p>
+        <div class="legend">
+          <span class="chip info">Camino feliz</span>
+          <span class="chip warn">Vuelve atrás</span>
+          <span class="chip block">Queda trabado</span>
+          <span class="chip ok">Impacta $ / stock</span>
+        </div>
+      </div>
+      
+      <p class="section-label">1 · Empresa (una vez)</p>
+      <div class="row cols-4">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">1</span>Directorio</h3>
+            <span class="who">Admin</span>
+          </div>
+          <p>Cargá contactos con el <strong>rol correcto</strong>. Un contacto puede tener varios roles.</p>
+          <ul><li>Cliente (obligatorio para crear obra)</li><li>Proveedor, empleado, subcontratista</li><li>Activo: si no, no sale en los selectores</li></ul>
+          <span class="state">Listo para usar</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">2</span>Equipo y permisos</h3>
+            <span class="who">OWNER / ADMIN</span>
+          </div>
+          <p>Invitá usuarios y revisá qué ve cada rol. La autorización también corre en el backend.</p>
+          <ul><li>Configuración → Equipo → Invitar</li><li>Módulos habilitados por empresa</li><li>Company tools ≠ tools de obra</li></ul>
+          <span class="state">Usuarios activos</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">3</span>Tesorería</h3>
+            <span class="who">Tesorería</span>
+          </div>
+          <p>Alta de cuentas caja/banco. Sin esto se bloquean cobros y pagos.</p>
+          <ul><li>Tesorería → Cuentas</li><li>Moneda de cada cuenta</li><li>Saldo inicial si aplica</li></ul>
+          <span class="state">Cuentas listas</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">4</span>Contabilidad</h3>
+            <span class="who">Contabilidad</span>
+          </div>
+          <p>Si el plan está vacío: <strong>Aplicar plantilla AR</strong>. Es una vez por empresa.</p>
+          <ul><li>Contabilidad → Cuentas</li><li>Revisar Reglas Debe/Haber</li><li>No sustituye AFIP</li></ul>
+          <span class="state">Plan + reglas</span>
+        </article>
+      </div>
+      <p class="section-label">2 · Primera obra</p>
+      <div class="row cols-3">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">5</span>Crear proyecto</h3>
+            <span class="who">OWNER / PM</span>
+          </div>
+          <p>Proyectos → Nuevo. Elegí el <strong>Cliente</strong> del Directorio.</p>
+          <ul><li>Tipo Privado / Público</li><li>Queda en Borrador</li><li>Código y nombre de obra</li></ul>
+          <span class="state">Estado: Borrador</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">6</span>Activar obra</h3>
+            <span class="who">OWNER / PM</span>
+          </div>
+          <p>En el resumen: <strong>Activar obra</strong>. Sin esto la operación diaria queda limitada.</p>
+          <ul><li>Pasa a ACTIVE</li><li>Ahí aparecen menús de obra</li><li>Asigná equipo de avisos si hace falta</li></ul>
+          <span class="state">Estado: Activa</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">7</span>Presupuesto</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Planificación → Presupuesto: EDT + APU → enviar → <strong>Aprobar</strong>.</p>
+          <ul><li>Habilita certificaciones y Materiales</li><li>Un solo APPROVED por obra</li><li>Después: cronograma e importar desde presupuesto</li></ul>
+          <span class="state">Baseline listo</span>
+        </article>
+      </div>
+      <div class="alt">
+        <strong>Orden del día a día</strong>
+        <p>Recién con obra activa y presupuesto aprobado: libro de obra, SC/OC, subcontratos, certificar, cobrar y pagar. El control de $ por partida está en <strong>EDT y costos</strong>.</p>
+      </div>
+      <p class="section-label">Si falta un maestro o se traba</p>
+      <div class="cons">
+        <div class="box warn">
+          <h2>Vuelve atrás</h2>
+          <ul>
+            <li>Proyecto en Borrador: se puede completar datos y activar después.</li>
+            <li>Presupuesto devuelto: corregir EDT/APU y reenviar a revisión.</li>
+            <li>Contacto sin el rol: abrí la ficha y asignalo; no dupliques el contacto.</li>
+          </ul>
+        </div>
+        <div class="box block">
+          <h2>Queda trabado</h2>
+          <ul>
+            <li>Sin Cliente activo no se crea la obra.</li>
+            <li>Sin cuenta de tesorería no hay cobro ni pago.</li>
+            <li>Sin presupuesto APPROVED/CLOSED no se certifica con normalidad ni corre Materiales MAT.</li>
+            <li>Módulo apagado o sin permiso: el menú ni aparece.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <span>Bloqer · Puesta en marcha · Guía operativa §0.1 · §1 · §3 · §4 · §5 · §15.0</span>
+      <span>Directorio · Tesorería · Contabilidad · Proyectos</span>
+    </footer>
+  </div>
+</body>
+</html>

@@ -47,7 +47,8 @@ DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED
 
 ## 8. Acciones disponibles
 - Crear/editar OC borrador (desde SC o directa) → **enviar** → **aprobar** o **rechazar/devolver** → **confirmar al proveedor**.
-- Al enviar: calcular tiers de varianza ([BR-PUR-009]); si no hay alto nivel, puede auto-aprobarse en el mismo acto (con segregación [BR-APR-004]).
+- **Autorizar y comprometer ([D-105]):** si `CompanyProcurementSettings.allowAuthorizeAndCommit` (default off) y la OC no es de alto nivel, desde `DRAFT`/`SUBMITTED` se puede autorizar y confirmar en un acto (persiste APPROVED+CONFIRMED). Alto nivel sigue sin atajo.
+- Al enviar: calcular tiers de varianza ([BR-PUR-009]); si no hay alto nivel, puede auto-aprobarse en el mismo acto (con segregación [BR-APR-004]); **no** auto-confirma.
 - Mostrar **costo referencial** y **saldo de partida** al armar/enviar ([BR-PUR-011]).
 - Registrar recepción(es) parciales; **cerrar saldo** no recibido ([BR-PUR-013]).
 - Anular solo si no hay recepciones confirmadas ni facturas activas.

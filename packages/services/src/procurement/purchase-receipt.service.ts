@@ -488,6 +488,38 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
     return receipt;
   });
 
+  // [D-108] Best-effort AP draft after confirm — never rolls back the receipt.
+  if (settings.autoDraftApInvoiceOnReceipt) {
+    try {
+      const { createSupplierInvoiceDraftFromPurchaseOrder, getPurchaseOrderBillingSummary } =
+        await import("../ap/supplier-invoice-from-po.service");
+      const billing = await getPurchaseOrderBillingSummary(existing.purchaseOrderId, ctx);
+      const pending = new Prisma.Decimal(billing.pendingToInvoice);
+      if (billing.hasReceivedQuantity && pending.greaterThan(0)) {
+        await createSupplierInvoiceDraftFromPurchaseOrder(
+          {
+            projectId: existing.projectId,
+            purchaseOrderId: existing.purchaseOrderId,
+            purchaseReceiptId: id,
+            basis: "received",
+          },
+          ctx,
+          { asSystemFromReceiptPolicy: true },
+        );
+      }
+    } catch (err) {
+      // Receipt already confirmed; Finance can still use Pendientes / panel billing.
+      console.warn(
+        "[D-108] auto-draft AP after receipt failed",
+        {
+          receiptId: id,
+          purchaseOrderId: existing.purchaseOrderId,
+          message: err instanceof Error ? err.message : String(err),
+        },
+      );
+    }
+  }
+
   return toPurchaseReceiptView(receipt);
 }
 

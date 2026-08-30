@@ -16,7 +16,7 @@ test("project nav labels cost control as EDT y costos under Planificación", () 
   assert.equal(edt!.href, "/proyectos/proj-1/control-costos");
 });
 
-test("project nav includes Compras section with hub, SC, OC and Recepciones", () => {
+test("project nav Compras is abastecimiento: hub, SC and Recepciones (no OC)", () => {
   const sections = buildProjectWorkspaceNavSections("proj-1", allOnGate, ["PROJECT_MANAGER"]);
   const compras = sections.find((s) => s.title === "Compras");
   assert.ok(compras);
@@ -25,17 +25,30 @@ test("project nav includes Compras section with hub, SC, OC and Recepciones", ()
     "/proyectos/proj-1/compras",
   );
   assert.ok(compras!.items.some((i) => i.label === "Solicitudes de compra"));
-  assert.ok(compras!.items.some((i) => i.label === "Órdenes de compra"));
   assert.ok(compras!.items.some((i) => i.label === "Recepciones"));
+  assert.equal(compras!.items.some((i) => i.label === "Órdenes de compra"), false);
 });
 
-test("project nav does not place Recepciones or SC under Finanzas del proyecto", () => {
+test("project nav Compromisos groups OC and Subcontratos as siblings", () => {
+  const sections = buildProjectWorkspaceNavSections("proj-1", allOnGate, ["PROJECT_MANAGER"]);
+  const compromisos = sections.find((s) => s.title === "Compromisos");
+  assert.ok(compromisos);
+  assert.deepEqual(
+    compromisos!.items.map((i) => i.label),
+    ["Órdenes de compra", "Subcontratos"],
+  );
+  assert.equal(compromisos!.items[0]!.href, "/proyectos/proj-1/ordenes-compra");
+  assert.equal(compromisos!.items[1]!.href, "/proyectos/proj-1/subcontratos");
+});
+
+test("project nav does not place Recepciones, SC, OC or Subcontratos under Finanzas", () => {
   const sections = buildProjectWorkspaceNavSections("proj-1", allOnGate, ["PROJECT_MANAGER"]);
   const finanzas = sections.find((s) => s.title === "Finanzas del proyecto");
   assert.ok(finanzas);
   assert.equal(finanzas!.items.some((i) => i.label === "Recepciones"), false);
   assert.equal(finanzas!.items.some((i) => i.label === "Solicitudes de compra"), false);
   assert.equal(finanzas!.items.some((i) => i.label === "Órdenes de compra"), false);
+  assert.equal(finanzas!.items.some((i) => i.label === "Subcontratos"), false);
 });
 
 test("project nav hides Compras when PROCUREMENT module is off", () => {
@@ -44,6 +57,10 @@ test("project nav hides Compras when PROCUREMENT module is off", () => {
   };
   const sections = buildProjectWorkspaceNavSections("proj-1", gate, ["PROJECT_MANAGER"]);
   assert.equal(sections.some((s) => s.title === "Compras"), false);
+  const compromisos = sections.find((s) => s.title === "Compromisos");
+  assert.ok(compromisos);
+  assert.equal(compromisos!.items.some((i) => i.label === "Órdenes de compra"), false);
+  assert.ok(compromisos!.items.some((i) => i.label === "Subcontratos"));
 });
 
 test("project nav includes Materiales and Consumos under Operación", () => {

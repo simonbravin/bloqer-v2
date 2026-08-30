@@ -36,6 +36,15 @@ export function CompanyProcurementSettingsForm({
   const [success, setSuccess] = useState(false);
   const [allowDirectPo, setAllowDirectPo] = useState(settings.allowDirectPo);
   const [allowSelfApproval, setAllowSelfApproval] = useState(settings.allowSelfApproval);
+  const [allowAuthorizeAndCommit, setAllowAuthorizeAndCommit] = useState(
+    settings.allowAuthorizeAndCommit ?? false,
+  );
+  const [autoConfirmOnApprove, setAutoConfirmOnApprove] = useState(
+    settings.autoConfirmOnApprove ?? false,
+  );
+  const [autoDraftApInvoiceOnReceipt, setAutoDraftApInvoiceOnReceipt] = useState(
+    settings.autoDraftApInvoiceOnReceipt ?? false,
+  );
   const [allowEmergencyDirectPo, setAllowEmergencyDirectPo] = useState(settings.allowEmergencyDirectPo);
   const [poThreshold, setPoThreshold] = useState(settings.poApprovalThresholdArs ?? "");
   const [prThreshold, setPrThreshold] = useState(settings.purchaseRequestRequiredAboveArs ?? "");
@@ -88,6 +97,9 @@ export function CompanyProcurementSettingsForm({
                 maxQuotesAllowed: Number.isFinite(maxQuotes) ? maxQuotes : undefined,
                 allowDirectPo,
                 allowSelfApproval,
+                allowAuthorizeAndCommit,
+                autoConfirmOnApprove,
+                autoDraftApInvoiceOnReceipt,
                 allowEmergencyDirectPo,
                 varianceSoftAlertPct: soft,
                 // Kept in sync with soft until Q-051 decides a distinct note tier ([BR-PUR-009]).
@@ -405,6 +417,51 @@ export function CompanyProcurementSettingsForm({
             <p className="-mt-2 text-xs text-muted-foreground">
               Si la OC supera el umbral de administración o requiere aprobación extra por desvío,
               quien originó la compra no puede aprobarla aunque esta opción esté activa.
+            </p>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={allowAuthorizeAndCommit}
+                onChange={(e) => setAllowAuthorizeAndCommit(e.target.checked)}
+                disabled={!canEdit || pending}
+                className="rounded border"
+              />
+              Un paso: autorizar y comprometer
+            </label>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Si está encendido, PM/Compras pueden autorizar y comprometer OC bajo umbral (sin
+              desvío extra). OWNER/ADMIN también pueden usarlo en OC de alto nivel. Por defecto
+              apagado.
+            </p>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={autoConfirmOnApprove}
+                onChange={(e) => setAutoConfirmOnApprove(e.target.checked)}
+                disabled={!canEdit || pending}
+                className="rounded border"
+              />
+              Al aprobar, confirmar al proveedor (bajo umbral)
+            </label>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Si está encendido, aprobar una OC que no es de alto nivel la deja Confirmada =
+              Comprometido. Alto nivel sigue Aprobar → Confirmar (o Autorizar y comprometer si
+              sos Admin). Por defecto apagado.
+            </p>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={autoDraftApInvoiceOnReceipt}
+                onChange={(e) => setAutoDraftApInvoiceOnReceipt(e.target.checked)}
+                disabled={!canEdit || pending}
+                className="rounded border"
+              />
+              Al recibir, crear borrador de factura
+            </label>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Si está encendido, al confirmar la recepción se crea un borrador de factura del
+              proveedor (no abre deuda). Finanzas completa y emite para crear la CxP. Por defecto
+              apagado.
             </p>
             <label className="flex items-center gap-2">
               <input

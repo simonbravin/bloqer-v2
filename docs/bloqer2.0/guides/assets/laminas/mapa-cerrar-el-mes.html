@@ -1,0 +1,104 @@
+﻿<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Cerrar el mes</title>
+  <link rel="stylesheet" href="../mapa-poster.css" />
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Nivel empresa · guía para usuarios</p>
+        <h1>Cerrar el mes</h1>
+        <span>Contabilizar → conciliar → cerrar el período</span>
+      </div>
+    </header>
+    <div class="body">
+      <div class="lede">
+        <p>El cierre mensual <strong>congela tesorería y asientos</strong> de ese mes. No es el cierre de gastos generales ni un cierre de ejercicio AFIP. Solo OWNER/ADMIN. El asiento nace en borrador: <strong>apareció ≠ está en los libros</strong>.</p>
+        <div class="legend">
+          <span class="chip info">Camino feliz</span>
+          <span class="chip warn">Vuelve atrás</span>
+          <span class="chip block">Queda trabado</span>
+          <span class="chip ok">Impacta $ / stock</span>
+        </div>
+      </div>
+      
+      <p class="section-label">1 · Orden recomendado del mes</p>
+      <div class="row cols-4">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">1</span>Terminar operación</h3>
+            <span class="who">Finanzas / PM</span>
+          </div>
+          <p>Cerrar cobros, pagos, facturas y transferencias del mes.</p>
+          <ul><li>Fechas dentro del mes</li><li>Emitir lo que falte</li><li>No dejes CxP colgadas sin registrar</li></ul>
+          <span class="state">Operación lista</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">2</span>Contabilizar</h3>
+            <span class="who">Contabilidad</span>
+          </div>
+          <p>Hub Contabilidad → Borradores → <strong>Contabilizar</strong>.</p>
+          <ul><li>Nunca se auto-posta</li><li>Origen operativo: montos bloqueados</li><li>Revertir si hay que corregir un POSTED</li></ul>
+          <span class="state">Asientos POSTED</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">3</span>Conciliar banco</h3>
+            <span class="who">Tesorería</span>
+          </div>
+          <p>Cuadrar extracto vs movimientos del mes (§4.2).</p>
+          <ul><li>Cerrar la sesión de conciliación</li><li>Desemparejar antes de anular pagos</li><li>Si falta un movimiento: crearlo desde el extracto</li></ul>
+          <span class="state">Banco cuadrado</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">4</span>Cerrar período</h3>
+            <span class="who">OWNER / ADMIN</span>
+          </div>
+          <p>Contabilidad → Cierres → <strong>Cerrar</strong> el mes.</p>
+          <ul><li>Confirmar en el diálogo</li><li>Pasa a Cerrado</li><li>Cualquier mutación de esa fecha → PERIOD_CLOSED</li></ul>
+          <span class="state">Mes cerrado</span>
+        </article>
+      </div>
+      <div class="alt">
+        <strong>Reabrir</strong>
+        <p>Si hay que corregir: <strong>Reabrir</strong> con <strong>motivo obligatorio</strong> (queda auditado). El mes vuelve a Abierto. No confundir con el cierre de GG en Finanzas → Gastos generales.</p>
+      </div>
+      <p class="section-label">Qué bloquea el cierre</p>
+      <div class="impact cols-4">
+        <div class="i1"><b>Tesorería</b><span>No se crean, anulan ni confirman movimientos de ese mes.</span></div>
+        <div class="i2"><b>Asientos</b><span>No se posta ni se revierte con fecha en el mes cerrado.</span></div>
+        <div class="i3"><b>Compras con impacto</b><span>Confirmar OC, recepción o factura de esa fecha se bloquea.</span></div>
+        <div class="i5"><b>Libros</b><span>Los reportes siguen leyendo solo POSTED ya contabilizados.</span></div>
+      </div>
+      <p class="section-label">Si no se puede cerrar o ya cerró mal</p>
+      <div class="cons">
+        <div class="box warn">
+          <h2>Vuelve atrás</h2>
+          <ul>
+            <li>Reabrir con motivo, corregir, contabilizar / conciliar, y volver a cerrar.</li>
+            <li>Revertir un asiento POSTED crea la reversa; no borra historia.</li>
+          </ul>
+        </div>
+        <div class="box block">
+          <h2>Queda trabado</h2>
+          <ul>
+            <li>Cerrar antes de postear: los reportes del mes quedan cortos y después no podés postear esa fecha.</li>
+            <li>Cerrar antes de conciliar: no vas a poder crear el movimiento que falta.</li>
+            <li>Anular un documento origen con asiento POSTED sin reverso: bloqueado.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <span>Bloqer · Cerrar el mes · Guía operativa §15.2 · §15.3</span>
+      <span>Contabilidad → Asientos · Cierres</span>
+    </footer>
+  </div>
+</body>
+</html>

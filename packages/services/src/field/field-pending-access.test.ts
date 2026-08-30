@@ -4,6 +4,8 @@ import { test } from "node:test";
 import { ServiceError } from "../types";
 import { createTenantModuleGate } from "../tenant-modules/tenant-module-gate";
 import {
+  fieldPendingComprasStageLabel,
+  fieldPendingComprasStageOrder,
   fieldPendingSourceAllowed,
   fieldPendingSourcesForActor,
   parseFieldPendingGroup,
@@ -98,4 +100,21 @@ test("resolveFieldPendingProjectFilter does not silently drop a bad id", () => {
     () => resolveFieldPendingProjectFilter("not-a-uuid"),
     (err: unknown) => err instanceof ServiceError && err.code === "VALIDATION",
   );
+});
+
+test("compras pipeline stage order and labels", () => {
+  assert.ok(fieldPendingComprasStageOrder("PURCHASE_REQUEST") < fieldPendingComprasStageOrder("PURCHASE_ORDER"));
+  assert.ok(fieldPendingComprasStageOrder("PURCHASE_ORDER") < fieldPendingComprasStageOrder("PURCHASE_ORDER_CONFIRM"));
+  assert.ok(
+    fieldPendingComprasStageOrder("PURCHASE_ORDER_CONFIRM") <
+      fieldPendingComprasStageOrder("PURCHASE_ORDER_RECEIPT"),
+  );
+  assert.ok(
+    fieldPendingComprasStageOrder("PURCHASE_ORDER_RECEIPT") <
+      fieldPendingComprasStageOrder("PURCHASE_ORDER_INVOICE"),
+  );
+  assert.equal(fieldPendingComprasStageOrder("JOBSITE_LOG"), 99);
+  assert.equal(fieldPendingComprasStageLabel("PURCHASE_ORDER_CONFIRM"), "Confirmar");
+  assert.equal(fieldPendingComprasStageLabel("PURCHASE_ORDER_INVOICE"), "Facturar");
+  assert.equal(fieldPendingComprasStageLabel("JOBSITE_LOG"), null);
 });

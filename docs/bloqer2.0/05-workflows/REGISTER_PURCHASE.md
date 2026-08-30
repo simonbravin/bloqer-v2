@@ -37,11 +37,12 @@ Registrar una compra de proyecto con trazabilidad presupuesto ↔ compromiso ↔
 
 ### 4.3 Workflow común de OC (enviar → aprobar/devolver → confirmar)
 
-1. **Enviar** OC (`DRAFT` → `SUBMITTED` o auto-`APPROVED` si no hay alto nivel y el actor puede aprobar sin violar segregación).
+1. **Enviar** OC (`DRAFT` → `SUBMITTED` o auto-`APPROVED` si no hay alto nivel y el actor puede aprobar sin violar segregación). Auto-approve **no** auto-confirma.
 2. Si requiere alto nivel (monto ≥ umbral o desvío `EXTRA_APPROVAL`): queda `SUBMITTED`; notifica aprobadores; solo OWNER/ADMIN aprueba.
 3. Aprobador puede **aprobar** (`APPROVED`) o **rechazar/devolver a `DRAFT`** con motivo ([BR-PUR-016]); notifica al solicitante.
 4. **Confirmar al proveedor** (`CONFIRMED`) → registra **comprometido** ([D-006], [BR-PUR-001]); si venía de SC, SC → `COMPLETED`.
 5. **Aprobar ≠ listo:** sin confirmación no hay compromiso ni recepción/factura habilitada.
+6. **Atajo [D-105]/[D-106] / [BR-PUR-021]:** si `allowAuthorizeAndCommit`, desde `DRAFT`/`SUBMITTED` se puede **Autorizar y comprometer** (APPROVED+CONFIRMED). Bajo umbral: EDIT; alto nivel: OWNER/ADMIN. [D-107] `autoConfirmOnApprove`: aprobar no-alto-nivel → CONFIRMED. [D-108] borrador AP al confirmar recepción.
 
 ### 4.4 Recepción, factura y pago
 
@@ -101,10 +102,15 @@ flowchart TD
   Wait --> Back[Devolver a DRAFT]
   Back --> Sub
   App --> Conf[CONFIRMED + committed]
+  Sub --> Shortcut{Politica D-105 y no alto nivel?}
+  OD --> Shortcut
+  Shortcut -- Si --> Conf
   Conf --> Rec[Recepcion]
   Rec --> Inv[Factura + Payable]
   Inv --> Pay[Pago]
 ```
+
+> Atajo [D-105]: desde `DRAFT`/`SUBMITTED` sin alto nivel, con política ON, **Autorizar y comprometer** llega a `CONFIRMED` sin pasar por Pendientes de aprobación.
 
 ## 9. Gaps de implementación (regla documentada; código pendiente)
 

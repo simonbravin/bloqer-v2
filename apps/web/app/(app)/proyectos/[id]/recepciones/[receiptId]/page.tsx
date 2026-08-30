@@ -25,7 +25,7 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { formatQtyFromString } from "@/lib/format-money";
+import { formatQtyFromString, isPositiveMoneyAmount } from "@/lib/format-money";
 import {
   confirmPurchaseReceiptAction,
   cancelPurchaseReceiptAction,
@@ -80,6 +80,10 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
 
   const canEditAp = canRegisterApInvoice(current.tenantCtx.roles);
   const isConfirmed = receipt.status === "CONFIRMED";
+  const highlightBilling =
+    isConfirmed &&
+    billing.hasReceivedQuantity &&
+    isPositiveMoneyAmount(billing.pendingToInvoice);
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={receipt.purchaseOrderCode}>
@@ -91,6 +95,24 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
       </div>
 
       <ActionErrorBanner message={sp.actionError} />
+
+      {sp.invoiceError && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {sp.invoiceError}
+        </div>
+      )}
+
+      {isConfirmed && (
+        <PoBillingNextStepPanel
+          projectId={id}
+          purchaseOrderId={receipt.purchaseOrderId}
+          purchaseReceiptId={receiptId}
+          billing={billing}
+          canEditAp={canEditAp}
+          errorReturnPath={`/proyectos/${id}/recepciones/${receiptId}`}
+          highlighted={highlightBilling}
+        />
+      )}
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -162,23 +184,6 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
           </div>
         )}
       </div>
-
-      {sp.invoiceError && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {sp.invoiceError}
-        </div>
-      )}
-
-      {isConfirmed && (
-        <PoBillingNextStepPanel
-          projectId={id}
-          purchaseOrderId={receipt.purchaseOrderId}
-          purchaseReceiptId={receiptId}
-          billing={billing}
-          canEditAp={canEditAp}
-          errorReturnPath={`/proyectos/${id}/recepciones/${receiptId}`}
-        />
-      )}
 
       {stockMovements.length > 0 && (
         <DataTableSection title="Movimientos de stock generados">

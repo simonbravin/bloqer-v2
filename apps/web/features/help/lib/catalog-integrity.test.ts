@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HELP_ARTICLES, HELP_FEATURED_SLUGS, getHelpArticle, listHelpIntentChips } from "./catalog";
+import { HELP_PROCESS_MAPS } from "./process-maps";
 import type { HelpHref, HelpModule } from "./types";
 import { HELP_MODULE_LABELS } from "./types";
 import { searchHelpArticles } from "./search";
@@ -48,6 +49,10 @@ test("every article has required shape", () => {
     for (const k of a.keywords) {
       if (k !== k.trim() || k.length < 2) failures.push(`${a.slug}: bad keyword «${k}»`);
     }
+    if (a.figure) {
+      if (!a.figure.src.startsWith("/help/")) failures.push(`${a.slug}: figure.src must start with /help/`);
+      if (!a.figure.alt?.trim()) failures.push(`${a.slug}: figure.alt empty`);
+    }
     // Self-related is noise
     if (a.relatedSlugs.includes(a.slug)) failures.push(`${a.slug}: self-related`);
   }
@@ -87,6 +92,26 @@ test("empty query with intent chip returns only matching intents", () => {
   const hits = searchHelpArticles(HELP_ARTICLES, { intent: "exportar-reportes", query: "" });
   assert.ok(hits.length >= 1);
   assert.ok(hits.every((a) => a.intents.includes("exportar-reportes")));
+});
+
+test("process maps point to real articles and /help/ images", () => {
+  assert.ok(HELP_PROCESS_MAPS.length >= 6);
+  const ids = new Set<string>();
+  const mapsByArticle = new Map<string, string[]>();
+  for (const m of HELP_PROCESS_MAPS) {
+    assert.ok(!ids.has(m.id), `duplicate map id ${m.id}`);
+    ids.add(m.id);
+    assert.ok(getHelpArticle(m.articleSlug), `map ${m.id} missing article ${m.articleSlug}`);
+    assert.ok(m.imageSrc.startsWith("/help/"), `map ${m.id} image`);
+    const list = mapsByArticle.get(m.articleSlug) ?? [];
+    list.push(m.imageSrc);
+    mapsByArticle.set(m.articleSlug, list);
+  }
+  for (const [slug, srcs] of mapsByArticle) {
+    const figure = getHelpArticle(slug)?.figure;
+    assert.ok(figure, `${slug} has maps but no figure`);
+    assert.ok(srcs.includes(figure.src), `${slug} figure ${figure.src} is not among its maps`);
+  }
 });
 
 test("related graph has no orphans pointed from new articles", () => {

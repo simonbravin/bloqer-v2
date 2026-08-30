@@ -1607,6 +1607,75 @@
 
 ---
 
+### D-105 — Autorizar y comprometer (atajo de OC con política)
+
+- **Fecha:** 2026-08-30
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (simplicidad PyME / caminito de compras)
+- **Contexto:** El circuito Enviar → Aprobar → Confirmar es correcto ([D-006]: el $ se reserva al confirmar). Las empresas chicas pedían un atajo de un paso sin saltar el enum ni el umbral de alto nivel.
+- **Decisión:**
+  1. Nuevo flag `CompanyProcurementSettings.allowAuthorizeAndCommit` (default **`false`**). Solo OWNER/ADMIN lo enciende en Configuración → Políticas → Compras.
+  2. Con la política ON, en OC **que no son de alto nivel** (monto &lt; `poApprovalThresholdArs` y sin línea `EXTRA_APPROVAL`), quien tiene `EDIT` de OC (PM, Compras, OWNER/ADMIN) puede **Autorizar y comprometer** desde `DRAFT` o `SUBMITTED`.
+  3. En **una** transacción se persisten `APPROVED` y `CONFIRMED` (mismos `approvedBy`/`confirmedBy`). No hay estado nuevo; [R-SM-001] se cumple internamente.
+  4. Alto nivel **no** tiene atajo: sigue Enviar → Aprobar (OWNER/ADMIN) → Confirmar. [BR-APR-004] / `allowSelfApproval` aplican a la mitad “aprobar”.
+  5. Notificaciones: **no** emitir `PURCHASE_ORDER_APPROVED` (“pendiente confirmar”); solo `PURCHASE_ORDER_CONFIRMED` (audiencia de recepción).
+  6. Comprometido sigue [D-006]: solo en `CONFIRMED+`. Auto-approve al Enviar (DRAFT → APPROVED) **no** auto-confirma.
+- **Implicancias:** service `authorizeAndCommitPurchaseOrder`; UI en detalle OC + interruptor de políticas; caminito/guía/help actualizados ([D-090]).
+- **Documentos afectados:** [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7, [`APPROVAL_WORKFLOWS.md`](../01-domain/APPROVAL_WORKFLOWS.md), [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md), [`EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md), [`NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md), [`PURCHASE_ORDERS_AND_RECEIPTS.md`](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [`REGISTER_PURCHASE.md`](../05-workflows/REGISTER_PURCHASE.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §9.2, help OC / políticas / circuito.
+- **Seguimiento UX (Oleada A, 2026-08-30):** Pendientes como portero (etapas + CTAs), menú **Compromisos** (OC + Sub sin fusionar), copy Aprobar ≠ Comprometer, CTA factura post-recepción.
+- **Oleada B (2026-08-30):** ver [D-106](#d-106--autorizar-y-comprometer-en-alto-nivel-owneradmin), [D-107](#d-107--auto-confirmar-al-aprobar-política), [D-108](#d-108--borrador-ap-automático-al-confirmar-recepción). Commitment unificado / Workflows → backlog Oleada C ([Q-060](./OPEN_QUESTIONS.md#q-060--oleada-b-compras-post-pendientes-portero--ux)).
+
+---
+
+### D-106 — Autorizar y comprometer en alto nivel (OWNER/ADMIN)
+
+- **Fecha:** 2026-08-30
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (Oleada B — menos clics, mismas reglas de dinero)
+- **Contexto:** [D-105] restringía el atajo a OC bajo umbral. Un Admin que ya es el único que puede aprobar montos altos seguía necesitando Confirmar aparte.
+- **Decisión:**
+  1. Con `allowAuthorizeAndCommit` ON, las OC de **alto nivel** (umbral o `EXTRA_APPROVAL`) también admiten **Autorizar y comprometer**.
+  2. Solo si el actor pasa `assertHighLevelApprover` (OWNER/ADMIN). PM/Compras siguen con el atajo **solo** bajo umbral ([D-105]).
+  3. Misma TX, mismos timestamps APPROVED+CONFIRMED, solo notifica `PURCHASE_ORDER_CONFIRMED`. Comprometido sigue en `CONFIRMED+` ([D-006]).
+  4. Segregación [BR-APR-004]: el originador no puede auto-comprometer alto nivel.
+- **Implicancias:** extiende `canAuthorizeAndCommitPo` / `authorizeAndCommitPurchaseOrder`; sin flag Prisma nuevo.
+- **Documentos afectados:** [BR-PUR-021], [`APPROVAL_WORKFLOWS.md`](../01-domain/APPROVAL_WORKFLOWS.md), [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7, [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §9.2, help OC/políticas, [Q-060](./OPEN_QUESTIONS.md) #1 → D-106.
+
+---
+
+### D-107 — Auto-confirmar al aprobar (política)
+
+- **Fecha:** 2026-08-30
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (Oleada B)
+- **Contexto:** empresas que quieren Aprobar = ya Comprometido en montos chicos, sin matar el copy Aprobar ≠ Comprometer del default.
+- **Decisión:**
+  1. Nuevo flag `CompanyProcurementSettings.autoConfirmOnApprove` (default **`false`**). Solo OWNER/ADMIN lo enciende.
+  2. Con ON, `approvePurchaseOrder` en OC **no** alto nivel pasa `SUBMITTED` → `CONFIRMED` en la misma TX (approvedAt + confirmedAt + `onPurchaseOrderConfirmed`). Notifica solo confirmación (no campana “pendiente confirmar”).
+  3. Alto nivel: **no** auto-confirma al aprobar (Admin usa [D-106] o Confirmar manual).
+  4. Comprometido sigue en estado `CONFIRMED+` ([D-006]); no se compromete en `APPROVED`.
+  5. Con política OFF: camino clásico + portero Oleada A intactos.
+- **Implicancias:** migración Prisma; rama en `approvePurchaseOrder`; help/guía condicionales.
+- **Documentos afectados:** [BR-PUR-022], schema, [`APPROVAL_WORKFLOWS.md`](../01-domain/APPROVAL_WORKFLOWS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §9.2, [Q-060](./OPEN_QUESTIONS.md) #2 → D-107.
+
+---
+
+### D-108 — Borrador AP automático al confirmar recepción
+
+- **Fecha:** 2026-08-30
+- **Estado:** ACTIVA
+- **Decidido por:** Owner (Oleada B)
+- **Contexto:** el cuello post-recepción es “registrar factura”; remito→CxP directo rompería Devengado/trail fiscal ([D-065]).
+- **Decisión:**
+  1. Nuevo flag `CompanyProcurementSettings.autoDraftApInvoiceOnReceipt` (default **`false`**).
+  2. Con ON, al confirmar una recepción con cantidad pendiente de facturar, se crea (idempotente) un **borrador** de factura proveedor vía `createSupplierInvoiceDraftFromPurchaseOrder` (`basis: "received"`, vínculo a la recepción).
+  3. **No** auto-ISSUED: CxP/Devengado siguen naciendo al emitir ([D-065]). Emitir exige `EDIT AP` y datos fiscales.
+  4. No se crea Payable desde el remito. Pendientes Facturar / panel billing siguen siendo el portero hasta emitir.
+- **Implicancias:** migración Prisma; hook post-`confirmPurchaseReceipt`; UX “Completar y emitir”.
+- **Documentos afectados:** [BR-PUR-023], [`PURCHASE_ORDERS_AND_RECEIPTS.md`](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), guía §9.3, help recepción/factura, [Q-060](./OPEN_QUESTIONS.md) #3 → D-108 (como auto-draft, no remito→CxP).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

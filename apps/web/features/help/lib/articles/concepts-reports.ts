@@ -28,7 +28,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     ],
     pitfalls: [
       "No sumes OC + factura como «costo total» (doble conteo).",
-      "Aprobar una OC sola no compromete: hay que Confirmar al proveedor.",
+      "Aprobar una OC sola no compromete: hay que Confirmar al proveedor (o Autorizar y comprometer si la política lo permite).",
     ],
     relatedSlugs: [
       "leer-edt-y-costos",

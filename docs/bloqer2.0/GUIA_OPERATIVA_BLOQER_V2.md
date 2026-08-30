@@ -120,6 +120,66 @@ En el Markdown y en el DOCX, cada bloque con este formato es un **hueco para ima
 
 El resto de bloques `📷` del documento (login, presupuesto, OC, certificaciones, etc.) siguen vigentes; completarlos cuando armes el entregable completo al cliente.
 
+### 0.4 Mapas de proceso (guía visual)
+
+Dos familias, misma marca. En la app: **Ayuda** → **Mapas de proceso** (primero caminitos, después láminas).
+
+| Carpeta | Qué es |
+|---------|--------|
+| [`guides/assets/flujos/`](./guides/assets/flujos/) | Caminitos si/si no (cómo se mueve el documento) |
+| [`guides/assets/laminas/`](./guides/assets/laminas/) | Láminas con roles y detalle (las primeras que armamos) |
+| [`guides/assets/screenshots/`](./guides/assets/screenshots/) | Capturas de pantalla de la guía |
+
+**Caminitos** (`flujos/`)
+
+| Mapa | Archivo | Guía |
+|------|---------|------|
+| Pagar un sueldo | [`flujos/mapa-flujo-sueldo-si-no.png`](./guides/assets/flujos/mapa-flujo-sueldo-si-no.png) | §12.2.1 |
+| Costo de empresa | [`flujos/mapa-flujo-gasto-empresa-si-no.png`](./guides/assets/flujos/mapa-flujo-gasto-empresa-si-no.png) | §12.2 · §14 |
+| Compra | [`flujos/mapa-flujo-compras-si-no.png`](./guides/assets/flujos/mapa-flujo-compras-si-no.png) | §9 |
+| Costo de obra | [`flujos/mapa-flujo-costo-obra-si-no.png`](./guides/assets/flujos/mapa-flujo-costo-obra-si-no.png) | §12.2 |
+| Subcontrato | [`flujos/mapa-flujo-subcontrato-si-no.png`](./guides/assets/flujos/mapa-flujo-subcontrato-si-no.png) | §10 |
+| Certificar y cobrar | [`flujos/mapa-flujo-certificar-cobrar-si-no.png`](./guides/assets/flujos/mapa-flujo-certificar-cobrar-si-no.png) | §11 · §12.1 |
+
+**Láminas** (`laminas/`)
+
+| Mapa | Archivo | Guía |
+|------|---------|------|
+| Puesta en marcha | [`laminas/mapa-puesta-en-marcha.png`](./guides/assets/laminas/mapa-puesta-en-marcha.png) | §0.1 · §5 |
+| Pagar desde la empresa | [`laminas/mapa-pago-corporativo.png`](./guides/assets/laminas/mapa-pago-corporativo.png) | §12.2 |
+| Tesorería y conciliación | [`laminas/mapa-tesoreria-conciliacion.png`](./guides/assets/laminas/mapa-tesoreria-conciliacion.png) | §4.2 |
+| Cerrar el mes | [`laminas/mapa-cerrar-el-mes.png`](./guides/assets/laminas/mapa-cerrar-el-mes.png) | §15.3 |
+| Presupuesto y EDT | [`laminas/mapa-presupuesto-edt.png`](./guides/assets/laminas/mapa-presupuesto-edt.png) | §6 |
+| Circuito de compra | [`laminas/mapa-circuito-compra-sc-oc.png`](./guides/assets/laminas/mapa-circuito-compra-sc-oc.png) | §9 |
+| Subcontrato hasta el pago | [`laminas/mapa-subcontrato.png`](./guides/assets/laminas/mapa-subcontrato.png) | §10 |
+| Certificar, facturar y cobrar | [`laminas/mapa-certificar-cobrar.png`](./guides/assets/laminas/mapa-certificar-cobrar.png) | §11 · §12.1 |
+| Cargar EDT y APU | [`laminas/mapa-cargar-edt-apu.png`](./guides/assets/laminas/mapa-cargar-edt-apu.png) | §6.1 |
+| Armar el cronograma | [`laminas/mapa-armar-cronograma.png`](./guides/assets/laminas/mapa-armar-cronograma.png) | §7 |
+
+Las láminas de empresa y de presupuesto:
+
+![Bloqer — Puesta en marcha](./guides/assets/laminas/mapa-puesta-en-marcha.png)
+
+*Puesta en marcha (empresa + primera obra).*
+
+![Bloqer — Pagar desde la empresa](./guides/assets/laminas/mapa-pago-corporativo.png)
+
+*Pagar desde la empresa.*
+
+![Bloqer — Tesorería y conciliación](./guides/assets/laminas/mapa-tesoreria-conciliacion.png)
+
+*Tesorería y conciliación.*
+
+![Bloqer — Cerrar el mes](./guides/assets/laminas/mapa-cerrar-el-mes.png)
+
+*Cerrar el mes.*
+
+![Bloqer — Presupuesto y EDT](./guides/assets/laminas/mapa-presupuesto-edt.png)
+
+*Presupuesto y EDT.*
+
+Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma están en su sección.
+
 ---
 
 ## 1. Configuración inicial de la empresa (nivel empresa)
@@ -152,7 +212,7 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 
 > **Visibilidad (D-056):** las secciones **Finanzas**, **Tesorería** y **Contabilidad** del menú de empresa solo aparecen para roles de **company finance**: `OWNER`, `ADMIN`, `FINANCE`, `TREASURER` y `VIEWER` (lectura). Roles operativos (`PROJECT_MANAGER`, `PROCUREMENT`, `SALES`, `PROJECT_FINANCE`, etc.) trabajan finanzas desde el **proyecto**, no desde el hub corporativo.
 
-> **Pendientes (bandeja personal, D-087 + D-094):** `/pendientes` lista cosas que **vos** todavía tenés que cerrar, filtradas por tu rol y por los módulos activos. Incluye **aprobaciones** (OC en Pend. aprobación, partes de libro de obra, certificaciones) y el **follow-through de compras**: SC enviada a cotizar/elegir, OC aprobada a confirmar al proveedor, OC confirmada (o parcial) a recibir. Los botones de cada card coinciden con la acción (`Cotizar` / `Elegir cotización` / `Revisar` / `Confirmar` / `Recibir`). **Recibir** abre el formulario de recepción (`…/recepciones/nueva`). **No** mezcla CxP ni “Listo para pagar” (eso va por la **campana**, §1.4). **No** es un listado único de la empresa: un OWNER ve más fuentes que un PM; Depósito ve recepciones; un VIEWER ve cero. El **globo rojo** en el ítem Pendientes del menú (y en mobile en la barra inferior) muestra ese recuento. En el menú de una obra, **Resumen → Pendientes** (`/proyectos/[id]/pendientes`) y su globo cuentan solo esa obra. El globo se refresca al entrar y cada 30 s con la pestaña visible. No confundir con la **campana** (§1.4): esa es el historial de avisos; Pendientes es la cola de acciones.
+> **Pendientes (bandeja personal / portero, D-087 + D-094):** `/pendientes` lista cosas que **vos** todavía tenés que cerrar, filtradas por tu rol y por los módulos activos. Incluye **aprobaciones** (OC en Pend. aprobación, partes de libro de obra, certificaciones) y el **follow-through de compras** en etapas: Cotizar → Aprobar → Confirmar → Recibir → Facturar (SC enviada; OC a aprobar; OC aprobada a confirmar al proveedor = Comprometido; OC confirmada a recibir; OC recibida sin factura a registrar). Los botones coinciden con la acción (`Cotizar` / `Elegir cotización` / `Aprobar` / `Confirmar al proveedor` / `Recibir` / `Registrar factura`). **Recibir** abre el formulario (`…/recepciones/nueva`). **Registrar factura** abre la OC con el panel de facturación destacado (`?siguiente=facturar`). **No** mezcla CxP ni “Listo para pagar” (eso va por la **campana**, §1.4). **No** es un listado único de la empresa: un OWNER ve más fuentes que un PM; Depósito ve recepciones; un VIEWER ve cero. El **globo rojo** en el ítem Pendientes del menú (y en mobile en la barra inferior) muestra ese recuento. En el menú de una obra, **Resumen → Pendientes** (`/proyectos/[id]/pendientes`) y su globo cuentan solo esa obra. El globo se refresca al entrar y cada 30 s con la pestaña visible. No confundir con la **campana** (§1.4): esa es el historial de avisos; Pendientes es la cola de acciones.
 >
 > Las **notificaciones** se abren desde la **campana del encabezado** (no tienen ítem propio en el menú lateral). Ver §1.4.
 >
@@ -491,12 +551,13 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
 | Resumen | Resumen → `/proyectos/[id]` |
 | Planificación | Presupuesto → `/presupuestos` · Cronograma → `/cronograma` · **EDT y costos** → `/control-costos` · Reportes → `/reportes` |
 | Operación | Libro de obra → `/libro-obra` · Certificaciones → `/certificaciones` · **Materiales** → `/materiales` · Inventario → `/inventario` · Consumos → `/consumos` · Documentos → `/documentos` |
-| Compras | **Tablero de compras** → `/compras` · **Solicitudes de compra** → `/solicitudes-compra` · **Órdenes de compra** → `/ordenes-compra` · **Recepciones** → `/recepciones` |
-| Finanzas del proyecto | **Tablero de finanzas** → `/finanzas` · Flujo de caja → `/flujo-caja` · Subcontratos → `/subcontratos` · CxP → `/cuentas-por-pagar` · CxC → `/cuentas-por-cobrar` · Facturas proveedor → `/facturas-proveedor` · Facturas emitidas → `/facturas` |
+| Compras | **Tablero de compras** → `/compras` · **Solicitudes de compra** → `/solicitudes-compra` · **Recepciones** → `/recepciones` |
+| Compromisos | **Órdenes de compra** → `/ordenes-compra` · **Subcontratos** → `/subcontratos` (hermanos visuales; modelos separados) |
+| Finanzas del proyecto | **Tablero de finanzas** → `/finanzas` · Flujo de caja → `/flujo-caja` · CxP → `/cuentas-por-pagar` · CxC → `/cuentas-por-cobrar` · Facturas proveedor → `/facturas-proveedor` · Facturas emitidas → `/facturas` |
 | Administración | Configuración → `/editar` (datos de la obra + **Equipo de obra** al final) |
 
 > En UI, **EDT** = Estructura de Desglose de Trabajo (WBS técnico = `WbsNode`).  
-> **Recepciones** viven bajo **Compras**, no bajo Operación. **Consumos** viven bajo **Operación**.
+> **Recepciones** viven bajo **Compras**, no bajo Operación. **Órdenes de compra** y **Subcontratos** viven bajo **Compromisos** (familia visual: ambos reservan $ en EDT al confirmar / activar). **Consumos** viven bajo **Operación**.
 
 <!-- capture:19 menu-del-proyecto-compras-operacion -->
 ![Bloqer — Menú del proyecto (Compras + Operación)](./guides/assets/screenshots/19-menu-del-proyecto-compras-operacion.png)
@@ -545,6 +606,10 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
 1. Agregar capítulos (`GROUP`) e ítems hoja (`ITEM`) desde el árbol (acciones del nodo: p. ej. **Agregar ítem**).
 2. En cada partida hoja: unidad + cantidad + guardar (**Guardar** en el panel del ítem).
 3. Código único por presupuesto.
+
+![Bloqer — Cargar EDT y APU](./guides/assets/laminas/mapa-cargar-edt-apu.png)
+
+*Cargar EDT (Excel o a mano), reordenar y completar el APU.*
 
 ### 6.1b Procedimiento — Completar el APU de una partida
 
@@ -635,6 +700,10 @@ stateDiagram-v2
 9. Con EDT vinculada: chips **Entrega OC** (fecha prometida de OC confirmada) y **Recibido**; chip ámbar si la prometida es posterior al inicio de una tarea hermana con la misma EDT.
 10. Revisar si aparece aviso de **baselineBudgetMismatch** (presupuesto base del cronograma ≠ el aprobado actual).
 11. Las tareas **canceladas** están ocultas por defecto en las cuatro vistas; filtrá estado **Cancelado** para verlas.
+
+![Bloqer — Armar el cronograma](./guides/assets/laminas/mapa-armar-cronograma.png)
+
+*Importar EDT, fechas, dependencias FS, hitos y reordenar.*
 
 **Estados de ítem:** `PLANNED` · `IN_PROGRESS` · `BLOCKED` · `COMPLETED` · `CANCELLED`.
 
@@ -734,6 +803,18 @@ En obra **no todo pasa por OC**. Tres caminos de egreso:
 
 **Tablero:** Compras → **Tablero de compras** → `/proyectos/[id]/compras` (pendientes SC / cotización / OC / recepción). Altas de SC/OC en **diálogo** desde el listado (`?create=1`; rutas `/nueva` redirigen). Es el tablero de **documentos** de abastecimiento; el control de **$** por partida está en **EDT y costos**.
 
+**Cómo se mueve el flujo** (si esto, entonces aquello). El caminito: [`guides/assets/flujos/mapa-flujo-compras-si-no.png`](./guides/assets/flujos/mapa-flujo-compras-si-no.png).
+
+![Bloqer — Compra: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-compras-si-no.png)
+
+*Caminito de compra: rombo = hay que decidir. Ámbar vuelve atrás. Rojo no sigue. El $ se reserva al confirmar, no al aprobar.*
+
+**Lámina con roles y detalle** (para imprimir o compartir): [`guides/assets/laminas/mapa-circuito-compra-sc-oc.png`](./guides/assets/laminas/mapa-circuito-compra-sc-oc.png).
+
+![Bloqer — Circuito de compra: de la SC al pago](./guides/assets/laminas/mapa-circuito-compra-sc-oc.png)
+
+*Lámina: solicitud → cotización → OC → confirmar → recepción → factura → pago.*
+
 ### 9.0 Procedimiento — Materiales del proyecto
 
 **Ruta:** Operación → **Materiales** → `/proyectos/[id]/materiales`
@@ -756,13 +837,27 @@ En obra **no todo pasa por OC**. Tres caminos de egreso:
 *Materiales Operativo + Pedir.*
 
 ```mermaid
-flowchart LR
-  PR["Solicitud de compra"] --> Q["Cotizaciones (precio + plazo)"]
-  Q --> SEL["Selección de proveedor"]
-  SEL --> PO["Orden de compra"]
-  DIR["OC directa (sin solicitud)"] --> PO
-  PO --> REC["Recepción → Inventario (entrada)"]
-  PO --> SI["Factura de proveedor → Cuenta por pagar"]
+flowchart TD
+  N[Necesidad] --> D1{¿OC directa permitida y bajo umbral?}
+  D1 -->|Sí / emergencia OWNER| OCD[OC borrador]
+  D1 -->|No| SC[SC → enviar → cotizar → elegir]
+  SC --> OCD
+  D1 -->|Sobre umbral sin emergencia| X1[Bloqer exige SC]
+  OCD --> ENV[Enviar a aprobación]
+  ENV --> D2{¿Aprueba la OC?}
+  D2 -->|No| DEV[Devolver + motivo]
+  DEV --> ENV
+  D2 -->|Sí| APR[Aprobada — aún no reserva $]
+  APR --> D3{¿Confirma al proveedor?}
+  D3 -->|No| PARK[No hay comprometido]
+  D3 -->|Sí| CONF[Confirmada = Comprometido]
+  CONF --> REC[Recepción — stock, no CxP]
+  REC --> D4{¿Hay qty recibida?}
+  D4 -->|No| X2[No hay factura desde OC]
+  D4 -->|Sí| FAC[Emitir factura = Devengado + CxP]
+  FAC --> D5{¿Hay fondos?}
+  D5 -->|No| X3[Bloqer bloquea el pago]
+  D5 -->|Sí| PAY[Pagado]
 ```
 
 > **Regla (D-050 / D-055):** toda línea de **solicitud/OC** y toda **factura de proveedor de proyecto** imputa a una **partida hoja**. Facturas desde OC **copian** la partida EDT de la OC. Facturas corporativas (sin obra) **sin** partida EDT.
@@ -784,7 +879,7 @@ flowchart LR
 
 ### 9.2 Procedimiento — Orden de compra (OC)
 
-**Ruta:** Compras → **Órdenes de compra**
+**Ruta:** Compromisos → **Órdenes de compra**
 
 **Estados en pantalla:** Borrador → Pend. aprobación → Aprobada → Confirmada → Recepción parcial / Recibida · Anulada.  
 **Enum:** `DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED` (o `CANCELLED`).
@@ -793,14 +888,16 @@ flowchart LR
 2. **Listado OC — buscador + filtro de estado** ([D-096]): arriba del listado hay un buscador (código, proveedor, aprobador) y botones **Todas / Borrador / Pend. aprobación / Aprobada / Confirmada / Recep. parcial / Recibida / Anulada** con contador por estado. Los deep-links históricos `?status=` siguen funcionando como estado inicial (por ejemplo desde **Pendientes** o el tablero).
 3. **Enviar a aprobación** → `SUBMITTED` (aprobadores: Pendientes + campana).
 4. Aprobador: **Aprobar** → `APPROVED`, o **Devolver a borrador** con **motivo obligatorio**. Quien puede confirmar la ve en **Pendientes**; campana de “OC aprobada” llega a origen + quien confirma.
-5. **Confirmar al proveedor** → `CONFIRMED` = **comprometido** en EDT y costos.  
-   > No existe atajo “Emitir y confirmar (rápido)”: siempre Enviar → Aprobar → Confirmar.
-6. **Registrar recepción** (parcial o total). Quien puede recibir (Compras / Depósito / PM) la ve en **Pendientes** con botón **Recibir** (abre `…/recepciones/nueva`). La campana de confirmación avisa “Ya se puede registrar la recepción” con CTA **Registrar recepción** a ese mismo formulario.
-7. **Entrega prevista vencida sin recepción** ([BR-PUR-018] · [D-097]): mientras la OC esté `CONFIRMED` o `PARTIALLY_RECEIVED` con `expectedDeliveryDate` pasada, en el listado y en **Pendientes** aparece el badge rojo **Vencida N d** junto a **Entrega prevista**. Se envía notificación diaria a quien puede recepcionar con deep-link al form (CTA **Registrar recepción**), CC OWNER/ADMIN, dedup 7 días. Ajustable con `deliveryOverdueGraceDays` y toggle `deliveryAlertsEnabled` por empresa.
-8. Con cantidades recibidas: **Registrar factura desde OC** (o alta manual en Facturas proveedor).
-9. **OC recibida sin factura registrada** ([BR-PUR-020] · [D-097]): si pasan `receiptToInvoiceSlaDays` (default **5**) desde la primera recepción confirmada y la OC no tiene ninguna factura de proveedor `ISSUED`, aparece en **Pendientes** para Administración / Finanzas con CTA **Registrar factura** (grupo `compras`, item "OC recibida sin factura"). Notificación diaria a `EDIT|APPROVE AP` con CC OWNER/ADMIN, dedup 7 días. Toggle `receiptToInvoiceAlertsEnabled` por empresa. Es la señal que evita que la CxP nunca se genere y que el pago quede en el aire.
-10. Desvíos de precio vs referencia: si el PU **supera** el referencial (umbrales de políticas), pide **Justificación desvío**. Comprar por debajo no exige nota. En la ficha, el % se muestra en **rojo** si se gasta más y en **verde** si se gasta menos; la nota de justificación queda debajo (sin códigos internos de estado). Sin referencial de partida (APU y costo dir. /u en cero) sí pide justificación.
-11. **OC directa** (sin SC): solo si la política de compras lo habilita; umbrales altos pueden exigir motivo de emergencia (`OWNER`/`ADMIN`).
+5. **Confirmar al proveedor** → `CONFIRMED` = **comprometido** en EDT y costos.
+6. **Autorizar y comprometer** ([D-105]/[D-106]): en **Configuración → Políticas → Compras**, OWNER/ADMIN puede prender **Un paso: autorizar y comprometer** (apagado por defecto). Con ON: OC bajo umbral → PM/Compras; **alto nivel** → solo OWNER/ADMIN. Un acto autoriza y reserva $ (Confirmada). Segregación de auto-aprobación sigue valiendo.
+7. **Al aprobar, confirmar** ([D-107]): política `autoConfirmOnApprove` (apagada por defecto). Con ON, aprobar una OC **no** de alto nivel la deja Confirmada = Comprometido (sin card «Confirmar» en Pendientes). Alto nivel no auto-confirma.
+8. **Al recibir, borrador de factura** ([D-108]): política `autoDraftApInvoiceOnReceipt` (apagada por defecto). Al confirmar recepción se crea un **borrador** de factura (no CxP). Emitir sigue creando Devengado + CxP.
+9. **Registrar recepción** (parcial o total). Quien puede recibir (Compras / Depósito / PM) la ve en **Pendientes** con botón **Recibir** (abre `…/recepciones/nueva`). La campana de confirmación avisa “Ya se puede registrar la recepción” con CTA **Registrar recepción** a ese mismo formulario.
+10. **Entrega prevista vencida sin recepción** ([BR-PUR-018] · [D-097]): mientras la OC esté `CONFIRMED` o `PARTIALLY_RECEIVED` con `expectedDeliveryDate` pasada, en el listado y en **Pendientes** aparece el badge rojo **Vencida N d** junto a **Entrega prevista**. Se envía notificación diaria a quien puede recepcionar con deep-link al form (CTA **Registrar recepción**), CC OWNER/ADMIN, dedup 7 días. Ajustable con `deliveryOverdueGraceDays` y toggle `deliveryAlertsEnabled` por empresa.
+11. Con cantidades recibidas: **Registrar factura desde OC** (o alta manual en Facturas proveedor).
+12. **OC recibida sin factura registrada** ([BR-PUR-020] · [D-097]): apenas hay recepción confirmada y la OC no tiene factura de proveedor `ISSUED`, aparece en **Pendientes** (grupo Compras → Facturar) para quien tiene `EDIT AP`, con CTA **Registrar factura** (abre la OC con el panel de facturación). La **alerta/campana diaria** espera `receiptToInvoiceSlaDays` (default **5**) desde la primera recepción confirmada, CC OWNER/ADMIN, dedup 7 días. Toggle `receiptToInvoiceAlertsEnabled` por empresa. Es la señal que evita que la CxP nunca se genere y que el pago quede en el aire.
+13. Desvíos de precio vs referencia: si el PU **supera** el referencial (umbrales de políticas), pide **Justificación desvío**. Comprar por debajo no exige nota. En la ficha, el % se muestra en **rojo** si se gasta más y en **verde** si se gasta menos; la nota de justificación queda debajo (sin códigos internos de estado). Sin referencial de partida (APU y costo dir. /u en cero) sí pide justificación.
+14. **OC directa** (sin SC): solo si la política de compras lo habilita; umbrales altos pueden exigir motivo de emergencia (`OWNER`/`ADMIN`).
 
 | Hito | Impacto |
 |------|---------|
@@ -820,6 +917,7 @@ flowchart LR
 2. Indicar cantidades recibidas por línea; depósito opcional si el módulo Inventario está activo.
 3. Confirmar. Si hay producto/depósito → **entrada de stock** (el movimiento IN puede copiar `wbsNodeId`).
 4. Al confirmar: si hay un **hito** del mismo proyecto vinculado a la EDT de alguna línea recibida (`PLANNED`/`IN_PROGRESS`), el sistema lo marca **Completado** ([D-104] / [BR-SCH-005]). Anular la recepción **no** reabre el hito.
+5. Si la política **Al recibir, crear borrador de factura** está ON ([D-108]), se crea un borrador AP (idempotente). Completar y **emitir** sigue siendo necesario para CxP.
 
 <!-- capture:27 listado-recepciones -->
 ![Bloqer — Listado Recepciones](./guides/assets/screenshots/27-listado-recepciones.png)
@@ -830,7 +928,7 @@ flowchart LR
 
 ## 10. Subcontratos (nivel proyecto)
 
-**Ruta:** Finanzas del proyecto → **Subcontratos** → `/proyectos/[id]/subcontratos`
+**Ruta:** Compromisos → **Subcontratos** → `/proyectos/[id]/subcontratos`
 
 ### 10.1 Procedimiento
 
@@ -839,6 +937,14 @@ flowchart LR
 3. Ciclo (enum `SubcontractCertificationStatus`): `DRAFT` → emitir (`ISSUED`) → **Aprobar** (`APPROVED`) (o `REJECTED` / `CANCELLED`).
 4. Al **aprobar**, el sistema genera / ofrece CTA hacia una **factura de proveedor en borrador** (el payee es el subcontratista); hay que **emitirla** para crear la CxP y poder pagar. **No** se paga el subcontrato creando una OC ni eligiendo al subcontratista en el gasto genérico.
 5. En el detalle: badge de estado de factura + **Revisar y emitir** o **Ver factura**.
+
+![Bloqer — Subcontrato: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-subcontrato-si-no.png)
+
+*Caminito de subcontrato: no es OC. Si no se aprueba o no se emite la factura, no hay CxP.*
+
+![Bloqer — Subcontrato hasta el pago](./guides/assets/laminas/mapa-subcontrato.png)
+
+*Lámina: certificar el paquete → factura AP → CxP → pagar.*
 
 <!-- capture:28 cert-subcontrato-con-factura -->
 ![Bloqer — Cert. subcontrato con factura](./guides/assets/screenshots/28-cert-subcontrato-con-factura.png)
@@ -887,6 +993,14 @@ stateDiagram-v2
 - La certificación (`APPROVED`) **no** acredita banco ni mueve caja; solo registra avance certificado.
 - **Emitir factura** abre la **cuenta por cobrar**; la **cobranza** elige la cuenta de tesorería y genera el ingreso (`INFLOW`).
 - Al emitir factura de obra con saldo pendiente, `OWNER`/`ADMIN`/`FINANCE`/`TREASURER` reciben aviso **Listo para cobrar**; un PM con permiso de cobro puede registrar la cobranza igual.
+
+![Bloqer — Certificar y cobrar: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-certificar-cobrar-si-no.png)
+
+*Caminito: aprobar la certificación no cobra. Pública bloquea si supera 100%. La caja se mueve recién al confirmar la cobranza.*
+
+![Bloqer — Certificar, facturar y cobrar](./guides/assets/laminas/mapa-certificar-cobrar.png)
+
+*Lámina: avance al cliente → factura de venta → CxC → cobranza.*
 
 <!-- capture:29 certificacion-cliente-approved -->
 ![Bloqer — Certificación cliente APPROVED](./guides/assets/screenshots/29-certificacion-cliente-approved.png)
@@ -977,6 +1091,10 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 4. Sin más: **Crear factura** → queda en **borrador** → luego **Emitir** en el detalle (crea CxP + **asiento DRAFT** en contabilidad, ver §15).
 5. Con permiso **EDIT tesorería** y módulo Tesorería activo: checkbox **Emitir y pagar ahora (egreso de caja)** → cuenta de pago + fecha → **Emitir y pagar**. Crea factura emitida + CxP + pago + egreso en un paso. Si no hay fondos suficientes, **bloquea**.
 
+![Bloqer — Costo de obra: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-costo-obra-si-no.png)
+
+*Caminito de costo de obra (gasto directo). Material con OC y subcontrato tienen su propio flujo. Reintegro de obra = este camino, payee Empleado.*
+
 #### Empresa (corporativo)
 
 | Pantalla | Ruta / etiqueta |
@@ -985,6 +1103,10 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 | Alta rápida con pago | `/finanzas/transacciones` → **Gasto / factura** → **A quién se le paga** → opcional **Pagar ahora (egreso de caja)** |
 | CxP | `/finanzas/cuentas-por-pagar` → `/[payableId]/pagar` (**Registrar pago**) |
 | Detalle de pago | `/finanzas/pagos-proveedor/[paymentId]` |
+
+![Bloqer — Costo de empresa: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-gasto-empresa-si-no.png)
+
+*Caminito de costo de empresa (alquiler, servicios, estructura). Si tiene partida EDT, no es este camino. Imputar GG a obras es otro menú.*
 
 #### 12.2.1 Pagar un sueldo (registro de costo, no nómina)
 
@@ -999,6 +1121,10 @@ Bloqer **no** liquida haberes ni aportes. Se registra el egreso como gasto corpo
 7. Confirmar. Queda factura emitida + CxP saldada + egreso de caja, **mapeado al contacto** (no solo en la descripción).
 
 Variante sin pagar en el acto: **Facturas y gastos** → **Nueva factura de gasto** → **Crear factura** (borrador) → **Emitir** → pagar después desde CxP.
+
+![Bloqer — Pagar un sueldo: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-sueldo-si-no.png)
+
+*Caminito de sueldo: no es nómina. Sin Empleado en Directorio no aparece. Sin fondos, Bloqer bloquea.*
 
 #### 12.2.2 Reintegrar un gasto a un empleado
 

@@ -2148,6 +2148,12 @@ model CompanyProcurementSettings {
   quoteRequiredCategories         Json?
   allowDirectPo                   Boolean                      @default(true)
   allowSelfApproval               Boolean                      @default(true)
+  /// One-step Autorizar y comprometer ([D-105]/[D-106] / [BR-PUR-021]). Default off. High-level requires OWNER/ADMIN.
+  allowAuthorizeAndCommit         Boolean                      @default(false)
+  /// When ON, approving a non-high-level PO goes SUBMITTED→CONFIRMED in one act ([D-107] / [BR-PUR-022]). Default off.
+  autoConfirmOnApprove            Boolean                      @default(false)
+  /// When ON, confirming a receipt auto-creates an AP invoice DRAFT from received qty ([D-108] / [BR-PUR-023]). Default off.
+  autoDraftApInvoiceOnReceipt     Boolean                      @default(false)
   allowEmergencyDirectPo          Boolean                      @default(false)
   varianceSoftAlertPct            Decimal                      @default(10) @db.Decimal(8, 4)
   varianceNoteRequiredPct         Decimal                      @default(25) @db.Decimal(8, 4)

@@ -46,7 +46,7 @@ export default async function ProyectoPendientesPage({ params, searchParams }: P
     <PageShell variant="default" className="space-y-4">
       <ProjectPageHeader
         title="Pendientes"
-        subtitle="Acciones que requieren tu intervención en esta obra. No es el historial de notificaciones."
+        subtitle="Acciones de esta obra, en orden. Compras: SC → OC → confirmar → recibir → factura. No es el historial de notificaciones."
       />
       <FieldPendingInbox
         list={list}

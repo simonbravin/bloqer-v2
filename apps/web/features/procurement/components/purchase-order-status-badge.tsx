@@ -1,16 +1,56 @@
 import { Badge } from "@/components/ui/badge";
 
 const MAP = {
-  DRAFT:               { label: "Borrador",            variant: "secondary" },
-  SUBMITTED:           { label: "Pend. aprobación",    variant: "outline" },
-  APPROVED:            { label: "Aprobada",             variant: "default" },
-  CONFIRMED:           { label: "Confirmada",           variant: "default" },
-  PARTIALLY_RECEIVED:  { label: "Recepción parcial",   variant: "outline" },
-  RECEIVED:            { label: "Recibida",             variant: "default" },
-  CANCELLED:           { label: "Anulada",              variant: "destructive" },
+  DRAFT: {
+    label: "Borrador",
+    variant: "secondary",
+    title: "Borrador: aún no enviada a aprobación",
+  },
+  SUBMITTED: {
+    label: "Pend. aprobación",
+    variant: "outline",
+    title: "Pendiente de aprobación (control interno; todavía no reserva $)",
+  },
+  APPROVED: {
+    label: "Aprobada",
+    variant: "default",
+    title: "Aprobada: control interno. Todavía no reserva $ — falta Confirmar al proveedor",
+  },
+  CONFIRMED: {
+    label: "Confirmada",
+    variant: "default",
+    title: "Confirmada: Comprometido en EDT (ya reserva $)",
+  },
+  PARTIALLY_RECEIVED: {
+    label: "Recepción parcial",
+    variant: "outline",
+    title: "Recepción parcial: parte de la mercadería ingresó",
+  },
+  RECEIVED: {
+    label: "Recibida",
+    variant: "default",
+    title: "Recibida: mercadería completa (la CxP nace al emitir la factura)",
+  },
+  CANCELLED: {
+    label: "Anulada",
+    variant: "destructive",
+    title: "Anulada",
+  },
 } as const;
 
 export function PurchaseOrderStatusBadge({ status }: { status: string }) {
-  const cfg = MAP[status as keyof typeof MAP] ?? { label: status, variant: "outline" };
-  return <Badge variant={cfg.variant as "secondary" | "default" | "destructive" | "outline"}>{cfg.label}</Badge>;
+  const cfg = MAP[status as keyof typeof MAP] ?? {
+    label: status,
+    variant: "outline" as const,
+    title: status,
+  };
+  return (
+    <Badge
+      variant={cfg.variant as "secondary" | "default" | "destructive" | "outline"}
+      title={cfg.title}
+      aria-label={cfg.title}
+    >
+      {cfg.label}
+    </Badge>
+  );
 }

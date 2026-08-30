@@ -57,6 +57,49 @@ export const FIELD_PENDING_GROUP_BY_SOURCE: Record<FieldPendingSource, FieldPend
   SUBCONTRACT_CERTIFICATION: "certificaciones",
 };
 
+/** Pipeline order for Compras portero (lower = earlier stage). */
+export const FIELD_PENDING_COMPRAS_STAGE_ORDER: Record<
+  Extract<
+    FieldPendingSource,
+    | "PURCHASE_REQUEST"
+    | "PURCHASE_ORDER"
+    | "PURCHASE_ORDER_CONFIRM"
+    | "PURCHASE_ORDER_RECEIPT"
+    | "PURCHASE_ORDER_INVOICE"
+  >,
+  number
+> = {
+  PURCHASE_REQUEST: 1,
+  PURCHASE_ORDER: 2,
+  PURCHASE_ORDER_CONFIRM: 3,
+  PURCHASE_ORDER_RECEIPT: 4,
+  PURCHASE_ORDER_INVOICE: 5,
+};
+
+export const FIELD_PENDING_COMPRAS_STAGE_LABEL: Record<
+  keyof typeof FIELD_PENDING_COMPRAS_STAGE_ORDER,
+  string
+> = {
+  PURCHASE_REQUEST: "Cotizar",
+  PURCHASE_ORDER: "Aprobar",
+  PURCHASE_ORDER_CONFIRM: "Confirmar",
+  PURCHASE_ORDER_RECEIPT: "Recibir",
+  PURCHASE_ORDER_INVOICE: "Facturar",
+};
+
+export function fieldPendingComprasStageOrder(source: FieldPendingSource): number {
+  return FIELD_PENDING_COMPRAS_STAGE_ORDER[
+    source as keyof typeof FIELD_PENDING_COMPRAS_STAGE_ORDER
+  ] ?? 99;
+}
+
+export function fieldPendingComprasStageLabel(source: FieldPendingSource): string | null {
+  return (
+    FIELD_PENDING_COMPRAS_STAGE_LABEL[source as keyof typeof FIELD_PENDING_COMPRAS_STAGE_LABEL] ??
+    null
+  );
+}
+
 /** Which pending sources this actor may query. Module-off sources are omitted. */
 export function fieldPendingSourcesForActor(
   roles: UserRole[],

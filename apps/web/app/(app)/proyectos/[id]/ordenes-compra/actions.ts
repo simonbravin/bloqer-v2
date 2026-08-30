@@ -7,6 +7,7 @@ import {
   approvePurchaseOrder,
   returnPurchaseOrder,
   confirmPurchaseOrder,
+  authorizeAndCommitPurchaseOrder,
   cancelPurchaseOrder,
   createPurchaseReceipt,
   confirmPurchaseReceipt,
@@ -48,6 +49,7 @@ function handle(err: unknown): { error: string } {
 function revalidatePO(projectId: string, poId?: string) {
   revalidatePath(`/proyectos/${projectId}/ordenes-compra`);
   if (poId) revalidatePath(`/proyectos/${projectId}/ordenes-compra/${poId}`);
+  revalidatePath("/pendientes");
   revalidateProjectCostAndFinancePaths(projectId);
 }
 
@@ -172,6 +174,22 @@ export async function confirmPurchaseOrderAction(
   }
 }
 
+export async function authorizeAndCommitPurchaseOrderAction(
+  poId: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  const mismatch = await assertPoBelongsToProject(poId, projectId, ctx);
+  if (mismatch) return mismatch;
+  try {
+    await authorizeAndCommitPurchaseOrder(poId, ctx);
+    revalidatePO(projectId, poId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
 export async function cancelPurchaseOrderAction(
   poId: string,
   projectId: string,
@@ -223,6 +241,8 @@ export async function confirmPurchaseReceiptAction(
     revalidatePath(`/proyectos/${projectId}/recepciones`);
     revalidatePath(`/proyectos/${projectId}/recepciones/${receiptId}`);
     revalidatePath(`/proyectos/${projectId}/ordenes-compra/${purchaseOrderId}`);
+    revalidatePath("/pendientes");
+    revalidatePath(`/proyectos/${projectId}/pendientes`);
     revalidateProjectCostAndFinancePaths(projectId);
     return { ok: true };
   } catch (err) {
@@ -245,6 +265,8 @@ export async function cancelPurchaseReceiptAction(
     revalidatePath(`/proyectos/${projectId}/recepciones`);
     revalidatePath(`/proyectos/${projectId}/recepciones/${receiptId}`);
     revalidatePath(`/proyectos/${projectId}/ordenes-compra/${purchaseOrderId}`);
+    revalidatePath("/pendientes");
+    revalidatePath(`/proyectos/${projectId}/pendientes`);
     revalidateProjectCostAndFinancePaths(projectId);
     return { ok: true };
   } catch (err) {

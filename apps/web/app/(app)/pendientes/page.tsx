@@ -51,7 +51,10 @@ export default async function PendientesPage({ searchParams }: PageProps) {
     <PageShell variant="default" className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Pendientes</h1>
-        <p className="text-sm text-muted-foreground">Cosas que todavía requieren tu acción. No es el historial de notificaciones.</p>
+        <p className="text-sm text-muted-foreground">
+          Lo que requiere tu acción, en orden. Compras: SC → OC → confirmar → recibir → factura. No
+          es el historial de notificaciones.
+        </p>
       </div>
       <FieldPendingInbox
         list={list}

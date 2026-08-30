@@ -94,9 +94,9 @@ La **facturación** no emite transición de `Certification.status` ([BR-CERT-007
 | Evento | Cuándo |
 |---|---|
 | `purchase_order.submitted` | DRAFT → SUBMITTED (o auto-APPROVED en el mismo acto) |
-| `purchase_order.approved` | SUBMITTED → APPROVED |
+| `purchase_order.approved` | SUBMITTED → APPROVED (también en el atajo [D-105], con `authorizeAndCommit: true` en el audit) |
 | `purchase_order.returned_for_changes` | SUBMITTED → DRAFT (rechazo / devolución con motivo, [BR-PUR-016], [D-050]) |
-| `purchase_order.confirmed` | APPROVED → CONFIRMED (compromiso de costo) |
+| `purchase_order.confirmed` | APPROVED → CONFIRMED (compromiso de costo); también fin del atajo [D-105] |
 | `purchase_order.received_partial` | CONFIRMED → PARTIALLY_RECEIVED |
 | `purchase_order.received_full` | * → RECEIVED |
 | `purchase_order.closed_partial` | cierre de saldo no recibido ([BR-PUR-013]) |
@@ -345,9 +345,9 @@ flowchart LR
 |---|---|
 | `purchase_request.submitted` | notifica a Compras / aprobadores OC (in-app + email, [BR-PUR-015], [D-050]). El email identifica tenant, proyecto y solicitante. |
 | `purchase_order.submitted` | si requiere alto nivel (umbral o `EXTRA_APPROVAL`), notifica a OWNER/ADMIN; si auto-aprueba, emite también `purchase_order.approved`. |
-| `purchase_order.approved` | habilita confirmación al proveedor; notifica al solicitante. |
+| `purchase_order.approved` | habilita confirmación al proveedor; notifica al solicitante. **Excepto** atajo [D-105]: se audita el evento pero **no** se notifica APPROVED. |
 | `purchase_order.returned_for_changes` | notifica al creador/solicitante con el motivo; documento vuelve a editable. |
-| `purchase_order.confirmed` | imputa **comprometido**; completa SC vinculada si aplica; notifica al solicitante. |
+| `purchase_order.confirmed` | imputa **comprometido**; completa SC vinculada si aplica; notifica audiencia de recepción ([D-105] solo este canal en el atajo). |
 | Job `procurement_approval_sla_reminder` | recordatorio por antigüedad de SC sin cotizar / OC en `SUBMITTED`; escalamiento OWNER/ADMIN ([D-050]). |
 
 ### 3.9 Vencimientos (jobs programados)

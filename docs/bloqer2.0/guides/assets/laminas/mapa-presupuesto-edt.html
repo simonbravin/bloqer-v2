@@ -1,0 +1,127 @@
+﻿<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Presupuesto y EDT</title>
+  <link rel="stylesheet" href="../mapa-poster.css" />
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Nivel proyecto · guía para usuarios</p>
+        <h1>Presupuesto y EDT</h1>
+        <span>Armar, enviar, aprobar — y qué pasa si lo devuelven</span>
+      </div>
+    </header>
+    <div class="body">
+      <div class="lede">
+        <p>La EDT son <strong>partidas hoja</strong> certificables. Los hierros y jornales van en el <strong>APU</strong>, no como hijos EDT. Sin presupuesto <strong>Aprobado o Cerrado</strong> no se certifica con normalidad ni corre el tablero Materiales.</p>
+        <div class="legend">
+          <span class="chip info">Camino feliz</span>
+          <span class="chip warn">Vuelve atrás</span>
+          <span class="chip block">Queda trabado</span>
+          <span class="chip ok">Impacta $ / stock</span>
+        </div>
+      </div>
+      
+      <p class="section-label">1 · Armar</p>
+      <div class="row cols-4">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">1</span>Crear presupuesto</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Planificación → Presupuesto, con la obra activa.</p>
+          <ul><li>Moneda y % económicos</li><li>Un presupuesto en curso por obra</li><li>Borrador = se puede editar todo</li></ul>
+          <span class="state">Estado: Borrador</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">2</span>Cargar EDT</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Capítulos y partidas hoja. La hoja es lo que se certifica y se imputa.</p>
+          <ul><li>No uses hijos EDT para insumos</li><li>Código y descripción claros</li><li>GG de obra = partida, no línea suelta</li></ul>
+          <span class="state">Estructura</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">3</span>Completar APU</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>En cada partida: materiales, MO, equipos, SUB, otros.</p>
+          <ul><li>APU requerido para aprobar</li><li>Insumos × rendimiento</li><li>Venta / costo según el formulario</li></ul>
+          <span class="state">Precios unitarios</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">4</span>Enviar a revisión</h3>
+            <span class="who">PM</span>
+          </div>
+          <p><strong>Enviar a revisión</strong> bloquea la economía.</p>
+          <ul><li>Pasa a En revisión</li><li>Ya no se edita la plata</li><li>Aprobador lo ve en Pendientes</li></ul>
+          <span class="state">En revisión</span>
+        </article>
+      </div>
+      <p class="section-label">2 · Autorizar</p>
+      <div class="row cols-3">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">5</span>Aprobar</h3>
+            <span class="who">OWNER / ADMIN</span>
+          </div>
+          <p><strong>Aprobar presupuesto</strong> congela y habilita la obra.</p>
+          <ul><li>Un solo APPROVED a la vez</li><li>Habilita certificaciones y Materiales</li><li>Baseline de EDT y costos</li></ul>
+          <span class="state">Aprobado</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">6</span>Devolver</h3>
+            <span class="who">Aprobador</span>
+          </div>
+          <p>Si no cierra: <strong>Devolver</strong> → correcciones → reenviar.</p>
+          <ul><li>Vuelve a Devuelto para cambios</li><li>Hay que reenviar a revisión</li><li>No se aprueba a medias</li></ul>
+          <span class="state">Otra vez edición</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">7</span>Cerrar / adenda</h3>
+            <span class="who">OWNER</span>
+          </div>
+          <p>Cerrar = base contractual de presentación. Cambio contractual hoy = <strong>Crear adenda / fase</strong>.</p>
+          <ul><li>CLOSED no se edita por la excepción de políticas</li><li>Adenda: nuevo presupuesto vinculado al padre</li><li>No hay entidad formal de contrato aún</li></ul>
+          <span class="state">Cerrado o nueva fase</span>
+        </article>
+      </div>
+      <div class="alt">
+        <strong>Excepción OWNER/ADMIN</strong>
+        <p>Para retocar un Aprobado: Políticas → Presupuestos (organización + obra). Al terminar, <strong>Congelar</strong>. Un Cerrado no entra: ahí se usa adenda.</p>
+      </div>
+      <p class="section-label">Si no se aprueba o se arma mal</p>
+      <div class="cons">
+        <div class="box warn">
+          <h2>Vuelve atrás</h2>
+          <ul>
+            <li>Devolver a cambios: se corrige EDT/APU y se reenvía.</li>
+            <li>Insumos mal cargados como hijos EDT: pasarlos al APU de la partida hoja.</li>
+          </ul>
+        </div>
+        <div class="box block">
+          <h2>Queda trabado</h2>
+          <ul>
+            <li>Sin APU completo no se aprueba.</li>
+            <li>Sin APPROVED/CLOSED no hay certificación al cliente ni Materiales MAT.</li>
+            <li>Dos presupuestos Aprobados a la vez: no se permite.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <span>Bloqer · Presupuesto y EDT · Guía operativa §6 · §6.2 · §6.3</span>
+      <span>Planificación → Presupuesto · EDT y costos</span>
+    </footer>
+  </div>
+</body>
+</html>

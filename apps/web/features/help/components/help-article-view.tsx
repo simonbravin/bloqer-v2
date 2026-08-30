@@ -42,6 +42,19 @@ export function HelpArticleView({ article }: { article: HelpArticle }) {
         <p className="mt-2 text-muted-foreground">{article.summary}</p>
       </div>
 
+      {article.figure ? (
+        <figure className="overflow-hidden rounded-lg border bg-muted/30">
+          {/* Static process maps from /public/help; keep intrinsic ratio. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={article.figure.src} alt={article.figure.alt} className="h-auto w-full" />
+          {article.figure.caption ? (
+            <figcaption className="border-t px-3 py-2 text-xs text-muted-foreground">
+              {article.figure.caption}
+            </figcaption>
+          ) : null}
+        </figure>
+      ) : null}
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Dónde</CardTitle>
@@ -84,7 +97,7 @@ export function HelpArticleView({ article }: { article: HelpArticle }) {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Pasos</CardTitle>
+          <CardTitle className="text-base">{article.stepsTitle ?? "Pasos"}</CardTitle>
         </CardHeader>
         <CardContent>
           <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed">

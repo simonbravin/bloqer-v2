@@ -31,6 +31,7 @@ import {
   serializeQtyDecimal,
   serializeRatePctDecimal,
   serializeUnitPriceDecimal,
+  serializeFxRateDecimal,
 } from "../finance/money-decimal";
 import {
   assertPoLinesWithinSelectedQuote,
@@ -52,6 +53,9 @@ export {
   approvePurchaseOrder,
   returnPurchaseOrder,
   confirmPurchaseOrder,
+  authorizeAndCommitPurchaseOrder,
+  canAuthorizeAndCommitPo,
+  willApproveAutoConfirmPo,
 } from "./purchase-order-workflow.service";
 
 // ─── View types ───────────────────────────────────────────────────────────────
@@ -83,10 +87,15 @@ export type PurchaseOrderLineView = {
   varianceJustification: string | null;
 };
 
-export type PurchaseOrderView = Omit<PurchaseOrder, "subtotal" | "taxAmount" | "totalAmount"> & {
+export type PurchaseOrderView = Omit<
+  PurchaseOrder,
+  "subtotal" | "taxAmount" | "totalAmount" | "totalAmountArs" | "fxRate"
+> & {
   subtotal: string;
   taxAmount: string;
   totalAmount: string;
+  totalAmountArs: string;
+  fxRate: string;
   code: string;
   supplierName: string;
   approvedByName: string | null;
@@ -160,6 +169,8 @@ function serializePO(
     subtotal:    serializeMoneyDecimal(po.subtotal),
     taxAmount:   serializeMoneyDecimal(po.taxAmount),
     totalAmount: serializeMoneyDecimal(po.totalAmount),
+    totalAmountArs: serializeMoneyDecimal(po.totalAmountArs),
+    fxRate: serializeFxRateDecimal(po.fxRate),
     approvedByName: names.approvedByName,
     createdByName: names.createdByName,
     originRequestedByName: names.originRequestedByName,

@@ -13,6 +13,8 @@ type Props = {
   canEditAp: boolean;
   /** Ruta a la que volver si falla la creación del borrador (sin reintentar en cada refresh). */
   errorReturnPath: string;
+  /** Highlight as the immediate next step (e.g. from Pendientes ?siguiente=facturar). */
+  highlighted?: boolean;
 };
 
 export function PoBillingNextStepPanel({
@@ -22,12 +24,20 @@ export function PoBillingNextStepPanel({
   billing,
   canEditAp,
   errorReturnPath,
+  highlighted = false,
 }: Props) {
   const pending = isPositiveMoneyAmount(billing.pendingToInvoice);
   const showAction = billing.hasReceivedQuantity && pending;
 
   return (
-    <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+    <div
+      id="facturar"
+      className={
+        highlighted
+          ? "scroll-mt-24 rounded-lg border-2 border-primary bg-muted/30 p-4 space-y-3 ring-2 ring-primary/20"
+          : "scroll-mt-24 rounded-lg border bg-muted/30 p-4 space-y-3"
+      }
+    >
       <div className="text-sm space-y-1">
         <p className="font-medium">Facturación de la OC</p>
         {billing.hasReceivedQuantity ? (
@@ -69,8 +79,12 @@ export function PoBillingNextStepPanel({
           </p>
         ) : billing.draftInvoiceCount > 0 ? (
           <p className="text-xs text-muted-foreground">
-            Hay factura(s) en borrador vinculada(s) a esta OC. Emitila desde la lista de facturas
-            de proveedor.
+            Hay factura(s) en borrador vinculada(s) a esta OC
+            {billing.draftInvoiceCount === 1 ? "" : ` (${billing.draftInvoiceCount})`}. Completala y
+            emitila desde Facturas proveedor para crear la CxP
+            {billing.hasReceivedQuantity && !pending
+              ? ""
+              : " (o usá Registrar factura si aún falta cantidad)."}.
           </p>
         ) : null}
       </div>

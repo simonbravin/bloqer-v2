@@ -1,0 +1,145 @@
+﻿<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Cargar EDT y APU</title>
+  <link rel="stylesheet" href="../mapa-poster.css" />
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Nivel proyecto · guía para usuarios</p>
+        <h1>Cargar EDT y APU</h1>
+        <span>Excel o a mano, reordenar partidas y armar el análisis de precio</span>
+      </div>
+    </header>
+    <div class="body">
+      <div class="lede">
+        <p>La EDT son <strong>capítulos y partidas hoja</strong>. Hierros, jornales y equipos van en el <strong>APU</strong>, no como hijos del árbol. El presupuesto tiene que estar en <strong>Borrador</strong> para importar, agregar o reordenar. Unidad e importes <strong>no</strong> viajan en el Excel: se cargan después en la partida / APU.</p>
+        <div class="legend">
+          <span class="chip info">Camino feliz</span>
+          <span class="chip warn">Vuelve atrás</span>
+          <span class="chip block">Queda trabado</span>
+          <span class="chip ok">Impacta $ / stock</span>
+        </div>
+      </div>
+      
+      <p class="section-label">1 · Crear el presupuesto y la estructura</p>
+      <div class="row cols-4">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">1</span>Nuevo presupuesto</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Planificación → Presupuesto → <strong>Nuevo presupuesto</strong>.</p>
+          <ul><li>Nombre, moneda y % económicos</li><li>Opcional: precarga / Importar EDT en el alta</li><li>Queda en Borrador y abre el detalle</li></ul>
+          <span class="state">Estado: Borrador</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">2</span>Importar EDT</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>En el detalle: <strong>Importar EDT</strong> → diálogo <strong>Importar estructura EDT</strong>.</p>
+          <ul><li>CSV o Excel (.xlsx)</li><li>Columna A = numeración (ARQ 1 / 1.1)</li><li>Columna B = nombre. Sin unidades ni $</li><li>Multi-rubro: ARQ, EST… → ARQ.1.1.1</li></ul>
+          <span class="state">Vista previa + Importar</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">3</span>Cargar a mano</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Toolbar: <strong>Agregar tarea</strong>. En cada nodo: menú → <strong>Agregar ítem</strong>.</p>
+          <ul><li>Capítulo (GROUP) vs partida hoja (ITEM)</li><li>En la hoja: unidad + cantidad → Guardar</li><li>Código único por presupuesto</li></ul>
+          <span class="state">Árbol editable</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">4</span>Reordenar</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Menú del nodo: <strong>Mover arriba</strong> / <strong>Mover abajo</strong>.</p>
+          <ul><li>Solo hermanos del mismo padre</li><li>No hay sangrar en EDT (el código marca el nivel)</li><li>Eliminar borra el nodo si no está usado</li></ul>
+          <span class="state">Orden del cómputo</span>
+        </article>
+      </div>
+      <div class="alt">
+        <strong>Reemplazar al importar</strong>
+        <p>Si ya hay EDT, el diálogo ofrece <strong>Reemplazar toda la estructura EDT existente (no se puede deshacer)</strong>. Sin ese check, se agrega sobre lo que hay. Errores de fila se listan antes de confirmar.</p>
+      </div>
+      <p class="section-label">2 · Completar el APU de cada partida hoja</p>
+      <div class="row cols-4">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">5</span>Abrir la partida</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Click en la hoja → <strong>APU — Análisis de precio unitario</strong>.</p>
+          <ul><li>El modal es solo costo (D-058)</li><li>PU y venta se editan en la tabla EDT</li><li>Chevron: filas APU·MAT de solo lectura</li></ul>
+          <span class="state">Partida abierta</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">6</span>Líneas de insumo</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Materiales / MO / Equipos / SUB / Otros.</p>
+          <ul><li>Descripción, unidad, cant., precio</li><li>Por unidad o Total partida (default)</li><li>Global (gl) = importe sin compra: no genera necesidad en Materiales</li></ul>
+          <span class="state">Costo directo</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">7</span>Guardar</h3>
+            <span class="who">PM</span>
+          </div>
+          <p><strong>Guardar cambios</strong> en el APU. Después <strong>Guardar</strong> la partida si cambiaste unidad/cantidad.</p>
+          <ul><li>APU requerido para aprobar el presupuesto</li><li>Click en una fila detalle reabre el APU</li><li>Esas filas no se certifican ni se compran</li></ul>
+          <span class="state">APU guardado</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">8</span>Anti-patrón</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>No crees hijos EDT para hierros o cuadrillas.</p>
+          <ul><li>Insumo ≠ partida certificable</li><li>Subdividir un ITEM convierte al padre en GROUP</li><li>Sirve para partir alcance, no para el BOM</li></ul>
+          <span class="state">Insumos solo en APU</span>
+        </article>
+      </div>
+      <p class="section-label">Qué queda listo</p>
+      <div class="impact cols-4">
+        <div class="i1"><b>Capítulo</b><span>Solo agrupa. Sin unidad operativa.</span></div>
+        <div class="i2"><b>Partida hoja</b><span>Se certifica, se compra y se imputa.</span></div>
+        <div class="i3"><b>APU</b><span>Compone el costo. Alimenta Materiales si hay MAT.</span></div>
+        <div class="i5"><b>Excel</b><span>Solo estructura (código + nombre). El $ se carga acá.</span></div>
+      </div>
+      <p class="section-label">Si el archivo no entra o se arma mal</p>
+      <div class="cons">
+        <div class="box warn">
+          <h2>Vuelve atrás</h2>
+          <ul>
+            <li>Errores en la vista previa: corregí el Excel (fila / campo) y volvé a subir.</li>
+            <li>Presupuesto en revisión o aprobado: no se importa ni se reordena. Hay que devolver o usar la excepción / adenda.</li>
+            <li>Insumos mal creados como hijos EDT: pasalos al APU de la partida hoja.</li>
+          </ul>
+        </div>
+        <div class="box block">
+          <h2>Queda trabado</h2>
+          <ul>
+            <li>Reemplazar EDT existente no se deshace.</li>
+            <li>Profundidad máxima: 3 niveles (o 4 si es multi-rubro). Más segmentos = error de importación.</li>
+            <li>Sin APU no se aprueba el presupuesto.</li>
+            <li>No se borran partidas ya usadas en certificaciones, OC o cronograma.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <span>Bloqer · Cargar EDT y APU · Guía operativa §6.0 · §6.1 · §6.1a · §6.1b</span>
+      <span>Planificación → Presupuesto · Estructura de trabajo (EDT)</span>
+    </footer>
+  </div>
+</body>
+</html>

@@ -10,7 +10,10 @@ import {
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { serializeMoneyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
+import {
+  getCompanyProcurementSettingsForProject,
+  type CompanyProcurementSettingsView,
+} from "./company-procurement-settings.service";
 import {
   assertDirectPoAllowed,
   assertHighLevelApprover,
@@ -157,6 +160,290 @@ function resolveOriginUserId(po: {
   purchaseRequest: { requestedByUserId: string | null } | null;
 }): string | null {
   return po.originRequestedByUserId ?? po.purchaseRequest?.requestedByUserId ?? null;
+}
+
+/**
+ * [D-105]/[D-106] Pure UI/service gate for one-step Autorizar y comprometer.
+ * Non-high-level: EDIT OC. High-level (threshold or EXTRA_APPROVAL): OWNER/ADMIN only.
+ * Self-approval [BR-APR-004] still applies.
+ *
+ * Prefer live document totals (`totalAmount` + FX) over stored `totalAmountArs`:
+ * DRAFT line edits update `totalAmount` via recalc but do not refresh `totalAmountArs`.
+ */
+export function canAuthorizeAndCommitPo(
+  settings: Pick<
+    CompanyProcurementSettingsView,
+    "allowAuthorizeAndCommit" | "allowSelfApproval" | "poApprovalThresholdArs"
+  >,
+  po: {
+    status: PurchaseOrderStatus | string;
+    /** Preferred: document total in document currency (kept current on DRAFT edits). */
+    totalAmount?: Prisma.Decimal | string | null;
+    currency?: string | null;
+    fxRate?: Prisma.Decimal | string | null;
+    /** Fallback when live totals are unavailable (e.g. unit tests). */
+    totalAmountArs?: Prisma.Decimal | string | null;
+    originRequestedByUserId?: string | null;
+    lines?: Array<{ varianceTier?: string | null }>;
+  },
+  ctx: Pick<ServiceContext, "roles" | "actorUserId">,
+): boolean {
+  if (!settings.allowAuthorizeAndCommit) return false;
+  if (po.status !== "DRAFT" && po.status !== "SUBMITTED") return false;
+
+  const totalArs = resolveAuthorizeAndCommitTotalArs(po);
+  if (totalArs == null) return false;
+
+  const requiresExtraApproval = (po.lines ?? []).some((l) => l.varianceTier === "EXTRA_APPROVAL");
+  const requiresHighLevelAmount = poRequiresHighLevelApproval(totalArs, settings);
+  const highLevel = requiresHighLevelAmount || requiresExtraApproval;
+
+  if (highLevel) {
+    // [D-106] Admin-only shortcut for high-level POs.
+    if (!ctx.roles.some((r) => r === "OWNER" || r === "ADMIN")) return false;
+  } else if (!canEditPurchaseOrders(ctx.roles)) {
+    return false;
+  }
+
+  return isSelfApprovalAllowed(
+    settings,
+    po.originRequestedByUserId ?? null,
+    ctx.actorUserId,
+    requiresExtraApproval,
+    requiresHighLevelAmount,
+  );
+}
+
+/**
+ * [D-107] Whether approving this PO would auto-confirm under company policy (UI copy).
+ * High-level POs never auto-confirm.
+ */
+export function willApproveAutoConfirmPo(
+  settings: Pick<
+    CompanyProcurementSettingsView,
+    "autoConfirmOnApprove" | "poApprovalThresholdArs"
+  >,
+  po: {
+    totalAmount?: Prisma.Decimal | string | null;
+    currency?: string | null;
+    fxRate?: Prisma.Decimal | string | null;
+    totalAmountArs?: Prisma.Decimal | string | null;
+    lines?: Array<{ varianceTier?: string | null }>;
+  },
+): boolean {
+  if (!settings.autoConfirmOnApprove) return false;
+  const totalArs = resolveAuthorizeAndCommitTotalArs(po);
+  if (totalArs == null) return false;
+  const requiresExtraApproval = (po.lines ?? []).some((l) => l.varianceTier === "EXTRA_APPROVAL");
+  const requiresHighLevelAmount = poRequiresHighLevelApproval(totalArs, settings);
+  return !(requiresHighLevelAmount || requiresExtraApproval);
+}
+
+function resolveAuthorizeAndCommitTotalArs(po: {
+  totalAmount?: Prisma.Decimal | string | null;
+  currency?: string | null;
+  fxRate?: Prisma.Decimal | string | null;
+  totalAmountArs?: Prisma.Decimal | string | null;
+}): Prisma.Decimal | null {
+  if (po.totalAmount != null && po.currency) {
+    try {
+      const amount =
+        po.totalAmount instanceof Prisma.Decimal
+          ? po.totalAmount
+          : new Prisma.Decimal(po.totalAmount);
+      const rate =
+        po.fxRate == null
+          ? null
+          : po.fxRate instanceof Prisma.Decimal
+            ? po.fxRate
+            : new Prisma.Decimal(po.fxRate);
+      return computeDocumentFxAmounts(po.currency, amount, rate).amountArs;
+    } catch {
+      // Missing FX for foreign currency → not eligible for the shortcut in UI.
+      return null;
+    }
+  }
+  if (po.totalAmountArs == null) return null;
+  return po.totalAmountArs instanceof Prisma.Decimal
+    ? po.totalAmountArs
+    : new Prisma.Decimal(po.totalAmountArs);
+}
+
+/**
+ * [D-105] Authorize + commit in one transaction (persists APPROVED then CONFIRMED).
+ * Notifies only PURCHASE_ORDER_CONFIRMED — never the “pending confirm” APPROVED bell.
+ */
+export async function authorizeAndCommitPurchaseOrder(
+  id: string,
+  ctx: ServiceContext,
+): Promise<PurchaseOrderView> {
+  await assertProcurementTenantModule(ctx);
+
+  const existing = await loadPo(id, ctx.tenantId);
+  if (existing.status !== "DRAFT" && existing.status !== "SUBMITTED") {
+    throw new ServiceError(
+      "CONFLICT",
+      "Solo se puede autorizar y comprometer una orden en borrador o pendiente de aprobación",
+    );
+  }
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+
+  const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
+  if (!settings.allowAuthorizeAndCommit) {
+    throw new ServiceError(
+      "CONFLICT",
+      "La política de autorizar y comprometer no está habilitada para esta empresa",
+    );
+  }
+
+  const lineCount = await prisma.purchaseOrderLine.count({ where: { purchaseOrderId: id } });
+  if (lineCount === 0) throw new ServiceError("CONFLICT", "La orden debe tener al menos una línea");
+
+  const fromStatus = existing.status;
+
+  const result = await prisma.$transaction(async (tx) => {
+    await recalcPurchaseOrderTotals(tx, id);
+    const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
+    if (po.totalAmount.lessThanOrEqualTo(0)) {
+      throw new ServiceError("CONFLICT", "El monto total debe ser mayor a cero");
+    }
+
+    const fx = computeDocumentFxAmounts(po.currency, po.totalAmount, po.fxRate);
+    const totalArs = fx.amountArs;
+
+    if (!po.purchaseRequestId) {
+      assertDirectPoAllowed(settings, totalArs, ctx, {
+        emergencyReason: po.emergencyReason,
+      });
+    }
+
+    const currentLines = await tx.purchaseOrderLine.findMany({
+      where: { purchaseOrderId: id },
+      select: {
+        description: true,
+        wbsNodeId: true,
+        quantity: true,
+        unitPrice: true,
+        discountPct: true,
+        sortOrder: true,
+      },
+    });
+    await assertPoLinesWithinSelectedQuote(id, currentLines, ctx.tenantId, tx);
+
+    const { requiresExtraApproval, requiresJustification } = await applyVarianceSnapshots(
+      tx,
+      id,
+      ctx.tenantId,
+      settings,
+    );
+    if (requiresJustification) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Completá la justificación de desvío presupuestario en las líneas",
+      );
+    }
+
+    const requiresHighLevelAmount = poRequiresHighLevelApproval(totalArs, settings);
+    const highLevel = requiresHighLevelAmount || requiresExtraApproval;
+
+    // [D-105] EDIT for low-level; [D-106] OWNER/ADMIN for high-level.
+    if (highLevel) {
+      assertHighLevelApprover(ctx.roles, requiresHighLevelAmount, requiresExtraApproval);
+    } else if (!canEditPurchaseOrders(ctx.roles)) {
+      throw new ServiceError(
+        "FORBIDDEN",
+        "Sin permisos para autorizar y comprometer órdenes de compra",
+      );
+    }
+
+    const originId = resolveOriginUserId(existing);
+    assertSelfApprovalAllowed(
+      settings,
+      originId,
+      ctx.actorUserId,
+      requiresExtraApproval,
+      requiresHighLevelAmount,
+    );
+
+    const now = new Date();
+    const flipped = await tx.purchaseOrder.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: fromStatus },
+      data: {
+        status: "CONFIRMED",
+        fxRate: fx.fxRate,
+        totalAmountArs: totalArs,
+        approvedByUserId: ctx.actorUserId,
+        approvedAt: now,
+        confirmedByUserId: ctx.actorUserId,
+        confirmedAt: now,
+        returnReason: null,
+        returnedAt: null,
+        returnedByUserId: null,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "La orden cambió de estado. Recargá e intentá de nuevo.",
+    );
+
+    await onPurchaseOrderConfirmed(id, ctx, tx);
+
+    if (fromStatus === "DRAFT") {
+      await auditProcurement(
+        ctx,
+        "purchase_order.submitted",
+        "PurchaseOrder",
+        id,
+        { projectId: po.projectId, companyId: po.companyId },
+        { after: { status: "CONFIRMED", authorizeAndCommit: true }, tx },
+      );
+    }
+    await auditProcurement(
+      ctx,
+      "purchase_order.approved",
+      "PurchaseOrder",
+      id,
+      { projectId: po.projectId, companyId: po.companyId },
+      { after: { authorizeAndCommit: true }, tx },
+    );
+    await auditProcurement(
+      ctx,
+      "purchase_order.confirmed",
+      "PurchaseOrder",
+      id,
+      { projectId: po.projectId, companyId: po.companyId },
+      {
+        after: {
+          authorizeAndCommit: true,
+          totalAmountArs: serializeMoneyDecimal(totalArs),
+        },
+        tx,
+      },
+    );
+
+    return {
+      projectId: po.projectId,
+      companyId: po.companyId,
+      number: po.number,
+      originRequestedByUserId: originId,
+      createdBy: po.createdBy,
+    };
+  });
+
+  // [D-105]/[D-106] Never send PURCHASE_ORDER_APPROVED (“pendiente confirmar”) on this shortcut.
+  await notifyPurchaseOrderConfirmed({
+    ctx,
+    purchaseOrderId: id,
+    projectId: result.projectId,
+    companyId: result.companyId,
+    code: `OC-${String(result.number).padStart(3, "0")}`,
+    recipientUserIds: [result.originRequestedByUserId, result.createdBy].filter(
+      Boolean,
+    ) as string[],
+  });
+
+  return reloadPoView(id, ctx);
 }
 
 export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Promise<PurchaseOrderView> {
@@ -336,7 +623,7 @@ export async function approvePurchaseOrder(id: string, ctx: ServiceContext): Pro
 
   const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
 
-  await prisma.$transaction(async (tx) => {
+  const outcome = await prisma.$transaction(async (tx) => {
     await recalcPurchaseOrderTotals(tx, id);
     const poBefore = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
     const fx = computeDocumentFxAmounts(poBefore.currency, poBefore.totalAmount, poBefore.fxRate);
@@ -368,16 +655,30 @@ export async function approvePurchaseOrder(id: string, ctx: ServiceContext): Pro
       requiresHighLevelAmount,
     );
 
+    // [D-107] Non-high-level + policy → SUBMITTED→CONFIRMED in one act.
+    const autoConfirm = settings.autoConfirmOnApprove && !highLevel;
+    const now = new Date();
     const approved = await tx.purchaseOrder.updateMany({
       where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },
-      data: {
-        status: "APPROVED",
-        fxRate: fx.fxRate,
-        totalAmountArs: fx.amountArs,
-        approvedByUserId: ctx.actorUserId,
-        approvedAt: new Date(),
-        updatedBy: ctx.actorUserId,
-      },
+      data: autoConfirm
+        ? {
+            status: "CONFIRMED",
+            fxRate: fx.fxRate,
+            totalAmountArs: fx.amountArs,
+            approvedByUserId: ctx.actorUserId,
+            approvedAt: now,
+            confirmedByUserId: ctx.actorUserId,
+            confirmedAt: now,
+            updatedBy: ctx.actorUserId,
+          }
+        : {
+            status: "APPROVED",
+            fxRate: fx.fxRate,
+            totalAmountArs: fx.amountArs,
+            approvedByUserId: ctx.actorUserId,
+            approvedAt: now,
+            updatedBy: ctx.actorUserId,
+          },
     });
     if (approved.count !== 1) {
       throw new ServiceError("CONFLICT", "La orden ya no está pendiente de aprobación");
@@ -391,22 +692,53 @@ export async function approvePurchaseOrder(id: string, ctx: ServiceContext): Pro
       "PurchaseOrder",
       id,
       { projectId: po.projectId, companyId: po.companyId },
-      { tx },
+      { after: autoConfirm ? { autoConfirmOnApprove: true } : undefined, tx },
     );
+
+    if (autoConfirm) {
+      await onPurchaseOrderConfirmed(id, ctx, tx);
+      await auditProcurement(
+        ctx,
+        "purchase_order.confirmed",
+        "PurchaseOrder",
+        id,
+        { projectId: po.projectId, companyId: po.companyId },
+        {
+          after: {
+            autoConfirmOnApprove: true,
+            totalAmountArs: serializeMoneyDecimal(fx.amountArs),
+          },
+          tx,
+        },
+      );
+    }
+
+    return { autoConfirm, originId };
   });
 
-  const originId = resolveOriginUserId({
-    ...existing,
-    purchaseRequest: existing.purchaseRequest,
-  });
-  await notifyPurchaseOrderApproved({
-    ctx,
-    purchaseOrderId: id,
-    projectId: existing.projectId,
-    companyId: existing.companyId,
-    code: `OC-${String(existing.number).padStart(3, "0")}`,
-    recipientUserIds: [originId, existing.createdBy].filter(Boolean) as string[],
-  });
+  const code = `OC-${String(existing.number).padStart(3, "0")}`;
+  const recipientUserIds = [outcome.originId, existing.createdBy].filter(Boolean) as string[];
+
+  if (outcome.autoConfirm) {
+    // Same as D-105: never send “pendiente confirmar”.
+    await notifyPurchaseOrderConfirmed({
+      ctx,
+      purchaseOrderId: id,
+      projectId: existing.projectId,
+      companyId: existing.companyId,
+      code,
+      recipientUserIds,
+    });
+  } else {
+    await notifyPurchaseOrderApproved({
+      ctx,
+      purchaseOrderId: id,
+      projectId: existing.projectId,
+      companyId: existing.companyId,
+      code,
+      recipientUserIds,
+    });
+  }
 
   return reloadPoView(id, ctx);
 }

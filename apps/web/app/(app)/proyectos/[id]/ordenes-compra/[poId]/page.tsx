@@ -5,6 +5,7 @@ import {
   formatQtyFromString,
   formatRatePctFromString,
   formatUnitPriceFromString,
+  isPositiveMoneyAmount,
   isZeroRatePct,
 } from "@/lib/format-money";
 import { costCategoryLabelEs } from "@/lib/cost-category-colors";
@@ -31,6 +32,7 @@ import {
 } from "@/features/procurement";
 import { PurchaseOrderMobileFiche } from "@/features/procurement/components/purchase-order-mobile-fiche";
 import { PurchaseOrderApprovalActions } from "@/features/procurement/components/purchase-order-approval-actions";
+import { AuthorizeAndCommitPoButton } from "@/features/procurement/components/authorize-and-commit-po-button";
 import { PurchaseOrderVarianceReadout } from "@/features/procurement/components/purchase-order-variance-readout";
 import { SupplierInvoiceTable } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
@@ -40,8 +42,11 @@ import { getCurrentUser } from "@/lib/auth";
 import { isStorageConfigured } from "@bloqer/config";
 import {
   canApprovePurchaseOrders,
+  canAuthorizeAndCommitPo,
+  willApproveAutoConfirmPo,
   canEditPurchaseOrders,
   canEditPurchaseReceipts,
+  getCompanyProcurementSettingsForProject,
   getPurchaseOrderBillingSummary,
   getPurchaseOrderById,
   getProjectShellInfo,
@@ -51,6 +56,7 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+import { ScrollToElement } from "@/components/navigation/scroll-to-element";
 import {
   submitPurchaseOrderAction,
   confirmPurchaseOrderAction,
@@ -59,7 +65,7 @@ import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; poId: string }>;
-  searchParams: Promise<{ invoiceError?: string; actionError?: string }>;
+  searchParams: Promise<{ invoiceError?: string; actionError?: string; siguiente?: string }>;
 }
 
 export default async function OrdenCompraDetailPage({ params, searchParams }: PageProps) {
@@ -75,17 +81,18 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     roles: current.tenantCtx.roles,
   };
 
-  let order, receipts, billing, linkedInvoices, project;
+  let order, receipts, billing, linkedInvoices, project, procurementSettings;
   try {
-    [order, receipts, billing, linkedInvoices, project] = await Promise.all([
+    [order, receipts, billing, linkedInvoices, project, procurementSettings] = await Promise.all([
       getPurchaseOrderById(poId, ctx),
       listReceiptsByPurchaseOrder(poId, ctx),
       getPurchaseOrderBillingSummary(poId, ctx),
       listSupplierInvoicesByPurchaseOrder(poId, ctx),
       getProjectShellInfo(id, ctx),
+      getCompanyProcurementSettingsForProject(id, ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
@@ -104,7 +111,45 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   const canApprovePo = canApprovePurchaseOrders(current.tenantCtx.roles);
   const canEditPo = canEditPurchaseOrders(current.tenantCtx.roles);
   const canReceive = canEditPurchaseReceipts(current.tenantCtx.roles);
+  const showAuthorizeAndCommit = canAuthorizeAndCommitPo(
+    procurementSettings,
+    {
+      status: order.status,
+      totalAmount: order.totalAmount,
+      currency: order.currency,
+      fxRate: order.fxRate,
+      totalAmountArs: order.totalAmountArs,
+      originRequestedByUserId: order.originRequestedByUserId,
+      lines: order.lines,
+    },
+    ctx,
+  );
+  const willAutoConfirmOnApprove = willApproveAutoConfirmPo(procurementSettings, {
+    totalAmount: order.totalAmount,
+    currency: order.currency,
+    fxRate: order.fxRate,
+    totalAmountArs: order.totalAmountArs,
+    lines: order.lines,
+  });
+  const canEditAp = canRegisterApInvoice(current.tenantCtx.roles);
   const showBilling = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status);
+  const canInvoiceNow =
+    showBilling &&
+    !isCancelled &&
+    billing.hasReceivedQuantity &&
+    isPositiveMoneyAmount(billing.pendingToInvoice);
+  const highlightBilling = canInvoiceNow && sp.siguiente === "facturar";
+  const billingPanel =
+    showBilling && !isCancelled ? (
+      <PoBillingNextStepPanel
+        projectId={id}
+        purchaseOrderId={poId}
+        billing={billing}
+        canEditAp={canEditAp}
+        errorReturnPath={`/proyectos/${id}/ordenes-compra/${poId}`}
+        highlighted={highlightBilling}
+      />
+    ) : null;
   const showReceiptQty = showBilling;
   const showDiscountCol = order.lines.some((l) => !isZeroRatePct(l.discountPct));
   const showVarianceCols = order.lines.some(
@@ -120,13 +165,12 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     !isCancelled && canEditPo && !["PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status);
   const hasActions =
     (isDraft && canEditPo) ||
-    (isSubmitted && canApprovePo) ||
+    (isSubmitted && (canApprovePo || showAuthorizeAndCommit)) ||
     (isApproved && canEditPo) ||
     (isReceivable && canReceive) ||
     canCancel;
   const actionBtn = "min-h-11 w-full sm:w-auto md:min-h-9";
 
-  const canEditAp = canRegisterApInvoice(current.tenantCtx.roles);
   const poPath = `/proyectos/${id}/ordenes-compra/${poId}`;
 
   const receiptItems: PurchaseReceiptListItem[] = receipts.map((r) => ({
@@ -179,15 +223,33 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                     redirect(poPath);
                   }}
                 >
-                  <Button type="submit" className={actionBtn}>
+                  <Button
+                    type="submit"
+                    className={actionBtn}
+                    variant={showAuthorizeAndCommit ? "outline" : "default"}
+                  >
                     Enviar a aprobación
                   </Button>
                 </form>
+                {showAuthorizeAndCommit ? (
+                  <AuthorizeAndCommitPoButton
+                    poId={poId}
+                    projectId={id}
+                    className={actionBtn}
+                  />
+                ) : null}
               </>
             )}
             {isSubmitted && canApprovePo && (
-              <PurchaseOrderApprovalActions poId={poId} projectId={id} />
+              <PurchaseOrderApprovalActions
+                poId={poId}
+                projectId={id}
+                willAutoConfirm={willAutoConfirmOnApprove}
+              />
             )}
+            {isSubmitted && showAuthorizeAndCommit ? (
+              <AuthorizeAndCommitPoButton poId={poId} projectId={id} className={actionBtn} />
+            ) : null}
             {isApproved && canEditPo && (
               <form
                 className="w-full sm:w-auto"
@@ -216,8 +278,25 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           </div>
         ) : null}
       </div>
+      {isApproved ? (
+        <p
+          className="hidden rounded-md border border-amber-300/60 bg-amber-50/80 px-3 py-2 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100 md:block"
+          role="status"
+        >
+          Aprobada — falta Confirmar al proveedor para comprometer $ en EDT.
+        </p>
+      ) : null}
 
       <ActionErrorBanner message={sp.actionError} />
+
+      {sp.invoiceError && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {sp.invoiceError}
+        </div>
+      )}
+
+      {billingPanel}
+      {highlightBilling ? <ScrollToElement id="facturar" /> : null}
 
       <PurchaseOrderMobileFiche
         order={order}
@@ -355,22 +434,6 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           </div>
         )}
       </div>
-
-      {sp.invoiceError && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {sp.invoiceError}
-        </div>
-      )}
-
-      {showBilling && !isCancelled && (
-        <PoBillingNextStepPanel
-          projectId={id}
-          purchaseOrderId={poId}
-          billing={billing}
-          canEditAp={canEditAp}
-          errorReturnPath={`/proyectos/${id}/ordenes-compra/${poId}`}
-        />
-      )}
 
       <DataTableSection
         title="Recepciones"

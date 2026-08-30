@@ -224,9 +224,18 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Regla:** desde `SUBMITTED`, un aprobador autorizado puede devolver la OC a `DRAFT` con **motivo obligatorio** (auditado). El origen/creador edita y reenvía. No existe “des-aprobar” un `APPROVED`/`CONFIRMED`: se anula o se cierra según [BR-PUR-013] y reglas de anulación.
 - **Origen:** [D-050](../00-product/DECISION_LOG.md).
 
+### BR-PUR-021 — Autorizar y comprometer (atajo de un paso)
+- **Regla:** si `CompanyProcurementSettings.allowAuthorizeAndCommit` está ON (default OFF), una OC en `DRAFT` o `SUBMITTED` puede pasar a `CONFIRMED` en un acto. Internamente se persisten `APPROVED` + `CONFIRMED` en la misma transacción. **No alto nivel:** quien tiene EDIT de OC ([D-105]). **Alto nivel** (umbral o `EXTRA_APPROVAL`): solo OWNER/ADMIN ([D-106] / `assertHighLevelApprover`). Respeta [BR-APR-004]. No se notifica `PURCHASE_ORDER_APPROVED` en este camino; solo `PURCHASE_ORDER_CONFIRMED`. El compromiso de costo sigue en `CONFIRMED` ([BR-PUR-001], [D-006]).
+
+### BR-PUR-022 — Auto-confirmar al aprobar (política)
+- **Regla:** si `CompanyProcurementSettings.autoConfirmOnApprove` está ON (default OFF), al aprobar una OC **no** de alto nivel el sistema pasa `SUBMITTED` → `CONFIRMED` en la misma transacción (approvedAt + confirmedAt + side effects de confirm). Alto nivel no auto-confirma ([D-107]). Comprometido solo en `CONFIRMED+` ([D-006]). Notifica confirmación, no “pendiente confirmar”.
+
+### BR-PUR-023 — Borrador AP al confirmar recepción (política)
+- **Regla:** si `CompanyProcurementSettings.autoDraftApInvoiceOnReceipt` está ON (default OFF), al confirmar una recepción con cantidad pendiente de facturar se crea (idempotente) un borrador de factura proveedor vinculado a la OC/recepción ([D-108]). **No** crea Payable ni Devengado: eso ocurre al emitir ([D-065]). No hay remito→CxP.- **Origen:** [D-105](../00-product/DECISION_LOG.md).
+
 ### BR-APR-004 — Segregación solicitante vs aprobador OC
-- **Regla:** quien originó la solicitud (`originRequestedByUserId` o `PurchaseRequest.requestedByUserId`) no puede aprobar la OC vinculada, salvo `allowSelfApproval` y sin varianza `EXTRA_APPROVAL` ni umbral de alto monto.
-- **Origen:** [D-044](../00-product/DECISION_LOG.md).
+- **Regla:** quien originó la solicitud (`originRequestedByUserId` o `PurchaseRequest.requestedByUserId`) no puede aprobar la OC vinculada, salvo `allowSelfApproval` y sin varianza `EXTRA_APPROVAL` ni umbral de alto monto. La misma segregación aplica al atajo [BR-PUR-021] / [D-105].
+- **Origen:** [D-044](../00-product/DECISION_LOG.md), [D-105](../00-product/DECISION_LOG.md).
 
 ### BR-APR-005 — Factura directa a obra sobre umbral
 - **Regla:** una `SupplierInvoice` de proyecto sin `purchaseOrderId` cuyo total en ARS supere `purchaseRequestRequiredAboveArs` solo puede registrarse por roles con `APPROVE AP` u OWNER/ADMIN, salvo que exista OC confirmada o solicitud completada que respalde el gasto.

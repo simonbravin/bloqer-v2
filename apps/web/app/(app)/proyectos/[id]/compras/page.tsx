@@ -170,6 +170,9 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
           <Button asChild variant="outline" size="sm">
             <Link href={hub.links.ordenes}>Todas las órdenes</Link>
           </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/proyectos/${projectId}/subcontratos`}>Paquetes de obra → Subcontratos</Link>
+          </Button>
         </CardContent>
       </Card>
     </PageShell>

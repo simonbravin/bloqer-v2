@@ -513,11 +513,18 @@ export async function resolveCompanyIdForAp(
 export async function createSupplierInvoice(
   input: CreateSupplierInvoiceInput,
   ctx: ServiceContext,
+  options?: {
+    /**
+     * [D-108] Trusted system path after receipt confirm under company policy.
+     * Skips AP mutate gate so warehouse can confirm receipt while Finance emits later.
+     */
+    bypassApMutateGate?: boolean;
+  },
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
 
   const projectId = input.projectId ?? null;
-  if (!canMutateApForScope(ctx.roles, projectId)) {
+  if (!options?.bypassApMutateGate && !canMutateApForScope(ctx.roles, projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas de proveedor");
   }
 
@@ -1250,6 +1257,11 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoice
     payable: inv.payable ? { id: inv.payable.id, status: inv.payable.status } : null,
     ...classFields,
   };
+}
+
+/** Shared serializer — also used by [D-108] system draft path without VIEW AP. */
+export function serializeSupplierInvoice(inv: RawInvoice): SupplierInvoiceView {
+  return serializeInvoice(inv);
 }
 
 function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {

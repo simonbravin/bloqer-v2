@@ -12,6 +12,12 @@ export type CompanyProcurementSettingsView = {
   quoteRequiredCategories: string[] | null;
   allowDirectPo: boolean;
   allowSelfApproval: boolean;
+  /** [D-105]/[D-106] One-step Autorizar y comprometer. Default false. */
+  allowAuthorizeAndCommit: boolean;
+  /** [D-107] Approve non-high-level PO → CONFIRMED in one act. Default false. */
+  autoConfirmOnApprove: boolean;
+  /** [D-108] Confirm receipt → auto-create AP invoice DRAFT. Default false. */
+  autoDraftApInvoiceOnReceipt: boolean;
   allowEmergencyDirectPo: boolean;
   varianceSoftAlertPct: string;
   varianceNoteRequiredPct: string;
@@ -40,6 +46,9 @@ const DEFAULTS = {
   maxQuotesAllowed: 3,
   allowDirectPo: true,
   allowSelfApproval: true,
+  allowAuthorizeAndCommit: false,
+  autoConfirmOnApprove: false,
+  autoDraftApInvoiceOnReceipt: false,
   allowEmergencyDirectPo: false,
   varianceSoftAlertPct: new Prisma.Decimal(10),
   // Kept equal to soft until Q-051 ([BR-PUR-009] uses soft → NOTE_REQUIRED).
@@ -66,6 +75,9 @@ function serialize(row: {
   quoteRequiredCategories: unknown;
   allowDirectPo: boolean;
   allowSelfApproval: boolean;
+  allowAuthorizeAndCommit: boolean;
+  autoConfirmOnApprove: boolean;
+  autoDraftApInvoiceOnReceipt: boolean;
   allowEmergencyDirectPo: boolean;
   varianceSoftAlertPct: Prisma.Decimal;
   varianceNoteRequiredPct: Prisma.Decimal;
@@ -93,6 +105,9 @@ function serialize(row: {
     quoteRequiredCategories: Array.isArray(cats) ? (cats as string[]) : null,
     allowDirectPo: row.allowDirectPo,
     allowSelfApproval: row.allowSelfApproval,
+    allowAuthorizeAndCommit: row.allowAuthorizeAndCommit,
+    autoConfirmOnApprove: row.autoConfirmOnApprove,
+    autoDraftApInvoiceOnReceipt: row.autoDraftApInvoiceOnReceipt,
     allowEmergencyDirectPo: row.allowEmergencyDirectPo,
     varianceSoftAlertPct: serializeRatePctDecimal(row.varianceSoftAlertPct),
     varianceNoteRequiredPct: serializeRatePctDecimal(row.varianceNoteRequiredPct),
@@ -144,6 +159,9 @@ export async function getCompanyProcurementSettings(
       quoteRequiredCategories: null,
       allowDirectPo: DEFAULTS.allowDirectPo,
       allowSelfApproval: DEFAULTS.allowSelfApproval,
+      allowAuthorizeAndCommit: DEFAULTS.allowAuthorizeAndCommit,
+      autoConfirmOnApprove: DEFAULTS.autoConfirmOnApprove,
+      autoDraftApInvoiceOnReceipt: DEFAULTS.autoDraftApInvoiceOnReceipt,
       allowEmergencyDirectPo: DEFAULTS.allowEmergencyDirectPo,
       varianceSoftAlertPct: serializeRatePctDecimal(DEFAULTS.varianceSoftAlertPct),
       varianceNoteRequiredPct: serializeRatePctDecimal(DEFAULTS.varianceNoteRequiredPct),
@@ -187,6 +205,9 @@ export async function upsertCompanyProcurementSettings(
     quoteRequiredCategories: string[] | null;
     allowDirectPo: boolean;
     allowSelfApproval: boolean;
+    allowAuthorizeAndCommit: boolean;
+    autoConfirmOnApprove: boolean;
+    autoDraftApInvoiceOnReceipt: boolean;
     allowEmergencyDirectPo: boolean;
     varianceSoftAlertPct: string;
     varianceNoteRequiredPct: string;
@@ -231,6 +252,10 @@ export async function upsertCompanyProcurementSettings(
           : input.quoteRequiredCategories,
     allowDirectPo: input.allowDirectPo ?? DEFAULTS.allowDirectPo,
     allowSelfApproval: input.allowSelfApproval ?? DEFAULTS.allowSelfApproval,
+    allowAuthorizeAndCommit: input.allowAuthorizeAndCommit ?? DEFAULTS.allowAuthorizeAndCommit,
+    autoConfirmOnApprove: input.autoConfirmOnApprove ?? DEFAULTS.autoConfirmOnApprove,
+    autoDraftApInvoiceOnReceipt:
+      input.autoDraftApInvoiceOnReceipt ?? DEFAULTS.autoDraftApInvoiceOnReceipt,
     allowEmergencyDirectPo: input.allowEmergencyDirectPo ?? DEFAULTS.allowEmergencyDirectPo,
     varianceSoftAlertPct: parsePctOrDefault(
       input.varianceSoftAlertPct,
@@ -296,6 +321,15 @@ export async function upsertCompanyProcurementSettings(
   }
   if (input.allowSelfApproval !== undefined) {
     updateData.allowSelfApproval = input.allowSelfApproval;
+  }
+  if (input.allowAuthorizeAndCommit !== undefined) {
+    updateData.allowAuthorizeAndCommit = input.allowAuthorizeAndCommit;
+  }
+  if (input.autoConfirmOnApprove !== undefined) {
+    updateData.autoConfirmOnApprove = input.autoConfirmOnApprove;
+  }
+  if (input.autoDraftApInvoiceOnReceipt !== undefined) {
+    updateData.autoDraftApInvoiceOnReceipt = input.autoDraftApInvoiceOnReceipt;
   }
   if (input.allowEmergencyDirectPo !== undefined) {
     updateData.allowEmergencyDirectPo = input.allowEmergencyDirectPo;

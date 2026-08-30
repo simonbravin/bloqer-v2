@@ -15,6 +15,7 @@
 | P-ERD-06 | Entidad **línea de extracto** en conciliación bancaria | **HECHO 2026-08-08** — tabla `BankStatementLine` ([D-081]) |
 | P-ERD-07 | **UUID v4 vs v7** | **HECHO 2026-05-07** — UUID v4 elegido. Ver ADR-Phase1-01. |
 | P-ERD-08 | **Equipo de obra / R-USR-007** | **Parcial 2026-08-26 ([D-091]):** tabla `ProjectTeamMember` = roster de notificaciones. RBAC “solo su proyecto” / filtrar `/pendientes` **pendiente**. |
+| P-PUR-01 | **Oleada B compras** (atajo alto nivel, auto-confirm on approve, auto-draft AP) | **Hecho 2026-08-30** — [D-106]/[D-107]/[D-108]. Commitment unificado / Workflows → Oleada C ([Q-060]). |
 
 ## Gastos generales → obra (D-040)
 

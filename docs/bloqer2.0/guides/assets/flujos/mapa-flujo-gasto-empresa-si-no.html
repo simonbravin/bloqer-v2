@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Costo de empresa: si esto, entonces aquello</title>
+  <link rel="stylesheet" href="../flujo-poster.css" />
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Nivel empresa · el caminito</p>
+        <h1>Costo de empresa: si esto, entonces aquello</h1>
+      </div>
+    </header>
+    <div class="lede">
+      <p>
+        Alquiler, servicios, estructura: <strong>sin obra y sin EDT</strong>. Clase: Gasto general.
+        Si el gasto es de una partida de obra, no uses este camino.
+      </p>
+      <div class="legend">
+        <span class="chip go">Sigue</span>
+        <span class="chip ask">¿Pregunta?</span>
+        <span class="chip stop">No sigue</span>
+        <span class="chip money">Impacta $</span>
+      </div>
+    </div>
+    <svg viewBox="0 0 1600 700" width="1600" height="700" role="img">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/></marker>
+        <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#047857"/></marker>
+        <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#be123c"/></marker>
+      </defs>
+
+      <rect x="24" y="18" width="1552" height="300" rx="16" fill="#fff" stroke="#e2e8f0"/>
+      <text x="44" y="44" fill="#1d4ed8" font-size="12" font-weight="800" letter-spacing="1.6">1 · ¿ES DE LA EMPRESA O DE UNA OBRA?</text>
+
+      <rect x="48" y="90" rx="16" width="176" height="64" fill="#1d4ed8"/>
+      <text x="136" y="118" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Hay un gasto</text>
+      <text x="136" y="136" text-anchor="middle" fill="#dbeafe" font-size="11">alquiler, luz, estructura</text>
+
+      <line x1="224" y1="122" x2="268" y2="122" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <polygon points="368,72 468,122 368,172 268,122" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="368" y="110" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">¿Es de una obra</text>
+      <text x="368" y="128" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">(tiene partida EDT)?</text>
+
+      <line x1="368" y1="72" x2="368" y2="40" stroke="#be123c" stroke-width="2"/>
+      <line x1="368" y1="40" x2="520" y2="40" stroke="#be123c" stroke-width="2" marker-end="url(#arrR)"/>
+      <rect x="524" y="20" rx="10" width="300" height="40" fill="#ffe4ea" stroke="#be123c"/>
+      <text x="674" y="37" text-anchor="middle" fill="#9f1239" font-size="12" font-weight="800">SÍ → no es este circuito</text>
+      <text x="674" y="52" text-anchor="middle" fill="#9f1239" font-size="11">Usá costo de obra (factura del proyecto)</text>
+
+      <line x1="468" y1="122" x2="540" y2="122" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="480" y="112" fill="#1d4ed8" font-size="12" font-weight="800">NO</text>
+      <rect x="544" y="94" rx="12" width="220" height="56" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="654" y="118" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Facturas y gastos</text>
+      <text x="654" y="136" text-anchor="middle" fill="#64748b" font-size="11">o Transacciones · sin proyecto</text>
+
+      <line x1="764" y1="122" x2="808" y2="122" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <polygon points="908,72 1008,122 908,172 808,122" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="908" y="110" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">¿Payee Proveedor</text>
+      <text x="908" y="128" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">o Empleado activo?</text>
+
+      <line x1="908" y1="172" x2="908" y2="220" stroke="#be123c" stroke-width="2" marker-end="url(#arrR)"/>
+      <rect x="760" y="224" rx="10" width="296" height="68" fill="#ffe4ea" stroke="#be123c"/>
+      <text x="908" y="250" text-anchor="middle" fill="#9f1239" font-size="12" font-weight="800">NO → no sale en el listado</text>
+      <text x="908" y="268" text-anchor="middle" fill="#9f1239" font-size="11">Asigná el rol en su ficha de Directorio</text>
+      <text x="908" y="284" text-anchor="middle" fill="#9f1239" font-size="11">Cliente / Subcontratista no sirven acá</text>
+
+      <line x1="1008" y1="122" x2="1120" y2="122" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="1024" y="112" fill="#1d4ed8" font-size="12" font-weight="800">SÍ</text>
+      <rect x="1124" y="90" rx="12" width="228" height="64" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="1238" y="116" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Factura de gasto</text>
+      <text x="1238" y="134" text-anchor="middle" fill="#64748b" font-size="11">Clase: Gasto general · sin EDT</text>
+
+      <rect x="24" y="338" width="1552" height="330" rx="16" fill="#fff" stroke="#e2e8f0"/>
+      <text x="44" y="364" fill="#1d4ed8" font-size="12" font-weight="800" letter-spacing="1.6">2 · EMITIR Y PAGAR</text>
+
+      <rect x="48" y="468" rx="12" width="176" height="56" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="136" y="492" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Crear / Emitir</text>
+      <text x="136" y="510" text-anchor="middle" fill="#64748b" font-size="11">Devengado + CxP</text>
+
+      <line x1="224" y1="496" x2="272" y2="496" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <polygon points="372,446 472,496 372,546 272,496" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="372" y="488" text-anchor="middle" fill="#92400e" font-size="13" font-weight="800">¿Pagar ahora?</text>
+      <text x="372" y="506" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">egreso de caja</text>
+
+      <line x1="372" y1="546" x2="372" y2="600" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <rect x="260" y="604" rx="10" width="224" height="40" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="372" y="629" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="700">NO → CxP, pagar después</text>
+
+      <line x1="472" y1="496" x2="548" y2="496" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="484" y="486" fill="#1d4ed8" font-size="12" font-weight="800">SÍ</text>
+      <polygon points="628,446 708,496 628,546 548,496" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="628" y="488" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">¿Hay fondos</text>
+      <text x="628" y="506" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">en la cuenta?</text>
+
+      <line x1="628" y1="546" x2="628" y2="600" stroke="#be123c" stroke-width="2" marker-end="url(#arrR)"/>
+      <rect x="516" y="604" rx="10" width="224" height="40" fill="#ffe4ea" stroke="#be123c"/>
+      <text x="628" y="629" text-anchor="middle" fill="#9f1239" font-size="12" font-weight="800">NO → Bloqer bloquea el pago</text>
+
+      <line x1="708" y1="496" x2="800" y2="496" stroke="#047857" stroke-width="2" marker-end="url(#arrG)"/>
+      <text x="720" y="486" fill="#047857" font-size="12" font-weight="800">SÍ</text>
+      <rect x="804" y="464" rx="14" width="220" height="64" fill="#047857"/>
+      <text x="914" y="492" text-anchor="middle" fill="#fff" font-size="15" font-weight="800">Pagado</text>
+      <text x="914" y="512" text-anchor="middle" fill="#d1fae5" font-size="11">egreso de caja · circuito cerrado</text>
+
+      <rect x="1080" y="468" rx="10" width="460" height="88" fill="#fff4e5" stroke="#b45309"/>
+      <text x="1310" y="496" text-anchor="middle" fill="#92400e" font-size="13" font-weight="800">Reintegro de oficina = mismo camino</text>
+      <text x="1310" y="516" text-anchor="middle" fill="#92400e" font-size="12">payee = Empleado. Sueldo de estructura también.</text>
+      <text x="1310" y="536" text-anchor="middle" fill="#92400e" font-size="12">Imputar GG a obras es otro menú (no este alta).</text>
+    </svg>
+    <footer>
+      <span>Bloqer · Flujo condicional de costo de empresa · Guía operativa §12.2 · §14</span>
+      <span>La lámina de pago corporativo sigue en laminas/mapa-pago-corporativo.png</span>
+    </footer>
+  </div>
+</body>
+</html>

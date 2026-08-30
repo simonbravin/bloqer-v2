@@ -30,9 +30,15 @@ import {
 type Props = {
   poId: string;
   projectId: string;
+  /** [D-107] When true, approving also confirms (Comprometido) under company policy. */
+  willAutoConfirm?: boolean;
 };
 
-export function PurchaseOrderApprovalActions({ poId, projectId }: Props) {
+export function PurchaseOrderApprovalActions({
+  poId,
+  projectId,
+  willAutoConfirm = false,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [approveOpen, setApproveOpen] = useState(false);
@@ -87,7 +93,7 @@ export function PurchaseOrderApprovalActions({ poId, projectId }: Props) {
         disabled={pending}
         onClick={() => setApproveOpen(true)}
       >
-        Aprobar
+        {willAutoConfirm ? "Aprobar y comprometer" : "Aprobar"}
       </Button>
       <Button
         type="button"
@@ -103,9 +109,13 @@ export function PurchaseOrderApprovalActions({ poId, projectId }: Props) {
       <AlertDialog open={approveOpen} onOpenChange={setApproveOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Aprobar esta orden?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {willAutoConfirm ? "¿Aprobar y comprometer?" : "¿Aprobar esta orden?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              La OC pasará a aprobada. Esta acción usa el workflow actual de compras.
+              {willAutoConfirm
+                ? "Con la política activa, al aprobar la OC queda Confirmada = Comprometido (reserva $ en EDT). Después se puede recibir y facturar."
+                : "La OC queda Aprobada (control interno). Todavía no reserva $. Después hay que Confirmar al proveedor para comprometer el costo en EDT."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -120,7 +130,13 @@ export function PurchaseOrderApprovalActions({ poId, projectId }: Props) {
                 approve();
               }}
             >
-              {pending ? "Aprobando…" : "Aprobar"}
+              {pending
+                ? willAutoConfirm
+                  ? "Procesando…"
+                  : "Aprobando…"
+                : willAutoConfirm
+                  ? "Aprobar y comprometer"
+                  : "Aprobar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

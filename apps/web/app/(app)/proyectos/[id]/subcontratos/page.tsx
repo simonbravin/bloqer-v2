@@ -51,6 +51,12 @@ export default async function SubcontratosPage({ params }: PageProps) {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" asChild>
+              <Link href={`/proyectos/${projectId}/compras`}>Tablero de compras</Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/proyectos/${projectId}/ordenes-compra`}>Órdenes de compra</Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
               <Link href={`/proyectos/${projectId}/reportes/subcontratos`}>
                 Varianza y certificaciones
               </Link>

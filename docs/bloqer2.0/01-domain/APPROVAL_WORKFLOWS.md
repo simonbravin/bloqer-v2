@@ -66,12 +66,17 @@ flowchart LR
   Reject --> Draft
   Approved --> Confirm[Confirmar al proveedor]
   Confirm --> Confirmed([CONFIRMED])
+  Draft --> AuthCommit[Autorizar y comprometer D-105]
+  Pending --> AuthCommit
+  AuthCommit --> Confirmed
 ```
 
 **Reglas:**
 - Umbral monto: `CompanyProcurementSettings.poApprovalThresholdArs`. Si es null, no hay 4 ojos por monto; igual puede exigir alto nivel por varianza `EXTRA_APPROVAL` ([BR-PUR-009]).
-- Al **enviar**, si no requiere alto nivel y el actor es aprobador estándar (y pasa segregación), la OC puede pasar directo a `APPROVED` (auto-aprobación en el mismo acto).
+- Al **enviar**, si no requiere alto nivel y el actor es aprobador estándar (y pasa segregación), la OC puede pasar directo a `APPROVED` (auto-aprobación en el mismo acto). **No** auto-confirma.
 - **Aprobar ≠ ejecutar:** `APPROVED` solo habilita confirmar al proveedor. El **compromiso de costo** ocurre en `CONFIRMED` ([D-006], [BR-PUR-001]).
+- **Autorizar y comprometer ([D-105]/[D-106]):** si `allowAuthorizeAndCommit` (default off): OC **no** alto nivel → EDIT OC; OC **alto nivel** → solo OWNER/ADMIN. Desde `DRAFT`/`SUBMITTED`, autorizar y confirmar en **un** acto (persiste APPROVED+CONFIRMED). Segregación [BR-APR-004] aplica.
+- **Auto-confirmar al aprobar ([D-107]):** si `autoConfirmOnApprove` (default off), aprobar OC no alto nivel pasa a `CONFIRMED` en la misma TX. Alto nivel no auto-confirma.
 - **Rechazo / devolución ([BR-PUR-016]):** desde `SUBMITTED`, el aprobador puede devolver a `DRAFT` con **motivo obligatorio** (auditado). El creador corrige y reenvía. No se “des-aprueba” un `APPROVED`/`CONFIRMED`.
 - **Segregación ([BR-APR-004]):** quien originó la SC/OC no aprueba, salvo `allowSelfApproval` y sin alto monto ni `EXTRA_APPROVAL`.
 - Toda línea de OC de proyecto lleva WBS ([BR-PUR-007], [D-050]).
@@ -81,12 +86,14 @@ flowchart LR
 - Aprueba (sin umbral ni desvío alto): PROCUREMENT, ADMIN, OWNER.
 - Aprueba (umbral superado o `EXTRA_APPROVAL`): solo ADMIN o OWNER.
 - Rechaza / devuelve: mismos roles que pueden aprobar en ese contexto.
-- Confirma al proveedor: PROCUREMENT, ADMIN, OWNER.
+- Confirma al proveedor: PROCUREMENT, ADMIN, OWNER (EDIT).
+- Autorizar y comprometer ([D-105]): EDIT OC + política ON + no alto nivel + segregación.
 
-**Notificaciones ([BR-PUR-015], [D-050]):**
+**Notificaciones ([BR-PUR-015], [D-050], [D-105]):**
 - SC enviada → Compras (+ fallback OWNER/ADMIN).
 - OC queda `SUBMITTED` → aprobadores correspondientes (alto nivel → OWNER/ADMIN).
 - OC aprobada / rechazada-devuelta / confirmada → **solicitante** (y creador si distinto).
+- Atajo [D-105]: **no** notificar `PURCHASE_ORDER_APPROVED`; solo `PURCHASE_ORDER_CONFIRMED` (audiencia de recepción).
 - Canal: **in-app + email**; recordatorio por antigüedad/SLA con escalamiento a OWNER/ADMIN.
 
 ---

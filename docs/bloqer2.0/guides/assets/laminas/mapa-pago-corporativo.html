@@ -1,0 +1,131 @@
+﻿<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Pagar desde la empresa</title>
+  <link rel="stylesheet" href="../mapa-poster.css" />
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Nivel empresa · guía para usuarios</p>
+        <h1>Pagar desde la empresa</h1>
+        <span>Sueldo, reintegro o gasto: factura → CxP → caja</span>
+      </div>
+    </header>
+    <div class="body">
+      <div class="lede">
+        <p>Bloqer <strong>no liquida nómina</strong>. Un sueldo, un reintegro o un gasto de oficina se registran como <strong>factura/gasto</strong> ligado a un contacto (Empleado o Proveedor). Siempre existe la cadena Factura → CxP → Pago, aunque se pague en el mismo momento.</p>
+        <div class="legend">
+          <span class="chip info">Camino feliz</span>
+          <span class="chip warn">Vuelve atrás</span>
+          <span class="chip block">Queda trabado</span>
+          <span class="chip ok">Impacta $ / stock</span>
+        </div>
+      </div>
+      
+      <p class="section-label">1 · Elegir el camino</p>
+      <div class="row cols-3">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">1</span>Sueldo</h3>
+            <span class="who">Admin / Finanzas</span>
+          </div>
+          <p>Registro de costo, no liquidación de haberes.</p>
+          <ul><li>Payee = Empleado del Directorio</li><li>Transacciones → Gasto / factura</li><li>No uses Solo caja (eso es ingreso)</li></ul>
+          <span class="state">Gasto mapeado al empleado</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">2</span>Reintegro</h3>
+            <span class="who">Admin / Finanzas</span>
+          </div>
+          <p>El empleado adelantó plata y la empresa se la devuelve.</p>
+          <ul><li>Payee = empleado, no el comercio</li><li>Adjunto del ticket</li><li>Si es monotributista con factura C: rol Proveedor</li></ul>
+          <span class="state">Mismo circuito AP</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">3</span>Gasto / factura</h3>
+            <span class="who">Admin / Finanzas</span>
+          </div>
+          <p>Alquiler, servicios, proveedor de oficina. Sin obra.</p>
+          <ul><li>Facturas y gastos o Transacciones</li><li>Clase: Gasto general</li><li>A quién se le paga = Proveedor o Empleado</li></ul>
+          <span class="state">Borrador o pago al emitir</span>
+        </article>
+      </div>
+      <p class="section-label">2 · Circuito común</p>
+      <div class="row cols-4">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">4</span>Cargar</h3>
+            <span class="who">Admin</span>
+          </div>
+          <p>Líneas, fechas y adjunto. Crear factura deja <strong>borrador</strong>.</p>
+          <ul><li>A quién se le paga (activo + rol)</li><li>Desc. % opcional antes de IVA</li><li>Sin proyecto = corporativo</li></ul>
+          <span class="state">Factura borrador</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">5</span>Emitir</h3>
+            <span class="who">Admin / Finanzas</span>
+          </div>
+          <p><strong>Emitir</strong> crea la CxP y el asiento DRAFT.</p>
+          <ul><li>Devengado</li><li>Ya se puede pagar</li><li>Opción: Emitir y pagar ahora</li></ul>
+          <span class="state">Factura emitida + CxP</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">6</span>Pagar</h3>
+            <span class="who">Tesorería</span>
+          </div>
+          <p>CxP → Registrar pago, o el checkbox al emitir.</p>
+          <ul><li>Cuenta de tesorería + fecha</li><li>Método y referencia</li><li>Default = saldo pendiente</li></ul>
+          <span class="state">Pagado + egreso</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">7</span>Contabilizar</h3>
+            <span class="who">Contabilidad</span>
+          </div>
+          <p>El asiento nace en borrador. Hay que <strong>Contabilizar</strong> para los libros.</p>
+          <ul><li>Hub Contabilidad → Borradores</li><li>Nunca se auto-posta</li><li>Reportes solo ven POSTED</li></ul>
+          <span class="state">Asiento POSTED</span>
+        </article>
+      </div>
+      <p class="section-label">Qué cambia en cada hito</p>
+      <div class="impact cols-4">
+        <div class="i1"><b>Borrador</b><span>Todavía no hay CxP ni caja.</span></div>
+        <div class="i2"><b>Emitida</b><span>Devengado + cuenta por pagar.</span></div>
+        <div class="i3"><b>Pago</b><span>Pagado + egreso de tesorería.</span></div>
+        <div class="i4"><b>Contabilizar</b><span>Entra a libros gerenciales.</span></div>
+      </div>
+      <p class="section-label">Si no se puede pagar</p>
+      <div class="cons">
+        <div class="box warn">
+          <h2>Vuelve atrás</h2>
+          <ul>
+            <li>Factura en borrador: se edita. Una vez emitida, se anula (no se edita).</li>
+            <li>Contacto que no aparece: asignale rol Proveedor o Empleado y que esté activo.</li>
+          </ul>
+        </div>
+        <div class="box block">
+          <h2>Queda trabado</h2>
+          <ul>
+            <li>Fondos insuficientes en la cuenta: Bloqer bloquea Emitir y pagar ahora / el pago.</li>
+            <li>Periodo contable cerrado en esa fecha.</li>
+            <li>Movimiento ya conciliado: hay que desemparejar antes de cancelar el pago.</li>
+            <li>No uses Solo caja para “pagar” un sueldo o reintegro (eso es ingreso).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <span>Bloqer · Pagar desde la empresa · Guía operativa §12.2 · §12.2.1 · §12.2.2</span>
+      <span>Finanzas → Transacciones · Facturas y gastos · CxP</span>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,141 @@
+﻿<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Armar el cronograma</title>
+  <link rel="stylesheet" href="../mapa-poster.css" />
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Nivel proyecto · guía para usuarios</p>
+        <h1>Armar el cronograma</h1>
+        <span>Importar la EDT, fechas, dependencias, hitos y reordenar</span>
+      </div>
+    </header>
+    <div class="body">
+      <div class="lede">
+        <p>El cronograma no nace vacío: lo habitual es <strong>Importar desde presupuesto</strong> para que las tareas queden alineadas a la EDT. Las fechas se editan en <strong>hojas</strong>, no en contenedores. Las dependencias son solo <strong>Finish-to-Start (FS)</strong>: avisan, no bloquean.</p>
+        <div class="legend">
+          <span class="chip info">Camino feliz</span>
+          <span class="chip warn">Vuelve atrás</span>
+          <span class="chip block">Queda trabado</span>
+          <span class="chip ok">Impacta $ / stock</span>
+        </div>
+      </div>
+      
+      <p class="section-label">1 · Traer la EDT y acomodar el árbol</p>
+      <div class="row cols-4">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">1</span>Importar</h3>
+            <span class="who">PM</span>
+          </div>
+          <p><strong>Importar desde presupuesto</strong> → diálogo <strong>Importar EDT al cronograma</strong>.</p>
+          <ul><li>Elegí el presupuesto aprobado</li><li>Por defecto: estructura, sin fechas</li><li>Opcional: fechas estimadas de borrador (reparte el rango; no respeta FS)</li><li>Después podés sumar hitos y tareas sin EDT</li></ul>
+          <span class="state">Tareas enlazadas</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">2</span>+ Tarea / hito</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Alta suelta. Tipo <strong>Tarea</strong> o <strong>Hito</strong> + fechas.</p>
+          <ul><li>Ubicación: Colocar bajo + Insertar después de</li><li>Si la EDT ya tiene una tarea hoja, propone hermano (no hijo)</li><li>El vínculo EDT no mueve la fila</li></ul>
+          <span class="state">Ítem en el árbol</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">3</span>Reordenar</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>En Gantt, Tabla o detalle: <strong>↑ ↓</strong>, <strong>sangrar →</strong>, <strong>← disminuir sangría</strong>.</p>
+          <ul><li>↑ ↓ = hermanos</li><li>Sangrar bajo una hoja: esa hoja pasa a contenedor (pide confirmación)</li><li>Se le quita el vínculo EDT al nuevo contenedor</li></ul>
+          <span class="state">Árbol del Gantt</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">4</span>Filtros</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Tipo = Todos / Tareas / Hitos. Estado. ▾ colapsa capítulos.</p>
+          <ul><li>Hitos = diamante, color fijo</li><li>Canceladas ocultas por defecto</li><li>Aviso si el presupuesto base ≠ el aprobado actual</li></ul>
+          <span class="state">Vista Gantt default</span>
+        </article>
+      </div>
+      <p class="section-label">2 · Fechas, FS e hitos</p>
+      <div class="row cols-4">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">5</span>Fechas en hojas</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Arrastrá / redimensioná en el Gantt o editá en el detalle.</p>
+          <ul><li>No edites fechas de contenedores: se pisan con el rollup</li><li>Recalcular contenedores si hace falta</li><li>Advertencia al guardar si rompés un FS</li></ul>
+          <span class="state">Plan (tiempo)</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">6</span>Dependencias FS</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Solo Finish-to-Start. Pestaña <strong>Dependencias</strong> o botón <strong>FS</strong> en el Gantt.</p>
+          <ul><li>Las flechas del Gantt son de solo lectura</li><li>Violación = aviso, no bloqueo</li><li>Las fechas placeholder del import no respetan FS</li></ul>
+          <span class="state">Predecesoras</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">7</span>Vínculo EDT</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>En el detalle: un nodo <strong>primario</strong>. Sin eso, chip <strong>Sin EDT</strong>.</p>
+          <ul><li>Sin EDT no hay % Real ni métricas de costo/cert</li><li>Hitos no toman % Real del libro (D-103)</li><li>Chips Entrega OC / Recibido si hay compra</li></ul>
+          <span class="state">Costo + avance</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">8</span>Completar un hito</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>A mano en el detalle, o al <strong>confirmar una recepción</strong> de la misma EDT (D-104).</p>
+          <ul><li>Filtro Tipo = Hitos</li><li>No anides un hito bajo la tarea de montaje</li><li>Anular la recepción no reabre el hito</li></ul>
+          <span class="state">Completado</span>
+        </article>
+      </div>
+      <p class="section-label">Las cuatro dimensiones (no las mezcles)</p>
+      <div class="impact cols-4">
+        <div class="i1"><b>Real</b><span>Libro de obra aprobado en tareas con EDT. Hitos: a mano o recepción.</span></div>
+        <div class="i2"><b>Plan (tiempo)</b><span>Fechas vs hoy. Automático.</span></div>
+        <div class="i3"><b>Cantidades</b><span>Físico vs presupuesto, desde el libro.</span></div>
+        <div class="i5"><b>Certificado</b><span>Certificaciones emitidas. Solo lectura acá.</span></div>
+      </div>
+      <p class="section-label">Si se desarma el Gantt</p>
+      <div class="cons">
+        <div class="box warn">
+          <h2>Vuelve atrás</h2>
+          <ul>
+            <li>Sangraste mal: disminuí sangría o mové el ítem. El contenedor nuevo ya no tiene EDT.</li>
+            <li>Fechas placeholder raras: las editás a mano; el import no corre de nuevo las FS.</li>
+            <li>Hito cerrado de más por una recepción: reabrilo a mano en el detalle.</li>
+          </ul>
+        </div>
+        <div class="box block">
+          <h2>Queda trabado / no hagas esto</h2>
+          <ul>
+            <li>Editar fechas de un contenedor: el rollup las pisa.</li>
+            <li>Anidar un hito debajo de una tarea hoja: esa tarea deja de tener fechas editables.</li>
+            <li>Kanban: un salto de estado inválido no se aplica (mensaje, no cambia).</li>
+            <li>Sin presupuesto aprobado, el import no tiene de dónde nacer las tareas.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <span>Bloqer · Armar el cronograma · Guía operativa §7.0 · §7.1</span>
+      <span>Planificación → Cronograma · Gantt / Tabla / + Tarea / hito</span>
+    </footer>
+  </div>
+</body>
+</html>

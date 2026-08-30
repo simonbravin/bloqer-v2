@@ -36,6 +36,14 @@ export function PurchaseOrderMobileFiche({
 
   return (
     <div className="space-y-4 md:hidden">
+      {order.status === "APPROVED" ? (
+        <p
+          className="rounded-md border border-amber-300/60 bg-amber-50/80 px-3 py-2 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100"
+          role="status"
+        >
+          Aprobada — falta Confirmar al proveedor para comprometer $ en EDT.
+        </p>
+      ) : null}
       <section className="rounded-lg border bg-card p-4 space-y-3" data-testid="po-mobile-fiche">
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div className="col-span-2">

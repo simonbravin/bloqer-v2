@@ -125,7 +125,7 @@ export const DIRECTORY_ARTICLES: HelpArticle[] = [
     steps: [
       "Abrí Directorio → + Nuevo contacto (?role=SUBCONTRACTOR).",
       "Marcá Subcontratista (podés sumar Proveedor si también vende materiales).",
-      "En la obra: Finanzas del proyecto → Subcontratos → Nuevo subcontrato.",
+      "En la obra: Compromisos → Subcontratos → Nuevo subcontrato.",
     ],
     effects: ["Queda disponible al crear un Subcontrato (buscá por razón social o nombre fantasía)."],
     pitfalls: ["No pagues un paquete de obra con OC ni con gasto genérico: usá el flujo de subcontrato."],

@@ -1,0 +1,490 @@
+﻿<!DOCTYPE html>
+<!--
+  Fuente del mapa de compras. El PNG publicado se genera con Chrome headless:
+  chrome --headless=new --hide-scrollbars --window-size=1600,1410 --screenshot=mapa-circuito-compra-sc-oc.png --force-device-scale-factor=2 mapa-circuito-compra-sc-oc.html
+  Recortar el margen inferior si Chrome deja vacío.
+-->
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Circuito de compra: de la SC al pago</title>
+  <style>
+    :root {
+      --navy: #07111f;
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #d7dee8;
+      --paper: #f4f7fb;
+      --card: #ffffff;
+      --blue: #1d4ed8;
+      --blue-soft: #e8effc;
+      --teal: #0f766e;
+      --teal-soft: #d1faf4;
+      --amber: #b45309;
+      --amber-soft: #fff4e5;
+      --rose: #be123c;
+      --rose-soft: #ffe4ea;
+      --green: #047857;
+      --green-soft: #d1fae5;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+    }
+    .poster {
+      width: 1600px;
+      margin: 0 auto;
+      background: var(--paper);
+    }
+    header {
+      background: var(--navy);
+      color: #fff;
+      padding: 28px 40px 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 32px;
+    }
+    header img {
+      height: 56px;
+      width: auto;
+      display: block;
+    }
+    .header-copy { text-align: right; }
+    .header-copy p {
+      margin: 0;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-size: 11px;
+      color: #93c5fd;
+      font-weight: 700;
+    }
+    .header-copy h1 {
+      margin: 6px 0 4px;
+      font-size: 34px;
+      line-height: 1.1;
+      font-weight: 750;
+    }
+    .header-copy span {
+      color: #cbd5e1;
+      font-size: 15px;
+    }
+    .body { padding: 28px 36px 32px; }
+    .lede {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: flex-start;
+      margin-bottom: 22px;
+    }
+    .lede p {
+      margin: 0;
+      max-width: 920px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.45;
+    }
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .chip {
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 5px 10px;
+      white-space: nowrap;
+    }
+    .chip.ok { background: var(--green-soft); color: var(--green); }
+    .chip.warn { background: var(--amber-soft); color: var(--amber); }
+    .chip.block { background: var(--rose-soft); color: var(--rose); }
+    .chip.info { background: var(--blue-soft); color: var(--blue); }
+    .section-label {
+      margin: 0 0 10px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--blue);
+    }
+    .row {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .row.a { grid-template-columns: repeat(4, 1fr); }
+    .row.b { grid-template-columns: 1fr 1.15fr 1.15fr; }
+    .row.c { grid-template-columns: repeat(3, 1fr); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px 16px 15px;
+      position: relative;
+      min-height: 176px;
+    }
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .card-top h3 { margin: 0; }
+    .card::after {
+      content: "→";
+      position: absolute;
+      right: -12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+    .row .card:last-child::after { display: none; }
+    .n {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: var(--blue);
+      color: #fff;
+      font-weight: 800;
+      font-size: 13px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 8px;
+    }
+    .who {
+      flex: 0 0 auto;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--blue);
+      background: var(--blue-soft);
+      border-radius: 999px;
+      padding: 3px 8px;
+      white-space: nowrap;
+    }
+    h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+    }
+    .card p {
+      margin: 0 0 8px;
+      font-size: 13px;
+      line-height: 1.4;
+      color: #334155;
+    }
+    .card ul {
+      margin: 0;
+      padding-left: 16px;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.4;
+    }
+    .state {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--blue);
+    }
+    .alt {
+      margin: 0 0 18px;
+      padding: 12px 16px;
+      border-radius: 14px;
+      background: #fff;
+      border: 1px dashed #93c5fd;
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+    .alt strong { color: var(--blue); font-size: 13px; }
+    .alt p { margin: 0; font-size: 13px; color: #334155; line-height: 1.4; }
+    .impact {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin: 6px 0 20px;
+    }
+    .impact div {
+      background: #fff;
+      border-radius: 12px;
+      padding: 10px 12px;
+      border-top: 3px solid var(--blue);
+    }
+    .impact b { display: block; font-size: 13px; margin-bottom: 3px; }
+    .impact span { font-size: 12px; color: var(--muted); line-height: 1.35; }
+    .impact .i2 { border-top-color: #2563eb; }
+    .impact .i3 { border-top-color: var(--teal); }
+    .impact .i4 { border-top-color: #7c3aed; }
+    .impact .i5 { border-top-color: var(--green); }
+    .cons {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 12px;
+    }
+    .box {
+      background: #fff;
+      border-radius: 16px;
+      padding: 16px 18px 14px;
+      border: 1px solid var(--line);
+    }
+    .box h2 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+    .box ul { margin: 0; padding-left: 18px; }
+    .box li {
+      margin: 0 0 7px;
+      font-size: 13px;
+      line-height: 1.4;
+      color: #334155;
+    }
+    .box.warn { background: var(--amber-soft); border-color: #f5d19a; }
+    .box.block { background: var(--rose-soft); border-color: #f4b4c4; }
+    footer {
+      padding: 14px 36px 20px;
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 11.5px;
+      border-top: 1px solid var(--line);
+    }
+  </style>
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Guía para usuarios</p>
+        <h1>Circuito de compra</h1>
+        <span>De la solicitud (SC) a la orden (OC), recepción, factura y pago</span>
+      </div>
+    </header>
+
+    <div class="body">
+      <div class="lede">
+        <p>
+          En obra, materiales e insumos van por <strong>solicitud → cotización → orden de compra</strong>.
+          No es lo mismo que un <strong>subcontrato</strong> (paquete de ejecución) ni que un
+          <strong>gasto chico / reintegro</strong> (factura sin OC). Toda línea de obra imputa a una
+          <strong>partida hoja EDT</strong>.
+        </p>
+        <div class="legend">
+          <span class="chip info">Camino feliz</span>
+          <span class="chip warn">Vuelve atrás</span>
+          <span class="chip block">Queda trabado</span>
+          <span class="chip ok">Impacta $ / stock</span>
+        </div>
+      </div>
+
+      <p class="section-label">1 · Solicitud de compra (camino formal)</p>
+      <div class="row a">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">1</span>Crear SC</h3>
+            <span class="who">PM / capataz</span>
+          </div>
+          <p>Desde <strong>Tablero de compras</strong>, <strong>Solicitudes</strong> o Materiales → <strong>Pedir</strong>.</p>
+          <ul>
+            <li>Cantidad, unidad y descripción</li>
+            <li>Partida EDT obligatoria</li>
+            <li>Fecha requerida (Necesaria para)</li>
+          </ul>
+          <span class="state">Estado: Borrador</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">2</span>Enviar</h3>
+            <span class="who">PM / capataz</span>
+          </div>
+          <p>Al enviar, Bloqer toma el snapshot de costo presupuestario y avisa a Compras.</p>
+          <ul>
+            <li>Aparece en <strong>Pendientes</strong> para cotizar</li>
+            <li>Campana a quien aprueba SC/OC</li>
+          </ul>
+          <span class="state">Estado: Enviada</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">3</span>Cotizar</h3>
+            <span class="who">Compras</span>
+          </div>
+          <p>Cargá ofertas comparables. El mínimo lo define la empresa en <strong>Políticas de compras</strong>.</p>
+          <ul>
+            <li>Proveedor del Directorio</li>
+            <li>Precio, desc. %, plazo e IVA</li>
+            <li>Vigencia de la cotización</li>
+          </ul>
+          <span class="state">Sigue enviada hasta elegir</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">4</span>Elegir proveedor</h3>
+            <span class="who">Compras</span>
+          </div>
+          <p><strong>Seleccionar</strong> una cotización genera la <strong>OC en borrador</strong> ya vinculada.</p>
+          <ul>
+            <li>Una OC activa por SC</li>
+            <li>La SC pasa a Cotización elegida</li>
+            <li>Al confirmar esa OC, la SC queda Completada</li>
+          </ul>
+          <span class="state">Sale: OC borrador</span>
+        </article>
+      </div>
+
+      <div class="alt">
+        <strong>Atajo · OC directa</strong>
+        <p>
+          Se puede crear la OC <strong>sin SC</strong> solo si la política lo habilita y el monto está bajo el umbral.
+          Si supera el umbral, Bloqer <strong>bloquea</strong> salvo emergencia documentada (OWNER/ADMIN + motivo).
+          Después entra al mismo circuito de aprobación.
+        </p>
+      </div>
+
+      <p class="section-label">2 · Orden de compra: enviar, autorizar y confirmar</p>
+      <div class="row b">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">5</span>Enviar a aprobación</h3>
+            <span class="who">Compras</span>
+          </div>
+          <p>No hay atajo “emitir y confirmar”. Siempre: Enviar → Aprobar → Confirmar.</p>
+          <ul>
+            <li>Si el precio supera el referencial: <strong>Justificación desvío</strong></li>
+            <li>Quien pide no se autoaprueba (salvo excepción de políticas)</li>
+          </ul>
+          <span class="state">Estado: Pend. aprobación</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">6</span>Aprobar o devolver</h3>
+            <span class="who">Aprobador</span>
+          </div>
+          <p><strong>Aprobar</strong> deja la OC lista para confirmar. <strong>Devolver a borrador</strong> exige motivo y notifica al origen.</p>
+          <ul>
+            <li>Si no se autoriza: vuelve a Borrador</li>
+            <li>Hay que corregir y reenviar</li>
+            <li>Aprobado ≠ comprometido</li>
+          </ul>
+          <span class="state">Aprobada · o otra vez Borrador</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">7</span>Confirmar al proveedor</h3>
+            <span class="who">Compras</span>
+          </div>
+          <p>Recién acá se informa al proveedor y se afecta el presupuesto.</p>
+          <ul>
+            <li><strong>Comprometido</strong> en EDT y costos</li>
+            <li>Habilita recepción y factura desde OC</li>
+            <li>Si venía de SC, la SC queda Completada</li>
+          </ul>
+          <span class="state">Estado: Confirmada</span>
+        </article>
+      </div>
+
+      <p class="section-label">3 · Cerrar el circuito: recibir, facturar y pagar</p>
+      <div class="row c">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">8</span>Recepcionar</h3>
+            <span class="who">Depósito / Compras</span>
+          </div>
+          <p>Parcial o total, desde <strong>Pendientes → Recibir</strong>, la campana o la OC.</p>
+          <ul>
+            <li>Entra stock si hay inventario</li>
+            <li><strong>No crea CxP</strong> por sí sola</li>
+            <li>Puede completar un hito del cronograma</li>
+          </ul>
+          <span class="state">Recep. parcial / Recibida</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">9</span>Facturar</h3>
+            <span class="who">Admin / Finanzas</span>
+          </div>
+          <p><strong>Registrar factura desde OC</strong> (Traer líneas). Crear = borrador; <strong>Emitir</strong> cierra el costo.</p>
+          <ul>
+            <li><strong>Devengado</strong> + cuenta por pagar</li>
+            <li>Copia la partida EDT de la OC</li>
+            <li>Opción: Emitir y pagar ahora</li>
+          </ul>
+          <span class="state">Factura emitida + CxP</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">10</span>Pagar</h3>
+            <span class="who">Tesorería</span>
+          </div>
+          <p>Desde <strong>Cuentas por pagar → Registrar pago</strong>, o en el mismo paso al emitir.</p>
+          <ul>
+            <li>Elige cuenta de tesorería</li>
+            <li>Si no hay fondos, Bloqer bloquea</li>
+            <li>Queda <strong>Pagado</strong> + egreso de caja</li>
+          </ul>
+          <span class="state">CxP pagada / parcial</span>
+        </article>
+      </div>
+
+      <p class="section-label">Qué cambia en EDT y costos en cada hito</p>
+      <div class="impact">
+        <div class="i1"><b>Aprobada</b><span>Solo control interno. Todavía no compromete plata.</span></div>
+        <div class="i2"><b>Confirmada</b><span>Comprometido. Ya “reserva” la partida.</span></div>
+        <div class="i3"><b>Recepción</b><span>Cantidades + stock. No abre la cuenta por pagar.</span></div>
+        <div class="i4"><b>Factura emitida</b><span>Devengado + CxP. Recién ahí se puede pagar.</span></div>
+        <div class="i5"><b>Pago</b><span>Pagado + salida de caja. Cierra el circuito.</span></div>
+      </div>
+
+      <p class="section-label">Si no se autoriza, se vence o se traba</p>
+      <div class="cons">
+        <div class="box warn">
+          <h2>Vuelve atrás (se puede corregir)</h2>
+          <ul>
+            <li><strong>Devolver a borrador:</strong> la OC no avanza; hay que editar, justificar si hace falta y reenviar.</li>
+            <li><strong>Anular SC</strong> se puede si la OC sigue en borrador. Si la OC ya salió de borrador, no.</li>
+            <li><strong>Anular OC en borrador</strong> vinculada: la SC vuelve a Enviada para elegir otra cotización.</li>
+            <li><strong>Fecha requerida o entrega vencida:</strong> badge rojo y aviso, pero no bloquea el circuito.</li>
+          </ul>
+        </div>
+        <div class="box block">
+          <h2>Queda trabado (no sigue)</h2>
+          <ul>
+            <li><strong>Sin aprobar / sin confirmar:</strong> no hay comprometido, no se recibe ni se factura desde OC.</li>
+            <li><strong>Periodo contable cerrado:</strong> no se confirma, no se recibe ni se emite factura con impacto.</li>
+            <li><strong>OC directa sobre umbral</strong> sin emergencia: Bloqer exige el camino con SC.</li>
+            <li><strong>Anular OC</strong> que ya tiene recepciones o facturas: hay que anular esos documentos primero.</li>
+            <li><strong>Emitir y pagar ahora</strong> sin fondos suficientes en la cuenta: bloquea.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <span>Bloqer · Circuito de compra · alineado a la Guía operativa §9 y §12.2</span>
+      <span>Compras → Tablero · Solicitudes · Órdenes · Recepciones · Facturas proveedor · CxP</span>
+    </footer>
+  </div>
+</body>
+</html>

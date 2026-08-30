@@ -258,11 +258,16 @@ stateDiagram-v2
   CANCELLED --> [*]
 ```
 
+> **Atajo [D-105]/[D-106]:** con `allowAuthorizeAndCommit`, `DRAFT`/`SUBMITTED` pueden llegar a `CONFIRMED` en un acto (**Autorizar y comprometer**). Bajo umbral: EDIT OC; alto nivel: OWNER/ADMIN. Internamente APPROVED+CONFIRMED en la misma TX.
+>
+> **Auto-confirmar [D-107]:** con `autoConfirmOnApprove`, aprobar OC no alto nivel pasa `SUBMITTED`→`CONFIRMED` en un acto.
+
 ### Tabla — transiciones (PurchaseOrder)
 
 | Desde | Hacia | Acción | Quién |
 |---|---|---|---|
 | `DRAFT` | `SUBMITTED` | Enviar (o auto-`APPROVED` si no requiere alto nivel) | PROCUREMENT / PM / ADMIN con EDIT |
+| `DRAFT` / `SUBMITTED` | `CONFIRMED` | **Autorizar y comprometer** ([D-105]): política ON, no alto nivel; escribe APPROVED+CONFIRMED | EDIT OC (PM / PROCUREMENT / ADMIN / OWNER) + segregación |
 | `SUBMITTED` | `APPROVED` | Aprobar | Estándar: PROCUREMENT/ADMIN/OWNER; alto monto o `EXTRA_APPROVAL`: solo OWNER/ADMIN |
 | `SUBMITTED` | `DRAFT` | Rechazar / devolver con motivo ([BR-PUR-016]) | Mismos roles que pueden aprobar |
 | `APPROVED` | `CONFIRMED` | Confirmar al proveedor → compromiso ([BR-PUR-001]) | PROCUREMENT / ADMIN / OWNER |
@@ -275,6 +280,7 @@ stateDiagram-v2
 - Toda línea tiene `wbs_node_id` obligatorio en compras de proyecto ([BR-PUR-007], [D-050]).
 - `APPROVED` **no** compromete costo; solo habilita confirmar al proveedor.
 - `CONFIRMED` impacta costo comprometido en proyecto ([BR-PUR-001], [D-006]).
+- Atajo [D-105]: alto nivel (umbral o `EXTRA_APPROVAL`) **no** tiene un paso; sigue Aprobar → Confirmar. Auto-approve al Enviar **no** auto-confirma.
 - Recepciones avanzan el estado; factura y pago son documentos separados ([D-020]).
 - Cancelación con recepción confirmada o factura activa: bloqueada; usar cierre parcial ([BR-PUR-013]).
 - Periodo cerrado bloquea confirmar OC / recepción / factura con impacto ([BR-PUR-014]).

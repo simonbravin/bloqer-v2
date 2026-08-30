@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { cn } from "@/lib/utils";
+import { HelpProcessMapsGallery } from "./help-process-maps";
 
 function FilterChip({
   active,
@@ -164,13 +165,17 @@ export function HelpSearchView() {
 
       <div>
         {browsing ? (
-          <>
-            <p className="mb-3 text-sm text-muted-foreground">
-              Empezá por un procedimiento frecuente, o buscá / filtrá arriba ({HELP_ARTICLES.length} en
-              total).
-            </p>
-            <ArticleResultList articles={featured} />
-          </>
+          <div className="space-y-8">
+            <HelpProcessMapsGallery />
+            <div>
+              <p className="mb-3 text-sm font-semibold tracking-tight">Procedimientos frecuentes</p>
+              <p className="mb-3 text-sm text-muted-foreground">
+                Texto paso a paso. Si hay mapa, también está en la ficha ({HELP_ARTICLES.length} en
+                total).
+              </p>
+              <ArticleResultList articles={featured} />
+            </div>
+          </div>
         ) : (
           <>
             <p className="mb-3 text-sm text-muted-foreground">

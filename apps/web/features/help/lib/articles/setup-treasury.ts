@@ -23,7 +23,12 @@ export const SETUP_ARTICLES: HelpArticle[] = [
       "Para volver a entrar: en /proyectos (abre en Tarjetas), clic en la tarjeta. También podés cambiar a Tabla y usar código, nombre o Ver.",
     ],
     effects: ["Sin activar, la operación diaria queda limitada."],
-    relatedSlugs: ["cargar-un-cliente", "armar-presupuesto-edt-apu", "asignar-equipo-de-obra"],
+    figure: {
+      src: "/help/mapa-puesta-en-marcha.png",
+      alt: "Bloqer — Puesta en marcha de la empresa y la primera obra",
+      caption: "Directorio, tesorería, contabilidad, crear y activar obra, y aprobar presupuesto.",
+    },
+    relatedSlugs: ["cargar-un-cliente", "armar-presupuesto-edt-apu", "asignar-equipo-de-obra", "puesta-en-marcha-contable"],
     keywords: [
       "crear proyecto",
       "crear obra",
@@ -132,7 +137,8 @@ export const SETUP_ARTICLES: HelpArticle[] = [
   {
     slug: "politicas-de-compras",
     title: "Políticas de compras",
-    summary: "Umbral de aprobación OC, SC requerida, cotizaciones, OC directa y desvíos.",
+    summary:
+      "Umbral de aprobación OC, SC requerida, cotizaciones, OC directa, auto-aprobación, atajos de un paso y borrador al recibir.",
     intents: ["politicas-compras"],
     modules: ["configuracion", "compras"],
     level: "company",
@@ -143,15 +149,29 @@ export const SETUP_ARTICLES: HelpArticle[] = [
     steps: [
       "Abrí Configuración → Políticas.",
       "Revisá umbral de aprobación, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia y % de desvíos.",
+      "Opcional: **Un paso: autorizar y comprometer** (apagado por defecto). Bajo umbral: PM/Compras; alto nivel: solo Admin ([D-106]).",
+      "Opcional: **Al aprobar, confirmar al proveedor** (bajo umbral) — [D-107].",
+      "Opcional: **Al recibir, crear borrador de factura** — no abre CxP hasta Emitir ([D-108]).",
       "Guardá. Las OC nuevas respetan esas reglas.",
     ],
     relatedSlugs: [
       "orden-de-compra-y-afectar-edt",
       "oc-directa-vs-con-solicitud",
       "editar-presupuesto-aprobado",
+      "circuito-comprar-material-hasta-pagarlo",
     ],
-    keywords: ["politicas", "compras", "umbral", "cotizaciones", "oc directa"],
-    guideRef: "§1.3 · §9",
+    keywords: [
+      "politicas",
+      "compras",
+      "umbral",
+      "cotizaciones",
+      "oc directa",
+      "autorizar y comprometer",
+      "un paso",
+      "auto confirmar",
+      "borrador factura",
+    ],
+    guideRef: "§1.3 · §9.2 · [D-105]–[D-108]",
   },
 ];
 
@@ -257,6 +277,11 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
     pitfalls: [
       "No canceles un pago/cobranza si el movimiento ya está Conciliado: desemparejá primero.",
     ],
+    figure: {
+      src: "/help/mapa-tesoreria-conciliacion.png",
+      alt: "Bloqer — Tesorería y conciliación",
+      caption: "Movimientos de caja y empareje del extracto hasta cerrar la sesión.",
+    },
     relatedSlugs: ["ajuste-manual-de-caja", "cerrar-el-mes", "ver-movimientos-de-tesoreria"],
     keywords: ["conciliacion", "extracto", "ofx", "banco"],
     guideRef: "§4.2",

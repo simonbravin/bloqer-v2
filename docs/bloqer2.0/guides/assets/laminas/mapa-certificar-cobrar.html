@@ -1,0 +1,131 @@
+﻿<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Certificar, facturar y cobrar</title>
+  <link rel="stylesheet" href="../mapa-poster.css" />
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Nivel proyecto · guía para usuarios</p>
+        <h1>Certificar, facturar y cobrar</h1>
+        <span>Avance al cliente → factura de venta → CxC → cobranza</span>
+      </div>
+    </header>
+    <div class="body">
+      <div class="lede">
+        <p>Aprobar la certificación <strong>no cobra</strong> y <strong>no crea la factura sola</strong>. Solo registra avance certificado. La plata entra cuando emitís la factura de venta y registrás la <strong>cobranza</strong> en CxC.</p>
+        <div class="legend">
+          <span class="chip info">Camino feliz</span>
+          <span class="chip warn">Vuelve atrás</span>
+          <span class="chip block">Queda trabado</span>
+          <span class="chip ok">Impacta $ / stock</span>
+        </div>
+      </div>
+      
+      <p class="section-label">1 · Certificar al cliente</p>
+      <div class="row cols-4">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">1</span>Precondición</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Presupuesto <strong>Aprobado o Cerrado</strong>.</p>
+          <ul><li>Sin baseline no se certifica con normalidad</li><li>Partidas hoja de la EDT</li><li>Pública vs Privada cambia el techo</li></ul>
+          <span class="state">Presupuesto listo</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">2</span>Nueva certificación</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Operación → Certificaciones. Período desde / hasta.</p>
+          <ul><li>Δ% físico y/o $ económico por partida</li><li>Pública: no superar 100% acumulado</li><li>Privada: puede superar con nota</li></ul>
+          <span class="state">Borrador</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">3</span>Emitir</h3>
+            <span class="who">PM</span>
+          </div>
+          <p><strong>Emitir</strong> la deja inmutable (ISSUED).</p>
+          <ul><li>Ya no se edita</li><li>El mandante todavía no aprobó</li><li>No mueve caja</li></ul>
+          <span class="state">Emitida</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">4</span>Aprobar o rechazar</h3>
+            <span class="who">PM / Admin</span>
+          </div>
+          <p>Según respuesta del cliente.</p>
+          <ul><li>Aprobar = avance certificado</li><li>Rechazar = no se factura esta versión</li><li>Aprobado ≠ cobrado</li></ul>
+          <span class="state">Aprobada · o rechazada</span>
+        </article>
+      </div>
+      <p class="section-label">2 · Facturar y cobrar</p>
+      <div class="row cols-3">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">5</span>Emitir factura</h3>
+            <span class="who">Admin / Finanzas</span>
+          </div>
+          <p>En la certificación Aprobada: <strong>Emitir factura</strong>.</p>
+          <ul><li>Es manual: aprobar no la crea</li><li>Genera cuenta por cobrar</li><li>Facturas emitidas quedan inmutables</li></ul>
+          <span class="state">Factura + CxC</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">6</span>Cobrar</h3>
+            <span class="who">Tesorería / Finanzas</span>
+          </div>
+          <p>CxC del proyecto → <strong>Cobrar</strong>. No hay Cobrar ahora en el alta de factura de obra.</p>
+          <ul><li>Cuenta de tesorería + fecha</li><li>Aviso Listo para cobrar (campana)</li><li>Solo la cobranza confirmada acredita banco</li></ul>
+          <span class="state">Ingreso de caja</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">7</span>Contabilizar</h3>
+            <span class="who">Contabilidad</span>
+          </div>
+          <p>Factura y cobranza generan asientos DRAFT.</p>
+          <ul><li>Contabilizar para los libros</li><li>Clase: Venta de obra / certificación</li><li>Anticipo / venta rápida es otro atajo</li></ul>
+          <span class="state">POSTED</span>
+        </article>
+      </div>
+      <p class="section-label">Qué cambia en cada hito</p>
+      <div class="impact cols-4">
+        <div class="i1"><b>Cert. aprobada</b><span>Avance certificado. No hay plata en banco.</span></div>
+        <div class="i2"><b>Factura emitida</b><span>Abre la CxC. Todavía no cobraste.</span></div>
+        <div class="i3"><b>Cobranza</b><span>INFLOW en tesorería. Cierra (o parcial) la CxC.</span></div>
+        <div class="i5"><b>Anticipo</b><span>Atajo: factura + CxC (+ cobro opcional) en un paso.</span></div>
+      </div>
+      <p class="section-label">Si el cliente no aprueba o no se cobra</p>
+      <div class="cons">
+        <div class="box warn">
+          <h2>Vuelve atrás</h2>
+          <ul>
+            <li>Rechazo del mandante: esa certificación no se factura; se corrige en una nueva.</li>
+            <li>Factura de venta emitida: solo se anula (no se edita).</li>
+          </ul>
+        </div>
+        <div class="box block">
+          <h2>Queda trabado</h2>
+          <ul>
+            <li>Obra pública: Bloqer bloquea si el acumulado supera 100%.</li>
+            <li>Sin presupuesto aprobado/cerrado no arranca el circuito.</li>
+            <li>Aprobar la certificación no genera CxC: hay que Emitir factura.</li>
+            <li>Periodo cerrado o cuenta sin usar: la cobranza se bloquea igual que cualquier tesorería.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <span>Bloqer · Certificar, facturar y cobrar · Guía operativa §11 · §12.1</span>
+      <span>Operación → Certificaciones · Facturas emitidas · CxC</span>
+    </footer>
+  </div>
+</body>
+</html>

@@ -68,7 +68,7 @@ export function assertProjectApDirectSpendAllowed(
 }
 
 export function assertSelfApprovalAllowed(
-  settings: CompanyProcurementSettingsView,
+  settings: Pick<CompanyProcurementSettingsView, "allowSelfApproval">,
   originRequestedByUserId: string | null | undefined,
   actorUserId: string | undefined,
   requiresExtraVarianceApproval: boolean,
@@ -90,7 +90,7 @@ export function assertSelfApprovalAllowed(
 
 /** Non-throwing check used when deciding auto-approve vs leave SUBMITTED. */
 export function isSelfApprovalAllowed(
-  settings: CompanyProcurementSettingsView,
+  settings: Pick<CompanyProcurementSettingsView, "allowSelfApproval">,
   originRequestedByUserId: string | null | undefined,
   actorUserId: string | undefined,
   requiresExtraVarianceApproval: boolean,

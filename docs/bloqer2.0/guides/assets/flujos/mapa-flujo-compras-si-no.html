@@ -1,0 +1,264 @@
+﻿<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Compra: si esto, entonces aquello</title>
+  <style>
+    :root {
+      --navy: #07111f;
+      --ink: #0f172a;
+      --muted: #475569;
+      --paper: #f4f7fb;
+      --blue: #1d4ed8;
+      --blue-soft: #e8effc;
+      --amber: #b45309;
+      --rose: #be123c;
+      --green: #047857;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--paper); font-family: "Segoe UI", Inter, Arial, sans-serif; color: var(--ink); }
+    .poster { width: 1600px; margin: 0 auto; background: var(--paper); }
+    header {
+      background: var(--navy); color: #fff;
+      padding: 22px 40px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    header img { height: 48px; }
+    .header-copy { text-align: right; }
+    .header-copy p { margin: 0; letter-spacing: .16em; text-transform: uppercase; font-size: 11px; color: #93c5fd; font-weight: 700; }
+    .header-copy h1 { margin: 4px 0 0; font-size: 28px; font-weight: 750; }
+    .lede { padding: 16px 40px 4px; display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+    .lede p { margin: 0; color: var(--muted); font-size: 15px; max-width: 1000px; line-height: 1.4; }
+    .legend { display: flex; gap: 8px; flex-shrink: 0; }
+    .chip { font-size: 11px; font-weight: 800; border-radius: 999px; padding: 4px 10px; }
+    .chip.go { background: #e8effc; color: #1d4ed8; }
+    .chip.ask { background: #fef3c7; color: #b45309; }
+    .chip.back { background: #fff4e5; color: #b45309; }
+    .chip.stop { background: #ffe4ea; color: #be123c; }
+    .chip.money { background: #d1fae5; color: #047857; }
+    svg { display: block; }
+    footer {
+      padding: 10px 40px 16px;
+      display: flex; justify-content: space-between;
+      color: var(--muted); font-size: 11.5px;
+      border-top: 1px solid #d7dee8;
+    }
+  </style>
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Nivel obra · el caminito</p>
+        <h1>Compra: si esto, entonces aquello</h1>
+      </div>
+    </header>
+    <div class="lede">
+      <p>
+        Cómo se mueve el documento. <strong>Azul</strong> sigue · <strong>rombo</strong> hay que decidir ·
+        <strong>ámbar</strong> vuelve atrás · <strong>rojo</strong> no pasa.
+        El $ se reserva al <strong>confirmar</strong>, no al aprobar.
+      </p>
+      <div class="legend">
+        <span class="chip go">Sigue</span>
+        <span class="chip ask">¿Pregunta?</span>
+        <span class="chip back">Vuelve</span>
+        <span class="chip stop">No sigue</span>
+        <span class="chip money">Impacta $</span>
+      </div>
+    </div>
+
+    <svg viewBox="0 0 1600 980" width="1600" height="980" role="img" aria-label="Flujo condicional de compra">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/>
+        </marker>
+        <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#047857"/>
+        </marker>
+        <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#b45309"/>
+        </marker>
+        <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#be123c"/>
+        </marker>
+      </defs>
+
+      <!-- Lane 1 band -->
+      <rect x="24" y="18" width="1552" height="288" rx="16" fill="#fff" stroke="#e2e8f0"/>
+      <text x="44" y="44" fill="#1d4ed8" font-size="12" font-weight="800" letter-spacing="1.6">1 · CÓMO NACIÓ LA OC</text>
+
+      <rect x="48" y="78" rx="16" width="168" height="68" fill="#1d4ed8"/>
+      <text x="132" y="106" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Necesidad</text>
+      <text x="132" y="126" text-anchor="middle" fill="#dbeafe" font-size="11">Materiales → Pedir</text>
+
+      <line x1="216" y1="112" x2="268" y2="112" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+
+      <polygon points="360,62 460,112 360,162 260,112" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="360" y="100" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">¿OC directa</text>
+      <text x="360" y="116" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">permitida y</text>
+      <text x="360" y="132" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">bajo umbral?</text>
+
+      <!-- invalid up -->
+      <line x1="360" y1="62" x2="360" y2="40" stroke="#be123c" stroke-width="2"/>
+      <line x1="360" y1="40" x2="520" y2="40" stroke="#be123c" stroke-width="2" marker-end="url(#arrR)"/>
+      <rect x="524" y="20" rx="10" width="268" height="40" fill="#ffe4ea" stroke="#be123c"/>
+      <text x="658" y="37" text-anchor="middle" fill="#9f1239" font-size="12" font-weight="800">Sobre umbral, sin emergencia</text>
+      <text x="658" y="52" text-anchor="middle" fill="#9f1239" font-size="11">Bloqer exige el camino SC</text>
+      <text x="308" y="36" fill="#be123c" font-size="10" font-weight="800">NO VÁLIDA</text>
+
+      <!-- YES to OC -->
+      <line x1="460" y1="112" x2="1290" y2="112" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="820" y="100" fill="#1d4ed8" font-size="12" font-weight="800">SÍ → salta a OC borrador  ·  o emergencia OWNER</text>
+
+      <!-- NO to SC row -->
+      <line x1="360" y1="162" x2="360" y2="198" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="372" y="186" fill="#1d4ed8" font-size="12" font-weight="800">NO</text>
+
+      <rect x="48" y="210" rx="12" width="148" height="58" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="122" y="234" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">SC borrador</text>
+      <text x="122" y="252" text-anchor="middle" fill="#64748b" font-size="11">EDT + fecha requerida</text>
+
+      <line x1="196" y1="239" x2="228" y2="239" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <rect x="232" y="210" rx="12" width="132" height="58" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="298" y="234" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Enviar SC</text>
+      <text x="298" y="252" text-anchor="middle" fill="#64748b" font-size="11">Pendientes Compras</text>
+
+      <line x1="364" y1="239" x2="396" y2="239" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <rect x="400" y="210" rx="12" width="132" height="58" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="466" y="234" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Cotizar</text>
+      <text x="466" y="252" text-anchor="middle" fill="#64748b" font-size="11">precio + plazo</text>
+
+      <line x1="532" y1="239" x2="564" y2="239" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <rect x="568" y="210" rx="12" width="168" height="58" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="652" y="234" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Elegir proveedor</text>
+      <text x="652" y="252" text-anchor="middle" fill="#64748b" font-size="11">genera OC borrador</text>
+
+      <path d="M736 239 C 980 239, 1120 112, 1290 112" fill="none" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+
+      <rect x="1296" y="78" rx="14" width="248" height="68" fill="#1d4ed8"/>
+      <text x="1420" y="106" text-anchor="middle" fill="#fff" font-size="15" font-weight="800">OC borrador</text>
+      <text x="1420" y="126" text-anchor="middle" fill="#dbeafe" font-size="12">Acá se juntan los dos caminos</text>
+
+      <!-- Lane 2 -->
+      <rect x="24" y="322" width="1552" height="288" rx="16" fill="#fff" stroke="#e2e8f0"/>
+      <text x="44" y="348" fill="#1d4ed8" font-size="12" font-weight="800" letter-spacing="1.6">2 · AUTORIZAR Y CONFIRMAR</text>
+
+      <rect x="48" y="430" rx="12" width="140" height="56" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="118" y="454" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">OC borrador</text>
+      <text x="118" y="472" text-anchor="middle" fill="#64748b" font-size="11">o Pend. aprobación</text>
+
+      <line x1="188" y1="458" x2="218" y2="458" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+
+      <polygon points="300,398 380,458 300,518 220,458" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="300" y="440" text-anchor="middle" fill="#92400e" font-size="11" font-weight="800">¿Política un paso</text>
+      <text x="300" y="456" text-anchor="middle" fill="#92400e" font-size="11" font-weight="800">y no es alto nivel?</text>
+      <text x="300" y="474" text-anchor="middle" fill="#92400e" font-size="10">umbral / desvío extra</text>
+
+      <!-- SÍ shortcut → Confirmada -->
+      <path d="M380 458 C 520 380, 900 360, 1094 440" fill="none" stroke="#047857" stroke-width="2.2" marker-end="url(#arrG)"/>
+      <text x="620" y="378" fill="#047857" font-size="12" font-weight="800">SÍ → Autorizar y comprometer</text>
+      <text x="700" y="394" fill="#047857" font-size="11">(autoriza + reserva $ juntos)</text>
+
+      <!-- NO → classic path -->
+      <line x1="380" y1="458" x2="420" y2="458" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="386" y="448" fill="#1d4ed8" font-size="11" font-weight="800">NO</text>
+
+      <rect x="424" y="430" rx="12" width="120" height="56" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="484" y="454" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Enviar</text>
+      <text x="484" y="472" text-anchor="middle" fill="#64748b" font-size="11">a aprobación</text>
+
+      <line x1="544" y1="458" x2="572" y2="458" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+
+      <polygon points="632,408 702,458 632,508 562,458" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="632" y="452" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">¿Aprueba</text>
+      <text x="632" y="470" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">la OC?</text>
+
+      <!-- NO return -->
+      <line x1="632" y1="508" x2="632" y2="560" stroke="#b45309" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="522" y="564" rx="10" width="220" height="36" fill="#fff4e5" stroke="#b45309"/>
+      <text x="632" y="586" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">NO → Devolver + motivo</text>
+      <path d="M522 582 H 484 V 486" fill="none" stroke="#b45309" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrA)"/>
+
+      <!-- YES approve -->
+      <line x1="702" y1="458" x2="740" y2="458" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="710" y="448" fill="#1d4ed8" font-size="12" font-weight="800">SÍ</text>
+      <rect x="744" y="430" rx="12" width="120" height="56" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="804" y="454" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Aprobada</text>
+      <text x="804" y="472" text-anchor="middle" fill="#64748b" font-size="11">aún no reserva $</text>
+
+      <line x1="864" y1="458" x2="896" y2="458" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+
+      <polygon points="956,408 1026,458 956,508 886,458" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="956" y="452" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">¿Confirma</text>
+      <text x="956" y="470" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">al proveedor?</text>
+
+      <!-- NO parked -->
+      <line x1="956" y1="408" x2="956" y2="372" stroke="#be123c" stroke-width="2" marker-end="url(#arrR)"/>
+      <rect x="828" y="326" rx="10" width="256" height="44" fill="#ffe4ea" stroke="#be123c"/>
+      <text x="956" y="344" text-anchor="middle" fill="#9f1239" font-size="12" font-weight="800">NO → no hay comprometido</text>
+      <text x="956" y="360" text-anchor="middle" fill="#9f1239" font-size="11">no se recibe ni se factura desde OC</text>
+
+      <!-- YES confirm -->
+      <line x1="1026" y1="458" x2="1090" y2="458" stroke="#047857" stroke-width="2" marker-end="url(#arrG)"/>
+      <text x="1038" y="448" fill="#047857" font-size="12" font-weight="800">SÍ</text>
+      <rect x="1094" y="424" rx="14" width="220" height="68" fill="#047857"/>
+      <text x="1204" y="452" text-anchor="middle" fill="#fff" font-size="15" font-weight="800">Confirmada</text>
+      <text x="1204" y="472" text-anchor="middle" fill="#d1fae5" font-size="12">= Comprometido en EDT</text>
+
+      <rect x="1332" y="430" rx="10" width="220" height="56" fill="#ffe4ea" stroke="#be123c"/>
+      <text x="1442" y="452" text-anchor="middle" fill="#9f1239" font-size="11" font-weight="800">Si el mes está cerrado</text>
+      <text x="1442" y="470" text-anchor="middle" fill="#9f1239" font-size="11">no se confirma / recibe / factura</text>
+
+      <!-- Lane 3 -->
+      <rect x="24" y="626" width="1552" height="318" rx="16" fill="#fff" stroke="#e2e8f0"/>
+      <text x="44" y="652" fill="#1d4ed8" font-size="12" font-weight="800" letter-spacing="1.6">3 · CERRAR: RECIBIR · FACTURAR · PAGAR</text>
+
+      <rect x="48" y="740" rx="12" width="156" height="58" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="126" y="764" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Recepción</text>
+      <text x="126" y="782" text-anchor="middle" fill="#64748b" font-size="11">stock · no crea CxP</text>
+
+      <line x1="204" y1="769" x2="248" y2="769" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+
+      <polygon points="328,719 408,769 328,819 248,769" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="328" y="763" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">¿Hay qty</text>
+      <text x="328" y="779" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">recibida?</text>
+
+      <line x1="328" y1="819" x2="328" y2="860" stroke="#be123c" stroke-width="2" marker-end="url(#arrR)"/>
+      <rect x="216" y="864" rx="10" width="224" height="40" fill="#ffe4ea" stroke="#be123c"/>
+      <text x="328" y="889" text-anchor="middle" fill="#9f1239" font-size="12" font-weight="800">NO → no hay factura desde OC</text>
+
+      <line x1="408" y1="769" x2="468" y2="769" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="420" y="758" fill="#1d4ed8" font-size="12" font-weight="800">SÍ</text>
+      <rect x="472" y="740" rx="12" width="176" height="58" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="560" y="764" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Emitir factura</text>
+      <text x="560" y="782" text-anchor="middle" fill="#047857" font-size="12" font-weight="700">Devengado + CxP</text>
+
+      <line x1="648" y1="769" x2="700" y2="769" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+
+      <polygon points="780,719 860,769 780,819 700,769" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="780" y="763" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">¿Hay fondos</text>
+      <text x="780" y="779" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">en la cuenta?</text>
+
+      <line x1="780" y1="819" x2="780" y2="860" stroke="#be123c" stroke-width="2" marker-end="url(#arrR)"/>
+      <rect x="668" y="864" rx="10" width="224" height="40" fill="#ffe4ea" stroke="#be123c"/>
+      <text x="780" y="889" text-anchor="middle" fill="#9f1239" font-size="12" font-weight="800">NO → Bloqer bloquea el pago</text>
+
+      <line x1="860" y1="769" x2="980" y2="769" stroke="#047857" stroke-width="2" marker-end="url(#arrG)"/>
+      <text x="888" y="758" fill="#047857" font-size="12" font-weight="800">SÍ</text>
+      <rect x="984" y="736" rx="14" width="220" height="66" fill="#047857"/>
+      <text x="1094" y="764" text-anchor="middle" fill="#fff" font-size="16" font-weight="800">Pagado</text>
+      <text x="1094" y="784" text-anchor="middle" fill="#d1fae5" font-size="12">egreso de caja · circuito cerrado</text>
+
+      <text x="1280" y="768" fill="#64748b" font-size="12">La recepción no abre deuda.</text>
+      <text x="1280" y="786" fill="#64748b" font-size="12">La factura emitida sí: CxP.</text>
+    </svg>
+
+    <footer>
+      <span>Bloqer · Flujo condicional de compra · Guía operativa §9</span>
+      <span>La lámina con roles y detalle sigue en mapa-circuito-compra-sc-oc.png</span>
+    </footer>
+  </div>
+</body>
+</html>

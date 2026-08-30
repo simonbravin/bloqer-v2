@@ -16,6 +16,7 @@ import { assertProjectAllowsOperationalMutation } from "../project/project-opera
 import {
   createSupplierInvoice,
   getSupplierInvoiceById,
+  serializeSupplierInvoice,
   type ProjectSupplierInvoiceListRow,
   type SupplierInvoiceView,
 } from "./supplier-invoice.service";
@@ -386,9 +387,16 @@ export async function getPurchaseOrderCodeForApLink(
 export async function createSupplierInvoiceDraftFromPurchaseOrder(
   input: CreateSupplierInvoiceFromPurchaseOrderInput,
   ctx: ServiceContext,
+  options?: {
+    /**
+     * [D-108] Trusted path after receipt confirm under company policy.
+     * Skips EDIT AP gate so warehouse can confirm while Finance emits later.
+     */
+    asSystemFromReceiptPolicy?: boolean;
+  },
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "AP")) {
+  if (!options?.asSystemFromReceiptPolicy && !can(ctx.roles, "EDIT", "AP")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas de proveedor");
   }
 
@@ -419,6 +427,13 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
     },
   });
   if (existingDraft) {
+    if (options?.asSystemFromReceiptPolicy) {
+      // Avoid VIEW AP gate on idempotent re-entry (warehouse confirm path).
+      return serializeSupplierInvoice({
+        ...existingDraft,
+        subcontractCertification: null,
+      });
+    }
     return getSupplierInvoiceById(existingDraft.id, ctx, input.projectId);
   }
 
@@ -522,5 +537,6 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
       })),
     },
     ctx,
+    options?.asSystemFromReceiptPolicy ? { bypassApMutateGate: true } : undefined,
   );
 }

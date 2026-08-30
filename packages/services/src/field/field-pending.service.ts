@@ -5,6 +5,7 @@ import { resolveUserDisplayNames } from "../user/resolve-user-display-names";
 import type { ServiceContext } from "../types";
 import {
   FIELD_PENDING_GROUP_BY_SOURCE,
+  fieldPendingComprasStageOrder,
   fieldPendingSourcesForActor,
   resolveFieldPendingProjectFilter,
   type FieldPendingGroup,
@@ -42,7 +43,7 @@ export type FieldPendingItem = {
   title: string;
   description: string | null;
   statusLabel: string;
-  /** Primary CTA on the card (Cotizar / Revisar / Confirmar / Recibir). */
+  /** Primary CTA on the card (Cotizar / Aprobar / Confirmar al proveedor / Recibir / Registrar factura). */
   actionLabel: string;
   amount: string | null;
   currency: string | null;
@@ -502,7 +503,7 @@ export async function getMyFieldPendingItems(
         title: `OC-${String(row.number).padStart(3, "0")}`,
         description: row.supplierContact.fantasyName ?? row.supplierContact.legalName,
         statusLabel: "Pendiente de aprobación",
-        actionLabel: "Revisar",
+        actionLabel: "Aprobar",
         amount: serializeMoneyDecimal(row.totalAmount),
         currency: row.currency,
         requestedByName: requestedBy,
@@ -530,9 +531,9 @@ export async function getMyFieldPendingItems(
         group: "compras",
         typeLabel: "Orden de compra",
         title: `OC-${String(row.number).padStart(3, "0")}`,
-        description: row.supplierContact.fantasyName ?? row.supplierContact.legalName,
+        description: `${row.supplierContact.fantasyName ?? row.supplierContact.legalName} · Confirmar reserva $ (Comprometido)`,
         statusLabel: "Pendiente de confirmar",
-        actionLabel: "Confirmar",
+        actionLabel: "Confirmar al proveedor",
         amount: serializeMoneyDecimal(row.totalAmount),
         currency: row.currency,
         requestedByName: requestedBy,
@@ -607,7 +608,7 @@ export async function getMyFieldPendingItems(
         currency: row.currency,
         requestedByName: requestedBy,
         occurredAt,
-        href: `/proyectos/${row.projectId}/ordenes-compra/${row.id}`,
+        href: `/proyectos/${row.projectId}/ordenes-compra/${row.id}?siguiente=facturar#facturar`,
         priority: stalePriority(occurredAt),
         overdueDays,
       });
@@ -690,8 +691,14 @@ export async function getMyFieldPendingItems(
     }
   }
 
-  // Overdue-first ([D-097]): items whose date-field is past today rise to the top, then FIFO.
+  // Portero: within Compras filter, pipeline stage then overdue then FIFO.
+  // Other filters / Todos: overdue-first ([D-097]) then FIFO (do not sink obra/cert).
   items.sort((a, b) => {
+    if (groupFilter === "compras") {
+      const stageA = fieldPendingComprasStageOrder(a.entityType);
+      const stageB = fieldPendingComprasStageOrder(b.entityType);
+      if (stageA !== stageB) return stageA - stageB;
+    }
     if (a.overdueDays !== b.overdueDays) return b.overdueDays - a.overdueDays;
     return a.occurredAt.getTime() - b.occurredAt.getTime();
   });

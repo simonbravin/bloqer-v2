@@ -1,0 +1,131 @@
+﻿<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Subcontrato hasta el pago</title>
+  <link rel="stylesheet" href="../mapa-poster.css" />
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Nivel proyecto · guía para usuarios</p>
+        <h1>Subcontrato hasta el pago</h1>
+        <span>Paquete de ejecución: certificar → factura → CxP → pagar</span>
+      </div>
+    </header>
+    <div class="body">
+      <div class="lede">
+        <p>Un subcontrato <strong>no es una OC</strong>. El albañil o el electricista van por este circuito. No se paga eligiendo al subcontratista en un gasto genérico ni creando una orden de compra.</p>
+        <div class="legend">
+          <span class="chip info">Camino feliz</span>
+          <span class="chip warn">Vuelve atrás</span>
+          <span class="chip block">Queda trabado</span>
+          <span class="chip ok">Impacta $ / stock</span>
+        </div>
+      </div>
+      
+      <p class="section-label">1 · Contratar</p>
+      <div class="row cols-3">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">1</span>Alta en Directorio</h3>
+            <span class="who">Admin</span>
+          </div>
+          <p>Contacto con rol <strong>Subcontratista</strong> (activo).</p>
+          <ul><li>No uses rol Proveedor si es paquete de ejecución</li><li>Se busca por razón social o fantasía</li><li>Puede tener otro rol además</li></ul>
+          <span class="state">Contacto listo</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">2</span>Crear subcontrato</h3>
+            <span class="who">PM / Compras</span>
+          </div>
+          <p>Finanzas del proyecto → Subcontratos → Nuevo.</p>
+          <ul><li>Alcance e imputación a partidas</li><li>Categoría SUB en el APU cuando corresponda</li><li>No genera comprometido de OC</li></ul>
+          <span class="state">Subcontrato activo</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">3</span>Certificación del período</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Nueva certificación de subcontrato (mes / avance).</p>
+          <ul><li>Borrador editable</li><li>Montos / partidas del período</li><li>Luego Emitir</li></ul>
+          <span class="state">Cert. borrador</span>
+        </article>
+      </div>
+      <p class="section-label">2 · Autorizar, facturar y pagar</p>
+      <div class="row cols-4">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">4</span>Emitir</h3>
+            <span class="who">PM</span>
+          </div>
+          <p>Pasa a Emitida e inmutable.</p>
+          <ul><li>Ya no se edita esa versión</li><li>El aprobador la revisa</li><li>Se puede anular / rechazar según reglas</li></ul>
+          <span class="state">Emitida</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">5</span>Aprobar o rechazar</h3>
+            <span class="who">Aprobador</span>
+          </div>
+          <p><strong>Aprobar</strong> habilita la factura. Rechazo es terminal: nueva versión.</p>
+          <ul><li>APPROVED genera CTA a factura borrador</li><li>Payee = el subcontratista</li><li>REJECTED no crea CxP</li></ul>
+          <span class="state">Aprobada · o rechazada</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">6</span>Emitir factura</h3>
+            <span class="who">Admin / Finanzas</span>
+          </div>
+          <p>Revisar y emitir la factura de proveedor.</p>
+          <ul><li>Crea CxP + asiento DRAFT</li><li>No cambies a quién se le paga</li><li>Clase: Subcontrato</li></ul>
+          <span class="state">Factura + CxP</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">7</span>Pagar</h3>
+            <span class="who">Tesorería</span>
+          </div>
+          <p>CxP → Registrar pago (o Emitir y pagar ahora).</p>
+          <ul><li>Cuenta de tesorería</li><li>Sin fondos: bloquea</li><li>Cierra el período certificado</li></ul>
+          <span class="state">Pagado</span>
+        </article>
+      </div>
+      <p class="section-label">Qué cambia</p>
+      <div class="impact cols-4">
+        <div class="i1"><b>Aprobar cert.</b><span>Avance del paquete. Todavía no hay CxP.</span></div>
+        <div class="i2"><b>Factura emitida</b><span>Devengado + cuenta por pagar.</span></div>
+        <div class="i3"><b>Pago</b><span>Pagado + egreso. Actualiza settlement del subcontrato.</span></div>
+        <div class="i5"><b>No es OC</b><span>No uses compras ni gasto genérico para pagarlo.</span></div>
+      </div>
+      <p class="section-label">Si no se autoriza</p>
+      <div class="cons">
+        <div class="box warn">
+          <h2>Vuelve atrás</h2>
+          <ul>
+            <li>Certificación en borrador: se edita. Emitida: anular o nueva versión si fue rechazada.</li>
+            <li>Factura en borrador: se revisa y se emite. No se paga el subcontrato desde OC.</li>
+          </ul>
+        </div>
+        <div class="box block">
+          <h2>Queda trabado</h2>
+          <ul>
+            <li>Sin Aprobar no hay factura ni CxP.</li>
+            <li>Rechazo terminal: no “des-rechazás”; nueva certificación que reemplaza.</li>
+            <li>Periodo cerrado o sin fondos: mismo bloqueo que cualquier AP.</li>
+            <li>Retenciones y anticipos de subcontrato no están modelados como entidad.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <span>Bloqer · Subcontrato hasta el pago · Guía operativa §10 · §12.2</span>
+      <span>Finanzas del proyecto → Subcontratos · Facturas proveedor · CxP</span>
+    </footer>
+  </div>
+</body>
+</html>

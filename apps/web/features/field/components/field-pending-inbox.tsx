@@ -1,10 +1,12 @@
 import Link from "next/link";
-import type { FieldPendingGroup, FieldPendingList, FieldPendingCounts } from "@bloqer/services";
+import type { FieldPendingGroup, FieldPendingItem, FieldPendingList, FieldPendingCounts } from "@bloqer/services";
+import { fieldPendingComprasStageLabel } from "@bloqer/services";
 import { FieldPendingCard } from "./field-pending-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { fieldPendingEmptyObraCta } from "@/lib/field-pending-empty-cta";
+import type { ReactNode } from "react";
 
 function groupCount(counts: FieldPendingCounts, id: "todos" | FieldPendingGroup): number {
   switch (id) {
@@ -31,6 +33,29 @@ const FILTERS: { id: "todos" | FieldPendingGroup; label: string }[] = [
   { id: "obra", label: "Obra" },
   { id: "certificaciones", label: "Certificaciones" },
 ];
+
+function renderItemsWithComprasStages(items: FieldPendingItem[]): ReactNode {
+  const nodes: ReactNode[] = [];
+  let lastStage: string | null = null;
+  for (const item of items) {
+    const stage = fieldPendingComprasStageLabel(item.entityType);
+    if (stage && stage !== lastStage) {
+      lastStage = stage;
+      nodes.push(
+        <h2
+          key={`stage-${stage}`}
+          className="pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground first:pt-0"
+        >
+          {stage}
+        </h2>,
+      );
+    }
+    nodes.push(
+      <FieldPendingCard key={`${item.entityType}-${item.entityId}`} item={item} />,
+    );
+  }
+  return <div className="space-y-2">{nodes}</div>;
+}
 
 type Props = {
   list: FieldPendingList;
@@ -62,6 +87,9 @@ export function FieldPendingInbox({
   };
 
   const obraCta = fieldPendingEmptyObraCta({ projectId, projects, lastProjectId });
+  // Stage headers only under the Compras filter (plan Oleada A), not on Todos.
+  const showComprasStages = group === "compras";
+  const helpComprasHref = "/ayuda/circuito-comprar-material-hasta-pagarlo";
 
   return (
     <div className="space-y-3" data-testid="field-pending-inbox" data-query-ms={list.queryMs}>
@@ -125,14 +153,22 @@ export function FieldPendingInbox({
         <div className="rounded-lg border bg-card p-6 text-center">
           <p className="font-medium">No tenés acciones pendientes.</p>
           <div className="mt-4 flex flex-col gap-2">
-            <Button asChild className="min-h-11">
-              <Link href={obraCta.href}>{obraCta.label}</Link>
-            </Button>
+            {group === "compras" ? (
+              <Button asChild className="min-h-11">
+                <Link href={helpComprasHref}>Ver caminito de compra</Link>
+              </Button>
+            ) : (
+              <Button asChild className="min-h-11">
+                <Link href={obraCta.href}>{obraCta.label}</Link>
+              </Button>
+            )}
             <Button asChild variant="outline" className="min-h-11">
               <Link href="/notificaciones">Ver notificaciones</Link>
             </Button>
           </div>
         </div>
+      ) : showComprasStages ? (
+        renderItemsWithComprasStages(list.items)
       ) : (
         <div className="space-y-2">
           {list.items.map((item) => (

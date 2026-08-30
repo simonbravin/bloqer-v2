@@ -109,8 +109,12 @@ export type HelpArticle = {
   where: { menu: string };
   hrefs: HelpHref[];
   steps: string[];
+  /** Card title over `steps`. Use «Caminito» for if/then workflows. */
+  stepsTitle?: string;
   effects?: string[];
   pitfalls?: string[];
+  /** Optional in-app figure (public URL). Used for process maps, not product screenshots. */
+  figure?: { src: string; alt: string; caption?: string };
   relatedSlugs: string[];
   keywords: string[];
   guideRef: string;

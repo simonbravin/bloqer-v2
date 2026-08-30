@@ -1,0 +1,138 @@
+﻿<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Tesorería y conciliación</title>
+  <link rel="stylesheet" href="../mapa-poster.css" />
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Nivel empresa · guía para usuarios</p>
+        <h1>Tesorería y conciliación</h1>
+        <span>Del movimiento de caja a cuadrar el extracto</span>
+      </div>
+    </header>
+    <div class="body">
+      <div class="lede">
+        <p>Los cobros y pagos ya generan movimientos. La <strong>conciliación</strong> empareja el extracto del banco con lo que Bloqer tiene en la cuenta. No reemplaza el pago: solo cuadra.</p>
+        <div class="legend">
+          <span class="chip info">Camino feliz</span>
+          <span class="chip warn">Vuelve atrás</span>
+          <span class="chip block">Queda trabado</span>
+          <span class="chip ok">Impacta $ / stock</span>
+        </div>
+      </div>
+      
+      <p class="section-label">1 · Caja del día a día</p>
+      <div class="row cols-4">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">1</span>Cuentas</h3>
+            <span class="who">Tesorería</span>
+          </div>
+          <p>Alta de caja o banco. Cada una tiene moneda.</p>
+          <ul><li>Tesorería → Cuentas</li><li>Sin cuenta no hay cobro/pago</li><li>Detalle muestra el ledger</li></ul>
+          <span class="state">Cuentas activas</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">2</span>Movimientos</h3>
+            <span class="who">Tesorería</span>
+          </div>
+          <p>Ingresos, egresos, transferencias y ajustes.</p>
+          <ul><li>Cobro / pago confirman caja</li><li>Transferir entre cuentas</li><li>Ajuste manual con motivo</li></ul>
+          <span class="state">Confirmado</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">3</span>Flujo de caja</h3>
+            <span class="who">Finanzas</span>
+          </div>
+          <p>Vista de proyección y movimientos.</p>
+          <ul><li>Tesorería → Flujo de caja</li><li>No es el extracto del banco</li><li>Sirve para ver holgura</li></ul>
+          <span class="state">Consulta</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">4</span>Ajuste</h3>
+            <span class="who">Tesorería</span>
+          </div>
+          <p>Diferencias que no son cobro/pago (cargo bancario, redondeo).</p>
+          <ul><li>Detalle de cuenta → Ajuste manual</li><li>Monto, sentido y motivo</li><li>Genera ADJUSTMENT confirmado</li></ul>
+          <span class="state">Impacta saldo</span>
+        </article>
+      </div>
+      <p class="section-label">2 · Conciliar el banco</p>
+      <div class="row cols-4">
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">5</span>Nueva sesión</h3>
+            <span class="who">Tesorería</span>
+          </div>
+          <p>Tesorería → Conciliación → Nueva.</p>
+          <ul><li>Elegí cuenta y rango</li><li>Saldos inicial/final del extracto</li><li>Una sesión abierta por cuenta</li></ul>
+          <span class="state">Borrador</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">6</span>Cargar extracto</h3>
+            <span class="who">Tesorería</span>
+          </div>
+          <p>Importar CSV, OFX/QFX o líneas a mano.</p>
+          <ul><li>Iniciar si está en borrador</li><li>Workspace de dos columnas</li><li>Extracto vs movimientos Bloqer</li></ul>
+          <span class="state">En progreso</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">7</span>Emparejar</h3>
+            <span class="who">Tesorería</span>
+          </div>
+          <p>Línea de extracto + movimiento → Emparejar.</p>
+          <ul><li>El movimiento pasa a Conciliado</li><li>Si falta el movimiento: Crear desde la línea</li><li>El resumen tiene que cuadrar</li></ul>
+          <span class="state">Matches</span>
+        </article>
+        <article class="card">
+          <div class="card-top">
+            <h3><span class="n">8</span>Cerrar</h3>
+            <span class="who">Tesorería</span>
+          </div>
+          <p>Cuando saldo extracto = saldo sistema.</p>
+          <ul><li>Cerrar conciliación</li><li>Reabrir con motivo si hay que corregir</li><li>Los matches se conservan</li></ul>
+          <span class="state">Cerrada</span>
+        </article>
+      </div>
+      <p class="section-label">Qué queda registrado</p>
+      <div class="impact cols-3">
+        <div class="i1"><b>Movimiento</b><span>Cambia el saldo de la cuenta.</span></div>
+        <div class="i3"><b>Conciliado</b><span>Cuadró con el banco. Cancelar el pago se bloquea.</span></div>
+        <div class="i5"><b>Sesión cerrada</b><span>Matches congelados hasta reabrir.</span></div>
+      </div>
+      <p class="section-label">Si no cierra o se traba</p>
+      <div class="cons">
+        <div class="box warn">
+          <h2>Vuelve atrás</h2>
+          <ul>
+            <li>Reabrir sesión (motivo obligatorio) para desemparejar o corregir.</li>
+            <li>Ajuste manual si la diferencia no viene de un cobro/pago.</li>
+          </ul>
+        </div>
+        <div class="box block">
+          <h2>Queda trabado</h2>
+          <ul>
+            <li>Cancelar un pago/cobranza ya Conciliado: primero desemparejá.</li>
+            <li>Dos sesiones abiertas sobre la misma cuenta: no se permite.</li>
+            <li>Cerrar el mes contable antes de terminar la conciliación complica las correcciones.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <span>Bloqer · Tesorería y conciliación · Guía operativa §4 · §4.2 · §4.3</span>
+      <span>Tesorería → Cuentas · Movimientos · Conciliación</span>
+    </footer>
+  </div>
+</body>
+</html>
