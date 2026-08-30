@@ -31,6 +31,10 @@ import {
   utcIsoDate,
   type ReceivablesFieldRow,
 } from "./receivables-field";
+import {
+  classFieldsForSalesInvoice,
+  type FinancialClassFields,
+} from "../finance/document-class.service";
 
 const MAX_COLLECTIBLE_RECEIVABLES = 500;
 
@@ -41,7 +45,7 @@ export type ReceivableView = Omit<Receivable, "originalAmount" | "paidAmount"> &
   paidAmount: string;
   balanceDue: string;
   clientName: string;
-};
+} & FinancialClassFields;
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
@@ -57,7 +61,10 @@ export async function getReceivableById(
   }
   const r = await prisma.receivable.findUnique({
     where: { id },
-    include: { clientContact: { select: { legalName: true, fantasyName: true } } },
+    include: {
+      clientContact: { select: { legalName: true, fantasyName: true } },
+      salesInvoice: { select: { certificationId: true } },
+    },
   });
   if (!r) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
   if (r.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -79,7 +86,10 @@ export async function getReceivableBySalesInvoiceId(
   }
   const r = await prisma.receivable.findUnique({
     where: { salesInvoiceId },
-    include: { clientContact: { select: { legalName: true, fantasyName: true } } },
+    include: {
+      clientContact: { select: { legalName: true, fantasyName: true } },
+      salesInvoice: { select: { certificationId: true } },
+    },
   });
   if (!r) return null;
   if (r.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -122,7 +132,7 @@ export async function listReceivablesByProject(
       where,
       include: {
         clientContact: { select: { legalName: true, fantasyName: true } },
-        salesInvoice: { select: { number: true } },
+        salesInvoice: { select: { number: true, certificationId: true } },
       },
       orderBy: [{ dueDate: "asc" }, { id: "asc" }],
       skip,
@@ -163,7 +173,10 @@ export async function listCollectibleReceivablesByProject(
       status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
       ...openReceivableBalanceWhere(),
     },
-    include: { clientContact: { select: { legalName: true, fantasyName: true } } },
+    include: {
+      clientContact: { select: { legalName: true, fantasyName: true } },
+      salesInvoice: { select: { certificationId: true } },
+    },
     orderBy: [{ dueDate: "asc" }, { id: "asc" }],
     take: MAX_COLLECTIBLE_RECEIVABLES,
   });
@@ -244,7 +257,7 @@ export async function listCompanyReceivables(
       where,
       include: {
         clientContact: { select: { legalName: true, fantasyName: true } },
-        salesInvoice: { select: { number: true } },
+        salesInvoice: { select: { number: true, certificationId: true } },
         project: { select: { code: true, name: true } },
       },
       orderBy: [{ dueDate: dueDir }, { id: dueDir }],
@@ -285,7 +298,7 @@ export async function getCompanyReceivableById(
     where: { id },
     include: {
       clientContact: { select: { legalName: true, fantasyName: true } },
-      salesInvoice: { select: { number: true } },
+      salesInvoice: { select: { number: true, certificationId: true } },
     },
   });
   if (!r) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
@@ -347,7 +360,7 @@ export async function listReceivablesFieldBoard(
       where,
       include: {
         clientContact: { select: { legalName: true, fantasyName: true } },
-        salesInvoice: { select: { number: true } },
+        salesInvoice: { select: { number: true, certificationId: true } },
         project: { select: { name: true } },
       },
       orderBy: [{ dueDate: "asc" }, { id: "asc" }],
@@ -360,7 +373,11 @@ export async function listReceivablesFieldBoard(
   const mapped: ReceivablesFieldRow[] = reconciled.map((p, i) => {
     const row = rows[i]!;
     const { salesInvoice, project, ...receivableWithContact } = row;
-    const base = serializeReceivable({ ...receivableWithContact, ...p });
+    const base = serializeReceivable({
+      ...receivableWithContact,
+      ...p,
+      salesInvoice,
+    });
     return {
       id: base.id,
       clientName: base.clientName,
@@ -535,7 +552,7 @@ export async function cancelReceivable(
 
 type RawReceivable = Receivable & {
   clientContact: { legalName: string; fantasyName: string | null };
-  salesInvoice?: { number: number } | null;
+  salesInvoice?: { number?: number; certificationId?: string | null } | null;
   project?: { code: string; name: string } | null;
 };
 
@@ -569,6 +586,10 @@ function serializeReceivable(r: RawReceivable): ReceivableView {
   const rawBalance = computeObligationBalanceDue(r.originalAmount, r.paidAmount);
   const balanceDue = normalizeObligationBalanceDue(rawBalance);
   const status = deriveObligationDisplayStatus(r.status, rawBalance, r.dueDate, undefined, r.paidAmount);
+  const classFields = classFieldsForSalesInvoice({
+    projectId: r.projectId,
+    certificationId: r.salesInvoice?.certificationId,
+  });
   return {
     ...r,
     status,
@@ -576,5 +597,6 @@ function serializeReceivable(r: RawReceivable): ReceivableView {
     paidAmount: serializeMoneyDecimal(r.paidAmount),
     balanceDue: serializeMoneyDecimal(balanceDue),
     clientName: r.clientContact.fantasyName ?? r.clientContact.legalName,
+    ...classFields,
   };
 }

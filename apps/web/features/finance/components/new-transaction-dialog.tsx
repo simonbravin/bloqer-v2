@@ -9,6 +9,9 @@ import {
   isZeroIvaRate,
   requiresArInvoiceLetter,
   suggestInvoiceLetter,
+  classifySupplierInvoice,
+  classifySalesInvoice,
+  classifyAccountMovement,
   type InvoiceLetterCode,
   type IvaConditionCode,
 } from "@bloqer/domain";
@@ -32,6 +35,7 @@ import { InvoiceLinesEditor } from "@/features/ap/components/invoice-lines-edito
 import type { InvoiceLine } from "@/features/ap/components/invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { InvoiceLetterSelect, PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
+import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
@@ -537,6 +541,23 @@ export function NewTransactionDialog({
   const incomeTabActive = kind === "AR_INCOME" || kind === "TREASURY_INFLOW";
   const showInvoiceAttachment = storageConfigured && (kind === "AP_EXPENSE" || kind === "AR_INCOME");
 
+  const derivedClass = useMemo(() => {
+    if (kind === "AP_EXPENSE") {
+      return classifySupplierInvoice({ projectId: null });
+    }
+    if (kind === "AR_INCOME") {
+      return classifySalesInvoice({ projectId: null });
+    }
+    return classifyAccountMovement({ type: "INFLOW", sourceType: "MANUAL_ADJUSTMENT" });
+  }, [kind]);
+
+  const classHint =
+    kind === "AP_EXPENSE"
+      ? "Gasto de estructura (sin obra)."
+      : kind === "AR_INCOME"
+        ? "Factura / CxC corporativa (sin obra)."
+        : "Mueve caja sin crear factura ni CxC.";
+
   return (
     <Dialog
       open={open}
@@ -581,6 +602,12 @@ export function NewTransactionDialog({
             </SegmentedOption>
           )}
         </div>
+
+        <DocumentClassCreateHint
+          classLabel={derivedClass.classLabel}
+          classFamily={derivedClass.family}
+          hint={classHint}
+        />
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (

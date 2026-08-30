@@ -122,6 +122,7 @@ export function parseMovementReportFilters(sp: Record<string, string | undefined
     projectId: sp.projectId,
     corporateOnly: scope === "corporate" || sp.corporateOnly === "true",
     projectOnly: scope === "project" || sp.projectOnly === "true",
+    class: sp.class,
     sortDir: sp.dir === "asc" ? "asc" : sp.dir === "desc" ? "desc" : undefined,
   };
 }
@@ -161,6 +162,7 @@ export function parseCompanySupplierInvoiceExportFilters(
     status: showAll ? undefined : (status ?? "ISSUED"),
     ...(issueDateFrom ? { issueDateFrom } : {}),
     ...(issueDateTo ? { issueDateTo } : {}),
+    ...(sp.class ? { class: sp.class } : {}),
   };
 }
 
@@ -420,6 +422,7 @@ export async function exportTreasuryMovementsCsv(
     "Fecha",
     "Cuenta",
     "Tipo",
+    "Clase",
     "Origen",
     "EtiquetaOrigen",
     "Proyecto",
@@ -435,6 +438,7 @@ export async function exportTreasuryMovementsCsv(
     r.movementDate,
     r.accountName,
     r.type,
+    r.classLabel,
     r.sourceType,
     r.sourceLabel,
     r.projectName ?? (r.projectId ? r.projectId : "Empresa"),
@@ -511,6 +515,7 @@ export async function exportCompanySupplierInvoicesCsv(
   const headers = [
     "Codigo",
     "Proveedor",
+    "Clase",
     "Emision",
     "Vencimiento",
     "Estado",
@@ -520,6 +525,7 @@ export async function exportCompanySupplierInvoicesCsv(
   const rows = data.map((inv) => [
     inv.code,
     inv.supplierName,
+    inv.classLabel,
     inv.issueDate instanceof Date ? inv.issueDate.toISOString().slice(0, 10) : String(inv.issueDate).slice(0, 10),
     inv.dueDate instanceof Date ? inv.dueDate.toISOString().slice(0, 10) : String(inv.dueDate).slice(0, 10),
     inv.status,

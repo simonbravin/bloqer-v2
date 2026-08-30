@@ -47,7 +47,8 @@ export {
   canEditCompanyAr,
   canMutateArForScope,
 } from "./ar/ar-access";
-export { canViewCompanyFinanceHub, canViewCompanyTreasury } from "./finance/finance-access";
+export * from "./finance/finance-access";
+export * from "./finance/document-class.service";
 export * from "./ar/sales-invoice.service";
 export * from "./ar/receivable.service";
 export * from "./ar/ar-notifications.service";

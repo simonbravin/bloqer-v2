@@ -113,3 +113,23 @@ export {
   type IvaRatePreset,
   type InvoiceLetterTaxIssue,
 } from "./finance/iva-rates";
+
+export {
+  FINANCIAL_DOCUMENT_CLASS_CODES,
+  FINANCIAL_DOCUMENT_CLASS_FAMILY,
+  FINANCIAL_DOCUMENT_CLASS_LABEL_ES,
+  MOVEMENT_CLASS_FILTER_CODES,
+  SALES_INVOICE_CLASS_FILTER_CODES,
+  SUPPLIER_INVOICE_CLASS_FILTER_CODES,
+  classifyAccountMovement,
+  classifySalesInvoice,
+  classifySupplierInvoice,
+  formatFinancialDocumentClassLabel,
+  isFinancialDocumentClassCode,
+  type ClassifyAccountMovementInput,
+  type ClassifySalesInvoiceInput,
+  type ClassifySupplierInvoiceInput,
+  type FinancialDocumentClass,
+  type FinancialDocumentClassCode,
+  type FinancialDocumentClassFamily,
+} from "./finance/document-classification";

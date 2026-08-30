@@ -132,6 +132,8 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
     paidAmount: p.paidAmount,
     balanceDue: p.balanceDue,
     currency: p.currency,
+    classLabel: p.classLabel,
+    classFamily: p.classFamily,
   }));
   const supplierInvoices: SupplierInvoiceListItem[] = supplierInvoicesResult.data.map((inv) => ({
     id: inv.id,
@@ -143,6 +145,8 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
     currency: inv.currency,
     status: inv.status,
     invoiceLetter: inv.invoiceLetter,
+    classLabel: inv.classLabel,
+    classFamily: inv.classFamily,
   }));
   const payments: PaymentListItem[] = paymentsResult.data.map((p) => ({
     id: p.id,

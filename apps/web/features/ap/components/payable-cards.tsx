@@ -4,6 +4,7 @@ import { formatMoneyAmount } from "@/lib/format-money";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { PayableListItem } from "./payable-list";
 
@@ -46,7 +47,12 @@ export function PayableCards({
           className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="shrink-0 text-xs text-muted-foreground">Vence {formatDate(p.dueDate)}</span>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <span className="shrink-0 text-xs text-muted-foreground">Vence {formatDate(p.dueDate)}</span>
+              {p.classLabel ? (
+                <DocumentClassBadge classLabel={p.classLabel} classFamily={p.classFamily} />
+              ) : null}
+            </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               <PayableStatusBadge status={p.status} />
               <span className="text-xs text-muted-foreground">

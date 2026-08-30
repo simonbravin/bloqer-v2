@@ -27,6 +27,9 @@ import {
 } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
 import { createCompanySupplierInvoiceAction } from "@/app/(app)/finanzas/facturas-proveedor/actions";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
+import { classifySupplierInvoice } from "@bloqer/domain";
+import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
+import { cn } from "@/lib/utils";
 
 export type SupplierOption = {
   id: string;
@@ -95,6 +98,8 @@ export function SupplierInvoiceForm({
   const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
   const [pricesIncludeTaxTouched, setPricesIncludeTaxTouched] = useState(false);
   const [purchaseOrderId, setPurchaseOrderId] = useState<string | null>(null);
+  /** Project AP: explicit commitment vs direct cost ([D-102] / Phase 1). */
+  const [apSpendMode, setApSpendMode] = useState<"AGAINST_PO" | "DIRECT">("DIRECT");
   const [lines, setLines] = useState<InvoiceLine[]>([{ ...DEFAULT_LINE }]);
   const [payNow, setPayNow] = useState(false);
   const [payAccountId, setPayAccountId] = useState("");
@@ -207,17 +212,54 @@ export function SupplierInvoiceForm({
   function onPurchaseOrderChange(nextId: string | null) {
     if (nextId === purchaseOrderId) return;
     setPurchaseOrderId(nextId);
+    if (nextId) setApSpendMode("AGAINST_PO");
     // Drop OC-line FKs when unlinking or switching OC ([D-066]).
     setLines((prev) => prev.map((l) => ({ ...l, purchaseOrderLineId: null })));
   }
 
+  function selectApSpendMode(mode: "AGAINST_PO" | "DIRECT") {
+    setApSpendMode(mode);
+    if (mode === "DIRECT") {
+      setPurchaseOrderId(null);
+      setLines((prev) => prev.map((l) => ({ ...l, purchaseOrderLineId: null })));
+    }
+  }
+
+  const derivedClass = useMemo(() => {
+    if (companyFinanzas || !projectId) {
+      return classifySupplierInvoice({ projectId: null });
+    }
+    if (apSpendMode === "AGAINST_PO") {
+      // Chip anticipa Compra comprometida aunque aún no haya OC elegida.
+      return classifySupplierInvoice({
+        projectId,
+        purchaseOrderId,
+        hasPoLineLink: true,
+      });
+    }
+    return classifySupplierInvoice({
+      projectId,
+      purchaseOrderId: null,
+      hasPoLineLink: false,
+    });
+  }, [companyFinanzas, projectId, apSpendMode, purchaseOrderId]);
+
+  const classHint =
+    companyFinanzas || !projectId
+      ? "Gasto de estructura (sin obra)."
+      : apSpendMode === "AGAINST_PO"
+        ? "Baja el comprometido abierto de esa OC."
+        : "No reduce el comprometido. Imputá partida y tipo de costo.";
+
   const poComboboxOptions = useMemo(
     () =>
-      withNoneOption(
-        toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code }))),
-        { label: "Sin OC vinculada" },
-      ),
-    [filteredPOs],
+      apSpendMode === "AGAINST_PO"
+        ? toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code })))
+        : withNoneOption(
+            toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code }))),
+            { label: "Sin OC vinculada" },
+          ),
+    [filteredPOs, apSpendMode],
   );
 
   const compatibleAccounts = useMemo(
@@ -269,6 +311,15 @@ export function SupplierInvoiceForm({
     }
     if (projectId && !companyFinanzas && lines.some((l) => !l.wbsNodeId)) {
       setError("Cada línea debe imputar a una partida EDT");
+      return;
+    }
+    if (
+      projectId &&
+      !companyFinanzas &&
+      apSpendMode === "AGAINST_PO" &&
+      !purchaseOrderId
+    ) {
+      setError("Seleccioná la orden de compra o cambiá a costo directo");
       return;
     }
     if (payNow && showPayNow && !payAccountId) {
@@ -323,8 +374,12 @@ export function SupplierInvoiceForm({
           invoiceLetter: letterPayload,
           pricesIncludeTax,
           notes: (fd.get("notes") as string) || null,
-          purchaseOrderId: purchaseOrderId ?? null,
-          lines: lines.map((l, i) => ({ ...l, sortOrder: i })),
+          purchaseOrderId: apSpendMode === "AGAINST_PO" ? purchaseOrderId : null,
+          lines: lines.map((l, i) => ({
+            ...l,
+            sortOrder: i,
+            purchaseOrderLineId: apSpendMode === "DIRECT" ? null : l.purchaseOrderLineId,
+          })),
           payNow: {
             accountId: payAccountId,
             paymentDate,
@@ -360,8 +415,12 @@ export function SupplierInvoiceForm({
         pricesIncludeTax,
         notes:           (fd.get("notes") as string) || null,
         internalNotes:   null,
-        purchaseOrderId: purchaseOrderId ?? null,
-        lines:           lines.map((l, i) => ({ ...l, sortOrder: i })),
+        purchaseOrderId: apSpendMode === "AGAINST_PO" ? purchaseOrderId : null,
+        lines: lines.map((l, i) => ({
+          ...l,
+          sortOrder: i,
+          purchaseOrderLineId: apSpendMode === "DIRECT" ? null : l.purchaseOrderLineId,
+        })),
       });
       if ("error" in res) {
         setError(res.error);
@@ -382,6 +441,12 @@ export function SupplierInvoiceForm({
         {error && (
           <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
         )}
+
+        <DocumentClassCreateHint
+          classLabel={derivedClass.classLabel}
+          classFamily={derivedClass.family}
+          hint={classHint}
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2 space-y-1">
@@ -456,18 +521,64 @@ export function SupplierInvoiceForm({
             </div>
           )}
 
-          {filteredPOs.length > 0 && !companyFinanzas && (
-            <div className="col-span-2 space-y-1">
-              <Label>Orden de compra (opcional)</Label>
-              <SearchableCombobox
-                options={poComboboxOptions}
-                value={purchaseOrderId ?? SEARCHABLE_NONE}
-                onValueChange={(v) =>
-                  onPurchaseOrderChange(v === SEARCHABLE_NONE ? null : v)
-                }
-                placeholder="Sin OC vinculada"
-                searchPlaceholder="Buscar OC…"
-              />
+          {Boolean(projectId) && !companyFinanzas && (
+            <div className="col-span-2 space-y-2">
+              <Label>Imputación de costo</Label>
+              <div
+                className="inline-flex flex-wrap rounded-lg border bg-muted/40 p-1"
+                role="group"
+                aria-label="Contra OC o costo directo"
+              >
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => selectApSpendMode("AGAINST_PO")}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    apSpendMode === "AGAINST_PO"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Contra orden de compra
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => selectApSpendMode("DIRECT")}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    apSpendMode === "DIRECT"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Costo directo
+                </button>
+              </div>
+              {apSpendMode === "DIRECT" ? (
+                <p className="text-xs text-muted-foreground">
+                  No reduce el comprometido de una OC. Si el monto supera el umbral de la empresa,
+                  puede requerir OC o permiso de aprobación AP.
+                </p>
+              ) : filteredPOs.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No hay OC confirmadas para este proveedor. Cambiá el payee o usá costo directo.
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  <Label>Orden de compra</Label>
+                  <SearchableCombobox
+                    options={poComboboxOptions}
+                    value={purchaseOrderId ?? SEARCHABLE_NONE}
+                    onValueChange={(v) =>
+                      onPurchaseOrderChange(v === SEARCHABLE_NONE ? null : v)
+                    }
+                    placeholder="Seleccionar OC…"
+                    searchPlaceholder="Buscar OC…"
+                  />
+                </div>
+              )}
             </div>
           )}
 

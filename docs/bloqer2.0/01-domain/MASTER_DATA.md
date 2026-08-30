@@ -124,6 +124,8 @@ Otros
 **Defaults precargados:** Factura A/B/C/E, Nota de crédito A/B/C, Nota de débito A/B/C, Recibo, OC, Orden de pago, Certificado, Contrato, Adenda, Change Order, RFI.
 
 > En Fase actual la letra de factura se persiste como `invoice_letter` en `SalesInvoice` / `SupplierInvoice` ([D-084]); la tabla `DocumentType` sigue como catálogo futuro (impresión / numeración).
+>
+> **Clase financiera ([D-102]):** no es `DocumentType`. Es una etiqueta **derivada** (venta de obra, compra comprometida, costo directo, gasto general, etc.) calculada en dominio a partir de FKs existentes. No reemplaza este catálogo.
 
 ### 2.6b IvaCondition (Condición frente al IVA — Argentina)
 

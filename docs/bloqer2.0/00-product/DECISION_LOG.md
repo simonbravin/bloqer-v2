@@ -1554,6 +1554,23 @@
 
 ---
 
+### D-102 — Clase financiera derivada (sin enums persistidos) + job cost explícito en alta AP
+
+- **Fecha:** 2026-08-29
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** El usuario pedía tipos gasto/compra/ingreso/venta y factura/recibo/NC/ND. Comparado con Procore/Sage/CMiC, el eje de obra es compromiso vs directo y obra vs G&A, no un catálogo de “tipos de transacción”. No se inventan columnas que dupliquen FKs.
+- **Decisión:**
+  1. **Clase** = etiqueta **derivada** (solo lectura) desde hechos existentes: `projectId`, `certificationId`, `purchaseOrderId` / línea OC, `subcontractCertificationId`, `AccountMovement.type` + `sourceType`. Helper puro en `@bloqer/domain` (`classifySalesInvoice` / `classifySupplierInvoice` / `classifyAccountMovement`). Códigos EN + labels es-AR. UI: badge **Clase** (nunca “Tipo de documento” — reservado a NC/ND futuras).
+  2. **No** persistir `EconomicNature` ni `DocumentKind`. **No** tabla `DocumentType` / `MovementCategory`. Letra A/B/C/E sigue en `invoiceLetter` ([D-084]). Recibo = `Collection` / `Payment`. Anticipo cae en `SALE_PROJECT` (sin flag nuevo).
+  3. Precedencia AP: `SUBCONTRACT` > `PURCHASE_COMMITTED` > `DIRECT_PROJECT` | `OVERHEAD`.
+  4. Fase 1 UX: en alta/edición de factura de proveedor **de obra**, segmented **Contra orden de compra** | **Costo directo** (explícito; el backend ya distinguía vía [D-065]/[D-066]). Corporativo / Transacciones AP = Gasto general sin WBS.
+  5. Fuera de alcance: NC/ND operativas, fondo de reparo ([Q-023]), split J/G por línea, ledger JC como posting.
+- **Implicancias:** Listados/detalle/exports/filtros `?class=` muestran la clase. Indari se “cataloga” al listar (cero backfill SQL).
+- **Documentos afectados:** [`ENTITY_RELATIONSHIPS.md`](../01-domain/ENTITY_RELATIONSHIPS.md), [`MASTER_DATA.md`](../01-domain/MASTER_DATA.md), [`ACCOUNTS_PAYABLE.md`](../03-finance/ACCOUNTS_PAYABLE.md), [`SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §12, help `clase-de-documento-financiero` + fichas de gasto/ingreso.
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
@@ -1562,7 +1579,7 @@ _(ninguna por ahora)_
 
 ## Cómo agregar una decisión nueva
 
-1. Tomar el siguiente ID disponible (`D-101`…).
+1. Tomar el siguiente ID disponible (`D-103`…).
 2. Completar el formato del header.
 3. Listar **todos** los documentos afectados.
 4. Enlazar la decisión desde los documentos afectados con un comentario `> Ver [D-NNN]`.

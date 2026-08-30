@@ -20,6 +20,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { UrlSortableTableHead } from "@/components/ui/url-sortable-table-head";
 import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 import { accountMovementStatusLabel } from "@/features/treasury/lib/account-movement-status-label";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 
 const TYPE_LABELS: Record<string, string> = {
   INFLOW: "Ingreso",
@@ -97,6 +98,7 @@ export function MovementLedgerTable({
               </Suspense>
               <TableHead>Cuenta</TableHead>
               <TableHead>Tipo</TableHead>
+              <TableHead>Clase</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Origen</TableHead>
               <TableHead>Descripción</TableHead>
@@ -124,6 +126,16 @@ export function MovementLedgerTable({
                     <span className={m.isInternalTransfer ? "text-muted-foreground text-xs" : ""}>
                       {TYPE_LABELS[m.type] ?? m.type}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {m.classLabel ? (
+                      <DocumentClassBadge
+                        classLabel={m.classLabel}
+                        classFamily={m.classFamily}
+                      />
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {accountMovementStatusLabel(m.status)}

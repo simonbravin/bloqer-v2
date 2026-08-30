@@ -19,6 +19,7 @@ import {
   type ProjectSupplierInvoiceListRow,
   type SupplierInvoiceView,
 } from "./supplier-invoice.service";
+import { classFieldsForSupplierInvoice } from "../finance/document-class.service";
 import {
   buildAutoFromPoInternalNotes,
   buildInvoiceDraftLinesFromPo,
@@ -257,6 +258,12 @@ export async function listSupplierInvoicesByPurchaseOrder(
     subcontractCertificationCode: null,
     subcontractId: null,
     payable: inv.payable ? { id: inv.payable.id, status: inv.payable.status } : null,
+    ...classFieldsForSupplierInvoice({
+      projectId: inv.projectId,
+      purchaseOrderId: inv.purchaseOrderId,
+      hasPoLineLink: Boolean(inv.purchaseOrderId),
+      subcontractCertificationId: inv.subcontractCertificationId,
+    }),
   }));
 }
 

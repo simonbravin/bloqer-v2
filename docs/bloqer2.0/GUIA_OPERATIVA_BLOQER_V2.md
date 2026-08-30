@@ -893,6 +893,23 @@ stateDiagram-v2
 
 ## 12. Facturar, cobrar y pagar (nivel proyecto y empresa)
 
+### 12.0 Clase del documento ([D-102])
+
+Cada factura, CxC/CxP o movimiento de caja muestra un badge **Clase** (solo lectura). No se elige a mano: se deriva de si hay obra, OC, certificación, etc.
+
+| Clase | Dónde aparece |
+|---|---|
+| Venta — certificación / Venta de obra | Facturas emitidas de proyecto |
+| Ingreso corporativo | Factura/CxC sin obra (Transacciones → Factura / CxC) |
+| Ingreso solo caja | Transacciones → Solo caja (sin factura) |
+| Compra comprometida | Factura de proveedor con OC |
+| Costo directo de obra | Factura de proveedor de obra **sin** OC |
+| Subcontrato | Factura ligada a certificación de subcontrato |
+| Gasto general | Factura/gasto sin obra (Transacciones AP, Nueva factura de gasto) |
+| Cobranza / Pago | Movimientos de tesorería por cobro/pago |
+
+**Transacciones** (`/finanzas/transacciones`) lista movimientos de caja, **no** facturas impagas. La clase de esas facturas está en **Facturas emitidas** / **Facturas de proveedor** / CxC / CxP.
+
 ### 12.1 Ventas y cobranzas (AR)
 
 ```mermaid
@@ -950,10 +967,11 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 
 **Alta en obra (`/nueva`):**
 
-1. **A quién se le paga** (proveedor o empleado si no hay OC), fechas, líneas (cada línea con **partida EDT obligatoria**, D-055; **Desc. %** opcional antes de IVA; **Descuento general %** para copiar el mismo % a todas), OC opcional (**solo si el payee es el proveedor de esa OC**), **adjunto** opcional (foto/PDF del comprobante).
-2. Desde OC: **Registrar factura desde OC** copia la partida EDT de cada línea de la orden.
-3. Sin más: **Crear factura** → queda en **borrador** → luego **Emitir** en el detalle (crea CxP + **asiento DRAFT** en contabilidad, ver §15).
-4. Con permiso **EDIT tesorería** y módulo Tesorería activo: checkbox **Emitir y pagar ahora (egreso de caja)** → cuenta de pago + fecha → **Emitir y pagar**. Crea factura emitida + CxP + pago + egreso en un paso. Si no hay fondos suficientes, **bloquea**.
+1. Elegí el modo **Contra orden de compra** o **Costo directo** ([D-102]). Contra OC: picker de OC + “Traer líneas” (baja el comprometido abierto). Costo directo: sin OC; imputá partida y tipo de costo (no reduce comprometido). El chip **Clase** muestra Compra comprometida o Costo directo de obra.
+2. **A quién se le paga** (proveedor o empleado si no hay OC), fechas, líneas (cada línea con **partida EDT obligatoria**, D-055; **Desc. %** opcional antes de IVA; **Descuento general %** para copiar el mismo % a todas), **adjunto** opcional (foto/PDF del comprobante).
+3. Desde OC: **Registrar factura desde OC** abre en modo Contra OC y copia la partida EDT de cada línea.
+4. Sin más: **Crear factura** → queda en **borrador** → luego **Emitir** en el detalle (crea CxP + **asiento DRAFT** en contabilidad, ver §15).
+5. Con permiso **EDIT tesorería** y módulo Tesorería activo: checkbox **Emitir y pagar ahora (egreso de caja)** → cuenta de pago + fecha → **Emitir y pagar**. Crea factura emitida + CxP + pago + egreso en un paso. Si no hay fondos suficientes, **bloquea**.
 
 #### Empresa (corporativo)
 

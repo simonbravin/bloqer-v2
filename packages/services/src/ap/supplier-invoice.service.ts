@@ -28,6 +28,12 @@ import {
   cancelDraftJournalOnOperationalCancel,
 } from "../accounting/accounting-cancel-sync.service";
 import { assertApInvoicePayee } from "../contact/assert-contact-role";
+import {
+  classFieldsForSupplierInvoice,
+  parseSupplierInvoiceClassFilter,
+  supplierInvoiceClassWhere,
+  type FinancialClassFields,
+} from "../finance/document-class.service";
 
 const PO_AP_LINKABLE_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
 
@@ -127,7 +133,7 @@ export type SupplierInvoiceView = Omit<SupplierInvoice, "subtotal" | "taxAmount"
   supplierName: string;
   subcontractCertificationCode: string | null;
   subcontractId: string | null;
-};
+} & FinancialClassFields;
 
 /** Payable snapshot for invoice lists (payment status lives on Payable, not the document). */
 export type SupplierInvoiceListPayable = {
@@ -272,6 +278,8 @@ export type ProjectSupplierInvoiceListFilters = {
   pageSize?: number;
   search?: string;
   sortDir?: "asc" | "desc";
+  /** Derived document class filter ([D-102]). */
+  class?: string;
 };
 
 export type ProjectSupplierInvoiceListRow = Omit<SupplierInvoiceView, "lines"> & {
@@ -316,10 +324,12 @@ export async function listSupplierInvoicesByProject(
   });
 
   const search = filters?.search?.trim();
+  const classCode = parseSupplierInvoiceClassFilter(filters?.class);
   const where: Prisma.SupplierInvoiceWhereInput = {
     projectId,
     tenantId: ctx.tenantId,
     ...(search ? supplierInvoiceSearchWhere(search) : {}),
+    ...(classCode ? supplierInvoiceClassWhere(classCode) : {}),
   };
 
   const issueDir = filters?.sortDir === "asc" ? "asc" : "desc";
@@ -330,6 +340,11 @@ export async function listSupplierInvoicesByProject(
       include: {
         supplierContact: { select: { legalName: true, fantasyName: true } },
         payable: { select: { id: true, status: true } },
+        lines: {
+          where: { purchaseOrderLineId: { not: null } },
+          select: { id: true },
+          take: 1,
+        },
       },
       orderBy: [{ issueDate: issueDir }, { number: issueDir }, { id: issueDir }],
       skip,
@@ -365,6 +380,8 @@ export type CompanySupplierInvoiceListFilters = {
   sortDir?:           "asc" | "desc";
   page?:              number;
   pageSize?:          number;
+  /** Derived document class filter ([D-102]). */
+  class?: string;
 };
 
 export type CompanySupplierInvoiceListRow = Omit<SupplierInvoiceView, "lines"> & {
@@ -387,6 +404,7 @@ export async function listCompanySupplierInvoices(
   });
 
   const search = filters?.search?.trim();
+  const classCode = parseSupplierInvoiceClassFilter(filters?.class);
   const where: Prisma.SupplierInvoiceWhereInput = {
     tenantId:  ctx.tenantId,
     projectId: null,
@@ -403,6 +421,7 @@ export async function listCompanySupplierInvoices(
         }
       : {}),
     ...(search ? supplierInvoiceSearchWhere(search) : {}),
+    ...(classCode ? supplierInvoiceClassWhere(classCode) : {}),
   };
 
   const issueDir = filters?.sortDir === "asc" ? "asc" : "desc";
@@ -413,6 +432,11 @@ export async function listCompanySupplierInvoices(
       include: {
         supplierContact: { select: { legalName: true, fantasyName: true } },
         payable: { select: { id: true, status: true } },
+        lines: {
+          where: { purchaseOrderLineId: { not: null } },
+          select: { id: true },
+          take: 1,
+        },
       },
       orderBy: [{ issueDate: issueDir }, { number: issueDir }, { id: issueDir }],
       skip,
@@ -1204,9 +1228,16 @@ type RawInvoice = SupplierInvoice & {
 type RawInvoiceListRow = SupplierInvoice & {
   supplierContact: { legalName: string; fantasyName: string | null };
   payable?: { id: string; status: string } | null;
+  lines?: Array<{ id: string }>;
 };
 
 function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoiceListRow {
+  const classFields = classFieldsForSupplierInvoice({
+    projectId: inv.projectId,
+    purchaseOrderId: inv.purchaseOrderId,
+    hasPoLineLink: (inv.lines?.length ?? 0) > 0,
+    subcontractCertificationId: inv.subcontractCertificationId,
+  });
   return {
     ...inv,
     subtotal:    serializeMoneyDecimal(inv.subtotal),
@@ -1217,10 +1248,18 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoice
     subcontractCertificationCode: null,
     subcontractId: null,
     payable: inv.payable ? { id: inv.payable.id, status: inv.payable.status } : null,
+    ...classFields,
   };
 }
 
 function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
+  const hasPoLineLink = inv.lines.some((l) => l.purchaseOrderLineId);
+  const classFields = classFieldsForSupplierInvoice({
+    projectId: inv.projectId,
+    purchaseOrderId: inv.purchaseOrderId,
+    hasPoLineLink,
+    subcontractCertificationId: inv.subcontractCertificationId,
+  });
   return {
     ...inv,
     subtotal:    serializeMoneyDecimal(inv.subtotal),
@@ -1248,5 +1287,6 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
       lineTotal:   serializeMoneyDecimal(l.lineTotal),
       sortOrder:   l.sortOrder,
     })),
+    ...classFields,
   };
 }

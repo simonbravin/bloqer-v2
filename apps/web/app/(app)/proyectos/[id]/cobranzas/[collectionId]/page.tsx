@@ -7,12 +7,13 @@ import { settlementMethodLabel } from "@/features/treasury/lib/settlement-method
 import { getCurrentUser } from "@/lib/auth";
 import { generateJournalFromCollectionAction } from "@/app/(app)/contabilidad/source-draft-actions";
 import { getCollectionById, ServiceError } from "@bloqer/services";
-import { can } from "@bloqer/domain";
+import { can, classifyAccountMovement } from "@bloqer/domain";
 import { cancelCollectionAction } from "../actions";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 
 interface PageProps {
   params: Promise<{ id: string; collectionId: string }>;
@@ -45,12 +46,21 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
   const returnPath = `/proyectos/${id}/cobranzas/${collectionId}`;
 
+  const collectionClass = classifyAccountMovement({
+    type: "INFLOW",
+    sourceType: "COLLECTION",
+  });
+
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={formatDate(collection.collectionDate)}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Cobranza</h1>
+            <DocumentClassBadge
+              classLabel={collectionClass.classLabel}
+              classFamily={collectionClass.family}
+            />
             <CollectionStatusBadge status={collection.status} />
           </div>
         </div>

@@ -6,6 +6,11 @@ import { DEFAULT_CASH_DATE_RANGE_DAYS, defaultDateRangeDays, MAX_CORPORATE_PAYME
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getAccountBalance, getAccountBalanceAsOf } from "../treasury/balance.service";
+import {
+  accountMovementClassWhere,
+  classFieldsForAccountMovement,
+  parseMovementClassFilter,
+} from "../finance/document-class.service";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -140,6 +145,10 @@ export type MovementReportRow = {
   counterpartyName:   string | null;
   externalInvoiceRef: string | null;
   runningBalance?:    string;
+  /** Derived document class ([D-102]). */
+  classCode:          string;
+  classLabel:         string;
+  classFamily:        string;
 };
 
 export type CashFlowBucket = {
@@ -186,6 +195,8 @@ export type MovementReportFilters = {
   corporateOnly?:           boolean;
   /** When true: only movements with a project (`projectId` not null). */
   projectOnly?:             boolean;
+  /** Derived document class filter ([D-102]). */
+  class?:                   string;
   page?:                    number;
   pageSize?:                number;
   /** Sort by movementDate; default desc (recent first). */
@@ -453,6 +464,7 @@ export async function getAccountMovementReport(
   }
 
   const projectWhere = await movementProjectWhere(filters, ctx.tenantId);
+  const classCode = parseMovementClassFilter(filters.class);
 
   const where: Prisma.AccountMovementWhereInput = {
     tenantId: ctx.tenantId,
@@ -475,6 +487,7 @@ export async function getAccountMovementReport(
       : {}),
     ...(companyId ? { account: { companyId } } : {}),
     ...projectWhere,
+    ...(classCode ? accountMovementClassWhere(classCode) : {}),
   };
 
   const needsRunningBalance = !paginated && Boolean(filters.accountId);
@@ -535,6 +548,10 @@ export async function getAccountMovementReport(
       ? (m.counterparty.fantasyName ?? m.counterparty.legalName)
       : null;
     const sourceType = m.sourceType as string;
+    const classFields = classFieldsForAccountMovement({
+      type: m.type as string,
+      sourceType,
+    });
     return {
       id: m.id,
       accountId: m.accountId,
@@ -567,6 +584,7 @@ export async function getAccountMovementReport(
       counterpartyName,
       externalInvoiceRef: m.externalInvoiceRef,
       ...(runningBalance !== undefined ? { runningBalance: serializeMoneyDecimal(runningBalance) } : {}),
+      ...classFields,
     };
   });
 

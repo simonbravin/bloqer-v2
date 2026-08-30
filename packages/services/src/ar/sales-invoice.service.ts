@@ -27,6 +27,12 @@ import {
 } from "../accounting/accounting-cancel-sync.service";
 import { notifyReceivableReadyToCollect } from "./ar-notifications.service";
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
+import {
+  classFieldsForSalesInvoice,
+  parseSalesInvoiceClassFilter,
+  salesInvoiceClassWhere,
+  type FinancialClassFields,
+} from "../finance/document-class.service";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -52,7 +58,7 @@ export type SalesInvoiceWithLines = Omit<SalesInvoice, "subtotal" | "taxAmount" 
   code: string;
   lines: SalesInvoiceLineView[];
   clientName: string;
-};
+} & FinancialClassFields;
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
 
@@ -140,6 +146,8 @@ export async function getActiveInvoiceForCertification(
 export type ProjectSalesInvoiceListFilters = {
   page?: number;
   pageSize?: number;
+  /** Derived document class filter ([D-102]). */
+  class?: string;
 };
 
 export type ProjectSalesInvoiceListRow = Omit<SalesInvoiceWithLines, "lines">;
@@ -160,7 +168,12 @@ export async function listInvoicesByProject(
     pageSize: filters?.pageSize,
   });
 
-  const where = { projectId, tenantId: ctx.tenantId };
+  const classCode = parseSalesInvoiceClassFilter(filters?.class);
+  const where: Prisma.SalesInvoiceWhereInput = {
+    projectId,
+    tenantId: ctx.tenantId,
+    ...(classCode ? salesInvoiceClassWhere(classCode) : {}),
+  };
 
   const [invoices, total] = await Promise.all([
     prisma.salesInvoice.findMany({
@@ -845,6 +858,10 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): ProjectSalesInvoiceLis
     subtotal: serializeMoneyDecimal(inv.subtotal),
     taxAmount: serializeMoneyDecimal(inv.taxAmount),
     totalAmount: serializeMoneyDecimal(inv.totalAmount),
+    ...classFieldsForSalesInvoice({
+      projectId: inv.projectId,
+      certificationId: inv.certificationId,
+    }),
   };
 }
 
@@ -888,5 +905,9 @@ function serializeInvoice(inv: RawInvoice): SalesInvoiceWithLines {
       certificationLineId: l.certificationLineId,
       sortOrder: l.sortOrder,
     })),
+    ...classFieldsForSalesInvoice({
+      projectId: inv.projectId,
+      certificationId: inv.certificationId,
+    }),
   };
 }

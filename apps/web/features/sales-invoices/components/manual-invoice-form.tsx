@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint, classifySalesInvoice } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -14,6 +14,7 @@ import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/se
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { uploadDocumentAction } from "@/features/documents/upload-document-action";
 import { InvoiceLetterSelect, PricesIncludeTaxCheckbox, TaxRateSelect } from "@/features/finance/components/invoice-letter-fields";
+import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import {
@@ -248,6 +249,12 @@ export function ManualInvoiceForm({
         {error && (
           <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
         )}
+
+        <DocumentClassCreateHint
+          classLabel={classifySalesInvoice({ projectId }).classLabel}
+          classFamily={classifySalesInvoice({ projectId }).family}
+          hint="Factura de venta imputada a esta obra."
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2 space-y-1">

@@ -48,6 +48,17 @@ const SCOPE_OPTIONS = [
   { value: "project", label: "Solo obra" },
 ];
 
+const CLASS_OPTIONS_ALL = [
+  { value: "_all", label: "Todas las clases" },
+  { value: "COLLECTION", label: "Cobranza" },
+  { value: "PAYMENT", label: "Pago" },
+  { value: "INCOME_CASH", label: "Ingreso solo caja" },
+  { value: "OVERHEAD", label: "Gasto general (caja)" },
+  { value: "TRANSFER", label: "Transferencia" },
+];
+
+const CLASS_OPTIONS_FINANCE = CLASS_OPTIONS_ALL.filter((o) => o.value !== "TRANSFER");
+
 export type MovementFilterProjectOption = { id: string; name: string };
 
 export type MovementFiltersProps = {
@@ -108,6 +119,7 @@ export function MovementFilters({
   const internalTransfersValue = sp.get("includeInternalTransfers") ?? "_all";
   const typeOptions = variant === "finance" ? TYPE_OPTIONS_FINANCE : TYPE_OPTIONS_ALL;
   const sourceOptions = variant === "finance" ? SOURCE_OPTIONS_FINANCE : SOURCE_OPTIONS_ALL;
+  const classOptions = variant === "finance" ? CLASS_OPTIONS_FINANCE : CLASS_OPTIONS_ALL;
 
   // Finance applies a 90-day default server-side when URL has no dates; mirror that
   // in the inputs so presets and Desde/Hasta stay in sync (controlled values).
@@ -225,6 +237,28 @@ export function MovementFilters({
             </SelectTrigger>
             <SelectContent>
               {sourceOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Clase</Label>
+          <Select
+            value={
+              classOptions.some((o) => o.value === (sp.get("class") ?? "_all"))
+                ? (sp.get("class") ?? "_all")
+                : "_all"
+            }
+            onValueChange={(v) => update("class", v === "_all" ? "" : v)}
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {classOptions.map((o) => (
                 <SelectItem key={o.value} value={o.value}>
                   {o.label}
                 </SelectItem>

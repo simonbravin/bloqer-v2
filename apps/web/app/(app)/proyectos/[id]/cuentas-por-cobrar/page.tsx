@@ -131,6 +131,8 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
     currency: r.currency,
     clientName: r.clientName,
     salesInvoiceCode: r.salesInvoiceCode,
+    classLabel: r.classLabel,
+    classFamily: r.classFamily,
   }));
   const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
   const invoices: SalesInvoiceListItem[] = invoicesResult.data.map((inv) => ({
@@ -144,6 +146,8 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
     currency: inv.currency,
     clientName: inv.clientName,
     invoiceLetter: inv.invoiceLetter,
+    classLabel: inv.classLabel,
+    classFamily: inv.classFamily,
   }));
   const collections: CollectionListItem[] = collectionsResult.data.map((c) => ({
     id: c.id,

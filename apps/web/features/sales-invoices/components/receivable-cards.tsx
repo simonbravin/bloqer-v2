@@ -3,6 +3,7 @@ import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 import { ReceivableStatusBadge } from "./receivable-status-badge";
 import { receivableDetailHref, type ReceivableListItem } from "./receivable-list";
 import { formatMoneyAmount } from "@/lib/format-money";
@@ -45,7 +46,12 @@ export function ReceivableCards({
           className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="shrink-0 text-xs text-muted-foreground">Vence {formatDate(r.dueDate)}</span>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <span className="shrink-0 text-xs text-muted-foreground">Vence {formatDate(r.dueDate)}</span>
+              {r.classLabel ? (
+                <DocumentClassBadge classLabel={r.classLabel} classFamily={r.classFamily} />
+              ) : null}
+            </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               <ReceivableStatusBadge status={r.status} />
               <span className="text-xs text-muted-foreground">

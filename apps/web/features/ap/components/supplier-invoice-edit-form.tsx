@@ -25,6 +25,9 @@ import { updateSupplierInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas
 import { updateCompanySupplierInvoiceAction } from "@/app/(app)/finanzas/facturas-proveedor/actions";
 import type { SupplierInvoiceView } from "@bloqer/services";
 import type { SupplierOption, POOption } from "./supplier-invoice-form";
+import { classifySupplierInvoice } from "@bloqer/domain";
+import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
+import { cn } from "@/lib/utils";
 
 interface Props {
   /** Required when `companyFinanzas` is false */
@@ -64,29 +67,10 @@ export function SupplierInvoiceEditForm({
   const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
   const [purchaseOrderId, setPurchaseOrderId] = useState<string | null>(invoice.purchaseOrderId ?? null);
   const payeeLocked = Boolean(invoice.subcontractCertificationId);
-
-  function onPurchaseOrderChange(nextId: string | null) {
-    if (nextId === purchaseOrderId) return;
-    setPurchaseOrderId(nextId);
-    setLines((prev) => prev.map((l) => ({ ...l, purchaseOrderLineId: null })));
-  }
-
-  const selectedSupplier = useMemo(
-    () => suppliers.find((s) => s.id === supplierContactId),
-    [suppliers, supplierContactId],
-  );
-  const showLetter = requiresArInvoiceLetter(companyCountry, selectedSupplier?.country ?? null);
-
-  const filteredPOs = poOptions.filter(
-    (po) => !supplierContactId || po.supplierContactId === supplierContactId,
-  );
-  const poComboboxOptions = useMemo(
-    () =>
-      withNoneOption(
-        toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code }))),
-        { label: "Sin OC vinculada" },
-      ),
-    [filteredPOs],
+  const [apSpendMode, setApSpendMode] = useState<"AGAINST_PO" | "DIRECT">(
+    invoice.purchaseOrderId || invoice.lines.some((l) => l.purchaseOrderLineId)
+      ? "AGAINST_PO"
+      : "DIRECT",
   );
   const [lines, setLines] = useState<InvoiceLine[]>(
     invoice.lines.length > 0
@@ -101,6 +85,74 @@ export function SupplierInvoiceEditForm({
           costType: (l.costType as InvoiceLine["costType"]) ?? "MATERIAL",
         }))
       : [{ description: "", quantity: "1", unitPrice: "", taxRate: "21", discountPct: "0", wbsNodeId: null, purchaseOrderLineId: null, costType: "MATERIAL" }],
+  );
+
+  function onPurchaseOrderChange(nextId: string | null) {
+    if (nextId === purchaseOrderId) return;
+    setPurchaseOrderId(nextId);
+    if (nextId) setApSpendMode("AGAINST_PO");
+    setLines((prev) => prev.map((l) => ({ ...l, purchaseOrderLineId: null })));
+  }
+
+  function selectApSpendMode(mode: "AGAINST_PO" | "DIRECT") {
+    if (payeeLocked) return;
+    setApSpendMode(mode);
+    if (mode === "DIRECT") {
+      setPurchaseOrderId(null);
+      setLines((prev) => prev.map((l) => ({ ...l, purchaseOrderLineId: null })));
+    }
+  }
+
+  const derivedClass = useMemo(() => {
+    if (payeeLocked) {
+      return classifySupplierInvoice({
+        projectId: invoice.projectId,
+        subcontractCertificationId: invoice.subcontractCertificationId,
+      });
+    }
+    if (companyFinanzas || !projectId) {
+      return classifySupplierInvoice({ projectId: null });
+    }
+    if (apSpendMode === "AGAINST_PO") {
+      return classifySupplierInvoice({
+        projectId,
+        purchaseOrderId,
+        hasPoLineLink: true,
+      });
+    }
+    return classifySupplierInvoice({
+      projectId,
+      purchaseOrderId: null,
+      hasPoLineLink: false,
+    });
+  }, [
+    payeeLocked,
+    invoice.projectId,
+    invoice.subcontractCertificationId,
+    companyFinanzas,
+    projectId,
+    apSpendMode,
+    purchaseOrderId,
+  ]);
+
+  const selectedSupplier = useMemo(
+    () => suppliers.find((s) => s.id === supplierContactId),
+    [suppliers, supplierContactId],
+  );
+  const showLetter = requiresArInvoiceLetter(companyCountry, selectedSupplier?.country ?? null);
+
+  const filteredPOs = poOptions.filter(
+    (po) => !supplierContactId || po.supplierContactId === supplierContactId,
+  );
+  const poComboboxOptions = useMemo(
+    () =>
+      apSpendMode === "AGAINST_PO"
+        ? toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code })))
+        : withNoneOption(
+            toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code }))),
+            { label: "Sin OC vinculada" },
+          ),
+    [filteredPOs, apSpendMode],
   );
 
   useEffect(() => {
@@ -140,6 +192,16 @@ export function SupplierInvoiceEditForm({
       setError("Cada línea debe imputar a una partida EDT");
       return;
     }
+    if (
+      !companyFinanzas &&
+      projectId &&
+      !payeeLocked &&
+      apSpendMode === "AGAINST_PO" &&
+      !purchaseOrderId
+    ) {
+      setError("Seleccioná la orden de compra o cambiá a costo directo");
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
     const payload = {
@@ -150,12 +212,13 @@ export function SupplierInvoiceEditForm({
       ...(showLetter ? { invoiceLetter } : {}),
       pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
       notes:           (fd.get("notes") as string) || null,
-      purchaseOrderId: companyFinanzas ? null : purchaseOrderId ?? null,
+      purchaseOrderId: companyFinanzas || apSpendMode === "DIRECT" ? null : purchaseOrderId ?? null,
       lines:           lines.map((l, i) => ({
         ...l,
         taxRate: forceZeroTax ? "0" : l.taxRate,
         wbsNodeId: companyFinanzas ? null : l.wbsNodeId,
-        purchaseOrderLineId: companyFinanzas ? null : l.purchaseOrderLineId,
+        purchaseOrderLineId:
+          companyFinanzas || apSpendMode === "DIRECT" ? null : l.purchaseOrderLineId,
         sortOrder: i,
       })),
     };
@@ -181,6 +244,20 @@ export function SupplierInvoiceEditForm({
         {error && (
           <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
         )}
+
+        <DocumentClassCreateHint
+          classLabel={derivedClass.classLabel}
+          classFamily={derivedClass.family}
+          hint={
+            payeeLocked
+              ? "Vinculada a certificación de subcontrato."
+              : companyFinanzas || !projectId
+                ? "Gasto de estructura (sin obra)."
+                : apSpendMode === "AGAINST_PO"
+                  ? "Baja el comprometido abierto de esa OC."
+                  : "No reduce el comprometido. Imputá partida y tipo de costo."
+          }
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2 space-y-1">
@@ -245,18 +322,63 @@ export function SupplierInvoiceEditForm({
             </div>
           )}
 
-          {!companyFinanzas && filteredPOs.length > 0 && (
-            <div className="col-span-2 space-y-1">
-              <Label>Orden de compra (opcional)</Label>
-              <SearchableCombobox
-                options={poComboboxOptions}
-                value={purchaseOrderId ?? SEARCHABLE_NONE}
-                onValueChange={(v) =>
-                  onPurchaseOrderChange(v === SEARCHABLE_NONE ? null : v)
-                }
-                placeholder="Sin OC vinculada"
-                searchPlaceholder="Buscar OC…"
-              />
+          {!companyFinanzas && projectId && (
+            <div className="col-span-2 space-y-2">
+              <Label>Imputación de costo</Label>
+              {payeeLocked ? (
+                <p className="text-xs text-muted-foreground">
+                  Subcontrato: la clase queda fija; no se cambia a OC ni a costo directo.
+                </p>
+              ) : (
+                <>
+                  <div
+                    className="inline-flex flex-wrap rounded-lg border bg-muted/40 p-1"
+                    role="group"
+                    aria-label="Contra OC o costo directo"
+                  >
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => selectApSpendMode("AGAINST_PO")}
+                      className={cn(
+                        "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                        apSpendMode === "AGAINST_PO"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      Contra orden de compra
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => selectApSpendMode("DIRECT")}
+                      className={cn(
+                        "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                        apSpendMode === "DIRECT"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      Costo directo
+                    </button>
+                  </div>
+                  {apSpendMode === "AGAINST_PO" && (
+                    <div className="space-y-1">
+                      <Label>Orden de compra</Label>
+                      <SearchableCombobox
+                        options={poComboboxOptions}
+                        value={purchaseOrderId ?? SEARCHABLE_NONE}
+                        onValueChange={(v) =>
+                          onPurchaseOrderChange(v === SEARCHABLE_NONE ? null : v)
+                        }
+                        placeholder="Seleccionar OC…"
+                        searchPlaceholder="Buscar OC…"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 

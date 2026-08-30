@@ -11,4 +11,7 @@ export type SalesInvoiceListItem = {
   currency: string;
   clientName: string;
   invoiceLetter?: string | null;
+  classCode?: string | null;
+  classLabel?: string | null;
+  classFamily?: string | null;
 };

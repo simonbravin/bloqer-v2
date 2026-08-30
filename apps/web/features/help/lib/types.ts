@@ -60,6 +60,7 @@ export type HelpIntent =
   | "reintegro"
   | "gasto-obra"
   | "gasto-corporativo"
+  | "clase-documento"
   | "emitir-y-pagar"
   | "pagar-cxp"
   | "edt-costos"

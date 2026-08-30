@@ -38,14 +38,28 @@ Ver máquinas SalesInvoice y Receivable.
 - Venta directa simplificada (sin certificación).
 - **Adjuntos** en el alta (create-then-upload) y en el detalle de factura de venta (`SALES_INVOICE`) — foto/copia del comprobante ([D-052]). Aplica a obra y a ingresos corporativos (`projectId` null; panel en CxC empresa).
 - AR corporativo: alta rápida con cobro opcional vía Registrar transacción ([D-051]).
-- Factura de venta **manual de proyecto**: “Emitir y cobrar ahora” opcional ([D-077] / Q-055); visible con `EDIT TREASURY`.
 
-> Ver [D-051](../00-product/DECISION_LOG.md), [D-052](../00-product/DECISION_LOG.md).
+## Clase financiera derivada ([D-102])
+
+Etiqueta de solo lectura. Helper `classifySalesInvoice` / movimientos:
+
+| classCode | Label UI | Hechos |
+|---|---|---|
+| `SALE_CERT` | Venta — certificación | `projectId` + `certificationId` |
+| `SALE_PROJECT` | Venta de obra | `projectId` sin cert (incluye anticipo hoy) |
+| `INCOME_CORPORATE` | Ingreso corporativo | sin `projectId` |
+| `INCOME_CASH` | Ingreso solo caja | movimiento `INFLOW` + `MANUAL_ADJUSTMENT` |
+| `COLLECTION` / `PAYMENT` | Cobranza / Pago | `sourceType` del movimiento |
+
+UI: columna/filtro **Clase** en listados; chip “Se registrará como…” en altas. No confundir con letra A/B/C/E ni con NC/ND futuras.
 
 ## 10. Reglas de negocio
+- Factura de venta **manual de proyecto**: “Emitir y cobrar ahora” opcional ([D-077] / Q-055); visible con `EDIT TREASURY`.
 - Retenciones/percepciones manuales por línea ([D-011]).
 - AR puede existir sin proyecto ([D-009]).
 - Letra de comprobante A/B/C/E sugerida y editable; requerida al emitir si operación AR ([D-084]).
+
+> Ver [D-051](../00-product/DECISION_LOG.md), [D-052](../00-product/DECISION_LOG.md), [D-102](../00-product/DECISION_LOG.md).
 
 ## 11. Validaciones
 - Suma aplicaciones cobranza ≤ saldo factura.

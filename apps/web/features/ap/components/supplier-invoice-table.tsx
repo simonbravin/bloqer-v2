@@ -20,6 +20,7 @@ import { PayableStatusBadge } from "./payable-status-badge";
 import type { SupplierInvoiceListItem } from "./supplier-invoice-list";
 import { formatInvoiceLetterBadge } from "@bloqer/domain";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 
 const PAYABLE_OPEN = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
 
@@ -61,7 +62,8 @@ export function SupplierInvoiceTable({
         <TableHeader>
           <TableRow>
             <TableHead>Código</TableHead>
-            <TableHead>Tipo</TableHead>
+            <TableHead>Letra</TableHead>
+            <TableHead>Clase</TableHead>
             <TableHead>Proveedor</TableHead>
             <Suspense fallback={<TableHead>Emisión</TableHead>}>
               <UrlSortableTableHead label="Emisión" defaultDir="desc" />
@@ -93,6 +95,16 @@ export function SupplierInvoiceTable({
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {letter ?? "—"}
+                </TableCell>
+                <TableCell>
+                  {inv.classLabel ? (
+                    <DocumentClassBadge
+                      classLabel={inv.classLabel}
+                      classFamily={inv.classFamily}
+                    />
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </TableCell>
                 <TableCell
                   className={cn(tableNameCellClass, "font-medium")}

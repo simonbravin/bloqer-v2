@@ -10,4 +10,7 @@ export type SupplierInvoiceListItem = {
   payableId?: string | null;
   payableStatus?: string | null;
   invoiceLetter?: string | null;
+  classCode?: string | null;
+  classLabel?: string | null;
+  classFamily?: string | null;
 };

@@ -47,6 +47,7 @@ interface PageProps {
     view?: string;
     create?: string;
     error?: string;
+    class?: string;
   }>;
 }
 
@@ -80,6 +81,7 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
       pageSize: PAGE_SIZE,
       search: sp.search,
       sortDir: sp.dir === "asc" ? "asc" : "desc",
+      class: sp.class,
     });
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
@@ -101,6 +103,9 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
     payableId: inv.payable?.id ?? null,
     payableStatus: inv.payable?.status ?? null,
     invoiceLetter: inv.invoiceLetter,
+    classCode: inv.classCode,
+    classLabel: inv.classLabel,
+    classFamily: inv.classFamily,
   }));
 
   const canCreateInvoice = can(ctx.roles, "EDIT", "AP");
@@ -203,7 +208,8 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
       <Suspense fallback={null}>
         <SupplierInvoiceListFilters
           showDateFilters={false}
-          preserveParams={["search", "sort", "dir", "view"]}
+          preserveParams={["search", "sort", "dir", "view", "class"]}
+          classFilterScope="supplier-project"
         />
       </Suspense>
 

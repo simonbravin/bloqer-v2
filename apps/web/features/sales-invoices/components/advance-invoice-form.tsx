@@ -12,8 +12,10 @@ import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/se
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { toIsoDateInTimeZone } from "@bloqer/utils";
+import { classifySalesInvoice } from "@bloqer/domain";
 import { registerArAdvanceAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
+import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import type { ClientOption } from "./manual-invoice-form";
 
 type TreasuryAccountOption = {
@@ -113,6 +115,12 @@ export function AdvanceInvoiceForm({
         {error ? (
           <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
         ) : null}
+
+        <DocumentClassCreateHint
+          classLabel={classifySalesInvoice({ projectId }).classLabel}
+          classFamily={classifySalesInvoice({ projectId }).family}
+          hint="Anticipo de obra: se etiqueta como venta de obra (sin señal persistida aparte)."
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2 space-y-1">

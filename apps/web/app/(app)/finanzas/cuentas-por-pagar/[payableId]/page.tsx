@@ -24,6 +24,7 @@ import {
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { isPayablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 
 interface PageProps {
   params: Promise<{ payableId: string }>;
@@ -145,6 +146,12 @@ export default async function FinanzasPayableDetailPage({ params, searchParams }
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={payable.supplierName}>
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Cuenta por pagar (empresa)</h1>
+        {payable.classLabel ? (
+          <DocumentClassBadge
+            classLabel={payable.classLabel}
+            classFamily={payable.classFamily}
+          />
+        ) : null}
         <PayableStatusBadge status={payable.status} />
       </div>
 

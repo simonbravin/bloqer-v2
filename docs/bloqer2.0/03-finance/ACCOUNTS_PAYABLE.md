@@ -25,3 +25,16 @@ Igual patrón que Receivable.
 
 ## Reportes
 Aging AP, proyección egresos ([`CASHFLOW_PROJECTION.md`](./CASHFLOW_PROJECTION.md)).
+
+## Clase financiera derivada ([D-102])
+
+Etiqueta de solo lectura (no columna). Helper `classifySupplierInvoice`:
+
+| classCode | Label UI | Hechos |
+|---|---|---|
+| `SUBCONTRACT` | Subcontrato | `subcontractCertificationId` (precede a OC) |
+| `PURCHASE_COMMITTED` | Compra comprometida | `purchaseOrderId` o línea con `purchaseOrderLineId` |
+| `DIRECT_PROJECT` | Costo directo de obra | `projectId` sin OC ni subcert |
+| `OVERHEAD` | Gasto general | sin `projectId` |
+
+Alta de obra: UX **Contra OC** vs **Costo directo** (no persiste el modo; solo guía FKs).

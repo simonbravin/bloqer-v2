@@ -9,4 +9,6 @@ export type PayableListItem = {
   currency: string;
   supplierInvoiceId?: string;
   supplierInvoiceCode?: string | null;
+  classLabel?: string | null;
+  classFamily?: string | null;
 };

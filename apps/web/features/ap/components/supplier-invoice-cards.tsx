@@ -7,6 +7,7 @@ import { PayableStatusBadge } from "./payable-status-badge";
 import type { SupplierInvoiceListItem } from "./supplier-invoice-list";
 import { formatInvoiceLetterBadge } from "@bloqer/domain";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 
 const PAYABLE_OPEN = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
 
@@ -66,6 +67,14 @@ export function SupplierInvoiceCards({
                   <SupplierInvoiceStatusBadge status={inv.status} />
                 </span>
               </div>
+              {inv.classLabel ? (
+                <div className="mt-2">
+                  <DocumentClassBadge
+                    classLabel={inv.classLabel}
+                    classFamily={inv.classFamily}
+                  />
+                </div>
+              ) : null}
               <p className="mt-2 truncate font-semibold" title={inv.supplierName}>
                 {inv.supplierName}
               </p>

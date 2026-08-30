@@ -13,6 +13,7 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PayableStatusBadge, SupplierInvoiceStatusBadge } from "@/features/ap";
 import { formatInvoiceLetterBadge } from "@bloqer/domain";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { getCurrentUser } from "@/lib/auth";
@@ -96,6 +97,12 @@ export default async function FinanzasFacturaProveedorDetailPage({
           <span className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground">
             {formatInvoiceLetterBadge(invoice.invoiceLetter)}
           </span>
+        ) : null}
+        {invoice.classLabel ? (
+          <DocumentClassBadge
+            classLabel={invoice.classLabel}
+            classFamily={invoice.classFamily}
+          />
         ) : null}
       </div>
 

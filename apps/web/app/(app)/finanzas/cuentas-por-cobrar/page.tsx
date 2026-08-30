@@ -128,6 +128,8 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
     projectCode: r.projectCode,
     projectName: r.projectName,
     salesInvoiceCode: r.salesInvoiceCode,
+    classLabel: r.classLabel,
+    classFamily: r.classFamily,
   }));
   const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
 

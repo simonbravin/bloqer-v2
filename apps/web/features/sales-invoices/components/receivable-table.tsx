@@ -16,6 +16,7 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { UrlSortableTableHead } from "@/components/ui/url-sortable-table-head";
 import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 import { ReceivableStatusBadge } from "./receivable-status-badge";
 import {
   receivableDetailHref,
@@ -74,6 +75,7 @@ export function ReceivableTable({
               <UrlSortableTableHead label="Vencimiento" defaultDir="asc" />
             </Suspense>
             {showInvoiceColumn ? <TableHead>Factura</TableHead> : null}
+            <TableHead>Clase</TableHead>
             <TableHead>Cobrada</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead className="text-right">Original</TableHead>
@@ -124,6 +126,16 @@ export function ReceivableTable({
                     )}
                   </TableCell>
                 ) : null}
+                <TableCell>
+                  {r.classLabel ? (
+                    <DocumentClassBadge
+                      classLabel={r.classLabel}
+                      classFamily={r.classFamily}
+                    />
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <ObligationSettledCell status={r.status} balanceDue={r.balanceDue} />
                 </TableCell>

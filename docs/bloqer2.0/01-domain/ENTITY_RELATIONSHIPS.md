@@ -376,6 +376,8 @@ flowchart LR
 | Product | StockMovement | 1:N | movimientos por producto |
 | BankReconciliation | AccountMovement | 1:N | conciliados |
 
+> **Clase financiera ([D-102]):** no es entidad ni columna. `SalesInvoice` / `SupplierInvoice` (en código; el ERD histórico dice `PurchaseInvoice` en sitios) y `AccountMovement` exponen `classCode`/`classLabel` derivados en el service layer. Recibo = Collection/Payment, no clase de factura.
+
 ---
 
 ## 9. Reglas de integridad funcional

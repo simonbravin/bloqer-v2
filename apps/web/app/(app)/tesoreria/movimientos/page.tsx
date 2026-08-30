@@ -22,6 +22,7 @@ interface PageProps {
     projectId?: string;
     sort?: string;
     dir?: string;
+    class?: string;
   }>;
 }
 
@@ -49,6 +50,7 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
   if (sp.corporateApPayments === "true") qs.set("corporateApPayments", "true");
   if (sp.scope) qs.set("scope", sp.scope);
   if (sp.projectId) qs.set("projectId", sp.projectId);
+  if (sp.class) qs.set("class", sp.class);
   if (sp.sort) qs.set("sort", sp.sort);
   if (sp.dir) qs.set("dir", sp.dir);
   const accountingReturnPath = `/tesoreria/movimientos${qs.size ? `?${qs}` : ""}`;

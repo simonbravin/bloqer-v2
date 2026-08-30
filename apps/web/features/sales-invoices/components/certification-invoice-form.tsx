@@ -2,13 +2,14 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint, classifySalesInvoice } from "@bloqer/domain";
 import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { InvoiceLetterSelect, TaxRateSelect } from "@/features/finance/components/invoice-letter-fields";
+import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { createInvoiceFromCertificationAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 import { formatMoneyAmount } from "@/lib/format-money";
 
@@ -103,6 +104,16 @@ export function CertificationInvoiceForm({
         {error && (
           <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
         )}
+
+        <DocumentClassCreateHint
+          classLabel={
+            classifySalesInvoice({ projectId, certificationId: cert.id }).classLabel
+          }
+          classFamily={
+            classifySalesInvoice({ projectId, certificationId: cert.id }).family
+          }
+          hint="Factura respaldada por la certificación de avance."
+        />
 
         <div className="grid grid-cols-2 gap-4">
           {showLetter ? (

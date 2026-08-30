@@ -151,6 +151,9 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     currency: inv.currency,
     status: inv.status,
     invoiceLetter: inv.invoiceLetter,
+    classCode: inv.classCode,
+    classLabel: inv.classLabel,
+    classFamily: inv.classFamily,
   }));
 
   return (

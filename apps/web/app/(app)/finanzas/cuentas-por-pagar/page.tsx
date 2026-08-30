@@ -128,6 +128,8 @@ export default async function FinanzasCuentasPorPagarPage({ searchParams }: Page
     currency: p.currency,
     supplierInvoiceId: p.supplierInvoiceId,
     supplierInvoiceCode: p.supplierInvoiceCode,
+    classLabel: p.classLabel,
+    classFamily: p.classFamily,
   }));
 
   const exportParams = { ...sp, scope: "corporate" as const };

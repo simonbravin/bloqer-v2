@@ -13,6 +13,7 @@ import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SalesInvoiceStatusBadge } from "@/features/sales-invoices";
 import { formatInvoiceLetterBadge } from "@bloqer/domain";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
@@ -94,6 +95,12 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
                 <span className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground">
                   {formatInvoiceLetterBadge(invoice.invoiceLetter)}
                 </span>
+              ) : null}
+              {invoice.classLabel ? (
+                <DocumentClassBadge
+                  classLabel={invoice.classLabel}
+                  classFamily={invoice.classFamily}
+                />
               ) : null}
             </div>
             <p className="text-sm text-muted-foreground">{invoice.clientName}</p>

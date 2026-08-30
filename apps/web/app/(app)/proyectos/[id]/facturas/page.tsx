@@ -28,12 +28,13 @@ import {
 import { PageShell } from "@/components/layout/page-shell";
 import { parsePage } from "@/lib/parse-page";
 import { toContactPickerOption } from "@/lib/searchable-options";
+import { DocumentClassFilter } from "@/features/finance/components/document-class-filter";
 
 const PAGE_SIZE = 20;
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string; create?: string }>;
+  searchParams: Promise<{ page?: string; create?: string; class?: string }>;
 }
 
 export default async function FacturasPage({ params, searchParams }: PageProps) {
@@ -61,7 +62,11 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
 
   let invoicesResult;
   try {
-    invoicesResult = await listInvoicesByProject(id, ctx, { page, pageSize: PAGE_SIZE });
+    invoicesResult = await listInvoicesByProject(id, ctx, {
+      page,
+      pageSize: PAGE_SIZE,
+      class: sp.class,
+    });
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
@@ -81,6 +86,9 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
     currency: inv.currency,
     clientName: inv.clientName,
     invoiceLetter: inv.invoiceLetter,
+    classCode: inv.classCode,
+    classLabel: inv.classLabel,
+    classFamily: inv.classFamily,
   }));
 
   const canCreate = canEditArArea(ctx.roles);
@@ -159,6 +167,12 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
           />
         }
       />
+
+      <Suspense fallback={null}>
+        <div className="rounded-lg border bg-card p-4">
+          <DocumentClassFilter scope="sales-project" />
+        </div>
+      </Suspense>
 
       <Suspense fallback={<ListSectionSkeleton />}>
         <SalesInvoiceListSection invoices={items} projectId={id} />

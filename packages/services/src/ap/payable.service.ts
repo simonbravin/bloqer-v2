@@ -25,6 +25,10 @@ import {
   utcIsoDate,
   type PayablesFieldRow,
 } from "./payables-field";
+import {
+  classFieldsForSupplierInvoice,
+  type FinancialClassFields,
+} from "../finance/document-class.service";
 
 // ─── View type ────────────────────────────────────────────────────────────────
 
@@ -33,6 +37,24 @@ export type PayableView = Omit<Payable, "originalAmount" | "paidAmount"> & {
   paidAmount: string;
   balanceDue: string;
   supplierName: string;
+} & FinancialClassFields;
+
+const PAYABLE_INVOICE_CLASS_INCLUDE = {
+  projectId: true,
+  purchaseOrderId: true,
+  subcontractCertificationId: true,
+  lines: {
+    where: { purchaseOrderLineId: { not: null } },
+    select: { id: true },
+    take: 1,
+  },
+} as const;
+
+type PayableInvoiceClassSelect = {
+  projectId: string | null;
+  purchaseOrderId: string | null;
+  subcontractCertificationId: string | null;
+  lines: Array<{ id: string }>;
 };
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
@@ -49,7 +71,10 @@ export async function getPayableById(
   }
   const p = await prisma.payable.findUnique({
     where: { id },
-    include: { supplierContact: { select: { legalName: true, fantasyName: true } } },
+    include: {
+      supplierContact: { select: { legalName: true, fantasyName: true } },
+      supplierInvoice: { select: PAYABLE_INVOICE_CLASS_INCLUDE },
+    },
   });
   if (!p) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -57,7 +82,11 @@ export async function getPayableById(
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
   }
   const reconciled = await reconcilePayableStatusIfSettled(p, ctx);
-  return serializePayable({ ...p, ...reconciled });
+  const { supplierInvoice, ...rest } = { ...p, ...reconciled };
+  return serializePayable({
+    ...rest,
+    supplierInvoice,
+  });
 }
 
 export async function getPayableBySupplierInvoiceId(
@@ -71,7 +100,10 @@ export async function getPayableBySupplierInvoiceId(
   }
   const p = await prisma.payable.findUnique({
     where: { supplierInvoiceId },
-    include: { supplierContact: { select: { legalName: true, fantasyName: true } } },
+    include: {
+      supplierContact: { select: { legalName: true, fantasyName: true } },
+      supplierInvoice: { select: PAYABLE_INVOICE_CLASS_INCLUDE },
+    },
   });
   if (!p) return null;
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -79,7 +111,8 @@ export async function getPayableBySupplierInvoiceId(
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
   }
   const reconciled = await reconcilePayableStatusIfSettled(p, ctx);
-  return serializePayable({ ...p, ...reconciled });
+  const { supplierInvoice, ...rest } = { ...p, ...reconciled };
+  return serializePayable({ ...rest, supplierInvoice });
 }
 
 export type ProjectPayableListFilters = {
@@ -108,7 +141,10 @@ export async function listPayablesByProject(
   const [rows, total] = await Promise.all([
     prisma.payable.findMany({
       where,
-      include: { supplierContact: { select: { legalName: true, fantasyName: true } } },
+      include: {
+        supplierContact: { select: { legalName: true, fantasyName: true } },
+        supplierInvoice: { select: PAYABLE_INVOICE_CLASS_INCLUDE },
+      },
       orderBy: [{ dueDate: "asc" }, { id: "asc" }],
       skip,
       take,
@@ -117,7 +153,11 @@ export async function listPayablesByProject(
   ]);
   const reconciled = await Promise.all(rows.map((r) => reconcilePayableStatusIfSettled(r, ctx)));
   return {
-    data: reconciled.map((p, i) => serializePayable({ ...rows[i]!, ...p })),
+    data: reconciled.map((p, i) => {
+      const row = rows[i]!;
+      const { supplierInvoice, ...rest } = { ...row, ...p };
+      return serializePayable({ ...rest, supplierInvoice });
+    }),
     total,
   };
 }
@@ -262,7 +302,9 @@ export async function listCompanyPayables(
       where,
       include: {
         supplierContact: { select: { legalName: true, fantasyName: true } },
-        supplierInvoice: { select: { number: true } },
+        supplierInvoice: {
+          select: { number: true, ...PAYABLE_INVOICE_CLASS_INCLUDE },
+        },
       },
       orderBy: [{ dueDate: dueDir }, { id: dueDir }],
       skip,
@@ -275,11 +317,21 @@ export async function listCompanyPayables(
   const data: CompanyPayableListRow[] = reconciled.map((p, i) => {
     const row = rows[i]!;
     const { supplierInvoice, ...payableWithContact } = row;
-    const base = serializePayable({ ...payableWithContact, ...p });
-    const num = supplierInvoice?.number;
+    const { number, ...invoiceClass } = supplierInvoice ?? {
+      number: undefined as number | undefined,
+      projectId: null,
+      purchaseOrderId: null,
+      subcontractCertificationId: null,
+      lines: [] as Array<{ id: string }>,
+    };
+    const base = serializePayable({
+      ...payableWithContact,
+      ...p,
+      supplierInvoice: invoiceClass,
+    });
     return {
       ...base,
-      supplierInvoiceCode: num != null ? `FP-${String(num).padStart(5, "0")}` : null,
+      supplierInvoiceCode: number != null ? `FP-${String(number).padStart(5, "0")}` : null,
     };
   });
 
@@ -323,7 +375,12 @@ export async function listPayablesFieldBoard(
       where,
       include: {
         supplierContact: { select: { legalName: true, fantasyName: true } },
-        supplierInvoice: { select: { number: true } },
+        supplierInvoice: {
+          select: {
+            number: true,
+            ...PAYABLE_INVOICE_CLASS_INCLUDE,
+          },
+        },
         project: { select: { name: true } },
       },
       orderBy: [{ dueDate: "asc" }, { id: "asc" }],
@@ -336,12 +393,23 @@ export async function listPayablesFieldBoard(
   const mapped: PayablesFieldRow[] = reconciled.map((p, i) => {
     const row = rows[i]!;
     const { supplierInvoice, project, ...payableWithContact } = row;
-    const base = serializePayable({ ...payableWithContact, ...p });
+    const { number, ...invoiceClass } = supplierInvoice ?? {
+      number: null,
+      projectId: null,
+      purchaseOrderId: null,
+      subcontractCertificationId: null,
+      lines: [],
+    };
+    const base = serializePayable({
+      ...payableWithContact,
+      ...p,
+      supplierInvoice: invoiceClass,
+    });
     return {
       id: base.id,
       supplierName: base.supplierName,
       supplierInvoiceId: base.supplierInvoiceId,
-      supplierInvoiceCode: formatSupplierInvoiceCode(supplierInvoice?.number),
+      supplierInvoiceCode: formatSupplierInvoiceCode(number),
       projectId: base.projectId,
       projectName: project?.name ?? null,
       issueDateIso: utcIsoDate(base.issueDate),
@@ -371,7 +439,10 @@ export async function getCompanyPayableById(id: string, ctx: ServiceContext): Pr
   }
   const p = await prisma.payable.findUnique({
     where: { id },
-    include: { supplierContact: { select: { legalName: true, fantasyName: true } } },
+    include: {
+      supplierContact: { select: { legalName: true, fantasyName: true } },
+      supplierInvoice: { select: PAYABLE_INVOICE_CLASS_INCLUDE },
+    },
   });
   if (!p) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -382,7 +453,8 @@ export async function getCompanyPayableById(id: string, ctx: ServiceContext): Pr
     throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
   }
   const reconciled = await reconcilePayableStatusIfSettled(p, ctx);
-  return serializePayable({ ...p, ...reconciled });
+  const { supplierInvoice, ...rest } = { ...p, ...reconciled };
+  return serializePayable({ ...rest, supplierInvoice });
 }
 
 export async function cancelPayable(id: string, ctx: ServiceContext): Promise<Payable> {
@@ -475,12 +547,20 @@ async function reconcilePayableStatusIfSettled(
 
 type RawPayable = Payable & {
   supplierContact: { legalName: string; fantasyName: string | null };
+  supplierInvoice?: PayableInvoiceClassSelect | null;
 };
 
 export function serializePayable(p: RawPayable): PayableView {
   const rawBalance = computeObligationBalanceDue(p.originalAmount, p.paidAmount);
   const balanceDue = normalizeObligationBalanceDue(rawBalance);
   const status = deriveObligationDisplayStatus(p.status, rawBalance, p.dueDate, undefined, p.paidAmount);
+  const inv = p.supplierInvoice;
+  const classFields = classFieldsForSupplierInvoice({
+    projectId: inv?.projectId ?? p.projectId,
+    purchaseOrderId: inv?.purchaseOrderId,
+    hasPoLineLink: (inv?.lines.length ?? 0) > 0,
+    subcontractCertificationId: inv?.subcontractCertificationId,
+  });
   return {
     ...p,
     status,
@@ -488,5 +568,6 @@ export function serializePayable(p: RawPayable): PayableView {
     paidAmount:     serializeMoneyDecimal(p.paidAmount),
     balanceDue:     serializeMoneyDecimal(balanceDue),
     supplierName:   p.supplierContact.fantasyName ?? p.supplierContact.legalName,
+    ...classFields,
   };
 }

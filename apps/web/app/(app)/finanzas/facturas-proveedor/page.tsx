@@ -35,6 +35,7 @@ interface PageProps {
     sort?: string;
     dir?: string;
     view?: string;
+    class?: string;
   }>;
 }
 
@@ -69,6 +70,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
       sortDir: sp.dir === "asc" ? "asc" : "desc",
       page,
       pageSize: PAGE_SIZE,
+      class: sp.class,
     });
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
@@ -95,6 +97,9 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     payableId: inv.payable?.id ?? null,
     payableStatus: inv.payable?.status ?? null,
     invoiceLetter: inv.invoiceLetter,
+    classCode: inv.classCode,
+    classLabel: inv.classLabel,
+    classFamily: inv.classFamily,
   }));
   const suppliers: SupplierOption[] = (suppliersResult ?? []).map(toApPayeeOption);
 
@@ -132,7 +137,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
           </Suspense>
           <ReportExportActions
             exportPath="/api/reports/finanzas/facturas-proveedor-corporativo.csv"
-            params={{ status: status ?? "ALL", from: sp.from, to: sp.to }}
+            params={{ status: status ?? "ALL", from: sp.from, to: sp.to, class: sp.class }}
             pdf
             label="Exportar"
           />
@@ -169,7 +174,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
       </div>
 
       <Suspense fallback={null}>
-        <SupplierInvoiceListFilters />
+        <SupplierInvoiceListFilters classFilterScope="supplier" />
       </Suspense>
 
       {items.length === 0 ? (

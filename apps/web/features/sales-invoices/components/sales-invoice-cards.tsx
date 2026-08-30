@@ -5,6 +5,7 @@ import { SalesInvoiceStatusBadge } from "./sales-invoice-status-badge";
 import type { SalesInvoiceListItem } from "./sales-invoice-list";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { formatInvoiceLetterBadge } from "@bloqer/domain";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 
 export function SalesInvoiceCards({
   invoices,
@@ -38,6 +39,14 @@ export function SalesInvoiceCards({
                 <SalesInvoiceStatusBadge status={inv.status} />
               </span>
             </div>
+            {inv.classLabel ? (
+              <div className="mt-2">
+                <DocumentClassBadge
+                  classLabel={inv.classLabel}
+                  classFamily={inv.classFamily}
+                />
+              </div>
+            ) : null}
             <h3 className="mt-2 truncate font-semibold leading-snug" title={inv.clientName}>
               {inv.clientName}
             </h3>

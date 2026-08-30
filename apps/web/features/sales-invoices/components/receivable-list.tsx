@@ -15,6 +15,8 @@ export type ReceivableListItem = {
   projectCode?: string;
   projectName?: string;
   salesInvoiceCode?: string | null;
+  classLabel?: string | null;
+  classFamily?: string | null;
 };
 
 export function receivableDetailHref(r: Pick<ReceivableListItem, "id" | "projectId">): string {

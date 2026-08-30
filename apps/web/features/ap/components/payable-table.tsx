@@ -17,6 +17,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { UrlSortableTableHead } from "@/components/ui/url-sortable-table-head";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { ObligationSettledCell } from "@/features/finance/components/obligation-settled-cell";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 import { PayableStatusBadge } from "./payable-status-badge";
 import type { PayableListItem } from "./payable-list";
 
@@ -60,6 +61,7 @@ export function PayableTable({
               <UrlSortableTableHead label="Vencimiento" defaultDir="asc" />
             </Suspense>
             <TableHead>Factura</TableHead>
+            <TableHead>Clase</TableHead>
             <TableHead className="text-right">Saldo</TableHead>
             <TableHead>Pagada</TableHead>
             <TableHead>Estado</TableHead>
@@ -86,6 +88,16 @@ export function PayableTable({
                   </Link>
                 ) : (
                   "—"
+                )}
+              </TableCell>
+              <TableCell>
+                {p.classLabel ? (
+                  <DocumentClassBadge
+                    classLabel={p.classLabel}
+                    classFamily={p.classFamily}
+                  />
+                ) : (
+                  <span className="text-muted-foreground">—</span>
                 )}
               </TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">

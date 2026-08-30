@@ -23,6 +23,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { isReceivablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
+import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 
 interface PageProps {
   params: Promise<{ id: string; receivableId: string }>;
@@ -137,6 +138,12 @@ export default async function ReceivableDetailPage({ params, searchParams }: Pag
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Cuenta por cobrar</h1>
+            {receivable.classLabel ? (
+              <DocumentClassBadge
+                classLabel={receivable.classLabel}
+                classFamily={receivable.classFamily}
+              />
+            ) : null}
             <ReceivableStatusBadge status={receivable.status} />
           </div>
         </div>
