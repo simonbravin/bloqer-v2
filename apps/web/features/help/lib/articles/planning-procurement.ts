@@ -340,7 +340,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     steps: [
       "¿La política permite OC directa y el monto está bajo el umbral (o es emergencia OWNER)? Si sí → OC borrador. Si no → SC (EDT + fecha requerida) → Enviar → Cotizar → Elegir proveedor → OC borrador. Si está sobre el umbral y no es emergencia → Bloqer exige SC.",
       "¿Política «Un paso: autorizar y comprometer» ON? Bajo umbral → Autorizar y comprometer. Alto nivel → solo Admin ([D-106]). Si no → Enviar a aprobación.",
-      "Camino clásico: si aprueban → Aprobada (todavía no reserva $), salvo política «Al aprobar, confirmar» ([D-107]) que deja Confirmada. Si no aprueban → Devolver a borrador. Después (si hace falta): Confirmar al proveedor → Comprometido.",
+      "Camino clásico: si aprueban → Aprobada (todavía no reserva $), salvo política «Al aprobar, confirmar» ([D-107]) → botón **Aprobar y comprometer** y queda Confirmada. Si no aprueban → Devolver a borrador. Después (si hace falta): Confirmar al proveedor → Comprometido.",
       "¿Llegó mercadería? Si sí → Recepción (stock; no abre CxP). Con política [D-108] puede nacer borrador de factura. Panel Facturación arriba. Si el mes está cerrado → no se confirma, recibe ni factura.",
       "¿Hay cantidad recibida? Si sí → Completar/Emitir factura = Devengado + CxP. Si no → no hay factura desde esa OC.",
       "¿Hay fondos en la cuenta? Si sí → Pagar = Pagado + egreso. Si no → Bloqer bloquea el pago.",
@@ -356,7 +356,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Subcontrato y reintegro no van por este circuito.",
       "Toda línea de obra imputa a una partida hoja EDT.",
       "Anular una OC que ya tiene recepciones o facturas: primero anular esos documentos.",
-      "Pendientes es el portero: Cotizar → Aprobar → Confirmar → Recibir → Facturar.",
+      "Pendientes es el portero: Cotizar → Aprobación → Confirmar → Recibir → Facturar.",
     ],
     figure: {
       src: "/help/mapa-flujo-compras-si-no.png",
@@ -501,11 +501,11 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Nueva OC (dialog en escritorio; en celular `/ordenes-compra/nueva`) o desde SC seleccionada. Proveedor: buscá por razón social o nombre fantasía. Cada línea: partida hoja, **Tipo de costo** (Materiales / Mano de obra / Equipos / Subcontratos / Otros; **Sugerido desde APU**), unidad / cantidad / precio unitario / ref. presupuesto, y debajo Desc. % · IVA · total. Descuento general % + Aplicar a todas copia el mismo % (hay que ingresar un número; 0 limpia todas).",
       "En el listado de OC hay un buscador (código, proveedor, aprobador) y botones de estado (Todas / Borrador / Pend. aprobación / Aprobada / Confirmada / Recep. parcial / Recibida / Anulada) con contador por estado. Los deep-links históricos (?status=) siguen funcionando como filtro inicial (por ejemplo desde Pendientes).",
       "Ref. presupuesto muestra el insumo de materiales del APU, o el costo dir. /u de la partida si esa partida no tiene materiales (p. ej. solo mano de obra).",
-      "Camino clásico: Enviar a aprobación → Aprobar (control interno; todavía no reserva $) o Devolver a borrador con motivo. Si el precio supera el referencial, completá Justificación desvío. Comprar por debajo no pide nota. Aprobadores la ven en Pendientes + campana.",
+      "Camino clásico: Enviar a aprobación → **Aprobar** (control interno; todavía no reserva $) o **Aprobar y comprometer** si la política «Al aprobar, confirmar» está ON ([D-107]), o Devolver a borrador con motivo. Si el precio supera el referencial, completá Justificación desvío. Comprar por debajo no pide nota. Aprobadores la ven en Pendientes (etapa Aprobación) + campana.",
       "Confirmar al proveedor → CONFIRMED = Comprometido en EDT y costos. Quien puede confirmar la ve en Pendientes; Depósito/Compras reciben campana al confirmar para registrar recepción.",
-      "Atajo (política): **Un paso: autorizar y comprometer** — bajo umbral: PM/Compras; alto nivel: Admin ([D-106]). Opcional: al aprobar (bajo umbral) ya queda Confirmada ([D-107]).",
+      "Atajo (política / Atajos operativos): **Un paso: autorizar y comprometer** — bajo umbral: PM/Compras; alto nivel: Admin ([D-106]). Si D-105 y D-107 están ON en Pend. aprobación, Autorizar es el botón primario.",
       "Si la OC queda Confirmada o Recep. parcial y pasa la Entrega prevista, aparece un badge rojo Vencida N d junto a Entrega prevista en el listado y en Pendientes.",
-      "Al recibir: panel Facturación arriba. Con política [D-108] puede crearse borrador de factura automáticamente (emitir = CxP). Pendientes muestra Facturar hasta ISSUED.",
+      "Al recibir: panel Facturación arriba. Con política [D-108] puede crearse borrador de factura automáticamente (emitir = CxP). Pendientes muestra **Registrar factura** o **Completar factura** hasta ISSUED.",
       "Luego recepción y factura (el tipo se hereda de la línea de OC).",
     ],
     effects: [
@@ -513,8 +513,9 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     ],
     pitfalls: [
       "Sin política ON no hay botón de un paso: Enviar → Aprobar → Confirmar.",
-      "Aprobar sola no compromete (salvo política Al aprobar, confirmar).",
+      "Aprobar sola no compromete (salvo política Al aprobar, confirmar → botón **Aprobar y comprometer**).",
       "Alto nivel: solo Admin en el atajo de un paso; al aprobar no auto-confirma.",
+      "Badge **Aprobada** (outline) ≠ **Confirmada** (primary / Comprometido).",
       "Si Ref. presup. sale — la partida no tiene APU ni costo dir. /u: hay que justificar el desvío o completar el presupuesto.",
       "Sin factura de proveedor emitida no hay CxP: borrador ≠ deuda.",
       "**Mano de obra externa** (cuadrilla contratada, empresa de albañilería, jornal facturado como AP): tipá la línea como **Mano de obra**. No hace falta contrato de subcontrato — SUB se usa solo con el módulo Subcontratos + certificación.",
@@ -627,7 +628,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       { kind: "project", suffix: "/ordenes-compra", label: "Órdenes de compra" },
     ],
     steps: [
-      "Desde Pendientes (Registrar factura) aterrizás en la OC con el panel destacado, o desde la ficha de recepción confirmada / OC: Registrar factura desde OC.",
+      "Desde Pendientes (**Registrar factura** o **Completar factura**) aterrizás en la OC / borrador; desde recepción confirmada u OC: panel Facturación → **Registrar factura**.",
       "Revisá montos, **Tipo de costo** (se hereda de la OC; ajustalo si hace falta) y adjunto del comprobante.",
       "Crear → borrador → Emitir (o Emitir y pagar ahora).",
       "**Sin OC**: al elegir la partida, el sistema pre-tipa la línea con la categoría dominante del APU (baño químico → EQP; excavación con retro → EQP). Si es mixto, queda Materiales con hint.",

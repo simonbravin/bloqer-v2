@@ -149,8 +149,8 @@ export const SETUP_ARTICLES: HelpArticle[] = [
     steps: [
       "Abrí Configuración → Políticas.",
       "Revisá umbral de aprobación, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia y % de desvíos.",
-      "Opcional: **Un paso: autorizar y comprometer** (apagado por defecto). Bajo umbral: PM/Compras; alto nivel: solo Admin ([D-106]).",
-      "Opcional: **Al aprobar, confirmar al proveedor** (bajo umbral) — [D-107].",
+      "Opcional — bloque **Atajos operativos**: **Un paso: autorizar y comprometer** (apagado por defecto). Bajo umbral: PM/Compras; alto nivel: solo Admin ([D-106]).",
+      "Opcional: **Al aprobar, confirmar al proveedor** (bajo umbral) — el botón pasa a **Aprobar y comprometer** ([D-107]).",
       "Opcional: **Al recibir, crear borrador de factura** — no abre CxP hasta Emitir ([D-108]).",
       "Guardá. Las OC nuevas respetan esas reglas.",
     ],

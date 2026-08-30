@@ -275,7 +275,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     slug: "revisar-pendientes",
     title: "Revisar pendientes",
     summary:
-      "Portero personal: aprobaciones y follow-through de compras en etapas (cotizar → aprobar → confirmar → recibir → facturar). El globo muestra cuántas te quedan a vos.",
+      "Portero personal: aprobaciones y follow-through de compras en etapas (cotizar → aprobación → confirmar → recibir → facturar). El globo muestra cuántas te quedan a vos.",
     intents: ["pendientes", "notificaciones"],
     modules: ["general", "compras", "libro-obra", "certificaciones"],
     level: "both",
@@ -289,8 +289,8 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "En el menú lateral, General → Pendientes (/pendientes): todas las obras. El globo rojo es tu recuento (en desktop también en la sección General si está plegada).",
       "En mobile, el ítem Pendientes de la barra inferior muestra el mismo globo (9+ si hay más de nueve).",
       "Dentro de un proyecto, Resumen → Pendientes lista solo esa obra; el globo de ese ítem es el recuento de esa obra.",
-      "Filtro Compras: etapas Cotizar → Aprobar → Confirmar → Recibir → Facturar. CTAs: Cotizar / Elegir cotización; Aprobar; Confirmar al proveedor (reserva $); Recibir (abre el formulario); Registrar factura (abre la OC con el panel de facturación).",
-      "OC recibida sin factura aparece en Pendientes apenas hay recepción confirmada (EDIT AP). La alerta/campana diaria puede esperar unos días (SLA configurable).",
+      "Filtro Compras: etapas Cotizar → **Aprobación** → Confirmar → Recibir → Facturar. CTAs: Cotizar / Elegir cotización; **Aprobar** o **Aprobar y comprometer** (si política [D-107]); Confirmar al proveedor (reserva $); Recibir (abre el formulario); **Registrar factura** o **Completar factura** (abre la OC / borrador).",
+      "OC recibida sin factura aparece en Pendientes apenas hay recepción confirmada (EDIT AP). Si ya hay borrador ([D-108]), el CTA es Completar factura. La alerta/campana diaria puede esperar unos días (SLA configurable).",
       "Ítems vencidos ([D-097]) traen un badge rojo Vencida N d: OC con entrega prevista pasada, SC con fecha requerida pasada.",
       "También partes de libro de obra y certificaciones que vos podés aprobar.",
       "El número no es el mismo para todos: solo cuenta lo que tu rol puede cerrar (p. ej. un PM no ve OC por aprobar; Depósito ve recepciones; un VIEWER ve 0).",
@@ -303,7 +303,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "El Equipo de obra (roster) no filtra esta bandeja: define avisos de partes, no quién ve Pendientes.",
       "Si no tenés permiso para ninguna de esas fuentes, el globo no aparece.",
       "Un PM puede ver SC en Pendientes aunque la campana de «Nueva solicitud» vaya a quien aprueba compras.",
-      "Aprobar ≠ Comprometer: Confirmar al proveedor es lo que reserva $.",
+      "Aprobar ≠ Comprometer: Confirmar al proveedor (o Aprobar y comprometer / Autorizar y comprometer con políticas) es lo que reserva $.",
     ],
     relatedSlugs: [
       "usar-notificaciones",
