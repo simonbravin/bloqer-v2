@@ -101,7 +101,7 @@ export const HELP_PROCESS_MAPS: readonly HelpProcessMap[] = [
     kind: "lamina",
     level: "company",
     title: "Tesorería y conciliación",
-    summary: "Movimientos de caja y empareje con el extracto.",
+    summary: "Extracto por cuenta y empareje con el banco.",
     articleSlug: "conciliar-el-banco",
     imageSrc: "/help/mapa-tesoreria-conciliacion.png",
     guideRef: "§4.2",

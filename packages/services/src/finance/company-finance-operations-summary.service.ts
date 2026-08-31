@@ -36,7 +36,7 @@ export type CompanyFinanceOperationsSummary = {
   openPayableCount: number;
   openPayableBalancesByCurrency: CompanyOpenPayableBalanceRow[];
   recentCorporatePayments: CompanyRecentPaymentRow[];
-  /** Pre-built query for tesorería movimientos (PAYMENT + corporate AP). */
+  /** Pre-built query for Finanzas → Transacciones (PAYMENT corporate AP). */
   movimientosCorporateFilterHref: string;
 };
 
@@ -46,7 +46,7 @@ function supplierLabel(legalName: string | null, fantasyName: string | null): st
 
 function emptySummary(visible: boolean, loadFailed: boolean): CompanyFinanceOperationsSummary {
   const movimientosCorporateFilterHref =
-    "/tesoreria/movimientos?sourceType=PAYMENT&type=OUTFLOW&corporateApPayments=true";
+    "/finanzas/transacciones?class=PAYMENT&corporateApPayments=true";
   return {
     visible,
     loadFailed,
@@ -80,7 +80,7 @@ export async function getCompanyFinanceOperationsSummary(
   opts?: { payableRows?: CorporatePayableSnapshotRow[] },
 ): Promise<CompanyFinanceOperationsSummary> {
   const movimientosCorporateFilterHref =
-    "/tesoreria/movimientos?sourceType=PAYMENT&type=OUTFLOW&corporateApPayments=true";
+    "/finanzas/transacciones?class=PAYMENT&corporateApPayments=true";
 
   const gate = await getTenantModuleGate(ctx);
   if (!gate.isEnabled("AP") || !canViewCompanyAp(ctx.roles)) {

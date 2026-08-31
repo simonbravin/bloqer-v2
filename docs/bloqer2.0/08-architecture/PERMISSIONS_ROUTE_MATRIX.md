@@ -172,7 +172,9 @@ See [`NOTIFICATIONS_ARCHITECTURE.md`](./NOTIFICATIONS_ARCHITECTURE.md).
 ### UI
 
 - `/finanzas` y subrutas bajo el mismo layout: hub **`getFinanceHubOverview`** (**16D**) + subnav (**16E**) con enlaces filtrados por módulo + `VIEW AR` / `VIEW AP` / `VIEW TREASURY` / `VIEW ACCOUNTING`; rutas corporativas AP (**16C**).
-- `/tesoreria` y vistas de caja (`/tesoreria/movimientos`, `/tesoreria/flujo-caja`): redirect si no `VIEW TREASURY` (deep links).
+- `/tesoreria` y vistas de caja (`/tesoreria/cuentas`, `/tesoreria/flujo-caja`): redirect si no `VIEW TREASURY` / `VIEW BANK_ACCOUNTS` según ruta (deep links).
+- `/tesoreria/movimientos` → redirect a `/tesoreria/cuentas` (o detalle si hay `accountId`).
+- `/tesoreria/transferencias` (historial / alta): sin ítem de menú; requiere `VIEW`/`EDIT` `INTERNAL_TRANSFERS`; entrada desde Cuentas.
 - `/contabilidad` y subrutas: redirect si no `VIEW ACCOUNTING` (hub, cuentas, asientos, **reglas contables**, detalle). Mutaciones en UI (crear/editar/contabilizar/anular borrador; crear/editar/desactivar reglas) requieren `EDIT ACCOUNTING` (botones condicionales + Server Actions; servicios validan igual).
 - **Fase 11C — borrador GL desde documentos (UI):** los botones “Generar asiento contable” / columna Contabilidad requieren **`EDIT ACCOUNTING`**. En tesorería se ocultan filas con origen COLLECTION/PAYMENT/OPENING_BALANCE ([D-061]).
 - **Fase 11E — auto-DRAFT soft [D-061]:** tras create de cobro/pago/factura/transferencia/ingreso puro, `ensureDraftJournal*` puede crear DRAFT sin `EDIT ACCOUNTING`. No auto-POST. `/contabilidad/sumas-y-saldos` = `VIEW ACCOUNTING`.

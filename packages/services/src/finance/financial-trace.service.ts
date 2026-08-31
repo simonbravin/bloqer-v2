@@ -30,8 +30,8 @@ export function buildFinancialHref(
       case "AccountMovement": {
         const accountId = options?.accountId;
         return accountId
-          ? `/tesoreria/movimientos?accountId=${encodeURIComponent(accountId)}`
-          : "/tesoreria/movimientos";
+          ? `/tesoreria/cuentas/${accountId}`
+          : "/tesoreria/cuentas";
       }
       default:
         return "/finanzas/transacciones";
@@ -58,8 +58,8 @@ export function buildFinancialHref(
     case "AccountMovement": {
       const accountId = options?.accountId;
       return accountId
-        ? `/tesoreria/movimientos?accountId=${encodeURIComponent(accountId)}`
-        : "/tesoreria/movimientos";
+        ? `/tesoreria/cuentas/${accountId}`
+        : "/tesoreria/cuentas";
     }
     default:
       return "/finanzas/transacciones";

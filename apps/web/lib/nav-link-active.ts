@@ -4,24 +4,9 @@ export function navHrefPathname(href: string): string {
   return idx === -1 ? href : href.slice(0, idx);
 }
 
-function hrefSearchParams(href: string): URLSearchParams | null {
-  const idx = href.indexOf("?");
-  if (idx === -1) return null;
-  return new URLSearchParams(href.slice(idx + 1));
-}
-
-/** Filtered movimientos deep-link (e.g. from Transferencias → Ver en movimientos). */
-export function isInternalTransferMovimientosHref(href: string): boolean {
-  const params = hrefSearchParams(href);
-  return (
-    navHrefPathname(href) === "/tesoreria/movimientos" &&
-    params?.get("sourceType") === "INTERNAL_TRANSFER"
-  );
-}
-
 export function isNavLinkActive(
   pathname: string,
-  searchParams: { get(name: string): string | null } | null | undefined,
+  _searchParams: { get(name: string): string | null } | null | undefined,
   href: string,
   options?: { matchExact?: boolean; activeWhenPathPrefix?: string },
 ): boolean {
@@ -35,11 +20,17 @@ export function isNavLinkActive(
 
   const hrefPath = navHrefPathname(href);
 
-  if (isInternalTransferMovimientosHref(href)) {
-    return (
-      pathname === "/tesoreria/movimientos" &&
-      searchParams?.get("sourceType") === "INTERNAL_TRANSFER"
-    );
+  // Account detail (extracto) keeps Cuentas active in the Tesorería subnav.
+  if (hrefPath === "/tesoreria/cuentas" && pathname.startsWith("/tesoreria/cuentas/")) {
+    return true;
+  }
+
+  // Transfer form/historial keep Cuentas active (entry point lives under Cuentas).
+  if (
+    hrefPath === "/tesoreria/cuentas" &&
+    (pathname === "/tesoreria/transferencias" || pathname.startsWith("/tesoreria/transferencias/"))
+  ) {
+    return true;
   }
 
   if (matchExact) {

@@ -48,6 +48,7 @@ interface PageProps {
     sort?: string;
     dir?: string;
     class?: string;
+    corporateApPayments?: string;
   }>;
 }
 
@@ -75,6 +76,7 @@ function movementExportParams(sp: Awaited<PageProps["searchParams"]>): Record<st
     scope: clean.scope,
     projectId: clean.projectId,
     class: clean.class,
+    corporateApPayments: clean.corporateApPayments,
     // Operational ledger never includes bank↔bank internal transfers.
     includeInternalTransfers: "false",
   };

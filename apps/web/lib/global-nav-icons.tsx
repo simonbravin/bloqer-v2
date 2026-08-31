@@ -27,7 +27,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { isInternalTransferMovimientosHref, navHrefPathname } from "@/lib/nav-link-active";
+import { navHrefPathname } from "@/lib/nav-link-active";
 
 const GLOBAL_NAV_ICON_BY_HREF: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
@@ -38,9 +38,7 @@ const GLOBAL_NAV_ICON_BY_HREF: Record<string, LucideIcon> = {
   "/inventario": Package,
   "/tesoreria": Landmark,
   "/tesoreria/cuentas": Wallet,
-  "/tesoreria/movimientos": ScrollText,
   "/tesoreria/flujo-caja": BarChart3,
-  "/tesoreria/transferencias": ArrowLeftRight,
   "/tesoreria/conciliacion": GitCompareArrows,
   "/contabilidad": Calculator,
   "/contabilidad/cuentas": ListTree,
@@ -65,10 +63,6 @@ const GLOBAL_NAV_ICON_BY_HREF: Record<string, LucideIcon> = {
 function resolveGlobalNavIcon(href: string): LucideIcon | undefined {
   const direct = GLOBAL_NAV_ICON_BY_HREF[href];
   if (direct) return direct;
-
-  if (isInternalTransferMovimientosHref(href)) {
-    return ArrowLeftRight;
-  }
 
   const byPath = GLOBAL_NAV_ICON_BY_HREF[navHrefPathname(href)];
   if (byPath) return byPath;

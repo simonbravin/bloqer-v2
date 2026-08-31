@@ -15,40 +15,23 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  tableNameCellClass,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { cn } from "@/lib/utils";
 import { UrlSortableTableHead } from "@/components/ui/url-sortable-table-head";
-import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatSignedMoneyAmount, signedMoneyAmountToneClass } from "@/lib/format-money";
 import { accountMovementStatusLabel } from "@/features/treasury/lib/account-movement-status-label";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
-
-const TYPE_LABELS: Record<string, string> = {
-  INFLOW: "Ingreso",
-  OUTFLOW: "Egreso",
-  TRANSFER_IN: "Transferencia entrada",
-  TRANSFER_OUT: "Transferencia salida",
-  ADJUSTMENT: "Ajuste",
-};
-
-function fmtSigned(signed: string) {
-  const formatted = formatMoneyAmount(signed);
-  if (isZeroMoneyAmount(signed) || formatted.startsWith("-") || formatted.startsWith("+")) {
-    return formatted;
-  }
-  return `+${formatted}`;
-}
-
-function safeDetailHref(url: string | null): string | null {
-  if (!url) return null;
-  const u = url.trim();
-  if (!u.startsWith("/") || u.startsWith("//")) return null;
-  return u;
-}
+import { MovementDetailDialog } from "./movement-detail-dialog";
+import { MOVEMENT_TYPE_LABELS } from "../lib/movement-type-labels";
 
 interface Props {
   rows: MovementReportRow[];
   showRunningBalance: boolean;
   showProjectColumn?: boolean;
+  /** Hide when the table is already scoped to one account (extracto). */
+  showAccountColumn?: boolean;
   canLinkProjects?: boolean;
   accountingReturnPath?: string;
   canEditAccounting?: boolean;
@@ -60,6 +43,7 @@ export function MovementLedgerTable({
   rows,
   showRunningBalance,
   showProjectColumn = false,
+  showAccountColumn = true,
   canLinkProjects = false,
   accountingReturnPath,
   canEditAccounting,
@@ -94,14 +78,17 @@ export function MovementLedgerTable({
           <TableHeader>
             <TableRow>
               <Suspense fallback={<TableHead>Fecha</TableHead>}>
-                <UrlSortableTableHead label="Fecha" defaultDir="desc" />
+                <UrlSortableTableHead
+                  label="Fecha"
+                  defaultDir={showRunningBalance ? "asc" : "desc"}
+                />
               </Suspense>
-              <TableHead>Cuenta</TableHead>
+              {showAccountColumn && <TableHead>Cuenta</TableHead>}
               <TableHead>Tipo</TableHead>
               <TableHead>Clase</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Origen</TableHead>
-              <TableHead>Descripción</TableHead>
+              <TableHead className="w-full">Descripción</TableHead>
               {showProjectColumn && <TableHead>Proyecto</TableHead>}
               <TableHead>Moneda</TableHead>
               <TableHead className="text-right">Importe</TableHead>
@@ -110,21 +97,19 @@ export function MovementLedgerTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((m) => {
-              const inflow = isPositiveMoneyAmount(m.signedAmount) || isZeroMoneyAmount(m.signedAmount);
-              const detailHref = safeDetailHref(m.detailHref);
-              return (
+            {rows.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="whitespace-nowrap">{formatDate(m.movementDate)}</TableCell>
-                  <TableCell
-                    className="max-w-[10rem] truncate text-muted-foreground"
-                    title={m.accountName}
-                  >
-                    {m.accountName}
-                  </TableCell>
+                  {showAccountColumn && (
+                    <TableCell className="text-muted-foreground">
+                      <span className="block w-36 truncate" title={m.accountName}>
+                        {m.accountName}
+                      </span>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <span className={m.isInternalTransfer ? "text-muted-foreground text-xs" : ""}>
-                      {TYPE_LABELS[m.type] ?? m.type}
+                      {MOVEMENT_TYPE_LABELS[m.type] ?? m.type}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -140,31 +125,28 @@ export function MovementLedgerTable({
                   <TableCell className="text-muted-foreground text-xs">
                     {accountMovementStatusLabel(m.status)}
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">{m.sourceLabel}</TableCell>
-                  <TableCell className="max-w-[220px] truncate text-muted-foreground">
-                    {detailHref ? (
-                      <Link
-                        href={detailHref}
-                        className="underline underline-offset-2 hover:text-foreground"
-                        title={m.description}
-                      >
-                        {m.description}
-                      </Link>
-                    ) : (
-                      <span title={m.description}>{m.description}</span>
-                    )}
+                  <TableCell className="text-muted-foreground text-xs">
+                    <span className="block w-28 truncate" title={m.sourceLabel}>
+                      {m.sourceLabel}
+                    </span>
+                  </TableCell>
+                  <TableCell className={cn(tableNameCellClass, "text-muted-foreground")}>
+                    <MovementDetailDialog row={m} canLinkProjects={canLinkProjects} />
                   </TableCell>
                   {showProjectColumn && (
-                    <TableCell className="max-w-[160px] truncate text-muted-foreground text-xs">
+                    <TableCell className="text-muted-foreground text-xs">
                       {m.projectId && canLinkProjects ? (
                         <Link
                           href={`/proyectos/${m.projectId}`}
-                          className="underline underline-offset-2 hover:text-foreground"
+                          className="block w-36 truncate underline underline-offset-2 hover:text-foreground"
+                          title={m.projectName ?? m.projectId}
                         >
                           {m.projectName ?? m.projectId}
                         </Link>
                       ) : m.projectId ? (
-                        (m.projectName ?? "Obra")
+                        <span className="block w-36 truncate" title={m.projectName ?? undefined}>
+                          {m.projectName ?? "Obra"}
+                        </span>
                       ) : (
                         "Empresa"
                       )}
@@ -172,17 +154,18 @@ export function MovementLedgerTable({
                   )}
                   <TableCell>{m.currency}</TableCell>
                   <TableCell
-                    className={`text-right tabular-nums font-mono ${
-                      inflow
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-red-600 dark:text-red-400"
-                    }`}
+                    className={cn(
+                      "text-right tabular-nums font-mono",
+                      signedMoneyAmountToneClass(m.signedAmount),
+                    )}
                   >
-                    {fmtSigned(m.signedAmount)}
+                    {formatSignedMoneyAmount(m.signedAmount)}
                   </TableCell>
                   {showRunningBalance && (
                     <TableCell className="text-right tabular-nums font-mono text-muted-foreground">
-                      {m.runningBalance ? formatMoneyAmount(m.runningBalance) : "—"}
+                      {m.runningBalance != null && m.runningBalance !== ""
+                        ? formatMoneyAmount(m.runningBalance)
+                        : "—"}
                     </TableCell>
                   )}
                   {showGl && (
@@ -202,8 +185,7 @@ export function MovementLedgerTable({
                     </TableCell>
                   )}
                 </TableRow>
-              );
-            })}
+            ))}
           </TableBody>
         </Table>
     </TableScroll>

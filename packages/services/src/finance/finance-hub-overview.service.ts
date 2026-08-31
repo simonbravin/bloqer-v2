@@ -436,7 +436,7 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
       treasuryHref:       "/tesoreria",
       reportsHref:        "/tesoreria",
       posicionCajaHref:   "/tesoreria",
-      movimientosHref:    "/tesoreria/movimientos",
+      movimientosHref:    "/tesoreria/cuentas",
       loadFailed,
     };
   }

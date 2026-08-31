@@ -1,5 +1,5 @@
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, tableNameCellClass,
 } from "@/components/ui/table";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -8,6 +8,7 @@ import { AccountMovementTypeBadge } from "./account-movement-type-badge";
 import type { AccountMovementType, AccountMovementStatus } from "@bloqer/database";
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { cn } from "@/lib/utils";
 import {
   accountMovementStatusBadgeVariant,
   accountMovementStatusLabel,
@@ -40,7 +41,7 @@ export function AccountMovementList({ movements }: AccountMovementListProps) {
       <TableHeader>
         <TableRow>
           <TableHead>Fecha</TableHead>
-          <TableHead>Descripción</TableHead>
+          <TableHead className="w-full">Descripción</TableHead>
           <TableHead>Tipo</TableHead>
           <TableHead>Moneda</TableHead>
           <TableHead className="text-right">Monto</TableHead>
@@ -53,7 +54,10 @@ export function AccountMovementList({ movements }: AccountMovementListProps) {
           return (
             <TableRow key={m.id}>
               <TableCell className="text-sm">{formatDate(m.movementDate)}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">
+              <TableCell
+                className={cn(tableNameCellClass, "text-sm text-muted-foreground")}
+                title={m.description ?? undefined}
+              >
                 {m.description ?? "—"}
               </TableCell>
               <TableCell>

@@ -77,18 +77,16 @@ describe("classifySupplierInvoice [D-102]", () => {
 });
 
 describe("classifyAccountMovement [D-102]", () => {
-  it("COLLECTION source → COLLECTION", () => {
-    assert.equal(
-      classifyAccountMovement({ type: "INFLOW", sourceType: "COLLECTION" }).classCode,
-      "COLLECTION",
-    );
+  it("COLLECTION source → COLLECTION (income family)", () => {
+    const c = classifyAccountMovement({ type: "INFLOW", sourceType: "COLLECTION" });
+    assert.equal(c.classCode, "COLLECTION");
+    assert.equal(c.family, "income");
   });
 
-  it("PAYMENT source → PAYMENT", () => {
-    assert.equal(
-      classifyAccountMovement({ type: "OUTFLOW", sourceType: "PAYMENT" }).classCode,
-      "PAYMENT",
-    );
+  it("PAYMENT source → PAYMENT (payment family)", () => {
+    const c = classifyAccountMovement({ type: "OUTFLOW", sourceType: "PAYMENT" });
+    assert.equal(c.classCode, "PAYMENT");
+    assert.equal(c.family, "payment");
   });
 
   it("internal transfer → TRANSFER", () => {
@@ -101,14 +99,13 @@ describe("classifyAccountMovement [D-102]", () => {
     );
   });
 
-  it("manual inflow → INCOME_CASH", () => {
-    assert.equal(
-      classifyAccountMovement({
-        type: "INFLOW",
-        sourceType: "MANUAL_ADJUSTMENT",
-      }).classCode,
-      "INCOME_CASH",
-    );
+  it("manual inflow → INCOME_CASH (income family)", () => {
+    const c = classifyAccountMovement({
+      type: "INFLOW",
+      sourceType: "MANUAL_ADJUSTMENT",
+    });
+    assert.equal(c.classCode, "INCOME_CASH");
+    assert.equal(c.family, "income");
   });
 
   it("manual outflow → OVERHEAD", () => {

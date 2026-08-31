@@ -176,8 +176,9 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     where: { menu: "Finanzas → Transacciones → Ingreso / cobro → Solo caja" },
     hrefs: [{ kind: "company", path: "/finanzas/transacciones", label: "Transacciones" }],
     steps: [
-      "Transacciones → Ingreso / cobro → modo Solo caja (TREASURY_INFLOW). Clase: Ingreso solo caja.",
+      "Transacciones → Ingreso / cobro → modo Solo caja (TREASURY_INFLOW). Clase: Ingreso solo caja (badge verde).",
       "Cuenta, monto y fecha.",
+      "En el listado, clic en la descripción para leer el texto completo (este tipo no tiene documento origen que abrir).",
     ],
     pitfalls: [
       "Reintegrar a un empleado es un EGRESO (Gasto / factura), no un ingreso Solo caja.",
@@ -374,10 +375,10 @@ export const AP_ARTICLES: HelpArticle[] = [
       { kind: "project", suffix: "/facturas-proveedor", label: "Facturas proveedor (obra)" },
     ],
     steps: [
-      "En listados y detalle vas a ver un badge Clase (venta de obra, compra comprometida, costo directo, gasto general, etc.).",
+      "En listados y detalle vas a ver un badge Clase (venta de obra, compra comprometida, costo directo, gasto general, etc.). En caja, Pago es rojo e Ingreso / Cobranza verdes.",
       "En el alta, el chip «Se registrará como…» anticipa esa etiqueta según obra / OC / certificación / solo caja.",
       "En obra, al cargar factura de proveedor elegí Contra OC o Costo directo: eso define Compra comprometida vs Costo directo.",
-      "Podés filtrar por Clase en los listados (?class=).",
+      "Podés filtrar por Clase en los listados (?class=). En Transacciones (y en el extracto de cuenta) no hace falta filtrar por Origen: es el mismo eje técnico.",
     ],
     effects: [
       "No hay columna nueva en la base: la clase se calcula de projectId, OC, certificación, sourceType, etc.",

@@ -155,7 +155,7 @@ export const HELP_INTENT_LABELS: Partial<Record<HelpIntent, string>> = {
   "edt-costos": "Ver EDT y costos",
   "errores-frecuentes": "Errores frecuentes",
   "flujo-caja": "Flujo de caja",
-  "movimientos-tesoreria": "Movimientos de caja",
+  "movimientos-tesoreria": "Extracto de cuenta",
   contabilizar: "Contabilizar asientos",
   "cerrar-mes": "Cerrar el mes",
   "plan-cuentas": "Plan de cuentas",

@@ -209,6 +209,26 @@ export function moneyAmountTone(raw: string): "success" | "danger" | "muted" {
   return isPositiveMoneyAmount(raw) ? "success" : "danger";
 }
 
+/**
+ * Ledger signed amount: keep an existing minus, prefix + on strictly positive.
+ * Do not pass `currency` here when the ISO code is shown in its own column.
+ */
+export function formatSignedMoneyAmount(raw: string): string {
+  const formatted = formatMoneyAmount(raw);
+  if (isZeroMoneyAmount(raw) || formatted.startsWith("-") || formatted.startsWith("+")) {
+    return formatted;
+  }
+  return `+${formatted}`;
+}
+
+/** Tailwind tone for signed ledger amounts (zero is muted, not treated as inflow). */
+export function signedMoneyAmountToneClass(raw: string): string {
+  const tone = moneyAmountTone(raw);
+  if (tone === "success") return "text-emerald-600 dark:text-emerald-400";
+  if (tone === "danger") return "text-red-600 dark:text-red-400";
+  return "text-muted-foreground";
+}
+
 /** Overrun (spend more than referential) is danger; savings (negative %) is success. */
 export function variancePctTone(raw: string | null | undefined): "success" | "danger" | "muted" {
   if (raw == null || raw === "" || isZeroRatePct(raw)) return "muted";

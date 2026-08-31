@@ -23,6 +23,7 @@ export type FinancialDocumentClassFamily =
   | "purchase"
   | "direct"
   | "overhead"
+  | "payment"
   | "cash";
 
 export type FinancialDocumentClass = {
@@ -60,8 +61,8 @@ export const FINANCIAL_DOCUMENT_CLASS_FAMILY: Record<
   SUBCONTRACT: "purchase",
   DIRECT_PROJECT: "direct",
   OVERHEAD: "overhead",
-  COLLECTION: "cash",
-  PAYMENT: "cash",
+  COLLECTION: "income",
+  PAYMENT: "payment",
   TRANSFER: "cash",
 };
 

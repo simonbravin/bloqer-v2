@@ -27,10 +27,12 @@ Borrador opcional → confirmado → anulado (revierte par).
 - Anular si periodo abierto.
 
 ## 9. Pantallas y vistas necesarias
-- Formulario transferencia con vista previa de impacto en ambas cuentas.
-- Lista transferencias filtrable (`/tesoreria/transferencias`) — **canónica** para crear/consultar pares OUT/IN.
-- Extracto de cuenta: `/tesoreria/movimientos` (puede incluir/excluir internas).
-- **No** aparecen en `/finanzas/transacciones` (ledger operativo con terceros).
+- Punto de entrada: **Tesorería → Cuentas** → CTA **Transferir entre cuentas** (o desde el detalle de una cuenta con `?fromAccountId=`).
+- Formulario `/tesoreria/transferencias/nueva` con ayuda: «Mueve plata entre cuentas de la empresa. Un pago a un proveedor no es una transferencia.»
+- Historial del par OUT/IN: `/tesoreria/transferencias` (sin ítem de menú; link desde Cuentas).
+- Extracto de cuenta: `/tesoreria/cuentas/[accountId]` (incluye las dos patas de la transferencia).
+- **No** aparecen en `/finanzas/transacciones` (ledger operativo con terceros, [D-048]).
+- El método de liquidación «Transferencia» en un **Payment**/**Collection** ([D-074]) **no** es un `InternalTransfer`.
 
 ## 10. Reglas de negocio
 - **BR-TRZ-004**: exactamente 2 movimientos por transferencia ([BR-TRZ-004]).

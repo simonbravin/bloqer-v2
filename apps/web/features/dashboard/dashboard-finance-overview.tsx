@@ -26,7 +26,7 @@ export function DashboardFinanceOverview({ finance }: { finance: DashboardFinanc
     <Card className="rounded-xl border bg-card shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">
-          <Link href="/tesoreria/movimientos" className="hover:underline">
+          <Link href="/tesoreria/cuentas" className="hover:underline">
             Movimientos recientes
           </Link>
         </CardTitle>

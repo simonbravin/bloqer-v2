@@ -109,7 +109,7 @@ En el Markdown y en el DOCX, cada bloque con este formato es un **hueco para ima
 | P5 | Cerrar conciliación | §4.2 | diálogo en detalle |
 | P6 | Detalle de cuenta + CTA Ajuste manual | §4.3 | `/tesoreria/cuentas/[id]` |
 | P7 | Ajuste manual de cuenta | §4.3 | `/tesoreria/cuentas/[id]/ajuste` |
-| P8 | Ledger con columna Estado | §4.0 | `/tesoreria/movimientos` |
+| P8 | Ledger con columna Estado | §4.0 | `/tesoreria/cuentas/[id]` (extracto) |
 | P9 | Tesorería subnav (incl. Conciliación) | §4.0 | `/tesoreria` |
 | P10 | Cierres de período (listado) | §15.3 | `/contabilidad/cierres` |
 | P11 | Diálogo Cerrar período | §15.3 | `/contabilidad/cierres` |
@@ -206,7 +206,7 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 |---------|--------------------------|
 | General | Inicio → `/dashboard` · **Pendientes** → `/pendientes` · Proyectos → `/proyectos` · **Reportes** → `/reportes` · Directorio → `/directorio` · Inventario → `/inventario` |
 | Finanzas | Tablero → `/finanzas` · Transacciones → `/finanzas/transacciones` · Facturas y gastos → `/finanzas/facturas-proveedor` · Cuentas por cobrar → `/finanzas/cuentas-por-cobrar` · Cuentas por pagar → `/finanzas/cuentas-por-pagar` · Imputación GG → `/finanzas/gastos-generales` |
-| Tesorería | Resumen → `/tesoreria` · Cuentas → `/tesoreria/cuentas` · Movimientos → `/tesoreria/movimientos` · Flujo de caja → `/tesoreria/flujo-caja` · Transferencias → `/tesoreria/transferencias` · **Conciliación** → `/tesoreria/conciliacion` |
+| Tesorería | Resumen → `/tesoreria` · Cuentas → `/tesoreria/cuentas` · Flujo de caja → `/tesoreria/flujo-caja` · **Conciliación** → `/tesoreria/conciliacion` |
 | Contabilidad | Resumen → `/contabilidad` · Cuentas → `/contabilidad/cuentas` · Asientos → `/contabilidad/asientos` · **Cierres** → `/contabilidad/cierres` · Reglas → `/contabilidad/reglas` · Libro diario → `/contabilidad/libro-diario` · Sumas y saldos → `/contabilidad/sumas-y-saldos` · Situación → `/contabilidad/situacion-patrimonial` · Resultados → `/contabilidad/estado-resultados` |
 | Configuración | General → `/configuracion` · Mi perfil → `/configuracion/perfil` · Equipo → `/configuracion/equipo` · Permisos → `/configuracion/permisos` · Reportes programados → `/configuracion/reportes` · Registro → `/configuracion/registro` |
 
@@ -374,14 +374,23 @@ Configurar tesorería **antes** de operar cobranzas y pagos.
 | Etiqueta | Ruta | Para qué |
 |----------|------|----------|
 | Resumen | `/tesoreria` | Saldos por cuenta/moneda y atajos |
-| Cuentas | `/tesoreria/cuentas` · `/nueva` · `/[id]` | Alta de banco/caja/billetera + saldo de apertura; desde el detalle → **Ajuste manual** |
-| Movimientos | `/tesoreria/movimientos` | Ledger / extracto interno (incluye columna **Estado**: Confirmado / Conciliado) |
+| Cuentas | `/tesoreria/cuentas` · `/nueva` · `/[id]` | Alta de banco/caja/billetera; **extracto** (ledger con saldo corrido) en el detalle; CTAs **Transferir entre cuentas** e historial |
 | Flujo de caja | `/tesoreria/flujo-caja` | Ingresos y egresos por período |
-| Transferencias | `/tesoreria/transferencias` | Entre cuentas propias (dos movimientos atómicos) |
 | **Conciliación** | `/tesoreria/conciliacion` | Emparejar extracto bancario vs movimientos del sistema (§4.2) |
 
+Rutas auxiliares (sin ítem de menú; se llegan desde Cuentas):
+
+| Ruta | Para qué |
+|------|----------|
+| `/tesoreria/transferencias` | Historial de transferencias internas (par origen/destino) |
+| `/tesoreria/transferencias/nueva` | Alta de transferencia entre cuentas propias (`?fromAccountId=` prellena origen) |
+| `/tesoreria/movimientos` | **Redirect** legacy → detalle de cuenta (si hay `accountId`) o listado de Cuentas |
+
+- **Extracto = detalle de cuenta:** abrí **Tesorería → Cuentas → [cuenta]**. Ahí ves el ledger (Confirmado / Conciliado), export CSV/PDF y atajos a transferir / conciliar / ajuste manual. La **descripción** se recorta; clic abre el detalle completo (importe, origen, proyecto, contraparte).
+- **Transferencia ≠ pago:** **Transferir entre cuentas** mueve plata entre **cuentas propias** (banco ↔ caja ↔ otro banco). Un **pago a un proveedor** (aunque el método diga «Transferencia», [D-074]) se registra en Finanzas → **Transacciones** / CxP — no es una transferencia interna.
 - **Movimientos operativos:** se generan **automáticamente** al cobrar (`INFLOW`) y pagar (`OUTFLOW`); se pueden **anular** con traza (nunca se borran), salvo que estén **conciliados** (hay que desemparejar antes).
-- En cobranzas y pagos podés indicar **método de liquidación** (Efectivo, Transferencia, Cheque, Tarjeta, Otro) y referencia opcional ([D-074]).
+- **Transacciones vs extracto:** Finanzas → **Transacciones** es la caja operativa con **terceros** (sin transferencias internas, [D-048]) más el alta (**Registrar transacción**). Tesorería → **Cuentas → detalle** es el extracto por cuenta (incluye internas, saldo corrido, asiento, conciliación).
+- En cobranzas y pagos podés indicar **método de liquidación** (Efectivo, Transferencia, Cheque, Tarjeta, Otro) y referencia opcional ([D-074]). Eso **no** crea un `InternalTransfer`.
 - **Fondos insuficientes:** un **pago** no puede dejar la cuenta en saldo negativo (igual que transferencias). El sistema muestra el disponible y bloquea.
 
 <!-- capture:09 tesoreria-con-subnav-incl-conciliacion -->
@@ -1013,7 +1022,7 @@ stateDiagram-v2
 
 ### 12.0 Clase del documento ([D-102])
 
-Cada factura, CxC/CxP o movimiento de caja muestra un badge **Clase** (solo lectura). No se elige a mano: se deriva de si hay obra, OC, certificación, etc.
+Cada factura, CxC/CxP o movimiento de caja muestra un badge **Clase** (solo lectura). No se elige a mano: se deriva de si hay obra, OC, certificación, etc. En listados de caja, **Pago** va en rojo y **Ingreso / Cobranza** en verde.
 
 | Clase | Dónde aparece |
 |---|---|
@@ -1026,7 +1035,7 @@ Cada factura, CxC/CxP o movimiento de caja muestra un badge **Clase** (solo lect
 | Gasto general | Factura/gasto sin obra (Transacciones AP, Nueva factura de gasto) |
 | Cobranza / Pago | Movimientos de tesorería por cobro/pago |
 
-**Transacciones** (`/finanzas/transacciones`) lista movimientos de caja, **no** facturas impagas. La clase de esas facturas está en **Facturas emitidas** / **Facturas de proveedor** / CxC / CxP.
+**Transacciones** (`/finanzas/transacciones`) lista movimientos de caja, **no** facturas impagas. La clase de esas facturas está en **Facturas emitidas** / **Facturas de proveedor** / CxC / CxP. Clic en la **descripción** abre el detalle (texto completo, cuenta, clase, contraparte). Si hay pago o cobranza de obra, desde ahí se abre el documento origen.
 
 ### 12.1 Ventas y cobranzas (AR)
 
@@ -1220,7 +1229,7 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 ## 14. Finanzas corporativas, gastos generales e inventario (nivel empresa)
 
 - **Finanzas corporativas** (`/finanzas`): tablero con KPIs, **Tendencia mensual** (ingresos vs gastos; rangos Este mes / 3 / 6 / 12 meses; pestaña Caja para tesorería), proyección y actividad consolidada. Contabilidad se abre desde el menú **Contabilidad**, no desde una card del tablero.
-- **Transacciones** (`/finanzas/transacciones`): alta rápida de **gasto corporativo (AP)** a proveedor o **empleado** ([D-089], §12.2), **factura/CxC corporativa (AR, D-051)** y **ingreso solo caja** (`TREASURY_INFLOW`, sin obligación).
+- **Transacciones** (`/finanzas/transacciones`): alta rápida de **gasto corporativo (AP)** a proveedor o **empleado** ([D-089], §12.2), **factura/CxC corporativa (AR, D-051)** y **ingreso solo caja** (`TREASURY_INFLOW`, sin obligación). El listado es el ledger de caja operativa (sin transferencias internas). Clic en la descripción = detalle del movimiento.
 - **Cuentas por cobrar empresa** (`/finanzas/cuentas-por-cobrar`): consolida obra + filas **Empresa**; detalle y cobranza corporativa en `/finanzas/cuentas-por-cobrar/[id]`.
 - **Gastos generales / overhead** (`/finanzas/gastos-generales`): se **imputan a las obras** de forma **manual** o por **prorrateo automático** según el peso del costo directo, con **cierre de período**. *(Es un módulo complejo; conviene validar los cálculos en producción.)*
 - **Inventario corporativo** (`/inventario`): hub con **Productos**, **Depósitos**, **Movimientos**, **Transferencias** y **Reportes** (misma subnav en todas las pantallas). Productos (`/inventario/productos`), depósitos (`/inventario/depositos`), movimientos (`/inventario/movimientos`, ledger append‑only; el saldo se calcula sumando movimientos), transferencias (`/inventario/transferencias`) y reportes (`/inventario/reportes`: **Stock actual** y **Movimientos** confirmados).

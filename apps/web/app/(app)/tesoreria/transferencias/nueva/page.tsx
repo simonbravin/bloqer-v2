@@ -5,12 +5,20 @@ import { getCurrentUser } from "@/lib/auth";
 import { listTreasuryAccounts } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
-export default async function NuevaTransferenciaPage() {
+export default async function NuevaTransferenciaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ fromAccountId?: string; returnTo?: string }>;
+}) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
   if (!canEditInternalTransfersUi(current.tenantCtx.roles)) {
-    redirect("/tesoreria/transferencias");
+    redirect("/tesoreria/cuentas");
   }
+
+  const sp = await searchParams;
+  const fromAccountId = sp.fromAccountId?.trim() || undefined;
+  const returnTo = sp.returnTo === "historial" ? "/tesoreria/transferencias" : undefined;
 
   const ctx = {
     actorUserId: current.session.user.id!,
@@ -23,6 +31,12 @@ export default async function NuevaTransferenciaPage() {
   const activeAccounts = allAccounts
     .filter((a) => a.status === "ACTIVE")
     .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
+
+  const successHref =
+    returnTo ??
+    (fromAccountId && activeAccounts.some((a) => a.id === fromAccountId)
+      ? `/tesoreria/cuentas/${fromAccountId}`
+      : undefined);
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -37,7 +51,11 @@ export default async function NuevaTransferenciaPage() {
           </p>
         </div>
       ) : (
-        <InternalTransferForm accounts={activeAccounts} />
+        <InternalTransferForm
+          accounts={activeAccounts}
+          defaultSourceAccountId={fromAccountId}
+          successHref={successHref}
+        />
       )}
     </PageShell>
   );

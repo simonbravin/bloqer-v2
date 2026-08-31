@@ -32,10 +32,11 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § AccountMovement.
 
 ## 9. Pantallas y vistas necesarias
 - **Resumen (`/tesoreria`):** posición de caja (saldo por moneda), ingresos/egresos del mes (sin transferencias internas), lista de cuentas con saldo, últimos movimientos confirmados; empty state si no hay cuentas.
-- Extracto por cuenta (filtros fecha contable/valor).
-- Ledger global filtrable.
-- Posición consolidada multi-moneda.
-- Flujo de fondos con toggle real/proyectado.
+- **Cuentas (`/tesoreria/cuentas`):** listado + CTA **Transferir entre cuentas** / historial.
+- **Extracto de cuenta (`/tesoreria/cuentas/[id]`):** ledger con saldo corrido (reusa el mismo componente que el ledger de Transacciones); export; atajos a transferir, conciliar y ajuste manual.
+- Transferencias internas: alta/historial bajo `/tesoreria/transferencias*` (sin ítem de menú).
+- Flujo de caja y conciliación bancaria (ítems de menú).
+- Legacy `/tesoreria/movimientos` → redirect a Cuentas / extracto.
 
 ## 10. Reglas de negocio
 - Ver [`../03-finance/TREASURY_MODEL.md`](../03-finance/TREASURY_MODEL.md).

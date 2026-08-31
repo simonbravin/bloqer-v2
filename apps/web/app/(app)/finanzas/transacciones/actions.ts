@@ -30,7 +30,7 @@ const REVALIDATE_PATHS = [
   "/finanzas/cuentas-por-cobrar",
   "/finanzas/gastos-generales",
   "/tesoreria",
-  "/tesoreria/movimientos",
+  "/tesoreria/cuentas",
   "/tesoreria/flujo-caja",
 ];
 

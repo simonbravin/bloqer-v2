@@ -20,13 +20,25 @@ interface AccountOption {
 
 interface Props {
   accounts: AccountOption[];
+  /** Prefill from account detail CTA (`?fromAccountId=`). */
+  defaultSourceAccountId?: string;
+  /** Where to go after success; defaults to source account extracto. */
+  successHref?: string;
 }
 
-export function InternalTransferForm({ accounts }: Props) {
+export function InternalTransferForm({
+  accounts,
+  defaultSourceAccountId = "",
+  successHref,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [sourceAccountId, setSourceAccountId] = useState("");
+  const [sourceAccountId, setSourceAccountId] = useState(
+    defaultSourceAccountId && accounts.some((a) => a.id === defaultSourceAccountId)
+      ? defaultSourceAccountId
+      : "",
+  );
   const [destinationAccountId, setDestinationAccountId] = useState("");
   const [amount, setAmount] = useState("");
   const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
@@ -49,13 +61,21 @@ export function InternalTransferForm({ accounts }: Props) {
         setError(res.error);
       } else {
         rotateIdempotencyKey();
-        router.push("/tesoreria/transferencias");
+        const href =
+          successHref ??
+          (sourceAccountId
+            ? `/tesoreria/cuentas/${sourceAccountId}`
+            : "/tesoreria/transferencias");
+        router.push(href);
       }
     });
   }
 
   return (
-    <div className="rounded-lg border bg-card p-6">
+    <div className="rounded-lg border bg-card p-6 space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Mueve plata entre cuentas de la empresa. Un pago a un proveedor no es una transferencia.
+      </p>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>

@@ -32,10 +32,8 @@ function fmtMoneyAr(amount: { toString(): string }, currency: string): string {
   return `${num} ${currency}`;
 }
 
-function treasuryMovimientosHref(accountId: string, movementDate: Date): string {
-  const d = fmtDate(movementDate);
-  const q = new URLSearchParams({ accountId, dateFrom: d, dateTo: d });
-  return `/tesoreria/movimientos?${q.toString()}`;
+function treasuryAccountExtractoHref(accountId: string): string {
+  return `/tesoreria/cuentas/${accountId}`;
 }
 
 async function resolvedTreasuryMovementCompanyId(
@@ -153,7 +151,7 @@ export async function getJournalEntrySourceLink(
       return {
         kindLabel: sourceType === "TREASURY_INFLOW" ? "Tesorería — ingreso" : "Tesorería — egreso",
         detail,
-        href:      canLink ? treasuryMovimientosHref(m.accountId, m.movementDate) : null,
+        href:      canLink ? treasuryAccountExtractoHref(m.accountId) : null,
         noAccessHint: canLink ? null : noTr,
       };
     }
@@ -295,7 +293,7 @@ export async function getJournalEntrySourceLink(
       return {
         kindLabel: "Ajuste de tesorería",
         detail,
-        href:      canLink ? treasuryMovimientosHref(m.accountId, m.movementDate) : null,
+        href:      canLink ? treasuryAccountExtractoHref(m.accountId) : null,
         noAccessHint: canLink ? null : noTr,
       };
     }

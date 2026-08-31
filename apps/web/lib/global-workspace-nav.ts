@@ -96,19 +96,9 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
       { label: "Resumen", href: "/tesoreria", matchExact: true, require: { action: "VIEW", module: "TREASURY" } },
       { label: "Cuentas", href: "/tesoreria/cuentas", require: { action: "VIEW", module: "BANK_ACCOUNTS" } },
       {
-        label: "Movimientos",
-        href: "/tesoreria/movimientos",
-        require: { action: "VIEW", module: "TREASURY" },
-      },
-      {
         label: "Flujo de caja",
         href: "/tesoreria/flujo-caja",
         require: { action: "VIEW", module: "TREASURY" },
-      },
-      {
-        label: "Transferencias",
-        href: "/tesoreria/transferencias",
-        require: { action: "VIEW", module: "INTERNAL_TRANSFERS" },
       },
       {
         label: "Conciliación",

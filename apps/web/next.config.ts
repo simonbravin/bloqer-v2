@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/tesoreria/reportes/movimientos",
-        destination: "/tesoreria/movimientos",
+        destination: "/tesoreria/cuentas",
         permanent: true,
       },
       {

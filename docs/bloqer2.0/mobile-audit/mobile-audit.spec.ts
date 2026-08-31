@@ -327,7 +327,7 @@ test.describe("Mobile UX audit", () => {
       ["/finanzas/cuentas-por-cobrar", "52-cxc-corp-390.png"],
       ["/tesoreria", "53-tesoreria-390.png"],
       ["/tesoreria/cuentas", "54-tesoreria-cuentas-390.png"],
-      ["/tesoreria/movimientos", "55-tesoreria-movimientos-390.png"],
+      ["/tesoreria/cuentas", "55-tesoreria-cuentas-390.png"],
       ["/tesoreria/transferencias", "56-tesoreria-transferencias-390.png"],
       ["/tesoreria/conciliacion", "57-conciliacion-390.png"],
       ["/configuracion", "58-config-empresa-390.png"],
@@ -420,7 +420,7 @@ test.describe("Mobile UX audit", () => {
     const rest: Array<[string, string]> = [
       ["/tesoreria", "53-tesoreria-390.png"],
       ["/tesoreria/cuentas", "54-tesoreria-cuentas-390.png"],
-      ["/tesoreria/movimientos", "55-tesoreria-movimientos-390.png"],
+      ["/tesoreria/cuentas", "55-tesoreria-cuentas-390.png"],
       ["/tesoreria/transferencias", "56-tesoreria-transferencias-390.png"],
       ["/tesoreria/conciliacion", "57-conciliacion-390.png"],
       ["/configuracion", "58-config-empresa-390.png"],

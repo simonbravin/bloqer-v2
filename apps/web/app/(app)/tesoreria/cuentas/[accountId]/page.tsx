@@ -1,13 +1,21 @@
 import { notFound, redirect } from "next/navigation";
 import {
   TreasuryAccountStatusBadge,
-  AccountMovementList,
   DeactivateTreasuryAccountButton,
 } from "@/features/treasury";
-import type { AccountMovementListItem } from "@/features/treasury";
-import { canEditTreasuryUi } from "@/features/treasury/lib/treasury-edit-gates";
+import {
+  canEditInternalTransfersUi,
+  canEditTreasuryUi,
+} from "@/features/treasury/lib/treasury-edit-gates";
+import { MovementLedgerTable } from "@/features/treasury-reports";
+import { ReportExportActions } from "@/features/reports";
 import { getCurrentUser } from "@/lib/auth";
-import { getTreasuryAccountById, listAccountMovements, ServiceError } from "@bloqer/services";
+import { can } from "@bloqer/domain";
+import {
+  getAccountMovementReport,
+  getTreasuryAccountById,
+  ServiceError,
+} from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { reactivateTreasuryAccountAction } from "../../actions";
@@ -19,7 +27,7 @@ import Link from "next/link";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
-  searchParams: Promise<{ actionError?: string }>;
+  searchParams: Promise<{ actionError?: string; sort?: string; dir?: string }>;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -44,10 +52,8 @@ export default async function AccountDetailPage({ params, searchParams }: PagePr
   };
 
   let account;
-  let movements;
   try {
     account = await getTreasuryAccountById(accountId, ctx);
-    movements = await listAccountMovements(accountId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) {
       notFound();
@@ -56,16 +62,21 @@ export default async function AccountDetailPage({ params, searchParams }: PagePr
   }
 
   const canEdit = canEditTreasuryUi(ctx.roles);
+  const canTransfer = canEditInternalTransfersUi(ctx.roles);
+  const canEditAccounting = can(ctx.roles, "EDIT", "ACCOUNTING");
+  const canViewReconciliation = can(ctx.roles, "VIEW", "BANK_RECONCILIATION");
+  const sortDir = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
 
-  const movementItems: AccountMovementListItem[] = movements.map((m) => ({
-    id: m.id,
-    movementDate: m.movementDate,
-    type: m.type,
-    currency: m.currency,
-    amount: m.amount,
-    description: m.description,
-    status: m.status,
-  }));
+  let movementRows;
+  try {
+    ({ rows: movementRows } = await getAccountMovementReport(
+      { accountId, sortDir },
+      ctx,
+    ));
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/tesoreria");
+    throw err;
+  }
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={account.name}>
@@ -78,9 +89,27 @@ export default async function AccountDetailPage({ params, searchParams }: PagePr
         <div className="flex flex-wrap items-center gap-2">
           {account.status === "ACTIVE" && (
             <>
+              {canTransfer && (
+                <Button asChild variant="outline" size="sm">
+                  <Link
+                    href={`/tesoreria/transferencias/nueva?fromAccountId=${encodeURIComponent(accountId)}`}
+                  >
+                    Transferir entre cuentas
+                  </Link>
+                </Button>
+              )}
               {canEdit && (
                 <Button asChild variant="default" size="sm">
                   <Link href={`/tesoreria/cuentas/${accountId}/ajuste`}>Ajuste manual</Link>
+                </Button>
+              )}
+              {canViewReconciliation && (
+                <Button asChild variant="outline" size="sm">
+                  <Link
+                    href={`/tesoreria/conciliacion?cuenta=${encodeURIComponent(accountId)}`}
+                  >
+                    Conciliar
+                  </Link>
                 </Button>
               )}
               {canEdit && <DeactivateTreasuryAccountButton accountId={accountId} />}
@@ -163,8 +192,26 @@ export default async function AccountDetailPage({ params, searchParams }: PagePr
         </dl>
       </div>
 
-      <DataTableSection title="Movimientos">
-        <AccountMovementList movements={movementItems} />
+      <DataTableSection
+        title="Extracto"
+        actions={
+          <ReportExportActions
+            exportPath="/api/reports/tesoreria/movimientos.csv"
+            params={{ accountId }}
+            pdf
+          />
+        }
+      >
+        <div className="text-sm text-muted-foreground mb-3">
+          {movementRows.length} movimiento{movementRows.length === 1 ? "" : "s"}.
+        </div>
+        <MovementLedgerTable
+          rows={movementRows}
+          showRunningBalance
+          showAccountColumn={false}
+          accountingReturnPath={returnPath}
+          canEditAccounting={canEditAccounting}
+        />
       </DataTableSection>
     </PageShell>
   );

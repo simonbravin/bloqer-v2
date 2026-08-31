@@ -29,19 +29,6 @@ const TYPE_OPTIONS_FINANCE = TYPE_OPTIONS_ALL.filter(
   (o) => o.value !== "TRANSFER_IN" && o.value !== "TRANSFER_OUT",
 );
 
-const SOURCE_OPTIONS_ALL = [
-  { value: "_all", label: "Todos los orígenes" },
-  { value: "COLLECTION", label: "Cobranza" },
-  { value: "PAYMENT", label: "Pago" },
-  { value: "INTERNAL_TRANSFER", label: "Transferencia interna" },
-  { value: "OPENING_BALANCE", label: "Saldo inicial" },
-  { value: "MANUAL_ADJUSTMENT", label: "Ingreso manual de caja" },
-];
-
-const SOURCE_OPTIONS_FINANCE = SOURCE_OPTIONS_ALL.filter(
-  (o) => o.value !== "INTERNAL_TRANSFER",
-);
-
 const SCOPE_OPTIONS = [
   { value: "_all", label: "Todos los alcances" },
   { value: "corporate", label: "Solo empresa" },
@@ -118,7 +105,6 @@ export function MovementFilters({
   const scopeValue = sp.get("projectId") ? "_all" : (sp.get("scope") ?? "_all");
   const internalTransfersValue = sp.get("includeInternalTransfers") ?? "_all";
   const typeOptions = variant === "finance" ? TYPE_OPTIONS_FINANCE : TYPE_OPTIONS_ALL;
-  const sourceOptions = variant === "finance" ? SOURCE_OPTIONS_FINANCE : SOURCE_OPTIONS_ALL;
   const classOptions = variant === "finance" ? CLASS_OPTIONS_FINANCE : CLASS_OPTIONS_ALL;
 
   // Finance applies a 90-day default server-side when URL has no dates; mirror that
@@ -133,10 +119,6 @@ export function MovementFilters({
     (sp.get("type") === "TRANSFER_IN" || sp.get("type") === "TRANSFER_OUT")
       ? "_all"
       : (sp.get("type") ?? "_all");
-  const sourceTypeValue =
-    variant === "finance" && sp.get("sourceType") === "INTERNAL_TRANSFER"
-      ? "_all"
-      : (sp.get("sourceType") ?? "_all");
 
   return (
     <div className="space-y-3">
@@ -219,24 +201,6 @@ export function MovementFilters({
             </SelectTrigger>
             <SelectContent>
               {typeOptions.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Origen</Label>
-          <Select
-            value={sourceTypeValue}
-            onValueChange={(v) => update("sourceType", v === "_all" ? "" : v)}
-          >
-            <SelectTrigger className="w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {sourceOptions.map((o) => (
                 <SelectItem key={o.value} value={o.value}>
                   {o.label}
                 </SelectItem>

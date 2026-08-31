@@ -48,20 +48,21 @@ export default async function TransferenciasPage({
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Transferencias internas</h1>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Transferencias internas</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Historial de movimientos entre cuentas propias. No son pagos a terceros.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link href="/tesoreria/movimientos?sourceType=INTERNAL_TRANSFER">
-              Ver en movimientos
-            </Link>
+            <Link href="/tesoreria/cuentas">Volver a cuentas</Link>
           </Button>
           {canEdit ? (
             <Button asChild size="sm">
-              <Link href="/tesoreria/transferencias/nueva">Nueva transferencia</Link>
+              <Link href="/tesoreria/transferencias/nueva?returnTo=historial">
+                Transferir entre cuentas
+              </Link>
             </Button>
           ) : null}
         </div>
