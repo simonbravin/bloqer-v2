@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { CertificationEvolutionPoint } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CHART_SERIES } from "@/lib/chart-series-colors";
 import { formatChartAxis, formatChartMoney } from "@/lib/format-money";
 import { REPORT_CHART_FRAME_CLASS, REPORT_CHART_Y_AXIS_WIDTH } from "./report-layout";
 
@@ -66,9 +67,9 @@ export function CertificationEvolutionChart({ series }: Props) {
               />
               <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="Certificado" fill="#2563eb" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="Facturado" fill="#16a34a" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="Cobrado" fill="#ca8a04" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="Certificado" fill={CHART_SERIES.certified} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="Facturado" fill={CHART_SERIES.invoiced} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="Cobrado" fill={CHART_SERIES.collected} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

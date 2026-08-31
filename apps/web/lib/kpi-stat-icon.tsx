@@ -80,6 +80,7 @@ const KEY_ICON: Record<string, { Icon: LucideIcon; accent: KpiIconAccent }> = {
   tr_ar_overdue: { Icon: AlertCircle, accent: "danger" },
   tr_ap_overdue: { Icon: AlertCircle, accent: "danger" },
   tr_draft_invoices: { Icon: FileEdit, accent: "warning" },
+  tr_ap_expected_90d: { Icon: Clock, accent: "warning" },
   tr_attr_project_out: { Icon: Building2, accent: "info" },
   tr_attr_corp_out: { Icon: Building, accent: "muted" },
   pf_ar_open: { Icon: ArrowUpCircle, accent: "info" },

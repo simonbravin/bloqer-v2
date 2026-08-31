@@ -33,6 +33,12 @@
     --workspace-foreground: 222.2 84% 4.9%;
     /* Form sections: slightly lighter than workspace, soft tint vs white dialog/card. */
     --form-section: 210 18% 97.5%;
+    /* Recharts series (HSL components for hsl(var(--chart-N))) */
+    --chart-1: 199 89% 40%;
+    --chart-2: 160 84% 32%;
+    --chart-3: 173 80% 31%;
+    --chart-4: 32 95% 44%;
+    --chart-5: 347 77% 50%;
   }
 
   .dark {
@@ -62,6 +68,11 @@
     --workspace-foreground: 210 40% 98%;
     /* Soft lift above canvas — keep light, never sink below workspace. */
     --form-section: 217 26% 15.5%;
+    --chart-1: 199 89% 55%;
+    --chart-2: 160 70% 45%;
+    --chart-3: 173 70% 45%;
+    --chart-4: 38 92% 55%;
+    --chart-5: 347 77% 60%;
   }
 
   * {

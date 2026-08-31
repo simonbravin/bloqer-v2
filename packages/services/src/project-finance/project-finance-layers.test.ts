@@ -90,6 +90,15 @@ describe("buildTreasuryAttributionKpis", () => {
   it("returns empty when no visible data", () => {
     assert.deepEqual(buildTreasuryAttributionKpis({ visible: false, byCurrency: [] }), []);
   });
+
+  it("emits Sin egresos slots when includeEmpty and no data", () => {
+    const kpis = buildTreasuryAttributionKpis({ visible: false, byCurrency: [] }, { includeEmpty: true });
+    assert.equal(kpis.length, 2);
+    assert.equal(kpis[0]?.key, "tr_attr_project_out");
+    assert.equal(kpis[0]?.value, "Sin egresos");
+    assert.equal(kpis[1]?.key, "tr_attr_corp_out");
+    assert.equal(kpis[1]?.value, "Sin egresos");
+  });
 });
 
 describe("project attributed cash net", () => {

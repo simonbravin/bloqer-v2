@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import type { IncomeExpensePoint } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CHART_SERIES } from "@/lib/chart-series-colors";
 import { formatChartAxis, formatChartMoney } from "@/lib/format-money";
 import { REPORT_CHART_FRAME_CLASS, REPORT_CHART_Y_AXIS_WIDTH } from "./report-layout";
 
@@ -79,21 +80,21 @@ export function IncomeExpenseChart({
             <Line
               type="monotone"
               dataKey="Certificado"
-              stroke="hsl(var(--chart-1))"
+              stroke={CHART_SERIES.certified}
               strokeWidth={2.5}
-              dot={{ r: 3 }}
+              dot={{ r: 3, fill: CHART_SERIES.certified, strokeWidth: 0 }}
             />
             <Line
               type="monotone"
               dataKey="Costo devengado"
-              stroke="hsl(var(--chart-4))"
+              stroke={CHART_SERIES.costAccrued}
               strokeWidth={2}
-              dot={{ r: 2 }}
+              dot={{ r: 2, fill: CHART_SERIES.costAccrued, strokeWidth: 0 }}
             />
             <Line
               type="monotone"
               dataKey="MB devengado"
-              stroke="hsl(var(--chart-2))"
+              stroke={CHART_SERIES.margin}
               strokeWidth={2}
               strokeDasharray="4 4"
               dot={false}
@@ -117,10 +118,22 @@ export function IncomeExpenseChart({
             <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
             <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="Certificado" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="Costo devengado" fill="hsl(var(--chart-4))" radius={[2, 2, 0, 0]} />
-            <Line type="monotone" dataKey="Cobrado" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="Costo pagado" stroke="hsl(var(--chart-5))" strokeWidth={2} dot={false} />
+            <Bar dataKey="Certificado" fill={CHART_SERIES.certified} radius={[2, 2, 0, 0]} />
+            <Bar dataKey="Costo devengado" fill={CHART_SERIES.costAccrued} radius={[2, 2, 0, 0]} />
+            <Line
+              type="monotone"
+              dataKey="Cobrado"
+              stroke={CHART_SERIES.collected}
+              strokeWidth={2.5}
+              dot={{ r: 3, fill: CHART_SERIES.collected, strokeWidth: 0 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="Costo pagado"
+              stroke={CHART_SERIES.costPaid}
+              strokeWidth={2.5}
+              dot={{ r: 3, fill: CHART_SERIES.costPaid, strokeWidth: 0 }}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

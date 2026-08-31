@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { SubcontractCertEvolutionPoint } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CHART_SERIES } from "@/lib/chart-series-colors";
 import { formatChartAxis, formatChartMoney } from "@/lib/format-money";
 import { REPORT_CHART_FRAME_CLASS, REPORT_CHART_Y_AXIS_WIDTH } from "./report-layout";
 
@@ -60,8 +61,8 @@ export function SubcontractCertChart({ series }: Props) {
               <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
               <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="Certificado" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="Pagado" fill="hsl(var(--chart-2))" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="Certificado" fill={CHART_SERIES.certified} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="Pagado" fill={CHART_SERIES.costPaid} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

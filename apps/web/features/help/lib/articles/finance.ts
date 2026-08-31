@@ -470,7 +470,7 @@ export const AP_ARTICLES: HelpArticle[] = [
     slug: "tablero-finanzas-tendencia",
     title: "Leer la tendencia de ingresos vs gastos",
     summary:
-      "En el tablero de Finanzas (empresa u obra) el gráfico Tendencia mensual muestra ingresos vs gastos. Elegí Este mes, 3, 6 o 12 meses.",
+      "En el tablero de Finanzas (empresa) los Indicadores van 4+4 (empresa → CxP/CxC); debajo, Tendencia mensual. En obra, el mismo gráfico tras la visión rápida del mes.",
     intents: ["tablero-finanzas"],
     modules: ["finanzas"],
     level: "both",
@@ -482,7 +482,8 @@ export const AP_ARTICLES: HelpArticle[] = [
       { kind: "project", suffix: "/finanzas", label: "Tablero de finanzas (obra)" },
     ],
     steps: [
-      "Empresa: Finanzas → Tablero. Después de Indicadores está Tendencia mensual (todo el ancho).",
+      "Empresa: Finanzas → Tablero. Indicadores (4+4): egresos obra/corp, facturas borrador, pagos esperados 90d; luego C×P y C×C. Saldo e ingresos/egresos del mes están en Tesorería.",
+      "Después de Indicadores está Tendencia mensual (todo el ancho).",
       "Obra: Finanzas del proyecto → Tablero de finanzas. El mismo gráfico va después de la visión rápida del mes.",
       "Rango: Este mes · 3 meses · 6 meses · 12 meses (queda en la URL como ?months=).",
       "En empresa, Económico es ingresos vs gastos; Caja es tesorería. Contabilidad se abre desde el menú Contabilidad, no desde el tablero.",
@@ -495,6 +496,9 @@ export const AP_ARTICLES: HelpArticle[] = [
       "tendencia mensual",
       "ingresos vs gastos",
       "tablero finanzas",
+      "indicadores finanzas",
+      "pagos esperados",
+      "facturas borrador",
       "grafico finanzas",
       "este mes",
       "3 meses",

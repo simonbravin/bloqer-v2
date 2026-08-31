@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { CashProjectionBucket } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CHART_SERIES } from "@/lib/chart-series-colors";
 import { formatChartAxis, formatChartMoney } from "@/lib/format-money";
 import { REPORT_CHART_FRAME_CLASS, REPORT_CHART_Y_AXIS_WIDTH } from "./report-layout";
 
@@ -64,9 +65,9 @@ export function CashProjectionChart({ buckets, currency }: Props) {
               <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
               <Tooltip formatter={(v) => formatChartMoney(Number(v), currency)} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="Cobros" fill="hsl(var(--chart-2))" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="Pagos" fill="hsl(var(--chart-4))" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="Neto" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="Cobros" fill={CHART_SERIES.collected} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="Pagos" fill={CHART_SERIES.costPaid} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="Neto" fill={CHART_SERIES.margin} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -88,8 +88,12 @@ export async function getTreasuryAttributionSummary(
   return { visible: byCurrency.length > 0, byCurrency };
 }
 
-export function buildTreasuryAttributionKpis(summary: TreasuryAttributionSummary): DashboardKpi[] {
-  if (!summary.visible || summary.byCurrency.length === 0) return [];
+export function buildTreasuryAttributionKpis(
+  summary: TreasuryAttributionSummary,
+  opts?: { /** Always emit both cards (e.g. hub 4+4) even with no movements. */ includeEmpty?: boolean },
+): DashboardKpi[] {
+  const empty = !summary.visible || summary.byCurrency.length === 0;
+  if (empty && !opts?.includeEmpty) return [];
 
   const projectOut = new Map<string, Prisma.Decimal>();
   const corpOut = new Map<string, Prisma.Decimal>();

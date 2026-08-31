@@ -14,6 +14,7 @@ import {
   YAxis,
 } from "recharts";
 import type { CashFlowCurrency } from "@bloqer/services";
+import { CHART_SERIES } from "@/lib/chart-series-colors";
 import { formatChartMoney } from "@/lib/format-money";
 
 function formatPeriodTick(period: string): string {
@@ -91,8 +92,8 @@ export function CashFlowChart({ data, variant = "bars", className }: Props) {
             />
             <defs>
               <linearGradient id="netFlowFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#6366f1" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="#6366f1" stopOpacity={0.02} />
+                <stop offset="0%" stopColor={CHART_SERIES.margin} stopOpacity={0.25} />
+                <stop offset="100%" stopColor={CHART_SERIES.margin} stopOpacity={0.02} />
               </linearGradient>
             </defs>
             <Area
@@ -106,10 +107,10 @@ export function CashFlowChart({ data, variant = "bars", className }: Props) {
               type="monotone"
               dataKey="netOperativo"
               name="Neto operativo"
-              stroke="#6366f1"
+              stroke={CHART_SERIES.margin}
               strokeWidth={2.5}
-              dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }}
-              activeDot={{ r: 5, fill: "#6366f1", strokeWidth: 2, stroke: "hsl(var(--background))" }}
+              dot={{ r: 3, fill: CHART_SERIES.margin, strokeWidth: 0 }}
+              activeDot={{ r: 5, fill: CHART_SERIES.margin, strokeWidth: 2, stroke: "hsl(var(--background))" }}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -145,9 +146,9 @@ export function CashFlowChart({ data, variant = "bars", className }: Props) {
             contentStyle={{ fontSize: 12 }}
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="ingresos"     name="Ingresos"        fill="#10b981" radius={[2, 2, 0, 0]} />
-          <Bar dataKey="egresos"      name="Egresos"         fill="#ef4444" radius={[2, 2, 0, 0]} />
-          <Bar dataKey="netOperativo" name="Neto operativo"  fill="#6366f1" radius={[2, 2, 0, 0]} />
+          <Bar dataKey="ingresos"     name="Ingresos"        fill={CHART_SERIES.collected} radius={[2, 2, 0, 0]} />
+          <Bar dataKey="egresos"      name="Egresos"         fill={CHART_SERIES.costPaid} radius={[2, 2, 0, 0]} />
+          <Bar dataKey="netOperativo" name="Neto operativo"  fill={CHART_SERIES.margin} radius={[2, 2, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
