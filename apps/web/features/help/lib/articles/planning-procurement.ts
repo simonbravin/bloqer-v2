@@ -239,6 +239,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     steps: [
       "Operación → Libro de obra → nuevo parte.",
       "Clima, cuadrilla, fotos. En Notas generales: viñetas, numeración o negrita para listar tareas o problemas. En avance: agregá una fila, elegí la partida EDT (% del día restante y cantidad se precargan). Si cambiás el % o la cantidad, el otro campo se alinea al presupuesto de la partida. En mano de obra, buscá el contacto por razón social o nombre fantasía.",
+      "En Adjuntos: iconos de ojo (ver), flecha (descargar), caja (archivar) y tacho (eliminar). Archivar y eliminar piden confirmación.",
       "Enviar (SUBMITTED): el PM del Equipo de obra (y OWNER/ADMIN) reciben campana + email.",
       "Si te lo devuelven, corregí desde el enlace de la notificación.",
       "Desde el detalle: Exportar PDF (incluye fotos jpeg/png/webp si hay adjuntos).",
@@ -272,6 +273,8 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "avance de obra",
       "exportar parte",
       "fotos parte",
+      "adjuntos",
+      "archivar",
       "notas generales",
       "viñetas",
       "numeración",
@@ -282,7 +285,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
   {
     slug: "ver-y-descargar-documento",
     title: "Ver y descargar un documento",
-    summary: "En Documentos, las acciones son iconos: ojo para abrir y flecha para bajar el archivo.",
+    summary: "En Documentos y adjuntos, las acciones son iconos: ojo, descarga, archivar y eliminar.",
     intents: ["documentos-obra"],
     modules: ["general"],
     level: "project",
@@ -293,7 +296,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Operación → Documentos.",
       "En la columna Acciones: el icono de ojo abre el archivo en una pestaña nueva (PDF e imágenes); el icono de descarga baja el archivo.",
       "El nombre del archivo abre el detalle (ficha, archivar o eliminar).",
-      "Los mismos iconos están en las tarjetas y en los adjuntos de un parte, OC o factura.",
+      "En los adjuntos de un parte, OC o factura: los mismos iconos de ver y descargar, más caja (archivar) y tacho (eliminar). Archivar y eliminar piden confirmación.",
     ],
     pitfalls: [
       "Si ves un icono de archivo tachado, no hay binario almacenado (almacenamiento no configurado al subir).",
@@ -306,6 +309,8 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "descargar",
       "icono ojo",
       "icono descarga",
+      "archivar adjunto",
+      "eliminar adjunto",
       "biblioteca",
       "adjunto",
     ],

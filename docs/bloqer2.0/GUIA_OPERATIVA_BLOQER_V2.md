@@ -741,7 +741,7 @@ En el Gantt: relleno oscuro de la barra = **Real**; franja/borde ámbar = **Cert
 
 1. **Nuevo parte** (fecha no futura, clima, cuadrilla, tareas). En **Notas generales** podés usar **viñetas**, **numeración** y **negrita** para listar lo hecho o los problemas del día ([D-101]). En **mano de obra**, el contacto se busca por razón social o nombre fantasía.
 2. Cargar **avance por partida EDT**: cada fila necesita **partida** y **cantidad** (el % del día y la cantidad sugerida se precargan al elegir partida). Si después editás el **% del día** o la **cantidad**, el otro campo se recalcula con el presupuesto de la partida (así el % del libro y el % avance libro de EDT coinciden). Si falta partida o cantidad, el parte **no se guarda** y se muestra el error. El **% avance libro** en EDT y costos solo cuenta partes **APPROVED** (un parte enviado todavía no mueve esa columna). La vista *Financiero* no muestra %: usá *Cantidades* o *% Avance*.
-3. Adjuntar fotos y observaciones.
+3. Adjuntar fotos y observaciones. En **Adjuntos**, la columna **Acciones** es una sola fila de iconos: ojo (**Ver**), flecha (**Descargar**), caja (**Archivar**) y tacho (**Eliminar**). Archivar y eliminar piden confirmación.
 4. **Enviar a revisión** → `SUBMITTED` → **campana + email** a OWNER/ADMIN y al PM (u otros supervisores) del **Equipo de obra**.
 5. El PM abre el parte (campana, Pendientes o listado) y pulsa **Aprobar parte** → `APPROVED` (queda inmutable salvo anulación con motivo). Si hace falta, **devolver** → el autor recibe campana + email con el motivo.
 6. **Exportar PDF** del parte: incluye tablas + **fotos jpeg/png/webp embebidas** (si hay adjuntos en R2). HEIC u otros tipos quedan listados sin embeber.
@@ -777,7 +777,7 @@ flowchart LR
 
 1. **Agregar documento** sube el archivo a la biblioteca de la obra.
 2. En la tabla, la columna **Acciones** no muestra texto: el icono de ojo **abre** el archivo en una pestaña nueva (PDF e imágenes) y el icono de descarga **baja** el archivo. El nombre abre el detalle.
-3. El mismo par de iconos aparece en las tarjetas, en los adjuntos de una ficha (parte, OC, factura, etc.) y en el detalle del documento.
+3. En los adjuntos de una ficha (parte de libro de obra, OC, factura, etc.) hay también iconos de **Archivar** (caja) y **Eliminar** (tacho). Archivar y eliminar piden confirmación antes de ejecutarse. El mismo par Ver/Descargar aparece en las tarjetas y en el detalle del documento.
 
 <!-- capture:23 parte-de-obra-detalle -->
 ![Bloqer — Parte de obra (detalle)](./guides/assets/screenshots/23-parte-de-obra-detalle.png)

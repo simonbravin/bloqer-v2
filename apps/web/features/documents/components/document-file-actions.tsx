@@ -9,7 +9,8 @@ import {
   documentDownloadHref,
 } from "../lib/document-file-utils";
 
-const iconButtonClass = "size-11 shrink-0 md:size-8";
+const iconButtonClass = "h-7 w-7 shrink-0";
+const iconSvgClass = "h-3.5 w-3.5";
 
 export type DocumentFileActionsProps = {
   documentId: string;
@@ -44,7 +45,7 @@ export function DocumentFileActions({
             title="No hay archivo binario almacenado"
             aria-label="Sin archivo"
           >
-            <FileX />
+            <FileX className={iconSvgClass} aria-hidden />
           </Button>
         </div>
       );
@@ -65,7 +66,7 @@ export function DocumentFileActions({
             aria-label="Ver"
             title="Ver"
           >
-            <Eye />
+            <Eye className={iconSvgClass} aria-hidden />
           </a>
         </Button>
       ) : null}
@@ -75,7 +76,7 @@ export function DocumentFileActions({
           aria-label="Descargar"
           title="Descargar"
         >
-          <Download />
+          <Download className={iconSvgClass} aria-hidden />
         </a>
       </Button>
     </div>

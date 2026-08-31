@@ -1,20 +1,21 @@
 "use client";
-import { formatDate } from "@/lib/format";
 
 import Link from "next/link";
 import { FileText } from "lucide-react";
 import type { DocumentAttachmentView } from "@bloqer/services";
+import { formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge } from "./document-status-badge";
 import { DocumentStorageBadge } from "./document-storage-badge";
 import { DocumentUploadDialog } from "./document-upload-dialog";
 import { DocumentFileActions } from "./document-file-actions";
+import { DocumentMutateIconActions } from "./document-mutate-icon-actions";
 import {
   canAccessDocumentFile,
   isImageLikeDocument,
 } from "../lib/document-file-utils";
 import { DocumentThumbnail } from "./document-thumbnail";
-import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import {
   Table,
@@ -46,14 +47,77 @@ function fmtSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+type AttachmentMutations = {
+  onArchive?: () => Promise<void>;
+  onRestore?: () => Promise<void>;
+  onDelete?: () => Promise<void>;
+};
+
+function getAttachmentMutations(
+  doc: DocumentAttachmentView,
+  opts: { isCompany: boolean; projectId: string | null; revalidateExtra: string[] },
+): AttachmentMutations {
+  if (!doc.canMutate) return {};
+  const { isCompany, projectId, revalidateExtra } = opts;
+  if (isCompany) {
+    return {
+      onArchive: () => archiveCompanyFinanzasAttachmentAction(doc.id, revalidateExtra),
+      onRestore: () => restoreCompanyFinanzasAttachmentAction(doc.id, revalidateExtra),
+      onDelete: () => softDeleteCompanyFinanzasAttachmentAction(doc.id, revalidateExtra),
+    };
+  }
+  if (!projectId) return {};
+  return {
+    onArchive: () => archiveDocumentAction(doc.id, projectId, revalidateExtra),
+    onRestore: () => restoreDocumentAction(doc.id, projectId, revalidateExtra),
+    onDelete: () =>
+      softDeleteDocumentAction(doc.id, projectId, {
+        extraPathsToRevalidate: revalidateExtra,
+        redirectToProjectDocuments: false,
+      }),
+  };
+}
+
+function AttachmentActionsRow({
+  doc,
+  mutations,
+  className,
+}: {
+  doc: DocumentAttachmentView;
+  mutations: AttachmentMutations;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-nowrap items-center justify-end gap-0.5", className)}>
+      <DocumentFileActions
+        documentId={doc.id}
+        mimeType={doc.mimeType}
+        originalFileName={doc.originalFileName}
+        storageProvider={doc.storageProvider}
+        status={doc.status}
+      />
+      <DocumentMutateIconActions
+        fileName={doc.originalFileName}
+        status={doc.status}
+        canMutate={doc.canMutate}
+        onArchive={mutations.onArchive}
+        onRestore={mutations.onRestore}
+        onDelete={mutations.onDelete}
+      />
+    </div>
+  );
+}
+
 function EntityDocumentMobileList({
   docs,
   projectId,
   emptyMessage,
+  mutationOpts,
 }: {
   docs: DocumentAttachmentView[];
   projectId: string | null;
   emptyMessage: string;
+  mutationOpts: { isCompany: boolean; projectId: string | null; revalidateExtra: string[] };
 }) {
   if (docs.length === 0) {
     return <ListEmptyState message={emptyMessage} />;
@@ -92,12 +156,9 @@ function EntityDocumentMobileList({
                 </div>
               </div>
             </div>
-            <DocumentFileActions
-              documentId={doc.id}
-              mimeType={doc.mimeType}
-              originalFileName={doc.originalFileName}
-              storageProvider={doc.storageProvider}
-              status={doc.status}
+            <AttachmentActionsRow
+              doc={doc}
+              mutations={getAttachmentMutations(doc, mutationOpts)}
               className="justify-start"
             />
           </li>
@@ -337,24 +398,30 @@ export function EntityDocumentsPanel({
             docs={docs}
             projectId={projectIdForTable}
             emptyMessage={emptyMessage}
+            mutationOpts={{ isCompany, projectId: projectIdForTable, revalidateExtra }}
           />
         <TableScroll className="hidden md:block">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Archivo</TableHead>
-                <TableHead>Categoría</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Tamaño</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead className="w-px text-right">Acciones</TableHead>
+                <TableHead className="h-9">Archivo</TableHead>
+                <TableHead className="h-9">Categoría</TableHead>
+                <TableHead className="h-9">Estado</TableHead>
+                <TableHead className="h-9">Tamaño</TableHead>
+                <TableHead className="h-9">Fecha</TableHead>
+                <TableHead className="h-9 w-px text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {docs.map((doc) => {
+                const mutations = getAttachmentMutations(doc, {
+                  isCompany,
+                  projectId: projectIdForTable,
+                  revalidateExtra,
+                });
                 return (
                   <TableRow key={doc.id}>
-                    <TableCell>
+                    <TableCell className="py-1.5">
                       {projectIdForTable ? (
                         <Link
                           href={`/proyectos/${projectIdForTable}/documentos/${doc.id}`}
@@ -371,97 +438,23 @@ export function EntityDocumentsPanel({
                         </p>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1.5">
                       <DocumentCategoryBadge category={doc.category} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1.5">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <DocumentStatusBadge status={doc.status} />
                         <DocumentStorageBadge storageProvider={doc.storageProvider} />
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs tabular-nums text-muted-foreground">
+                    <TableCell className="py-1.5 text-xs tabular-nums text-muted-foreground">
                       {fmtSize(doc.sizeBytes)}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                    <TableCell className="whitespace-nowrap py-1.5 text-xs text-muted-foreground">
                       {fmtDate(doc.createdAt)}
                     </TableCell>
-                    <TableCell className="w-px text-right">
-                      <div className="flex flex-wrap justify-end gap-1">
-                        <DocumentFileActions
-                          documentId={doc.id}
-                          mimeType={doc.mimeType}
-                          originalFileName={doc.originalFileName}
-                          storageProvider={doc.storageProvider}
-                          status={doc.status}
-                        />
-                        {doc.canMutate && doc.status === "ACTIVE" && isCompany && (
-                          <form action={archiveCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
-                            <Button variant="ghost" size="sm" type="submit">
-                              Archivar
-                            </Button>
-                          </form>
-                        )}
-                        {doc.canMutate && doc.status === "ACTIVE" && !isCompany && projectIdForTable && (
-                          <form action={archiveDocumentAction.bind(null, doc.id, projectIdForTable, revalidateExtra)}>
-                            <Button variant="ghost" size="sm" type="submit">
-                              Archivar
-                            </Button>
-                          </form>
-                        )}
-                        {doc.canMutate && doc.status === "ARCHIVED" && isCompany && (
-                          <form action={restoreCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
-                            <Button variant="ghost" size="sm" type="submit">
-                              Restaurar
-                            </Button>
-                          </form>
-                        )}
-                        {doc.canMutate && doc.status === "ARCHIVED" && !isCompany && projectIdForTable && (
-                          <form action={restoreDocumentAction.bind(null, doc.id, projectIdForTable, revalidateExtra)}>
-                            <Button variant="ghost" size="sm" type="submit">
-                              Restaurar
-                            </Button>
-                          </form>
-                        )}
-                        {doc.canMutate && doc.status === "UPLOADING" && isCompany && (
-                          <form action={softDeleteCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
-                            <Button variant="ghost" size="sm" type="submit" className="text-destructive">
-                              Cancelar subida
-                            </Button>
-                          </form>
-                        )}
-                        {doc.canMutate && doc.status === "UPLOADING" && !isCompany && projectIdForTable && (
-                          <form
-                            action={softDeleteDocumentAction.bind(null, doc.id, projectIdForTable, {
-                              extraPathsToRevalidate: revalidateExtra,
-                              redirectToProjectDocuments: false,
-                            })}
-                          >
-                            <Button variant="ghost" size="sm" type="submit" className="text-destructive">
-                              Cancelar subida
-                            </Button>
-                          </form>
-                        )}
-                        {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && isCompany && (
-                          <form action={softDeleteCompanyFinanzasAttachmentAction.bind(null, doc.id, revalidateExtra)}>
-                            <Button variant="ghost" size="sm" type="submit" className="text-destructive">
-                              Eliminar
-                            </Button>
-                          </form>
-                        )}
-                        {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && !isCompany && projectIdForTable && (
-                          <form
-                            action={softDeleteDocumentAction.bind(null, doc.id, projectIdForTable, {
-                              extraPathsToRevalidate: revalidateExtra,
-                              redirectToProjectDocuments: false,
-                            })}
-                          >
-                            <Button variant="ghost" size="sm" type="submit" className="text-destructive">
-                              Eliminar
-                            </Button>
-                          </form>
-                        )}
-                      </div>
+                    <TableCell className="w-px py-1.5 text-right">
+                      <AttachmentActionsRow doc={doc} mutations={mutations} />
                     </TableCell>
                   </TableRow>
                 );
