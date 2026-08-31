@@ -1,0 +1,22 @@
+---
+description: No browser localhost — Simon trabaja contra portal/producción; no trabarse en localhost:3000
+alwaysApply: true
+---
+
+# Verificación UI — no localhost
+
+Simon opera **contra producción** (`portal.bloqer.app`), no contra el `next dev` local.
+
+## Prohibido (salvo pedido explícito)
+
+- Abrir / navegar `http://localhost:3000` (o cualquier puerto local) con el browser MCP / IDE browser.
+- Quedarse en loops “Navigated to localhost…” / lock / snapshot esperando login local.
+- Reiniciar o matar el server local solo para “chequear” la UI.
+
+## Qué hacer en su lugar
+
+1. Confiar en typecheck / lints / tests / lectura de código.
+2. Si hace falta ver la UI en vivo: **`https://portal.bloqer.app`** (después del deploy), o pedir a Simon que revise.
+3. Si el usuario no pidió smoke en browser, **no abrir el browser**.
+
+El agent se traba a menudo en navegación local (auth, blank page, hang). No vale la pena.

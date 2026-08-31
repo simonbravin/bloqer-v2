@@ -18,7 +18,8 @@ export default async function NuevaTransferenciaPage({
 
   const sp = await searchParams;
   const fromAccountId = sp.fromAccountId?.trim() || undefined;
-  const returnTo = sp.returnTo === "historial" ? "/tesoreria/transferencias" : undefined;
+  /** Only override redirect when opened from historial; otherwise form uses the actual source. */
+  const successHref = sp.returnTo === "historial" ? "/tesoreria/transferencias" : undefined;
 
   const ctx = {
     actorUserId: current.session.user.id!,
@@ -31,12 +32,6 @@ export default async function NuevaTransferenciaPage({
   const activeAccounts = allAccounts
     .filter((a) => a.status === "ACTIVE")
     .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
-
-  const successHref =
-    returnTo ??
-    (fromAccountId && activeAccounts.some((a) => a.id === fromAccountId)
-      ? `/tesoreria/cuentas/${fromAccountId}`
-      : undefined);
 
   return (
     <PageShell variant="default" className="space-y-6">

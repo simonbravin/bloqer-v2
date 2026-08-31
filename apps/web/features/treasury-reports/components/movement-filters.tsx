@@ -249,23 +249,21 @@ export function MovementFilters({
             </Select>
           </div>
         )}
-        {variant === "treasury" && (
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Pagos AP empresa</Label>
-            <Select
-              value={sp.get("corporateApPayments") ?? "_all"}
-              onValueChange={(v) => update("corporateApPayments", v === "_all" ? "" : v)}
-            >
-              <SelectTrigger className="w-52">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_all">Todos los pagos</SelectItem>
-                <SelectItem value="true">Solo corporativos (sin obra)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Pagos AP empresa</Label>
+          <Select
+            value={sp.get("corporateApPayments") ?? "_all"}
+            onValueChange={(v) => update("corporateApPayments", v === "_all" ? "" : v)}
+          >
+            <SelectTrigger className="w-52">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">Todos los pagos</SelectItem>
+              <SelectItem value="true">Solo corporativos (sin obra)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <Button variant="ghost" size="sm" onClick={clearFilters} className="self-end">
           Limpiar
         </Button>

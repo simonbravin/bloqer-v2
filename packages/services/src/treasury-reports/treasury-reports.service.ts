@@ -522,10 +522,12 @@ export async function getAccountMovementReport(
 
   let runningBalance: Prisma.Decimal | undefined;
   if (needsRunningBalance) {
-    runningBalance = await getAccountBalanceAsOf(
-      filters.accountId!,
-      dateFrom ? { beforeDate: new Date(dateFrom) } : undefined,
-    );
+    // Seed = balance *before* the first row in the result set.
+    // Without dateFrom, use epoch so we start from opening base only (not full balance),
+    // then accumulate each returned movement — otherwise the extracto double-counts.
+    runningBalance = await getAccountBalanceAsOf(filters.accountId!, {
+      beforeDate: dateFrom ? new Date(dateFrom) : new Date(0),
+    });
   }
 
   const typedRawRows = rawRows as RawMovementRow[];
@@ -538,9 +540,9 @@ export async function getAccountMovementReport(
   const projectNames = await loadProjectNames(ctx.tenantId, uniqueProjectIds);
 
   let rows: MovementReportRow[] = typedRawRows.map((m) => {
-    const isAdj = m.type === "ADJUSTMENT";
-    const signed = isAdj ? m.amount : signedAmount(m.type as string, m.amount);
-    if (runningBalance !== undefined && !isAdj) {
+    // Same sign convention as balance.service (INFLOW/TRANSFER_IN +, else −).
+    const signed = signedAmount(m.type as string, m.amount);
+    if (runningBalance !== undefined) {
       runningBalance = runningBalance.plus(signed);
     }
     const resolvedProjectId = projectIdByMovement.get(m.id) ?? null;

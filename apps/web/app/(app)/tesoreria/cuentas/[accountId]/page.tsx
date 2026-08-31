@@ -14,6 +14,7 @@ import { can } from "@bloqer/domain";
 import {
   getAccountMovementReport,
   getTreasuryAccountById,
+  listTreasuryAccounts,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -67,6 +68,21 @@ export default async function AccountDetailPage({ params, searchParams }: PagePr
   const canViewReconciliation = can(ctx.roles, "VIEW", "BANK_RECONCILIATION");
   const sortDir = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
 
+  let canTransferFromThisAccount = false;
+  if (canTransfer && account.status === "ACTIVE") {
+    try {
+      const { data: peers } = await listTreasuryAccounts(ctx);
+      canTransferFromThisAccount = peers.some(
+        (a) =>
+          a.id !== accountId &&
+          a.status === "ACTIVE" &&
+          a.currency === account.currency,
+      );
+    } catch {
+      canTransferFromThisAccount = false;
+    }
+  }
+
   let movementRows;
   try {
     ({ rows: movementRows } = await getAccountMovementReport(
@@ -89,7 +105,7 @@ export default async function AccountDetailPage({ params, searchParams }: PagePr
         <div className="flex flex-wrap items-center gap-2">
           {account.status === "ACTIVE" && (
             <>
-              {canTransfer && (
+              {canTransferFromThisAccount && (
                 <Button asChild variant="outline" size="sm">
                   <Link
                     href={`/tesoreria/transferencias/nueva?fromAccountId=${encodeURIComponent(accountId)}`}

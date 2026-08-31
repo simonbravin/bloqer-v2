@@ -7,6 +7,7 @@ import type { TreasuryAccountListItem } from "@/features/treasury";
 import {
   canEditBankAccountsUi,
   canEditInternalTransfersUi,
+  canViewInternalTransfersUi,
 } from "@/features/treasury/lib/treasury-edit-gates";
 import { getCurrentUser } from "@/lib/auth";
 import { listTreasuryAccounts } from "@bloqer/services";
@@ -26,6 +27,7 @@ export default async function CuentasPage() {
 
   const canEdit = canEditBankAccountsUi(ctx.roles);
   const canTransfer = canEditInternalTransfersUi(ctx.roles);
+  const canViewTransfers = canViewInternalTransfersUi(ctx.roles);
   const { data: accounts } = await listTreasuryAccounts(ctx);
 
   const items: TreasuryAccountListItem[] = accounts.map((a) => ({
@@ -38,7 +40,12 @@ export default async function CuentasPage() {
     bankName: a.bankName,
   }));
 
-  const activeCount = accounts.filter((a) => a.status === "ACTIVE").length;
+  const activeAccounts = accounts.filter((a) => a.status === "ACTIVE");
+  const canTransferNow =
+    canTransfer &&
+    activeAccounts.some((a) =>
+      activeAccounts.some((b) => b.id !== a.id && b.currency === a.currency),
+    );
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -47,10 +54,12 @@ export default async function CuentasPage() {
           <h1 className="text-2xl font-bold tracking-tight">Cuentas</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/tesoreria/transferencias">Historial de transferencias</Link>
-          </Button>
-          {canTransfer && activeCount >= 2 ? (
+          {canViewTransfers ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href="/tesoreria/transferencias">Historial de transferencias</Link>
+            </Button>
+          ) : null}
+          {canTransferNow ? (
             <Button asChild variant="outline" size="sm">
               <Link href="/tesoreria/transferencias/nueva">Transferir entre cuentas</Link>
             </Button>

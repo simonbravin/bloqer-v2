@@ -22,7 +22,10 @@ interface Props {
   accounts: AccountOption[];
   /** Prefill from account detail CTA (`?fromAccountId=`). */
   defaultSourceAccountId?: string;
-  /** Where to go after success; defaults to source account extracto. */
+  /**
+   * Override after success (e.g. historial).
+   * When omitted, redirects to the **actual** source account extracto.
+   */
   successHref?: string;
 }
 
@@ -41,12 +44,49 @@ export function InternalTransferForm({
   );
   const [destinationAccountId, setDestinationAccountId] = useState("");
   const [amount, setAmount] = useState("");
+  const [transferDate, setTransferDate] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  });
   const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
+
+  const sourceAccount = accounts.find((a) => a.id === sourceAccountId) ?? null;
+  const destinationOptions = !sourceAccount
+    ? accounts.filter((a) => a.id !== sourceAccountId)
+    : accounts.filter(
+        (a) => a.id !== sourceAccount.id && a.currency === sourceAccount.currency,
+      );
+
+  function onSourceChange(id: string) {
+    setSourceAccountId(id);
+    setDestinationAccountId((prev) => {
+      const src = accounts.find((a) => a.id === id);
+      if (!src) return "";
+      const dest = accounts.find((a) => a.id === prev);
+      if (!dest || dest.id === id || dest.currency !== src.currency) return "";
+      return prev;
+    });
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!sourceAccountId) { setError("Seleccione cuenta origen"); return; }
     if (!destinationAccountId) { setError("Seleccione cuenta destino"); return; }
+    if (sourceAccountId === destinationAccountId) {
+      setError("La cuenta origen y destino deben ser diferentes");
+      return;
+    }
+    const src = accounts.find((a) => a.id === sourceAccountId);
+    const dest = accounts.find((a) => a.id === destinationAccountId);
+    if (src && dest && src.currency !== dest.currency) {
+      setError(
+        `Monedas diferentes (${src.currency} → ${dest.currency}). Elegí cuentas de la misma moneda.`,
+      );
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
       const res = await createInternalTransferAction({
@@ -84,7 +124,7 @@ export function InternalTransferForm({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label>Cuenta origen</Label>
-            <Select onValueChange={setSourceAccountId} value={sourceAccountId}>
+            <Select onValueChange={onSourceChange} value={sourceAccountId}>
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar cuenta…" />
               </SelectTrigger>
@@ -100,12 +140,24 @@ export function InternalTransferForm({
 
           <div className="space-y-1">
             <Label>Cuenta destino</Label>
-            <Select onValueChange={setDestinationAccountId} value={destinationAccountId}>
+            <Select
+              onValueChange={setDestinationAccountId}
+              value={destinationAccountId}
+              disabled={!sourceAccountId}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Seleccionar cuenta…" />
+                <SelectValue
+                  placeholder={
+                    sourceAccountId
+                      ? destinationOptions.length === 0
+                        ? "No hay otra cuenta en esa moneda…"
+                        : "Seleccionar cuenta…"
+                      : "Elegí origen primero…"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
-                {accounts.map((a) => (
+                {destinationOptions.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
                     {a.name} ({a.currency})
                   </SelectItem>
@@ -116,7 +168,14 @@ export function InternalTransferForm({
 
           <div className="space-y-1">
             <Label htmlFor="transferDate">Fecha</Label>
-            <Input id="transferDate" name="transferDate" type="date" required />
+            <Input
+              id="transferDate"
+              name="transferDate"
+              type="date"
+              required
+              value={transferDate}
+              onChange={(e) => setTransferDate(e.target.value)}
+            />
           </div>
 
           <div className="space-y-1">
@@ -141,7 +200,15 @@ export function InternalTransferForm({
           <Button type="button" variant="outline" onClick={() => router.back()}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={isPending || accounts.length < 2}>
+          <Button
+            type="submit"
+            disabled={
+              isPending ||
+              !sourceAccountId ||
+              !destinationAccountId ||
+              destinationOptions.length === 0
+            }
+          >
             {isPending ? "Guardando…" : "Crear transferencia"}
           </Button>
         </div>

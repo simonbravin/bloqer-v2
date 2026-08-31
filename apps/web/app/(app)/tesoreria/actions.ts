@@ -118,6 +118,9 @@ export async function createInternalTransferAction(
   try {
     const transfer = await createInternalTransfer(parsed.data, ctx);
     revalidatePath("/tesoreria");
+    revalidatePath("/tesoreria/transferencias");
+    revalidatePath(`/tesoreria/cuentas/${parsed.data.sourceAccountId}`);
+    revalidatePath(`/tesoreria/cuentas/${parsed.data.destinationAccountId}`);
     return { id: transfer.id };
   } catch (err) {
     return handle(err);
@@ -145,8 +148,11 @@ export async function cancelInternalTransferAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx("cancelInternalTransfer");
   try {
-    await cancelInternalTransfer(id, ctx);
+    const cancelled = await cancelInternalTransfer(id, ctx);
     revalidatePath("/tesoreria");
+    revalidatePath("/tesoreria/transferencias");
+    revalidatePath(`/tesoreria/cuentas/${cancelled.sourceAccountId}`);
+    revalidatePath(`/tesoreria/cuentas/${cancelled.destinationAccountId}`);
     return { ok: true };
   } catch (err) {
     return handle(err);

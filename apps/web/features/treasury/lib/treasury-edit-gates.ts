@@ -25,3 +25,11 @@ export function canEditInternalTransfersUi(roles: UserRole[]): boolean {
     (can(roles, "EDIT", "INTERNAL_TRANSFERS") || can(roles, "EDIT", "TREASURY"))
   );
 }
+
+/** List/historial: company finance + VIEW INTERNAL_TRANSFERS (or TREASURY). */
+export function canViewInternalTransfersUi(roles: UserRole[]): boolean {
+  return (
+    hasCompanyFinanceRole(roles) &&
+    (can(roles, "VIEW", "INTERNAL_TRANSFERS") || can(roles, "VIEW", "TREASURY"))
+  );
+}
