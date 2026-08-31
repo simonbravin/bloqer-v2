@@ -25,6 +25,7 @@ import { ScheduleFieldItemSheet } from "./schedule-field-item-sheet";
 import { ScheduleFieldView, ScheduleFieldViewSkeleton } from "./schedule-field-view";
 import { filterScheduleItemsForDisplay } from "../adapters/schedule-view-types";
 import { useHasMounted, useIsLgUp } from "@/lib/media-query";
+import { ReportExportActions } from "@/features/reports/report-export-actions";
 
 type ViewId = "gantt" | "calendar" | "kanban" | "table";
 
@@ -314,6 +315,18 @@ export function ScheduleWorkspace({
                 />
               </>
             )}
+            <ReportExportActions
+              exportPath={`/api/reports/proyectos/${projectId}/cronograma`}
+              params={{
+                budgetId: workspace.budgetId,
+                status: searchParams.get("status") ?? undefined,
+                delayedOnly: searchParams.get("delayedOnly") === "1" ? "1" : undefined,
+                type: searchParams.get("type") ?? undefined,
+              }}
+              pdf
+              xlsx
+              csv={false}
+            />
             <div className="ml-auto flex flex-wrap gap-1 rounded-lg border p-1">
               {VIEWS.map((v) => (
                 <Button

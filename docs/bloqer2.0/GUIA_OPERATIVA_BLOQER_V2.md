@@ -688,17 +688,18 @@ stateDiagram-v2
 
 ### 7.0 Procedimiento — Armar el cronograma
 
-1. Abrir Cronograma. Vista por defecto: **Gantt** (`?view=gantt`). También: Calendario, Kanban, Tabla.
+1. Abrir Cronograma. Vista por defecto: **Gantt** (`?view=gantt`). El eje de tiempo abre en **hoy** (no en el medio del rango); **Ir a hoy** vuelve a esa fecha. También: Calendario, Kanban, Tabla.
 2. (Recomendado) **Importar desde presupuesto** → diálogo **Importar EDT al cronograma** → elegir presupuesto aprobado → **Importar**. Así las tareas nacen alineadas a la EDT.
 3. Completar fechas en ítems **hoja** (no en contenedores: sus fechas se derivan; usar **Recalcular contenedores** en el Gantt si hace falta). En Gantt: arrastrar/redimensionar barras y **hitos**.
 4. Crear ítems adicionales con **+ Tarea / hito** (`TASK` o `MILESTONE`). En **Ubicación**: *Colocar bajo* (capítulo o raíz) e *Insertar después de* (hermano). Si vinculás una partida EDT que ya tiene una tarea hoja, el sistema propone poner el ítem **justo debajo** (hermano, no hijo). El vínculo EDT **no** mueve la fila.
-5. Reordenar: en Gantt (sidebar), Tabla o detalle usá **↑ ↓**, **sangrar** / **disminuir sangría**. Si sangrás bajo una hoja con fechas, esa hoja pasa a contenedor (fechas derivadas); el sistema pide confirmación.
+5. Reordenar: el botón **⋮** de cada fila en Gantt, Tabla o detalle (Subir / Bajar / Sangrar / Disminuir sangría). Si sangrás bajo una hoja con fechas, esa hoja pasa a contenedor (fechas derivadas); el sistema pide confirmación.
 6. Dependencias: solo **Finish‑to‑Start (FS)** en la pestaña **Dependencias** del detalle (o botón **FS** en el Gantt). Violaciones = advertencias al guardar fechas, no bloqueos. Las flechas del Gantt son de solo lectura.
 7. En cada tarea crítica: vincular nodos EDT (uno **primario**) desde el detalle — sin vínculo aparece el chip **Sin EDT** (no hay sync Real ni métricas de costo/cert). Los **hitos** no reciben % Real del libro aunque tengan EDT ([D-103]); se completan a mano o al **confirmar una recepción** de la misma EDT ([D-104]).
 8. Filtrá por **Tipo** (Todos / Tareas / Hitos) y estado. Los hitos se ven con color fijo (diamante) en el Gantt; las barras de tarea **atrasadas** también se pintan en rojo. En el sidebar del Gantt, **▾** colapsa capítulos (estado local del navegador).
 9. Con EDT vinculada: chips **Entrega OC** (fecha prometida de OC confirmada) y **Recibido**; chip ámbar si la prometida es posterior al inicio de una tarea hermana con la misma EDT.
 10. Revisar si aparece aviso de **baselineBudgetMismatch** (presupuesto base del cronograma ≠ el aprobado actual).
 11. Las tareas **canceladas** están ocultas por defecto en las cuatro vistas; filtrá estado **Cancelado** para verlas.
+12. **Exportar:** en escritorio, botón **Exportar** (Excel o PDF). El archivo respeta los filtros activos (tipo, estado, solo atrasados y presupuesto). El PDF es apaisado y se parte en varias hojas: tabla de **fechas**, tabla de **avance/costos**, y Gantt (eje de tiempo a lo ancho + filas a lo largo). Cada hoja lleva empresa y obra. El Excel trae hoja **Tabla** (fechas `dd/mm/aaaa` reales) y hoja **Gantt** con celdas pintadas del mismo color que las barras.
 
 ![Bloqer — Armar el cronograma](./guides/assets/laminas/mapa-armar-cronograma.png)
 
@@ -717,7 +718,7 @@ stateDiagram-v2
 
 ### 7.1 Cuatro dimensiones de avance (no confundir)
 
-En detalle de tarea / tabla / Gantt aparecen como **Real / plan t. / cant. / cert.**:
+En detalle de tarea / tabla / Gantt aparecen como **Real / plan t. / cant. / cert.** Pasá el mouse por el valor (o por el encabezado en la tabla) para ver qué significa cada uno. El detalle de la tarea abre con **Nombre**, **Planificación** y **EDT enlazado**; el avance y el presupuesto van debajo.
 
 | Dimensión | Fuente | Quién la mueve |
 |-----------|--------|----------------|

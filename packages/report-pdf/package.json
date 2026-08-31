@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/pdf-render.smoke.test.tsx src/pdf/pdf-filter-line.test.ts"
+    "test": "node --import tsx --test src/pdf-render.smoke.test.tsx src/pdf/pdf-filter-line.test.ts src/pdf/schedule-pdf.smoke.test.tsx"
   },
   "dependencies": {
     "@bloqer/config": "workspace:*",

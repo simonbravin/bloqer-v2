@@ -41,6 +41,8 @@ type Props = {
   pdfOnly?: boolean;
   /** When true, adds XLSX to the export menu (requires route support). */
   xlsx?: boolean;
+  /** When false, hides CSV from the menu. Defaults to true when the menu is shown. */
+  csv?: boolean;
   /** Button / menu label. Defaults: "Exportar CSV" | "Exportar PDF" | "Exportar". */
   label?: string;
 };
@@ -51,6 +53,7 @@ export function ReportExportActions({
   pdf = false,
   pdfOnly = false,
   xlsx = false,
+  csv = true,
   label,
 }: Props) {
   const [downloading, setDownloading] = useState(false);
@@ -128,13 +131,15 @@ export function ReportExportActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
-        <DropdownMenuItem
-          onSelect={() => void downloadExport(csvHref)}
-          className="flex cursor-pointer items-center gap-2"
-        >
-          <FileSpreadsheet className="h-4 w-4" aria-hidden />
-          CSV
-        </DropdownMenuItem>
+        {csv ? (
+          <DropdownMenuItem
+            onSelect={() => void downloadExport(csvHref)}
+            className="flex cursor-pointer items-center gap-2"
+          >
+            <FileSpreadsheet className="h-4 w-4" aria-hidden />
+            CSV
+          </DropdownMenuItem>
+        ) : null}
         {xlsx ? (
           <DropdownMenuItem
             onSelect={() => void downloadExport(xlsxHref)}

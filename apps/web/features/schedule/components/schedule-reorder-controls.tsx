@@ -3,12 +3,26 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { MoreVertical } from "lucide-react";
 import type { ScheduleTreeItemDto, ScheduleWorkspaceItemDto } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { moveScheduleItemAction } from "../actions/schedule-actions";
 
 type MoveKind = "up" | "down" | "indent" | "outdent";
+
+const MOVES: { kind: MoveKind; label: string }[] = [
+  { kind: "up", label: "Subir" },
+  { kind: "down", label: "Bajar" },
+  { kind: "indent", label: "Sangrar" },
+  { kind: "outdent", label: "Disminuir sangría" },
+];
 
 export function ScheduleReorderControls({
   projectId,
@@ -17,6 +31,7 @@ export function ScheduleReorderControls({
   treeItems,
   className,
   size = "sm",
+  layout = "buttons",
 }: {
   projectId: string;
   itemId: string;
@@ -26,6 +41,8 @@ export function ScheduleReorderControls({
   treeItems?: ScheduleTreeItemDto[];
   className?: string;
   size?: "sm" | "xs";
+  /** `menu` = one ⋮ control (Gantt, tabla, detalle). `buttons` kept for dense toolbars. */
+  layout?: "buttons" | "menu";
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -57,13 +74,13 @@ export function ScheduleReorderControls({
   }
 
   function run(kind: MoveKind) {
+    if (kind === "indent" && willPromoteLeafOnIndent()) {
+      const ok = window.confirm(
+        "Si sangrás este ítem bajo el hermano de arriba, ese hermano pasará a contenedor (fechas derivadas, no editables). ¿Continuar?",
+      );
+      if (!ok) return;
+    }
     startTransition(async () => {
-      if (kind === "indent" && willPromoteLeafOnIndent()) {
-        const ok = window.confirm(
-          "Si sangrás este ítem bajo el hermano de arriba, ese hermano pasará a contenedor (fechas derivadas, no editables). ¿Continuar?",
-        );
-        if (!ok) return;
-      }
       const res = await moveScheduleItemAction(projectId, {
         itemId,
         action: { kind },
@@ -85,6 +102,43 @@ export function ScheduleReorderControls({
     size === "xs"
       ? "h-5 w-5 p-0 text-[10px]"
       : "h-7 w-7 p-0 text-xs";
+
+  if (layout === "menu") {
+    return (
+      <div
+        className={cn("shrink-0", className)}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={btnClass}
+              disabled={pending}
+              title="Orden y sangría"
+              aria-label="Orden y sangría"
+            >
+              <MoreVertical className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            {MOVES.map((m) => (
+              <DropdownMenuItem
+                key={m.kind}
+                disabled={pending}
+                onSelect={() => run(m.kind)}
+              >
+                {m.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  }
 
   return (
     <div

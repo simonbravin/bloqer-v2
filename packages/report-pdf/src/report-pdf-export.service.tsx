@@ -38,6 +38,8 @@ import {
   budgetWbsExportPdfColumns,
   budgetWbsExportPdfRowsFromTable,
   buildBudgetWbsExportPayload,
+  buildScheduleExportPayload,
+  type ScheduleExportFilters,
   buildJobsiteLogPdfPayload,
   type CashFlowFilters,
   type CashPositionFilters,
@@ -74,6 +76,7 @@ import { AgingReportPdfDocument } from "./pdf/aging-pdf";
 import { CostControlReportPdfDocument } from "./pdf/cost-control-pdf";
 import { JobsiteLogPdfDocument } from "./pdf/jobsite-log-pdf";
 import { ProjectSimpleTablePdfDocument } from "./pdf/project-simple-table-pdf";
+import { SchedulePdfDocument } from "./pdf/schedule-pdf";
 import type { ReportPdfPayload } from "./pdf/pdf-export.types";
 import { MAX_AUDIT_LOG_PDF_ROWS } from "./pdf/pdf-export.types";
 import { renderReportPdfToBuffer } from "./pdf/pdf-renderer.service";
@@ -845,6 +848,18 @@ export async function exportJobsiteLogPdf(
     `libro_obra_parte_${payload.meta.logDateIso}_${payload.meta.status.toLowerCase()}`,
     (branding) => <JobsiteLogPdfDocument payload={payload} branding={branding} />,
   );
+}
+
+export async function exportSchedulePdf(
+  projectId: string,
+  filters: ScheduleExportFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const payload = await buildScheduleExportPayload(projectId, filters, ctx);
+  const slug = payload.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 60);
+  return exportPdfDocument(ctx, { projectId }, `cronograma_${slug}`, (branding) => (
+    <SchedulePdfDocument payload={payload} branding={branding} />
+  ));
 }
 
 export async function exportTrialBalancePdf(

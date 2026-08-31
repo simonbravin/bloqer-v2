@@ -9,14 +9,6 @@ import type {
   ScheduleWorkspaceDto,
   ScheduleWorkspaceItemDto,
 } from "@bloqer/services";
-
-type ScheduleItemAuditEntryView = {
-  id: string;
-  action: string;
-  actorName: string | null;
-  createdAt: string;
-  summary: string;
-};
 import { Button } from "@/components/ui/button";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
@@ -31,9 +23,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  PROGRESS_DIMENSION_HINTS,
+  ScheduleHint,
   ScheduleProgressDimensions,
-  ScheduleProgressLegend,
 } from "./schedule-progress-dimensions";
+import {
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { ScheduleProcurementChips } from "./schedule-procurement-chips";
 import {
   addScheduleDependencyAction,
@@ -50,7 +46,6 @@ import {
 } from "../actions/schedule-actions";
 import {
   STATUS_LABELS,
-  primaryWbsLink,
   MILESTONE_COLOR,
 } from "../adapters/schedule-view-types";
 import { formatDateAr } from "@/lib/gantt-date-format";
@@ -60,6 +55,14 @@ import { ScheduleWbsPicker } from "./schedule-wbs-picker";
 import { ScheduleMissingEdtBadge } from "./schedule-missing-edt-badge";
 import { ScheduleReorderControls } from "./schedule-reorder-controls";
 import { Badge } from "@/components/ui/badge";
+
+type ScheduleItemAuditEntryView = {
+  id: string;
+  action: string;
+  actorName: string | null;
+  createdAt: string;
+  summary: string;
+};
 
 const CATEGORY_LABELS: Record<string, string> = {
   MATERIAL: "Materiales",
@@ -144,7 +147,6 @@ export function ScheduleItemDialog({
   }, [workspace.treeItems, allItems]);
 
   const m = item?.metrics;
-  const primaryWbs = item ? primaryWbsLink(item) : null;
   const linkedIds = item?.wbsLinks.map((l) => l.wbsNodeId) ?? [];
   const predItems = (item?.predecessorDependencies ?? []).map((d) => ({
     dependencyId: d.dependencyId,
@@ -208,7 +210,7 @@ export function ScheduleItemDialog({
 
   function saveProgress() {
     const pct = Number(progressInput);
-    if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+    if (!progressInput.trim() || Number.isNaN(pct) || pct < 0 || pct > 100) {
       toast.error("Avance inválido (0–100)");
       return;
     }
@@ -223,6 +225,10 @@ export function ScheduleItemDialog({
   }
 
   function saveName(name: string) {
+    if (!name) {
+      toast.error("El nombre no puede estar vacío");
+      return;
+    }
     startTransition(async () => {
       const res = await updateScheduleItemNameAction(projectId, item!.id, { name });
       if ("error" in res) toast.error(res.error);
@@ -342,24 +348,26 @@ export function ScheduleItemDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex flex-wrap items-center gap-2">
-            <span>{item?.name ?? "Tarea"}</span>
+          <DialogTitle className="flex items-center gap-2 pr-8">
+            <span className="min-w-0 truncate" title={item?.name ?? "Tarea"}>
+              {item?.name ?? "Tarea"}
+            </span>
             {item?.type === "MILESTONE" ? (
               <Badge
                 variant="outline"
-                className="text-[10px]"
+                className="shrink-0 text-[10px]"
                 style={{ borderColor: `${MILESTONE_COLOR}88`, color: MILESTONE_COLOR }}
               >
                 Hito
               </Badge>
             ) : null}
-            {item ? <ScheduleMissingEdtBadge item={item} /> : null}
+            {item ? <ScheduleMissingEdtBadge item={item} className="shrink-0" /> : null}
           </DialogTitle>
           <DialogDescription>
             {item ? (
               <>
                 {STATUS_LABELS[item.status] ?? item.status}
-                {item.daysLate ? ` · Atrasado ${item.daysLate} días` : ""}
+                {item.daysLate != null ? ` · Atrasado ${item.daysLate} días` : ""}
               </>
             ) : null}
           </DialogDescription>
@@ -392,40 +400,55 @@ export function ScheduleItemDialog({
         ) : null}
 
         {item && tab === "detail" && (
-          <div className="space-y-6 text-sm mt-4">
-            {workspace.canEdit && (
-              <section className="space-y-2">
-                <h3 className="font-medium">Orden en el árbol</h3>
-                <ScheduleReorderControls
-                  projectId={projectId}
-                  itemId={item.id}
-                  items={allItems}
-                  treeItems={workspace.treeItems}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Subí/bajá o sangrá. El vínculo EDT no cambia la altura.
-                </p>
-              </section>
-            )}
-            <section className="space-y-2">
-              <h3 className="font-medium">Cuatro dimensiones de avance (BR-SCH-002 / D-045)</h3>
-              <ScheduleProgressDimensions item={item} />
-              <ScheduleProcurementChips item={item} />
-              <ScheduleProgressLegend />
-              <p className="text-xs text-muted-foreground">
-                Solo <strong className="font-medium text-foreground">Real</strong> se edita o
-                sincroniza desde el libro en <em>tareas</em>. Los <strong>hitos</strong> no
-                reciben sync del libro ([D-103]); se completan a mano o al confirmar una
-                recepción de la misma EDT ([D-104]). Plan (t), Cant. y Cert. son de solo lectura.
-              </p>
+          <TooltipProvider delayDuration={200}>
+          <div className="mt-4 space-y-4 text-sm">
+            <section className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs">Nombre</Label>
+                {workspace.canEdit ? (
+                  <ScheduleReorderControls
+                    projectId={projectId}
+                    itemId={item.id}
+                    items={allItems}
+                    treeItems={workspace.treeItems}
+                    size="xs"
+                    layout="menu"
+                  />
+                ) : null}
+              </div>
+              {workspace.canEdit ? (
+                <form
+                  key={`${item.id}:${item.name}`}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.currentTarget);
+                    saveName((fd.get("name") as string).trim());
+                  }}
+                  className="flex gap-2"
+                >
+                  <Input name="name" defaultValue={item.name} maxLength={500} />
+                  <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+                    OK
+                  </Button>
+                </form>
+              ) : (
+                <p className="truncate" title={item.name}>{item.name}</p>
+              )}
             </section>
 
             <section className="space-y-2">
-              <h3 className="font-medium">Planificación</h3>
+              <div className="flex items-center gap-1">
+                <h3 className="font-medium">Planificación</h3>
+                {isContainer ? (
+                  <ScheduleHint hint="Fechas calculadas desde las subtareas. El avance real se carga en las hojas, no en el contenedor." />
+                ) : item.type === "MILESTONE" ? (
+                  <ScheduleHint hint="En hitos el % no viene del libro; también se completa al confirmar una recepción de la misma EDT." />
+                ) : null}
+              </div>
               {workspace.canEdit && !isContainer ? (
                 item.type === "MILESTONE" ? (
-                  <div className="grid gap-2">
-                    <div className="space-y-1">
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-[10rem] flex-1 space-y-1">
                       <Label className="text-xs">Fecha del hito</Label>
                       <Input
                         type="date"
@@ -438,11 +461,11 @@ export function ScheduleItemDialog({
                       />
                     </div>
                     <Button size="sm" disabled={pending} onClick={saveDates}>
-                      Guardar fecha
+                      Guardar
                     </Button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs">Inicio</Label>
                       <Input
@@ -461,34 +484,30 @@ export function ScheduleItemDialog({
                         onChange={(e) => setEndDateInput(e.target.value)}
                       />
                     </div>
-                    <Button size="sm" className="col-span-2" disabled={pending} onClick={saveDates}>
-                      Guardar fechas
+                    <Button size="sm" disabled={pending} onClick={saveDates}>
+                      Guardar
                     </Button>
                   </div>
                 )
               ) : (
-                <div>
-                  <p>
-                    {item.type === "MILESTONE"
-                      ? formatDateAr(item.endDate ?? item.startDate)
-                      : `${formatDateAr(item.startDate)} → ${formatDateAr(item.endDate)}`}
-                  </p>
-                  {isContainer && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Fechas de contenedor calculadas automáticamente desde las subtareas.
-                    </p>
-                  )}
-                </div>
+                <p>
+                  {item.type === "MILESTONE"
+                    ? formatDateAr(item.endDate ?? item.startDate)
+                    : `${formatDateAr(item.startDate)} → ${formatDateAr(item.endDate)}`}
+                </p>
               )}
               {item.blockReason && (
                 <p className="text-destructive">Bloqueo: {item.blockReason}</p>
               )}
               {workspace.canEdit && !isContainer && (
-                <div className="flex gap-2 items-end pt-2">
-                  <div className="space-y-1 flex-1">
-                    <Label className="text-xs">
-                      {item.type === "MILESTONE" ? "Avance % (manual)" : "Avance real %"}
-                    </Label>
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-1">
+                      <Label className="text-xs">
+                        {item.type === "MILESTONE" ? "Avance % (manual)" : "Avance real %"}
+                      </Label>
+                      <ScheduleHint hint={PROGRESS_DIMENSION_HINTS.real.hint} />
+                    </div>
                     <DecimalInput
                       value={progressInput}
                       onValueChange={setProgressInput}
@@ -500,57 +519,20 @@ export function ScheduleItemDialog({
                   </Button>
                 </div>
               )}
-              {workspace.canEdit && !isContainer && item.type === "MILESTONE" && (
-                <p className="text-xs text-muted-foreground">
-                  En hitos el % no viene del libro; también se completa al confirmar una recepción
-                  de la misma EDT.
-                </p>
-              )}
-              {isContainer && (
-                <p className="text-xs text-muted-foreground pt-1">
-                  El avance real se registra en las subtareas hoja (no en contenedores).
-                </p>
-              )}
             </section>
 
-            {workspace.canEdit && (
-              <section className="space-y-1">
-                <Label className="text-xs">Nombre</Label>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const fd = new FormData(e.currentTarget);
-                    saveName((fd.get("name") as string).trim());
-                  }}
-                  className="flex gap-2"
-                >
-                  <Input name="name" defaultValue={item.name} maxLength={500} />
-                  <Button type="submit" size="sm" variant="secondary" disabled={pending}>
-                    OK
-                  </Button>
-                </form>
-              </section>
-            )}
-
             <section className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1">
                 <h3 className="font-medium">EDT enlazado</h3>
-                <ScheduleMissingEdtBadge item={item} />
+                <ScheduleHint
+                  hint={
+                    item.type === "MILESTONE"
+                      ? "El vínculo alimenta costos/certificados y permite completar el hito al confirmar una recepción. Los hitos no sincronizan % Real desde el libro."
+                      : "La partida primaria sincroniza el avance Real al aprobar el libro y alimenta costos/certificados."
+                  }
+                />
+                <ScheduleMissingEdtBadge item={item} className="ml-auto" />
               </div>
-              <p className="text-xs text-muted-foreground">
-                {item.type === "MILESTONE" ? (
-                  <>
-                    El vínculo EDT alimenta costos/certificados y permite completar el hito al
-                    confirmar una recepción ([D-104]). Los hitos <strong className="font-medium text-foreground">no</strong>{" "}
-                    sincronizan % Real desde el libro ([D-103]).
-                  </>
-                ) : (
-                  <>
-                    La partida <strong className="font-medium text-foreground">primaria</strong>{" "}
-                    sincroniza el avance Real al aprobar el libro y alimenta costos/certificados.
-                  </>
-                )}
-              </p>
               {item.wbsLinks.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Sin partidas vinculadas.</p>
               ) : (
@@ -567,7 +549,7 @@ export function ScheduleItemDialog({
                             <span className="ml-1 text-[10px] text-primary">(primaria)</span>
                           ) : null}
                         </p>
-                        <div className="flex flex-wrap gap-2 mt-0.5">
+                        <div className="mt-0.5 flex flex-wrap gap-2">
                           <Button variant="link" className="h-auto p-0 text-xs" asChild>
                             <Link href={`/proyectos/${projectId}/control-costos/${link.wbsNodeId}`}>
                               EDT y costos
@@ -609,8 +591,8 @@ export function ScheduleItemDialog({
                         </div>
                       )}
                       {workspace.canEdit && isContainer && (
-                        <p className="text-[10px] text-muted-foreground shrink-0 max-w-[9rem] text-right">
-                          EDT solo en hojas (sync Real)
+                        <p className="max-w-[9rem] shrink-0 text-right text-[10px] text-muted-foreground">
+                          EDT solo en hojas
                         </p>
                       )}
                     </li>
@@ -618,7 +600,7 @@ export function ScheduleItemDialog({
                 </ul>
               )}
               {workspace.canEdit && !isContainer && (
-                <div className="flex gap-2 items-end pt-1">
+                <div className="flex items-end gap-2 pt-1">
                   <div className="flex-1">
                     <ScheduleWbsPicker
                       projectId={projectId}
@@ -636,14 +618,22 @@ export function ScheduleItemDialog({
               )}
             </section>
 
+            <section className="space-y-2">
+              <div className="flex items-center gap-1">
+                <h3 className="font-medium">Avance</h3>
+                <ScheduleHint hint="Pasá el mouse por cada valor. En el Gantt: relleno oscuro = Real, borde ámbar = Cert., barra roja = atrasado." />
+              </div>
+              <ScheduleProgressDimensions item={item} />
+              <ScheduleProcurementChips item={item} />
+            </section>
+
             {m && (
               <section className="space-y-2">
-                <h3 className="font-medium">Presupuesto vs real</h3>
-                <p className="text-xs text-muted-foreground">
-                  Comprometido refleja OC confirmadas y subcontratos (solo lectura). Certificado ($)
-                  proviene de certificaciones emitidas.
-                </p>
-                <dl className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-1">
+                  <h3 className="font-medium">Presupuesto vs real</h3>
+                  <ScheduleHint hint="Comprometido: OC confirmadas y subcontratos (solo lectura). Certificado ($): certificaciones emitidas." />
+                </div>
+                <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
                   <dt className="text-muted-foreground">Presupuestado</dt>
                   <dd className="text-right tabular-nums">{money(m.budgetTotalCost)}</dd>
                   <dt className="text-muted-foreground">Comprometido</dt>
@@ -655,7 +645,7 @@ export function ScheduleItemDialog({
                   <dt className="text-muted-foreground">Certificado ($)</dt>
                   <dd className="text-right tabular-nums">{money(m.certifiedApproved)}</dd>
                 </dl>
-                <div className="space-y-1 pt-2">
+                <div className="space-y-1 pt-1">
                   {(
                     ["MATERIAL", "LABOR", "EQUIPMENT", "SUBCONTRACT", "OTHER"] as const
                   ).map((key) => (
@@ -668,31 +658,32 @@ export function ScheduleItemDialog({
               </section>
             )}
 
-            {workspace.canEdit && !isContainer && item.type !== "MILESTONE" && m?.operationalProgressPct && (
-              <Button size="sm" variant="secondary" disabled={pending} onClick={copyPhysical}>
-                Copiar avance por cantidad (operativo)
-              </Button>
-            )}
-
-            {workspace.canEdit && !isContainer && item.type !== "MILESTONE" && context?.jobsitePhysicalPctCumulative && (
-              <Button size="sm" variant="secondary" disabled={pending} onClick={copyJobsitePhysicalPct}>
-                Copiar % físico acumulado ({context.jobsitePhysicalPctCumulative}%)
-              </Button>
-            )}
-
-            {workspace.canEdit &&
-              item.status !== "CANCELLED" &&
-              item.status !== "COMPLETED" && (
-              <Button
-                size="sm"
-                variant="destructive"
-                disabled={pending}
-                onClick={() => setCancelOpen(true)}
-              >
-                Cancelar tarea
-              </Button>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {workspace.canEdit && !isContainer && item.type !== "MILESTONE" && m?.operationalProgressPct && (
+                <Button size="sm" variant="secondary" disabled={pending} onClick={copyPhysical}>
+                  Copiar avance por cantidad
+                </Button>
+              )}
+              {workspace.canEdit && !isContainer && item.type !== "MILESTONE" && context?.jobsitePhysicalPctCumulative && (
+                <Button size="sm" variant="secondary" disabled={pending} onClick={copyJobsitePhysicalPct}>
+                  Copiar % físico ({context.jobsitePhysicalPctCumulative}%)
+                </Button>
+              )}
+              {workspace.canEdit &&
+                item.status !== "CANCELLED" &&
+                item.status !== "COMPLETED" && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={pending}
+                  onClick={() => setCancelOpen(true)}
+                >
+                  Cancelar tarea
+                </Button>
+              )}
+            </div>
           </div>
+          </TooltipProvider>
         )}
 
         {item && tab === "deps" && (
@@ -700,8 +691,7 @@ export function ScheduleItemDialog({
             <section className="space-y-2">
               <h3 className="font-medium">Dependencias Finish-to-Start (FS)</h3>
               <p className="text-xs text-muted-foreground">
-                Las violaciones FS se guardan con advertencia (no bloquean). Editá vínculos acá; en
-                el Gantt las flechas son de solo lectura.
+                Finish-to-Start. Las violaciones se guardan con advertencia. En el Gantt las flechas son de solo lectura.
               </p>
               {predItems.length === 0 ? (
                 <p className="text-muted-foreground text-xs">Sin predecesoras</p>

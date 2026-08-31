@@ -1,6 +1,14 @@
 "use client";
 
+import type { ReactNode } from "react";
+import { Info } from "lucide-react";
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MILESTONE_COLOR } from "../adapters/schedule-view-types";
 import { formatProgressPctDisplay } from "../adapters/schedule-field-labels";
@@ -13,6 +21,61 @@ export function scheduleProgressValues(item: ScheduleWorkspaceItemDto) {
   return { real, timePlan, quantity, certified };
 }
 
+export const PROGRESS_DIMENSION_HINTS = {
+  real: {
+    label: "Real",
+    hint: "Avance real del cronograma. En tareas se sincroniza al aprobar el libro de obra. En hitos se completa a mano o al confirmar una recepción de la misma EDT.",
+  },
+  time: {
+    label: "Plan (t)",
+    hint: "Avance esperado según las fechas planificadas frente a hoy. Solo lectura.",
+  },
+  quantity: {
+    label: "Cant.",
+    hint: "Avance por cantidades ejecutadas (libro aprobado vs presupuesto). Solo lectura.",
+  },
+  cert: {
+    label: "Cert.",
+    hint: "Avance económico certificado. Solo lectura; no actualiza el Real del cronograma.",
+  },
+} as const;
+
+const CHIP_CLASS: Record<keyof typeof PROGRESS_DIMENSION_HINTS, string> = {
+  real: "border-primary/30 bg-primary/5",
+  time: "border-sky-500/30 bg-sky-500/5",
+  quantity: "border-emerald-500/30 bg-emerald-500/5",
+  cert: "border-amber-500/30 bg-amber-500/5",
+};
+
+export function ScheduleHint({
+  hint,
+  label,
+  className,
+}: {
+  hint: string;
+  label?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex items-center gap-1 text-muted-foreground hover:text-foreground",
+            className,
+          )}
+          aria-label="Más información"
+        >
+          {label}
+          <Info className="h-3.5 w-3.5 shrink-0" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs text-xs leading-relaxed">{hint}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function ScheduleProgressDimensions({
   item,
   compact = false,
@@ -22,57 +85,50 @@ export function ScheduleProgressDimensions({
   compact?: boolean;
   className?: string;
 }) {
-  const { real, timePlan, quantity, certified } = scheduleProgressValues(item);
-
+  const values = scheduleProgressValues(item);
   const chips = [
-    { key: "real", label: "Real", value: formatProgressPctDisplay(real), title: "Avance real en cronograma (libro de obra al aprobar)" },
-    {
-      key: "time",
-      label: "Plan (t)",
-      value: formatProgressPctDisplay(timePlan),
-      title: "Avance esperado según fechas vs hoy",
-    },
-    {
-      key: "quantity",
-      label: "Cant.",
-      value: formatProgressPctDisplay(quantity),
-      title: "Avance por cantidad ejecutada (libro aprobado / presupuesto)",
-    },
-    {
-      key: "cert",
-      label: "Cert.",
-      value: formatProgressPctDisplay(certified),
-      title: "Avance económico certificado",
-    },
-  ] as const;
+    { key: "real" as const, value: formatProgressPctDisplay(values.real) },
+    { key: "time" as const, value: formatProgressPctDisplay(values.timePlan) },
+    { key: "quantity" as const, value: formatProgressPctDisplay(values.quantity) },
+    { key: "cert" as const, value: formatProgressPctDisplay(values.certified) },
+  ];
 
   return (
-    <div
-      className={cn(
-        "flex flex-wrap gap-1",
-        compact ? "text-[10px]" : "text-xs",
-        className,
-      )}
-      role="group"
-      aria-label="Avance real, plan temporal, cantidad y certificado"
-    >
-      {chips.map((c) => (
-        <span
-          key={c.key}
-          title={c.title}
-          className={cn(
-            "rounded border px-1.5 py-0.5 tabular-nums",
-            c.key === "real" && "border-primary/30 bg-primary/5",
-            c.key === "time" && "border-sky-500/30 bg-sky-500/5",
-            c.key === "quantity" && "border-emerald-500/30 bg-emerald-500/5",
-            c.key === "cert" && "border-amber-500/30 bg-amber-500/5",
-          )}
-        >
-          <span className="text-muted-foreground">{c.label}</span>{" "}
-          <span className="font-medium">{c.value}</span>
-        </span>
-      ))}
-    </div>
+    <TooltipProvider delayDuration={200}>
+      <div
+        className={cn(
+          "flex flex-wrap gap-1",
+          compact ? "text-[10px]" : "text-xs",
+          className,
+        )}
+        role="group"
+        aria-label="Avance real, plan temporal, cantidad y certificado"
+      >
+        {chips.map((c) => {
+          const meta = PROGRESS_DIMENSION_HINTS[c.key];
+          return (
+            <Tooltip key={c.key}>
+              <TooltipTrigger asChild>
+                <span
+                  tabIndex={0}
+                  className={cn(
+                    "inline-flex shrink-0 cursor-help items-center gap-0.5 rounded border px-1 py-0 tabular-nums",
+                    CHIP_CLASS[c.key],
+                  )}
+                >
+                  <span className="text-muted-foreground">{meta.label}</span>{" "}
+                  <span className="font-medium">{c.value}</span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs text-xs leading-relaxed">
+                <p className="font-medium">{meta.label}</p>
+                <p>{meta.hint}</p>
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+    </TooltipProvider>
   );
 }
 

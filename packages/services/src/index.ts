@@ -125,6 +125,8 @@ export * from "./schedule/schedule-field-workspace.service";
 export * from "./schedule/schedule-progress-sync.service";
 export * from "./schedule/schedule-placement";
 export * from "./schedule/schedule-bar-color";
+export * from "./schedule/schedule-export-pure";
+export * from "./schedule/schedule-export.service";
 export * from "./schedule/schedule-milestone-from-receipt";
 export type { ScheduleItemAuditEntryDto } from "./schedule/schedule-audit";
 export type {

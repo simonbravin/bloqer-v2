@@ -14,6 +14,7 @@
     "./schedule-field": "./src/schedule/schedule-field.ts",
     "./schedule-placement": "./src/schedule/schedule-placement.ts",
     "./schedule-bar-color": "./src/schedule/schedule-bar-color.ts",
+    "./schedule-export-pure": "./src/schedule/schedule-export-pure.ts",
     "./materials-field": "./src/materials/materials-field.ts",
     "./payables-field": "./src/ap/payables-field.ts",
     "./receivables-field": "./src/ar/receivables-field.ts",

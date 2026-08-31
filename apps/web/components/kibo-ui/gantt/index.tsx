@@ -42,6 +42,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -494,20 +495,14 @@ export const GanttSidebarItem: FC<GanttSidebarItemProps> = ({
       ? formatDurationDaysFromRange(feature.startAt, tempEndAt)
       : "En curso");
 
-  const handleClick: MouseEventHandler<HTMLDivElement> = (event) => {
-    if (event.target === event.currentTarget) {
-      // Scroll to the feature in the timeline
-      gantt.scrollToFeature?.(feature);
-      // Call the original onSelectItem callback
-      onSelectItem?.(feature.id);
-    }
+  const handleClick: MouseEventHandler<HTMLDivElement> = () => {
+    gantt.scrollToFeature?.(feature);
+    onSelectItem?.(feature.id);
   };
 
   const handleKeyDown: KeyboardEventHandler<HTMLDivElement> = (event) => {
     if (event.key === "Enter") {
-      // Scroll to the feature in the timeline
       gantt.scrollToFeature?.(feature);
-      // Call the original onSelectItem callback
       onSelectItem?.(feature.id);
     }
   };
@@ -515,7 +510,7 @@ export const GanttSidebarItem: FC<GanttSidebarItemProps> = ({
   return (
     <div
       className={cn(
-        "relative flex items-center gap-2.5 p-2.5 text-xs hover:bg-secondary",
+        "relative flex min-w-0 items-center gap-1 px-1 py-0 text-xs hover:bg-secondary",
         className
       )}
       key={feature.id}
@@ -527,6 +522,7 @@ export const GanttSidebarItem: FC<GanttSidebarItemProps> = ({
         height: "var(--gantt-row-height)",
       }}
       tabIndex={0}
+      title={feature.name}
     >
       {/* <Checkbox onCheckedChange={handleCheck} className="shrink-0" /> */}
       <div
@@ -535,22 +531,27 @@ export const GanttSidebarItem: FC<GanttSidebarItemProps> = ({
           backgroundColor: feature.status.color,
         }}
       />
-      <p className="pointer-events-none flex-1 truncate text-left font-medium">
+      <p
+        className="pointer-events-none min-w-0 flex-1 truncate text-left font-medium"
+        title={feature.name}
+      >
         {feature.name}
       </p>
-      <p className="pointer-events-none text-muted-foreground">{duration}</p>
+      <p className="pointer-events-none shrink-0 text-[10px] text-muted-foreground">
+        {duration}
+      </p>
     </div>
   );
 };
 
 export const GanttSidebarHeader: FC = () => (
   <div
-    className="sticky top-0 z-10 flex shrink-0 items-end justify-between gap-2.5 border-border/50 border-b bg-backdrop/90 p-2.5 font-medium text-muted-foreground text-xs backdrop-blur-sm"
+    className="sticky top-0 z-10 flex shrink-0 items-end justify-between gap-1 border-border/50 border-b bg-backdrop/90 px-1.5 py-2 font-medium text-muted-foreground text-xs backdrop-blur-sm"
     style={{ height: "var(--gantt-header-height)" }}
   >
     {/* <Checkbox className="shrink-0" /> */}
-    <p className="flex-1 truncate text-left">Tarea</p>
-    <p className="shrink-0">Duración</p>
+    <p className="min-w-0 flex-1 truncate text-left">Tarea</p>
+    <p className="shrink-0">Días</p>
   </div>
 );
 
@@ -587,7 +588,7 @@ export const GanttSidebar: FC<GanttSidebarProps> = ({
 }) => (
   <div
     className={cn(
-      "sticky left-0 z-30 h-max min-h-full overflow-clip border-border/50 border-r bg-background/90 backdrop-blur-md",
+      "sticky left-0 z-30 h-max min-h-full min-w-0 overflow-clip border-border/50 border-r bg-background/90 backdrop-blur-md",
       className
     )}
     data-roadmap-ui="gantt-sidebar"
@@ -1203,6 +1204,8 @@ export const GanttProvider: FC<GanttProviderProps> = ({
   timelineDataRef.current = timelineData;
   const [, setScrollX] = useGanttScrollX();
   const [sidebarWidth, setSidebarWidth] = useState(0);
+  const didScrollToToday = useRef(false);
+  const lastRangeRef = useRef(range);
 
   const headerHeight = 60;
   const rowHeight = 36;
@@ -1227,38 +1230,97 @@ export const GanttProvider: FC<GanttProviderProps> = ({
     [zoom, columnWidth, sidebarWidth]
   );
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft =
-        scrollRef.current.scrollWidth / 2 - scrollRef.current.clientWidth / 2;
-      setScrollX(scrollRef.current.scrollLeft);
+  // Measure sidebar, then open the timeline at today (not the 3-year midpoint).
+  useLayoutEffect(() => {
+    const root = scrollRef.current;
+    if (!root) {
+      return;
     }
-  }, [setScrollX]);
 
-  // Update sidebar width when DOM is ready
+    if (lastRangeRef.current !== range) {
+      didScrollToToday.current = false;
+      lastRangeRef.current = range;
+    }
+
+    const sidebarElement = root.querySelector(
+      '[data-roadmap-ui="gantt-sidebar"]'
+    );
+    const measured =
+      sidebarElement instanceof HTMLElement
+        ? Math.round(sidebarElement.getBoundingClientRect().width)
+        : 0;
+
+    if (measured !== sidebarWidth) {
+      setSidebarWidth(measured);
+      return;
+    }
+
+    if (didScrollToToday.current) {
+      return;
+    }
+    const startYear = timelineData[0]?.year;
+    if (startYear == null) {
+      return;
+    }
+    if (root.scrollWidth <= root.clientWidth) {
+      return;
+    }
+
+    const offset = getOffset(startOfDay(new Date()), new Date(startYear, 0, 1), {
+      zoom,
+      range,
+      columnWidth,
+      sidebarWidth,
+      headerHeight,
+      rowHeight,
+      onAddItem,
+      placeholderLength: 2,
+      timelineData,
+      ref: scrollRef,
+    });
+
+    root.scrollLeft = Math.max(0, offset);
+    setScrollX(root.scrollLeft);
+    didScrollToToday.current = true;
+  }, [timelineData, zoom, range, columnWidth, sidebarWidth, onAddItem, setScrollX]);
+
   useEffect(() => {
-    const updateSidebarWidth = () => {
-      const sidebarElement = scrollRef.current?.querySelector(
+    const root = scrollRef.current;
+    if (!root) {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      const sidebarElement = root.querySelector(
         '[data-roadmap-ui="gantt-sidebar"]'
       );
-      const newWidth = sidebarElement ? 300 : 0;
-      setSidebarWidth(newWidth);
+      if (!(sidebarElement instanceof HTMLElement)) {
+        setSidebarWidth(0);
+        return;
+      }
+      const measured = Math.round(sidebarElement.getBoundingClientRect().width);
+      setSidebarWidth((prev) => (prev === measured ? prev : measured));
+    });
+
+    const observeSidebar = () => {
+      resizeObserver.disconnect();
+      const sidebarElement = root.querySelector(
+        '[data-roadmap-ui="gantt-sidebar"]'
+      );
+      if (sidebarElement) {
+        resizeObserver.observe(sidebarElement);
+      } else {
+        setSidebarWidth(0);
+      }
     };
 
-    // Update immediately
-    updateSidebarWidth();
-
-    // Also update on resize or when children change
-    const observer = new MutationObserver(updateSidebarWidth);
-    if (scrollRef.current) {
-      observer.observe(scrollRef.current, {
-        childList: true,
-        subtree: true,
-      });
-    }
+    observeSidebar();
+    const mutationObserver = new MutationObserver(observeSidebar);
+    mutationObserver.observe(root, { childList: true });
 
     return () => {
-      observer.disconnect();
+      mutationObserver.disconnect();
+      resizeObserver.disconnect();
     };
   }, []);
 
@@ -1287,7 +1349,7 @@ export const GanttProvider: FC<GanttProviderProps> = ({
             months: new Array(3).fill(null).map((_, monthIndex) => {
               const month = quarterIndex * 3 + monthIndex;
               return {
-                days: getDaysInMonth(new Date(firstYear, month, 1)),
+                days: getDaysInMonth(new Date(firstYear - 1, month, 1)),
               };
             }),
           })),
@@ -1311,7 +1373,7 @@ export const GanttProvider: FC<GanttProviderProps> = ({
             months: new Array(3).fill(null).map((_, monthIndex) => {
               const month = quarterIndex * 3 + monthIndex;
               return {
-                days: getDaysInMonth(new Date(lastYear, month, 1)),
+                days: getDaysInMonth(new Date(lastYear + 1, month, 1)),
               };
             }),
           })),
@@ -1334,7 +1396,7 @@ export const GanttProvider: FC<GanttProviderProps> = ({
     }
 
     return () => {
-      // Fix memory leak by properly referencing the scroll element
+      handleScroll.cancel();
       if (scrollElement) {
         scrollElement.removeEventListener("scroll", handleScroll);
       }

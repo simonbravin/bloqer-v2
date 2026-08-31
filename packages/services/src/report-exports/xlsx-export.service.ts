@@ -6,6 +6,10 @@ export type XlsxSheetInput = {
   rows: string[][];
   /** Optional rows prepended before headers (metadata). */
   preamble?: string[][];
+  /** Excel character widths per column (0-based). */
+  colWidths?: number[];
+  /** Freeze panes: split after this many columns / rows (1-based Excel semantics via SheetJS). */
+  freeze?: { xSplit?: number; ySplit?: number };
 };
 
 export function buildXlsxWorkbook(sheets: XlsxSheetInput[]): Buffer {
@@ -19,6 +23,23 @@ export function buildXlsxWorkbook(sheets: XlsxSheetInput[]): Buffer {
     aoa.push(sheet.headers);
     aoa.push(...sheet.rows);
     const ws = XLSX.utils.aoa_to_sheet(aoa);
+    if (sheet.colWidths?.length) {
+      ws["!cols"] = sheet.colWidths.map((wch) => ({ wch }));
+    }
+    if (sheet.freeze) {
+      const xSplit = sheet.freeze.xSplit ?? 0;
+      const ySplit = sheet.freeze.ySplit ?? 0;
+      const topLeftCell = `${XLSX.utils.encode_col(xSplit)}${ySplit + 1}`;
+      ws["!views"] = [
+        {
+          state: "frozen",
+          xSplit,
+          ySplit,
+          topLeftCell,
+          activeCell: topLeftCell,
+        },
+      ];
+    }
     const safeName = sheet.sheetName.replace(/[\\/*?:[\]]/g, "_").slice(0, 31) || "Sheet1";
     XLSX.utils.book_append_sheet(wb, ws, safeName);
   }
